@@ -86,8 +86,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleNavigateEvent = (e: any) => {
       if (e.isMainFrame && e.url) {
+        // Keep lastLoadedUrl in sync so that redirect-caused tab.url updates
+        // don't re-trigger the URL useEffect and cause an infinite reload loop
+        lastLoadedUrl.current = e.url;
         onUpdateTab(tab.id, {
           url: e.url,
+          isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false
         });
@@ -96,8 +100,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleNavigateInPage = (e: any) => {
       if (e.isMainFrame && e.url) {
+        lastLoadedUrl.current = e.url;
         onUpdateTab(tab.id, {
           url: e.url,
+          isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false
         });
