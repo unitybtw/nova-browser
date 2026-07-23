@@ -30,9 +30,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = ({
 }) => {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const [hoveredTabId, setHoveredTabId] = useState<string | null>(null);
+  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleMouseEnter = (id: string) => {
+  const handleMouseEnter = (id: string, e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setHoverPos({ top: rect.top, left: rect.right + 8 });
+    
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredTabId(id);
@@ -84,7 +88,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = ({
                 exit={{ opacity: 0, scale: 0.8 }}
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                onMouseEnter={() => handleMouseEnter(tab.id)}
+                onMouseEnter={(e) => handleMouseEnter(tab.id, e)}
                 onMouseLeave={handleMouseLeave}
                 className={`relative flex items-center h-10 rounded-lg cursor-pointer transition-colors group/tab ${
                   isActive
@@ -147,7 +151,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = ({
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute left-[calc(100%+8px)] top-0 z-[100] w-64 bg-white dark:bg-slate-900 shadow-2xl rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden pointer-events-none"
+                      className="fixed z-[9999] w-64 bg-white dark:bg-slate-900 shadow-2xl rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden pointer-events-none"
+                      style={{ top: Math.min(hoverPos.top, window.innerHeight - 200), left: hoverPos.left }}
                     >
                       <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
                         <div className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{tab.title || tab.url}</div>
