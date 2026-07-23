@@ -33,5 +33,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Capture a screenshot of a webview by its webContentsId for Tab Peek
   captureTabThumbnail: (webContentsId: number) => ipcRenderer.invoke('capture-tab-thumbnail', webContentsId),
+  // Listen for auto-captured thumbnails pushed from main process
+  onTabThumbnailUpdate: (callback: (event: any, data: { webContentsId: number; dataUrl: string }) => void) => {
+    ipcRenderer.on('tab-thumbnail-update', callback);
+    return () => ipcRenderer.removeListener('tab-thumbnail-update', callback);
+  },
 });
 

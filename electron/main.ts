@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
 import fs from 'fs';
@@ -240,16 +240,30 @@ ipcMain.handle('set-privacy-shield', (_event, enabled: boolean) => {
 // Capture thumbnail from a webview via its webContentsId
 ipcMain.handle('capture-tab-thumbnail', async (_event, webContentsId: number) => {
   try {
-    const { webContents } = require('electron');
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return null;
     const image = await wc.capturePage();
     if (image.isEmpty()) return null;
-    // Resize to a compact thumbnail (320x200)
     return image.resize({ width: 320, height: 200 }).toDataURL();
   } catch (err) {
     return null;
   }
+});
+
+// Auto-capture thumbnails when any webview finishes loading and push to renderer
+app.on('web-contents-created', (_event, wc) => {
+  wc.on('did-stop-loading', async () => {
+    if (!mainWindow || wc.isDestroyed()) return;
+    const wcId = wc.id;
+    try {
+      await new Promise(r => setTimeout(r, 800)); // Wait for render
+      if (wc.isDestroyed()) return;
+      const image = await wc.capturePage();
+      if (image.isEmpty()) return;
+      const dataUrl = image.resize({ width: 320, height: 200 }).toDataURL();
+      mainWindow.webContents.send('tab-thumbnail-update', { webContentsId: wcId, dataUrl });
+    } catch (_) {}
+  });
 });
 
 // Download Controls

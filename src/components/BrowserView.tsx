@@ -77,24 +77,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleStopLoading = () => {
-      onUpdateTab(tab.id, { 
+      onUpdateTab(tab.id, {
         isLoading: false,
         canGoBack: webview.canGoBack?.() || false,
         canGoForward: webview.canGoForward?.() || false,
         title: webview.getTitle?.() || tab.url
       });
-      // Capture a thumbnail shortly after page load for Tab Peek
-      const electronAPI = (window as any).electronAPI;
-      if (electronAPI?.captureTabThumbnail) {
-        setTimeout(async () => {
-          try {
-            const wcId = webview.getWebContentsId?.();
-            if (!wcId) return;
-            const dataUrl = await electronAPI.captureTabThumbnail(wcId);
-            if (dataUrl) onUpdateTab(tab.id, { thumbnail: dataUrl });
-          } catch (_) {}
-        }, 800);
-      }
     };
 
     const handleFailLoad = (e: any) => {
@@ -207,30 +195,24 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
   }, [tab.isMuted]);
 
-  // Thumbnail capture loop — uses IPC via main process since capturePage is not exposed on renderer-side webview element
+  // Receive thumbnails pushed from the main process (via web-contents-created + did-stop-loading)
   useEffect(() => {
-    const webview = webviewRef.current;
     const electronAPI = (window as any).electronAPI;
-    if (!webview || !isActive || isNewTab || !electronAPI?.captureTabThumbnail) return;
+    if (!electronAPI?.onTabThumbnailUpdate || isNewTab) return;
 
-    const capture = async () => {
+    const unsubscribe = electronAPI.onTabThumbnailUpdate((_event: any, { webContentsId, dataUrl }: { webContentsId: number; dataUrl: string }) => {
+      // Check if this thumbnail belongs to our webview
+      const webview = webviewRef.current;
       try {
-        const wcId = webview.getWebContentsId?.();
-        if (!wcId) return;
-        const dataUrl = await electronAPI.captureTabThumbnail(wcId);
-        if (dataUrl) {
+        const ourWcId = webview?.getWebContentsId?.();
+        if (ourWcId && ourWcId === webContentsId && dataUrl) {
           onUpdateTab(tab.id, { thumbnail: dataUrl });
         }
-      } catch (err) {
-        // Ignore errors
-      }
-    };
+      } catch (_) {}
+    });
 
-    // Capture immediately when becoming active, then every 5s
-    capture();
-    const interval = setInterval(capture, 5000);
-    return () => clearInterval(interval);
-  }, [isActive, isNewTab, tab.id, onUpdateTab]);
+    return () => { try { unsubscribe?.(); } catch (_) {} };
+  }, [isNewTab, tab.id, onUpdateTab]);
 
   if (isNewTab) {
     return (
