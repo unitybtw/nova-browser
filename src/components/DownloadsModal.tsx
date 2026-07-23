@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, X, CheckCircle2, AlertCircle, FileText } from 'lucide-react';
+import { Download, X, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 export interface DownloadItem {
@@ -9,7 +9,8 @@ export interface DownloadItem {
   url: string;
   receivedBytes: number;
   totalBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled';
+  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
+  isPaused?: boolean;
 }
 
 interface DownloadsModalProps {
@@ -160,6 +161,32 @@ export const DownloadsModal: React.FC<DownloadsModalProps> = React.memo(({
                         <span>
                           {formatBytes(item.receivedBytes)} {item.totalBytes > 0 && `/ ${formatBytes(item.totalBytes)}`}
                         </span>
+                        {item.state === 'progressing' && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => {
+                                if (item.isPaused) {
+                                  (window as any).electronAPI?.resumeDownload?.(item.id);
+                                } else {
+                                  (window as any).electronAPI?.pauseDownload?.(item.id);
+                                }
+                              }}
+                              className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                              title={item.isPaused ? "Resume" : "Pause"}
+                            >
+                              {item.isPaused ? <Play className="w-3.5 h-3.5 text-blue-500" /> : <Pause className="w-3.5 h-3.5 text-blue-500" />}
+                            </button>
+                            <button
+                              onClick={() => {
+                                (window as any).electronAPI?.cancelDownload?.(item.id);
+                              }}
+                              className="p-1 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                              title="Cancel"
+                            >
+                              <XCircle className="w-3.5 h-3.5 text-red-500" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );

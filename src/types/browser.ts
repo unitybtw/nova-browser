@@ -36,4 +36,5 @@ export interface DownloadItem {
   totalBytes: number;
   startTime: number;
   savePath?: string;
+  isPaused?: boolean;
 }

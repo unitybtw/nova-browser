@@ -1,11 +1,16 @@
 import { ipcRenderer } from 'electron';
 
-// Expose safe IPC APIs to the renderer process
-(window as any).electronAPI = {
-  onShortcut: (callback: (shortcut: string) => void) => {
-    const handler = (_: any, shortcut: string) => callback(shortcut);
-    ipcRenderer.on('shortcut', handler);
-    return () => ipcRenderer.removeListener('shortcut', handler);
+contextBridge.exposeInMainWorld('electronAPI', {
+  // Existing API
+  setPrivacyShield: (enabled: boolean) => ipcRenderer.invoke('set-privacy-shield', enabled),
+  getSuggestions: (query: string) => ipcRenderer.invoke('get-suggestions', query),
+  pauseDownload: (id: string) => ipcRenderer.invoke('pause-download', id),
+  resumeDownload: (id: string) => ipcRenderer.invoke('resume-download', id),
+  cancelDownload: (id: string) => ipcRenderer.invoke('cancel-download', id),
+  setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
+  onShortcut: (callback: (event: any, command: string) => void) => {
+    ipcRenderer.on('shortcut', callback);
+    return () => ipcRenderer.removeListener('shortcut', callback);
   },
   onDownloadUpdate: (callback: (data: any) => void) => {
     const handler = (_: any, data: any) => callback(data);
