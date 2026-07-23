@@ -1,51 +1,46 @@
-export type SearchEngine = 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+import { UserSettings } from '../components/SettingsModal';
 
-export const SEARCH_ENGINES: Record<SearchEngine, { name: string; searchUrl: string }> = {
-  google: {
-    name: 'Google',
-    searchUrl: 'https://www.google.com/search?q='
-  },
-  duckduckgo: {
-    name: 'DuckDuckGo',
-    searchUrl: 'https://duckduckgo.com/?q='
-  },
-  bing: {
-    name: 'Bing',
-    searchUrl: 'https://www.bing.com/search?q='
-  },
-  brave: {
-    name: 'Brave Search',
-    searchUrl: 'https://search.brave.com/search?q='
-  },
-  ecosia: {
-    name: 'Ecosia',
-    searchUrl: 'https://www.ecosia.org/search?q='
-  }
-};
-
-export function formatSearchUrl(query: string, engine: SearchEngine = 'google'): string {
+export function formatSearchUrl(query: string, engine: UserSettings['searchEngine'] = 'google'): string {
   const trimmed = query.trim();
-  if (!trimmed) return 'zen://newtab';
+  if (!trimmed) return '';
 
-  // Check if query is a valid URL or domain
-  const isUrl = /^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?(\/.*)?$/.test(trimmed);
-  if (isUrl) {
-    if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
-      return `https://${trimmed}`;
+  // Check if query is a direct domain or URL
+  const isUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/.*)?$/i.test(trimmed);
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    if (isUrl) {
+      return 'https://' + trimmed;
+    } else {
+      const q = encodeURIComponent(trimmed);
+      switch (engine) {
+        case 'duckduckgo':
+          return `https://duckduckgo.com/?q=${q}`;
+        case 'brave':
+          return `https://search.brave.com/search?q=${q}`;
+        case 'bing':
+          return `https://www.bing.com/search?q=${q}`;
+        case 'ecosia':
+          return `https://www.ecosia.org/search?q=${q}`;
+        case 'google':
+        default:
+          return `https://www.google.com/search?q=${q}`;
+      }
     }
-    return trimmed;
   }
-
-  // Handle custom protocols
-  if (trimmed.startsWith('zen://') || trimmed.startsWith('about:')) {
-    return trimmed;
-  }
-
-  // Otherwise, search with selected engine
-  const engineConfig = SEARCH_ENGINES[engine] || SEARCH_ENGINES.google;
-  return `${engineConfig.searchUrl}${encodeURIComponent(trimmed)}`;
+  return trimmed;
 }
 
-export function getSearchEngineName(engine: SearchEngine = 'google'): string {
-  return SEARCH_ENGINES[engine]?.name || 'Google';
+export function getSearchEngineName(engine: UserSettings['searchEngine'] = 'google'): string {
+  switch (engine) {
+    case 'duckduckgo':
+      return 'DuckDuckGo';
+    case 'brave':
+      return 'Brave Search';
+    case 'bing':
+      return 'Microsoft Bing';
+    case 'ecosia':
+      return 'Ecosia';
+    case 'google':
+    default:
+      return 'Google';
+  }
 }

@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Existing API
@@ -14,13 +14,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('shortcut', callback);
     return () => ipcRenderer.removeListener('shortcut', callback);
   },
-  onDownloadUpdate: (callback: (data: any) => void) => {
-    const handler = (_: any, data: any) => callback(data);
-    ipcRenderer.on('download-update', handler);
-    return () => ipcRenderer.removeListener('download-update', handler);
+  onDownloadUpdate: (callback: (event: any, data: any) => void) => {
+    ipcRenderer.on('download-update', callback);
+    return () => ipcRenderer.removeListener('download-update', callback);
   },
-  togglePrivacyShield: (enabled: boolean) => ipcRenderer.invoke('toggle-privacy-shield', enabled),
-  getLoadedExtensions: () => ipcRenderer.invoke('get-loaded-extensions'),
-  installCrxExtension: (filePath: string) => ipcRenderer.invoke('install-crx-extension', filePath),
-  removeExtension: (extensionId: string) => ipcRenderer.invoke('remove-extension', extensionId)
-};
+  // Extension management
+  installExtension: (folderPath: string) => ipcRenderer.invoke('install-extension', folderPath),
+  listExtensions: () => ipcRenderer.invoke('list-extensions'),
+  removeExtension: (extensionId: string) => ipcRenderer.invoke('remove-extension', extensionId),
+  // Open folder dialog for extension install
+  selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
+  // Install directly from Chrome Web Store URL
+  installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
+  // Silently installed via crx download
+  onExtensionInstalledSilently: (callback: (event: any, data: any) => void) => {
+    ipcRenderer.on('extension-installed-silently', callback);
+    return () => ipcRenderer.removeListener('extension-installed-silently', callback);
+  }
+});
+

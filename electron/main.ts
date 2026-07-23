@@ -7,17 +7,21 @@ import unzip from 'unzip-crx-3';
 import { ElectronBlocker } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 
+// Enable WebGPU and hardware acceleration flags
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
 app.commandLine.appendSwitch('enable-features', 'Vulkan,UseSkiaRenderer,WebAssemblySimd');
 
+// Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 let mainWindow: BrowserWindow | null = null;
+
 let isPrivacyShieldEnabled = true;
 let blocker: ElectronBlocker | null = null;
 const activeDownloads = new Map<string, Electron.DownloadItem>();
 let mcpServer: BrowserMCPServer | null = null;
 
+// Initialize AdBlocker globally so IPC can access it
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
 });
@@ -30,7 +34,7 @@ function createWindow() {
     minHeight: 650,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f8fafc', // Light mode background (slate-50)
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
@@ -177,6 +181,11 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // Listen for console messages from the renderer process and log them to the terminal
+  mainWindow?.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+  });
 }
 
 app.whenReady().then(() => {
@@ -189,6 +198,26 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  app.on('browser-window-focus', () => {
+    globalShortcut.register('CommandOrControl+K', () => {
+      mainWindow?.webContents.send('shortcut', 'toggle-omnibox');
+    });
+
+    globalShortcut.register('CommandOrControl+F', () => {
+      if (mainWindow?.isFocused()) {
+        mainWindow?.webContents.send('shortcut', 'find-in-page');
+      }
+    });
+  });
+
+  app.on('browser-window-blur', () => {
+    globalShortcut.unregisterAll();
+  });
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 app.on('window-all-closed', () => {

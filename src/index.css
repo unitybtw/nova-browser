@@ -1,24 +1,89 @@
 @import "tailwindcss";
 
-@layer base {
-  body {
-    @apply antialiased text-slate-900 bg-slate-50 dark:bg-slate-900 dark:text-slate-100;
+@layer utilities {
+  .drag-region {
+    -webkit-app-region: drag;
+  }
+  .no-drag {
+    -webkit-app-region: no-drag;
   }
 }
 
-/* Custom scrollbars for clean UI */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+:root {
+  /* Light Mode Colors */
+  --bg-main: #f8fafc; /* slate-50 */
+  --bg-surface: #ffffff; /* pure white */
+  --text-main: #0f172a; /* slate-900 */
+  --text-muted: #64748b; /* slate-500 */
+  --item-hover: #f1f5f9; /* slate-100 */
+  --item-active: #e2e8f0; /* slate-200 */
+  --border-color: #cbd5e1; /* slate-300 */
+  --accent-color: #3b82f6; /* blue-500 */
 }
 
-.drag-region {
-  -webkit-app-region: drag;
+* {
+  box-sizing: border-box;
 }
 
-.no-drag {
-  -webkit-app-region: no-drag;
+body {
+  background-color: var(--bg-main) !important;
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  background-color: var(--bg-main) !important;
+}
+
+h1, h2, h3, h4, h5, h6, .font-serif {
+  font-family: 'Lora', serif;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Floating animation */
+@keyframes float-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-float {
+  animation: float-up 0.2s ease-out forwards;
+}
+
+/* Top bar specific styles */
+.top-bar {
+  background: var(--bg-main);
+  border-bottom: 1px solid var(--border-color);
 }
