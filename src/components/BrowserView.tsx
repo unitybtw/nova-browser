@@ -33,36 +33,24 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   const domReadyRef = useRef(false);
 
-  // Programmatically navigate the webview when tab.url changes (single source of truth for navigation)
+  // Programmatically navigate the webview when tab.url changes.
+  // IMPORTANT: Only call loadURL() when the webview is ALREADY dom-ready.
+  // For the initial mount, the `src={tab.url}` attribute handles the load —
+  // registering a dom-ready listener here would cause a DOUBLE navigation (src + loadURL).
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview || isNewTab) return;
     if (!tab.url || tab.url === lastLoadedUrl.current) return;
 
     lastLoadedUrl.current = tab.url;
-    const urlToLoad = tab.url;
-
-    const doLoad = () => {
-      try {
-        webview.loadURL(urlToLoad);
-      } catch (_) {}
-    };
 
     if (domReadyRef.current) {
-      // Webview is already ready, load immediately
-      doLoad();
-    } else {
-      // Wait for dom-ready before calling any webview methods
-      webview.addEventListener('dom-ready', doLoad, { once: true });
+      // Webview already initialized — navigate programmatically
+      try { webview.loadURL(tab.url); } catch (_) {}
     }
-
-    // Safety net: if loading never stops after 15s, clear the spinner
-    const safetyTimer = setTimeout(() => {
-      onUpdateTab(tab.id, { isLoading: false });
-    }, 15000);
-
-    return () => clearTimeout(safetyTimer);
-  }, [tab.url, isNewTab, tab.id, onUpdateTab]);
+    // If not yet dom-ready: the `src` attribute handles the first load.
+    // Once dom-ready fires, domReadyRef becomes true and future URL changes use loadURL().
+  }, [tab.url, isNewTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;
