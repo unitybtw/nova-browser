@@ -62,6 +62,18 @@ export class BrowserMCPServer {
             }
           },
           {
+            name: 'type_text',
+            description: 'Types text into an input or textarea element',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                selector: { type: 'string', description: 'CSS selector of the input element' },
+                text: { type: 'string', description: 'Text to type into the element' }
+              },
+              required: ['selector', 'text']
+            }
+          },
+          {
             name: 'run_script',
             description: 'Executes arbitrary JavaScript in the context of the active page',
             inputSchema: {
@@ -85,55 +97,16 @@ export class BrowserMCPServer {
       const args = request.params.arguments || {};
 
       try {
-        if (toolName === 'navigate') {
-          await this.mainWindow.webContents.executeJavaScript(`
-            window.location.href = "${args.url}";
-          `);
-          // Wait for load
-          await new Promise(r => setTimeout(r, 2000));
-          return { content: [{ type: 'text', text: `Navigated to ${args.url}` }] };
-        } 
+        const result = await this.mainWindow.webContents.executeJavaScript(`
+          (async () => {
+            if (typeof window.executeMcpAction === 'function') {
+              return await window.executeMcpAction("${toolName}", ${JSON.stringify(args)});
+            }
+            return "Error: executeMcpAction is not defined in the renderer";
+          })();
+        `);
         
-        else if (toolName === 'read_page_content') {
-          const result = await this.mainWindow.webContents.executeJavaScript(`
-            (() => {
-              const text = document.body.innerText.substring(0, 5000);
-              const inputs = Array.from(document.querySelectorAll('input, textarea')).map(el => ({
-                tag: el.tagName, type: el.type, name: el.name, placeholder: el.placeholder, id: el.id
-              }));
-              const linksAndButtons = Array.from(document.querySelectorAll('a, button, [role="button"]')).slice(0, 50).map(el => ({
-                text: el.innerText.trim().substring(0, 50), id: el.id, href: el.href
-              })).filter(e => e.text);
-              return JSON.stringify({ url: window.location.href, text, inputs, linksAndButtons });
-            })();
-          `);
-          return { content: [{ type: 'text', text: result }] };
-        }
-
-        else if (toolName === 'click_element') {
-          const result = await this.mainWindow.webContents.executeJavaScript(`
-            (() => {
-              const el = document.querySelector(\`${args.selector}\`);
-              if (el) {
-                el.click();
-                return 'Clicked element: ' + \`${args.selector}\`;
-              }
-              return 'Element not found: ' + \`${args.selector}\`;
-            })();
-          `);
-          return { content: [{ type: 'text', text: result }] };
-        }
-
-        else if (toolName === 'run_script') {
-          const result = await this.mainWindow.webContents.executeJavaScript(`
-            (async () => {
-              ${args.script}
-            })();
-          `);
-          return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }] };
-        }
-
-        throw new Error(`Unknown tool: ${toolName}`);
+        return { content: [{ type: 'text', text: typeof result === 'string' ? result : JSON.stringify(result) }] };
       } catch (err: any) {
         return { content: [{ type: 'text', text: `Error executing ${toolName}: ${err.message}` }], isError: true };
       }

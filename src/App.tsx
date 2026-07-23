@@ -11,6 +11,7 @@ import { SpotlightOmnibox } from './components/SpotlightOmnibox';
 import { VpnPopover, VpnLocation } from './components/VpnPopover';
 import { SidePanel } from './components/SidePanel';
 import { WorkspaceManager } from './components/WorkspaceManager';
+import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
 import { ExtensionsModal } from './components/ExtensionsModal';
@@ -1105,6 +1106,8 @@ function App() {
         onSelectWorkspace={handleSelectWorkspace} 
         isIncognito={activeTab?.isIncognito} 
       />
+
+      <AICursorOverlay />
 
       </div>
     </div>
