@@ -31,19 +31,40 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab.url]);
 
-  // Programmatically navigate the webview when tab.url changes (src prop alone is not reactive)
+  // Programmatically navigate the webview when tab.url changes (single source of truth for navigation)
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview || isNewTab) return;
-    if (tab.url && tab.url !== lastLoadedUrl.current) {
-      lastLoadedUrl.current = tab.url;
+    if (!tab.url || tab.url === lastLoadedUrl.current) return;
+
+    lastLoadedUrl.current = tab.url;
+    const urlToLoad = tab.url;
+
+    const doLoad = () => {
       try {
-        webview.loadURL(tab.url);
+        webview.loadURL(urlToLoad);
       } catch (e) {
-        // webview not ready yet, src handles initial load
+        // Webview not ready yet — listen for dom-ready and retry once
+        webview.addEventListener('dom-ready', () => {
+          try { webview.loadURL(urlToLoad); } catch (_) {}
+        }, { once: true });
       }
+    };
+
+    // If webview already has a src/page, load immediately; otherwise wait for dom-ready
+    if (webview.getURL && webview.getURL()) {
+      doLoad();
+    } else {
+      webview.addEventListener('dom-ready', doLoad, { once: true });
     }
-  }, [tab.url, isNewTab]);
+
+    // Safety net: if loading never stops after 15s, clear the spinner
+    const safetyTimer = setTimeout(() => {
+      onUpdateTab(tab.id, { isLoading: false });
+    }, 15000);
+
+    return () => clearTimeout(safetyTimer);
+  }, [tab.url, isNewTab, tab.id, onUpdateTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;

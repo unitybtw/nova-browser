@@ -374,18 +374,13 @@ function App() {
     setTabs(prev => {
       const activeTab = prev.find(t => t.id === activeTabId);
       if (activeTab && activeTab.url === url) {
-        // URL is exactly the same, force a reload to prevent infinite spinner
+        // URL is exactly the same, force a reload
         const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
         if (webview) webview.reload();
         return prev.map(t => t.id === activeTabId ? { ...t, isLoading: true } : t);
       }
-      // Also directly load in webview for immediate response (don't wait for React state)
-      if (!isNewTabUrl) {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-        if (webview && webview.loadURL) {
-          try { webview.loadURL(url); } catch(e) {}
-        }
-      }
+      // Update the tab URL — BrowserView's useEffect will call webview.loadURL()
+      // DO NOT call loadURL here directly to avoid double-load race conditions
       return prev.map(t => t.id === activeTabId ? { ...t, url, isLoading: !isNewTabUrl } : t);
     });
   }, [activeTabId]);
