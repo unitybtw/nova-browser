@@ -9,6 +9,7 @@ export interface Tab {
   isMuted?: boolean;
   isPinned?: boolean;
   isIncognito?: boolean;
+  thumbnail?: string;
   workspaceId?: string;
 }
 

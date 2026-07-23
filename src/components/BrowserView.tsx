@@ -11,6 +11,7 @@ export interface BrowserViewProps {
   onFoundInPage?: (index: number, count: number) => void;
   searchEngine?: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
   privacyShield?: boolean;
+  isActive?: boolean;
 }
 
 export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
@@ -20,7 +21,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onNavigate,
   onFoundInPage,
   searchEngine = 'google',
-  privacyShield = true
+  privacyShield = true,
+  isActive = false
 }) => {
   const webviewRef = useRef<any>(null);
   const lastLoadedUrl = useRef<string>('');
@@ -161,6 +163,27 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     }
   }, [tab.isMuted]);
+
+  // Thumbnail capture loop
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview || !isActive || isNewTab) return;
+
+    const interval = setInterval(async () => {
+      try {
+        if (webview.capturePage) {
+          const image = await webview.capturePage();
+          if (image && !image.isEmpty()) {
+            onUpdateTab(tab.id, { thumbnail: image.toDataURL() });
+          }
+        }
+      } catch (err) {
+        // Ignore capture errors
+      }
+    }, 5000); // Every 5 seconds while active
+
+    return () => clearInterval(interval);
+  }, [isActive, isNewTab, tab.id, onUpdateTab]);
 
   if (isNewTab) {
     return (

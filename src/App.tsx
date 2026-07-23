@@ -940,6 +940,7 @@ function App() {
                   onFoundInPage={handleFoundInPage}
                   searchEngine={settings.searchEngine}
                   privacyShield={settings.privacyShield}
+                  isActive={tab.id === activeTabId || tab.id === splitTabId}
                 />
               </div>
             );
@@ -996,6 +997,7 @@ function App() {
               onFoundInPage={handleFoundInPage}
               searchEngine={settings.searchEngine}
               privacyShield={settings.privacyShield}
+              isActive={true}
             />
           </div>
         )}
