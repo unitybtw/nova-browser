@@ -19,6 +19,12 @@ export interface Workspace {
   icon?: string;
 }
 
+export const defaultSettings = {
+  showBookmarksBar: true,
+  useVerticalTabs: false,
+  mcpServerEnabled: false
+};
+
 export interface Bookmark {
   id: string;
   url: string;

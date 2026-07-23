@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   pauseDownload: (id: string) => ipcRenderer.invoke('pause-download', id),
   resumeDownload: (id: string) => ipcRenderer.invoke('resume-download', id),
   cancelDownload: (id: string) => ipcRenderer.invoke('cancel-download', id),
+  startMcpServer: () => ipcRenderer.invoke('start-mcp-server'),
+  stopMcpServer: () => ipcRenderer.invoke('stop-mcp-server'),
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
   onShortcut: (callback: (event: any, command: string) => void) => {
     ipcRenderer.on('shortcut', callback);

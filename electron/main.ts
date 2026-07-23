@@ -5,6 +5,7 @@ import fs from 'fs';
 // @ts-ignore
 import unzip from 'unzip-crx-3';
 import { ElectronBlocker } from '@cliqz/adblocker-electron';
+import { BrowserMCPServer } from './mcpServer.js';
 
 app.commandLine.appendSwitch('enable-unsafe-webgpu');
 app.commandLine.appendSwitch('enable-features', 'Vulkan,UseSkiaRenderer,WebAssemblySimd');
@@ -15,6 +16,7 @@ let mainWindow: BrowserWindow | null = null;
 let isPrivacyShieldEnabled = true;
 let blocker: ElectronBlocker | null = null;
 const activeDownloads = new Map<string, Electron.DownloadItem>();
+let mcpServer: BrowserMCPServer | null = null;
 
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
@@ -180,8 +182,12 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 app.whenReady().then(() => {
   createWindow();
 
-  globalShortcut.register('CommandOrControl+Shift+K', () => {
-    mainWindow?.webContents.send('shortcut', 'toggle-omnibox');
+  // Initialize MCP Server but don't start it until toggled
+  mcpServer = new BrowserMCPServer(3020);
+  mcpServer.setMainWindow(mainWindow);
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
@@ -207,6 +213,23 @@ ipcMain.handle('pause-download', (_event, id: string) => {
   const item = activeDownloads.get(id);
   if (item && !item.isPaused()) {
     item.pause();
+    return true;
+  }
+  return false;
+});
+
+// MCP Server Controls
+ipcMain.handle('start-mcp-server', async () => {
+  if (mcpServer) {
+    await mcpServer.start();
+    return true;
+  }
+  return false;
+});
+
+ipcMain.handle('stop-mcp-server', () => {
+  if (mcpServer) {
+    mcpServer.stop();
     return true;
   }
   return false;
