@@ -31,6 +31,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab.url]);
 
+  const domReadyRef = useRef(false);
+
   // Programmatically navigate the webview when tab.url changes (single source of truth for navigation)
   useEffect(() => {
     const webview = webviewRef.current;
@@ -43,18 +45,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const doLoad = () => {
       try {
         webview.loadURL(urlToLoad);
-      } catch (e) {
-        // Webview not ready yet — listen for dom-ready and retry once
-        webview.addEventListener('dom-ready', () => {
-          try { webview.loadURL(urlToLoad); } catch (_) {}
-        }, { once: true });
-      }
+      } catch (_) {}
     };
 
-    // If webview already has a src/page, load immediately; otherwise wait for dom-ready
-    if (webview.getURL && webview.getURL()) {
+    if (domReadyRef.current) {
+      // Webview is already ready, load immediately
       doLoad();
     } else {
+      // Wait for dom-ready before calling any webview methods
       webview.addEventListener('dom-ready', doLoad, { once: true });
     }
 
@@ -69,6 +67,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
+
+    const handleDomReady = () => {
+      domReadyRef.current = true;
+    };
 
     const handleStartLoading = () => {
       onUpdateTab(tab.id, { isLoading: true });
@@ -167,6 +169,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    webview.addEventListener('dom-ready', handleDomReady);
     webview.addEventListener('did-start-loading', handleStartLoading);
     webview.addEventListener('did-stop-loading', handleStopLoading);
     webview.addEventListener('did-fail-load', handleFailLoad);
@@ -179,6 +182,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('found-in-page', handleFoundInPage);
 
     return () => {
+      webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('did-start-loading', handleStartLoading);
       webview.removeEventListener('did-stop-loading', handleStopLoading);
       webview.removeEventListener('did-fail-load', handleFailLoad);
