@@ -1,4 +1,4 @@
-import { UserSettings } from '../components/SettingsModal';
+import { UserSettings } from '../App';
 
 export function formatSearchUrl(query: string, engine: UserSettings['searchEngine'] = 'google'): string {
   const trimmed = query.trim();

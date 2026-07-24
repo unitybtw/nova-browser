@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Search, Globe, Plus, X } from 'lucide-react';
 import { Tab } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
-import { UserSettings } from './SettingsModal';
+import { UserSettings } from '../App';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 interface SpotlightOmniboxProps {

@@ -3,7 +3,17 @@ import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 import { HistoryModal, HistoryItem } from './components/HistoryModal';
 import { DownloadsModal, DownloadItem } from './components/DownloadsModal';
-import { SettingsModal, UserSettings } from './components/SettingsModal';
+export interface UserSettings {
+  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+  privacyShield: boolean;
+  theme: 'light' | 'dark' | 'system';
+  fontSize: 'small' | 'medium' | 'large';
+  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber';
+  showBookmarksBar: boolean;
+  useVerticalTabs: boolean;
+  mcpServerEnabled: boolean;
+  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass';
+}
 import { ShareModal } from './components/ShareModal';
 import { ScreenshotModal } from './components/ScreenshotModal';
 import { FindInPage } from './components/FindInPage';
@@ -52,7 +62,7 @@ function App() {
 
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Removed isSettingsOpen
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
@@ -101,7 +111,7 @@ function App() {
   const closeAllModals = useCallback(() => {
     setIsHistoryOpen(false);
     setIsDownloadsOpen(false);
-    setIsSettingsOpen(false);
+
     setIsShareOpen(false);
     setIsSpotlightOpen(false);
     setIsVpnPopoverOpen(false);
@@ -113,7 +123,7 @@ function App() {
     closeAllModals();
     if (modalName === 'history') setIsHistoryOpen(true);
     else if (modalName === 'downloads') setIsDownloadsOpen(true);
-    else if (modalName === 'settings') setIsSettingsOpen(true);
+
     else if (modalName === 'share') setIsShareOpen(true);
     else if (modalName === 'spotlight') setIsSpotlightOpen(true);
     else if (modalName === 'extensions') setIsExtensionsOpen(true);
@@ -691,7 +701,7 @@ function App() {
 
   const handleOpenHistory = useCallback(() => openModal('history'), [openModal]);
   const handleOpenDownloads = useCallback(() => openModal('downloads'), [openModal]);
-  const handleOpenSettings = useCallback(() => openModal('settings'), [openModal]);
+  const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
   const handleOpenShare = useCallback(() => openModal('share'), [openModal]);
   const handleTakeScreenshot = useCallback(async () => {
@@ -781,7 +791,7 @@ function App() {
   const handleCloseDownloads = useCallback(() => setIsDownloadsOpen(false), []);
   const handleClearDownloads = useCallback(() => setDownloads([]), []);
 
-  const handleCloseSettings = useCallback(() => setIsSettingsOpen(false), []);
+
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
 
   const handleExportData = useCallback(() => {
@@ -1082,7 +1092,13 @@ function App() {
                   searchEngine={settings.searchEngine}
                   privacyShield={settings.privacyShield}
                   newTabBackground={settings.newTabBackground}
+                  settings={settings}
+                  onUpdateSettings={handleUpdateSettings}
+                  onExportData={handleExportData}
+                  onImportData={handleImportData}
                   isActive={tab.id === activeTabId || tab.id === splitTabId}
+                  onCloseTab={handleCloseTab}
+                  isIncognito={tab.isIncognito || false}
                 />
               </div>
             );
@@ -1139,7 +1155,14 @@ function App() {
               onFoundInPage={handleFoundInPage}
               searchEngine={settings.searchEngine}
               privacyShield={settings.privacyShield}
+              newTabBackground={settings.newTabBackground}
+              settings={settings}
+              onUpdateSettings={handleUpdateSettings}
+              onExportData={handleExportData}
+              onImportData={handleImportData}
               isActive={true}
+              onCloseTab={handleCloseTab}
+              isIncognito={secondaryTab.isIncognito || false}
             />
           </div>
         )}
@@ -1190,15 +1213,7 @@ function App() {
         onClearDownloads={handleClearDownloads}
       />
 
-      {/* SETTINGS MODAL */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={handleCloseSettings}
-        settings={settings}
-        onUpdateSettings={handleUpdateSettings}
-        onExportData={handleExportData}
-        onImportData={handleImportData}
-      />
+    // Deleted SettingsModal
 
       {/* SHARE & QR CODE MODAL */}
       <ShareModal

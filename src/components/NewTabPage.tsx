@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2 } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
-import { UserSettings } from './SettingsModal';
+import { UserSettings } from '../App';
 
 interface NewTabPageProps {
   onNavigate: (url: string) => void;

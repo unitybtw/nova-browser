@@ -32,7 +32,7 @@ import {
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
-import { UserSettings } from './SettingsModal';
+import { UserSettings } from '../App';
 
 interface TopBarProps {
   tabs: Tab[];

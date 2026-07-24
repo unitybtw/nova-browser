@@ -2,36 +2,53 @@ import React, { useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
-import { UserSettings } from './SettingsModal';
+import { SettingsPage } from './SettingsPage';
+import { UserSettings } from '../App';
 
-export interface BrowserViewProps {
+interface BrowserViewProps {
   tab: Tab;
+  isActive: boolean;
   onUpdateTab: (id: string, updates: Partial<Tab>) => void;
+  onCloseTab: (id: string) => void;
+  isIncognito: boolean;
   onNewTab?: (url?: string) => void;
   onNavigate?: (url: string) => void;
-  onFoundInPage?: (index: number, count: number) => void;
-  searchEngine?: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
-  privacyShield?: boolean;
-  newTabBackground?: string;
-  isActive?: boolean;
+  onFoundInPage?: (activeMatchOrdinal: number, numberOfMatches: number) => void;
+  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+  privacyShield: boolean;
+  newTabBackground?: 'default' | 'gradient' | 'mesh' | 'glass';
+  settings: UserSettings;
+  onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
+  onExportData?: () => void;
+  onImportData?: (file: File) => void;
 }
 
 export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   tab,
+  isActive,
   onUpdateTab,
+  onCloseTab,
+  isIncognito,
   onNewTab,
   onNavigate,
   onFoundInPage,
   searchEngine = 'google',
   privacyShield = true,
   newTabBackground = 'default',
-  isActive = false
+  settings,
+  onUpdateSettings,
+  onExportData,
+  onImportData
 }) => {
   const webviewRef = useRef<any>(null);
   const lastLoadedUrl = useRef<string>('');
 
   const isNewTab = React.useMemo(() => (
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
+  ), [tab.url]);
+  
+  const isSettingsTab = React.useMemo(() => (
+    tab.url === 'nova://settings' || tab.url === 'about:settings'
   ), [tab.url]);
 
   const domReadyRef = useRef(false);
@@ -300,6 +317,17 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         searchEngine={searchEngine}
         privacyShield={privacyShield}
         newTabBackground={newTabBackground}
+      />
+    );
+  }
+
+  if (isSettingsTab) {
+    return (
+      <SettingsPage
+        settings={settings}
+        onUpdateSettings={onUpdateSettings}
+        onExportData={onExportData}
+        onImportData={onImportData}
       />
     );
   }
