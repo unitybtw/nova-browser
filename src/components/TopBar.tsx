@@ -256,7 +256,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-2 overflow-hidden"
+                <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden"
                      onMouseEnter={(e) => {
                        if (isActive) return;
                        const rect = e.currentTarget.getBoundingClientRect();
@@ -388,7 +388,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }}
                 onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                 placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL`}
-                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pl-9 pr-9 text-[13px] outline-none transition-all shadow-2xs ${
+                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pl-9 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
                   isIncognito 
                     ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
