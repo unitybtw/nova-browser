@@ -13,6 +13,12 @@ export interface UserSettings {
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass';
+  startupBehavior: 'newTab' | 'continue' | 'specificPages';
+  tabStyle: 'rounded' | 'square' | 'floating';
+  doNotTrack: boolean;
+  clearOnExit: boolean;
+  hardwareAcceleration: boolean;
+  developerMode: boolean;
 }
 import { ShareModal } from './components/ShareModal';
 import { ScreenshotModal } from './components/ScreenshotModal';
@@ -135,9 +141,19 @@ function App() {
     return saved ? JSON.parse(saved) : {
       searchEngine: 'google',
       privacyShield: true,
-      theme: 'light',
+      theme: 'system',
       fontSize: 'medium',
-      showBookmarksBar: true
+      accentColor: 'blue',
+      showBookmarksBar: false,
+      useVerticalTabs: false,
+      mcpServerEnabled: false,
+      newTabBackground: 'default',
+      startupBehavior: 'newTab',
+      tabStyle: 'floating',
+      doNotTrack: true,
+      clearOnExit: false,
+      hardwareAcceleration: true,
+      developerMode: false
     };
   });
 

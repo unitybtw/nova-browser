@@ -65,6 +65,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {activeTab === 'general' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">On Startup</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">
+                  {[
+                    { id: 'newTab', label: 'Open New Tab Page' },
+                    { id: 'continue', label: 'Continue where you left off' },
+                    { id: 'specificPages', label: 'Open a specific page' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => onUpdateSettings({ startupBehavior: opt.id as any })}
+                      className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+                        settings.startupBehavior === opt.id || (!settings.startupBehavior && opt.id === 'newTab')
+                          ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Search Engine</h2>
                 <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
@@ -110,12 +133,87 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   ))}
                 </div>
               </section>
+
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Clear Browsing Data</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Clear History & Cache</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Clear your browsing history, cookies, cache, and more.</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (window.confirm("Are you sure you want to clear your browsing history?")) {
+                        localStorage.removeItem('browsing_history');
+                        alert("Browsing history cleared.");
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl font-medium transition-colors text-sm"
+                  >
+                    Clear Data
+                  </button>
+                </div>
+              </section>
             </div>
           )}
 
           {/* APPEARANCE */}
           {activeTab === 'appearance' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Theme Mode</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
+                  {[
+                    { id: 'light', label: 'Light' },
+                    { id: 'dark', label: 'Dark' },
+                    { id: 'system', label: 'System Default' }
+                  ].map(opt => (
+                    <button
+                      key={opt.id}
+                      onClick={() => onUpdateSettings({ theme: opt.id as any })}
+                      className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
+                        settings.theme === opt.id || (!settings.theme && opt.id === 'system')
+                          ? 'bg-slate-900 text-white shadow-md dark:bg-blue-600 dark:text-white'
+                          : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tab Style</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {[
+                    { id: 'floating', name: 'Floating', desc: 'Modern & Detached' },
+                    { id: 'rounded', name: 'Rounded', desc: 'Classic Chrome Style' },
+                    { id: 'square', name: 'Square', desc: 'Compact & Sharp' }
+                  ].map(ts => (
+                    <button
+                      key={ts.id}
+                      onClick={() => onUpdateSettings({ tabStyle: ts.id as any })}
+                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${
+                        settings.tabStyle === ts.id || (!settings.tabStyle && ts.id === 'floating')
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100'
+                          : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="w-full h-8 bg-slate-100 dark:bg-slate-800 rounded-md relative flex items-end justify-center overflow-hidden border border-slate-200 dark:border-slate-700">
+                        {ts.id === 'floating' && <div className="w-16 h-5 bg-white dark:bg-slate-700 rounded-md mb-1 shadow-sm" />}
+                        {ts.id === 'rounded' && <div className="w-16 h-6 bg-white dark:bg-slate-700 rounded-t-lg" />}
+                        {ts.id === 'square' && <div className="w-16 h-6 bg-white dark:bg-slate-700" />}
+                      </div>
+                      <div className="text-center">
+                        <p className="font-semibold text-sm">{ts.name}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{ts.desc}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
                 <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
@@ -226,6 +324,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </div>
                 </div>
               </section>
+
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tracking & Cookies</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Send a "Do Not Track" request</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Request that your browsing traffic is not tracked</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ doNotTrack: !settings.doNotTrack })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.doNotTrack ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.doNotTrack ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Clear cookies on exit</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Clear cookies and site data when you close all windows</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.clearOnExit ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.clearOnExit ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              </section>
             </div>
           )}
 
@@ -233,6 +362,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {activeTab === 'advanced' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">System & Developer</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Use hardware acceleration</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Use GPU to render web pages faster (requires restart)</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ hardwareAcceleration: !settings.hardwareAcceleration })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.hardwareAcceleration ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.hardwareAcceleration ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Developer Mode</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Enable "Inspect Element" in right-click menu and advanced tools</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ developerMode: !settings.developerMode })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.developerMode ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.developerMode ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              </section>
+
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Integration (MCP)</h2>
                 <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6">
