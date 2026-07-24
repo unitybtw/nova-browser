@@ -1268,8 +1268,6 @@ function App() {
         onClearDownloads={handleClearDownloads}
       />
 
-    // Deleted SettingsModal
-
       {/* SHARE & QR CODE MODAL */}
       <ShareModal
         isOpen={isShareOpen}
