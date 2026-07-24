@@ -228,7 +228,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-started-playing', handleMediaStarted);
       webview.removeEventListener('media-paused', handleMediaPaused);
     };
-  }, [tab.id, onUpdateTab, onNewTab, onFoundInPage]);
+  }, [tab.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;
