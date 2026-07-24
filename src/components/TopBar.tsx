@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowLeft,
@@ -117,6 +118,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onOpenExtensions
 }) => {
   const [searchValue, setSearchValue] = useState('');
+  const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
+  const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
+  const [hoverPos, setHoverPos] = useState({ left: 0, width: 0 });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
@@ -168,7 +172,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
 
   return (
-    <header className={`w-full flex flex-col select-none drag-region border-b ${isIncognito ? 'bg-slate-900 border-slate-800' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800'}`}>
+    <>
+    <header className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}>
       {/* 
         ROW 1: Tabs & Window Controls spacer
       */}
@@ -245,21 +250,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
               >
-                <div className="flex items-center gap-2 overflow-hidden">
-                  {/* Thumbnail Hover Preview */}
-                  {!isActive && tab.thumbnail && (
-                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-56 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200/80 dark:border-slate-700/80 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-[100] overflow-hidden translate-y-2 group-hover:translate-y-0 scale-95 group-hover:scale-100 origin-top">
-                      <div className="w-full aspect-video bg-slate-100 dark:bg-slate-900 overflow-hidden relative">
-                        <img src={tab.thumbnail} className="w-full h-full object-cover object-top" alt="Preview" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                      </div>
-                      <div className="p-2.5 text-xs font-semibold text-slate-800 dark:text-slate-100 truncate flex items-center gap-2">
-                        {tab.favicon && <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm" />}
-                        <span className="truncate">{tab.title || 'New Tab'}</span>
-                      </div>
-                    </div>
-                  )}
-
+                <div className="flex items-center gap-2 overflow-hidden"
+                     onMouseEnter={(e) => {
+                       if (isActive) return;
+                       const rect = e.currentTarget.getBoundingClientRect();
+                       setHoveredTab(tab);
+                       setHoverPos({ left: rect.left, width: rect.width });
+                     }}
+                     onMouseLeave={() => setHoveredTab(null)}
+                >
                   {tab.isLoading ? (
                     <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : tab.favicon ? (
@@ -679,5 +678,47 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
       )}
     </header>
+
+    {/* Tab Peek rendered via Portal to escape overflow-hidden */}
+    {hoveredTab && hoveredTab.thumbnail && createPortal(
+      <AnimatePresence>
+        <motion.div
+          key="topbar-tab-peek"
+          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -5, scale: 0.95 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="pointer-events-none"
+          style={{
+            position: 'fixed',
+            top: 50,
+            left: Math.max(10, Math.min(hoverPos.left + (hoverPos.width / 2) - (272 / 2), window.innerWidth - 282)),
+            zIndex: 999999,
+            width: 272,
+            borderRadius: 12,
+            overflow: 'hidden',
+            background: 'white',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
+            border: '1px solid rgba(0,0,0,0.08)',
+          }}
+        >
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {hoveredTab.favicon && (
+                <img src={hoveredTab.favicon} style={{ width: '16px', height: '16px', borderRadius: '4px' }} />
+              )}
+              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {hoveredTab.title || 'New Tab'}
+              </div>
+            </div>
+          </div>
+          <div style={{ width: '100%', aspectRatio: '16/9', background: '#f1f5f9', position: 'relative' }}>
+            <img src={hoveredTab.thumbnail} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
+          </div>
+        </motion.div>
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 });
