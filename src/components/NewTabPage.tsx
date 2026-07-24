@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Globe } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2 } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { UserSettings } from './SettingsModal';
 
@@ -15,47 +15,28 @@ const DEFAULT_SPEED_DIALS = [
   { name: 'GitHub', url: 'https://github.com', domain: 'github.com' },
   { name: 'YouTube', url: 'https://www.youtube.com', domain: 'youtube.com' },
   { name: 'Reddit', url: 'https://www.reddit.com', domain: 'reddit.com' },
-  { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' },
+  { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' }
 ];
 
-// Floating particle component
-const Particle: React.FC<{ delay: number; x: number; size: number; duration: number }> = ({ delay, x, size, duration }) => (
-  <motion.div
-    className="absolute rounded-full pointer-events-none"
-    style={{
-      width: size,
-      height: size,
-      left: `${x}%`,
-      bottom: '-20px',
-      background: `radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)`,
-    }}
-    animate={{ y: [0, -600], opacity: [0, 0.6, 0] }}
-    transition={{ duration, delay, repeat: Infinity, ease: 'linear' }}
-  />
-);
-
-export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
-  onNavigate,
+export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({ 
+  onNavigate, 
   searchEngine = 'google',
   privacyShield = true
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [timeStr, setTimeStr] = useState('');
-  const [dateStr, setDateStr] = useState('');
   const [greeting, setGreeting] = useState('');
-  const [isFocused, setIsFocused] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   const [speedDials, setSpeedDials] = useState<typeof DEFAULT_SPEED_DIALS>(() => {
     try {
       const saved = localStorage.getItem('nova_speed_dials');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch(e) {}
     return DEFAULT_SPEED_DIALS;
   });
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingDial, setEditingDial] = useState<{ name: string; url: string; index: number | null }>({ name: '', url: '', index: null });
+  const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
 
   useEffect(() => {
     localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
@@ -63,7 +44,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const handleDeleteDial = (e: React.MouseEvent, index: number) => {
     e.stopPropagation();
-    setSpeedDials(prev => prev.filter((_, i) => i !== index));
+    const newDials = [...speedDials];
+    newDials.splice(index, 1);
+    setSpeedDials(newDials);
   };
 
   const handleEditDial = (e: React.MouseEvent, index: number) => {
@@ -86,15 +69,17 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       }
       const urlObj = new URL(finalUrl);
       const newDial = { name: editingDial.name, url: finalUrl, domain: urlObj.hostname };
-      setSpeedDials(prev => {
-        const next = [...prev];
-        if (editingDial.index !== null) next[editingDial.index] = newDial;
-        else next.push(newDial);
-        return next;
-      });
+      
+      const newDials = [...speedDials];
+      if (editingDial.index !== null) {
+        newDials[editingDial.index] = newDial;
+      } else {
+        newDials.push(newDial);
+      }
+      setSpeedDials(newDials);
       setIsEditModalOpen(false);
-    } catch {
-      alert('Lütfen geçerli bir URL girin.');
+    } catch (err) {
+      alert("Lütfen geçerli bir URL girin.");
     }
   };
 
@@ -102,13 +87,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     const updateTime = () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      setDateStr(now.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' }));
-      const h = now.getHours();
-      if (h < 5) setGreeting('İyi geceler');
-      else if (h < 12) setGreeting('Günaydın');
-      else if (h < 18) setGreeting('İyi öğleden sonralar');
-      else setGreeting('İyi akşamlar');
+      
+      const hour = now.getHours();
+      if (hour < 12) setGreeting('Good morning');
+      else if (hour < 18) setGreeting('Good afternoon');
+      else setGreeting('Good evening');
     };
+
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
@@ -117,222 +102,178 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchValue.trim()) return;
-    onNavigate(formatSearchUrl(searchValue, searchEngine));
+
+    const url = formatSearchUrl(searchValue, searchEngine);
+    onNavigate(url);
   };
 
-  const particles = Array.from({ length: 12 }, (_, i) => ({
-    delay: i * 1.5,
-    x: (i * 8 + Math.sin(i) * 5) % 100,
-    size: 4 + (i % 3) * 4,
-    duration: 8 + (i % 4) * 2,
-  }));
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.1 }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0, transition: { type: 'spring' as any, damping: 20, stiffness: 300 } }
+  };
 
   return (
-    <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center"
-      style={{
-        background: 'linear-gradient(135deg, #0f0c29 0%, #1a1a4e 30%, #302b63 60%, #24243e 100%)',
-      }}
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={containerVariants}
+      className="w-full h-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 px-6 py-12 overflow-hidden"
     >
-      {/* Ambient glow orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%)', filter: 'blur(40px)' }} />
-      <div className="absolute bottom-1/4 right-1/4 w-80 h-80 rounded-full pointer-events-none"
-        style={{ background: 'radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)', filter: 'blur(40px)' }} />
+      
+      {/* Privacy Shield Badge */}
+      <motion.div variants={itemVariants} className={`flex items-center gap-2 px-4 py-1.5 rounded-full border text-xs font-medium mb-6 shadow-2xs transition-all ${
+        privacyShield 
+          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50' 
+          : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
+      }`}>
+        {privacyShield ? <ShieldCheck className="w-4 h-4 text-emerald-600" /> : <ShieldAlert className="w-4 h-4 text-slate-400" />}
+        <span>{privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Disabled'}</span>
+      </motion.div>
 
-      {/* Floating particles */}
-      {particles.map((p, i) => <Particle key={i} {...p} />)}
+      {/* Clock & Greeting */}
+      <motion.div variants={itemVariants} className="text-center mb-8">
+        <h1 className="text-5xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-serif">{timeStr}</h1>
+        <p className="text-lg text-slate-500 dark:text-slate-400 font-medium">{greeting}</p>
+      </motion.div>
 
-      {/* Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="relative z-10 flex flex-col items-center w-full max-w-2xl px-6"
-      >
-        {/* Privacy badge */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.1 }}
-          className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold mb-8 ${
-            privacyShield
-              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-              : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'
-          }`}
+      {/* Main Search Bar */}
+      <motion.form variants={itemVariants} onSubmit={handleSearch} className="w-full max-w-2xl relative mb-10 group">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+        <input
+          type="text"
+          value={searchValue}
+          onChange={(e) => setSearchValue(e.target.value)}
+          placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL...`}
+          className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 dark:focus:ring-blue-900/50 rounded-2xl py-4 pl-12 pr-12 text-base text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 shadow-xs hover:shadow-md outline-none transition-all"
+          autoFocus
+        />
+        <button
+          type="submit"
+          aria-label="Perform search"
+          className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white transition-all shadow-md active:scale-95"
         >
-          {privacyShield
-            ? <ShieldCheck className="w-3.5 h-3.5" />
-            : <ShieldAlert className="w-3.5 h-3.5" />}
-          {privacyShield ? 'Privacy Shield Aktif' : 'Privacy Shield Devre Dışı'}
-        </motion.div>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </motion.form>
 
-        {/* Clock */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.15 }}
-          className="text-center mb-8 select-none"
-        >
-          <div className="text-8xl font-thin text-white tracking-tight tabular-nums" style={{ fontFamily: 'system-ui, sans-serif', textShadow: '0 0 60px rgba(139,92,246,0.3)' }}>
-            {timeStr}
-          </div>
-          <div className="text-slate-400 text-sm mt-2 font-medium capitalize tracking-wide">{dateStr}</div>
-          <div className="text-indigo-300 text-base mt-1 font-medium">{greeting}</div>
-        </motion.div>
-
-        {/* Search bar */}
-        <motion.form
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          onSubmit={handleSearch}
-          className="w-full relative mb-10"
-        >
-          <div className={`relative rounded-2xl transition-all duration-300 ${
-            isFocused
-              ? 'shadow-[0_0_0_2px_rgba(99,102,241,0.5),0_8px_40px_rgba(99,102,241,0.2)]'
-              : 'shadow-[0_4px_24px_rgba(0,0,0,0.3)]'
-          }`}
-            style={{ background: 'rgba(255,255,255,0.06)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255,255,255,0.1)' }}
-          >
-            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isFocused ? 'text-indigo-400' : 'text-slate-400'}`} />
-            <input
-              ref={inputRef}
-              type="text"
-              value={searchValue}
-              onChange={e => setSearchValue(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              placeholder={`${getSearchEngineName(searchEngine)} ile ara veya URL gir...`}
-              className="w-full bg-transparent text-white placeholder-slate-400 py-4 pl-12 pr-14 text-base outline-none rounded-2xl"
-              autoFocus
-            />
-            <button
-              type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white transition-all active:scale-95 shadow-md"
-            >
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </motion.form>
-
-        {/* Speed Dials */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="w-full"
-        >
-          <p className="text-center text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Hızlı Erişim</p>
-          <div className="grid grid-cols-6 gap-3">
-            {speedDials.map((dial, idx) => (
-              <div key={idx} className="relative group">
-                <button
-                  onClick={() => onNavigate(dial.url)}
-                  className="w-full flex flex-col items-center gap-2 p-3 rounded-2xl transition-all hover:-translate-y-1"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', backdropFilter: 'blur(10px)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center overflow-hidden">
-                    <img
-                      src={`https://www.google.com/s2/favicons?domain=${dial.domain}&sz=64`}
-                      alt={dial.name}
-                      className="w-6 h-6 object-contain"
-                      onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                    />
-                  </div>
-                  <span className="text-xs text-slate-300 truncate w-full text-center font-medium">{dial.name}</span>
-                </button>
-                {/* Edit actions */}
-                <div className="absolute -top-1.5 -right-1.5 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  <button onClick={e => handleEditDial(e, idx)} className="p-1 bg-indigo-500 text-white rounded-full shadow hover:bg-indigo-600 transition-colors">
-                    <Edit2 className="w-2.5 h-2.5" />
-                  </button>
-                  <button onClick={e => handleDeleteDial(e, idx)} className="p-1 bg-red-500 text-white rounded-full shadow hover:bg-red-600 transition-colors">
-                    <X className="w-2.5 h-2.5" />
-                  </button>
+      {/* Speed Dials */}
+      <motion.div variants={itemVariants} className="w-full max-w-2xl mb-16 relative">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-6 text-center">Quick Access</h2>
+        <div className="grid grid-cols-5 gap-6">
+          {speedDials.map((dial, idx) => (
+            <div key={idx} className="relative group">
+              <button
+                onClick={() => onNavigate(dial.url)}
+                className="w-full flex flex-col items-center gap-3 p-4 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-500 hover:shadow-md hover:-translate-y-1 transition-all"
+              >
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-xs bg-slate-50 dark:bg-slate-900 group-hover:scale-110 group-hover:bg-white dark:group-hover:bg-slate-700 transition-all overflow-hidden border border-slate-100 dark:border-slate-800 p-2.5">
+                  <img 
+                    src={`https://www.google.com/s2/favicons?domain=${dial.domain}&sz=64`} 
+                    alt={`${dial.name} icon`}
+                    className="w-full h-full object-contain"
+                  />
                 </div>
+                <span className="text-sm font-medium text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 truncate w-full text-center">
+                  {dial.name}
+                </span>
+              </button>
+              {/* Edit Actions */}
+              <div className="absolute -top-2 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button 
+                  onClick={(e) => handleEditDial(e, idx)}
+                  className="p-1.5 bg-blue-500 text-white rounded-full shadow-md hover:bg-blue-600 transition-colors"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+                <button 
+                  onClick={(e) => handleDeleteDial(e, idx)}
+                  className="p-1.5 bg-red-500 text-white rounded-full shadow-md hover:bg-red-600 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
-            ))}
+            </div>
+          ))}
 
-            {/* Add button */}
-            <button
-              onClick={handleAddDial}
-              className="flex flex-col items-center gap-2 p-3 rounded-2xl transition-all hover:-translate-y-1"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px dashed rgba(255,255,255,0.12)' }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.07)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                <Plus className="w-5 h-5 text-slate-400" />
-              </div>
-              <span className="text-xs text-slate-500 font-medium">Ekle</span>
-            </button>
-          </div>
-        </motion.div>
+          {/* Add New Dial Button */}
+          <button
+            onClick={handleAddDial}
+            className="flex flex-col items-center justify-center p-4 aspect-square rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-100/50 dark:hover:bg-slate-800/50 transition-all text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-400"
+          >
+            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-3">
+              <Plus className="w-6 h-6" />
+            </div>
+            <span className="text-xs font-medium">Add New</span>
+          </button>
+        </div>
       </motion.div>
 
       {/* Edit/Add Modal */}
       <AnimatePresence>
-        {isEditModalOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-50 flex items-center justify-center"
-            style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
-            onClick={() => setIsEditModalOpen(false)}
+      {isEditModalOpen && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+        >
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            className="bg-white dark:bg-slate-800 rounded-2xl p-6 w-96 shadow-2xl"
           >
-            <motion.div
-              initial={{ scale: 0.92, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.92, opacity: 0, y: 10 }}
-              onClick={e => e.stopPropagation()}
-              className="w-96 rounded-2xl p-6 shadow-2xl"
-              style={{ background: 'rgba(30,27,75,0.95)', border: '1px solid rgba(255,255,255,0.1)', backdropFilter: 'blur(20px)' }}
-            >
-              <h3 className="text-lg font-semibold text-white mb-5">
-                {editingDial.index !== null ? 'Kısayolu Düzenle' : 'Kısayol Ekle'}
-              </h3>
-              <form onSubmit={handleSaveDial} className="flex flex-col gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1.5">İsim</label>
-                  <input
-                    type="text"
-                    value={editingDial.name}
-                    onChange={e => setEditingDial(p => ({ ...p, name: e.target.value }))}
-                    required
-                    className="w-full px-3 py-2.5 rounded-lg text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1.5">URL</label>
-                  <input
-                    type="text"
-                    value={editingDial.url}
-                    onChange={e => setEditingDial(p => ({ ...p, url: e.target.value }))}
-                    required
-                    placeholder="https://example.com"
-                    className="w-full px-3 py-2.5 rounded-lg text-white text-sm outline-none focus:ring-2 focus:ring-indigo-500"
-                    style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
-                  />
-                </div>
-                <div className="flex justify-end gap-2 mt-2">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)}
-                    className="px-4 py-2 text-slate-300 hover:text-white text-sm font-medium rounded-lg transition-colors"
-                    style={{ background: 'rgba(255,255,255,0.05)' }}
-                  >İptal</button>
-                  <button type="submit"
-                    className="px-4 py-2 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium rounded-lg transition-colors"
-                  >Kaydet</button>
-                </div>
-              </form>
-            </motion.div>
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{editingDial.index !== null ? 'Edit Shortcut' : 'Add Shortcut'}</h3>
+            <form onSubmit={handleSaveDial} className="flex flex-col gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Name</label>
+                <input 
+                  type="text" 
+                  value={editingDial.name}
+                  onChange={e => setEditingDial(prev => ({...prev, name: e.target.value}))}
+                  required
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 dark:bg-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">URL</label>
+                <input 
+                  type="text" 
+                  value={editingDial.url}
+                  onChange={e => setEditingDial(prev => ({...prev, url: e.target.value}))}
+                  required
+                  placeholder="https://example.com"
+                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 dark:bg-slate-900"
+                />
+              </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button 
+                  type="button" 
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium cursor-pointer"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
           </motion.div>
-        )}
+        </motion.div>
+      )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 });
