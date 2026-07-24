@@ -201,6 +201,20 @@ function App() {
     }
   }, [settings]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlocked) {
+      const removeListener = (window as any).electronAPI.onAdBlocked((event: any, tabId: number) => {
+        setTabs(prev => prev.map(t => {
+          if (t.webContentsId === tabId) {
+            return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + 1 };
+          }
+          return t;
+        }));
+      });
+      return () => removeListener();
+    }
+  }, []);
+
   // Downloads state
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
 

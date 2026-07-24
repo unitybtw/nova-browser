@@ -28,7 +28,8 @@ import {
   Settings,
   Camera,
   Sparkles,
-  Puzzle
+  Puzzle,
+  ShieldCheck
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
@@ -436,6 +437,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     title="Zoom Level"
                   >
                     {Math.round(Math.pow(1.2, activeTab.zoomLevel) * 100)}%
+                  </div>
+                )}
+                {!!activeTab?.blockedAdsCount && (
+                  <div
+                    className={`flex items-center gap-1 px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all shadow-xs ${isIncognito ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-800/50' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50 border border-emerald-200/80'}`}
+                    title="Privacy Shield: Ads & Trackers Blocked"
+                  >
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>{activeTab.blockedAdsCount}</span>
                   </div>
                 )}
                 {onToggleReaderMode && (

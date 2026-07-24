@@ -101,18 +101,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const handleDomReady = () => {
       console.log('[BrowserView] dom-ready');
       domReadyRef.current = true;
+      let wcId = undefined;
+      try { wcId = webview.getWebContentsId(); } catch (e) {}
       onUpdateTab(tab.id, {
         isLoading: false,
         canGoBack: webview.canGoBack?.() || false,
         canGoForward: webview.canGoForward?.() || false,
-        title: webview.getTitle?.() || tab.url
+        title: webview.getTitle?.() || tab.url,
+        webContentsId: wcId
       });
     };
 
     const handleStartNavigation = (e: any) => {
       console.log('[BrowserView] did-start-navigation', e.isMainFrame, e.url);
       if (e.isMainFrame) {
-        onUpdateTab(tab.id, { isLoading: true });
+        onUpdateTab(tab.id, { isLoading: true, blockedAdsCount: 0 });
       }
     };
 

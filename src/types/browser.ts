@@ -13,6 +13,8 @@ export interface Tab {
   workspaceId?: string;
   zoomLevel?: number;
   isPlayingAudio?: boolean;
+  blockedAdsCount?: number;
+  webContentsId?: number;
 }
 
 export interface Workspace {

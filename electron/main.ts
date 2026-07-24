@@ -24,6 +24,11 @@ let mcpServer: BrowserMCPServer | null = null;
 // Initialize AdBlocker globally so IPC can access it
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
+  blocker.on('request-blocked', (request: any) => {
+    if (request.tabId && mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('ad-blocked', request.tabId);
+    }
+  });
 });
 
 function createWindow() {
