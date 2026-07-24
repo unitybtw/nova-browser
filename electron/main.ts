@@ -264,6 +264,39 @@ app.on('web-contents-created', (_event, wc) => {
       mainWindow.webContents.send('tab-thumbnail-update', { webContentsId: wcId, dataUrl });
     } catch (_) {}
   });
+
+  // Native Context Menu for webviews
+  wc.on('context-menu', (e, params) => {
+    // Only show for webviews, not the main browser UI
+    if (wc.getType() === 'webview') {
+      const { Menu, MenuItem, clipboard } = require('electron');
+      const menu = new Menu();
+
+      if (params.linkURL) {
+        menu.append(new MenuItem({
+          label: 'Bağlantı Adresini Kopyala',
+          click: () => clipboard.writeText(params.linkURL)
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      if (params.srcURL && params.mediaType === 'image') {
+        menu.append(new MenuItem({
+          label: 'Resim Adresini Kopyala',
+          click: () => clipboard.writeText(params.srcURL)
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.canGoBack() }));
+      menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.canGoForward() }));
+      menu.append(new MenuItem({ label: 'Yenile', click: () => wc.reload() }));
+      menu.append(new MenuItem({ type: 'separator' }));
+      menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+
+      menu.popup();
+    }
+  });
 });
 
 // Download Controls
