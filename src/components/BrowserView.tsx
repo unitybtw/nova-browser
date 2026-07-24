@@ -67,17 +67,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       });
     };
 
-    const handleStartLoading = () => {
-      onUpdateTab(tab.id, { isLoading: true });
-    };
-
-    const handleStopLoading = () => {
-      onUpdateTab(tab.id, {
-        isLoading: false,
-        canGoBack: webview.canGoBack?.() || false,
-        canGoForward: webview.canGoForward?.() || false,
-        title: webview.getTitle?.() || tab.url
-      });
+    const handleStartNavigation = (e: any) => {
+      if (e.isMainFrame) {
+        onUpdateTab(tab.id, { isLoading: true });
+      }
     };
 
     const handleFinishLoad = (e: any) => {
@@ -89,6 +82,16 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           title: webview.getTitle?.() || tab.url
         });
       }
+    };
+
+    const handleStopLoading = () => {
+      // Fallback for when all frames finish loading
+      onUpdateTab(tab.id, {
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false,
+        title: webview.getTitle?.() || tab.url
+      });
     };
 
     const handleFailLoad = (e: any) => {
@@ -156,7 +159,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     webview.addEventListener('dom-ready', handleDomReady);
-    webview.addEventListener('did-start-loading', handleStartLoading);
+    webview.addEventListener('did-start-navigation', handleStartNavigation);
     webview.addEventListener('did-stop-loading', handleStopLoading);
     webview.addEventListener('did-finish-load', handleFinishLoad);
     webview.addEventListener('did-fail-load', handleFailLoad);
@@ -177,7 +180,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     return () => {
       webview.removeEventListener('dom-ready', handleDomReady);
-      webview.removeEventListener('did-start-loading', handleStartLoading);
+      webview.removeEventListener('did-start-navigation', handleStartNavigation);
       webview.removeEventListener('did-stop-loading', handleStopLoading);
       webview.removeEventListener('did-finish-load', handleFinishLoad);
       webview.removeEventListener('did-fail-load', handleFailLoad);
