@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX } from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2 } from 'lucide-react';
 import { Tab, Workspace } from '../types/browser';
 
 interface SidebarTabsProps {
@@ -174,14 +174,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1 pr-2 opacity-0 group-hover:group-hover/tab:opacity-100 transition-opacity shrink-0">
-                    {tab.isMuted && (
+                    {tab.isMuted ? (
                       <button
                         onClick={(e) => onToggleMuteTab(tab.id, e)}
                         className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500"
                       >
                         <VolumeX className="w-3.5 h-3.5" />
                       </button>
-                    )}
+                    ) : tab.isPlayingAudio ? (
+                      <button
+                        onClick={(e) => onToggleMuteTab(tab.id, e)}
+                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-blue-500"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+                      </button>
+                    ) : null}
                     {tabs.length > 1 && (
                       <button
                         onClick={(e) => {

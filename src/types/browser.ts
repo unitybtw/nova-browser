@@ -12,6 +12,7 @@ export interface Tab {
   thumbnail?: string;
   workspaceId?: string;
   zoomLevel?: number;
+  isPlayingAudio?: boolean;
 }
 
 export interface Workspace {

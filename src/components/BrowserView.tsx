@@ -164,6 +164,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    const handleMediaStarted = () => {
+      onUpdateTab(tab.id, { isPlayingAudio: true });
+    };
+
+    const handleMediaPaused = () => {
+      onUpdateTab(tab.id, { isPlayingAudio: false });
+    };
+
     webview.addEventListener('dom-ready', handleDomReady);
     webview.addEventListener('did-start-navigation', handleStartNavigation);
     webview.addEventListener('did-stop-loading', handleStopLoading);
@@ -176,6 +184,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('new-window', handleNewWindow);
     webview.addEventListener('crashed', handleCrashed);
     webview.addEventListener('found-in-page', handleFoundInPage);
+    webview.addEventListener('media-started-playing', handleMediaStarted);
+    webview.addEventListener('media-paused', handleMediaPaused);
 
     // Initial check: if webview is already not loading, ensure isLoading is false
     setTimeout(() => {
@@ -215,6 +225,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('new-window', handleNewWindow);
       webview.removeEventListener('crashed', handleCrashed);
       webview.removeEventListener('found-in-page', handleFoundInPage);
+      webview.removeEventListener('media-started-playing', handleMediaStarted);
+      webview.removeEventListener('media-paused', handleMediaPaused);
     };
   }, [tab.id, onUpdateTab, onNewTab, onFoundInPage]);
 

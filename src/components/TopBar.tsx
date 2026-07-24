@@ -255,15 +255,23 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 ml-2">
-                  {tab.isMuted && (
+                  {tab.isMuted ? (
                     <button
                       onClick={(e) => onToggleMuteTab(tab.id, e)}
-                      className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-all shrink-0"
+                      className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
                       title="Unmute Tab"
                     >
                       <VolumeX className="w-3.5 h-3.5 text-red-500" />
                     </button>
-                  )}
+                  ) : tab.isPlayingAudio ? (
+                    <button
+                      onClick={(e) => onToggleMuteTab(tab.id, e)}
+                      className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
+                      title="Mute Tab"
+                    >
+                      <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                    </button>
+                  ) : null}
 
                   {tabs.length > 1 && (
                     <button
