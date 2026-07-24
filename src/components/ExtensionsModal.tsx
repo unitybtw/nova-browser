@@ -197,8 +197,12 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = React.memo(({ isO
                   {extensions.map((ext) => (
                     <div key={ext.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm flex items-start justify-between gap-4 group hover:border-indigo-200 dark:hover:border-indigo-800 transition-colors">
                       <div className="flex items-start gap-4 flex-1 overflow-hidden">
-                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 dark:text-indigo-400 rounded-lg flex items-center justify-center shrink-0">
-                          <Puzzle className="w-6 h-6" />
+                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-500 dark:text-indigo-400 rounded-xl flex items-center justify-center shrink-0 border border-indigo-100/50 dark:border-indigo-800/50">
+                          {(ext as any).iconData ? (
+                            <img src={(ext as any).iconData} alt={ext.name} className="w-8 h-8 rounded-md object-contain" />
+                          ) : (
+                            <Puzzle className="w-6 h-6" />
+                          )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">

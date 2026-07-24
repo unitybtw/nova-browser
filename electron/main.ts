@@ -420,14 +420,38 @@ ipcMain.handle('install-extension', async (_event, folderPath: string) => {
 
 // Return list of loaded extensions
 ipcMain.handle('list-extensions', async () => {
-  return loadedExtensions.map((e) => ({
-    name: e.name,
-    id: e.id,
-    enabled: true,
-    path: e.path,
-    version: e.version,
-    description: e.description,
-    // icon can't be directly accessed, will use placeholder
+  return Promise.all(loadedExtensions.map(async (e) => {
+    let iconData = undefined;
+    try {
+      const manifestPath = path.join(e.path, 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        if (manifest.icons) {
+          // Find largest icon
+          const sizes = Object.keys(manifest.icons).map(Number).sort((a, b) => b - a);
+          if (sizes.length > 0) {
+            const iconPath = path.join(e.path, manifest.icons[sizes[0]]);
+            if (fs.existsSync(iconPath)) {
+              const ext = path.extname(iconPath).toLowerCase().substring(1) || 'png';
+              const buffer = fs.readFileSync(iconPath);
+              iconData = `data:image/${ext};base64,${buffer.toString('base64')}`;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load extension icon', err);
+    }
+    
+    return {
+      name: e.name,
+      id: e.id,
+      enabled: true,
+      path: e.path,
+      version: e.version,
+      description: e.description,
+      iconData
+    };
   }));
 });
 
@@ -453,10 +477,18 @@ ipcMain.handle('install-from-webstore', async (_event, urlOrId: string) => {
     if (!match) return { error: 'Geçersiz eklenti URL\'si veya ID\'si' };
     const extensionId = match[0];
     
-    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&prodversion=120.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=mac&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=unknown&prodversion=120.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
     
-    const res = await fetch(crxUrl);
-    if (!res.ok) throw new Error('Eklenti indirilemedi (Google sunucuları reddetti).');
+    const res = await fetch(crxUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Eklenti indirilemedi (HTTP ${res.status}): ${errText.substring(0, 100)}`);
+    }
     
     const arrayBuffer = await res.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);

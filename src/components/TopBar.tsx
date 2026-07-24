@@ -612,13 +612,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           {extensions.map(ext => (
             <button
               key={ext.id}
-              className={`p-1.5 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-indigo-100 dark:hover:bg-indigo-800/50'}`}
+              className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-indigo-900/30 text-indigo-400 hover:bg-slate-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
               title={ext.name}
               onClick={() => {
                 // Future: Trigger extension popup
               }}
             >
-              {ext.name.charAt(0).toUpperCase()}
+              {ext.iconData ? (
+                <img src={ext.iconData} alt={ext.name} className="w-5 h-5 rounded-sm object-contain" />
+              ) : (
+                ext.name.charAt(0).toUpperCase()
+              )}
             </button>
           ))}
 
