@@ -415,8 +415,97 @@ function App() {
     });
   }, [activeTabId]);
 
-  // Setup AI Agent Action Context
+  // Setup AI Agent Action Context and MCP Action Bridge
   useEffect(() => {
+    // 1. Expose executeMcpAction globally for the main process to call
+    (window as any).executeMcpAction = async (toolName: string, args: any) => {
+      const activeWebview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+      
+      switch (toolName) {
+        case 'browser_navigate':
+          handleNavigate(args.url);
+          return `Navigated to ${args.url}`;
+
+        case 'browser_read_page':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                let text = document.body.innerText;
+                const links = Array.from(document.querySelectorAll('a')).map(a => a.href).filter(Boolean);
+                return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50) });
+              })();
+            `);
+          }
+          return "Error: No active webview available.";
+
+        case 'browser_click':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector("${args.selector}");
+                if (el) { el.click(); return "Successfully clicked element."; }
+                return "Error: Element not found with selector: ${args.selector}";
+              })();
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_type':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector("${args.selector}");
+                if (el) { 
+                  el.value = "${args.text}";
+                  el.dispatchEvent(new Event('input', { bubbles: true }));
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  if (${args.pressEnter ? 'true' : 'false'}) {
+                    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+                    el.dispatchEvent(enterEvent);
+                  }
+                  return "Successfully typed text."; 
+                }
+                return "Error: Element not found with selector: ${args.selector}";
+              })();
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_run_js':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            const result = await activeWebview.executeJavaScript(args.script);
+            return typeof result === 'object' ? JSON.stringify(result) : String(result);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_list_tabs':
+          return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));
+
+        case 'browser_switch_tab':
+          const tabExists = tabs.some(t => t.id === args.tabId);
+          if (tabExists) {
+            setActiveTabId(args.tabId);
+            return `Switched to tab ${args.tabId}`;
+          }
+          return `Error: Tab ${args.tabId} not found.`;
+
+        case 'browser_close_tab':
+          handleCloseTab(args.tabId);
+          return `Closed tab ${args.tabId}`;
+
+        case 'browser_screenshot':
+          if (activeWebview && activeWebview.capturePage) {
+            const image = await activeWebview.capturePage();
+            return image.toDataURL();
+          }
+          return "Error: Could not take screenshot.";
+
+        default:
+          return `Error: Unknown tool ${toolName}`;
+      }
+    };
+
+    // 2. Original aiAgent context setup
     aiAgent.setActionContext({
       onNavigate: (url: string) => {
         handleNavigate(url);

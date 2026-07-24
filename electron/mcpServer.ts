@@ -35,47 +35,48 @@ export class BrowserMCPServer {
       return {
         tools: [
           {
-            name: 'navigate',
-            description: 'Navigates the browser to a specific URL',
+            name: 'browser_navigate',
+            description: 'Navigates the current browser tab to a specific URL.',
             inputSchema: {
               type: 'object',
               properties: {
-                url: { type: 'string', description: 'The URL to navigate to (must include http/https)' }
+                url: { type: 'string', description: 'The absolute URL to navigate to (e.g., https://github.com)' }
               },
               required: ['url']
             }
           },
           {
-            name: 'read_page_content',
-            description: 'Extracts the visible text and interactive elements (links, buttons, inputs) from the current page',
+            name: 'browser_read_page',
+            description: 'Extracts the visible text and interactive elements (links, buttons, inputs) from the current active page. Useful for understanding the DOM state.',
             inputSchema: { type: 'object', properties: {} }
           },
           {
-            name: 'click_element',
-            description: 'Clicks an element on the page using a CSS selector',
+            name: 'browser_click',
+            description: 'Clicks an element on the active page using a CSS selector.',
             inputSchema: {
               type: 'object',
               properties: {
-                selector: { type: 'string', description: 'CSS selector of the element to click' }
+                selector: { type: 'string', description: 'CSS selector of the element to click (e.g., #submit-btn, .nav-link)' }
               },
               required: ['selector']
             }
           },
           {
-            name: 'type_text',
-            description: 'Types text into an input or textarea element',
+            name: 'browser_type',
+            description: 'Types text into an input or textarea element on the active page.',
             inputSchema: {
               type: 'object',
               properties: {
                 selector: { type: 'string', description: 'CSS selector of the input element' },
-                text: { type: 'string', description: 'Text to type into the element' }
+                text: { type: 'string', description: 'Text to type into the element' },
+                pressEnter: { type: 'boolean', description: 'Whether to press Enter after typing (default: false)' }
               },
               required: ['selector', 'text']
             }
           },
           {
-            name: 'run_script',
-            description: 'Executes arbitrary JavaScript in the context of the active page',
+            name: 'browser_run_js',
+            description: 'Executes arbitrary JavaScript in the context of the active page and returns the result.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -83,6 +84,38 @@ export class BrowserMCPServer {
               },
               required: ['script']
             }
+          },
+          {
+            name: 'browser_list_tabs',
+            description: 'Lists all currently open tabs with their IDs, titles, and URLs.',
+            inputSchema: { type: 'object', properties: {} }
+          },
+          {
+            name: 'browser_switch_tab',
+            description: 'Switches the active tab to the one with the specified ID.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: { type: 'string', description: 'The ID of the tab to switch to' }
+              },
+              required: ['tabId']
+            }
+          },
+          {
+            name: 'browser_close_tab',
+            description: 'Closes the tab with the specified ID.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                tabId: { type: 'string', description: 'The ID of the tab to close' }
+              },
+              required: ['tabId']
+            }
+          },
+          {
+            name: 'browser_screenshot',
+            description: 'Takes a screenshot of the current active page and returns it as a base64 encoded string.',
+            inputSchema: { type: 'object', properties: {} }
           }
         ]
       };
