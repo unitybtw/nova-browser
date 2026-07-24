@@ -1,8 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
-import { HistoryModal, HistoryItem } from './components/HistoryModal';
-import { DownloadsModal, DownloadItem } from './components/DownloadsModal';
+export interface HistoryItem {
+  id: string;
+  url: string;
+  title: string;
+  favicon?: string;
+  timestamp: number;
+}
+
+export interface DownloadItem {
+  id: string;
+  filename: string;
+  url: string;
+  receivedBytes: number;
+  totalBytes: number;
+  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
+  isPaused?: boolean;
+  savePath?: string;
+}
 export interface UserSettings {
   searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
   privacyShield: boolean;
@@ -66,9 +82,6 @@ function App() {
     return saved || (tabs[0]?.id || '1');
   });
 
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
-  // Removed isSettingsOpen
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
@@ -115,22 +128,16 @@ function App() {
   const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(DEFAULT_VPN_LOCATIONS);
 
   const closeAllModals = useCallback(() => {
-    setIsHistoryOpen(false);
-    setIsDownloadsOpen(false);
-
     setIsShareOpen(false);
+    setIsScreenshotOpen(false);
     setIsSpotlightOpen(false);
     setIsVpnPopoverOpen(false);
     setIsExtensionsOpen(false);
   }, []);
 
-
-  const openModal = useCallback((modalName: 'history' | 'downloads' | 'settings' | 'share' | 'spotlight' | 'extensions') => {
+  const openModal = useCallback((modalName: 'share' | 'spotlight' | 'extensions') => {
     closeAllModals();
-    if (modalName === 'history') setIsHistoryOpen(true);
-    else if (modalName === 'downloads') setIsDownloadsOpen(true);
-
-    else if (modalName === 'share') setIsShareOpen(true);
+    if (modalName === 'share') setIsShareOpen(true);
     else if (modalName === 'spotlight') setIsSpotlightOpen(true);
     else if (modalName === 'extensions') setIsExtensionsOpen(true);
   }, [closeAllModals]);
@@ -753,8 +760,13 @@ function App() {
     if (activeTab) handleToggleBookmark(activeTab);
   }, [activeTab, handleToggleBookmark]);
 
-  const handleOpenHistory = useCallback(() => openModal('history'), [openModal]);
-  const handleOpenDownloads = useCallback(() => openModal('downloads'), [openModal]);
+  const handleOpenHistory = useCallback(() => {
+    handleNewTab('nova://history');
+  }, [handleNewTab]);
+
+  const handleOpenDownloads = useCallback(() => {
+    handleNewTab('nova://downloads');
+  }, [handleNewTab]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
   const handleOpenShare = useCallback(() => openModal('share'), [openModal]);
@@ -838,11 +850,9 @@ function App() {
     }
   }, [activeTabId]);
 
-  const handleCloseHistory = useCallback(() => setIsHistoryOpen(false), []);
   const handleClearHistory = useCallback(() => setHistory([]), []);
   const handleRemoveHistoryItem = useCallback((id: string) => setHistory(prev => prev.filter(item => item.id !== id)), []);
 
-  const handleCloseDownloads = useCallback(() => setIsDownloadsOpen(false), []);
   const handleClearDownloads = useCallback(() => setDownloads([]), []);
 
 
@@ -981,14 +991,16 @@ function App() {
       // Cmd + H: History
       if (key === 'h' && !e.shiftKey) {
         e.preventDefault();
-        setIsHistoryOpen(prev => !prev);
+        closeAllModals();
+        handleOpenHistory();
         return;
       }
 
       // Cmd + J: Downloads
       if (key === 'j') {
         e.preventDefault();
-        setIsDownloadsOpen(prev => !prev);
+        closeAllModals();
+        handleOpenDownloads();
         return;
       }
 
@@ -1248,24 +1260,6 @@ function App() {
         onNewTab={handleNewTab}
         onCloseTab={handleCloseTab}
         onNavigate={handleNavigate}
-      />
-
-      {/* HISTORY MODAL */}
-      <HistoryModal
-        isOpen={isHistoryOpen}
-        onClose={handleCloseHistory}
-        history={history}
-        onNavigate={handleNavigate}
-        onClearHistory={handleClearHistory}
-        onRemoveHistoryItem={handleRemoveHistoryItem}
-      />
-
-      {/* DOWNLOADS MODAL */}
-      <DownloadsModal
-        isOpen={isDownloadsOpen}
-        onClose={handleCloseDownloads}
-        downloads={downloads}
-        onClearDownloads={handleClearDownloads}
       />
 
       {/* SHARE & QR CODE MODAL */}

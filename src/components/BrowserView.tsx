@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { SettingsPage } from './SettingsPage';
+import { HistoryPage } from './HistoryPage';
+import { DownloadsPage } from './DownloadsPage';
+import { HistoryItem } from '../App';
+import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
 
 interface BrowserViewProps {
@@ -18,7 +22,12 @@ interface BrowserViewProps {
   privacyShield: boolean;
   newTabBackground?: 'default' | 'gradient' | 'mesh' | 'glass';
   settings: UserSettings;
-  onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
+  onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
+  history?: HistoryItem[];
+  downloads?: DownloadItemPage[];
+  onClearHistory?: () => void;
+  onRemoveHistoryItem?: (id: string) => void;
+  onClearDownloads?: () => void;
   onExportData?: () => void;
   onImportData?: (file: File) => void;
 }
@@ -37,6 +46,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   newTabBackground = 'default',
   settings,
   onUpdateSettings,
+  history = [],
+  downloads = [],
+  onClearHistory,
+  onRemoveHistoryItem,
+  onClearDownloads,
   onExportData,
   onImportData
 }) => {
@@ -49,6 +63,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   
   const isSettingsTab = React.useMemo(() => (
     tab.url === 'nova://settings' || tab.url === 'about:settings'
+  ), [tab.url]);
+  
+  const isHistoryTab = React.useMemo(() => (
+    tab.url === 'nova://history' || tab.url === 'about:history'
+  ), [tab.url]);
+  
+  const isDownloadsTab = React.useMemo(() => (
+    tab.url === 'nova://downloads' || tab.url === 'about:downloads'
   ), [tab.url]);
 
   const domReadyRef = useRef(false);
@@ -325,9 +347,32 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return (
       <SettingsPage
         settings={settings}
-        onUpdateSettings={onUpdateSettings}
+        onUpdateSettings={onUpdateSettings || (() => {})}
         onExportData={onExportData}
         onImportData={onImportData}
+      />
+    );
+  }
+
+  if (isHistoryTab) {
+    return (
+      <HistoryPage
+        history={history}
+        onNavigate={(url) => {
+          onUpdateTab(tab.id, { url, isLoading: true });
+          if (onNavigate) onNavigate(url);
+        }}
+        onClearHistory={onClearHistory || (() => {})}
+        onRemoveHistoryItem={onRemoveHistoryItem || (() => {})}
+      />
+    );
+  }
+
+  if (isDownloadsTab) {
+    return (
+      <DownloadsPage
+        downloads={downloads}
+        onClearDownloads={onClearDownloads || (() => {})}
       />
     );
   }
