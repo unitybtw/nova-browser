@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { UserSettings } from './SettingsModal';
@@ -235,31 +236,59 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     );
   }
 
-  return (
-    <div className="w-full h-full relative bg-white dark:bg-slate-900">
-      {/* Electron Webview Tag for Native Browser Experience */}
-      {typeof window !== 'undefined' && (window as any).electronAPI ? (
-        <webview
-          ref={webviewRef}
-          data-tab-id={tab.id}
-          src={tab.url}
-          className="w-full h-full border-none"
-          allowpopups={"true" as any}
-        />
-      ) : (
-        /* Web / Dev IFrame Fallback for standard browser preview */
-        <iframe
-          ref={webviewRef}
-          data-tab-id={tab.id}
-          src={tab.url}
-          className="w-full h-full border-none"
-          title={tab.title}
-          sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-          onLoad={() => {
-            onUpdateTab(tab.id, { isLoading: false });
-          }}
-        />
-      )}
+    <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
+      {/* Top Progress Bar */}
+      <AnimatePresence>
+        {tab.isLoading && (
+          <motion.div
+            initial={{ opacity: 0, width: '0%' }}
+            animate={{ 
+              opacity: 1, 
+              width: '85%',
+              transition: { 
+                width: { duration: 10, ease: 'easeOut' }, // Fake slow progress
+                opacity: { duration: 0.2 }
+              } 
+            }}
+            exit={{ 
+              opacity: 0, 
+              width: '100%', 
+              transition: { 
+                width: { duration: 0.3, ease: 'easeIn' }, // Jump to 100% quickly
+                opacity: { duration: 0.4, delay: 0.2 } // Then fade out
+              } 
+            }}
+            className="absolute top-0 left-0 h-[2px] bg-blue-500 z-50 origin-left"
+            style={{ boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}
+          />
+        )}
+      </AnimatePresence>
+
+      <div className="flex-1 w-full relative">
+        {/* Electron Webview Tag for Native Browser Experience */}
+        {typeof window !== 'undefined' && (window as any).electronAPI ? (
+          <webview
+            ref={webviewRef}
+            data-tab-id={tab.id}
+            src={tab.url}
+            className="w-full h-full border-none"
+            allowpopups={"true" as any}
+          />
+        ) : (
+          /* Web / Dev IFrame Fallback for standard browser preview */
+          <iframe
+            ref={webviewRef}
+            data-tab-id={tab.id}
+            src={tab.url}
+            className="w-full h-full border-none"
+            title={tab.title}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            onLoad={() => {
+              onUpdateTab(tab.id, { isLoading: false });
+            }}
+          />
+        )}
+      </div>
     </div>
   );
 });
