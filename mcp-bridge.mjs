@@ -29,7 +29,7 @@ async function main() {
   });
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     try {
-      const response = await client.request({ method: "tools/list" }, ListToolsRequestSchema);
+      const response = await client.listTools();
       return response;
     } catch (e) {
       console.error("[MCP Bridge] Error listing tools:", e);
@@ -38,10 +38,7 @@ async function main() {
   });
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
-      const response = await client.request(
-        { method: "tools/call", params: request.params },
-        CallToolRequestSchema
-      );
+      const response = await client.callTool(request.params);
       return response;
     } catch (e) {
       console.error(`[MCP Bridge] Error calling tool ${request.params.name}:`, e);
