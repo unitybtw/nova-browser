@@ -372,8 +372,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
 
         {/* Omnibox / Address Bar */}
-        <div className="flex-1 flex justify-center">
-          <div className="w-full max-w-3xl relative">
+        <div className="flex-1 flex px-2 lg:px-6 max-w-[1400px] mx-auto">
+          <div className="w-full relative">
             <form onSubmit={handleSearchSubmit} className="relative group w-full">
               <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
                 <Globe className={`w-3.5 h-3.5 transition-colors ${isIncognito ? 'text-slate-400 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-500'}`} />
