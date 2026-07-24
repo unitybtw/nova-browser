@@ -245,6 +245,11 @@ function App() {
     
     applyTheme();
 
+    // Apply to Electron nativeTheme for webviews
+    if ((window as any).electronAPI?.setTheme) {
+      (window as any).electronAPI.setTheme(settings.theme || 'system');
+    }
+
     // Listen for system theme changes if using system
     if (settings.theme === 'system' || !settings.theme) {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Existing API
+  setTheme: (theme: 'light' | 'dark' | 'system') => ipcRenderer.send('set-theme', theme),
   setPrivacyShield: (enabled: boolean) => ipcRenderer.invoke('set-privacy-shield', enabled),
   getSuggestions: (query: string) => ipcRenderer.invoke('get-suggestions', query),
   pauseDownload: (id: string) => ipcRenderer.invoke('pause-download', id),

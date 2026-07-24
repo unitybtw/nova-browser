@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
 import fs from 'fs';
@@ -236,6 +236,11 @@ ipcMain.handle('set-privacy-shield', (_event, enabled: boolean) => {
     }
   }
   return isPrivacyShieldEnabled;
+});
+
+// Set theme source for dark mode rendering on pages
+ipcMain.on('set-theme', (_event, theme: 'light' | 'dark' | 'system') => {
+  nativeTheme.themeSource = theme;
 });
 
 // Capture thumbnail from a webview via its webContentsId
