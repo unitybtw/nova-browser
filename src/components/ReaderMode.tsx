@@ -34,11 +34,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const controlsRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
 
-  // Keep isPlayingRef updated
-  useEffect(() => {
-    isPlayingRef.current = isPlaying;
-  }, [isPlaying]);
-
   // Close controls dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -58,40 +53,45 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const text = contentRef.current.innerText || title;
       const splitRegex = /[^.!?\n]+[.!?\n]+/g;
       const matches = text.match(splitRegex) || [text];
-      setSentences(matches.map(s => s.trim()).filter(s => s.length > 0));
+      const parsed = matches.map(s => s.trim()).filter(s => s.length > 0);
+      setSentences(parsed);
       setCurrentSentenceIndex(0);
     }
   }, [content, title]);
 
   useEffect(() => {
     if (!isActive) {
+      isPlayingRef.current = false;
       window.speechSynthesis.cancel();
       setIsPlaying(false);
       setIsPaused(false);
     }
     return () => {
+      isPlayingRef.current = false;
       window.speechSynthesis.cancel();
     };
   }, [isActive]);
 
-  const speakSentence = (index: number, rate: number = speechRate) => {
-    if (!isPlayingRef.current || index >= sentences.length) {
+  const speakSentence = (index: number, rate: number = speechRate, targetSentences: string[] = sentences) => {
+    if (!isPlayingRef.current || index >= targetSentences.length) {
+      isPlayingRef.current = false;
       setIsPlaying(false);
       setIsPaused(false);
       setCurrentSentenceIndex(0);
       return;
     }
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(sentences[index]);
+    const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
     utterance.rate = rate;
     
     utterance.onend = () => {
       if (!isPlayingRef.current) return;
       const next = index + 1;
-      if (next < sentences.length) {
+      if (next < targetSentences.length) {
         setCurrentSentenceIndex(next);
-        setTimeout(() => speakSentence(next, rate), 20);
+        setTimeout(() => speakSentence(next, rate, targetSentences), 20);
       } else {
+        isPlayingRef.current = false;
         setIsPlaying(false);
         setIsPaused(false);
         setCurrentSentenceIndex(0);
@@ -99,6 +99,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     };
 
     utterance.onerror = () => {
+      isPlayingRef.current = false;
       setIsPlaying(false);
       setIsPaused(false);
     };
@@ -108,23 +109,36 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
   const toggleSpeech = () => {
     if (isPlaying) {
+      isPlayingRef.current = false;
       window.speechSynthesis.pause();
       setIsPlaying(false);
       setIsPaused(true);
     } else if (isPaused) {
+      isPlayingRef.current = true;
       window.speechSynthesis.resume();
       setIsPlaying(true);
       setIsPaused(false);
     } else {
-      if (sentences.length > 0) {
+      let currentSentences = sentences;
+      if (currentSentences.length === 0 && contentRef.current) {
+        const text = contentRef.current.innerText || title || '';
+        const splitRegex = /[^.!?\n]+[.!?\n]+/g;
+        const matches = text.match(splitRegex) || [text];
+        currentSentences = matches.map(s => s.trim()).filter(s => s.length > 0);
+        setSentences(currentSentences);
+      }
+
+      if (currentSentences.length > 0) {
+        isPlayingRef.current = true; // Synchronous ref update
         setIsPlaying(true);
         setIsPaused(false);
-        speakSentence(currentSentenceIndex);
+        speakSentence(currentSentenceIndex, speechRate, currentSentences);
       }
     }
   };
 
   const stopSpeech = () => {
+    isPlayingRef.current = false;
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
@@ -135,6 +149,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     const nextRate = speechRate === 1 ? 1.25 : speechRate === 1.25 ? 1.5 : speechRate === 1.5 ? 2 : 1;
     setSpeechRate(nextRate);
     if (isPlaying) {
+      isPlayingRef.current = true;
       window.speechSynthesis.cancel();
       speakSentence(currentSentenceIndex, nextRate);
     }
@@ -164,7 +179,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         const doc = parser.parseFromString(html, 'text/html');
         const clonedDoc = doc.cloneNode(true) as Document;
         
-        // Add base element for resolving relative links & images
         try {
           const base = clonedDoc.createElement('base');
           base.href = url;
@@ -232,11 +246,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               </button>
             </div>
             
-            <div className="relative flex items-center gap-1" ref={controlsRef}>
-              <div className={`flex items-center gap-1 rounded-full px-2 mr-2 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+            <div className="relative flex items-center gap-1 no-drag" ref={controlsRef}>
+              <div className={`flex items-center gap-1 rounded-full px-2 mr-2 no-drag ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
                 <button 
                   onClick={toggleSpeech}
-                  className={`p-1.5 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                  className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title={isPlaying ? "Duraklat" : "Sesli Oku"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
@@ -244,7 +258,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 {(isPlaying || isPaused) && (
                   <button 
                     onClick={stopSpeech}
-                    className={`p-1.5 rounded-full transition-colors text-red-500 ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                    className={`p-1.5 rounded-full transition-colors text-red-500 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                     title="Durdur"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
@@ -253,7 +267,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <div className={`h-4 w-px mx-1 ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-300'}`}></div>
                 <button
                   onClick={changeSpeechRate}
-                  className={`flex items-center gap-1 p-1.5 rounded-full transition-colors text-xs font-bold w-12 justify-center ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                  className={`flex items-center gap-1 p-1.5 rounded-full transition-colors text-xs font-bold w-12 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title="Okuma Hızı"
                 >
                   {speechRate}x
@@ -262,35 +276,35 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               
               <button 
                 onClick={() => setShowControls(!showControls)}
-                className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
                 title="Görünüm Ayarları"
               >
                 <Type className="w-4 h-4" />
               </button>
               
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[260px] z-[100] ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[260px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
                   <div>
                     <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">TEMA</div>
                     <div className="flex gap-2">
-                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Açık Tema"><Sun className="w-5 h-5 mx-auto"/></button>
-                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepya Tema">A</button>
-                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Karanlık Tema"><Moon className="w-5 h-5 mx-auto"/></button>
+                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Açık Tema"><Sun className="w-5 h-5 mx-auto"/></button>
+                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepya Tema">A</button>
+                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Karanlık Tema"><Moon className="w-5 h-5 mx-auto"/></button>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">YAZI TİPİ</div>
                     <div className="flex gap-2">
-                      <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded-lg border text-sm font-sans font-medium transition-all ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Klasik</button>
+                      <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded-lg border text-sm font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
+                      <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Klasik</button>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">BOYUT</div>
                     <div className="flex gap-2 items-center">
-                      <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-sm transition-all ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
-                      <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-base font-medium transition-all ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
-                      <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-lg font-bold transition-all ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
+                      <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-sm transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
+                      <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-base font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
+                      <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-lg font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
                     </div>
                   </div>
                 </div>
