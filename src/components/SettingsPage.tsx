@@ -461,6 +461,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.useVerticalTabs ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
+                  
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tasks Widget</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show tasks and to-do list on the New Tab Page</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.showTasksWidget !== false ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.showTasksWidget !== false ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
                 </div>
               </section>
             </div>

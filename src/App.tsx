@@ -29,6 +29,7 @@ export interface UserSettings {
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
+  showTasksWidget?: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url';
   backgroundCustomUrl?: string;
   unsplashCategory?: string;

@@ -17,6 +17,7 @@ interface NewTabPageProps {
   newTabBackground?: string;
   backgroundCustomUrl?: string;
   unsplashCategory?: string;
+  showTasksWidget?: boolean;
 }
 
 const DEFAULT_SPEED_DIALS = [
@@ -33,7 +34,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   privacyShield = true,
   newTabBackground = 'default',
   backgroundCustomUrl = '',
-  unsplashCategory = 'nature,architecture'
+  unsplashCategory = 'nature,architecture',
+  showTasksWidget = true,
 }) => {
   const [query, setQuery] = useState('');
   const [speedDials, setSpeedDials] = useState(() => {
@@ -346,6 +348,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       </motion.div>
 
       {/* ToDo / Tasks Widget */}
+      {showTasksWidget && (
       <motion.div 
         variants={itemVariants}
         className="absolute bottom-8 right-8 w-84 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
@@ -442,6 +445,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           </div>
         </form>
       </motion.div>
+      )}
 
       {/* Edit/Add Modal */}
       <AnimatePresence>

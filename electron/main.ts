@@ -212,7 +212,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       });
     };
     loadDev();
-    mainWindow?.webContents.openDevTools({ mode: 'detach' });
+    mainWindow?.webContents.openDevTools({ mode: 'bottom' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }

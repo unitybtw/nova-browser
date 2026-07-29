@@ -344,6 +344,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         newTabBackground={newTabBackground}
         backgroundCustomUrl={settings.backgroundCustomUrl}
         unsplashCategory={settings.unsplashCategory}
+        showTasksWidget={settings.showTasksWidget}
       />
     );
   }
