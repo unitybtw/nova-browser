@@ -4,6 +4,12 @@ import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2 } f
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { UserSettings } from '../App';
 
+interface Todo {
+  id: string;
+  text: string;
+  completed: boolean;
+}
+
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
   searchEngine?: UserSettings['searchEngine'];
@@ -39,6 +45,35 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
+
+  // Todos State
+  const [todos, setTodos] = useState<Todo[]>(() => {
+    try {
+      const saved = localStorage.getItem('nova_todos');
+      if (saved) return JSON.parse(saved);
+    } catch(e) {}
+    return [];
+  });
+  const [newTodo, setNewTodo] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('nova_todos', JSON.stringify(todos));
+  }, [todos]);
+
+  const handleAddTodo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTodo.trim()) return;
+    setTodos([...todos, { id: Date.now().toString(), text: newTodo.trim(), completed: false }]);
+    setNewTodo('');
+  };
+
+  const toggleTodo = (id: string) => {
+    setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  };
+
+  const deleteTodo = (id: string) => {
+    setTodos(todos.filter(t => t.id !== id));
+  };
 
   useEffect(() => {
     localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
@@ -231,6 +266,60 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       </motion.div>
       </div>
 
+      {/* ToDo Widget */}
+      <motion.div 
+        variants={itemVariants}
+        className={`absolute bottom-8 right-8 w-80 rounded-2xl overflow-hidden flex flex-col shadow-2xl transition-colors border ${
+          isDarkBg 
+            ? 'bg-slate-900/60 backdrop-blur-md border-slate-700/50' 
+            : 'bg-white/80 backdrop-blur-md border-slate-200/80 dark:bg-slate-800/80 dark:border-slate-700/80'
+        }`}
+        style={{ maxHeight: '350px' }}
+      >
+        <div className={`px-4 py-3 border-b font-medium flex justify-between items-center ${isDarkBg ? 'border-slate-700/50 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200'}`}>
+          <span>Tasks</span>
+          <span className="text-xs opacity-60">{todos.filter(t => !t.completed).length} remaining</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 scrollbar-hide">
+          <AnimatePresence>
+            {todos.map(todo => (
+              <motion.div 
+                key={todo.id}
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className={`flex items-center gap-3 p-2 rounded-lg group ${isDarkBg ? 'hover:bg-white/10' : 'hover:bg-slate-100 dark:hover:bg-slate-700/50'}`}
+              >
+                <input 
+                  type="checkbox" 
+                  checked={todo.completed} 
+                  onChange={() => toggleTodo(todo.id)}
+                  className="w-4 h-4 rounded-full border-slate-300 text-blue-500 focus:ring-blue-500 bg-transparent cursor-pointer"
+                />
+                <span className={`flex-1 text-sm truncate ${todo.completed ? 'line-through opacity-50' : ''} ${isDarkBg ? 'text-white' : 'text-slate-700 dark:text-slate-300'}`}>
+                  {todo.text}
+                </span>
+                <button onClick={() => deleteTodo(todo.id)} className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/20 text-red-500 rounded transition-all">
+                  <X className="w-3 h-3" />
+                </button>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          {todos.length === 0 && (
+            <div className="text-center py-6 text-sm opacity-50">No tasks for today</div>
+          )}
+        </div>
+        <form onSubmit={handleAddTodo} className={`p-3 border-t ${isDarkBg ? 'border-slate-700/50' : 'border-slate-200 dark:border-slate-700'}`}>
+          <input
+            type="text"
+            value={newTodo}
+            onChange={(e) => setNewTodo(e.target.value)}
+            placeholder="Add a new task..."
+            className={`w-full bg-transparent text-sm outline-none placeholder-opacity-50 ${isDarkBg ? 'text-white placeholder-white' : 'text-slate-800 dark:text-white placeholder-slate-500'}`}
+          />
+        </form>
+      </motion.div>
+
       {/* Edit/Add Modal */}
       <AnimatePresence>
       {isEditModalOpen && (
@@ -249,37 +338,37 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4">{editingDial.index !== null ? 'Edit Shortcut' : 'Add Shortcut'}</h3>
             <form onSubmit={handleSaveDial} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">Name</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Name</label>
+                <input
+                  type="text"
                   value={editingDial.name}
-                  onChange={e => setEditingDial(prev => ({...prev, name: e.target.value}))}
+                  onChange={e => setEditingDial(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all dark:text-white"
                   required
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 dark:bg-slate-900"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-1">URL</label>
-                <input 
-                  type="text" 
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">URL</label>
+                <input
+                  type="text"
                   value={editingDial.url}
-                  onChange={e => setEditingDial(prev => ({...prev, url: e.target.value}))}
+                  onChange={e => setEditingDial(prev => ({ ...prev, url: e.target.value }))}
+                  className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all dark:text-white"
                   required
-                  placeholder="https://example.com"
-                  className="w-full px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-slate-800 dark:text-slate-100 dark:bg-slate-900"
+                  placeholder="e.g. example.com"
                 />
               </div>
-              <div className="flex justify-end gap-2 mt-4">
-                <button 
-                  type="button" 
+              <div className="flex items-center justify-end gap-2 mt-2">
+                <button
+                  type="button"
                   onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
                 >
                   Cancel
                 </button>
-                <button 
-                  type="submit" 
-                  className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium cursor-pointer"
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-500 hover:bg-blue-600 rounded-lg transition-colors shadow-sm"
                 >
                   Save
                 </button>
