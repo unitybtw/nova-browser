@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { UserSettings } from '../App';
 
 interface TopBarProps {
@@ -429,8 +430,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         <div className="flex-1 flex px-2 lg:px-6 max-w-[1400px] mx-auto">
           <div className="w-full relative">
             <form onSubmit={handleSearchSubmit} className="relative group w-full">
-              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none">
-                <Globe className={`w-3.5 h-3.5 transition-colors ${isIncognito ? 'text-slate-400 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-500'}`} />
+              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
+                {(() => {
+                  const sec = getUrlSecurityInfo(activeTab?.url || '');
+                  return (
+                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                      <span className="text-[10px] leading-none">{sec.icon}</span>
+                    </div>
+                  );
+                })()}
               </div>
               <input
                 type="text"
@@ -446,13 +454,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
                 placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL`}
-                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pl-9 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
+                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pl-11 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
                   isIncognito 
                     ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
                 }`}
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                 {activeTab?.zoomLevel !== undefined && activeTab.zoomLevel !== 0 && (
                   <div 
                     className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all ${isIncognito ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}

@@ -325,6 +325,15 @@ function App() {
       if (splitTabId === id) {
         setSplitTabId(null);
       }
+      
+      // If closing an incognito tab and no more incognito tabs exist, clear session
+      if (targetTab?.isIncognito) {
+        const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
+        if (!remainingIncognitoTabs && (window as any).electronAPI?.clearIncognitoSession) {
+          (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+        }
+      }
+      
       return newTabs;
     });
   }, [activeTabId, splitTabId]);

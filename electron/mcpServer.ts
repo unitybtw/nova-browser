@@ -1,5 +1,9 @@
 import express from 'express';
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, safeStorage } from 'electron';
+import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { app as electronApp } from 'electron';
 
 interface McpTool {
   name: string;
@@ -256,6 +260,45 @@ const TOOLS: McpTool[] = [
   }
 ];
 
+// Tool permission levels
+export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
+
+export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
+  // 🟢 Safe — always allowed
+  browser_navigate: 'safe',
+  browser_read_page: 'safe',
+  browser_screenshot: 'safe',
+  browser_list_tabs: 'safe',
+  browser_get_url: 'safe',
+  browser_scroll: 'safe',
+  browser_go_back: 'safe',
+  browser_go_forward: 'safe',
+  browser_reload: 'safe',
+  browser_wait: 'safe',
+  browser_get_element_text: 'safe',
+  browser_scroll_to_element: 'safe',
+  // 🟡 Medium — allowed by default, can be disabled
+  browser_click: 'medium',
+  browser_hover: 'medium',
+  browser_focus: 'medium',
+  browser_switch_tab: 'medium',
+  browser_close_tab: 'medium',
+  browser_new_tab: 'medium',
+  browser_mute_tab: 'medium',
+  browser_pin_tab: 'medium',
+  browser_duplicate_tab: 'medium',
+  browser_zoom: 'medium',
+  // 🔴 Sensitive — disabled by default, user must enable
+  browser_type: 'sensitive',
+  browser_run_js: 'sensitive',
+  browser_press_key: 'sensitive',
+  browser_select_option: 'sensitive',
+  browser_full_page_screenshot: 'safe',
+};
+
+// Default disabled tools (sensitive level)
+const DEFAULT_DISABLED_TOOLS = new Set(['browser_run_js']);
+
 interface SseClient {
   id: string;
   connectedAt: number;
@@ -270,11 +313,92 @@ export class BrowserMCPServer {
   private clients: Map<string, SseClient> = new Map();
   private requestCounter = 0;
   private pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
+  private token: string = '';
+  private disabledTools: Set<string> = new Set(DEFAULT_DISABLED_TOOLS);
+  private tokenFilePath: string = '';
 
   constructor(private port: number = 3020) {
     this.app = express();
     this.app.use(express.json({ limit: '10mb' }));
+    // Set token file path in app userData
+    try {
+      this.tokenFilePath = path.join(electronApp.getPath('userData'), 'nova-mcp-token');
+      this.token = this.loadOrGenerateToken();
+    } catch {
+      this.token = randomUUID();
+    }
     this.setupRoutes();
+  }
+
+  private loadOrGenerateToken(): string {
+    try {
+      if (fs.existsSync(this.tokenFilePath)) {
+        const raw = fs.readFileSync(this.tokenFilePath);
+        if (safeStorage.isEncryptionAvailable()) {
+          return safeStorage.decryptString(raw);
+        }
+        return raw.toString('utf-8');
+      }
+    } catch {}
+    return this.saveNewToken();
+  }
+
+  private saveNewToken(): string {
+    const newToken = randomUUID();
+    try {
+      const data = safeStorage.isEncryptionAvailable()
+        ? safeStorage.encryptString(newToken)
+        : Buffer.from(newToken, 'utf-8');
+      fs.writeFileSync(this.tokenFilePath, data);
+    } catch {}
+    return newToken;
+  }
+
+  public getToken(): string { return this.token; }
+
+  public rotateToken(): string {
+    this.token = this.saveNewToken();
+    return this.token;
+  }
+
+  public getDisabledTools(): string[] { return Array.from(this.disabledTools); }
+
+  public setToolEnabled(toolName: string, enabled: boolean) {
+    if (enabled) this.disabledTools.delete(toolName);
+    else this.disabledTools.add(toolName);
+    // Persist to userData
+    try {
+      const settingsPath = path.join(electronApp.getPath('userData'), 'mcp-tool-settings.json');
+      const current: Record<string, boolean> = fs.existsSync(settingsPath)
+        ? JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
+        : {};
+      current[toolName] = enabled;
+      fs.writeFileSync(settingsPath, JSON.stringify(current));
+    } catch {}
+  }
+
+  public loadToolSettings() {
+    try {
+      const settingsPath = path.join(electronApp.getPath('userData'), 'mcp-tool-settings.json');
+      if (!fs.existsSync(settingsPath)) return;
+      const settings: Record<string, boolean> = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      for (const [tool, enabled] of Object.entries(settings)) {
+        this.setToolEnabled(tool, enabled);
+      }
+    } catch {}
+  }
+
+  private isAuthenticated(req: express.Request): boolean {
+    // Check Authorization header: Bearer <token>
+    const authHeader = req.headers.authorization || '';
+    if (authHeader.startsWith('Bearer ') && authHeader.slice(7) === this.token) return true;
+    // Check query param: ?token=<token>
+    if (req.query.token === this.token) return true;
+    return false;
+  }
+
+  private isToolAllowed(toolName: string): boolean {
+    return !this.disabledTools.has(toolName);
   }
 
   public setMainWindow(window: BrowserWindow | null) {
@@ -303,6 +427,10 @@ export class BrowserMCPServer {
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Nova Browser window is not available');
+    }
+
+    if (!this.isToolAllowed(toolName)) {
+      throw new Error(`Permission denied: Tool '${toolName}' is disabled in MCP security settings.`);
     }
 
     // Special: browser_wait is handled directly
@@ -351,6 +479,10 @@ export class BrowserMCPServer {
 
     // MCP over SSE — client connects here
     this.app.get('/sse', (req, res) => {
+      if (!this.isAuthenticated(req)) {
+        return res.status(401).send('Unauthorized: Invalid or missing token');
+      }
+
       const clientId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
       res.setHeader('Content-Type', 'text/event-stream');
@@ -400,6 +532,10 @@ export class BrowserMCPServer {
 
     // MCP message endpoint — client POSTs JSON-RPC here
     this.app.post('/message', async (req, res) => {
+      if (!this.isAuthenticated(req)) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
+      }
+
       const body = req.body;
       
       try {
@@ -472,6 +608,10 @@ export class BrowserMCPServer {
 
     // Direct tool call endpoint (for testing without full MCP protocol)
     this.app.post('/call', async (req, res) => {
+      if (!this.isAuthenticated(req)) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
+      }
+
       const { tool, args = {} } = req.body;
       if (!tool) return res.status(400).json({ error: 'Missing tool name' });
 
@@ -484,7 +624,10 @@ export class BrowserMCPServer {
     });
 
     // List available tools
-    this.app.get('/tools', (_req, res) => {
+    this.app.get('/tools', (req, res) => {
+      if (!this.isAuthenticated(req)) {
+        return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
+      }
       res.json({ tools: TOOLS });
     });
   }

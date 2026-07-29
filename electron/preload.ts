@@ -19,6 +19,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mcp-client-changed', callback);
     return () => ipcRenderer.removeListener('mcp-client-changed', callback);
   },
+  getMcpToken: () => ipcRenderer.invoke('get-mcp-token'),
+  rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
+  getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
+  setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
+  clearIncognitoSession: () => ipcRenderer.invoke('clear-incognito-session'),
+  secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
+  secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
   // VPN
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
   // Shortcuts & Downloads events

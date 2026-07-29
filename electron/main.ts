@@ -1,5 +1,5 @@
 console.log('Main process starting...');
-import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme } from 'electron';
+import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme, safeStorage } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
 import fs from 'fs';
@@ -12,6 +12,38 @@ import { BrowserMCPServer } from './mcpServer.js';
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
 let mainWindow: BrowserWindow | null = null;
+let blockedDomains: string[] = [];
+
+try {
+  const blocklistPath = path.join(__dirname, '..', 'electron', 'blocked-domains.json');
+  if (fs.existsSync(blocklistPath)) {
+    blockedDomains = JSON.parse(fs.readFileSync(blocklistPath, 'utf8'));
+  }
+} catch (err) {
+  console.error('Failed to load blocked domains:', err);
+}
+
+const PHISHING_KEYWORDS = [
+  'login-secure', 'verify-account', 'account-verify', 'security-alert',
+  'billing-update', 'account-suspended', 'at-risk', 'urgent-verify',
+  'secure-login', 'identity-verify', 'recovery-team', 'prize-winner',
+  'free-robux', 'free-bitcoin', 'nitro-free', 'wallet-recovery',
+  'refund-2024', 'gift-card-free', 'survey-winner'
+];
+
+function isPhishing(urlStr: string) {
+  try {
+    const url = new URL(urlStr);
+    const hostname = url.hostname.toLowerCase();
+    
+    if (PHISHING_KEYWORDS.some(kw => hostname.includes(kw))) return true;
+    if (blockedDomains.some(blocked => hostname === blocked || hostname.endsWith('.' + blocked))) return true;
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 let isPrivacyShieldEnabled = true;
 let blocker: ElectronBlocker | null = null;
@@ -226,6 +258,38 @@ app.whenReady().then(async () => {
   });
 });
 
+app.on('web-contents-created', (_event, contents) => {
+  if (contents.getType() === 'webview') {
+    contents.on('will-navigate', (e, navigationUrl) => {
+      // 1. Phishing Check
+      if (isPhishing(navigationUrl)) {
+        e.preventDefault();
+        mainWindow?.webContents.send('blocked-site', { url: navigationUrl, reason: 'phishing' });
+        // Optional: you can inject a warning HTML directly or navigate to a local warning page
+        contents.executeJavaScript(`
+          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Tehlikeli Site Engellendi</h1><p>Bu sitenin (${navigationUrl}) oltalama (phishing) veya zararlı yazılım içerdiği tespit edildi.</p></div>';
+        `).catch(() => {});
+        return;
+      }
+
+      // 2. HTTPS Upgrade
+      try {
+        const urlObj = new URL(navigationUrl);
+        if (urlObj.protocol === 'http:' && urlObj.hostname !== 'localhost' && !urlObj.hostname.startsWith('127.')) {
+          e.preventDefault();
+          const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
+          
+          // Try loading HTTPS. If it fails, fallback to HTTP.
+          contents.loadURL(httpsUrl).catch(() => {
+            // If HTTPS fails (e.g. SSL error), fallback to HTTP
+            contents.loadURL(navigationUrl);
+          });
+        }
+      } catch {}
+    });
+  }
+});
+
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
@@ -372,6 +436,14 @@ ipcMain.handle('stop-mcp-server', () => {
   return false;
 });
 
+ipcMain.handle('get-mcp-token', () => mcpServer?.getToken() || '');
+ipcMain.handle('rotate-mcp-token', () => mcpServer?.rotateToken() || '');
+ipcMain.handle('get-mcp-tool-settings', () => mcpServer?.getDisabledTools() || []);
+ipcMain.handle('set-mcp-tool-enabled', (_event, toolName: string, enabled: boolean) => {
+  mcpServer?.setToolEnabled(toolName, enabled);
+  return true;
+});
+
 ipcMain.handle('get-mcp-status', () => {
   if (!mcpServer) return { running: false, port: 3020, clients: [], clientCount: 0 };
   return {
@@ -380,6 +452,49 @@ ipcMain.handle('get-mcp-status', () => {
     clientCount: mcpServer.getClientCount(),
     clients: mcpServer.getConnectedClientsInfo()
   };
+});
+
+// Gizli mod session temizleme
+ipcMain.handle('clear-incognito-session', async () => {
+  try {
+    const incogSession = session.fromPartition('incognito');
+    await incogSession.clearStorageData(); // cookies, cache, localStorage vs.
+    await incogSession.clearCache();
+    return true;
+  } catch (err) {
+    console.error('Gizli mod temizlenirken hata:', err);
+    return false;
+  }
+});
+
+// Generic Secure Storage API (for future password manager, etc.)
+ipcMain.handle('secure-store-set', async (_event, key: string, value: string) => {
+  try {
+    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+    const encrypted = safeStorage.isEncryptionAvailable() 
+      ? safeStorage.encryptString(value) 
+      : Buffer.from(value, 'utf-8');
+    fs.writeFileSync(keyPath, encrypted);
+    return true;
+  } catch (err) {
+    console.error('Secure store set error:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('secure-store-get', async (_event, key: string) => {
+  try {
+    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+    if (fs.existsSync(keyPath)) {
+      const encrypted = fs.readFileSync(keyPath);
+      return safeStorage.isEncryptionAvailable() 
+        ? safeStorage.decryptString(encrypted) 
+        : encrypted.toString('utf-8');
+    }
+  } catch (err) {
+    console.error('Secure store get error:', err);
+  }
+  return null;
 });
 
 // IPC Handler for VPN
