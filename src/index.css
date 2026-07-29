@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @custom-variant dark (&:is(.dark *));
 
+@theme {
+  --color-accent: var(--nova-accent, var(--color-blue-500));
+  --color-accent-hover: var(--nova-accent-hover, var(--color-blue-600));
+  --color-accent-light: var(--nova-accent-light, var(--color-blue-100));
+  --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
+  --color-accent-text: var(--nova-accent-text, #ffffff);
+}
+
 @layer utilities {
   .drag-region {
     -webkit-app-region: drag;

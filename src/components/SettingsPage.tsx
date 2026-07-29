@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard } from 'lucide-react';
 import { UserSettings } from '../App';
 
 export interface SettingsPageProps {
@@ -15,7 +15,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportData,
   onImportData
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced' | 'mcp'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   // MCP Server state
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
@@ -135,6 +135,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'advanced', label: 'Advanced', icon: Bot },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
+    { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
   ] as const;
 
   return (
@@ -335,17 +336,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'emerald', color: 'bg-emerald-500' },
                     { id: 'purple', color: 'bg-purple-500' },
                     { id: 'rose', color: 'bg-rose-500' },
-                    { id: 'amber', color: 'bg-amber-500' }
+                    { id: 'amber', color: 'bg-amber-500' },
+                    { id: 'custom', color: 'bg-slate-200 dark:bg-slate-700' }
                   ].map(c => (
                     <button
                       key={c.id}
                       onClick={() => onUpdateSettings({ accentColor: c.id as any })}
-                      className={`w-12 h-12 rounded-full ${c.color} shadow-lg transition-transform hover:scale-110 flex items-center justify-center`}
+                      className={`w-12 h-12 rounded-full ${c.color} shadow-lg transition-transform hover:scale-110 flex items-center justify-center relative`}
                     >
-                      {settings.accentColor === c.id && <div className="w-4 h-4 bg-white rounded-full opacity-90" />}
+                      {c.id === 'custom' && (
+                        <div 
+                          className="absolute inset-0 rounded-full flex items-center justify-center" 
+                          style={{ backgroundColor: settings.customAccentColor || '#3b82f6' }} 
+                        />
+                      )}
+                      {settings.accentColor === c.id && <div className="w-4 h-4 bg-white rounded-full opacity-90 z-10" />}
                     </button>
                   ))}
                 </div>
+                {settings.accentColor === 'custom' && (
+                  <div className="mt-4 flex items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Custom Color Picker:</label>
+                    <input 
+                      type="color" 
+                      value={settings.customAccentColor || '#3b82f6'}
+                      onChange={(e) => onUpdateSettings({ customAccentColor: e.target.value })}
+                      className="w-12 h-12 rounded cursor-pointer border-none p-0 bg-transparent"
+                    />
+                  </div>
+                )}
               </section>
 
               <section>
@@ -355,7 +374,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'default', name: 'Clean (Default)', style: 'bg-slate-100 dark:bg-slate-800' },
                     { id: 'gradient', name: 'Vibrant Gradient', style: 'bg-gradient-to-br from-blue-500 via-purple-500 to-rose-500' },
                     { id: 'mesh', name: 'Mesh Aurora', style: 'bg-gradient-to-tr from-emerald-400 via-cyan-500 to-blue-500' },
-                    { id: 'glass', name: 'Dark Glass', style: 'bg-slate-900' }
+                    { id: 'glass', name: 'Dark Glass', style: 'bg-slate-900' },
+                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-indigo-900/50 backdrop-blur' },
+                    { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
                   ].map(bg => (
                     <button
                       key={bg.id}
@@ -373,6 +394,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </button>
                   ))}
                 </div>
+                {settings.newTabBackground === 'unsplash' && (
+                  <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unsplash Category/Keywords:</label>
+                    <input 
+                      type="text" 
+                      value={settings.unsplashCategory || 'nature,architecture'}
+                      onChange={(e) => onUpdateSettings({ unsplashCategory: e.target.value })}
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500"
+                      placeholder="e.g. nature,city,dark"
+                    />
+                  </div>
+                )}
+                {settings.newTabBackground === 'custom_url' && (
+                  <div className="mt-4 animate-in fade-in slide-in-from-top-2">
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Video / Image URL:</label>
+                    <input 
+                      type="text" 
+                      value={settings.backgroundCustomUrl || ''}
+                      onChange={(e) => onUpdateSettings({ backgroundCustomUrl: e.target.value })}
+                      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500"
+                      placeholder="e.g. https://example.com/video.mp4"
+                    />
+                  </div>
+                )}
               </section>
 
               <section>
@@ -742,6 +787,99 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   })}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* SHORTCUTS */}
+          {activeTab === 'shortcuts' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <section>
+                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Keyboard Shortcuts</h2>
+                  <button 
+                    onClick={() => {
+                      onUpdateSettings({ 
+                        shortcuts: {
+                          newTab: { key: 't', shift: false, meta: true },
+                          reopenTab: { key: 't', shift: true, meta: true },
+                          closeTab: { key: 'w', shift: false, meta: true },
+                          newIncognito: { key: 'n', shift: true, meta: true },
+                          reload: { key: 'r', shift: false, meta: true },
+                          omnibox: { key: 'l', shift: false, meta: true },
+                          bookmark: { key: 'd', shift: false, meta: true },
+                          history: { key: 'h', shift: false, meta: true },
+                          downloads: { key: 'j', shift: false, meta: true },
+                          findInPage: { key: 'f', shift: false, meta: true },
+                        }
+                      });
+                    }}
+                    className="text-xs text-blue-500 hover:text-blue-600 font-medium"
+                  >
+                    Reset Defaults
+                  </button>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 divide-y divide-slate-100 dark:divide-slate-700/50">
+                  {[
+                    { id: 'newTab', label: 'New Tab' },
+                    { id: 'reopenTab', label: 'Reopen Closed Tab' },
+                    { id: 'closeTab', label: 'Close Active Tab' },
+                    { id: 'newIncognito', label: 'New Incognito Window' },
+                    { id: 'reload', label: 'Reload Page' },
+                    { id: 'omnibox', label: 'Focus Address Bar' },
+                    { id: 'bookmark', label: 'Bookmark Page' },
+                    { id: 'history', label: 'Open History' },
+                    { id: 'downloads', label: 'Open Downloads' },
+                    { id: 'findInPage', label: 'Find in Page' },
+                  ].map(action => {
+                    const currentBinding = settings.shortcuts?.[action.id] || { key: '?', meta: true };
+                    
+                    const formatBinding = (b: { key: string, shift?: boolean, meta?: boolean }) => {
+                      let str = '';
+                      if (b.meta) str += '⌘/Ctrl + ';
+                      if (b.shift) str += 'Shift + ';
+                      str += b.key.toUpperCase();
+                      return str;
+                    };
+
+                    return (
+                      <div key={action.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 group hover:bg-slate-50 dark:hover:bg-slate-700/20 rounded-xl transition-colors">
+                        <div>
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{action.label}</p>
+                          <p className="text-xs text-slate-500">ID: {action.id}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-slate-600 dark:text-slate-300 shadow-sm min-w-[100px] text-center">
+                            {formatBinding(currentBinding)}
+                          </div>
+                          <button
+                            onClick={() => {
+                              const input = prompt('Enter new key combination (e.g. "t", "T" for shift+t). Note: Cmd/Ctrl is always assumed.');
+                              if (input) {
+                                const newBinding = {
+                                  key: input.toLowerCase(),
+                                  shift: input.toLowerCase() !== input,
+                                  meta: true
+                                };
+                                onUpdateSettings({
+                                  shortcuts: {
+                                    ...settings.shortcuts,
+                                    [action.id]: newBinding
+                                  }
+                                });
+                              }
+                            }}
+                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                            title="Edit Shortcut"
+                          >
+                            <Keyboard className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           )}
 

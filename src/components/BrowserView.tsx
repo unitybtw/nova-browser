@@ -20,7 +20,7 @@ interface BrowserViewProps {
   onFoundInPage?: (activeMatchOrdinal: number, numberOfMatches: number) => void;
   searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
   privacyShield: boolean;
-  newTabBackground?: 'default' | 'gradient' | 'mesh' | 'glass';
+  newTabBackground?: string;
   settings: UserSettings;
   onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
   history?: HistoryItem[];
@@ -342,6 +342,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         searchEngine={searchEngine}
         privacyShield={privacyShield}
         newTabBackground={newTabBackground}
+        backgroundCustomUrl={settings.backgroundCustomUrl}
+        unsplashCategory={settings.unsplashCategory}
       />
     );
   }

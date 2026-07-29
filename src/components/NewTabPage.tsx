@@ -15,6 +15,8 @@ interface NewTabPageProps {
   searchEngine?: UserSettings['searchEngine'];
   privacyShield?: boolean;
   newTabBackground?: string;
+  backgroundCustomUrl?: string;
+  unsplashCategory?: string;
 }
 
 const DEFAULT_SPEED_DIALS = [
@@ -29,7 +31,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   onNavigate,
   searchEngine = 'google',
   privacyShield = true,
-  newTabBackground = 'default'
+  newTabBackground = 'default',
+  backgroundCustomUrl = '',
+  unsplashCategory = 'nature,architecture'
 }) => {
   const [query, setQuery] = useState('');
   const [speedDials, setSpeedDials] = useState(() => {
@@ -138,6 +142,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   };
 
   const getBackgroundStyle = () => {
+    if (newTabBackground === 'unsplash' || newTabBackground === 'custom_url') {
+      return 'text-white';
+    }
     switch (newTabBackground) {
       case 'gradient':
         return 'bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 text-white';
@@ -150,11 +157,42 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     }
   };
 
-  const isDarkBg = newTabBackground !== 'default' || true;
+  const isDarkBg = newTabBackground !== 'default';
+
+  const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
   return (
     <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()}`}>
       
+      {/* Dynamic Backgrounds (Unsplash / Custom) */}
+      {(newTabBackground === 'unsplash' || (newTabBackground === 'custom_url' && backgroundCustomUrl)) && (
+        <div className="absolute inset-0 z-0">
+          {isVideoBg ? (
+            <video 
+              src={backgroundCustomUrl} 
+              autoPlay 
+              loop 
+              muted 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img 
+              src={newTabBackground === 'unsplash' ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(unsplashCategory)}` : backgroundCustomUrl} 
+              alt="Background" 
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                // If Unsplash API fails (it was recently deprecated for source.unsplash.com), fallback to a generic placeholder service
+                if (newTabBackground === 'unsplash') {
+                  e.currentTarget.src = `https://picsum.photos/1920/1080?blur=2`;
+                }
+              }}
+            />
+          )}
+          {/* Overlay to ensure text remains readable */}
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+        </div>
+      )}
+
       {/* Background Decorative Mesh Orbs */}
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

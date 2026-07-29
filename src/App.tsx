@@ -24,17 +24,21 @@ export interface UserSettings {
   privacyShield: boolean;
   theme: 'light' | 'dark' | 'system';
   fontSize: 'small' | 'medium' | 'large';
-  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber';
+  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
+  customAccentColor?: string;
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
-  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass';
+  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url';
+  backgroundCustomUrl?: string;
+  unsplashCategory?: string;
   startupBehavior: 'newTab' | 'continue' | 'specificPages';
   tabStyle: 'rounded' | 'square' | 'floating';
   doNotTrack: boolean;
   clearOnExit: boolean;
   hardwareAcceleration: boolean;
   developerMode: boolean;
+  shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
 }
 import { ShareModal } from './components/ShareModal';
 import { ScreenshotModal } from './components/ScreenshotModal';
@@ -151,16 +155,31 @@ function App() {
       theme: 'system',
       fontSize: 'medium',
       accentColor: 'blue',
+      customAccentColor: '#3b82f6',
       showBookmarksBar: false,
       useVerticalTabs: false,
       mcpServerEnabled: false,
       newTabBackground: 'default',
+      backgroundCustomUrl: '',
+      unsplashCategory: 'nature,architecture',
       startupBehavior: 'newTab',
       tabStyle: 'floating',
       doNotTrack: true,
       clearOnExit: false,
       hardwareAcceleration: true,
-      developerMode: false
+      developerMode: false,
+      shortcuts: {
+        newTab: { key: 't', shift: false, meta: true },
+        reopenTab: { key: 't', shift: true, meta: true },
+        closeTab: { key: 'w', shift: false, meta: true },
+        newIncognito: { key: 'n', shift: true, meta: true },
+        reload: { key: 'r', shift: false, meta: true },
+        omnibox: { key: 'l', shift: false, meta: true },
+        bookmark: { key: 'd', shift: false, meta: true },
+        history: { key: 'h', shift: false, meta: true },
+        downloads: { key: 'j', shift: false, meta: true },
+        findInPage: { key: 'f', shift: false, meta: true },
+      }
     };
   });
 
@@ -246,25 +265,60 @@ function App() {
     localStorage.setItem('active_tab_session', activeTabId);
   }, [activeTabId]);
 
-  // Apply Theme Mode
+  // Apply Theme Mode & Custom Accent
   useEffect(() => {
-    const root = document.documentElement;
-    const applyTheme = () => {
-      if (settings.theme === 'dark') {
-        root.classList.add('dark');
-      } else if (settings.theme === 'light') {
-        root.classList.remove('dark');
+    if (settings.theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else if (settings.theme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
       } else {
-        // System default
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          root.classList.add('dark');
-        } else {
-          root.classList.remove('dark');
-        }
+        document.documentElement.classList.remove('dark');
       }
-    };
+    }
     
-    applyTheme();
+    // Apply custom accent colors via style injection
+    let accentStyleEl = document.getElementById('nova-accent-style');
+    if (!accentStyleEl) {
+      accentStyleEl = document.createElement('style');
+      accentStyleEl.id = 'nova-accent-style';
+      document.head.appendChild(accentStyleEl);
+    }
+    
+    if (settings.accentColor === 'custom' && settings.customAccentColor) {
+      // Basic hex to variants
+      const hex = settings.customAccentColor;
+      accentStyleEl.innerHTML = `
+        :root {
+          --nova-accent: ${hex};
+          --nova-accent-hover: ${hex}cc;
+          --nova-accent-light: ${hex}33;
+          --nova-accent-dark: ${hex}99;
+          --nova-accent-text: #ffffff;
+        }
+      `;
+    } else {
+      // For standard colors, we can map to Tailwind defaults or just clear custom vars to let Tailwind @theme defaults kick in
+      const defaultColorMap: Record<string, string> = {
+        'blue': '#3b82f6',
+        'emerald': '#10b981',
+        'purple': '#a855f7',
+        'rose': '#f43f5e',
+        'amber': '#f59e0b'
+      };
+      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['blue'];
+      accentStyleEl.innerHTML = `
+        :root {
+          --nova-accent: ${hex};
+          --nova-accent-hover: ${hex}cc;
+          --nova-accent-light: ${hex}33;
+          --nova-accent-dark: ${hex}99;
+          --nova-accent-text: #ffffff;
+        }
+      `;
+    }
 
     // Apply to Electron nativeTheme for webviews
     if ((window as any).electronAPI?.setTheme) {
@@ -274,28 +328,17 @@ function App() {
     // Listen for system theme changes if using system
     if (settings.theme === 'system' || !settings.theme) {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = () => applyTheme();
+      const listener = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      };
       mediaQuery.addEventListener('change', listener);
       return () => mediaQuery.removeEventListener('change', listener);
     }
-  }, [settings.theme]);
-
-  // Apply User Accent Color to CSS Root Variable
-  useEffect(() => {
-    const colorMap: Record<string, string> = {
-      blue: '#3b82f6',
-      emerald: '#10b981',
-      purple: '#a855f7',
-      rose: '#f43f5e',
-      amber: '#f59e0b'
-    };
-    const accentHex = colorMap[settings.accentColor] || '#3b82f6';
-    document.documentElement.style.setProperty('--accent-color', accentHex);
-    // In Tailwind v4, we can override the default blue color to match the accent
-    document.documentElement.style.setProperty('--color-blue-500', accentHex);
-    document.documentElement.style.setProperty('--color-blue-600', accentHex);
-    document.documentElement.style.setProperty('--color-blue-400', accentHex);
-  }, [settings.accentColor]);
+  }, [settings.theme, settings.accentColor, settings.customAccentColor]);
   
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
     const saved = localStorage.getItem('bookmarks');
@@ -1109,20 +1152,35 @@ function App() {
   // Global Chrome Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const isCmdOrCtrl = e.metaKey || e.ctrlKey;
-      if (!isCmdOrCtrl) return;
+      // Don't trigger shortcuts when typing in inputs/textareas
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+        // Allow Cmd/Ctrl combinations to pass through if they are specific browser shortcuts,
+        // but it's safer to just ignore unless metaKey is pressed.
+        if (!e.metaKey && !e.ctrlKey) return;
+      }
+
+      const s = settings.shortcuts;
+      if (!s) return;
 
       const key = e.key.toLowerCase();
+      const shift = e.shiftKey;
+      const meta = e.metaKey || e.ctrlKey; // Accept either Meta (Mac) or Ctrl (Windows)
 
-      // Cmd + T: New Tab
-      if (key === 't' && !e.shiftKey) {
+      const matches = (shortcutName: keyof typeof s) => {
+        const binding = s[shortcutName];
+        if (!binding) return false;
+        return key === binding.key.toLowerCase() && 
+               shift === !!binding.shift && 
+               meta === !!binding.meta;
+      };
+
+      if (matches('newTab')) {
         e.preventDefault();
         handleNewTab();
         return;
       }
-
-      // Cmd + Shift + T: Reopen Closed Tab
-      if (key === 't' && e.shiftKey) {
+      
+      if (matches('reopenTab')) {
         e.preventDefault();
         setClosedTabsStack(stack => {
           if (stack.length === 0) return stack;
@@ -1134,68 +1192,58 @@ function App() {
         return;
       }
 
-      // Cmd + W: Close Active Tab
-      if (key === 'w' && !e.shiftKey) {
+      if (matches('closeTab')) {
         e.preventDefault();
-        if (activeTabId) {
-          handleCloseTab(activeTabId);
-        }
+        if (activeTabId) handleCloseTab(activeTabId);
         return;
       }
 
-      // Cmd + Shift + N: New Incognito Tab
-      if (key === 'n' && e.shiftKey) {
+      if (matches('newIncognito')) {
         e.preventDefault();
         handleNewIncognitoTab();
         return;
       }
 
-      // Cmd + R: Reload
-      if (key === 'r') {
+      if (matches('reload')) {
         e.preventDefault();
         handleReload();
         return;
       }
 
-      // Cmd + L or Cmd + K: Focus Omnibox / Spotlight
-      if (key === 'l' || key === 'k') {
+      if (matches('omnibox')) {
         e.preventDefault();
         setIsSpotlightOpen(prev => !prev);
         return;
       }
 
-      // Cmd + D: Bookmark Active Page
-      if (key === 'd') {
+      if (matches('bookmark')) {
         e.preventDefault();
         handleToggleBookmarkActive();
         return;
       }
 
-      // Cmd + H: History
-      if (key === 'h' && !e.shiftKey) {
+      if (matches('history')) {
         e.preventDefault();
         closeAllModals();
         handleOpenHistory();
         return;
       }
 
-      // Cmd + J: Downloads
-      if (key === 'j') {
+      if (matches('downloads')) {
         e.preventDefault();
         closeAllModals();
         handleOpenDownloads();
         return;
       }
 
-      // Cmd + F: Find in Page
-      if (key === 'f' && !e.shiftKey) {
+      if (matches('findInPage')) {
         e.preventDefault();
         setIsFindInPageOpen(prev => !prev);
         return;
       }
 
-      // Cmd + 1..8: Switch to tab N, Cmd + 9: Switch to last tab
-      if (/^[1-9]$/.test(key)) {
+      // Hardcoded tab switching (Cmd + 1..9)
+      if (meta && !shift && /^[1-9]$/.test(key)) {
         e.preventDefault();
         const num = parseInt(key, 10);
         setTabs(currentTabs => {
@@ -1209,13 +1257,13 @@ function App() {
         return;
       }
 
-      // Cmd + Zoom Shortcuts (+, -, 0)
-      if (key === '+' || key === '=') {
+      // Hardcoded Zoom (Cmd + +, Cmd + -)
+      if (meta && (key === '+' || key === '=')) {
         e.preventDefault();
         handleZoomIn();
         return;
       }
-      if (key === '-') {
+      if (meta && key === '-') {
         e.preventDefault();
         handleZoomOut();
         return;
@@ -1224,7 +1272,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleCloseTab]);
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleCloseTab, settings.shortcuts]);
 
 
 
