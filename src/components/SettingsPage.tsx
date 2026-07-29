@@ -3,6 +3,7 @@ import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbru
 import { UserSettings } from '../App';
 
 export interface SettingsPageProps {
+  url?: string;
   settings: UserSettings;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
   onExportData?: () => void;
@@ -10,12 +11,24 @@ export interface SettingsPageProps {
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
+  url,
   settings,
   onUpdateSettings,
   onExportData,
   onImportData
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced' | 'mcp' | 'shortcuts'>('general');
+
+  useEffect(() => {
+    if (url) {
+      if (url.includes('#appearance')) setActiveTab('appearance');
+      else if (url.includes('#privacy')) setActiveTab('privacy');
+      else if (url.includes('#advanced')) setActiveTab('advanced');
+      else if (url.includes('#mcp')) setActiveTab('mcp');
+      else if (url.includes('#shortcuts')) setActiveTab('shortcuts');
+      else if (url.includes('#general')) setActiveTab('general');
+    }
+  }, [url]);
 
   // MCP Server state
   const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);

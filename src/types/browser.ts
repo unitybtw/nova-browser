@@ -30,6 +30,15 @@ export const defaultSettings = {
   mcpServerEnabled: false
 };
 
+export interface Extension {
+  id: string;
+  name: string;
+  description?: string;
+  version?: string;
+  enabled?: boolean;
+  iconData?: string;
+}
+
 export interface Bookmark {
   id: string;
   url: string;

@@ -351,6 +351,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (isSettingsTab) {
     return (
       <SettingsPage
+        url={tab.url}
         settings={settings}
         onUpdateSettings={onUpdateSettings || (() => {})}
         onExportData={onExportData}

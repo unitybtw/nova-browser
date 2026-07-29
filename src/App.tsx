@@ -41,6 +41,7 @@ export interface UserSettings {
   shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
 }
 import { ShareModal } from './components/ShareModal';
+import { ExtensionsModal } from './components/ExtensionsModal';
 import { ScreenshotModal } from './components/ScreenshotModal';
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
@@ -52,7 +53,7 @@ import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Bookmark } from './types/browser';
+import { Tab, Bookmark, Extension } from './types/browser';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -125,6 +126,7 @@ function App() {
   const [splitTabId, setSplitTabId] = useState<string | null>(null);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
+  const [extensions, setExtensions] = useState<Extension[]>([]);
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
@@ -1491,6 +1493,19 @@ function App() {
         onNewTab={handleNewTab}
         onCloseTab={handleCloseTab}
         onNavigate={handleNavigate}
+      />
+
+      {/* EXTENSIONS MODAL */}
+      <ExtensionsModal
+        isOpen={isExtensionsOpen}
+        onClose={() => setIsExtensionsOpen(false)}
+        extensions={extensions}
+        onToggleExtension={(id) => {
+          setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
+        }}
+        onRemoveExtension={(id) => {
+          setExtensions(prev => prev.filter(e => e.id !== id));
+        }}
       />
 
       {/* SHARE & QR CODE MODAL */}

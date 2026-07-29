@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { UserSettings } from '../App';
 
@@ -47,7 +47,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
 
-  // Todos State
   const [todos, setTodos] = useState<Todo[]>(() => {
     try {
       const saved = localStorage.getItem('nova_todos');
@@ -56,6 +55,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     return [];
   });
   const [newTodo, setNewTodo] = useState('');
+
+  // Clock & Greeting
+  const [timeStr, setTimeStr] = useState('');
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const hour = now.getHours();
+      if (hour < 12) setGreeting('Good Morning');
+      else if (hour < 18) setGreeting('Good Afternoon');
+      else setGreeting('Good Evening');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('nova_todos', JSON.stringify(todos));
@@ -157,12 +174,22 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     }
   };
 
-  const isDarkBg = newTabBackground !== 'default';
-
+  const isCustomDarkBg = newTabBackground !== 'default';
   const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
   return (
-    <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()}`}>
+    <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isCustomDarkBg ? 'dark' : ''}`}>
+      
+      {/* Settings Button */}
+      <div className="absolute top-6 right-6 z-50">
+        <button
+          onClick={() => onNavigate('nova://settings')}
+          className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-slate-800 dark:text-white transition-all shadow-lg shadow-black/5 hover:scale-110 active:scale-95"
+          title="Customize (Settings)"
+        >
+          <Settings className="w-5 h-5 opacity-70" />
+        </button>
+      </div>
       
       {/* Dynamic Backgrounds (Unsplash / Custom) */}
       {(newTabBackground === 'unsplash' || (newTabBackground === 'custom_url' && backgroundCustomUrl)) && (
@@ -209,19 +236,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         animate="visible"
         className="w-full max-w-3xl flex flex-col items-center gap-8 z-10"
       >
-        {/* Logo / Header */}
-        <motion.div variants={itemVariants} className="flex flex-col items-center gap-2">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 p-0.5 shadow-lg shadow-indigo-500/25">
-              <div className="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center">
-                <Globe className="w-6 h-6 text-indigo-400" />
-              </div>
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-slate-900 via-slate-700 to-slate-900 dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent">
-              Nova
-            </h1>
-          </div>
-          <p className="text-xs font-medium tracking-widest uppercase opacity-40">Next-Gen Browser</p>
+        {/* Clock & Greeting */}
+        <motion.div variants={itemVariants} className="text-center mb-4">
+          <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-serif transition-colors">{timeStr}</h1>
+          <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 font-medium transition-colors">{greeting}</p>
         </motion.div>
 
         {/* Omnibox / Search Form */}
@@ -235,11 +253,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className={`w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border ${
-                isDarkBg 
-                  ? 'bg-slate-800/60 backdrop-blur-md border-slate-700/60 text-white placeholder-slate-400 focus:bg-slate-800/90 focus:border-indigo-500/80 focus:ring-4 focus:ring-indigo-500/20' 
-                  : 'bg-white/90 backdrop-blur-md border-slate-200 text-slate-900 placeholder-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15'
-              }`}
+              className="w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-800/60 backdrop-blur-md border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-800/90 focus:border-indigo-500 dark:focus:border-indigo-500/80 focus:ring-4 focus:ring-indigo-500/15 dark:focus:ring-indigo-500/20"
               autoFocus
             />
             <button
@@ -276,11 +290,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               <div key={idx} className="relative group">
                 <button
                   onClick={() => onNavigate(dial.url)}
-                  className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md hover:scale-105 active:scale-95 ${
-                    isDarkBg 
-                      ? 'bg-slate-800/40 backdrop-blur-md border-slate-700/40 hover:bg-slate-800/80 hover:border-slate-600' 
-                      : 'bg-white/70 backdrop-blur-md border-slate-200/70 hover:bg-white hover:border-slate-300 dark:bg-slate-800/40 dark:border-slate-700/40'
-                  }`}
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md hover:scale-105 active:scale-95 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
                 >
                   <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center overflow-hidden p-2 shadow-inner">
                     <img 
@@ -325,11 +335,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                   setEditingDial({ name: '', url: '', index: null });
                   setIsEditModalOpen(true);
                 }}
-                className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border border-dashed opacity-60 hover:opacity-100 hover:scale-105 active:scale-95 ${
-                  isDarkBg 
-                    ? 'border-slate-700 hover:bg-slate-800/40' 
-                    : 'border-slate-300 hover:bg-slate-100 dark:border-slate-700'
-                }`}
+                className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border border-dashed opacity-60 hover:opacity-100 hover:scale-105 active:scale-95 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40"
               >
                 <Plus className="w-6 h-6" />
                 <span className="text-xs font-medium">Add Shortcut</span>
@@ -342,14 +348,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {/* ToDo / Tasks Widget */}
       <motion.div 
         variants={itemVariants}
-        className={`absolute bottom-8 right-8 w-84 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border ${
-          isDarkBg 
-            ? 'bg-slate-900/70 backdrop-blur-xl border-slate-700/60 shadow-black/40' 
-            : 'bg-white/85 backdrop-blur-xl border-slate-200/90 dark:bg-slate-800/85 dark:border-slate-700/80'
-        }`}
+        className="absolute bottom-8 right-8 w-84 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
         style={{ maxHeight: '380px' }}
       >
-        <div className={`px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center ${isDarkBg ? 'border-slate-700/50 text-white' : 'border-slate-200/80 dark:border-slate-700/80 text-slate-800 dark:text-slate-100'}`}>
+        <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
           <div className="flex items-center gap-2">
             <ListTodo className="w-4 h-4 text-indigo-400" />
             <span>Tasks</span>
@@ -380,12 +382,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
                 onClick={() => toggleTodo(todo.id)}
-                className={`flex items-center justify-between gap-3 p-2.5 rounded-xl group cursor-pointer transition-all ${
-                  todo.completed 
-                    ? 'opacity-60 bg-slate-500/5' 
-                    : isDarkBg 
-                      ? 'hover:bg-white/10' 
-                      : 'hover:bg-slate-100/80 dark:hover:bg-slate-700/60'
+                className={`flex items-center justify-between gap-3 p-2.5 rounded-xl group cursor-pointer transition-all hover:bg-slate-100/80 dark:hover:bg-white/10 ${
+                  todo.completed ? 'opacity-60 bg-slate-500/5' : ''
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -396,9 +394,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                   }`}>
                     {todo.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
-                  <span className={`text-sm truncate select-none transition-all ${
+                  <span className={`text-sm truncate select-none transition-all text-slate-800 dark:text-slate-100 ${
                     todo.completed ? 'line-through opacity-70' : ''
-                  } ${isDarkBg ? 'text-slate-100' : 'text-slate-800 dark:text-slate-200'}`}>
+                  }`}>
                     {todo.text}
                   </span>
                 </div>
@@ -424,16 +422,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           )}
         </div>
 
-        <form onSubmit={handleAddTodo} className={`p-3 border-t ${isDarkBg ? 'border-slate-700/50' : 'border-slate-200/80 dark:border-slate-700/80'}`}>
+        <form onSubmit={handleAddTodo} className="p-3 border-t border-slate-200/80 dark:border-slate-700/50">
           <div className="relative flex items-center">
             <input
               type="text"
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               placeholder="Add a new task..."
-              className={`w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-all focus:ring-2 focus:ring-indigo-500/40 ${
-                isDarkBg ? 'text-white placeholder-slate-400' : 'text-slate-800 dark:text-white placeholder-slate-500'
-              }`}
+              className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-all focus:ring-2 focus:ring-indigo-500/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
             />
             {newTodo.trim() && (
               <button 

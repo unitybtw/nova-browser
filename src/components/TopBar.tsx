@@ -497,39 +497,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : ''}`} />
                 </button>
                 
-                {/* Quick AI Actions Dropdown */}
-                <div className="relative group/ai">
-                  <button 
-                    type="button"
-                    className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-blue-500 hover:bg-blue-100 dark:hover:bg-slate-700'}`}
-                    title="Quick AI Actions"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                  </button>
-                  <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50 opacity-0 invisible group-hover/ai:opacity-100 group-hover/ai:visible transition-all">
-                    <button
-                      type="button"
-                      onClick={() => window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: 'Bu sayfayı benim için özetle.' }))}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
-                    >
-                      Sayfayı Özetle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: 'Bu sayfadaki metinleri Türkçeye çevir.' }))}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
-                    >
-                      Türkçeye Çevir
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: 'Bu sayfadaki en önemli 3 noktayı maddeler halinde çıkar.' }))}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-700"
-                    >
-                      Önemli Noktaları Çıkar
-                    </button>
-                  </div>
-                </div>
+
               </div>
           </form>
 
@@ -699,7 +667,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           </button>
           {/* MCP Status Badge */}
           <button
-            onClick={onOpenSettings}
+            onClick={() => onNavigate('nova://settings#mcp')}
             title={mcpRunning ? `MCP Server Running${mcpClientCount > 0 ? ` · ${mcpClientCount} connected` : ''}` : 'MCP Server Stopped'}
             className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
               mcpRunning && mcpClientCount > 0
