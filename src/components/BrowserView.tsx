@@ -62,7 +62,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   ), [tab.url]);
   
   const isSettingsTab = React.useMemo(() => (
-    tab.url === 'nova://settings' || tab.url === 'about:settings'
+    tab.url.startsWith('nova://settings') || tab.url.startsWith('about:settings')
   ), [tab.url]);
   
   const isHistoryTab = React.useMemo(() => (

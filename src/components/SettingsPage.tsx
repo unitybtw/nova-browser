@@ -577,40 +577,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </section>
 
-              <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Integration (MCP)</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Model Context Protocol (MCP) Server</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Allow external AI agents (like Claude Desktop) to control the browser, read tabs, and execute commands.</p>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        const newVal = !settings.mcpServerEnabled;
-                        onUpdateSettings({ mcpServerEnabled: newVal });
-                        if (newVal) {
-                          await (window as any).electronAPI?.startMcpServer?.();
-                        } else {
-                          await (window as any).electronAPI?.stopMcpServer?.();
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.mcpServerEnabled ? 'bg-purple-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.mcpServerEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
-                  </div>
-                  
-                  {settings.mcpServerEnabled && (
-                    <div className="mt-4 p-4 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
-                      <p className="text-xs font-semibold text-purple-800 dark:text-purple-300 mb-2">SSE Connection URL:</p>
-                      <code className="block bg-white dark:bg-slate-900 px-3 py-2 rounded-lg text-sm text-slate-800 dark:text-slate-300 font-mono shadow-inner border border-slate-200 dark:border-slate-700">
-                        http://localhost:3020/mcp
-                      </code>
-                    </div>
-                  )}
-                </div>
-              </section>
+
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Backup & Restore</h2>
