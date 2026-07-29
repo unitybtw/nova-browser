@@ -120,7 +120,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   };
 
   const handleDeleteSpeedDial = (index: number) => {
-    setSpeedDials(speedDials.filter((_, i) => i !== index));
+    setSpeedDials(speedDials.filter((_: any, i: number) => i !== index));
   };
 
   const containerVariants = {
@@ -234,7 +234,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         {/* Speed Dials Grid */}
         <motion.div variants={itemVariants} className="w-full">
           <div className="grid grid-cols-5 gap-4">
-            {speedDials.map((dial, idx) => (
+            {speedDials.map((dial: any, idx: number) => (
               <div key={idx} className="relative group">
                 <button
                   onClick={() => onNavigate(dial.url)}

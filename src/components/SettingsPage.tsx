@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink } from 'lucide-react';
 import { UserSettings } from '../App';
 
 export interface SettingsPageProps {
@@ -15,13 +15,94 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportData,
   onImportData
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced' | 'mcp'>('general');
+
+  // MCP Server state
+  const [mcpStatus, setMcpStatus] = useState<{ running: boolean; port: number; clientCount: number; clients: any[] } | null>(null);
+  const [mcpCopied, setMcpCopied] = useState(false);
+
+  const fetchMcpStatus = useCallback(async () => {
+    if ((window as any).electronAPI?.getMcpStatus) {
+      const status = await (window as any).electronAPI.getMcpStatus();
+      setMcpStatus(status);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchMcpStatus();
+    const interval = setInterval(fetchMcpStatus, 2000);
+
+    let cleanup: (() => void) | void;
+    if ((window as any).electronAPI?.onMcpClientChanged) {
+      cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
+        setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
+      });
+    }
+    return () => {
+      clearInterval(interval);
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, [fetchMcpStatus]);
+
+  const handleToggleMcp = async () => {
+    if (!mcpStatus) return;
+    if (mcpStatus.running) {
+      await (window as any).electronAPI?.stopMcpServer?.();
+    } else {
+      await (window as any).electronAPI?.startMcpServer?.();
+    }
+    setTimeout(fetchMcpStatus, 300);
+  };
+
+  const mcpConfigSnippet = `{
+  "mcpServers": {
+    "nova-browser": {
+      "url": "http://localhost:${mcpStatus?.port || 3020}/sse"
+    }
+  }
+}`;
+
+  const handleCopyConfig = () => {
+    navigator.clipboard.writeText(mcpConfigSnippet);
+    setMcpCopied(true);
+    setTimeout(() => setMcpCopied(false), 2000);
+  };
+
+  const MCP_TOOLS = [
+    { name: 'browser_navigate', desc: 'Navigate to a URL' },
+    { name: 'browser_read_page', desc: 'Extract full page text + links' },
+    { name: 'browser_screenshot', desc: 'Take a screenshot' },
+    { name: 'browser_click', desc: 'Click an element by CSS selector' },
+    { name: 'browser_type', desc: 'Type text into an input' },
+    { name: 'browser_scroll', desc: 'Scroll the page up/down/top/bottom' },
+    { name: 'browser_new_tab', desc: 'Open a new tab' },
+    { name: 'browser_close_tab', desc: 'Close a tab by ID' },
+    { name: 'browser_list_tabs', desc: 'List all open tabs' },
+    { name: 'browser_switch_tab', desc: 'Switch to a tab by ID' },
+    { name: 'browser_go_back', desc: 'Navigate back in history' },
+    { name: 'browser_go_forward', desc: 'Navigate forward in history' },
+    { name: 'browser_reload', desc: 'Reload the current page' },
+    { name: 'browser_get_url', desc: 'Get the current tab URL' },
+    { name: 'browser_hover', desc: 'Hover over an element' },
+    { name: 'browser_focus', desc: 'Focus an element' },
+    { name: 'browser_press_key', desc: 'Simulate a keyboard key press' },
+    { name: 'browser_select_option', desc: 'Select a dropdown option' },
+    { name: 'browser_get_element_text', desc: 'Get an element\'s text content' },
+    { name: 'browser_scroll_to_element', desc: 'Scroll until element is visible' },
+    { name: 'browser_zoom', desc: 'Set page zoom level' },
+    { name: 'browser_mute_tab', desc: 'Mute or unmute the active tab' },
+    { name: 'browser_pin_tab', desc: 'Pin or unpin the active tab' },
+    { name: 'browser_duplicate_tab', desc: 'Duplicate the active tab' },
+    { name: 'browser_run_js', desc: 'Execute arbitrary JavaScript' },
+    { name: 'browser_wait', desc: 'Wait for N milliseconds' },
+  ];
 
   const tabs = [
     { id: 'general', label: 'General', icon: Settings },
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'advanced', label: 'Advanced', icon: Bot },
+    { id: 'mcp', label: 'MCP Server', icon: Cpu },
   ] as const;
 
   return (
@@ -465,6 +546,105 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </section>
 
+            </div>
+          )}
+
+          {activeTab === 'mcp' && (
+            <div className="p-8 space-y-8 max-w-3xl">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
+                    <Cpu className="w-6 h-6 text-blue-500" />
+                    MCP Server
+                  </h2>
+                  <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Model Context Protocol — Let AI tools control Nova Browser</p>
+                </div>
+                <button
+                  onClick={handleToggleMcp}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all ${
+                    mcpStatus?.running
+                      ? 'bg-red-100 text-red-600 hover:bg-red-200 dark:bg-red-500/20 dark:text-red-400'
+                      : 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-500/20 dark:text-blue-400'
+                  }`}
+                >
+                  {mcpStatus?.running ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {mcpStatus?.running ? 'Stop Server' : 'Start Server'}
+                </button>
+              </div>
+
+              {/* Status Card */}
+              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-3 h-3 rounded-full ${mcpStatus?.running ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">
+                      {mcpStatus?.running ? 'Running' : 'Stopped'}
+                    </span>
+                    {mcpStatus?.running && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded-md">
+                        http://localhost:{mcpStatus.port}/sse
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <Users className="w-4 h-4" />
+                    <span>{mcpStatus?.clientCount || 0} connected</span>
+                  </div>
+                </div>
+
+                {/* Connected clients list */}
+                {(mcpStatus?.clients?.length || 0) > 0 && (
+                  <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Connected Clients</p>
+                    {mcpStatus!.clients.map((c: any) => (
+                      <div key={c.id} className="flex items-center gap-2 text-sm">
+                        <div className="w-2 h-2 rounded-full bg-green-400" />
+                        <span className="text-slate-700 dark:text-slate-300 truncate">{c.userAgent}</span>
+                        <span className="text-slate-400 text-xs ml-auto">
+                          {Math.round((Date.now() - c.connectedAt) / 1000)}s ago
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Config snippet */}
+              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-800 dark:text-slate-100">Setup Guide</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Add this to your AI tool's MCP config (e.g., claude_desktop_config.json)</p>
+                  </div>
+                  <button
+                    onClick={handleCopyConfig}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                  >
+                    {mcpCopied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+                    {mcpCopied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+                <pre className="bg-slate-950 text-green-400 text-sm rounded-xl p-4 font-mono overflow-x-auto leading-relaxed">
+                  {mcpConfigSnippet}
+                </pre>
+              </div>
+
+              {/* Tools list */}
+              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-yellow-500" />
+                  <p className="font-semibold text-slate-800 dark:text-slate-100">Available Tools ({MCP_TOOLS.length})</p>
+                </div>
+                <div className="grid grid-cols-1 gap-1.5 max-h-80 overflow-y-auto pr-1">
+                  {MCP_TOOLS.map(tool => (
+                    <div key={tool.name} className="flex items-center gap-3 py-1.5 px-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                      <code className="text-xs text-blue-600 dark:text-blue-400 font-mono bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded shrink-0">{tool.name}</code>
+                      <span className="text-sm text-slate-500 dark:text-slate-400 truncate">{tool.desc}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

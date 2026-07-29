@@ -29,7 +29,8 @@ import {
   Camera,
   Sparkles,
   Puzzle,
-  ShieldCheck
+  ShieldCheck,
+  Cpu
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
@@ -127,7 +128,28 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
+  const [mcpClientCount, setMcpClientCount] = useState(0);
+  const [mcpRunning, setMcpRunning] = useState(false);
   
+  // Poll MCP status every 3 seconds for the badge
+  useEffect(() => {
+    const fetchMcp = async () => {
+      if ((window as any).electronAPI?.getMcpStatus) {
+        const s = await (window as any).electronAPI.getMcpStatus();
+        setMcpRunning(s?.running || false);
+        setMcpClientCount(s?.clientCount || 0);
+      }
+    };
+    fetchMcp();
+    const iv = setInterval(fetchMcp, 3000);
+    let cleanup: (() => void) | void;
+    if ((window as any).electronAPI?.onMcpClientChanged) {
+      cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
+        setMcpClientCount(data.count);
+      });
+    }
+    return () => { clearInterval(iv); if (typeof cleanup === 'function') cleanup(); };
+  }, []);
   const activeTab = React.useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
   const isBookmarked = React.useMemo(() => bookmarks.some(b => b.url === activeTab?.url), [bookmarks, activeTab?.url]);
 
@@ -666,6 +688,24 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             title="Extensions"
           >
             <Puzzle className="w-4 h-4" />
+          </button>
+          {/* MCP Status Badge */}
+          <button
+            onClick={onOpenSettings}
+            title={mcpRunning ? `MCP Server Running${mcpClientCount > 0 ? ` · ${mcpClientCount} connected` : ''}` : 'MCP Server Stopped'}
+            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
+              mcpRunning && mcpClientCount > 0
+                ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
+                : mcpRunning
+                ? 'bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400'
+                : 'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500'
+            }`}
+          >
+            <Cpu className="w-3 h-3" />
+            <span>MCP</span>
+            {mcpClientCount > 0 && (
+              <span className={`w-1.5 h-1.5 rounded-full ${mcpClientCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
+            )}
           </button>
           <button 
             onClick={onToggleSplitView}

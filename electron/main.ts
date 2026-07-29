@@ -1,3 +1,4 @@
+console.log('Main process starting...');
 import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
@@ -6,10 +7,6 @@ import fs from 'fs';
 import unzip from 'unzip-crx-3';
 import { ElectronBlocker } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
-
-// Enable WebGPU and hardware acceleration flags
-app.commandLine.appendSwitch('enable-unsafe-webgpu');
-app.commandLine.appendSwitch('enable-features', 'Vulkan,UseSkiaRenderer,WebAssemblySimd');
 
 // Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
@@ -194,12 +191,19 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
   });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  console.log('App is ready, creating window...');
   createWindow();
 
-  // Initialize MCP Server but don't start it until toggled
+  // Initialize and auto-start MCP Server
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
+  try {
+    await mcpServer.start();
+    console.log('[MCP] Server started on port 3020');
+  } catch (err) {
+    console.error('[MCP] Failed to start server:', err);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -353,7 +357,7 @@ ipcMain.handle('show-download-in-folder', (_event, pathStr: string) => {
 
 // MCP Server Controls
 ipcMain.handle('start-mcp-server', async () => {
-  if (mcpServer) {
+  if (mcpServer && !mcpServer.isRunning()) {
     await mcpServer.start();
     return true;
   }
@@ -361,11 +365,21 @@ ipcMain.handle('start-mcp-server', async () => {
 });
 
 ipcMain.handle('stop-mcp-server', () => {
-  if (mcpServer) {
+  if (mcpServer && mcpServer.isRunning()) {
     mcpServer.stop();
     return true;
   }
   return false;
+});
+
+ipcMain.handle('get-mcp-status', () => {
+  if (!mcpServer) return { running: false, port: 3020, clients: [], clientCount: 0 };
+  return {
+    running: mcpServer.isRunning(),
+    port: 3020,
+    clientCount: mcpServer.getClientCount(),
+    clients: mcpServer.getConnectedClientsInfo()
+  };
 });
 
 // IPC Handler for VPN

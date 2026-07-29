@@ -46,7 +46,7 @@ import { WorkspaceManager } from './components/WorkspaceManager';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
-import { ExtensionsModal } from './components/ExtensionsModal';
+
 import { aiAgent } from './services/aiAgent';
 import { Tab, Bookmark } from './types/browser';
 
@@ -584,6 +584,166 @@ function App() {
             return image.toDataURL();
           }
           return "Error: Could not take screenshot.";
+
+        case 'browser_scroll': {
+          const direction = args.direction || 'down';
+          const amount = args.amount || 500;
+          if (activeWebview && activeWebview.executeJavaScript) {
+            if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${amount})`);
+            else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${amount})`);
+            else if (direction === 'top') await activeWebview.executeJavaScript(`window.scrollTo(0, 0)`);
+            else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+            return `Scrolled ${direction}`;
+          }
+          return "Error: No active webview.";
+        }
+
+        case 'browser_new_tab': {
+          const newUrl = args.url || 'nova://newtab';
+          handleNewTab(newUrl);
+          return `Opened new tab: ${newUrl}`;
+        }
+
+        case 'browser_go_back':
+          if (activeWebview && activeWebview.goBack) {
+            activeWebview.goBack();
+            return "Navigated back";
+          }
+          return "Error: No active webview.";
+
+        case 'browser_go_forward':
+          if (activeWebview && activeWebview.goForward) {
+            activeWebview.goForward();
+            return "Navigated forward";
+          }
+          return "Error: No active webview.";
+
+        case 'browser_reload':
+          if (activeWebview && activeWebview.reload) {
+            activeWebview.reload();
+            return "Page reloaded";
+          }
+          return "Error: No active webview.";
+
+        case 'browser_get_url': {
+          const activeTab = tabs.find(t => t.id === activeTabId);
+          return activeTab?.url || "Error: Could not get URL";
+        }
+
+        case 'browser_hover':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector(${JSON.stringify(args.selector)});
+                if (el) {
+                  el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                  el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                  return "Hovered over element";
+                }
+                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_focus':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector(${JSON.stringify(args.selector)});
+                if (el) { el.focus(); return "Focused element"; }
+                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_select_option':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector(${JSON.stringify(args.selector)});
+                if (el && el.tagName === 'SELECT') {
+                  el.value = ${JSON.stringify(args.value)};
+                  el.dispatchEvent(new Event('change', { bubbles: true }));
+                  return "Selected option: " + ${JSON.stringify(args.value)};
+                }
+                return "Error: Select element not found: " + ${JSON.stringify(args.selector)};
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_press_key':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            const focusSelector = args.selector ? `document.querySelector(${JSON.stringify(args.selector)})?.focus();` : '';
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                ${focusSelector}
+                const target = ${args.selector ? `document.querySelector(${JSON.stringify(args.selector)}) || document.activeElement` : 'document.activeElement || document.body'};
+                const key = ${JSON.stringify(args.key)};
+                const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
+                const keyCode = keyMap[key] || key.charCodeAt(0);
+                ['keydown','keypress','keyup'].forEach(t => {
+                  target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true }));
+                });
+                return "Pressed key: " + key;
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_get_element_text':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector(${JSON.stringify(args.selector)});
+                if (el) return el.innerText || el.textContent || '';
+                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_scroll_to_element':
+          if (activeWebview && activeWebview.executeJavaScript) {
+            return await activeWebview.executeJavaScript(`
+              (() => {
+                const el = document.querySelector(${JSON.stringify(args.selector)});
+                if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return "Scrolled to element"; }
+                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+              })()
+            `);
+          }
+          return "Error: No active webview.";
+
+        case 'browser_zoom':
+          if (activeWebview && activeWebview.setZoomLevel) {
+            activeWebview.setZoomLevel(args.level || 0);
+            return `Zoom level set to ${args.level}`;
+          }
+          return "Error: No active webview.";
+
+        case 'browser_mute_tab': {
+          const mute = Boolean(args.mute);
+          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isMuted: mute } : t));
+          return mute ? "Tab muted" : "Tab unmuted";
+        }
+
+        case 'browser_pin_tab': {
+          const pin = Boolean(args.pin);
+          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isPinned: pin } : t));
+          return pin ? "Tab pinned" : "Tab unpinned";
+        }
+
+        case 'browser_duplicate_tab': {
+          const currentTab = tabs.find(t => t.id === activeTabId);
+          if (currentTab) {
+            handleNewTab(currentTab.url);
+            return `Duplicated tab: ${currentTab.url}`;
+          }
+          return "Error: No active tab to duplicate";
+        }
 
         default:
           return `Error: Unknown tool ${toolName}`;
@@ -1292,11 +1452,7 @@ function App() {
         pageTitle={activeTab?.title || ''}
       />
 
-      {/* EXTENSIONS MODAL */}
-      <ExtensionsModal
-        isOpen={isExtensionsOpen}
-        onClose={() => setIsExtensionsOpen(false)}
-      />
+
 
       {/* VPN POPOVER */}
       <VpnPopover
