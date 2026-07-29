@@ -245,28 +245,28 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             </button>
             
             {showControls && (
-              <div className={`absolute top-full right-0 mt-2 p-4 rounded-xl shadow-xl border flex flex-col gap-4 min-w-[200px] ${theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-white border-slate-200'}`}>
+              <div className={`absolute top-full right-4 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[240px] z-[100] ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50' : 'bg-white border-slate-200'}`}>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-2">TEMA</div>
+                  <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">TEMA</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setTheme('light')} className={`flex-1 p-2 rounded border ${theme==='light' ? 'border-blue-500' : 'border-slate-200'} bg-white text-slate-900`}><Sun className="w-4 h-4 mx-auto"/></button>
-                    <button onClick={() => setTheme('sepia')} className={`flex-1 p-2 rounded border ${theme==='sepia' ? 'border-amber-600' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900`}>A</button>
-                    <button onClick={() => setTheme('dark')} className={`flex-1 p-2 rounded border ${theme==='dark' ? 'border-blue-500' : 'border-slate-600'} bg-slate-900 text-white`}><Moon className="w-4 h-4 mx-auto"/></button>
+                    <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Açık Tema"><Sun className="w-5 h-5 mx-auto"/></button>
+                    <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepya Tema">A</button>
+                    <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Karanlık Tema"><Moon className="w-5 h-5 mx-auto"/></button>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-2">FONT TİPİ</div>
+                  <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">YAZI TİPİ</div>
                   <div className="flex gap-2">
-                    <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded border text-sm font-sans ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700' : theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>Sans</button>
-                    <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded border text-sm font-serif ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700' : theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>Serif</button>
+                    <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded-lg border text-sm font-sans font-medium transition-all ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
+                    <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Klasik</button>
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold text-slate-400 mb-2">BOYUT</div>
-                  <div className="flex gap-2">
-                    <button onClick={() => setFontSize('sm')} className={`flex-1 py-1 rounded border text-sm ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700' : theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>A-</button>
-                    <button onClick={() => setFontSize('md')} className={`flex-1 py-1 rounded border text-md ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700' : theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>A</button>
-                    <button onClick={() => setFontSize('lg')} className={`flex-1 py-1 rounded border text-lg ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700' : theme === 'dark' ? 'border-slate-600' : 'border-slate-200'}`}>A+</button>
+                  <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">BOYUT</div>
+                  <div className="flex gap-2 items-center">
+                    <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-sm transition-all ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
+                    <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-base font-medium transition-all ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
+                    <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-lg font-bold transition-all ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
                   </div>
                 </div>
               </div>
