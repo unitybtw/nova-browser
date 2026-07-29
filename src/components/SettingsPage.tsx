@@ -68,8 +68,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [fetchMcpStatus]);
 
   const handleToggleMcp = async () => {
-    if (!mcpStatus) return;
-    if (mcpStatus.running) {
+    const isRunning = mcpStatus?.running || false;
+    if (isRunning) {
       await (window as any).electronAPI?.stopMcpServer?.();
     } else {
       await (window as any).electronAPI?.startMcpServer?.();
