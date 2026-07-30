@@ -9,6 +9,7 @@ interface ExtensionsModalProps {
   extensions: Extension[];
   onToggleExtension?: (id: string) => void;
   onRemoveExtension?: (id: string) => void;
+  onManageExtensions?: () => void;
 }
 
 export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
@@ -16,7 +17,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onClose,
   extensions,
   onToggleExtension,
-  onRemoveExtension
+  onRemoveExtension,
+  onManageExtensions
 }) => {
   if (!isOpen) return null;
 
@@ -87,7 +89,13 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
         </div>
         
         <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-          <button onClick={onClose} className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 shadow-sm">
+          <button 
+            onClick={() => {
+              if (onManageExtensions) onManageExtensions();
+              onClose();
+            }}
+            className="w-full py-2.5 px-4 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
+          >
             <Settings className="w-4 h-4" /> Manage Extensions
           </button>
         </div>

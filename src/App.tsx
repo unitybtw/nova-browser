@@ -1507,6 +1507,7 @@ function App() {
         onRemoveExtension={(id) => {
           setExtensions(prev => prev.filter(e => e.id !== id));
         }}
+        onManageExtensions={() => handleNewTab('nova://settings#extensions')}
       />
 
       {/* SHARE & QR CODE MODAL */}

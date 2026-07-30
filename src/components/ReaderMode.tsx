@@ -251,7 +251,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
     utterance.rate = rate;
-    
+    const voices = window.speechSynthesis.getVoices();
+    const betterVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Siri') || v.name === 'Yelda' || v.name === 'Samantha' || v.name.includes('Google')) || voices.find(v => !v.name.includes('Alex')) || voices[0];
+    if (betterVoice) {
+      utterance.voice = betterVoice;
+    }
     utterance.onend = () => {
       if (!isPlayingRef.current) return;
       const next = index + 1;

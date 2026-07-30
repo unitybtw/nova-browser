@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard } from 'lucide-react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle } from 'lucide-react';
 import { UserSettings } from '../App';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 
@@ -217,6 +217,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'passwords', label: 'Passwords', icon: Key },
+    { id: 'extensions', label: 'Extensions', icon: Puzzle },
     { id: 'advanced', label: 'Advanced', icon: Bot },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -956,6 +957,34 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                     );
                   })}
+                </div>
+              </section>
+            </div>
+          )}
+
+          {activeTab === 'extensions' && (
+            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <section className="space-y-4">
+                <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
+                  <div className="p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl shadow-inner">
+                    <Puzzle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Manage your browser extensions.</p>
+                  </div>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
+                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400">
+                    <Puzzle className="w-8 h-8" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Extension Management</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
+                      Extensions are loaded from your local extensions folder. You can enable or disable them from the extensions menu in the top bar. Advanced management will be available in a future update.
+                    </p>
+                  </div>
                 </div>
               </section>
             </div>
