@@ -48,11 +48,11 @@ export const Hero = () => {
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            <a href="https://github.com/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
+            <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
               <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
               Download for Mac
             </a>
-            <a href="https://github.com/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-white/50 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
+            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-white/50 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
               View Source
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>

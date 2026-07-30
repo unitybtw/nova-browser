@@ -39,12 +39,12 @@ export const Navbar = () => {
             <a href="#features" className="hover:text-primary transition-colors">Features</a>
             <a href="#privacy" className="hover:text-primary transition-colors">Privacy</a>
             <a href="#design" className="hover:text-primary transition-colors">Design</a>
-            <a href="https://github.com/nova-browser" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">GitHub</a>
+            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">GitHub</a>
           </nav>
 
           {/* CTA */}
           <div className="hidden md:flex items-center">
-            <a href="https://github.com/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-foreground hover:bg-foreground/90 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2">
+            <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-foreground hover:bg-foreground/90 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2">
               <Download className="w-4 h-4" />
               Download for Mac
             </a>
@@ -66,7 +66,7 @@ export const Navbar = () => {
           <a href="#features" className="px-4 py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>Features</a>
           <a href="#privacy" className="px-4 py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>Privacy</a>
           <a href="#design" className="px-4 py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>Design</a>
-          <a href="https://github.com/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors">
+          <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors">
             Download for Mac
           </a>
         </div>

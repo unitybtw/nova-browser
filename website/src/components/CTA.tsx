@@ -23,12 +23,12 @@ export const CTA = () => {
               Join thousands of users who have switched to Nova for a faster, cleaner, and more private web experience. Fully open source and free forever.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <a href="https://github.com/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2">
+              <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2">
                 <Download className="w-5 h-5" />
                 Download for Mac
               </a>
               <a 
-                href="https://github.com/nova-browser" 
+                href="https://github.com/unitybtw/nova-browser" 
                 target="_blank" 
                 rel="noreferrer"
                 className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all backdrop-blur-md border border-white/20 flex items-center justify-center gap-2"
