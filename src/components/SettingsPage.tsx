@@ -1,6 +1,75 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard } from 'lucide-react';
 import { UserSettings } from '../App';
+import { Eye, EyeOff, Trash2 } from 'lucide-react';
+
+const PasswordList = () => {
+  const [passwords, setPasswords] = useState<any[]>([]);
+  const [visibleIndexes, setVisibleIndexes] = useState<Set<number>>(new Set());
+
+  useEffect(() => {
+    const fetchPasswords = async () => {
+      try {
+        const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        if (raw) setPasswords(JSON.parse(raw));
+      } catch (e) {}
+    };
+    fetchPasswords();
+  }, []);
+
+  const handleDelete = async (index: number) => {
+    if (!window.confirm('Bu şifreyi silmek istediğinize emin misiniz?')) return;
+    const newPasses = [...passwords];
+    newPasses.splice(index, 1);
+    setPasswords(newPasses);
+    try {
+      await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(newPasses));
+    } catch (e) {}
+  };
+
+  const toggleVisibility = (index: number) => {
+    const next = new Set(visibleIndexes);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setVisibleIndexes(next);
+  };
+
+  if (passwords.length === 0) {
+    return <div className="p-6 text-center text-slate-500">Henüz kaydedilmiş şifre yok.</div>;
+  }
+
+  return (
+    <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+      {passwords.map((p, i) => (
+        <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+          <div className="flex items-center gap-4 flex-1">
+            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center flex-shrink-0">
+              <img src={`https://www.google.com/s2/favicons?domain=${p.hostname}&sz=32`} className="w-5 h-5" alt="" />
+            </div>
+            <div className="flex-1">
+              <div className="font-medium text-slate-800 dark:text-slate-200">{p.hostname}</div>
+              <div className="text-sm text-slate-500 dark:text-slate-400">{p.username}</div>
+            </div>
+            <div className="flex-1 max-w-[200px] flex items-center gap-2">
+              <input 
+                type={visibleIndexes.has(i) ? "text" : "password"} 
+                value={p.password}
+                readOnly
+                className="w-full bg-transparent border-none text-sm text-slate-700 dark:text-slate-300 focus:outline-none"
+              />
+              <button onClick={() => toggleVisibility(i)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-md">
+                {visibleIndexes.has(i) ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            </div>
+          </div>
+          <button onClick={() => handleDelete(i)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg ml-4">
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
 
 export interface SettingsPageProps {
   url?: string;
@@ -17,12 +86,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportData,
   onImportData
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'advanced' | 'mcp' | 'shortcuts'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'passwords' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   useEffect(() => {
     if (url) {
       if (url.includes('#appearance')) setActiveTab('appearance');
       else if (url.includes('#privacy')) setActiveTab('privacy');
+      else if (url.includes('#passwords')) setActiveTab('passwords');
       else if (url.includes('#advanced')) setActiveTab('advanced');
       else if (url.includes('#mcp')) setActiveTab('mcp');
       else if (url.includes('#shortcuts')) setActiveTab('shortcuts');
@@ -146,6 +216,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'general', label: 'General', icon: Settings },
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
+    { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'advanced', label: 'Advanced', icon: Bot },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -537,6 +608,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.clearOnExit ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* PASSWORDS */}
+          {activeTab === 'passwords' && (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <section>
+                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Saved Passwords</h2>
+                </div>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+                  <PasswordList />
                 </div>
               </section>
             </div>

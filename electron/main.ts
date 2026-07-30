@@ -212,7 +212,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       });
     };
     loadDev();
-    mainWindow?.webContents.openDevTools({ mode: 'bottom' });
+    // mainWindow?.webContents.openDevTools({ mode: 'bottom' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
@@ -493,6 +493,30 @@ ipcMain.handle('secure-store-get', async (_event, key: string) => {
     }
   } catch (err) {
     console.error('Secure store get error:', err);
+  }
+  return null;
+});
+
+// Generic JSON Storage API (for highlights, stats, whitelists, etc.)
+ipcMain.handle('store-set', async (_event, key: string, value: string) => {
+  try {
+    const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
+    fs.writeFileSync(keyPath, value, 'utf-8');
+    return true;
+  } catch (err) {
+    console.error('Store set error:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('store-get', async (_event, key: string) => {
+  try {
+    const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
+    if (fs.existsSync(keyPath)) {
+      return fs.readFileSync(keyPath, 'utf-8');
+    }
+  } catch (err) {
+    console.error('Store get error:', err);
   }
   return null;
 });

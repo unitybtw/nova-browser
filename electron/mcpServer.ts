@@ -461,7 +461,13 @@ export class BrowserMCPServer {
       next();
     });
 
-    this.app.options('*', (_req, res) => res.sendStatus(200));
+    this.app.use((req, res, next) => {
+      if (req.method === 'OPTIONS') {
+        res.sendStatus(200);
+      } else {
+        next();
+      }
+    });
 
     // Health check endpoint
     this.app.get('/health', (_req, res) => {

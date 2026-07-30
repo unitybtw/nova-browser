@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   clearIncognitoSession: () => ipcRenderer.invoke('clear-incognito-session'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
   secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
+  storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),
+  storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   // VPN
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
   // Shortcuts & Downloads events

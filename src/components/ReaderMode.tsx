@@ -4,6 +4,15 @@ import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square } from 'lu
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
 
+interface HighlightData {
+  id: string;
+  text: string;
+  color: string;
+  note: string;
+  path: string;
+  offset: number;
+}
+
 interface ReaderModeProps {
   url: string;
   tabId: string;
@@ -34,6 +43,22 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const controlsRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
 
+  // Highlights State
+  const [highlights, setHighlights] = useState<HighlightData[]>([]);
+  const [popoverState, setPopoverState] = useState<{
+    visible: boolean;
+    top: number;
+    left: number;
+    text: string;
+    range?: Range;
+    existingId?: string;
+    existingNote?: string;
+    existingColor?: string;
+  }>({ visible: false, top: 0, left: 0, text: '' });
+  const [noteText, setNoteText] = useState('');
+  const [highlightColor, setHighlightColor] = useState('#fef08a');
+  const [viewingNote, setViewingNote] = useState<{ visible: boolean; note: string; top: number; left: number }>({ visible: false, note: '', top: 0, left: 0 });
+
   // Close controls dropdown on click outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -46,6 +71,149 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showControls]);
+
+  // Load highlights from storage when content is ready
+  useEffect(() => {
+    if (content && url) {
+      const storageKey = 'reader_highlights_' + btoa(url);
+      (window as any).electronAPI?.storeGet(storageKey).then((saved: string) => {
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved);
+            setHighlights(parsed);
+            
+            // Re-apply to DOM
+            setTimeout(() => {
+              if (!contentRef.current) return;
+              const walkDOM = (node: Node, textToFind: string): Range | null => {
+                if (node.nodeType === 3) { // Text node
+                  const idx = node.nodeValue?.indexOf(textToFind);
+                  if (idx !== undefined && idx !== -1) {
+                    const range = document.createRange();
+                    range.setStart(node, idx);
+                    range.setEnd(node, idx + textToFind.length);
+                    return range;
+                  }
+                }
+                for (let i = 0; i < node.childNodes.length; i++) {
+                  const r = walkDOM(node.childNodes[i], textToFind);
+                  if (r) return r;
+                }
+                return null;
+              };
+
+              parsed.forEach((h: HighlightData) => {
+                if (contentRef.current) {
+                  const range = walkDOM(contentRef.current, h.text);
+                  if (range) {
+                    const span = document.createElement('mark');
+                    span.style.backgroundColor = h.color;
+                    span.style.cursor = 'pointer';
+                    span.dataset.id = h.id;
+                    span.onclick = (e) => {
+                      e.stopPropagation();
+                      setViewingNote({
+                        visible: true,
+                        note: h.note,
+                        top: e.clientY,
+                        left: e.clientX
+                      });
+                    };
+                    try {
+                      range.surroundContents(span);
+                    } catch (e) {}
+                  }
+                }
+              });
+            }, 100);
+          } catch (e) {
+            console.error('Failed to parse highlights', e);
+          }
+        }
+      });
+    }
+  }, [content, url]);
+
+  // Handle selection for highlighting
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !contentRef.current) {
+        return;
+      }
+      if (!contentRef.current.contains(selection.anchorNode)) return;
+
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      setPopoverState({
+        visible: true,
+        top: rect.top,
+        left: rect.left + rect.width / 2,
+        text: selection.toString(),
+        range: range.cloneRange()
+      });
+      setNoteText('');
+      setHighlightColor('#fef08a');
+      setViewingNote({ visible: false, note: '', top: 0, left: 0 });
+    };
+
+    document.addEventListener('mouseup', handleSelectionChange);
+    return () => document.removeEventListener('mouseup', handleSelectionChange);
+  }, [content]);
+
+  const saveHighlight = () => {
+    if (!popoverState.range) return;
+
+    const id = popoverState.existingId || Math.random().toString(36).substr(2, 9);
+    const newHighlight: HighlightData = {
+      id,
+      text: popoverState.text,
+      color: highlightColor,
+      note: noteText,
+      path: '',
+      offset: 0
+    };
+
+    let updated = [];
+    if (popoverState.existingId) {
+      updated = highlights.map(h => h.id === id ? newHighlight : h);
+    } else {
+      updated = [...highlights, newHighlight];
+      
+      const span = document.createElement('mark');
+      span.style.backgroundColor = highlightColor;
+      span.style.cursor = 'pointer';
+      span.dataset.id = id;
+      span.onclick = (e) => {
+        e.stopPropagation();
+        setViewingNote({
+          visible: true,
+          note: newHighlight.note,
+          top: e.clientY,
+          left: e.clientX
+        });
+        setPopoverState(prev => ({ ...prev, visible: false }));
+      };
+      
+      try {
+        popoverState.range.surroundContents(span);
+      } catch (e) {}
+    }
+
+    setHighlights(updated);
+    if (url) {
+      const storageKey = 'reader_highlights_' + btoa(url);
+      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
+    }
+    
+    setPopoverState({ visible: false, top: 0, left: 0, text: '' });
+    window.getSelection()?.removeAllRanges();
+  };
+
+  const closePopover = () => {
+    setPopoverState({ visible: false, top: 0, left: 0, text: '' });
+  };
 
   // Extract sentences when content changes
   useEffect(() => {
@@ -223,6 +391,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     lg: 'text-xl leading-loose'
   };
 
+  const highlightColors = [
+    { name: 'Yellow', hex: '#fef08a' },
+    { name: 'Green', hex: '#bbf7d0' },
+    { name: 'Pink', hex: '#fbcfe8' }
+  ];
+
   return (
     <AnimatePresence>
       {isActive && (
@@ -339,6 +513,96 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               </motion.div>
             )}
           </div>
+
+          {/* Highlight Creation Popover */}
+          <AnimatePresence>
+            {popoverState.visible && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="fixed z-[100] shadow-2xl rounded-xl p-3 border w-64 text-sm"
+                style={{ 
+                  top: Math.max(10, popoverState.top - 10), 
+                  left: popoverState.left, 
+                  transform: 'translate(-50%, -100%)',
+                  backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                  borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
+                  color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                }}
+                onMouseDown={e => e.stopPropagation()}
+              >
+                <div className="flex gap-2 mb-3">
+                  {highlightColors.map(c => (
+                    <button 
+                      key={c.name}
+                      onClick={() => setHighlightColor(c.hex)}
+                      className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-blue-500 scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: c.hex }}
+                      title={c.name}
+                    />
+                  ))}
+                </div>
+                <textarea 
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  placeholder="Not ekle (Markdown)..."
+                  className="w-full h-20 p-2 rounded mb-2 resize-none outline-none border transition-colors"
+                  style={{
+                    backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
+                    borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
+                    color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <button 
+                    onClick={closePopover} 
+                    className="px-3 py-1 rounded transition-colors text-xs font-medium"
+                    style={{
+                      color: theme === 'dark' ? '#cbd5e1' : '#64748b'
+                    }}
+                  >
+                    İptal
+                  </button>
+                  <button 
+                    onClick={saveHighlight} 
+                    className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs font-medium"
+                  >
+                    Kaydet
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* View Note Popover */}
+          <AnimatePresence>
+            {viewingNote.visible && viewingNote.note && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="fixed z-[100] shadow-2xl rounded-xl p-4 border max-w-sm"
+                style={{ 
+                  top: viewingNote.top + 10, 
+                  left: viewingNote.left, 
+                  transform: 'translateX(-50%)',
+                  backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                  borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
+                  color: theme === 'dark' ? '#f8fafc' : '#0f172a'
+                }}
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">Not</span>
+                  <button onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} className="opacity-50 hover:opacity-100">
+                    &times;
+                  </button>
+                </div>
+                <div className="text-sm whitespace-pre-wrap">{viewingNote.note}</div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
         </motion.div>
       )}
     </AnimatePresence>

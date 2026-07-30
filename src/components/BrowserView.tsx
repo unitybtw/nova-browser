@@ -1,10 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { SettingsPage } from './SettingsPage';
 import { HistoryPage } from './HistoryPage';
 import { DownloadsPage } from './DownloadsPage';
+import { PasswordPromptModal } from './PasswordPromptModal';
 import { HistoryItem } from '../App';
 import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
@@ -60,6 +61,18 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const isNewTab = React.useMemo(() => (
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab.url]);
+  
+  const [passwordPrompt, setPasswordPrompt] = useState<{
+    isOpen: boolean;
+    hostname: string;
+    username: string;
+    password: string;
+  }>({
+    isOpen: false,
+    hostname: '',
+    username: '',
+    password: ''
+  });
   
   const isSettingsTab = React.useMemo(() => (
     tab.url.startsWith('nova://settings') || tab.url.startsWith('about:settings')
@@ -226,6 +239,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       onUpdateTab(tab.id, { isPlayingAudio: false });
     };
 
+    const handleIpcMessage = (e: any) => {
+      if (e.channel === 'password-form-submitted') {
+        const { hostname, username, password } = e.args[0];
+        setPasswordPrompt({ isOpen: true, hostname, username, password });
+      }
+    };
+
     webview.addEventListener('dom-ready', handleDomReady);
     webview.addEventListener('did-start-navigation', handleStartNavigation);
     webview.addEventListener('did-stop-loading', handleStopLoading);
@@ -240,6 +260,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('found-in-page', handleFoundInPage);
     webview.addEventListener('media-started-playing', handleMediaStarted);
     webview.addEventListener('media-paused', handleMediaPaused);
+    webview.addEventListener('ipc-message', handleIpcMessage);
 
     // Initial check: if webview is already not loading, ensure isLoading is false
     setTimeout(() => {
@@ -281,6 +302,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('found-in-page', handleFoundInPage);
       webview.removeEventListener('media-started-playing', handleMediaStarted);
       webview.removeEventListener('media-paused', handleMediaPaused);
+      webview.removeEventListener('ipc-message', handleIpcMessage);
     };
   }, [tab.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 
@@ -438,6 +460,34 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           />
         )}
       </div>
+
+      <PasswordPromptModal
+        isOpen={passwordPrompt.isOpen}
+        hostname={passwordPrompt.hostname}
+        username={passwordPrompt.username}
+        onClose={() => setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))}
+        onSave={async () => {
+          try {
+            const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+            let passwords = raw ? JSON.parse(raw) : [];
+            
+            // Remove existing password for this host if any
+            passwords = passwords.filter((p: any) => p.hostname !== passwordPrompt.hostname);
+            
+            passwords.push({
+              hostname: passwordPrompt.hostname,
+              username: passwordPrompt.username,
+              password: passwordPrompt.password,
+              timestamp: Date.now()
+            });
+            
+            await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
+          } catch (e) {
+            console.error('Failed to save password', e);
+          }
+          setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }));
+        }}
+      />
     </div>
   );
 });

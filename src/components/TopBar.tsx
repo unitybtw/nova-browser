@@ -30,11 +30,17 @@ import {
   Sparkles,
   Puzzle,
   ShieldCheck,
-  Cpu
+  Cpu,
+  Lock,
+  Unlock,
+  ShieldAlert,
+  HelpCircle,
+  Network
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
+import { AdBlockerPopover } from './AdBlockerPopover';
 import { UserSettings } from '../App';
 
 interface TopBarProps {
@@ -131,6 +137,39 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [extensions, setExtensions] = useState<any[]>([]);
   const [mcpClientCount, setMcpClientCount] = useState(0);
   const [mcpRunning, setMcpRunning] = useState(false);
+  const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
+  const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
+  const [, setForceUpdate] = useState(0);
+
+  useEffect(() => {
+    let cleanup: (() => void) | void;
+    if ((window as any).electronAPI?.onAdBlocked) {
+      cleanup = (window as any).electronAPI.onAdBlocked((_: any, data: { tabId: string }) => {
+        const tab = tabs.find(t => t.id === data.tabId);
+        if (tab) {
+          tab.blockedAdsCount = (tab.blockedAdsCount || 0) + 1;
+          setForceUpdate(v => v + 1);
+        }
+      });
+    }
+    return () => {
+      if (typeof cleanup === 'function') cleanup();
+    };
+  }, [tabs]);
+
+  useEffect(() => {
+    const fetchWhitelist = async () => {
+      try {
+        if ((window as any).electronAPI?.storeGet) {
+          const val = await (window as any).electronAPI.storeGet('adblocker_whitelist');
+          if (val) {
+            setAdblockWhitelist(JSON.parse(val));
+          }
+        }
+      } catch (e) {}
+    };
+    fetchWhitelist();
+  }, []);
   
   // Poll MCP status every 3 seconds for the badge
   useEffect(() => {
@@ -227,6 +266,28 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
+
+  const currentUrl = activeTab?.url || '';
+  let currentHostname = '';
+  try {
+    if (currentUrl && !currentUrl.startsWith('nova://')) {
+      currentHostname = new URL(currentUrl).hostname;
+    }
+  } catch(e) {}
+  const isWhitelisted = adblockWhitelist.includes(currentHostname);
+  
+  const handleToggleWhitelist = async () => {
+    if (!currentHostname) return;
+    const newWhitelist = isWhitelisted 
+      ? adblockWhitelist.filter(h => h !== currentHostname)
+      : [...adblockWhitelist, currentHostname];
+    
+    setAdblockWhitelist(newWhitelist);
+    if ((window as any).electronAPI?.storeSet) {
+      await (window as any).electronAPI.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
+    }
+    onReload();
+  };
 
   return (
     <>
@@ -434,8 +495,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 {(() => {
                   const sec = getUrlSecurityInfo(activeTab?.url || '');
                   return (
-                    <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
-                      <span className="text-[10px] leading-none">{sec.icon}</span>
+                    <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                      {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
+                      {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
+                      {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
+                      {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
+                      {sec.level === 'unknown' && <HelpCircle className="w-3.5 h-3.5" />}
                     </div>
                   );
                 })()}
@@ -638,7 +703,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             }`}
             title="VPN (Proxy)"
           >
-            <Shield className="w-4 h-4" />
+            <Network className="w-4 h-4" />
           </button>
           {/* Active Extensions */}
           {extensions.map(ext => (
@@ -657,6 +722,31 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </button>
           ))}
+
+          {/* Ad Blocker Shield */}
+          <div className="relative">
+            <button 
+              onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
+              className={`p-1.5 rounded transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+              title="Ad Blocker"
+            >
+              {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4" />}
+              {(!isWhitelisted && (activeTab?.blockedAdsCount || 0) > 0) && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                  {activeTab!.blockedAdsCount}
+                </span>
+              )}
+            </button>
+            {isAdBlockerOpen && (
+              <AdBlockerPopover 
+                blockedCount={activeTab?.blockedAdsCount || 0}
+                isWhitelisted={isWhitelisted}
+                onToggleWhitelist={handleToggleWhitelist}
+                onClose={() => setIsAdBlockerOpen(false)}
+                hostname={currentHostname}
+              />
+            )}
+          </div>
 
           <button 
             onClick={onOpenExtensions}
@@ -781,7 +871,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -5, scale: 0.95 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none"
+          className="pointer-events-none bg-white dark:bg-slate-800"
           style={{
             position: 'fixed',
             top: 50,
@@ -790,22 +880,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             width: 272,
             borderRadius: 12,
             overflow: 'hidden',
-            background: 'white',
             boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
             border: '1px solid rgba(0,0,0,0.08)',
           }}
         >
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div className="flex items-center gap-2">
               {hoveredTab.favicon && (
                 <img src={hoveredTab.favicon} style={{ width: '16px', height: '16px', borderRadius: '4px' }} />
               )}
-              <div style={{ fontSize: '13px', fontWeight: 600, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
                 {hoveredTab.title || 'New Tab'}
               </div>
             </div>
           </div>
-          <div style={{ width: '100%', aspectRatio: '16/9', background: '#f1f5f9', position: 'relative' }}>
+          <div className="bg-slate-100 dark:bg-slate-900 w-full relative" style={{ aspectRatio: '16/9' }}>
             <img src={hoveredTab.thumbnail} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
           </div>
         </motion.div>

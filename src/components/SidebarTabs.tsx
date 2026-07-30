@@ -33,7 +33,7 @@ const TabPeekPortal: React.FC<{
           animate={{ opacity: 1, x: 0, scale: 1 }}
           exit={{ opacity: 0, x: -8, scale: 0.95 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none"
+          className="pointer-events-none bg-white dark:bg-slate-800"
           style={{
             position: 'fixed',
             top: Math.min(pos.top, window.innerHeight - 220),
@@ -42,18 +42,17 @@ const TabPeekPortal: React.FC<{
             width: 272,
             borderRadius: 12,
             overflow: 'hidden',
-            background: 'white',
             boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
             border: '1px solid rgba(0,0,0,0.08)',
           }}
         >
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid #f1f5f9', background: '#f8fafc' }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
               {tab.favicon && <img src={tab.favicon} alt="" style={{ width: 12, height: 12, marginRight: 6, display: 'inline', verticalAlign: 'middle', borderRadius: 2 }} />}
               {tab.title || tab.url || 'New Tab'}
             </div>
           </div>
-          <div style={{ aspectRatio: '16/9', background: '#f1f5f9', overflow: 'hidden' }}>
+          <div className="bg-slate-100 dark:bg-slate-900 overflow-hidden" style={{ aspectRatio: '16/9' }}>
             <img
               src={tab.thumbnail}
               alt="Tab preview"
