@@ -6,11 +6,23 @@ directories:
 files:
   - "dist/**/*"
   - "dist-electron/**/*"
+publish:
+  provider: github
+  owner: unitybtw
+  repo: nova-browser
 win:
-  target: nsis
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: "Nova-Browser-Setup-${version}.exe"
 mac:
-  target: dmg
+  target:
+    - target: dmg
+      arch: [x64, arm64]
   category: public.app-category.productivity
+  artifactName: "Nova-Browser-${version}-${arch}.dmg"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  installerIcon: "build/icon.ico"
+  uninstallerIcon: "build/icon.ico"
