@@ -66,7 +66,7 @@ const TabPeekPortal: React.FC<{
   );
 };
 
-export const SidebarTabs: React.FC<SidebarTabsProps> = ({
+export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   tabs,
   activeTabId,
   onSelectTab,
@@ -263,4 +263,4 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = ({
       <TabPeekPortal tab={hoveredTab} pos={hoverPos} />
     </>
   );
-};
+});

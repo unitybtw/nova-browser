@@ -23,10 +23,19 @@ export default defineConfig({
     }
   },
   build: {
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true
+      }
+    },
     rollupOptions: {
       output: {
         manualChunks: {
-          'web-llm': ['@mlc-ai/web-llm']
+          'web-llm': ['@mlc-ai/web-llm'],
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-ui': ['framer-motion', 'lucide-react']
         }
       }
     }

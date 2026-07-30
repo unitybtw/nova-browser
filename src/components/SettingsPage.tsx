@@ -86,7 +86,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportData,
   onImportData
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'passwords' | 'advanced' | 'mcp' | 'shortcuts'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   useEffect(() => {
     if (url) {
