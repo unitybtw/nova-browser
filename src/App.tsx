@@ -414,7 +414,6 @@ function App() {
 
     if (window.electronAPI?.onShortcut) {
       cleanupShortcut = window.electronAPI.onShortcut((_event: any, command: string) => {
-        console.log('Shortcut received in React:', command);
         if (command === 'search' || command === 'toggle-omnibox') {
           setIsSpotlightOpen(prev => !prev);
         }
@@ -1476,6 +1475,11 @@ function App() {
                   isActive={tab.id === activeTabId || tab.id === splitTabId}
                   onCloseTab={handleCloseTab}
                   isIncognito={tab.isIncognito || false}
+                  history={history}
+                  downloads={downloads}
+                  onClearHistory={handleClearHistory}
+                  onRemoveHistoryItem={handleRemoveHistoryItem}
+                  onClearDownloads={handleClearDownloads}
                 />
               </div>
             );
@@ -1540,6 +1544,11 @@ function App() {
               isActive={true}
               onCloseTab={handleCloseTab}
               isIncognito={secondaryTab.isIncognito || false}
+              history={history}
+              downloads={downloads}
+              onClearHistory={handleClearHistory}
+              onRemoveHistoryItem={handleRemoveHistoryItem}
+              onClearDownloads={handleClearDownloads}
             />
           </div>
         )}

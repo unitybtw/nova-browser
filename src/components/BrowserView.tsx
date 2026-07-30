@@ -112,7 +112,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     if (!webview) return;
 
     const handleDomReady = () => {
-      console.log('[BrowserView] dom-ready');
       domReadyRef.current = true;
       let wcId = undefined;
       try { wcId = webview.getWebContentsId(); } catch (e) {}
@@ -126,14 +125,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleStartNavigation = (e: any) => {
-      console.log('[BrowserView] did-start-navigation', e.isMainFrame, e.url);
       if (e.isMainFrame) {
         onUpdateTab(tab.id, { isLoading: true, blockedAdsCount: 0 });
       }
     };
 
     const handleFinishLoad = (e: any) => {
-      console.log('[BrowserView] did-finish-load', e.isMainFrame);
       if (e.isMainFrame || e.isMainFrame === undefined) {
         onUpdateTab(tab.id, {
           isLoading: false,
@@ -145,7 +142,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleStopLoading = async () => {
-      console.log('[BrowserView] did-stop-loading');
       
       let thumbnailDataUrl;
       try {
@@ -166,13 +162,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleFailLoad = (e: any) => {
-      console.log('[BrowserView] did-fail-load', e.isMainFrame, e.errorCode, e.errorDescription);
       if (!e.isMainFrame) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
       onUpdateTab(tab.id, { isLoading: false });
     };
 
     const handleNavigateEvent = (e: any) => {
-      console.log('[BrowserView] did-navigate', e.isMainFrame, e.url);
       if (e.isMainFrame && e.url) {
         lastLoadedUrl.current = e.url;
         onUpdateTab(tab.id, {

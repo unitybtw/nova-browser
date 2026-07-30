@@ -7,3 +7,6 @@ dist-test
 !.env.example
 *.log
 .DS_Store
+
+# Electron Builder output
+dist-electron-builder/
