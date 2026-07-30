@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Download, ChevronRight, Zap } from 'lucide-react';
+import { Download, ChevronRight, Zap, Monitor } from 'lucide-react';
 
 export const Hero = () => {
   return (
@@ -46,12 +46,18 @@ export const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-4"
+            className="flex flex-col items-center justify-center gap-4"
           >
-            <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
-              <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
-              Download for Mac
-            </a>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+              <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
+                <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
+                Download for Mac
+              </a>
+              <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 group">
+                <Monitor className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
+                Download for Windows
+              </a>
+            </div>
             <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-white/50 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
               View Source
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Download } from 'lucide-react';
+import { Download, Monitor } from 'lucide-react';
 
 export const CTA = () => {
   return (
@@ -26,6 +26,10 @@ export const CTA = () => {
               <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2">
                 <Download className="w-5 h-5" />
                 Download for Mac
+              </a>
+              <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2">
+                <Monitor className="w-5 h-5" />
+                Download for Windows
               </a>
               <a 
                 href="https://github.com/unitybtw/nova-browser" 

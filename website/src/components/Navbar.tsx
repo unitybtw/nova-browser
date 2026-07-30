@@ -46,7 +46,7 @@ export const Navbar = () => {
           <div className="hidden md:flex items-center">
             <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-foreground hover:bg-foreground/90 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2">
               <Download className="w-4 h-4" />
-              Download for Mac
+              Download
             </a>
           </div>
 
@@ -67,7 +67,7 @@ export const Navbar = () => {
           <a href="#privacy" className="px-4 py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>Privacy</a>
           <a href="#design" className="px-4 py-2 font-medium" onClick={() => setMobileMenuOpen(false)}>Design</a>
           <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors">
-            Download for Mac
+            Download
           </a>
         </div>
       )}
