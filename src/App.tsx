@@ -52,6 +52,7 @@ import { WorkspaceManager } from './components/WorkspaceManager';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
+import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension } from './types/browser';
@@ -159,6 +160,11 @@ function App() {
     else if (modalName === 'spotlight') setIsSpotlightOpen(true);
     else if (modalName === 'extensions') setIsExtensionsOpen(true);
   }, [closeAllModals]);
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(
+    () => !localStorage.getItem('nova_onboarding_complete')
+  );
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {
@@ -1333,6 +1339,22 @@ function App() {
   }
 
   const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
+
+  if (showOnboarding) {
+    return (
+      <Onboarding
+        onComplete={(prefs) => {
+          setSettings(prev => ({
+            ...prev,
+            theme: prefs.theme,
+            searchEngine: prefs.searchEngine,
+            privacyShield: prefs.privacyShield,
+          }));
+          setShowOnboarding(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-screen w-screen overflow-hidden text-slate-900 dark:text-slate-100 relative ${
