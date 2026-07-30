@@ -94,6 +94,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       else if (url.includes('#privacy')) setActiveTab('privacy');
       else if (url.includes('#passwords')) setActiveTab('passwords');
       else if (url.includes('#advanced')) setActiveTab('advanced');
+      else if (url.includes('#extensions')) setActiveTab('extensions');
       else if (url.includes('#mcp')) setActiveTab('mcp');
       else if (url.includes('#shortcuts')) setActiveTab('shortcuts');
       else if (url.includes('#general')) setActiveTab('general');

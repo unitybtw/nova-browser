@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  
+  --color-primary: #3b82f6; /* blue-500 */
+  --color-on-primary: #ffffff;
+  --color-secondary: #6366f1; /* indigo-500 */
+  --color-accent: #8b5cf6; /* violet-500 */
+  --color-background: #f8fafc; /* slate-50 */
+  --color-foreground: #0f172a; /* slate-900 */
+  --color-muted: #e2e8f0; /* slate-200 */
+  --color-border: #cbd5e1; /* slate-300 */
+  --color-destructive: #ef4444; /* red-500 */
+  --color-ring: #3b82f6;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  overflow-x: hidden;
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.05);
+}
+
+.glass-dark {
+  background: rgba(19, 78, 74, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(153, 246, 228, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}

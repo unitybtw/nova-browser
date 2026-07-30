@@ -303,7 +303,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                         (e.target as HTMLElement).style.display = 'none';
                       }}
                     />
-                    <Globe className="w-5 h-5 opacity-40 hidden group-has-[:failed]:block" />
+                    <Globe className="w-5 h-5 opacity-40" />
                   </div>
                   <span className="text-xs font-semibold truncate max-w-full">{dial.name}</span>
                 </button>

@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2 } from 'lucide-react';
-import { Tab, Workspace } from '../types/browser';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus } from 'lucide-react';
+import { Tab, Workspace, Folder } from '../types/browser';
 
 interface SidebarTabsProps {
   tabs: Tab[];
+  folders?: Folder[];
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
@@ -15,6 +16,11 @@ interface SidebarTabsProps {
   activeWorkspaceId: string;
   onSelectWorkspace: (id: string) => void;
   isIncognito?: boolean;
+  onCreateFolder?: () => void;
+  onToggleFolder?: (id: string) => void;
+  onRenameFolder?: (id: string, name: string) => void;
+  onDeleteFolder?: (id: string) => void;
+  onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
 }
 
 // Tab Peek Popover rendered via Portal to escape Framer Motion's transform context
@@ -76,7 +82,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   workspaces,
   activeWorkspaceId,
   onSelectWorkspace,
-  isIncognito
+  isIncognito,
+  folders,
+  onCreateFolder,
+  onToggleFolder,
+  onRenameFolder,
+  onDeleteFolder,
+  onMoveTabToFolder
 }) => {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
@@ -104,6 +116,74 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     };
   }, []);
 
+  const renderTab = (tab: Tab, isNested: boolean = false) => {
+    const isActive = tab.id === activeTabId;
+    return (
+      <motion.div
+        layout
+        draggable
+        onDragStart={(e: any) => {
+          e.dataTransfer.setData('text/plain', tab.id);
+          e.dataTransfer.effectAllowed = 'move';
+        }}
+        initial={{ opacity: 0, x: -20, scale: 0.9 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.8, height: 0 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
+        whileTap={{ scale: 0.95 }}
+        key={tab.id}
+        onClick={() => onSelectTab(tab.id)}
+        onMouseEnter={(e) => handleMouseEnter(tab, e)}
+        onMouseLeave={handleMouseLeave}
+        className={`relative flex items-center h-10 rounded-xl cursor-pointer transition-all group/tab ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
+          isActive
+            ? isIncognito
+              ? 'bg-slate-800/80 text-white shadow-sm'
+              : 'bg-white/90 text-slate-900 shadow-sm dark:bg-white/10 dark:text-white'
+            : isIncognito
+              ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
+              : 'text-slate-600 hover:bg-white/50 dark:text-slate-400 dark:hover:bg-white/5'
+        }`}
+      >
+        <div className="flex items-center gap-3 px-3 flex-1 min-w-0">
+          <div className="w-5 h-5 flex items-center justify-center shrink-0 drop-shadow-sm">
+            {tab.isLoading ? (
+              <div className="w-4 h-4 border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
+            ) : tab.favicon ? (
+              <img src={tab.favicon} alt="" className="w-4 h-4 rounded-sm" />
+            ) : (
+              <Globe className="w-4 h-4 opacity-70" />
+            )}
+          </div>
+          <span className="truncate text-[13px] font-medium transition-opacity duration-200">
+            {tab.title || tab.url || 'New Tab'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1 pr-2 opacity-0 group-hover/tab:opacity-100 transition-opacity shrink-0">
+          {tab.isMuted ? (
+            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500">
+              <VolumeX className="w-3.5 h-3.5" />
+            </button>
+          ) : tab.isPlayingAudio ? (
+            <div className="flex items-center">
+              <button onClick={(e) => { e.stopPropagation(); const wv = document.querySelector(`webview[data-tab-id="${tab.id}"]`) as any; if(wv) wv.executeJavaScript(`(() => { const v = Array.from(document.querySelectorAll('video')).find(v=>!v.paused)||document.querySelector('video'); if(!v) return; if(document.pictureInPictureElement) document.exitPictureInPicture(); else v.requestPictureInPicture(); })();`, true); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500" title="Picture in Picture">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
+              </button>
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-blue-500">
+                <Volume2 className="w-3.5 h-3.5 animate-pulse" />
+              </button>
+            </div>
+          ) : null}
+          {tabs.length > 1 && (
+            <button onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <>
       <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 no-drag z-40 pt-12 backdrop-blur-3xl shadow-sm ${
@@ -126,121 +206,73 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </div>
         </div>
 
-        {/* Tabs List */}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 space-y-1 px-2 no-scrollbar">
+        {/* Tabs & Folders List */}
+        <div 
+          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 no-scrollbar flex flex-col gap-1"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const tabId = e.dataTransfer.getData('text/plain');
+            // Check if dropped on empty space (not on a folder)
+            if (tabId && (e.target as HTMLElement).tagName === 'DIV' && (e.target === e.currentTarget)) {
+              onMoveTabToFolder?.(tabId, undefined);
+            }
+          }}
+        >
           <AnimatePresence mode="popLayout">
-            {tabs.map((tab) => {
-              const isActive = tab.id === activeTabId;
+            {/* Folders */}
+            {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
+              const folderTabs = tabs.filter(t => t.folderId === folder.id);
               return (
                 <motion.div
                   layout
-                  initial={{ opacity: 0, x: -20, scale: 0.9 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8, height: 0 }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
-                  whileTap={{ scale: 0.95 }}
-                  key={tab.id}
-                  onClick={() => onSelectTab(tab.id)}
-                  onMouseEnter={(e) => handleMouseEnter(tab, e)}
-                  onMouseLeave={handleMouseLeave}
-                  className={`relative flex items-center h-10 rounded-xl cursor-pointer transition-all group/tab ${
-                    isActive
-                      ? isIncognito
-                        ? 'bg-slate-800/80 text-white shadow-sm'
-                        : 'bg-white/90 text-slate-900 shadow-sm dark:bg-white/10 dark:text-white'
-                      : isIncognito
-                        ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-                        : 'text-slate-600 hover:bg-white/50 dark:text-slate-400 dark:hover:bg-white/5'
-                  }`}
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, height: 0 }}
+                  key={folder.id}
+                  className="flex flex-col gap-1"
                 >
-                  <div className="flex items-center gap-3 px-3 flex-1 min-w-0">
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0 drop-shadow-sm">
-                      {tab.isLoading ? (
-                        <div className="w-4 h-4 border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
-                      ) : tab.favicon ? (
-                        <img src={tab.favicon} alt="" className="w-4 h-4 rounded-sm" />
-                      ) : (
-                        <Globe className="w-4 h-4 opacity-70" />
-                      )}
+                  <div
+                    onClick={() => onToggleFolder?.(folder.id)}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-black/10', 'dark:bg-white/10'); }}
+                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-black/10', 'dark:bg-white/10')}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove('bg-black/10', 'dark:bg-white/10');
+                      const tabId = e.dataTransfer.getData('text/plain');
+                      if (tabId) onMoveTabToFolder?.(tabId, folder.id);
+                    }}
+                    className="flex items-center gap-2 h-9 px-2 rounded-lg cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group/folder"
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
+                      {folder.isExpanded ? <ChevronDown className="w-4 h-4 opacity-70" /> : <ChevronRight className="w-4 h-4 opacity-70" />}
                     </div>
-
-                    <span className="truncate text-[13px] font-medium transition-opacity duration-200">
-                      {tab.title || tab.url || 'New Tab'}
-                    </span>
+                    <FolderIcon className="w-4 h-4 opacity-70" />
+                    <span className="text-sm font-medium flex-1 truncate">{folder.name}</span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
+                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-
-                  <div className="flex items-center gap-1 pr-2 opacity-0 group-hover/tab:opacity-100 transition-opacity shrink-0">
-                    {tab.isMuted ? (
-                      <button
-                        onClick={(e) => onToggleMuteTab(tab.id, e)}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500"
-                      >
-                        <VolumeX className="w-3.5 h-3.5" />
-                      </button>
-                    ) : tab.isPlayingAudio ? (
-                      <div className="flex items-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (typeof (window as any).executeMcpAction === 'function') {
-                              // We can just trigger the PIP via the MCP action or we should pass onTogglePip.
-                              // Wait, SidebarTabs doesn't have onTogglePip. Let's just dispatch an event or click a hidden button.
-                              // Since we don't have onTogglePip in SidebarTabs props, we can select the webview directly.
-                              const webview = document.querySelector(`webview[data-tab-id="${tab.id}"]`) as any;
-                              if (webview) {
-                                webview.executeJavaScript(`
-                                  (() => {
-                                    const videos = Array.from(document.querySelectorAll('video'));
-                                    const target = videos.find(v => !v.paused) || videos[0];
-                                    if (!target) {
-                                      throw new Error("No video found on page!");
-                                    }
-                                    if (document.pictureInPictureElement) {
-                                      return document.exitPictureInPicture();
-                                    } else {
-                                      return target.requestPictureInPicture();
-                                    }
-                                  })();
-                                `, true).catch((e: any) => alert("Picture-in-Picture Error: " + (e.message || e)));
-                              }
-                            }
-                          }}
-                          className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500"
-                          title="Picture in Picture"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-picture-in-picture-2"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
-                        </button>
-                        <button
-                          onClick={(e) => onToggleMuteTab(tab.id, e)}
-                          className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-blue-500"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-                        </button>
-                      </div>
-                    ) : null}
-                    {tabs.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCloseTab(tab.id, e);
-                        }}
-                        className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
+                  <AnimatePresence mode="popLayout">
+                    {folder.isExpanded && folderTabs.map(tab => renderTab(tab, true))}
+                  </AnimatePresence>
                 </motion.div>
               );
             })}
+
+            {/* Root Tabs (not in any folder) */}
+            {tabs.filter(t => !t.folderId).map(tab => renderTab(tab, false))}
           </AnimatePresence>
         </div>
 
-        {/* Footer / New Tab */}
-        <div className="p-3 flex flex-col gap-2">
+        {/* Footer / New Tab & New Folder */}
+        <div className="p-3 flex items-center gap-2">
           <button
             onClick={() => onNewTab()}
-            className={`flex items-center gap-3 w-full h-10 px-3 rounded-xl transition-all shadow-sm ${
+            className={`flex flex-1 items-center gap-3 h-10 px-3 rounded-xl transition-all shadow-sm ${
               isIncognito
                 ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
                 : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'
@@ -252,6 +284,18 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <span className="text-[13px] font-medium truncate">
               New Tab
             </span>
+          </button>
+          
+          <button
+            onClick={() => onCreateFolder?.()}
+            className={`flex items-center justify-center shrink-0 w-10 h-10 rounded-xl transition-all shadow-sm ${
+              isIncognito
+                ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'
+            }`}
+            title="New Folder"
+          >
+            <FolderPlus className="w-5 h-5" />
           </button>
         </div>
       </div>

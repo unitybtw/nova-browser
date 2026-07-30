@@ -11,10 +11,18 @@ export interface Tab {
   isIncognito?: boolean;
   thumbnail?: string;
   workspaceId?: string;
+  folderId?: string;
   zoomLevel?: number;
   isPlayingAudio?: boolean;
   blockedAdsCount?: number;
   webContentsId?: number;
+}
+
+export interface Folder {
+  id: string;
+  name: string;
+  isExpanded: boolean;
+  workspaceId: string;
 }
 
 export interface Workspace {

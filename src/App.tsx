@@ -54,7 +54,7 @@ import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Bookmark, Extension } from './types/browser';
+import { Tab, Folder, Bookmark, Extension } from './types/browser';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -86,6 +86,17 @@ function App() {
   const [activeTabId, setActiveTabId] = useState<string>(() => {
     const saved = localStorage.getItem('active_tab_session');
     return saved || (tabs[0]?.id || '1');
+  });
+
+  const [folders, setFolders] = useState<Folder[]>(() => {
+    const saved = localStorage.getItem('folders_session');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {}
+    }
+    return [];
   });
 
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -268,6 +279,10 @@ function App() {
     localStorage.setItem('active_tab_session', activeTabId);
   }, [activeTabId]);
 
+  useEffect(() => {
+    localStorage.setItem('folders_session', JSON.stringify(folders));
+  }, [folders]);
+
   // Apply Theme Mode & Custom Accent
   useEffect(() => {
     if (settings.theme === 'dark') {
@@ -440,6 +455,35 @@ function App() {
   }, []);
 
   const activeTab = tabs.find(t => t.id === activeTabId);
+
+  // Folder Management
+  const handleCreateFolder = useCallback(() => {
+    const newFolder: Folder = {
+      id: `folder-${Date.now()}`,
+      name: 'New Folder',
+      isExpanded: true,
+      workspaceId: activeWorkspaceId
+    };
+    setFolders(prev => [...prev, newFolder]);
+  }, [activeWorkspaceId]);
+
+  const handleToggleFolder = useCallback((folderId: string) => {
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, isExpanded: !f.isExpanded } : f));
+  }, []);
+
+  const handleRenameFolder = useCallback((folderId: string, name: string) => {
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name } : f));
+  }, []);
+
+  const handleDeleteFolder = useCallback((folderId: string) => {
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    // Remove folderId from all tabs that were in this folder
+    setTabs(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: undefined } : t));
+  }, []);
+
+  const handleMoveTabToFolder = useCallback((tabId: string, folderId?: string) => {
+    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, folderId } : t));
+  }, []);
 
   const handleNewTab = useCallback((url?: string | any) => {
     const finalUrl = typeof url === 'string' ? url : 'nova://newtab';
@@ -1301,6 +1345,7 @@ function App() {
         <div className="h-full flex flex-col shrink-0 drag-region relative z-50">
           <SidebarTabs
             tabs={workspaceTabs}
+            folders={folders}
             activeTabId={activeTabId}
             onSelectTab={setActiveTabId}
             onCloseTab={handleCloseTab}
@@ -1310,6 +1355,11 @@ function App() {
             activeWorkspaceId={activeWorkspaceId}
             onSelectWorkspace={handleSelectWorkspace}
             isIncognito={activeTab?.isIncognito}
+            onCreateFolder={handleCreateFolder}
+            onToggleFolder={handleToggleFolder}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onMoveTabToFolder={handleMoveTabToFolder}
           />
         </div>
       )}

@@ -80,7 +80,7 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
       label: 'Nova',
       color: 'text-purple-500',
       bgColor: 'bg-purple-50 dark:bg-purple-500/10',
-      icon: '🏠',
+      icon: 'Home',
       tooltip: 'Nova internal page'
     };
   }
@@ -96,7 +96,7 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
         label: 'Nova',
         color: 'text-purple-500',
         bgColor: 'bg-purple-50 dark:bg-purple-500/10',
-        icon: '🏠',
+        icon: 'Home',
         tooltip: 'Nova internal page'
       };
     }
@@ -108,8 +108,8 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
         label: 'Tehlikeli',
         color: 'text-red-600',
         bgColor: 'bg-red-50 dark:bg-red-500/10',
-        icon: '🚨',
-        tooltip: 'Bu site phishing veya zararlı olarak tanımlandı. Devam etmek tehlikeli olabilir.'
+        icon: 'ShieldAlert',
+        tooltip: 'Potansiyel kimlik avı veya tehlikeli site'
       };
     }
 
@@ -118,43 +118,29 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
       return {
         level: 'secure',
         label: 'Güvenli',
-        color: 'text-green-600',
-        bgColor: 'bg-green-50 dark:bg-green-500/10',
-        icon: '🔒',
-        tooltip: `Bağlantı şifreli (HTTPS)\n${parsed.hostname}`
+        color: 'text-emerald-600',
+        bgColor: 'bg-emerald-50 dark:bg-emerald-500/10',
+        icon: 'Lock',
+        tooltip: 'Bağlantı şifrelenmiş ve güvenli'
       };
-    }
-
-    // HTTP (plain)
-    if (protocol === 'http:') {
+    } else {
       return {
         level: 'http',
-        label: 'HTTP',
+        label: 'Güvenli Değil',
         color: 'text-amber-600',
         bgColor: 'bg-amber-50 dark:bg-amber-500/10',
-        icon: '⚠️',
-        tooltip: 'Bu bağlantı şifresiz (HTTP). Verileriniz izlenebilir.'
+        icon: 'Unlock',
+        tooltip: 'Bağlantı şifrelenmemiş (HTTP)'
       };
     }
-
-    // Other (file:, ftp:, etc.)
-    return {
-      level: 'unknown',
-      label: protocol.replace(':', ''),
-      color: 'text-slate-500',
-      bgColor: 'bg-slate-50 dark:bg-slate-700/50',
-      icon: '🌐',
-      tooltip: url
-    };
-
   } catch {
     return {
       level: 'unknown',
       label: 'Bilinmiyor',
       color: 'text-slate-500',
-      bgColor: 'bg-slate-50 dark:bg-slate-700/50',
-      icon: '🌐',
-      tooltip: url
+      bgColor: 'bg-slate-100 dark:bg-slate-800',
+      icon: 'Globe',
+      tooltip: 'Geçersiz veya bilinmeyen bağlantı'
     };
   }
 }

@@ -251,11 +251,27 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
     utterance.rate = rate;
-    const voices = window.speechSynthesis.getVoices();
-    const betterVoice = voices.find(v => v.name.includes('Premium') || v.name.includes('Siri') || v.name === 'Yelda' || v.name === 'Samantha' || v.name.includes('Google')) || voices.find(v => !v.name.includes('Alex')) || voices[0];
+    utterance.pitch = 1.1; // Slightly higher pitch to sound less robotic
+    
+    let voices = window.speechSynthesis.getVoices();
+    // Prefer higher quality local or Google voices
+    let betterVoice = voices.find(v => 
+      (v.name.includes('Google') && !v.name.includes('Translate')) || 
+      v.name.includes('Siri') || 
+      v.name.includes('Premium') ||
+      v.name === 'Samantha' ||
+      v.name === 'Yelda'
+    );
+    
+    // Fallback avoiding known robotic voices
+    if (!betterVoice) {
+      betterVoice = voices.find(v => !v.name.includes('Alex') && !v.name.includes('Fred') && !v.name.includes('Zarvox') && !v.name.includes('Trinoids')) || voices[0];
+    }
+    
     if (betterVoice) {
       utterance.voice = betterVoice;
     }
+    
     utterance.onend = () => {
       if (!isPlayingRef.current) return;
       const next = index + 1;
