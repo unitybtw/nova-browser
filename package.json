@@ -11,6 +11,8 @@
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
     "preview": "vite preview",
+    "pack:win": "npm run build && electron-builder --win",
+    "pack:mac": "npm run build && electron-builder --mac",
     "dev:website": "npm --prefix website run dev",
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
@@ -42,6 +44,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
     "electron": "^33.2.1",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.24.2",
     "tailwindcss": "^4.3.3",
     "terser": "^5.49.0",

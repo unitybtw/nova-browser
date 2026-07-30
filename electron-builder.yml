@@ -1,0 +1,16 @@
+appId: com.unitybtw.novabrowser
+productName: Nova Browser
+directories:
+  output: dist-electron-builder
+  buildResources: build
+files:
+  - "dist/**/*"
+  - "dist-electron/**/*"
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.productivity
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
