@@ -1291,10 +1291,14 @@ function App() {
   const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
 
   return (
-    <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-screen w-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100`}>
+    <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-screen w-screen overflow-hidden text-slate-900 dark:text-slate-100 relative ${
+      settings.useVerticalTabs 
+        ? isIncognito ? 'bg-slate-950' : 'bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900'
+        : 'bg-slate-50 dark:bg-slate-900'
+    }`}>
       
       {settings.useVerticalTabs && (
-        <div className="pt-8 bg-slate-50 dark:bg-slate-900 h-full flex flex-col shrink-0 drag-region">
+        <div className="h-full flex flex-col shrink-0 drag-region relative z-50">
           <SidebarTabs
             tabs={workspaceTabs}
             activeTabId={activeTabId}
@@ -1310,7 +1314,7 @@ function App() {
         </div>
       )}
 
-      <div className={`flex flex-col flex-1 min-w-0 ${settings.useVerticalTabs ? 'pt-8' : ''}`}>
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${settings.useVerticalTabs ? 'rounded-l-2xl shadow-2xl border-l border-y border-slate-200/50 dark:border-slate-700/50' : ''}`}>
         {/* TOP NAVIGATION BAR */}
         <TopBar 
           tabs={workspaceTabs}
