@@ -106,14 +106,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className={`flex flex-col h-full w-[260px] border-r overflow-hidden shrink-0 no-drag z-40 pt-12 backdrop-blur-3xl shadow-sm ${
+      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 no-drag z-40 pt-12 backdrop-blur-3xl shadow-sm ${
         isIncognito
-          ? 'bg-slate-900/80 border-slate-800'
-          : 'bg-white/60 border-white/20 dark:bg-slate-900/60 dark:border-slate-800/50'
+          ? 'bg-slate-900/80'
+          : 'bg-white/60 dark:bg-slate-900/60'
       }`}>
 
         {/* Workspace Header */}
-        <div className="flex items-center gap-3 px-4 h-12 shrink-0 border-b border-transparent hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+        <div className="flex items-center gap-3 px-4 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
              onClick={() => window.dispatchEvent(new CustomEvent('open-workspace-manager'))}
         >
           <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
@@ -237,7 +237,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* Footer / New Tab */}
-        <div className="p-3 border-t border-slate-200/50 dark:border-slate-700/50 flex flex-col gap-2">
+        <div className="p-3 flex flex-col gap-2">
           <button
             onClick={() => onNewTab()}
             className={`flex items-center gap-3 w-full h-10 px-3 rounded-xl transition-all shadow-sm ${
