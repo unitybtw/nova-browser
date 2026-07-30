@@ -76,8 +76,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {filteredHistory.map((item) => (
-                <div key={item.id} className="group flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+              {filteredHistory.map((item, idx) => (
+                <div 
+                  key={item.id}
+                  className="group flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors animate-in fade-in slide-in-from-bottom-2"
+                  style={{ animationFillMode: 'both', animationDelay: `${idx * 30}ms` }}
+                >
                   <div className="flex-1 flex items-center gap-4 min-w-0">
                     <div className="p-2 bg-slate-100 dark:bg-slate-900 rounded-lg text-slate-400 dark:text-slate-500 shrink-0">
                       {item.favicon ? (

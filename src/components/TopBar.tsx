@@ -356,6 +356,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8, minWidth: 0, width: 0, paddingLeft: 0, paddingRight: 0, margin: 0, transition: { duration: 0.2 } }}
                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                whileTap={{ scale: 0.98 }}
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
                 className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-pointer transition-colors no-drag ${
@@ -480,7 +481,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <ArrowRight className="w-4 h-4" />
           </button>
           <button onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Reload Page">
-            <RotateCw className={`w-4 h-4 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
+            <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
           </button>
           <button onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="New Tab Page">
             <Home className="w-4 h-4" />
@@ -488,7 +489,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
 
         {/* Omnibox / Address Bar */}
-        <div className="flex-1 flex px-2 lg:px-6 max-w-[1400px] mx-auto">
+        <div className="flex-1 flex px-2 lg:px-6 max-w-[1400px] mx-auto transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
           <div className="w-full relative">
             <form onSubmit={handleSearchSubmit} className="relative group w-full">
               <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
@@ -569,7 +570,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             {/* Search Suggestions Dropdown */}
             {showSuggestions && searchValue.trim().length > 0 && (
               <div 
-                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
+                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y animate-in fade-in slide-in-from-top-2 duration-200 ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >
               

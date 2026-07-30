@@ -134,9 +134,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               return (
                 <motion.div
                   layout
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
+                  initial={{ opacity: 0, x: -20, scale: 0.9 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8, height: 0 }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
+                  whileTap={{ scale: 0.95 }}
                   key={tab.id}
                   onClick={() => onSelectTab(tab.id)}
                   onMouseEnter={(e) => handleMouseEnter(tab, e)}

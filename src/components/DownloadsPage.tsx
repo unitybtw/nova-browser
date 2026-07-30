@@ -81,7 +81,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                 <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Files you download will appear here.</p>
               </div>
             ) : (
-              downloads.map((item) => {
+              downloads.map((item, idx) => {
                 const percent = item.totalBytes > 0 
                   ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
                   : 0;
@@ -89,7 +89,8 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/30 hover:bg-white dark:hover:bg-slate-800/80 transition-all shadow-sm hover:shadow-md space-y-3"
+                    className="p-5 rounded-2xl border border-slate-200 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/30 hover:bg-white dark:hover:bg-slate-800/80 transition-all shadow-sm hover:shadow-md space-y-3 animate-in fade-in slide-in-from-bottom-2"
+                    style={{ animationFillMode: 'both', animationDelay: `${idx * 40}ms` }}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-4 min-w-0">
