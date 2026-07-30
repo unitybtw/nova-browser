@@ -1293,7 +1293,7 @@ function App() {
   return (
     <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-screen w-screen overflow-hidden text-slate-900 dark:text-slate-100 relative ${
       settings.useVerticalTabs 
-        ? isIncognito ? 'bg-slate-950' : 'bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900'
+        ? activeTab?.isIncognito ? 'bg-slate-950' : 'bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900'
         : 'bg-slate-50 dark:bg-slate-900'
     }`}>
       
