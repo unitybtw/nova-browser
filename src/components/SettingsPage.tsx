@@ -461,7 +461,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'gradient', name: 'Vibrant Gradient', style: 'bg-gradient-to-br from-blue-500 via-purple-500 to-rose-500' },
                     { id: 'mesh', name: 'Mesh Aurora', style: 'bg-gradient-to-tr from-emerald-400 via-cyan-500 to-blue-500' },
                     { id: 'glass', name: 'Dark Glass', style: 'bg-slate-900' },
-                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-indigo-900/50 backdrop-blur' },
+                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-accent-dark/50 backdrop-blur' },
                     { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
                   ].map(bg => (
                     <button
@@ -967,7 +967,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section className="space-y-4">
                 <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
-                  <div className="p-2 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-xl shadow-inner">
+                  <div className="p-2 bg-accent/20 dark:bg-accent/20 text-accent-hover dark:text-accent rounded-xl shadow-inner">
                     <Puzzle className="w-5 h-5" />
                   </div>
                   <div>

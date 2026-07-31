@@ -679,8 +679,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onClick={onToggleAIAssistant}
             className={`p-1.5 rounded transition-colors ${
               isIncognito 
-                ? 'hover:bg-indigo-900/40 text-indigo-400' 
-                : 'hover:bg-indigo-50 text-indigo-500 dark:hover:bg-indigo-900/30 dark:text-indigo-400'
+                ? 'hover:bg-accent-dark/40 text-accent' 
+                : 'hover:bg-accent/10 text-accent dark:hover:bg-accent-dark/30 dark:text-accent'
             }`}
             title="AI Browser Assistant"
           >
@@ -702,7 +702,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           {extensions.map(ext => (
             <button
               key={ext.id}
-              className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-indigo-900/30 text-indigo-400 hover:bg-slate-700' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
+              className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-accent-dark/30 text-accent hover:bg-slate-700' : 'bg-accent/10 text-accent-hover hover:bg-accent/20 dark:bg-accent-dark/30 dark:text-accent dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
               title={ext.name}
               onClick={() => {
                 // Future: Trigger extension popup

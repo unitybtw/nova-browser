@@ -231,7 +231,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {/* Background Decorative Mesh Orbs */}
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-indigo-600/20 rounded-full blur-[140px] animate-pulse" />
+          <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-accent-hover/20 rounded-full blur-[140px] animate-pulse" />
           <div className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-purple-600/20 rounded-full blur-[130px]" />
           <div className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/15 rounded-full blur-[120px]" />
         </div>
@@ -253,7 +253,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         {/* Omnibox / Search Form */}
         <motion.div variants={itemVariants} className="w-full">
           <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-500 transition-colors">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-accent transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
@@ -261,12 +261,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-800/60 backdrop-blur-md border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-800/90 focus:border-indigo-500 dark:focus:border-indigo-500/80 focus:ring-4 focus:ring-indigo-500/15 dark:focus:ring-indigo-500/20"
+              className="w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-800/60 backdrop-blur-md border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-800/90 focus:border-accent dark:focus:border-accent/80 focus:ring-4 focus:ring-accent/15 dark:focus:ring-accent/20"
               autoFocus
             />
             <button
               type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/30 opacity-90 hover:opacity-100 active:scale-95"
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-accent-hover hover:bg-accent text-white transition-all shadow-md shadow-indigo-600/30 opacity-90 hover:opacity-100 active:scale-95"
             >
               <ArrowRight className="w-4 h-4" />
             </button>
@@ -362,7 +362,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
           <div className="flex items-center gap-2">
-            <ListTodo className="w-4 h-4 text-indigo-400" />
+            <ListTodo className="w-4 h-4 text-accent" />
             <span>Tasks</span>
           </div>
           <div className="flex items-center gap-2">
@@ -398,8 +398,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-all ${
                     todo.completed 
-                      ? 'bg-indigo-500 text-white shadow-xs shadow-indigo-500/30' 
-                      : 'border-2 border-slate-300 dark:border-slate-600 group-hover:border-indigo-400'
+                      ? 'bg-accent text-white shadow-xs shadow-accent/30' 
+                      : 'border-2 border-slate-300 dark:border-slate-600 group-hover:border-accent'
                   }`}>
                     {todo.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
@@ -425,7 +425,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           </AnimatePresence>
           {todos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center text-xs opacity-50 space-y-1">
-              <CheckSquare className="w-6 h-6 stroke-[1.5] text-indigo-400" />
+              <CheckSquare className="w-6 h-6 stroke-[1.5] text-accent" />
               <span>No tasks for today. All done!</span>
             </div>
           )}
@@ -438,12 +438,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               placeholder="Add a new task..."
-              className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-all focus:ring-2 focus:ring-indigo-500/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
+              className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-all focus:ring-2 focus:ring-accent/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
             />
             {newTodo.trim() && (
               <button 
                 type="submit" 
-                className="absolute right-2 p-1 bg-indigo-500 text-white rounded-lg hover:bg-indigo-600 transition-colors shadow-xs"
+                className="absolute right-2 p-1 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -500,7 +500,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               </button>
               <button 
                 onClick={handleAddSpeedDial}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-md shadow-indigo-600/20"
+                className="px-4 py-2 bg-accent-hover hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-md shadow-indigo-600/20"
               >
                 Save
               </button>

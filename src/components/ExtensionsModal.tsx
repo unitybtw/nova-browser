@@ -33,7 +33,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
       >
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
           <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
-            <Puzzle className="w-5 h-5 text-indigo-500" />
+            <Puzzle className="w-5 h-5 text-accent" />
             <h2 className="text-lg font-semibold">Extensions</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 transition-colors">
