@@ -128,18 +128,18 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         }}
         initial={{ opacity: 0, x: -20, scale: 0.9 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8, height: 0 }}
+        exit={{ opacity: 0, scale: 0.8, height: 0, marginTop: 0, marginBottom: 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: 0.98 }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-10 rounded-xl cursor-pointer transition-all group/tab ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
+        className={`relative flex items-center h-10 rounded-xl cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
           isActive
             ? isIncognito
-              ? 'bg-slate-800/80 text-white shadow-sm'
-              : 'bg-white/90 text-slate-900 shadow-sm dark:bg-white/10 dark:text-white'
+              ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50'
+              : 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200/50 dark:bg-slate-800/90 dark:text-white dark:ring-slate-700/50'
             : isIncognito
               ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
               : 'text-slate-600 hover:bg-white/50 dark:text-slate-400 dark:hover:bg-white/5'
@@ -155,11 +155,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <Globe className="w-4 h-4 opacity-70" />
             )}
           </div>
-          <span className="truncate text-[13px] font-medium transition-opacity duration-200">
+          <span className={`truncate text-[13px] transition-opacity duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
             {tab.title || tab.url || 'New Tab'}
           </span>
         </div>
-        <div className="flex items-center gap-1 pr-2 opacity-0 group-hover/tab:opacity-100 transition-opacity shrink-0">
+        <div className={`flex items-center gap-1 pr-2 transition-opacity shrink-0 ${isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'}`}>
           {tab.isMuted ? (
             <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500">
               <VolumeX className="w-3.5 h-3.5" />
@@ -175,7 +175,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             </div>
           ) : null}
           {tabs.length > 1 && (
-            <button onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-900 dark:hover:text-slate-100">
+            <button onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500 transition-colors">
               <X className="w-3.5 h-3.5" />
             </button>
           )}
