@@ -1,52 +1,7 @@
 import { ipcRenderer } from 'electron';
 
 if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
-  // Spoof navigator properties for Chrome Web Store
-  Object.defineProperty(navigator, 'userAgent', {
-    get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-    configurable: true
-  });
-
-  Object.defineProperty(navigator, 'vendor', {
-    get: () => 'Google Inc.',
-    configurable: true
-  });
-
-  Object.defineProperty(navigator, 'userAgentData', {
-    get: () => ({
-      brands: [
-        { brand: 'Not/A)Brand', version: '8' },
-        { brand: 'Chromium', version: '126' },
-        { brand: 'Google Chrome', version: '126' }
-      ],
-      mobile: false,
-      platform: 'macOS',
-      getHighEntropyValues: async (hints: string[]) => {
-        return {
-          architecture: 'x86',
-          bitness: '64',
-          brands: [
-            { brand: 'Not/A)Brand', version: '8' },
-            { brand: 'Chromium', version: '126' },
-            { brand: 'Google Chrome', version: '126' }
-          ],
-          mobile: false,
-          model: '',
-          platform: 'macOS',
-          platformVersion: '13.0.0',
-          uaFullVersion: '126.0.0.0'
-        };
-      }
-    }),
-    configurable: true
-  });
-}
-
-// Setup the chrome.webstore API spoof
-const setupWebstoreAPI = () => {
-  const _window = window as any;
-  _window.chrome = _window.chrome || {};
-
+  // 1. Setup the IPC bridge in the isolated world
   const showNovaToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const existing = document.getElementById('nova-extension-toast');
     if (existing) existing.remove();
@@ -106,114 +61,143 @@ const setupWebstoreAPI = () => {
     
     return toast;
   };
-  
-  _window.chrome.webstore = {
-    install: (url?: string, successCallback?: () => void, failureCallback?: (err: string) => void) => {
-      const targetUrl = url || window.location.href;
-      const match = targetUrl.match(/[a-p]{32}/);
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
+    
+    const extensionId = event.data.extensionId;
+    const loadingToast = showNovaToast("Nova Browser'a yükleniyor...", 'info');
       
-      if (!match) {
-        showNovaToast('Eklenti ID si bulunamadı.', 'error');
-        if (failureCallback) failureCallback('Could not determine extension ID');
-        return;
-      }
-      
-      const extensionId = match[0];
-      const loadingToast = showNovaToast("Nova Browser'a yükleniyor...", 'info');
-      
-      ipcRenderer.invoke('install-from-webstore', extensionId)
-        .then(result => {
-          loadingToast.remove();
-          if (result.error) {
-            showNovaToast('Kurulum hatası: ' + result.error, 'error');
-            if (failureCallback) failureCallback(result.error);
-          } else {
-            showNovaToast('Eklenti başarıyla kuruldu!', 'success');
+    ipcRenderer.invoke('install-from-webstore', extensionId)
+      .then(result => {
+        loadingToast.remove();
+        if (result.error) {
+          showNovaToast('Kurulum hatası: ' + result.error, 'error');
+          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: result.error }, '*');
+        } else {
+          showNovaToast('Eklenti başarıyla kuruldu!', 'success');
+          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, '*');
+          setTimeout(() => window.location.reload(), 1500);
+        }
+      })
+      .catch(err => {
+        loadingToast.remove();
+        showNovaToast('Kurulum hatası: ' + err.message, 'error');
+        window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, '*');
+      });
+  });
+
+  // 2. Inject spoofing script into the MAIN WORLD
+  const script = document.createElement('script');
+  script.textContent = `
+    Object.defineProperty(navigator, 'userAgent', {
+      get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      configurable: true
+    });
+
+    Object.defineProperty(navigator, 'vendor', {
+      get: () => 'Google Inc.',
+      configurable: true
+    });
+
+    Object.defineProperty(navigator, 'userAgentData', {
+      get: () => ({
+        brands: [
+          { brand: 'Not/A)Brand', version: '8' },
+          { brand: 'Chromium', version: '126' },
+          { brand: 'Google Chrome', version: '126' }
+        ],
+        mobile: false,
+        platform: 'macOS',
+        getHighEntropyValues: async (hints) => {
+          return {
+            architecture: 'x86',
+            bitness: '64',
+            brands: [
+              { brand: 'Not/A)Brand', version: '8' },
+              { brand: 'Chromium', version: '126' },
+              { brand: 'Google Chrome', version: '126' }
+            ],
+            mobile: false,
+            model: '',
+            platform: 'macOS',
+            platformVersion: '13.0.0',
+            uaFullVersion: '126.0.0.0'
+          };
+        }
+      }),
+      configurable: true
+    });
+
+    window.chrome = window.chrome || {};
+    window.chrome.webstore = {
+      install: (url, successCallback, failureCallback) => {
+        const targetUrl = url || window.location.href;
+        const match = targetUrl.match(/[a-p]{32}/);
+        
+        if (!match) {
+          if (failureCallback) failureCallback('Could not determine extension ID');
+          return;
+        }
+        
+        const extensionId = match[0];
+        
+        // Listen for the result from the isolated world
+        const listener = (event) => {
+          if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
+          window.removeEventListener('message', listener);
+          
+          if (event.data.success) {
             if (successCallback) successCallback();
-            setTimeout(() => window.location.reload(), 1500);
+          } else {
+            if (failureCallback) failureCallback(event.data.error);
           }
-        })
-        .catch(err => {
-          loadingToast.remove();
-          showNovaToast('Kurulum hatası: ' + err.message, 'error');
-          if (failureCallback) failureCallback(err.message);
-        });
+        };
+        window.addEventListener('message', listener);
+        
+        // Tell isolated world to install
+        window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, '*');
+      }
+    };
+    
+    window.chrome.webstorePrivate = {
+      beginInstallWithManifest3: (details, callback) => {
+        window.chrome.webstore.install(details.id, () => callback('success'), (err) => callback(err));
+      },
+      completeInstall: (id, callback) => { callback(); },
+      getBrowserLogin: (callback) => { callback({ login: '', loggedIn: false }); },
+      getExtensionStatus: (id, callback) => { callback('installable'); },
+      isInIncognitoMode: (callback) => callback(false)
+    };
+  `;
+  document.documentElement.appendChild(script);
+  script.remove();
+
+  // 3. Inject the UI Banner
+  const injectNovaBanner = () => {
+    if (window.location.pathname.startsWith('/detail/')) {
+      const existingBanner = document.getElementById('nova-extension-banner');
+      if (existingBanner) return;
+
+      const banner = document.createElement('div');
+      banner.id = 'nova-extension-banner';
+      banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; z-index: 9999999; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
+
+      banner.innerHTML = "<div style='display: flex; align-items: center; gap: 12px;'><svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg><div><div style='font-weight: 600; font-size: 15px;'>Nova Browser Eklenti Sistemi</div><div style='font-size: 13px; opacity: 0.9;'>Bu eklentiyi tek tikla Nova Browsera kurabilirsiniz.</div></div></div><button id='nova-install-btn' style='background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>Nova'ya Ekle</button>";
+
+      document.body.prepend(banner);
+      document.body.style.marginTop = '60px';
+
+      document.getElementById('nova-install-btn')?.addEventListener('click', () => {
+        window.postMessage({ 
+          type: 'NOVA_INSTALL_EXTENSION', 
+          extensionId: window.location.pathname.split('/').pop()?.split('?')[0] 
+        }, '*');
+      });
     }
   };
-  
-  _window.chrome.webstorePrivate = {
-    beginInstallWithManifest3: (details: any, callback: (res: any) => void) => {
-      _window.chrome.webstore.install(details.id, () => callback('success'), (err: string) => callback(err));
-    },
-    completeInstall: (id: string, callback: () => void) => { callback(); },
-    getBrowserLogin: (callback: (info: any) => void) => { callback({ login: '', loggedIn: false }); },
-    getExtensionStatus: (id: string, callback: (status: string) => void) => { callback('installable'); },
-    isInIncognitoMode: (callback: (isIncognito: boolean) => void) => callback(false)
-  };
-};
 
-const injectNovaBanner = () => {
-  if (window.location.pathname.startsWith('/detail/')) {
-    const existingBanner = document.getElementById('nova-extension-banner');
-    if (existingBanner) return;
-
-    const banner = document.createElement('div');
-    banner.id = 'nova-extension-banner';
-    banner.style.cssText = `
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-      color: white;
-      padding: 12px 24px;
-      z-index: 9999999;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    `;
-
-    banner.innerHTML = `
-      <div style="display: flex; align-items: center; gap: 12px;">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-        <div>
-          <div style="font-weight: 600; font-size: 15px;">Nova Browser Eklenti Sistemi</div>
-          <div style="font-size: 13px; opacity: 0.9;">Bu eklentiyi tek tıkla Nova Browser'a kurabilirsiniz.</div>
-        </div>
-      </div>
-      <button id="nova-install-btn" style="
-        background: white;
-        color: #4f46e5;
-        border: none;
-        padding: 8px 20px;
-        border-radius: 6px;
-        font-weight: 600;
-        cursor: pointer;
-        font-size: 14px;
-        transition: transform 0.2s;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      ">Nova'ya Ekle</button>
-    `;
-
-    document.body.prepend(banner);
-    document.body.style.marginTop = '60px';
-
-    document.getElementById('nova-install-btn')?.addEventListener('click', () => {
-      if ((window as any).chrome?.webstore?.install) {
-        (window as any).chrome.webstore.install();
-      }
-    });
-  }
-};
-
-if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
-  setupWebstoreAPI();
-  window.addEventListener('DOMContentLoaded', () => {
-    setupWebstoreAPI();
-    injectNovaBanner();
-  });
+  window.addEventListener('DOMContentLoaded', injectNovaBanner);
 }
 
 // Password Manager Form Detection
@@ -260,7 +244,6 @@ const attemptAutofill = async () => {
       const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
       if (passwordInput && !passwordInput.value) {
         passwordInput.value = saved.password;
-        // Trigger React/Vue events if necessary
         passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
         passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
         
