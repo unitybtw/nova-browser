@@ -9,13 +9,47 @@
   "build": {
     "appId": "com.nova.browser",
     "productName": "Nova Browser",
+    "directories": {
+      "output": "dist-electron-builder",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
     "publish": [
       {
         "provider": "github",
         "owner": "unitybtw",
-        "repo": "nova-browser"
+        "repo": "nova-browser",
+        "releaseType": "release"
       }
-    ]
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "Nova-Browser-Setup.exe"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "category": "public.app-category.productivity",
+      "artifactName": "Nova-Browser-${arch}.dmg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
   },
   "scripts": {
     "dev:web": "vite",
