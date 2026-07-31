@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Sun, Moon, Monitor, Search, Shield, Ban, EyeOff, Bug } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (prefs: {
@@ -29,10 +30,9 @@ const SEARCH_ENGINES = [
     name: 'DuckDuckGo',
     desc: 'Sizi takip etmez, gizliliğinizi korur',
     icon: (
-      <svg viewBox="0 0 100 100" className="w-8 h-8">
-        <circle cx="50" cy="50" r="50" fill="#DE5833"/>
-        <text x="50" y="68" textAnchor="middle" fontSize="50" fill="white">🦆</text>
-      </svg>
+      <div className="w-8 h-8 rounded-full bg-[#DE5833] flex items-center justify-center">
+        <Shield className="w-5 h-5 text-white" />
+      </div>
     ),
   },
   {
@@ -40,10 +40,9 @@ const SEARCH_ENGINES = [
     name: 'Brave Search',
     desc: 'Bağımsız, reklamsız, hızlı',
     icon: (
-      <svg viewBox="0 0 100 100" className="w-8 h-8">
-        <circle cx="50" cy="50" r="50" fill="#FB542B"/>
-        <text x="50" y="68" textAnchor="middle" fontSize="50" fill="white">🦁</text>
-      </svg>
+      <div className="w-8 h-8 rounded-full bg-[#FB542B] flex items-center justify-center">
+        <Search className="w-5 h-5 text-white" />
+      </div>
     ),
   },
   {
@@ -64,10 +63,9 @@ const SEARCH_ENGINES = [
     name: 'Ecosia',
     desc: 'Her aramada ağaç dikiyor',
     icon: (
-      <svg viewBox="0 0 100 100" className="w-8 h-8">
-        <circle cx="50" cy="50" r="50" fill="#00894A"/>
-        <text x="50" y="68" textAnchor="middle" fontSize="50" fill="white">🌱</text>
-      </svg>
+      <div className="w-8 h-8 rounded-full bg-[#00894A] flex items-center justify-center">
+        <Search className="w-5 h-5 text-white" />
+      </div>
     ),
   },
 ];
@@ -76,7 +74,7 @@ const THEMES = [
   {
     id: 'light' as const,
     name: 'Açık',
-    icon: '☀️',
+    icon: <Sun className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-white border-2 border-slate-200',
     dot: 'bg-slate-800',
     bar: 'bg-slate-100 border-b border-slate-200',
@@ -84,7 +82,7 @@ const THEMES = [
   {
     id: 'dark' as const,
     name: 'Koyu',
-    icon: '🌙',
+    icon: <Moon className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-slate-900 border-2 border-slate-700',
     dot: 'bg-white',
     bar: 'bg-slate-800 border-b border-slate-700',
@@ -92,7 +90,7 @@ const THEMES = [
   {
     id: 'system' as const,
     name: 'Sistem',
-    icon: '💻',
+    icon: <Monitor className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-gradient-to-br from-white to-slate-900 border-2 border-slate-400',
     dot: 'bg-slate-500',
     bar: 'bg-gradient-to-r from-slate-100 to-slate-800',
@@ -317,16 +315,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       <p className="text-slate-400 text-lg max-w-md mb-10 leading-relaxed">
         Nova Browser'ın yerleşik gizlilik kalkanı; reklamları, izleyicileri ve kötü amaçlı içerikleri otomatik olarak engeller.
       </p>
-      <div className="grid grid-cols-3 gap-4 mb-10 max-w-lg w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-lg w-full">
         {[
-          { icon: '🚫', label: 'Reklamlar' },
-          { icon: '👁️', label: 'İzleyiciler' },
-          { icon: '🦠', label: 'Kötü Yazılım' },
+          { icon: <Ban className="w-8 h-8 text-slate-400" />, label: 'Reklamlar' },
+          { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'İzleyiciler' },
+          { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Kötü Yazılım' },
         ].map(item => (
-          <div key={item.label} className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col items-center gap-2">
-            <span className="text-3xl">{item.icon}</span>
+          <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
+            {item.icon}
             <span className="text-slate-300 text-sm font-medium">{item.label}</span>
-            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
+            <span className={`text-xs font-bold px-3 py-1 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
               {privacyShield ? 'Engellendi' : 'Açık'}
             </span>
           </div>
