@@ -1,25 +1,53 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   
-  --color-primary: #3b82f6; /* blue-500 */
-  --color-on-primary: #ffffff;
-  --color-secondary: #6366f1; /* indigo-500 */
-  --color-accent: #8b5cf6; /* violet-500 */
-  --color-background: #f8fafc; /* slate-50 */
-  --color-foreground: #0f172a; /* slate-900 */
-  --color-muted: #e2e8f0; /* slate-200 */
-  --color-border: #cbd5e1; /* slate-300 */
-  --color-destructive: #ef4444; /* red-500 */
-  --color-ring: #3b82f6;
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-ring: var(--ring);
+}
+
+:root {
+  --primary: #3b82f6;
+  --on-primary: #ffffff;
+  --secondary: #6366f1;
+  --accent: #8b5cf6;
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --muted: #e2e8f0;
+  --border: #cbd5e1;
+  --destructive: #ef4444;
+  --ring: #3b82f6;
+}
+
+.dark {
+  --primary: #3b82f6;
+  --on-primary: #ffffff;
+  --secondary: #6366f1;
+  --accent: #8b5cf6;
+  --background: #0f172a;
+  --foreground: #f8fafc;
+  --muted: #1e293b;
+  --border: #334155;
+  --destructive: #ef4444;
+  --ring: #3b82f6;
 }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--color-background);
-  color: var(--color-foreground);
+  background-color: var(--background);
+  color: var(--foreground);
   overflow-x: hidden;
 }
 
