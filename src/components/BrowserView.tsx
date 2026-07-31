@@ -110,6 +110,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         title: webview.getTitle?.() || tab.url,
         webContentsId: wcId
       });
+
+      try {
+        const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
+        webview.setZoomFactor(zoomMap[settings.fontSize || 'medium'] || 1.0);
+      } catch (err) {
+        console.error('Failed to set zoom factor', err);
+      }
     };
 
     const handleStartNavigation = (e: any) => {
