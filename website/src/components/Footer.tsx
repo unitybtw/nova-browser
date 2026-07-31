@@ -2,7 +2,7 @@
 
 export const Footer = () => {
   return (
-    <footer className="border-t border-primary/10 bg-white/30 backdrop-blur-md pt-16 pb-8">
+    <footer className="border-t border-primary/10 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md pt-16 pb-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
