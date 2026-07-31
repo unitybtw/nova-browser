@@ -655,6 +655,35 @@ ipcMain.handle('list-extensions', async () => {
   }));
 });
 
+// Open Extension Popup Window
+ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
+  const popupWin = new BrowserWindow({
+    width: 380,
+    height: 500,
+    x: bounds?.x ? Math.round(bounds.x) - 340 : undefined,
+    y: bounds?.y ? Math.round(bounds.y) + 40 : undefined,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    resizable: false,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      session: session.defaultSession
+    }
+  });
+
+  // Close popup when it loses focus
+  popupWin.on('blur', () => {
+    if (!popupWin.isDestroyed()) popupWin.close();
+  });
+
+  await popupWin.loadURL(url);
+  return { success: true };
+});
+
 // Unload / remove an extension by its ID
 ipcMain.handle('remove-extension', async (_event, extensionId: string) => {
   const win = BrowserWindow.getAllWindows()[0];

@@ -826,10 +826,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               key={ext.id}
               className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-accent-dark/30 text-accent hover:bg-slate-700' : 'bg-accent/10 text-accent-hover hover:bg-accent/20 dark:bg-accent-dark/30 dark:text-accent dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
               title={ext.name}
-              onClick={() => {
+              onClick={(e) => {
                 if (ext.popupUrl) {
                   const url = `chrome-extension://${ext.id}/${ext.popupUrl}`;
-                  onNewTab(url);
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  if ((window as any).electronAPI?.openExtensionPopup) {
+                    (window as any).electronAPI.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+                  } else {
+                    onNewTab(url); // fallback
+                  }
                 } else {
                   alert(ext.name + ' eklentisinin popup ekranı yok veya henüz desteklenmiyor.');
                 }

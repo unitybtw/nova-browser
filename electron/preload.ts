@@ -43,6 +43,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installExtension: (folderPath: string) => ipcRenderer.invoke('install-extension', folderPath),
   listExtensions: () => ipcRenderer.invoke('list-extensions'),
   removeExtension: (extensionId: string) => ipcRenderer.invoke('remove-extension', extensionId),
+  openExtensionPopup: (url: string, bounds: any) => ipcRenderer.invoke('open-extension-popup', url, bounds),
   selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
   installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
   onExtensionInstalledSilently: (callback: (event: any, data: any) => void) => {
