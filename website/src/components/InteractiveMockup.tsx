@@ -1,6 +1,6 @@
 import { motion, useAnimation } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Sparkles, LayoutPanelLeft, Search, Plus, X, Globe, Menu, Shield } from 'lucide-react';
+import { Sparkles, Plus, X, Globe, Menu, Shield, Star, Download } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 
 export const InteractiveMockup = () => {
@@ -81,9 +81,9 @@ export const InteractiveMockup = () => {
     sequence();
   }, [cursorControls, sidebarControls, aiTextControls]);
 
-  const frameBg = isDark ? 'bg-slate-900' : 'bg-white';
-  const topbarBg = isDark ? 'bg-slate-950' : 'bg-slate-100';
-  const toolbarBg = isDark ? 'bg-slate-900' : 'bg-slate-50';
+  const frameBg = isDark ? 'bg-[#0f172a]' : 'bg-white';
+  const topbarBg = isDark ? 'bg-[#0f172a]' : 'bg-slate-100';
+  const toolbarBg = isDark ? 'bg-[#1e293b]' : 'bg-slate-50';
   const borderColor = isDark ? 'border-slate-800' : 'border-slate-200';
   const textColor = isDark ? 'text-slate-200' : 'text-slate-800';
   const mutedText = isDark ? 'text-slate-400' : 'text-slate-500';
@@ -91,59 +91,64 @@ export const InteractiveMockup = () => {
   return (
     <div className={`w-full max-w-4xl mx-auto h-[500px] rounded-2xl ${frameBg} ${borderColor} border shadow-2xl overflow-hidden flex flex-col relative`}>
       {/* Topbar (Tabs & Window Controls) */}
-      <div className={`h-12 ${topbarBg} flex items-end px-3 gap-4 border-b ${borderColor}`}>
-        <div className="flex gap-1.5 mb-4 items-center">
+      <div className={`h-11 ${topbarBg} flex items-end px-3 gap-2 border-b ${borderColor} pt-2 relative`}>
+        <div className="flex gap-1.5 mb-3 items-center absolute left-4">
           <div className="w-3 h-3 rounded-full bg-red-500" />
           <div className="w-3 h-3 rounded-full bg-yellow-500" />
           <div className="w-3 h-3 rounded-full bg-green-500" />
         </div>
         
         {/* Active Tab */}
-        <div className={`px-4 py-2 ${toolbarBg} rounded-t-lg flex items-center gap-2 border-t border-x ${borderColor} min-w-[200px]`}>
+        <div className={`px-4 py-2 ${toolbarBg} rounded-t-xl flex items-center gap-2 border-t border-x ${borderColor} min-w-[200px] ml-16 shadow-sm`}>
           <Globe className={`w-3.5 h-3.5 ${mutedText}`} />
           <span className={`text-xs font-medium ${textColor}`}>AuraSite - Web Design</span>
-          <X className={`w-3.5 h-3.5 ${mutedText} ml-auto`} />
+          <X className={`w-3.5 h-3.5 ${mutedText} ml-auto hover:text-red-400 cursor-pointer transition-colors`} />
         </div>
         
-        <div className={`mb-3 p-1 rounded-md hover:bg-slate-800/10 cursor-pointer`}>
+        <div className={`mb-2 p-1.5 rounded-lg hover:bg-slate-800/20 cursor-pointer`}>
           <Plus className={`w-4 h-4 ${mutedText}`} />
         </div>
       </div>
 
       {/* Toolbar (URL bar, extensions) */}
-      <div className={`h-12 ${toolbarBg} flex items-center px-4 gap-4 border-b ${borderColor}`}>
-        <div className="flex gap-3">
-          <div className={`w-5 h-5 rounded ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`} />
-          <div className={`w-5 h-5 rounded ${isDark ? 'bg-slate-800' : 'bg-slate-200'}`} />
+      <div className={`h-12 ${toolbarBg} flex items-center px-4 gap-3 border-b ${borderColor}`}>
+        <div className="flex gap-1">
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg></div>
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg></div>
         </div>
         
         {/* URL Bar */}
-        <div className={`flex-1 h-8 ${isDark ? 'bg-slate-950/50' : 'bg-white'} border ${borderColor} rounded-lg flex items-center px-3 shadow-inner relative`}>
-          <Shield className={`w-4 h-4 text-green-500 mr-2`} />
+        <div className={`flex-1 h-8 ${isDark ? 'bg-[#0f172a]' : 'bg-white'} border ${borderColor} rounded-xl flex items-center px-3 shadow-inner relative group`}>
+          <Shield className={`w-4 h-4 text-emerald-500 mr-2`} />
           <span className={`text-xs ${mutedText}`}>https://</span>
           <span className={`text-xs ${textColor}`}>aurasite.tech</span>
-          <div className={`ml-auto p-1 rounded-md bg-primary/10 text-primary`}>
-            <Search className="w-3.5 h-3.5" />
+          
+          <div className="ml-auto flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Star className={`w-3.5 h-3.5 ${mutedText}`} />
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
-          <div className={`p-1.5 rounded-md ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-200 text-slate-700'}`}>
-            <LayoutPanelLeft className="w-4 h-4" />
+        <div className="flex gap-1">
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20`}>
+            <Shield className="w-4 h-4" />
           </div>
-          <div className="p-1.5 rounded-md bg-purple-500/10 text-purple-500 relative">
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20 relative`}>
+            <Download className="w-4 h-4" />
+          </div>
+          <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 cursor-pointer relative transition-colors shadow-sm">
             <Sparkles className="w-4 h-4" />
-            <div className="absolute top-0 right-0 w-1.5 h-1.5 bg-purple-500 rounded-full" />
+            <div className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-purple-500 rounded-full border border-[#1e293b]" />
           </div>
-          <div className={`p-1.5 rounded-md ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <div className={`p-1.5 rounded-lg ${mutedText} hover:bg-slate-800/20 ml-1`}>
             <Menu className="w-4 h-4" />
           </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex relative overflow-hidden bg-white dark:bg-slate-950">
+      <div className="flex-1 flex relative overflow-hidden bg-white dark:bg-[#0f172a]">
         {/* Fake Website Content */}
         <div className="flex-1 p-10 flex flex-col items-center justify-center relative">
           <motion.div animate={contentControls} className="text-center max-w-lg">
@@ -152,7 +157,10 @@ export const InteractiveMockup = () => {
             </div>
             <h1 className={`text-4xl font-bold mb-4 ${textColor}`}>Welcome to AuraSite</h1>
             <p className={`text-lg ${mutedText} mb-8`}>Building the future of web design, one pixel at a time.</p>
-            <div className="h-10 w-32 bg-blue-500 rounded-xl mx-auto" />
+            <div className="flex justify-center gap-4">
+              <div className="h-10 w-32 bg-blue-600 hover:bg-blue-700 transition-colors rounded-xl cursor-pointer" />
+              <div className={`h-10 w-32 ${isDark ? 'bg-slate-800' : 'bg-slate-200'} rounded-xl cursor-pointer`} />
+            </div>
           </motion.div>
         </div>
 
@@ -160,30 +168,33 @@ export const InteractiveMockup = () => {
         <motion.div
           initial={{ width: 0, opacity: 0 }}
           animate={sidebarControls}
-          className={`h-full ${isDark ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200'} border-l flex flex-col overflow-hidden`}
+          className={`h-full ${isDark ? 'bg-[#1e293b] border-slate-700' : 'bg-slate-50 border-slate-200'} border-l flex flex-col overflow-hidden shadow-2xl`}
         >
-          <div className={`p-4 border-b ${borderColor} flex items-center gap-2`}>
-            <Sparkles className="w-4 h-4 text-purple-500" />
-            <span className={`text-sm font-semibold ${textColor} whitespace-nowrap`}>Nova AI Assistant</span>
+          <div className={`p-4 border-b ${isDark ? 'border-slate-800' : 'border-slate-200'} flex items-center justify-between`}>
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-purple-500" />
+              <span className={`text-sm font-semibold ${textColor} whitespace-nowrap`}>Nova AI</span>
+            </div>
+            <X className={`w-4 h-4 ${mutedText} cursor-pointer`} />
           </div>
           
-          <div className="flex-1 p-4 flex flex-col gap-4">
-            <div className={`self-end max-w-[80%] p-3 rounded-xl rounded-tr-sm bg-purple-500 text-white text-xs`}>
+          <div className="flex-1 p-4 flex flex-col gap-4 overflow-y-auto">
+            <div className={`self-end max-w-[85%] p-3 rounded-2xl rounded-tr-sm bg-purple-600 text-white text-xs shadow-md`}>
               Summarize this website for me.
             </div>
             
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={aiTextControls}
-              className={`self-start max-w-[90%] p-3 rounded-xl rounded-tl-sm ${isDark ? 'bg-slate-800' : 'bg-white border border-slate-200'} text-xs ${textColor} leading-relaxed`}
+              className={`self-start max-w-[90%] p-3 rounded-2xl rounded-tl-sm ${isDark ? 'bg-slate-800' : 'bg-white border border-slate-200'} text-xs ${textColor} leading-relaxed shadow-sm`}
             >
-              <strong>AuraSite</strong> is a modern web design platform focused on futuristic interfaces and pixel-perfect layouts.
+              <strong>AuraSite</strong> is a modern web design platform focused on futuristic interfaces and pixel-perfect layouts. It provides tools for building next-gen web applications quickly.
             </motion.div>
           </div>
           
-          <div className={`p-3 border-t ${borderColor}`}>
-            <div className={`h-8 rounded-md ${isDark ? 'bg-slate-950' : 'bg-white border border-slate-200'} flex items-center px-2`}>
-              <span className={`text-xs ${mutedText}`}>Ask Nova...</span>
+          <div className={`p-3 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
+            <div className={`h-10 rounded-xl ${isDark ? 'bg-[#0f172a]' : 'bg-white border border-slate-200'} flex items-center px-3 shadow-inner`}>
+              <span className={`text-xs ${mutedText}`}>Ask Nova to summarize or explain...</span>
             </div>
           </div>
         </motion.div>
