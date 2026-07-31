@@ -84,6 +84,7 @@ interface TopBarProps {
   onTogglePinTab: (id: string, e: React.MouseEvent) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onSuspendTab?: (id: string) => void;
+  onReorderTabs?: (draggedId: string, targetId: string) => void;
   onTogglePip?: (id: string) => void;
   onSelectTab: (id: string) => void;
   onNewTab: (url?: string) => void;
@@ -129,6 +130,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onTogglePinTab,
   onToggleMuteTab,
   onSuspendTab,
+  onReorderTabs,
   onTogglePip,
   onSelectTab,
   onNewTab,
@@ -149,6 +151,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ left: 0, width: 0 });
+  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [extensions, setExtensions] = useState<any[]>([]);
@@ -442,11 +446,48 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   whileTap={{ scale: 0.98 }}
                   key={tab.id}
                   data-tab-id={tab.id}
+                  draggable={true}
+                  onDragStart={(e: any) => {
+                    if (e.dataTransfer) {
+                      e.dataTransfer.setData('text/plain', tab.id);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }
+                    setDraggedTabId(tab.id);
+                  }}
+                  onDragOver={(e: any) => {
+                    if (e.preventDefault) e.preventDefault();
+                    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
+                    if (dragOverTabId !== tab.id) {
+                      setDragOverTabId(tab.id);
+                    }
+                  }}
+                  onDragLeave={() => {
+                    if (dragOverTabId === tab.id) {
+                      setDragOverTabId(null);
+                    }
+                  }}
+                  onDrop={(e: any) => {
+                    if (e.preventDefault) e.preventDefault();
+                    const sourceId = e.dataTransfer?.getData('text/plain') || draggedTabId;
+                    if (sourceId && sourceId !== tab.id && onReorderTabs) {
+                      onReorderTabs(sourceId, tab.id);
+                    }
+                    setDraggedTabId(null);
+                    setDragOverTabId(null);
+                  }}
+                  onDragEnd={() => {
+                    setDraggedTabId(null);
+                    setDragOverTabId(null);
+                  }}
                   onClick={() => onSelectTab(tab.id)}
-                  className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-pointer transition-colors no-drag ${
+                  className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-grab active:cursor-grabbing transition-all no-drag ${
                     tabStyle === 'floating' ? 'rounded-lg mx-0.5 my-1 border' : 
                     tabStyle === 'square' ? 'rounded-none border-t border-x' : 
                     'rounded-t-xl border-t border-x'
+                  } ${
+                    draggedTabId === tab.id ? 'opacity-30 scale-95' : ''
+                  } ${
+                    dragOverTabId === tab.id && draggedTabId !== tab.id ? 'ring-2 ring-blue-500 z-30 scale-105 shadow-xl border-blue-500' : ''
                   } ${
                     isActive
                       ? isIncognito

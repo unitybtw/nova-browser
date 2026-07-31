@@ -500,6 +500,21 @@ function App() {
     });
   }, [activeTabId, splitTabId]);
 
+  // Tab Reordering (Drag and Drop)
+  const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
+    if (draggedId === targetId) return;
+    setTabs(prevTabs => {
+      const draggedIdx = prevTabs.findIndex(t => t.id === draggedId);
+      const targetIdx = prevTabs.findIndex(t => t.id === targetId);
+      if (draggedIdx === -1 || targetIdx === -1) return prevTabs;
+
+      const newTabs = [...prevTabs];
+      const [removed] = newTabs.splice(draggedIdx, 1);
+      newTabs.splice(targetIdx, 0, removed);
+      return newTabs;
+    });
+  }, []);
+
 
 
   // Listen to IPC events from main process (Shortcuts & Downloads) with cleanups
@@ -1548,6 +1563,7 @@ function App() {
           onTogglePinTab={handleTogglePinTab}
           onToggleMuteTab={handleToggleMuteTab}
           onSuspendTab={handleSuspendTab}
+          onReorderTabs={handleReorderTabs}
           onTogglePip={handleTogglePip}
           onSelectTab={handleSelectTab}
           onNewTab={handleNewTab}
