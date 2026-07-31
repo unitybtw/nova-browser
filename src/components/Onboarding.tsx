@@ -161,7 +161,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="mb-8"
       >
         <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-6 mx-auto">
-          <img src="/browser-assets/nova-icon.jpg" alt="Nova" className="w-20 h-20 rounded-2xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          <img src="/nova-icon.jpg" alt="Nova" className="w-20 h-20 rounded-2xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         </div>
       </motion.div>
       <motion.h1
