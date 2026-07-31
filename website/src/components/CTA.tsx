@@ -19,6 +19,22 @@ export const CTA = () => {
     }
   }, []);
 
+  const [downloadUrl, setDownloadUrl] = useState<string>('https://github.com/unitybtw/nova-browser/releases/latest');
+
+  useEffect(() => {
+    fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest')
+      .then(res => res.json())
+      .then(data => {
+        if (data.assets) {
+          const asset = data.assets.find((a: any) => 
+            os === 'win' ? a.name.endsWith('.exe') : a.name.endsWith('.dmg')
+          );
+          if (asset) setDownloadUrl(asset.browser_download_url);
+        }
+      })
+      .catch(console.error);
+  }, [os]);
+
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,10 +55,10 @@ export const CTA = () => {
             <p className="text-lg text-white/85 mb-10">
               {t.cta.sub}
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
               {os === 'win' ? (
                 <a
-                  href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
+                  href={downloadUrl}
                   className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2"
                 >
                   <Monitor className="w-5 h-5" />
@@ -50,7 +66,7 @@ export const CTA = () => {
                 </a>
               ) : os === 'mac' ? (
                 <a
-                  href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
+                  href={downloadUrl}
                   className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 backdrop-blur-sm"
                 >
                   <Download className="w-5 h-5" />
