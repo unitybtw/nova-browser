@@ -356,6 +356,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         backgroundCustomUrl={settings.backgroundCustomUrl}
         unsplashCategory={settings.unsplashCategory}
         showTasksWidget={settings.showTasksWidget}
+        isIncognito={isIncognito}
       />
     );
   }

@@ -35,7 +35,10 @@ import {
   Unlock,
   ShieldAlert,
   HelpCircle,
-  Network
+  Network,
+  MonitorSmartphone,
+  ScanSearch,
+  VenetianMask
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
@@ -402,7 +405,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   ) : tab.url === 'nova://downloads' ? (
                     <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
-                    <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   ) : (
                     <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   )}
@@ -514,6 +517,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   const sec = getUrlSecurityInfo(activeTab?.url || '');
                   return (
                     <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                      {isIncognito && <VenetianMask className="w-3.5 h-3.5 mr-0.5" />}
                       {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
                       {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
                       {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}

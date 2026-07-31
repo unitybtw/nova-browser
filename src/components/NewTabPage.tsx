@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings, VenetianMask } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { UserSettings } from '../App';
 
@@ -18,6 +18,7 @@ interface NewTabPageProps {
   backgroundCustomUrl?: string;
   unsplashCategory?: string;
   showTasksWidget?: boolean;
+  isIncognito?: boolean;
 }
 
 const DEFAULT_SPEED_DIALS = [
@@ -36,6 +37,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   backgroundCustomUrl = '',
   unsplashCategory = 'nature,architecture',
   showTasksWidget = true,
+  isIncognito = false,
 }) => {
   const [query, setQuery] = useState('');
   const [speedDials, setSpeedDials] = useState(() => {
@@ -184,6 +186,51 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
   const isCustomDarkBg = newTabBackground !== 'default';
   const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
+
+  if (isIncognito) {
+    return (
+      <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="visible"
+          className="w-full max-w-2xl flex flex-col items-center gap-10 z-10"
+        >
+          <motion.div variants={itemVariants} className="flex flex-col items-center text-center">
+            <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-2xl shadow-black/50">
+              <VenetianMask className="w-16 h-16 text-slate-300" strokeWidth={1.5} />
+            </div>
+            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">Gizli Sekmedesiniz</h1>
+            <p className="text-lg text-slate-400 max-w-lg">
+              Tarama geçmişiniz, çerezler, site verileri ve formlara girilen bilgiler kaydedilmeyecek.
+            </p>
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="w-full relative group">
+            <form onSubmit={handleSearch} className="w-full">
+              <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-slate-500" />
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Gizli modda ara veya adres yaz..."
+                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-all shadow-xl backdrop-blur-xl"
+                autoFocus
+              />
+              <button 
+                type="submit"
+                className="absolute inset-y-0 right-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+              >
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            </form>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isCustomDarkBg ? 'dark' : ''}`}>
