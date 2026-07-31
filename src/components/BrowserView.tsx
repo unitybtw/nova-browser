@@ -100,7 +100,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const webview = webviewRef.current;
     if (!webview) return;
 
-    const handleDomReady = () => {
+    const handleDomReady = async () => {
       domReadyRef.current = true;
       let wcId = undefined;
       try { wcId = webview.getWebContentsId(); } catch (e) {}
@@ -118,6 +118,72 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       } catch (err) {
         console.error('Failed to set zoom factor', err);
       }
+
+      // 1. Password Autofill & Capture Logic
+      try {
+        // Fetch saved passwords for current domain
+        let hostname = '';
+        try { hostname = new URL(tab.url).hostname; } catch (e) {}
+        
+        let savedPasswords: any[] = [];
+        try {
+          const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+          if (raw) {
+            const all = JSON.parse(raw);
+            savedPasswords = all.filter((p: any) => p.hostname === hostname);
+          }
+        } catch (e) {}
+
+        const autofillScript = `
+          (function() {
+            if (window.__nova_pw_injected) return;
+            window.__nova_pw_injected = true;
+
+            // Autofill existing credentials
+            const savedCredentials = ${JSON.stringify(savedPasswords)};
+            if (savedCredentials.length > 0) {
+              const cred = savedCredentials[0];
+              const pwdInputs = document.querySelectorAll('input[type="password"]');
+              if (pwdInputs.length > 0) {
+                const form = pwdInputs[0].closest('form');
+                if (form) {
+                  const textInputs = form.querySelectorAll('input[type="text"], input[type="email"]');
+                  if (textInputs.length > 0) {
+                    textInputs[0].value = cred.username;
+                    textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                  }
+                  pwdInputs[0].value = cred.password;
+                  pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                }
+              }
+            }
+
+            // Capture new submissions
+            document.addEventListener('submit', (e) => {
+              const form = e.target;
+              if (form && form.tagName === 'FORM') {
+                const pwdInput = form.querySelector('input[type="password"]');
+                if (pwdInput && pwdInput.value) {
+                  let username = '';
+                  const textInputs = form.querySelectorAll('input[type="text"], input[type="email"]');
+                  if (textInputs.length > 0) {
+                    username = textInputs[0].value;
+                  }
+                  
+                  // IPC to parent window (App.tsx / BrowserView.tsx)
+                  // But wait, window.ipcRenderer doesn't exist unless nodeIntegration/preload.
+                  // Instead, we can send a custom event and listen for it via another executeJavaScript polling, 
+                  // or set title? No, webview supports ipc-message if we use sendToHost in a preload.
+                  // Since we have no preload, we can't easily send an IPC message from standard injected script.
+                  // However, we can use console.log and capture it!
+                  console.log('NOVA_SAVE_PW::' + JSON.stringify({ hostname: window.location.hostname, username, password: pwdInput.value }));
+                }
+              }
+            });
+          })();
+        `;
+        webview.executeJavaScript(autofillScript);
+      } catch (e) {}
     };
 
     const handleStartNavigation = (e: any) => {
@@ -236,6 +302,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    const handleConsoleMessage = (e: any) => {
+      if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
+        try {
+          const data = JSON.parse(e.message.substring(14));
+          setPasswordPrompt({ isOpen: true, hostname: data.hostname, username: data.username, password: data.password });
+        } catch (err) {}
+      }
+    };
+
     webview.addEventListener('dom-ready', handleDomReady);
     webview.addEventListener('did-start-navigation', handleStartNavigation);
     webview.addEventListener('did-stop-loading', handleStopLoading);
@@ -251,6 +326,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('media-started-playing', handleMediaStarted);
     webview.addEventListener('media-paused', handleMediaPaused);
     webview.addEventListener('ipc-message', handleIpcMessage);
+    webview.addEventListener('console-message', handleConsoleMessage);
 
     // Initial check: if webview is already not loading, ensure isLoading is false
     setTimeout(() => {
@@ -293,6 +369,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-started-playing', handleMediaStarted);
       webview.removeEventListener('media-paused', handleMediaPaused);
       webview.removeEventListener('ipc-message', handleIpcMessage);
+      webview.removeEventListener('console-message', handleConsoleMessage);
     };
   }, [tab.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 

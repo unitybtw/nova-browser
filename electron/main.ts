@@ -411,12 +411,35 @@ app.on('web-contents-created', (_event, wc) => {
 
   // Native Context Menu for webviews
   wc.on('context-menu', (e, params) => {
-    // Only show for webviews, not the main browser UI
+    // Sadece webview'ler için göster
     if (wc.getType() === 'webview') {
       const { Menu, MenuItem, clipboard } = require('electron');
       const menu = new Menu();
 
+      // Seçili metin varsa
+      if (params.selectionText) {
+        menu.append(new MenuItem({
+          label: 'Kopyala',
+          accelerator: 'CmdOrCtrl+C',
+          click: () => clipboard.writeText(params.selectionText)
+        }));
+        menu.append(new MenuItem({
+          label: `Google'da Ara: "${params.selectionText.length > 15 ? params.selectionText.substring(0, 15) + '...' : params.selectionText}"`,
+          click: () => {
+            mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`);
+          }
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // Link varsa
       if (params.linkURL) {
+        menu.append(new MenuItem({
+          label: 'Bağlantıyı Yeni Sekmede Aç',
+          click: () => {
+            mainWindow?.webContents.send('new-tab', params.linkURL);
+          }
+        }));
         menu.append(new MenuItem({
           label: 'Bağlantı Adresini Kopyala',
           click: () => clipboard.writeText(params.linkURL)
@@ -424,7 +447,20 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
+      // Resim varsa
       if (params.srcURL && params.mediaType === 'image') {
+        menu.append(new MenuItem({
+          label: 'Resmi Yeni Sekmede Aç',
+          click: () => {
+            mainWindow?.webContents.send('new-tab', params.srcURL);
+          }
+        }));
+        menu.append(new MenuItem({
+          label: 'Resmi Farklı Kaydet...',
+          click: () => {
+            wc.downloadURL(params.srcURL);
+          }
+        }));
         menu.append(new MenuItem({
           label: 'Resim Adresini Kopyala',
           click: () => clipboard.writeText(params.srcURL)
@@ -432,13 +468,17 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
-      menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.canGoBack() }));
-      menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.canGoForward() }));
-      menu.append(new MenuItem({ label: 'Yenile', click: () => wc.reload() }));
-      menu.append(new MenuItem({ type: 'separator' }));
-      menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+      // Standart Gezinme (boşluğa tıklanınca)
+      if (!params.linkURL && !params.selectionText && params.mediaType === 'none') {
+        menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.canGoBack() }));
+        menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.canGoForward() }));
+        menu.append(new MenuItem({ label: 'Yeniden Yükle', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
 
-      menu.popup();
+      menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+      
+      menu.popup({ window: mainWindow || undefined });
     }
   });
 });

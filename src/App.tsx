@@ -1585,6 +1585,8 @@ function App() {
           activeTabId={activeTabId}
           bookmarks={bookmarks}
           activeDownloadsCount={activeDownloadsCount}
+          downloads={downloads}
+          onClearDownloads={handleClearDownloads}
           showBookmarksBar={settings.showBookmarksBar}
           useVerticalTabs={settings.useVerticalTabs}
           onToggleReaderMode={() => setIsReaderModeOpen(prev => !prev)}

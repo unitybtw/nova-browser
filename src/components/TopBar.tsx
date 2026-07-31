@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { DownloadsPopover } from './DownloadsPopover';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
   ArrowLeft,
@@ -99,6 +100,8 @@ interface TopBarProps {
   onToggleVpn?: () => void;
   onToggleAIAssistant: () => void;
   activeDownloadsCount?: number;
+  downloads?: any[];
+  onClearDownloads?: () => void;
   showBookmarksBar?: boolean;
   onToggleReaderMode?: () => void;
   onOpenExtensions: () => void;
@@ -112,6 +115,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   activeTabId,
   bookmarks,
   activeDownloadsCount,
+  downloads = [],
+  onClearDownloads,
   isSplitView,
   isIncognito = false,
   useVerticalTabs = false,
@@ -161,6 +166,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [mcpClientCount, setMcpClientCount] = useState(0);
   const [mcpRunning, setMcpRunning] = useState(false);
   const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
+  const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
+  const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
 
@@ -871,6 +878,30 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 hostname={currentHostname}
               />
             )}
+          </div>
+
+          {/* Downloads Button & Popover */}
+          <div className="relative flex items-center">
+            <button
+              ref={downloadsBtnRef}
+              onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
+              className={`p-1.5 rounded transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+              title="Downloads"
+            >
+              <Download className="w-4 h-4" />
+              {(activeDownloadsCount || 0) > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                  {activeDownloadsCount}
+                </span>
+              )}
+            </button>
+            <DownloadsPopover
+              downloads={downloads}
+              isOpen={isDownloadsOpen}
+              onClose={() => setIsDownloadsOpen(false)}
+              onClearDownloads={onClearDownloads || (() => {})}
+              buttonRef={downloadsBtnRef}
+            />
           </div>
 
           <button 
