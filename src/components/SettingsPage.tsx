@@ -420,11 +420,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
                 <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
                   {[
-                    { id: 'blue', color: 'bg-blue-500' },
-                    { id: 'emerald', color: 'bg-emerald-500' },
-                    { id: 'purple', color: 'bg-purple-500' },
-                    { id: 'rose', color: 'bg-rose-500' },
-                    { id: 'amber', color: 'bg-amber-500' },
+                    { id: 'blue', color: 'bg-[#3b82f6]' },
+                    { id: 'emerald', color: 'bg-[#10b981]' },
+                    { id: 'purple', color: 'bg-[#a855f7]' },
+                    { id: 'rose', color: 'bg-[#f43f5e]' },
+                    { id: 'amber', color: 'bg-[#f59e0b]' },
                     { id: 'custom', color: 'bg-slate-200 dark:bg-slate-700' }
                   ].map(c => (
                     <button

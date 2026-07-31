@@ -326,19 +326,30 @@ function App() {
     }
     
     if (settings.accentColor === 'custom' && settings.customAccentColor) {
-      // Basic hex to variants
+      // Use custom hex
       const hex = settings.customAccentColor;
       accentStyleEl.innerHTML = `
         :root {
+          --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
+          --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
+          --color-blue-200: color-mix(in oklab, ${hex} 40%, white) !important;
+          --color-blue-300: color-mix(in oklab, ${hex} 60%, white) !important;
+          --color-blue-400: color-mix(in oklab, ${hex} 80%, white) !important;
+          --color-blue-500: ${hex} !important;
+          --color-blue-600: color-mix(in oklab, ${hex} 80%, black) !important;
+          --color-blue-700: color-mix(in oklab, ${hex} 60%, black) !important;
+          --color-blue-800: color-mix(in oklab, ${hex} 40%, black) !important;
+          --color-blue-900: color-mix(in oklab, ${hex} 20%, black) !important;
+          --color-blue-950: color-mix(in oklab, ${hex} 10%, black) !important;
           --nova-accent: ${hex};
-          --nova-accent-hover: ${hex}cc;
-          --nova-accent-light: ${hex}33;
-          --nova-accent-dark: ${hex}99;
+          --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
+          --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
+          --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
           --nova-accent-text: #ffffff;
         }
       `;
     } else {
-      // For standard colors, we can map to Tailwind defaults or just clear custom vars to let Tailwind @theme defaults kick in
+      // Map standard colors
       const defaultColorMap: Record<string, string> = {
         'blue': '#3b82f6',
         'emerald': '#10b981',
@@ -347,15 +358,40 @@ function App() {
         'amber': '#f59e0b'
       };
       const hex = defaultColorMap[settings.accentColor] || defaultColorMap['blue'];
-      accentStyleEl.innerHTML = `
-        :root {
-          --nova-accent: ${hex};
-          --nova-accent-hover: ${hex}cc;
-          --nova-accent-light: ${hex}33;
-          --nova-accent-dark: ${hex}99;
-          --nova-accent-text: #ffffff;
-        }
-      `;
+      
+      // If it's standard blue, we can either clear or just set it
+      if (settings.accentColor === 'blue') {
+        accentStyleEl.innerHTML = `
+          :root {
+            --nova-accent: ${hex};
+            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
+            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
+            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
+            --nova-accent-text: #ffffff;
+          }
+        `;
+      } else {
+        accentStyleEl.innerHTML = `
+          :root {
+            --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
+            --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
+            --color-blue-200: color-mix(in oklab, ${hex} 40%, white) !important;
+            --color-blue-300: color-mix(in oklab, ${hex} 60%, white) !important;
+            --color-blue-400: color-mix(in oklab, ${hex} 80%, white) !important;
+            --color-blue-500: ${hex} !important;
+            --color-blue-600: color-mix(in oklab, ${hex} 80%, black) !important;
+            --color-blue-700: color-mix(in oklab, ${hex} 60%, black) !important;
+            --color-blue-800: color-mix(in oklab, ${hex} 40%, black) !important;
+            --color-blue-900: color-mix(in oklab, ${hex} 20%, black) !important;
+            --color-blue-950: color-mix(in oklab, ${hex} 10%, black) !important;
+            --nova-accent: ${hex};
+            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
+            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
+            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
+            --nova-accent-text: #ffffff;
+          }
+        `;
+      }
     }
 
     // Apply to Electron nativeTheme for webviews
