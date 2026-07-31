@@ -612,7 +612,7 @@ function App() {
         // URL is exactly the same, force a reload
         const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
         if (webview) webview.reload();
-        return prev.map(t => t.id === activeTabId ? { ...t, isLoading: true } : t);
+        return prev.map(t => t.id === activeTabId ? { ...t, isLoading: !isNewTabUrl } : t);
       }
       // Update the tab URL — BrowserView's useEffect will call webview.loadURL()
       // DO NOT call loadURL here directly to avoid double-load race conditions
