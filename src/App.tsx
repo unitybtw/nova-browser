@@ -65,18 +65,29 @@ const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
 
 function App() {
   const [tabs, setTabs] = useState<Tab[]>(() => {
-    const saved = localStorage.getItem('tabs_session');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {}
+    let startupBehavior = 'newTab';
+    try {
+      const savedSettings = localStorage.getItem('user_settings');
+      if (savedSettings) {
+        startupBehavior = JSON.parse(savedSettings).startupBehavior || 'newTab';
+      }
+    } catch (e) {}
+
+    if (startupBehavior === 'continue') {
+      const saved = localStorage.getItem('tabs_session');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {}
+      }
     }
+
     return [
       {
         id: '1',
-        url: 'https://www.google.com',
-        title: 'Google',
+        url: 'nova://newtab',
+        title: 'New Tab',
         isLoading: false,
         canGoBack: false,
         canGoForward: false

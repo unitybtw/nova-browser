@@ -41,7 +41,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   const [speedDials, setSpeedDials] = useState(() => {
     try {
       const saved = localStorage.getItem('nova_speed_dials');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch (e) {}
     return DEFAULT_SPEED_DIALS;
   });
@@ -52,7 +55,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   const [todos, setTodos] = useState<Todo[]>(() => {
     try {
       const saved = localStorage.getItem('nova_todos');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
     } catch(e) {}
     return [];
   });
