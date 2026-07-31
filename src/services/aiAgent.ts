@@ -429,19 +429,29 @@ class AIAgent {
         
         // Auto-read page content to prevent the AI from getting stuck in a loop
         const script = `(() => {
-          const text = document.body.innerText.substring(0, 2000);
-          const inputs = Array.from(document.querySelectorAll('input, textarea')).map(el => ({
-            tag: el.tagName,
-            type: el.type,
-            name: el.name,
-            placeholder: el.placeholder,
-            id: el.id
-          }));
-          const buttons = Array.from(document.querySelectorAll('button, [role="button"]')).slice(0, 20).map(el => ({
-            text: el.innerText.trim().substring(0, 30),
-            id: el.id
-          })).filter(e => e.text);
-          return JSON.stringify({ text, inputs, buttons });
+          let currentId = 1;
+          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])'));
+          
+          const items = interactiveElements.map(el => {
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0 || window.getComputedStyle(el).visibility === 'hidden') return null;
+            
+            const aiId = currentId++;
+            el.setAttribute('data-ai-id', aiId.toString());
+            
+            let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+            if (text.length > 50) text = text.substring(0, 50) + '...';
+            
+            return {
+              ai_id: aiId.toString(),
+              tag: el.tagName.toLowerCase(),
+              type: el.getAttribute('type') || undefined,
+              text: text
+            };
+          }).filter(Boolean);
+          
+          const text = document.body.innerText.substring(0, 3000);
+          return JSON.stringify({ text, interactable_elements: items.slice(0, 80) });
         })();`;
         
         const pageData = await this.actionContext.onExecuteScript(script);
