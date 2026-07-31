@@ -469,6 +469,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             src={tab.url}
             className="w-full h-full border-none"
             allowpopups={"true" as any}
+            useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           />
         ) : (
           /* Web / Dev IFrame Fallback for standard browser preview */
