@@ -26,7 +26,7 @@ interface BrowserViewProps {
   onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
   history?: HistoryItem[];
   downloads?: DownloadItemPage[];
-  onClearHistory?: () => void;
+  onClearHistory?: (timeframe?: string) => void;
   onRemoveHistoryItem?: (id: string) => void;
   onClearDownloads?: () => void;
   onExportData?: () => void;

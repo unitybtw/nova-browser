@@ -1144,7 +1144,21 @@ function App() {
     }
   }, [activeTabId]);
 
-  const handleClearHistory = useCallback(() => setHistory([]), []);
+  const handleClearHistory = useCallback((timeframe: string = 'all') => {
+    if (timeframe === 'all') {
+      setHistory([]);
+      return;
+    }
+    
+    const now = Date.now();
+    let cutoff = 0;
+    if (timeframe === 'hour') cutoff = now - 60 * 60 * 1000;
+    else if (timeframe === 'day') cutoff = now - 24 * 60 * 60 * 1000;
+    else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
+    else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
+
+    setHistory(prev => prev.filter(item => item.timestamp < cutoff));
+  }, []);
   const handleRemoveHistoryItem = useCallback((id: string) => setHistory(prev => prev.filter(item => item.id !== id)), []);
 
   const handleClearDownloads = useCallback(() => setDownloads([]), []);
