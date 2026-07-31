@@ -182,9 +182,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     if (!tabsContainerRef.current) return;
     const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
     if (activeTabEl) {
-      activeTabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      // Delay scrolling slightly to allow Framer Motion layout animations to calculate correct positions
+      setTimeout(() => {
+        activeTabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }, 150);
     }
-  }, [activeTabId]);
+  }, [activeTabId, tabs.length]);
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (tabsContainerRef.current) {
@@ -423,16 +426,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region"
           >
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence>
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               return (
                 <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 15, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8, minWidth: 0, width: 0, paddingLeft: 0, paddingRight: 0, margin: 0, transition: { duration: 0.2 } }}
-                  transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  layout="position"
+                  initial={{ opacity: 0, scale: 0.9, y: 15 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                   whileTap={{ scale: 0.98 }}
                   key={tab.id}
                   data-tab-id={tab.id}
