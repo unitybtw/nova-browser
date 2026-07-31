@@ -67,9 +67,9 @@ export const Features = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: index * 0.1 }}
-              className="glass p-8 rounded-3xl hover:bg-white/60 transition-colors group cursor-pointer"
+              className="glass p-8 rounded-3xl hover:bg-white/60 dark:hover:bg-foreground/10 transition-colors group cursor-pointer"
             >
-              <div className="w-12 h-12 rounded-2xl bg-white flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
+              <div className="w-12 h-12 rounded-2xl bg-white dark:bg-foreground/10 flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
                 {feature.icon}
               </div>
               <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
