@@ -87,6 +87,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onImportData
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
+  const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
+  const [shortcutInputValue, setShortcutInputValue] = useState('');
 
   useEffect(() => {
     if (url) {
@@ -871,11 +873,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           )}
 
           {/* SHORTCUTS */}
-          {activeTab === 'shortcuts' && (() => {
-            const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
-            const [shortcutInputValue, setShortcutInputValue] = useState('');
-
-            return (
+          {activeTab === 'shortcuts' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -996,8 +994,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </section>
             </div>
-            );
-          })()}
+          )}
 
           {activeTab === 'extensions' && (
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
