@@ -224,6 +224,9 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
+
+
+
   // Listen for console messages from the renderer process and log them to the terminal
   mainWindow?.webContents.on('console-message', (event, level, message, line, sourceId) => {
     console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
