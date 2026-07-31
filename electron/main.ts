@@ -75,7 +75,7 @@ function createWindow() {
     minHeight: 650,
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 16, y: 16 },
-    backgroundColor: '#f8fafc', // Light mode background (slate-50)
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

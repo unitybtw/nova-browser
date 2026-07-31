@@ -88,24 +88,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   const domReadyRef = useRef(false);
 
-  // Programmatically navigate the webview when tab.url changes.
-  // IMPORTANT: Only call loadURL() when the webview is ALREADY dom-ready.
-  // For the initial mount, the `src={tab.url}` attribute handles the load —
-  // registering a dom-ready listener here would cause a DOUBLE navigation (src + loadURL).
+  // IMPORTANT: The `src` attribute of <webview> handles the navigation automatically when it changes.
+  // DO NOT call webview.loadURL() here when tab.url changes, because doing both causes ERR_ABORTED (white screen).
   useEffect(() => {
-    const webview = webviewRef.current;
-    if (!webview || isNewTab) return;
     if (!tab.url || tab.url === lastLoadedUrl.current) return;
-
     lastLoadedUrl.current = tab.url;
-
-    if (domReadyRef.current) {
-      // Webview already initialized — navigate programmatically
-      try { webview.loadURL(tab.url); } catch (_) {}
-    }
-    // If not yet dom-ready: the `src` attribute handles the first load.
-    // Once dom-ready fires, domReadyRef becomes true and future URL changes use loadURL().
-  }, [tab.url, isNewTab]);
+  }, [tab.url]);
 
   useEffect(() => {
     const webview = webviewRef.current;

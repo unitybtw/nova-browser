@@ -1,7 +1,25 @@
 import { motion } from 'framer-motion';
 import { Download, ChevronRight, Zap, Monitor } from 'lucide-react';
+import { useTheme } from './ThemeProvider';
+import { useEffect, useState } from 'react';
 
 export const Hero = () => {
+  const { theme } = useTheme();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    if (theme === 'dark') setIsDark(true);
+    else if (theme === 'light') setIsDark(false);
+    else {
+      setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
+      
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = (e: MediaQueryListEvent) => setIsDark(e.matches);
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
+  }, [theme]);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-24 pb-16 overflow-hidden">
       {/* Background Orbs */}
@@ -58,7 +76,7 @@ export const Hero = () => {
                 Download for Windows
               </a>
             </div>
-            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-white/50 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
+            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-foreground/10 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
               View Source
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
@@ -74,8 +92,7 @@ export const Hero = () => {
         >
           <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
             <div className="w-full relative rounded-2xl overflow-hidden shadow-inner">
-              <img src="/browser-assets/preview-light.png" alt="Nova Browser Screenshot Light" className="w-full h-auto rounded-2xl object-cover block dark:hidden" />
-              <img src="/browser-assets/preview-dark.png" alt="Nova Browser Screenshot Dark" className="w-full h-auto rounded-2xl object-cover hidden dark:block" />
+              <img src={isDark ? "/browser-assets/preview-dark.png" : "/browser-assets/preview-light.png"} alt="Nova Browser Screenshot" className="w-full h-auto rounded-2xl object-cover block" />
             </div>
           </div>
         </motion.div>
