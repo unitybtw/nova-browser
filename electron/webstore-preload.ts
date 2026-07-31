@@ -170,7 +170,7 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
   `;
 
   import('electron').then(({ webFrame }) => {
-    webFrame.executeJavaScript(mainWorldScript);
+    webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: mainWorldScript }]);
   }).catch(() => {
     // Fallback to script tag if webFrame is not available for some reason
     try {
