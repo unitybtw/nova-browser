@@ -11,6 +11,35 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
     get: () => 'Google Inc.',
     configurable: true
   });
+
+  Object.defineProperty(navigator, 'userAgentData', {
+    get: () => ({
+      brands: [
+        { brand: 'Not/A)Brand', version: '8' },
+        { brand: 'Chromium', version: '126' },
+        { brand: 'Google Chrome', version: '126' }
+      ],
+      mobile: false,
+      platform: 'macOS',
+      getHighEntropyValues: async (hints: string[]) => {
+        return {
+          architecture: 'x86',
+          bitness: '64',
+          brands: [
+            { brand: 'Not/A)Brand', version: '8' },
+            { brand: 'Chromium', version: '126' },
+            { brand: 'Google Chrome', version: '126' }
+          ],
+          mobile: false,
+          model: '',
+          platform: 'macOS',
+          platformVersion: '13.0.0',
+          uaFullVersion: '126.0.0.0'
+        };
+      }
+    }),
+    configurable: true
+  });
 }
 
 // Setup the chrome.webstore API spoof
