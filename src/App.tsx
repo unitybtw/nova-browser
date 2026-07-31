@@ -1527,13 +1527,19 @@ function App() {
     return (
       <Onboarding
         onComplete={(prefs) => {
-          setSettings(prev => ({
-            ...prev,
+          setShowOnboarding(false);
+          setSettings(s => ({
+            ...s,
             theme: prefs.theme,
             searchEngine: prefs.searchEngine,
-            privacyShield: prefs.privacyShield,
+            privacyShield: prefs.privacyShield
           }));
-          setShowOnboarding(false);
+          if (prefs.importedBookmarks && prefs.importedBookmarks.length > 0) {
+            setBookmarks(prev => {
+              const newBookmarks = [...prev, ...prefs.importedBookmarks!];
+              return newBookmarks;
+            });
+          }
         }}
       />
     );

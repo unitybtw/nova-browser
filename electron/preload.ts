@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // MCP Server
   startMcpServer: () => ipcRenderer.invoke('start-mcp-server'),
+  importChromeBookmarks: () => ipcRenderer.invoke('import-chrome-bookmarks'),
   stopMcpServer: () => ipcRenderer.invoke('stop-mcp-server'),
   getMcpStatus: () => ipcRenderer.invoke('get-mcp-status'),
   onMcpClientChanged: (callback: (event: any, data: { count: number; clients: any[] }) => void) => {

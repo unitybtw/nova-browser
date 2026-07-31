@@ -6,6 +6,7 @@ interface OnboardingProps {
     theme: 'light' | 'dark' | 'system';
     searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
     privacyShield: boolean;
+    importedBookmarks?: any[];
   }) => void;
 }
 
@@ -98,7 +99,7 @@ const THEMES = [
   },
 ];
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 const slideVariants = {
   enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
@@ -112,6 +113,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
   const [searchEngine, setSearchEngine] = useState<'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia'>('google');
   const [privacyShield, setPrivacyShield] = useState(true);
+  
+  const [isImporting, setIsImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [importedData, setImportedData] = useState<any[]>([]);
 
   const goNext = () => {
     setDir(1);
@@ -126,7 +131,24 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
   const handleFinish = () => {
     localStorage.setItem('nova_onboarding_complete', 'true');
-    onComplete({ theme, searchEngine, privacyShield });
+    onComplete({ theme, searchEngine, privacyShield, importedBookmarks: importedData });
+  };
+
+  const handleImport = async () => {
+    if (!(window as any).electronAPI?.importChromeBookmarks) return;
+    setIsImporting(true);
+    try {
+      const res = await (window as any).electronAPI.importChromeBookmarks();
+      if (res.success && res.bookmarks) {
+        setImportedData(res.bookmarks);
+        setImportStatus('success');
+      } else {
+        setImportStatus('error');
+      }
+    } catch (err) {
+      setImportStatus('error');
+    }
+    setIsImporting(false);
   };
 
   const steps = [
@@ -172,7 +194,53 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </motion.button>
     </motion.div>,
 
-    // Step 1 — Theme
+    // Step 1 — Import Data
+    <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8">
+      <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-2xl">
+        <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+      </div>
+      <h2 className="text-4xl font-bold text-white mb-3">Eski Tarayıcınızdan Aktarın</h2>
+      <p className="text-slate-400 text-lg max-w-md mb-8">
+        Google Chrome (ve Chromium tabanlı diğer tarayıcılardaki) yer işaretlerinizi tek tıkla Nova'ya aktarabilirsiniz.
+      </p>
+      
+      {importStatus === 'idle' && (
+        <button
+          onClick={handleImport}
+          disabled={isImporting}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-xl font-medium transition-colors mb-4 flex items-center gap-2"
+        >
+          {isImporting ? (
+            <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          ) : (
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+          )}
+          {isImporting ? 'Aktarılıyor...' : 'Chrome Yer İşaretlerini Aktar'}
+        </button>
+      )}
+
+      {importStatus === 'success' && (
+        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          Yer işaretleri başarıyla aktarıldı!
+        </div>
+      )}
+
+      {importStatus === 'error' && (
+        <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          Chrome verisi bulunamadı veya okunamadı.
+        </div>
+      )}
+
+      <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4">
+        {importStatus === 'success' ? 'Devam Et' : 'Şimdilik Atla'}
+      </button>
+    </motion.div>,
+
+    // Step 2 — Theme
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8">
       <h2 className="text-4xl font-bold text-white mb-3">Tema Seçin</h2>
       <p className="text-slate-400 text-lg mb-10">Nova Browser'ın görünümünü kişiselleştirin.</p>

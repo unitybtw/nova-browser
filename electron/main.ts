@@ -717,7 +717,52 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
   return { success: true };
 });
 
-// Unload / remove an extension by its ID
+// Read Chrome Bookmarks
+ipcMain.handle('import-chrome-bookmarks', async () => {
+  const isMac = process.platform === 'darwin';
+  const isWin = process.platform === 'win32';
+  
+  let bookmarksPath = '';
+  if (isMac) {
+    bookmarksPath = path.join(app.getPath('home'), 'Library/Application Support/Google/Chrome/Default/Bookmarks');
+  } else if (isWin) {
+    bookmarksPath = path.join(app.getPath('appData'), '..', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks');
+  }
+
+  if (!fs.existsSync(bookmarksPath)) {
+    return { success: false, error: 'Chrome Bookmarks file not found.' };
+  }
+
+  try {
+    const data = JSON.parse(fs.readFileSync(bookmarksPath, 'utf8'));
+    const importedBookmarks: any[] = [];
+    
+    // Recursive function to extract URLs
+    const extractNodes = (node: any) => {
+      if (node.type === 'url') {
+        importedBookmarks.push({
+          id: `imported-${Date.now()}-${Math.random()}`,
+          title: node.name,
+          url: node.url,
+          favicon: `https://www.google.com/s2/favicons?domain=${new URL(node.url).hostname}&sz=32`
+        });
+      } else if (node.type === 'folder' && node.children) {
+        node.children.forEach(extractNodes);
+      }
+    };
+
+    if (data.roots?.bookmark_bar) extractNodes(data.roots.bookmark_bar);
+    if (data.roots?.other) extractNodes(data.roots.other);
+    if (data.roots?.synced) extractNodes(data.roots.synced);
+
+    return { success: true, bookmarks: importedBookmarks };
+  } catch (err) {
+    console.error('Failed to parse Chrome bookmarks:', err);
+    return { success: false, error: 'Failed to read bookmarks file.' };
+  }
+});
+
+// Remove Extension
 ipcMain.handle('remove-extension', async (_event, extensionId: string) => {
   const win = BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No window available' };
