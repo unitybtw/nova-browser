@@ -1415,7 +1415,7 @@ function App() {
         </div>
       )}
 
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${settings.useVerticalTabs ? 'rounded-xl shadow-2xl shadow-black/20 my-2 mr-2' : ''}`}>
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${settings.useVerticalTabs ? 'rounded-xl shadow-2xl shadow-black/20 m-2' : ''}`}>
         {/* TOP NAVIGATION BAR */}
         <TopBar 
           tabs={workspaceTabs}

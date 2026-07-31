@@ -218,7 +218,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
         {/* Workspace Header & Switcher */}
         <div className="relative no-drag" ref={dropdownRef}>
-          <div className="flex items-center gap-3 px-4 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+          <div className="flex items-center gap-3 px-3 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
           >
             <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
@@ -293,7 +293,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
         {/* Tabs & Folders List */}
         <div 
-          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 no-scrollbar flex flex-col gap-1 no-drag"
+          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-3 no-scrollbar flex flex-col gap-1 no-drag"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
