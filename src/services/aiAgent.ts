@@ -364,7 +364,7 @@ class AIAgent {
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
       this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
         initProgressCallback,
-        context_window_size: 4096 // Limit VRAM usage
+        context_window_size: 8192 // Increased from 4096 to prevent ContextWindowSizeExceededError
       } as any) as any;
 
     } catch (err) {
@@ -450,8 +450,8 @@ class AIAgent {
             };
           }).filter(Boolean);
           
-          const text = document.body.innerText.substring(0, 3000);
-          return JSON.stringify({ text, interactable_elements: items.slice(0, 80) });
+          const text = document.body.innerText.substring(0, 1500);
+          return JSON.stringify({ text, interactable_elements: items.slice(0, 50) });
         })();`;
         
         const pageData = await this.actionContext.onExecuteScript(script);
@@ -488,8 +488,8 @@ class AIAgent {
             };
           }).filter(Boolean);
           
-          const text = document.body.innerText.substring(0, 3000);
-          return JSON.stringify({ text, interactable_elements: items.slice(0, 80) }); // limit to 80 elements to save context window
+          const text = document.body.innerText.substring(0, 1500);
+          return JSON.stringify({ text, interactable_elements: items.slice(0, 50) }); // limit to 50 elements to save context window
         })();`;
         const data = await this.actionContext.onExecuteScript(script);
         result = { success: true, pageData: JSON.parse(data) };
