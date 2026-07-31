@@ -3,7 +3,7 @@
   "description": "An open source browser built with React and Electron",
   "author": "unitybtw",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "build": {
