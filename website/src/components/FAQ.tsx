@@ -1,43 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
+import { useLang } from '../i18n/LanguageContext';
 
-const faqs = [
-  {
-    q: 'Is Nova Browser really free?',
-    a: 'Yes, completely. Nova is open source under the MIT license. There are no premium tiers, subscriptions, or hidden costs. You can even fork and build your own version.',
-  },
-  {
-    q: 'Is it based on Chromium?',
-    a: 'Nova is built on Electron, which uses Chromium under the hood. This means full compatibility with modern web standards and great performance. However, unlike Chrome, we strip out all Google tracking and telemetry.',
-  },
-  {
-    q: 'Does Nova collect any data about me?',
-    a: 'Absolutely not. Nova has zero telemetry. We don\'t collect crash reports, usage analytics, or any personal data. Everything stays on your machine. You can verify this by reading our open source code.',
-  },
-  {
-    q: 'How does the built-in AI work?',
-    a: 'Nova\'s AI runs entirely locally on your device using WebGPU. It downloads the model once and then operates completely offline. No API keys, no cloud processing, no data sent anywhere.',
-  },
-  {
-    q: 'Can I import my bookmarks and history from Chrome or Firefox?',
-    a: 'Yes! Nova supports importing bookmarks from any browser that can export a standard HTML bookmarks file. Go to Settings → Import to get started.',
-  },
-  {
-    q: 'Does Nova support Chrome extensions?',
-    a: 'Nova has basic extension support. Since it\'s built on Electron/Chromium, many Chrome extensions can be loaded manually. Native extension store support is on our roadmap.',
-  },
-  {
-    q: 'What platforms does Nova support?',
-    a: 'Currently macOS (Apple Silicon & Intel) and Windows. Linux support is planned for a future release.',
-  },
-  {
-    q: 'How do I contribute or report a bug?',
-    a: 'Head over to our GitHub repository at github.com/unitybtw/nova-browser. We welcome pull requests, bug reports, and feature suggestions. Check the CONTRIBUTING.md file to get started.',
-  },
-];
+interface FAQItemProps {
+  faq: { q: string; a: string };
+  index: number;
+}
 
-function FAQItem({ faq, index }: { faq: typeof faqs[0]; index: number }) {
+function FAQItem({ faq, index }: FAQItemProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -81,6 +52,8 @@ function FAQItem({ faq, index }: { faq: typeof faqs[0]; index: number }) {
 }
 
 export const FAQ = () => {
+  const { t } = useLang();
+
   return (
     <section className="py-24 relative">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -90,20 +63,20 @@ export const FAQ = () => {
           viewport={{ once: true }}
           className="text-center max-w-3xl mx-auto mb-14"
         >
-          <span className="text-sm font-semibold text-primary uppercase tracking-widest">FAQ</span>
+          <span className="text-sm font-semibold text-primary uppercase tracking-widest">{t.faq.badge}</span>
           <h2 className="text-3xl md:text-5xl font-bold text-foreground mt-3 mb-4">
-            Frequently asked questions
+            {t.faq.title}
           </h2>
           <p className="text-lg text-foreground/70">
-            Everything you need to know before switching. Can't find the answer? Ask us on{' '}
-            <a href="https://github.com/unitybtw/nova-browser/discussions" target="_blank" rel="noreferrer" className="text-primary hover:underline">
-              GitHub Discussions
+            {t.faq.sub}{' '}
+            <a href="https://github.com/unitybtw/nova-browser/discussions" target="_blank" rel="noreferrer" className="text-primary hover:underline font-semibold">
+              {t.faq.askLink}
             </a>.
           </p>
         </motion.div>
 
         <div className="max-w-3xl mx-auto flex flex-col gap-3">
-          {faqs.map((faq, i) => (
+          {t.faq.items.map((faq, i) => (
             <FAQItem key={i} faq={faq} index={i} />
           ))}
         </div>

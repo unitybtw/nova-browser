@@ -1,6 +1,8 @@
-
+import { useLang } from '../i18n/LanguageContext';
 
 export const Footer = () => {
+  const { t } = useLang();
+
   return (
     <footer className="border-t border-primary/10 bg-white/30 dark:bg-slate-900/30 backdrop-blur-md pt-16 pb-8">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -13,13 +15,13 @@ export const Footer = () => {
           </div>
           
           <div className="flex gap-8 text-sm font-medium text-foreground/60">
-            <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-primary transition-colors">Contact</a>
+            <a href="#" className="hover:text-primary transition-colors">{t.footer.privacy}</a>
+            <a href="#" className="hover:text-primary transition-colors">{t.footer.terms}</a>
+            <a href="#" className="hover:text-primary transition-colors">{t.footer.contact}</a>
           </div>
 
           <div className="text-sm text-foreground/40">
-            &copy; {new Date().getFullYear()} Nova Browser. Open Source.
+            &copy; {new Date().getFullYear()} {t.footer.copy}
           </div>
         </div>
       </div>

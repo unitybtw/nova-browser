@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { Star, GitFork, Code, Heart } from 'lucide-react';
+import { useLang } from '../i18n/LanguageContext';
 
 interface GitHubData {
   stars: number;
@@ -14,6 +15,7 @@ export const Stats = () => {
   const inView = useInView(ref, { once: true });
   const [gh, setGh] = useState<GitHubData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { t } = useLang();
 
   useEffect(() => {
     fetch('https://api.github.com/repos/unitybtw/nova-browser')
@@ -34,7 +36,7 @@ export const Stats = () => {
     {
       icon: <Star className="w-6 h-6" />,
       value: gh?.stars,
-      label: 'GitHub Stars',
+      label: t.stats.stars,
       color: 'text-amber-500',
       bg: 'from-amber-500/10 to-amber-500/5',
       border: 'border-amber-500/20',
@@ -42,7 +44,7 @@ export const Stats = () => {
     {
       icon: <GitFork className="w-6 h-6" />,
       value: gh?.forks,
-      label: 'Forks',
+      label: t.stats.forks,
       color: 'text-blue-500',
       bg: 'from-blue-500/10 to-blue-500/5',
       border: 'border-blue-500/20',
@@ -50,8 +52,8 @@ export const Stats = () => {
     {
       icon: <Code className="w-6 h-6" />,
       value: null,
-      label: 'MIT License',
-      display: '100% Free',
+      label: t.stats.license,
+      display: 'MIT',
       color: 'text-emerald-500',
       bg: 'from-emerald-500/10 to-emerald-500/5',
       border: 'border-emerald-500/20',
@@ -59,8 +61,8 @@ export const Stats = () => {
     {
       icon: <Heart className="w-6 h-6" />,
       value: null,
-      label: 'Open Source',
-      display: 'Always',
+      label: t.stats.openSource,
+      display: '100%',
       color: 'text-rose-500',
       bg: 'from-rose-500/10 to-rose-500/5',
       border: 'border-rose-500/20',
@@ -78,10 +80,10 @@ export const Stats = () => {
         >
           <span className="text-sm font-semibold text-primary uppercase tracking-widest">By the numbers</span>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mt-2">
-            Real numbers, no marketing fluff
+            {t.stats.title}
           </h2>
           <p className="text-foreground/60 mt-2 text-sm">
-            GitHub stats are fetched live directly from the API.
+            {t.stats.subtitle}
           </p>
         </motion.div>
 
@@ -120,14 +122,14 @@ export const Stats = () => {
           viewport={{ once: true }}
           className="text-center text-xs text-foreground/40 mt-6"
         >
-          GitHub stats update in real time.{' '}
+          {t.stats.liveNote}{' '}
           <a
             href="https://github.com/unitybtw/nova-browser"
             target="_blank"
             rel="noreferrer"
             className="text-primary hover:underline"
           >
-            View on GitHub →
+            {t.stats.viewGithub}
           </a>
         </motion.p>
       </div>

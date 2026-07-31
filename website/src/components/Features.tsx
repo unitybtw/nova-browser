@@ -1,52 +1,63 @@
 import { motion } from 'framer-motion';
 import { ShieldCheck, LayoutDashboard, Zap, EyeOff, LayoutPanelLeft, FolderTree } from 'lucide-react';
-
-const features = [
-  {
-    icon: <FolderTree className="w-6 h-6 text-primary" />,
-    title: 'Tab Folders',
-    description: 'Organize your digital life with native drag-and-drop tab folders. Keep work, research, and personal browsing perfectly separated.'
-  },
-  {
-    icon: <LayoutPanelLeft className="w-6 h-6 text-accent" />,
-    title: 'Split Screen',
-    description: 'View two tabs side-by-side natively without opening new windows. Perfect for research, coding, or comparing documents.'
-  },
-  {
-    icon: <ShieldCheck className="w-6 h-6 text-secondary" />,
-    title: 'Built-in Ad Blocker',
-    description: 'Experience a cleaner, faster web. Nova blocks trackers and intrusive ads at the network level by default.'
-  },
-  {
-    icon: <Zap className="w-6 h-6 text-yellow-500" />,
-    title: 'Lightning Fast',
-    description: 'Built on Electron and optimized for performance. Minimal memory footprint with suspended background tabs.'
-  },
-  {
-    icon: <EyeOff className="w-6 h-6 text-purple-500" />,
-    title: 'Privacy First',
-    description: 'Your data stays yours. No telemetry, no tracking. We don\'t even know what you\'re browsing.'
-  },
-  {
-    icon: <LayoutDashboard className="w-6 h-6 text-blue-500" />,
-    title: 'Workspaces',
-    description: 'Switch between entire contexts instantly. One click changes your tabs, bookmarks, and history context.'
-  }
-];
+import { useLang } from '../i18n/LanguageContext';
 
 export const Features = () => {
+  const { t } = useLang();
+
+  const features = [
+    {
+      icon: <FolderTree className="w-6 h-6 text-primary" />,
+      title: t.features.items.tabFolders.title,
+      description: t.features.items.tabFolders.desc
+    },
+    {
+      icon: <LayoutPanelLeft className="w-6 h-6 text-accent" />,
+      title: t.features.items.splitScreen.title,
+      description: t.features.items.splitScreen.desc
+    },
+    {
+      icon: <ShieldCheck className="w-6 h-6 text-secondary" />,
+      title: t.features.items.adBlocker.title,
+      description: t.features.items.adBlocker.desc
+    },
+    {
+      icon: <Zap className="w-6 h-6 text-yellow-500" />,
+      title: t.features.items.fast.title,
+      description: t.features.items.fast.desc
+    },
+    {
+      icon: <EyeOff className="w-6 h-6 text-purple-500" />,
+      title: t.features.items.privacy.title,
+      description: t.features.items.privacy.desc
+    },
+    {
+      icon: <LayoutDashboard className="w-6 h-6 text-blue-500" />,
+      title: t.features.items.workspaces.title,
+      description: t.features.items.workspaces.desc
+    }
+  ];
+
   return (
     <section id="features" className="py-24 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-sm font-semibold text-primary uppercase tracking-widest mb-3"
+          >
+            {t.features.badge}
+          </motion.div>
           <motion.h2 
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             className="text-3xl md:text-5xl font-bold text-foreground mb-6"
           >
-            Everything you need. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Nothing you don't.</span>
+            {t.features.title1} <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">{t.features.title2}</span>
           </motion.h2>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
@@ -55,7 +66,7 @@ export const Features = () => {
             transition={{ delay: 0.1 }}
             className="text-lg text-foreground/70"
           >
-            Nova is built from the ground up for productivity and privacy. Say goodbye to clutter and hello to focus.
+            {t.features.sub}
           </motion.p>
         </div>
 

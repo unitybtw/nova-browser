@@ -1,40 +1,43 @@
 import { motion } from 'framer-motion';
 import { Code2, MessageCircle, Star } from 'lucide-react';
-
-const communityLinks = [
-  {
-    icon: <Code2 className="w-7 h-7" />,
-    title: 'Star on GitHub',
-    desc: 'If you find Nova useful, a star helps others discover it and motivates us to keep going.',
-    cta: 'Star the repo',
-    href: 'https://github.com/unitybtw/nova-browser',
-    color: 'from-slate-500/10 to-slate-500/5',
-    border: 'border-slate-400/20',
-    accent: 'text-slate-600 dark:text-slate-300',
-  },
-  {
-    icon: <MessageCircle className="w-7 h-7" />,
-    title: 'Join the Discussion',
-    desc: 'Share feedback, request features, report bugs, or just say hi. All conversations happen openly on GitHub.',
-    cta: 'Open a discussion',
-    href: 'https://github.com/unitybtw/nova-browser/discussions',
-    color: 'from-blue-500/10 to-blue-500/5',
-    border: 'border-blue-500/20',
-    accent: 'text-blue-600 dark:text-blue-400',
-  },
-  {
-    icon: <Star className="w-7 h-7" />,
-    title: 'Share Your Feedback',
-    desc: 'Tried Nova? We\'d love to hear what you think — good or bad. Open an issue and let us know.',
-    cta: 'Open an issue',
-    href: 'https://github.com/unitybtw/nova-browser/issues',
-    color: 'from-amber-500/10 to-amber-500/5',
-    border: 'border-amber-500/20',
-    accent: 'text-amber-600 dark:text-amber-400',
-  },
-];
+import { useLang } from '../i18n/LanguageContext';
 
 export const Testimonials = () => {
+  const { t } = useLang();
+
+  const communityLinks = [
+    {
+      icon: <Code2 className="w-7 h-7" />,
+      title: t.community.starTitle,
+      desc: t.community.starDesc,
+      cta: t.community.starCta,
+      href: 'https://github.com/unitybtw/nova-browser',
+      color: 'from-slate-500/10 to-slate-500/5',
+      border: 'border-slate-400/20',
+      accent: 'text-slate-600 dark:text-slate-300',
+    },
+    {
+      icon: <MessageCircle className="w-7 h-7" />,
+      title: t.community.discussTitle,
+      desc: t.community.discussDesc,
+      cta: t.community.discussCta,
+      href: 'https://github.com/unitybtw/nova-browser/discussions',
+      color: 'from-blue-500/10 to-blue-500/5',
+      border: 'border-blue-500/20',
+      accent: 'text-blue-600 dark:text-blue-400',
+    },
+    {
+      icon: <Star className="w-7 h-7" />,
+      title: t.community.issueTitle,
+      desc: t.community.issueDesc,
+      cta: t.community.issueCta,
+      href: 'https://github.com/unitybtw/nova-browser/issues',
+      color: 'from-amber-500/10 to-amber-500/5',
+      border: 'border-amber-500/20',
+      accent: 'text-amber-600 dark:text-amber-400',
+    },
+  ];
+
   return (
     <section id="community" className="py-24 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/3 to-transparent pointer-events-none" />
@@ -46,12 +49,12 @@ export const Testimonials = () => {
           viewport={{ once: true }}
           className="text-center max-w-3xl mx-auto mb-14"
         >
-          <span className="text-sm font-semibold text-primary uppercase tracking-widest">Community</span>
+          <span className="text-sm font-semibold text-primary uppercase tracking-widest">{t.community.badge}</span>
           <h2 className="text-3xl md:text-5xl font-bold text-foreground mt-3 mb-4">
-            Built in the open, together
+            {t.community.title}
           </h2>
           <p className="text-lg text-foreground/70">
-            Nova is a community-driven project. Every feature, bug fix, and improvement happens publicly on GitHub. Come be part of it.
+            {t.community.sub}
           </p>
         </motion.div>
 
@@ -87,7 +90,7 @@ export const Testimonials = () => {
           viewport={{ once: true }}
           className="text-center mt-12 text-sm text-foreground/50"
         >
-          All development happens publicly at{' '}
+          {t.community.footer}{' '}
           <a
             href="https://github.com/unitybtw/nova-browser"
             target="_blank"

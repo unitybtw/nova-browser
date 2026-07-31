@@ -1,27 +1,27 @@
 import { motion } from 'framer-motion';
 import { Check, X, Minus } from 'lucide-react';
+import { useLang } from '../i18n/LanguageContext';
 
 type CellValue = true | false | null | string;
 
 interface ComparisonRow {
-  feature: string;
   nova: CellValue;
   chrome: CellValue;
   firefox: CellValue;
   brave: CellValue;
 }
 
-const rows: ComparisonRow[] = [
-  { feature: 'Built-in Ad Blocker', nova: true, chrome: false, firefox: false, brave: true },
-  { feature: 'Built-in AI Agent', nova: true, chrome: false, firefox: false, brave: false },
-  { feature: 'Split Screen View', nova: true, chrome: false, firefox: false, brave: false },
-  { feature: 'Tab Workspaces', nova: true, chrome: false, firefox: false, brave: true },
-  { feature: 'Zero Telemetry', nova: true, chrome: false, firefox: true, brave: null },
-  { feature: 'Open Source', nova: true, chrome: false, firefox: true, brave: true },
-  { feature: 'Private Browsing Mode', nova: true, chrome: true, firefox: true, brave: true },
-  { feature: 'Reader Mode', nova: true, chrome: false, firefox: true, brave: true },
-  { feature: 'No Account Required', nova: true, chrome: false, firefox: null, brave: null },
-  { feature: 'Free Forever', nova: true, chrome: true, firefox: true, brave: true },
+const rowsData: ComparisonRow[] = [
+  { nova: true, chrome: false, firefox: false, brave: true },
+  { nova: true, chrome: false, firefox: false, brave: false },
+  { nova: true, chrome: false, firefox: false, brave: false },
+  { nova: true, chrome: false, firefox: false, brave: true },
+  { nova: true, chrome: false, firefox: true, brave: null },
+  { nova: true, chrome: false, firefox: true, brave: true },
+  { nova: true, chrome: true, firefox: true, brave: true },
+  { nova: true, chrome: false, firefox: true, brave: true },
+  { nova: true, chrome: false, firefox: null, brave: null },
+  { nova: true, chrome: true, firefox: true, brave: true },
 ];
 
 const browsers = [
@@ -39,6 +39,8 @@ function Cell({ value }: { value: CellValue }) {
 }
 
 export const Comparison = () => {
+  const { t } = useLang();
+
   return (
     <section className="py-24 relative overflow-hidden">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,12 +50,12 @@ export const Comparison = () => {
           viewport={{ once: true }}
           className="text-center max-w-3xl mx-auto mb-14"
         >
-          <span className="text-sm font-semibold text-primary uppercase tracking-widest">Why Nova?</span>
+          <span className="text-sm font-semibold text-primary uppercase tracking-widest">{t.comparison.badge}</span>
           <h2 className="text-3xl md:text-5xl font-bold text-foreground mt-3 mb-4">
-            See how we stack up
+            {t.comparison.title}
           </h2>
           <p className="text-lg text-foreground/70">
-            Nova isn't just another browser. It's built with features that others charge for or don't offer at all.
+            {t.comparison.sub}
           </p>
         </motion.div>
 
@@ -72,7 +74,7 @@ export const Comparison = () => {
                   <th key={b.key} className={`py-4 px-4 text-center font-bold text-sm rounded-t-2xl ${b.highlight ? 'bg-primary text-white' : 'text-foreground/60'}`}>
                     {b.highlight && (
                       <div className="text-[10px] font-semibold text-primary-foreground/70 mb-0.5 uppercase tracking-wider">
-                        ✦ Recommended
+                        {t.comparison.recommended}
                       </div>
                     )}
                     {b.label}
@@ -81,26 +83,29 @@ export const Comparison = () => {
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
-                <motion.tr
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ delay: i * 0.04 }}
-                  className={`border-b border-border/50 last:border-0 ${i % 2 === 0 ? 'bg-foreground/[0.015]' : ''}`}
-                >
-                  <td className="py-4 px-6 text-foreground/80 font-medium text-sm">{row.feature}</td>
-                  {browsers.map((b) => (
-                    <td
-                      key={b.key}
-                      className={`py-4 px-4 text-center ${b.highlight ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
-                    >
-                      <Cell value={row[b.key]} />
-                    </td>
-                  ))}
-                </motion.tr>
-              ))}
+              {rowsData.map((row, i) => {
+                const featureLabel = t.comparison.features[i] || '';
+                return (
+                  <motion.tr
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.04 }}
+                    className={`border-b border-border/50 last:border-0 ${i % 2 === 0 ? 'bg-foreground/[0.015]' : ''}`}
+                  >
+                    <td className="py-4 px-6 text-foreground/80 font-medium text-sm">{featureLabel}</td>
+                    {browsers.map((b) => (
+                      <td
+                        key={b.key}
+                        className={`py-4 px-4 text-center ${b.highlight ? 'bg-primary/5 dark:bg-primary/10' : ''}`}
+                      >
+                        <Cell value={row[b.key]} />
+                      </td>
+                    ))}
+                  </motion.tr>
+                );
+              })}
             </tbody>
             <tfoot>
               <tr>
@@ -114,7 +119,7 @@ export const Comparison = () => {
         </motion.div>
 
         <p className="text-center text-xs text-foreground/40 mt-6">
-          Based on default configurations as of 2025. Some features may require extensions in other browsers. <Minus className="inline w-3 h-3" /> = Partial support.
+          {t.comparison.disclaimer}
         </p>
       </div>
     </section>

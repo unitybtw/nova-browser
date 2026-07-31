@@ -2,9 +2,11 @@ import { motion } from 'framer-motion';
 import { Download, ChevronRight, Zap, Monitor } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useState } from 'react';
+import { useLang } from '../i18n/LanguageContext';
 
 export const Hero = () => {
   const { theme } = useTheme();
+  const { t } = useLang();
   const [isDark, setIsDark] = useState(false);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export const Hero = () => {
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass border border-primary/20 text-primary font-medium text-sm mb-8"
           >
             <Zap className="w-4 h-4 text-accent" />
-            <span>Nova Browser 1.0 is now available</span>
+            <span>{t.hero.badge}</span>
           </motion.div>
 
           <motion.h1
@@ -45,9 +47,9 @@ export const Hero = () => {
             transition={{ duration: 0.5, delay: 0.1 }}
             className="text-5xl md:text-7xl font-bold tracking-tight text-foreground mb-6 leading-tight"
           >
-            The internet, <br className="hidden md:block" />
+            {t.hero.headline1} <br className="hidden md:block" />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
-              reimagined for you.
+              {t.hero.headline2}
             </span>
           </motion.h1>
 
@@ -57,7 +59,7 @@ export const Hero = () => {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-lg md:text-xl text-foreground/70 mb-10 max-w-2xl mx-auto leading-relaxed"
           >
-            A productivity-first browser with built-in AI, native ad-blocking, and seamless split-screen workspaces. Fast, beautiful, and completely open source.
+            {t.hero.sub}
           </motion.p>
 
           <motion.div
@@ -69,15 +71,15 @@ export const Hero = () => {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
                 <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
-                Download for Mac
+                {t.hero.downloadMac}
               </a>
               <a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noreferrer" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 group">
                 <Monitor className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
-                Download for Windows
+                {t.hero.downloadWin}
               </a>
             </div>
             <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-foreground/10 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
-              View Source
+              {t.hero.viewSource}
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
           </motion.div>
