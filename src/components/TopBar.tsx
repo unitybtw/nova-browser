@@ -660,116 +660,122 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           </form>
 
             {/* Search Suggestions Dropdown */}
-            {showSuggestions && searchValue.trim().length > 0 && (
-              <div 
-                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y animate-in fade-in slide-in-from-top-2 duration-200 ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
-                onMouseDown={(e) => e.preventDefault()}
-              >
-              
-              {/* Primary Direct Action */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuggestions(false);
-                    onNavigate(formatSearchUrl(searchValue, searchEngine));
-                    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${isIncognito ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+            <AnimatePresence>
+              {showSuggestions && searchValue.trim().length > 0 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
+                  onMouseDown={(e) => e.preventDefault()}
                 >
-                {searchValue.includes('.') || searchValue.includes('://') ? (
-                  <>
-                    <Globe className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span className="truncate font-medium text-blue-600">Siteye Git: <span className="underline">{searchValue}</span></span>
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0" />
-                    <span className="truncate">{getSearchEngineName(searchEngine)} ile Ara: <strong className="text-slate-900">{searchValue}</strong></span>
-                  </>
-                )}
-              </button>
-
-              {/* Suggestions with 'Bunu mu kastettiniz?' badge */}
-              {suggestions.length > 0 && (
-                <div className="py-1">
-                  {suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchValue(suggestions[0]);
-                        setShowSuggestions(false);
-                        onNavigate(formatSearchUrl(suggestions[0], searchEngine));
-                        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                      }}
-                      className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-amber-50/80 text-slate-800 text-sm text-left transition-colors group bg-amber-50/30"
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <Search className="w-4 h-4 text-amber-500 shrink-0" />
-                        <span className="truncate font-semibold text-slate-900">{suggestions[0]}</span>
-                      </div>
-                      <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full shrink-0">
-                        Bunu mu kastettiniz?
-                      </span>
-                    </button>
+                
+                {/* Primary Direct Action */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSuggestions(false);
+                      onNavigate(formatSearchUrl(searchValue, searchEngine));
+                      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${isIncognito ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                  >
+                  {searchValue.includes('.') || searchValue.includes('://') ? (
+                    <>
+                      <Globe className="w-4 h-4 text-blue-500 shrink-0" />
+                      <span className="truncate font-medium text-blue-600">Siteye Git: <span className="underline">{searchValue}</span></span>
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                      <span className="truncate">{getSearchEngineName(searchEngine)} ile Ara: <strong className="text-slate-900">{searchValue}</strong></span>
+                    </>
                   )}
+                </button>
 
-                  <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Arama Önerileri
-                  </div>
-
-                  {suggestions
-                    .slice(suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() ? 1 : 0)
-                    .map((suggestion, idx) => (
+                {/* Suggestions with 'Bunu mu kastettiniz?' badge */}
+                {suggestions.length > 0 && (
+                  <div className="py-1">
+                    {suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() && (
                       <button
-                        key={idx}
                         type="button"
                         onClick={() => {
-                          setSearchValue(suggestion);
+                          setSearchValue(suggestions[0]);
                           setShowSuggestions(false);
-                          onNavigate(formatSearchUrl(suggestion, searchEngine));
+                          onNavigate(formatSearchUrl(suggestions[0], searchEngine));
                           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
-                      >
-                        <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate">{suggestion}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-
-              {/* Matching Bookmarks */}
-              {bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).length > 0 && (
-                <div className="py-1">
-                  <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Yer İmleri
-                  </div>
-                  {bookmarks
-                    .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-                    .slice(0, 3)
-                    .map((bookmark) => (
-                      <button
-                        key={bookmark.id}
-                        type="button"
-                        onClick={() => {
-                          setSearchValue(bookmark.url);
-                          setShowSuggestions(false);
-                          onNavigate(bookmark.url);
-                          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                        }}
-                        className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
+                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-amber-50/80 text-slate-800 text-sm text-left transition-colors group bg-amber-50/30"
                       >
                         <div className="flex items-center gap-3 overflow-hidden">
-                          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                          <span className="truncate font-medium">{bookmark.title}</span>
+                          <Search className="w-4 h-4 text-amber-500 shrink-0" />
+                          <span className="truncate font-semibold text-slate-900">{suggestions[0]}</span>
                         </div>
-                        <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
+                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full shrink-0">
+                          Bunu mu kastettiniz?
+                        </span>
                       </button>
-                    ))}
-                </div>
+                    )}
+
+                    <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Arama Önerileri
+                    </div>
+
+                    {suggestions
+                      .slice(suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() ? 1 : 0)
+                      .map((suggestion, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            setSearchValue(suggestion);
+                            setShowSuggestions(false);
+                            onNavigate(formatSearchUrl(suggestion, searchEngine));
+                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
+                        >
+                          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{suggestion}</span>
+                        </button>
+                      ))}
+                  </div>
                 )}
-              </div>
-            )}
+
+                {/* Matching Bookmarks */}
+                {bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).length > 0 && (
+                  <div className="py-1">
+                    <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                      Yer İmleri
+                    </div>
+                    {bookmarks
+                      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
+                      .slice(0, 3)
+                      .map((bookmark) => (
+                        <button
+                          key={bookmark.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchValue(bookmark.url);
+                            setShowSuggestions(false);
+                            onNavigate(bookmark.url);
+                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                          }}
+                          className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
+                            <span className="truncate font-medium">{bookmark.title}</span>
+                          </div>
+                          <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
+                        </button>
+                      ))}
+                  </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

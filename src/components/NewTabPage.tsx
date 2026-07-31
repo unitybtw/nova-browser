@@ -278,9 +278,34 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {/* Background Decorative Mesh Orbs */}
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-accent-hover/20 rounded-full blur-[140px] animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-purple-600/20 rounded-full blur-[130px]" />
-          <div className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/15 rounded-full blur-[120px]" />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.15, 1],
+              opacity: [0.2, 0.35, 0.2],
+              x: [0, 20, 0],
+              y: [0, -15, 0]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-accent-hover/25 rounded-full blur-[140px]" 
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.2, 1],
+              opacity: [0.15, 0.3, 0.15],
+              x: [0, -25, 0],
+              y: [0, 20, 0]
+            }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+            className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-purple-600/25 rounded-full blur-[130px]" 
+          />
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.1, 1],
+              opacity: [0.1, 0.25, 0.1]
+            }}
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+            className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/20 rounded-full blur-[120px]" 
+          />
         </div>
       )}
 
@@ -332,7 +357,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                   <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
                   <span>Shield Disabled</span>
                 </>
-              )}
+              ) }
             </div>
             <span>Engine: {getSearchEngineName(searchEngine)}</span>
           </div>
@@ -342,10 +367,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <motion.div variants={itemVariants} className="w-full">
           <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
             {speedDials.map((dial: any, idx: number) => (
-              <div key={idx} className="relative group w-[100px] sm:w-[110px]">
+              <motion.div 
+                key={idx} 
+                whileHover={{ scale: 1.08, y: -4 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                className="relative group w-[100px] sm:w-[110px]"
+              >
                 <button
                   onClick={() => onNavigate(dial.url)}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md hover:scale-105 active:scale-95 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
                 >
                   <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-sm shrink-0">
                     <img 
@@ -356,7 +387,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                   </div>
                   <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-100">{dial.name}</span>
                 </button>
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs">
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
@@ -377,7 +408,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                     <X className="w-3 h-3" />
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ))}
 
             {speedDials.length < 10 && (

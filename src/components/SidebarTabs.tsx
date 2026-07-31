@@ -154,6 +154,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         animate={{ opacity: 1, x: 0, scale: 1 }}
         exit={{ opacity: 0, scale: 0.8, height: 0, marginTop: 0, marginBottom: 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
+        whileHover={{ x: 2, scale: 1.01 }}
         whileTap={{ scale: 0.98 }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
@@ -220,7 +221,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-8 backdrop-blur-3xl shadow-sm ${
         isIncognito
-          ? 'bg-slate-900/80'
+          ? 'bg-slate-900/80 dark'
           : 'bg-white/60 dark:bg-slate-900/60'
       }`}>
 

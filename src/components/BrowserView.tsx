@@ -407,7 +407,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               opacity: 1, 
               width: '85%',
               transition: { 
-                width: { duration: 10, ease: 'easeOut' }, // Fake slow progress
+                width: { duration: 8, ease: [0.16, 1, 0.3, 1] },
                 opacity: { duration: 0.2 }
               } 
             }}
@@ -415,12 +415,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               opacity: 0, 
               width: '100%', 
               transition: { 
-                width: { duration: 0.3, ease: 'easeIn' }, // Jump to 100% quickly
-                opacity: { duration: 0.4, delay: 0.2 } // Then fade out
+                width: { duration: 0.25, ease: 'easeOut' },
+                opacity: { duration: 0.3, delay: 0.15 }
               } 
             }}
-            className="absolute top-0 left-0 h-[2px] bg-blue-500 z-50 origin-left"
-            style={{ boxShadow: '0 0 10px rgba(59, 130, 246, 0.5)' }}
+            className="absolute top-0 left-0 h-[2.5px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-50 origin-left shadow-lg"
+            style={{ boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
           />
         )}
       </AnimatePresence>
