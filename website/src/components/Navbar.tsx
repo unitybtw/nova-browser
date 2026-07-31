@@ -129,7 +129,7 @@ export const Navbar = () => {
 
             {/* Download */}
             <a
-              href="https://github.com/unitybtw/nova-browser/releases"
+              href="https://github.com/unitybtw/nova-browser/releases/latest"
               target="_blank"
               rel="noreferrer"
               className="bg-foreground hover:bg-foreground/90 text-background px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
@@ -186,7 +186,7 @@ export const Navbar = () => {
             </div>
 
             <a
-              href="https://github.com/unitybtw/nova-browser/releases"
+              href="https://github.com/unitybtw/nova-browser/releases/latest"
               target="_blank"
               rel="noreferrer"
               className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"

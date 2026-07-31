@@ -25,20 +25,16 @@ export const CTA = () => {
             <p className="text-lg text-white/85 mb-10">
               {t.cta.sub}
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
               <a
-                href="https://github.com/unitybtw/nova-browser/releases"
-                target="_blank"
-                rel="noreferrer"
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-1.0.1-arm64.dmg"
                 className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 backdrop-blur-sm"
               >
                 <Download className="w-5 h-5" />
                 {t.cta.downloadMac}
               </a>
               <a
-                href="https://github.com/unitybtw/nova-browser/releases"
-                target="_blank"
-                rel="noreferrer"
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.0.1.exe"
                 className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2"
               >
                 <Monitor className="w-5 h-5" />
