@@ -636,6 +636,43 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               
               <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Memory & Performance</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automatic Tab Hibernation (Memory Saver)</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unloads inactive background tabs from RAM to keep the browser lightning fast</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ tabHibernationEnabled: !(settings.tabHibernationEnabled ?? true) })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(settings.tabHibernationEnabled ?? true) ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${(settings.tabHibernationEnabled ?? true) ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+
+                  {(settings.tabHibernationEnabled ?? true) && (
+                    <div className="p-5 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Hibernation Inactivity Timeout</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Time after which unused tabs are suspended to save RAM</div>
+                      </div>
+                      <select
+                        value={settings.hibernationTimeoutMinutes ?? 10}
+                        onChange={(e) => onUpdateSettings({ hibernationTimeoutMinutes: Number(e.target.value) })}
+                        className="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 focus:outline-none"
+                      >
+                        <option value={5}>5 minutes</option>
+                        <option value={10}>10 minutes</option>
+                        <option value={30}>30 minutes</option>
+                        <option value={60}>1 hour</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">System & Developer</h2>
                 <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                   <div className="p-5 flex items-center justify-between">

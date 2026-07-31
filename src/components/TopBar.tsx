@@ -39,6 +39,7 @@ import {
   MonitorSmartphone,
   ScanSearch,
   VenetianMask,
+  Moon,
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
@@ -82,6 +83,7 @@ interface TopBarProps {
   onDuplicateTab: (id: string, e: React.MouseEvent) => void;
   onTogglePinTab: (id: string, e: React.MouseEvent) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onSuspendTab?: (id: string) => void;
   onTogglePip?: (id: string) => void;
   onSelectTab: (id: string) => void;
   onNewTab: (url?: string) => void;
@@ -126,6 +128,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onDuplicateTab,
   onTogglePinTab,
   onToggleMuteTab,
+  onSuspendTab,
   onTogglePip,
   onSelectTab,
   onNewTab,
@@ -510,6 +513,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         </button>
                       </div>
                     ) : null}
+
+                    {tab.isSuspended && (
+                      <span className="p-0.5 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
+                        <Moon className="w-3.5 h-3.5 opacity-80" />
+                      </span>
+                    )}
 
                     {tabs.length > 1 && (
                       <button

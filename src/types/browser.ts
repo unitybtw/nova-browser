@@ -16,6 +16,8 @@ export interface Tab {
   isPlayingAudio?: boolean;
   blockedAdsCount?: number;
   webContentsId?: number;
+  isSuspended?: boolean;
+  lastAccessed?: number;
 }
 
 export interface Folder {
@@ -35,7 +37,9 @@ export interface Workspace {
 export const defaultSettings = {
   showBookmarksBar: true,
   useVerticalTabs: false,
-  mcpServerEnabled: false
+  mcpServerEnabled: false,
+  tabHibernationEnabled: true,
+  hibernationTimeoutMinutes: 10,
 };
 
 export interface Extension {

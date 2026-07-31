@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Moon, Zap } from 'lucide-react';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { SettingsPage } from './SettingsPage';
@@ -340,6 +341,40 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       capture();
     }
   }, [isActive, isNewTab, tab.id, onUpdateTab]);
+
+  if (tab.isSuspended) {
+    return (
+      <div 
+        onClick={() => onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() })}
+        className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100 cursor-pointer relative overflow-hidden group"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/40 via-slate-950 to-purple-950/40 opacity-80" />
+        <div className="relative z-10 flex flex-col items-center text-center max-w-md">
+          <div className="w-24 h-24 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl flex items-center justify-center mb-6 backdrop-blur-xl group-hover:scale-105 transition-transform duration-300">
+            {tab.favicon ? (
+              <img src={tab.favicon} alt="" className="w-12 h-12 rounded-xl object-contain" />
+            ) : (
+              <Moon className="w-10 h-10 text-indigo-400" />
+            )}
+          </div>
+          <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
+          <p className="text-sm text-slate-400 mb-8 leading-relaxed">
+            Bellek tasarrufu için bu sekme askıya alındı. Tıklayarak anında uyandırın.
+          </p>
+          <button 
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
+            }}
+            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 group-hover:scale-105"
+          >
+            <Zap className="w-4 h-4" />
+            Sekmeyi Yeniden Yükle
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isNewTab) {
     return (

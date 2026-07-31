@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Clock, Download, VenetianMask } from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Clock, Download, VenetianMask, Moon } from 'lucide-react';
 import { Tab, Workspace, Folder } from '../types/browser';
 
 const WORKSPACE_COLORS: Record<string, string> = {
@@ -207,6 +207,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               </button>
             </div>
           ) : null}
+          {tab.isSuspended && (
+            <span className="p-1 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
+              <Moon className="w-3.5 h-3.5 opacity-80" />
+            </span>
+          )}
           {tabs.length > 1 && (
             <button onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500 transition-colors">
               <X className="w-3.5 h-3.5" />

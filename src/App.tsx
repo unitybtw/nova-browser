@@ -39,6 +39,8 @@ export interface UserSettings {
   clearOnExit: boolean;
   hardwareAcceleration: boolean;
   developerMode: boolean;
+  tabHibernationEnabled?: boolean;
+  hibernationTimeoutMinutes?: number;
   shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
 }
 import { ShareModal } from './components/ShareModal';
@@ -202,6 +204,8 @@ function App() {
       clearOnExit: false,
       hardwareAcceleration: true,
       developerMode: false,
+      tabHibernationEnabled: true,
+      hibernationTimeoutMinutes: 10,
       shortcuts: {
         newTab: { key: 't', shift: false, meta: true },
         reopenTab: { key: 't', shift: true, meta: true },
@@ -423,8 +427,49 @@ function App() {
   useEffect(() => {
     localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
   }, [bookmarks]);
-
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
+
+  // Select/focus tab & reset hibernation timer
+  const handleSelectTab = useCallback((id: string) => {
+    setActiveTabId(id);
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
+  }, []);
+
+  // Manual tab suspension
+  const handleSuspendTab = useCallback((id: string) => {
+    setTabs(prev => prev.map(t => (t.id === id && t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio) ? { ...t, isSuspended: true } : t));
+  }, [activeTabId, splitTabId]);
+
+  // Automatic Tab Hibernation (Memory Saver)
+  useEffect(() => {
+    if (settings.tabHibernationEnabled === false) return;
+    const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
+    
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTabs(prevTabs =>
+        prevTabs.map(tab => {
+          if (
+            tab.id === activeTabId ||
+            tab.id === splitTabId ||
+            tab.isPlayingAudio ||
+            tab.isPinned ||
+            tab.isSuspended ||
+            !tab.lastAccessed
+          ) {
+            return tab;
+          }
+          if (now - tab.lastAccessed > timeoutMs) {
+            console.log(`[MemorySaver] Auto-hibernating tab ${tab.id} (${tab.title || tab.url})`);
+            return { ...tab, isSuspended: true };
+          }
+          return tab;
+        })
+      );
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [activeTabId, splitTabId, settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
 
   // Track closed tabs for Cmd+Shift+T
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
@@ -952,7 +997,7 @@ function App() {
       },
       onCreateTab: (url: string) => handleNewTab(url),
       onCloseTab: (id: string) => handleCloseTab(id),
-      onSwitchTab: (id: string) => setActiveTabId(id),
+      onSwitchTab: (id: string) => handleSelectTab(id),
       onGetAllTabs: () => tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: (direction, amount) => {
         const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
@@ -1454,7 +1499,7 @@ function App() {
             tabs={workspaceTabs}
             folders={folders}
             activeTabId={activeTabId}
-            onSelectTab={setActiveTabId}
+            onSelectTab={handleSelectTab}
             onCloseTab={handleCloseTab}
             onNewTab={handleNewTab}
             onToggleMuteTab={handleToggleMuteTab}
@@ -1502,8 +1547,9 @@ function App() {
           onDuplicateTab={handleDuplicateTab}
           onTogglePinTab={handleTogglePinTab}
           onToggleMuteTab={handleToggleMuteTab}
+          onSuspendTab={handleSuspendTab}
           onTogglePip={handleTogglePip}
-          onSelectTab={setActiveTabId}
+          onSelectTab={handleSelectTab}
           onNewTab={handleNewTab}
           onNewIncognitoTab={handleNewIncognitoTab}
           onCloseTab={handleCloseTab}
