@@ -291,11 +291,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           </div>
         </motion.div>
 
-        {/* Speed Dials Grid */}
+        {/* Speed Dials */}
         <motion.div variants={itemVariants} className="w-full">
-          <div className="grid grid-cols-5 gap-4">
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
             {speedDials.map((dial: any, idx: number) => (
-              <div key={idx} className="relative group">
+              <div key={idx} className="relative group w-[100px] sm:w-[110px]">
                 <button
                   onClick={() => onNavigate(dial.url)}
                   className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md hover:scale-105 active:scale-95 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
@@ -334,16 +334,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             ))}
 
             {speedDials.length < 10 && (
-              <button
-                onClick={() => {
-                  setEditingDial({ name: '', url: '', index: null });
-                  setIsEditModalOpen(true);
-                }}
-                className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border border-dashed opacity-60 hover:opacity-100 hover:scale-105 active:scale-95 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40"
-              >
-                <Plus className="w-6 h-6" />
-                <span className="text-xs font-medium">Add Shortcut</span>
-              </button>
+              <div className="relative group w-[100px] sm:w-[110px]">
+                <button
+                  onClick={() => {
+                    setEditingDial({ name: '', url: '', index: null });
+                    setIsEditModalOpen(true);
+                  }}
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border border-dashed opacity-60 hover:opacity-100 hover:scale-105 active:scale-95 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40"
+                >
+                  <Plus className="w-6 h-6" />
+                  <span className="text-xs font-medium">Add</span>
+                </button>
+              </div>
             )}
           </div>
         </motion.div>
