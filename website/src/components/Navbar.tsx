@@ -37,9 +37,22 @@ export const Navbar = () => {
       }`}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className={`flex items-center justify-between rounded-2xl px-6 py-3 transition-all ${
-          scrolled ? 'glass' : 'bg-transparent'
-        }`}>
+        <div
+          className="flex items-center justify-between rounded-2xl px-6 py-3 transition-all duration-300"
+          style={scrolled ? {
+            background: isDark
+              ? 'rgba(15, 23, 42, 0.85)'
+              : 'rgba(255, 255, 255, 0.85)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            boxShadow: isDark
+              ? '0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.06) inset'
+              : '0 4px 24px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.8) inset',
+          } : {
+            background: 'transparent',
+            boxShadow: 'none',
+          }}
+        >
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-primary/30">
