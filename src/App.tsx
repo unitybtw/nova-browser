@@ -1655,7 +1655,9 @@ function App() {
         anchorRef={{ current: null } as any}
       />
 
-    <ReaderMode 
+      </div>
+
+      <ReaderMode 
         url={activeTab?.url || ''} 
         tabId={activeTabId} 
         isActive={isReaderModeOpen} 
@@ -1673,8 +1675,6 @@ function App() {
       />
 
       <AICursorOverlay />
-
-      </div>
     </div>
   );
 }

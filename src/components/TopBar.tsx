@@ -43,6 +43,15 @@ import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { UserSettings } from '../App';
 
+const WORKSPACE_COLORS: Record<string, string> = {
+  slate: '#64748b',
+  blue: '#3b82f6',
+  emerald: '#10b981',
+  purple: '#a855f7',
+  rose: '#f43f5e',
+  amber: '#f59e0b'
+};
+
 interface TopBarProps {
   tabs: Tab[];
   workspaces?: import('../types/browser').Workspace[];
@@ -307,7 +316,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
                 className="flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/50 hover:bg-slate-300/50 text-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-700/50 dark:text-slate-300 transition-colors mr-1"
               >
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: activeWorkspace.color === 'slate' ? '#64748b' : activeWorkspace.color === 'blue' ? '#3b82f6' : '#a855f7' }} />
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b' }} />
                 <span>{activeWorkspace.name}</span>
               </button>
               {isWorkspaceDropdownOpen && (
@@ -323,7 +332,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         }}
                         className="w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 hover:bg-slate-100 dark:hover:bg-slate-700"
                       >
-                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: w.color === 'slate' ? '#64748b' : w.color === 'blue' ? '#3b82f6' : w.color === 'emerald' ? '#10b981' : w.color === 'amber' ? '#f59e0b' : '#a855f7' }} />
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }} />
                         <span className={w.id === activeWorkspaceId ? 'font-medium text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}>{w.name}</span>
                       </button>
                     ))}

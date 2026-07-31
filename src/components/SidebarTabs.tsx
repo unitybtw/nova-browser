@@ -1,8 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings } from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
 import { Tab, Workspace, Folder } from '../types/browser';
+
+const WORKSPACE_COLORS: Record<string, string> = {
+  slate: '#64748b',
+  blue: '#3b82f6',
+  emerald: '#10b981',
+  purple: '#a855f7',
+  rose: '#f43f5e',
+  amber: '#f59e0b'
+};
+
+const WORKSPACE_ICONS: Record<string, React.ElementType> = {
+  LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Folder: FolderIcon
+};
 
 interface SidebarTabsProps {
   tabs: Tab[];
@@ -197,20 +210,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 no-drag z-40 pt-12 backdrop-blur-3xl shadow-sm ${
+      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-8 backdrop-blur-3xl shadow-sm ${
         isIncognito
           ? 'bg-slate-900/80'
           : 'bg-white/60 dark:bg-slate-900/60'
       }`}>
 
         {/* Workspace Header & Switcher */}
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative no-drag" ref={dropdownRef}>
           <div className="flex items-center gap-3 px-4 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
           >
             <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
-                 style={{ backgroundColor: activeWorkspace?.color === 'slate' ? '#64748b' : activeWorkspace?.color === 'blue' ? '#3b82f6' : activeWorkspace?.color === 'emerald' ? '#10b981' : activeWorkspace?.color === 'amber' ? '#f59e0b' : '#a855f7' }}>
-              <span className="text-white text-xs font-bold">{activeWorkspace?.name.charAt(0)}</span>
+                 style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace?.color || 'slate'] || '#64748b' }}>
+              {activeWorkspace?.icon ? (
+                React.createElement(WORKSPACE_ICONS[activeWorkspace.icon] || LayoutGrid, { className: "w-3.5 h-3.5 text-white" })
+              ) : (
+                <span className="text-white text-xs font-bold">{activeWorkspace?.name.charAt(0)}</span>
+              )}
             </div>
             <div className="flex-1 min-w-0 transition-opacity duration-200 flex items-center justify-between">
               <div>
@@ -241,8 +258,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
                     >
                       <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-sm"
-                           style={{ backgroundColor: w.color === 'slate' ? '#64748b' : w.color === 'blue' ? '#3b82f6' : w.color === 'emerald' ? '#10b981' : w.color === 'amber' ? '#f59e0b' : '#a855f7' }}>
-                        <span className="text-white text-[10px] font-bold">{w.name.charAt(0)}</span>
+                           style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
+                        {w.icon ? (
+                          React.createElement(WORKSPACE_ICONS[w.icon] || LayoutGrid, { className: "w-3 h-3 text-white" })
+                        ) : (
+                          <span className="text-white text-[10px] font-bold">{w.name.charAt(0)}</span>
+                        )}
                       </div>
                       <span className={`text-[13px] flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
                         {w.name}
@@ -272,7 +293,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
         {/* Tabs & Folders List */}
         <div 
-          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 no-scrollbar flex flex-col gap-1"
+          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 no-scrollbar flex flex-col gap-1 no-drag"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -333,7 +354,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* Footer / New Tab & New Folder */}
-        <div className="p-3 flex items-center gap-2">
+        <div className="p-3 flex items-center gap-2 no-drag border-t border-slate-200/50 dark:border-slate-700/50">
           <button
             onClick={() => onNewTab()}
             className={`flex flex-1 items-center gap-3 h-10 px-3 rounded-xl transition-all shadow-sm ${
