@@ -3,23 +3,14 @@ import { Download, ChevronRight, Zap, Monitor } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
+import { InteractiveMockup } from './InteractiveMockup';
 
 export const Hero = () => {
   const { theme } = useTheme();
   const { t } = useLang();
-  const [isDark, setIsDark] = useState(false);
-
   useEffect(() => {
-    if (theme === 'dark') setIsDark(true);
-    else if (theme === 'light') setIsDark(false);
-    else {
-      setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
-      
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const listener = (e: MediaQueryListEvent) => setIsDark(e.matches);
-      mediaQuery.addEventListener('change', listener);
-      return () => mediaQuery.removeEventListener('change', listener);
-    }
+    // Theme logic can be simplified or removed if Hero doesn't need to track isDark directly anymore.
+    // The ThemeProvider already handles the 'dark' class on the HTML element.
   }, [theme]);
 
   const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
@@ -114,9 +105,7 @@ export const Hero = () => {
           className="mt-16 max-w-5xl mx-auto"
         >
           <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
-            <div className="w-full relative rounded-2xl overflow-hidden shadow-inner">
-              <img src={isDark ? "/browser-assets/preview-dark.png" : "/browser-assets/preview-light.png"} alt="Nova Browser Screenshot" className="w-full h-auto rounded-2xl object-cover block" />
-            </div>
+            <InteractiveMockup />
           </div>
         </motion.div>
       </div>
