@@ -47,11 +47,14 @@
         }
       ],
       "category": "public.app-category.productivity",
-      "artifactName": "Nova-Browser-${arch}.dmg"
+      "artifactName": "Nova-Browser-${arch}.dmg",
+      "icon": "build/icon.icns"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
     }
   },
   "scripts": {
