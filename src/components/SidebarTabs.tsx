@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus } from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings } from 'lucide-react';
 import { Tab, Workspace, Folder } from '../types/browser';
 
 interface SidebarTabsProps {
@@ -94,6 +94,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = (tab: Tab, e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -111,8 +113,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   };
 
   useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsWorkspaceDropdownOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -192,18 +203,71 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           : 'bg-white/60 dark:bg-slate-900/60'
       }`}>
 
-        {/* Workspace Header */}
-        <div className="flex items-center gap-3 px-4 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-             onClick={() => window.dispatchEvent(new CustomEvent('open-workspace-manager'))}
-        >
-          <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
-               style={{ backgroundColor: activeWorkspace?.color === 'slate' ? '#64748b' : activeWorkspace?.color === 'blue' ? '#3b82f6' : activeWorkspace?.color === 'emerald' ? '#10b981' : activeWorkspace?.color === 'amber' ? '#f59e0b' : '#a855f7' }}>
-            <span className="text-white text-xs font-bold">{activeWorkspace?.name.charAt(0)}</span>
+        {/* Workspace Header & Switcher */}
+        <div className="relative" ref={dropdownRef}>
+          <div className="flex items-center gap-3 px-4 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+               onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+          >
+            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
+                 style={{ backgroundColor: activeWorkspace?.color === 'slate' ? '#64748b' : activeWorkspace?.color === 'blue' ? '#3b82f6' : activeWorkspace?.color === 'emerald' ? '#10b981' : activeWorkspace?.color === 'amber' ? '#f59e0b' : '#a855f7' }}>
+              <span className="text-white text-xs font-bold">{activeWorkspace?.name.charAt(0)}</span>
+            </div>
+            <div className="flex-1 min-w-0 transition-opacity duration-200 flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold truncate text-slate-800 dark:text-slate-200">{activeWorkspace?.name}</div>
+                <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Workspace</div>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`} />
+            </div>
           </div>
-          <div className="flex-1 min-w-0 transition-opacity duration-200">
-            <div className="text-sm font-semibold truncate text-slate-800 dark:text-slate-200">{activeWorkspace?.name}</div>
-            <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Workspace</div>
-          </div>
+
+          <AnimatePresence>
+            {isWorkspaceDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
+                className="absolute top-12 left-2 right-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden z-50 py-1"
+              >
+                <div className="max-h-60 overflow-y-auto no-scrollbar py-1">
+                  {workspaces.map(w => (
+                    <button
+                      key={w.id}
+                      onClick={() => {
+                        onSelectWorkspace(w.id);
+                        setIsWorkspaceDropdownOpen(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
+                    >
+                      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-sm"
+                           style={{ backgroundColor: w.color === 'slate' ? '#64748b' : w.color === 'blue' ? '#3b82f6' : w.color === 'emerald' ? '#10b981' : w.color === 'amber' ? '#f59e0b' : '#a855f7' }}>
+                        <span className="text-white text-[10px] font-bold">{w.name.charAt(0)}</span>
+                      </div>
+                      <span className={`text-[13px] flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
+                        {w.name}
+                      </span>
+                      {w.id === activeWorkspaceId && (
+                        <Check className="w-3.5 h-3.5 text-blue-500" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                <div className="border-t border-slate-100 dark:border-slate-700/60 mt-1 pt-1">
+                  <button
+                    onClick={() => {
+                      setIsWorkspaceDropdownOpen(false);
+                      window.dispatchEvent(new CustomEvent('open-workspace-manager'));
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Manage Workspaces
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Tabs & Folders List */}
