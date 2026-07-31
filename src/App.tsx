@@ -542,10 +542,16 @@ function App() {
 
   const handleNewTab = useCallback((url?: string | any) => {
     const finalUrl = typeof url === 'string' ? url : 'nova://newtab';
+    
+    let initialTitle = 'New Tab';
+    if (finalUrl === 'nova://settings') initialTitle = 'Settings';
+    else if (finalUrl === 'nova://history') initialTitle = 'History';
+    else if (finalUrl === 'nova://downloads') initialTitle = 'Downloads';
+    
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
       url: finalUrl,
-      title: 'New Tab',
+      title: initialTitle,
       isLoading: false,
       canGoBack: false,
       canGoForward: false,
