@@ -1,6 +1,20 @@
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, webFrame } from 'electron';
 
 if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
+  // Create Trusted Types policy to bypass CSP for innerHTML
+  let policy: any = null;
+  if ((window as any).trustedTypes && (window as any).trustedTypes.createPolicy) {
+    try {
+      policy = (window as any).trustedTypes.createPolicy('nova-extension', {
+        createHTML: (s: string) => s,
+        createScript: (s: string) => s,
+        createScriptURL: (s: string) => s
+      });
+    } catch(e) {}
+  }
+  
+  const toHTML = (html: string) => policy ? policy.createHTML(html) : html;
+
   // 1. Setup the IPC bridge in the isolated world
   const showNovaToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     const existing = document.getElementById('nova-extension-toast');
@@ -13,26 +27,7 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
     if (type === 'success') bgColor = '#10b981';
     if (type === 'error') bgColor = '#ef4444';
 
-    toast.style.cssText = `
-      position: fixed;
-      top: 20px;
-      left: 50%;
-      transform: translateX(-50%) translateY(-20px);
-      background-color: ${bgColor};
-      color: white;
-      padding: 12px 24px;
-      border-radius: 8px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      font-size: 14px;
-      font-weight: 500;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2);
-      z-index: 999999;
-      opacity: 0;
-      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    `;
+    toast.style.cssText = `position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px); background-color: ${bgColor}; color: white; padding: 12px 24px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2); z-index: 999999; opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; gap: 8px;`;
 
     let iconSvg = '';
     if (type === 'info') {
@@ -43,7 +38,7 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
       iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
     }
 
-    toast.innerHTML = `${iconSvg} <span>${message}</span>`;
+    toast.innerHTML = toHTML(`${iconSvg} <span>${message}</span>`);
     document.body.appendChild(toast);
 
     setTimeout(() => {
@@ -140,7 +135,6 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
         
         const extensionId = match[0];
         
-        // Listen for the result from the isolated world
         const listener = (event) => {
           if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
           window.removeEventListener('message', listener);
@@ -153,33 +147,41 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
         };
         window.addEventListener('message', listener);
         
-        // Tell isolated world to install
         window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, '*');
       }
     };
     
     window.chrome.webstorePrivate = {
       beginInstallWithManifest3: (details, callback) => {
-        window.chrome.webstore.install(details.id, () => callback('success'), (err) => callback(err));
+        if (typeof callback === 'function') {
+          window.chrome.webstore.install(details.id, () => callback('success'), (err) => callback(err));
+        } else {
+          return new Promise((resolve, reject) => {
+            window.chrome.webstore.install(details.id, () => resolve('success'), (err) => reject(err));
+          });
+        }
       },
-      completeInstall: (id, callback) => { callback(); },
-      getBrowserLogin: (callback) => { callback({ login: '', loggedIn: false }); },
-      getExtensionStatus: (id, callback) => { callback('installable'); },
-      isInIncognitoMode: (callback) => callback(false)
+      completeInstall: (id, callback) => { 
+        if (typeof callback === 'function') callback(); 
+        else return Promise.resolve();
+      },
+      getBrowserLogin: (callback) => { 
+        if (typeof callback === 'function') callback({ login: '', loggedIn: false }); 
+        else return Promise.resolve({ login: '', loggedIn: false });
+      },
+      getExtensionStatus: (id, callback) => { 
+        if (typeof callback === 'function') callback('installable'); 
+        else return Promise.resolve('installable');
+      },
+      isInIncognitoMode: (callback) => {
+        if (typeof callback === 'function') callback(false);
+        else return Promise.resolve(false);
+      }
     };
   `;
 
-  import('electron').then(({ webFrame }) => {
-    webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: mainWorldScript }]);
-  }).catch(() => {
-    // Fallback to script tag if webFrame is not available for some reason
-    try {
-      const script = document.createElement('script');
-      script.textContent = mainWorldScript;
-      document.documentElement.appendChild(script);
-      script.remove();
-    } catch(e) {}
-  });
+  // Synchronously execute spoofing in the main world (World ID: 0)
+  webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: mainWorldScript }]);
 
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
@@ -191,7 +193,8 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
       banner.id = 'nova-extension-banner';
       banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; z-index: 9999999; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
 
-      banner.innerHTML = "<div style='display: flex; align-items: center; gap: 12px;'><svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg><div><div style='font-weight: 600; font-size: 15px;'>Nova Browser Eklenti Sistemi</div><div style='font-size: 13px; opacity: 0.9;'>Bu eklentiyi tek tikla Nova Browsera kurabilirsiniz.</div></div></div><button id='nova-install-btn' style='background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>Nova'ya Ekle</button>";
+      const htmlContent = "<div style='display: flex; align-items: center; gap: 12px;'><svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg><div><div style='font-weight: 600; font-size: 15px;'>Nova Browser Eklenti Sistemi</div><div style='font-size: 13px; opacity: 0.9;'>Bu eklentiyi tek tikla Nova Browser'a kurabilirsiniz.</div></div></div><button id='nova-install-btn' style='background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>Nova'ya Ekle</button>";
+      banner.innerHTML = toHTML(htmlContent);
 
       document.body.prepend(banner);
       document.body.style.marginTop = '60px';
