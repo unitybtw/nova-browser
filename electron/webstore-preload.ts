@@ -1,6 +1,10 @@
 import { ipcRenderer, webFrame } from 'electron';
 
-if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
+if ((window as any).__novaPreloadInjected) {
+  // Already injected
+} else if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
+  (window as any).__novaPreloadInjected = true;
+
   // Create Trusted Types policy to bypass CSP for innerHTML
   let policy: any = null;
   if ((window as any).trustedTypes && (window as any).trustedTypes.createPolicy) {

@@ -256,6 +256,27 @@ app.whenReady().then(async () => {
     console.error('[MCP] Failed to start server:', err);
   }
 
+  // Load persistent extensions from disk
+  const extensionsPath = path.join(app.getPath('userData'), 'extensions');
+  if (fs.existsSync(extensionsPath)) {
+    try {
+      const extensionDirs = fs.readdirSync(extensionsPath);
+      for (const dir of extensionDirs) {
+        const extPath = path.join(extensionsPath, dir);
+        if (fs.statSync(extPath).isDirectory() && fs.existsSync(path.join(extPath, 'manifest.json'))) {
+          session.defaultSession.loadExtension(extPath).then(extInfo => {
+            loadedExtensions.push(extInfo);
+            console.log(`Loaded extension: ${extInfo.name}`);
+          }).catch(err => {
+            console.error(`Failed to load extension at ${extPath}:`, err);
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error loading extensions on startup:', err);
+    }
+  }
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
