@@ -1331,15 +1331,15 @@ function App() {
   const handleFoundInPage = useCallback((idx: number, count: number) => setFindMatches({ index: idx, count }), []);
   const handleCloseFindInPage = useCallback(() => setIsFindInPageOpen(false), []);
 
-  const handleFind = useCallback((text: string, forward?: boolean) => {
+  const handleFind = useCallback((text: string, forward?: boolean, matchCase?: boolean, wholeWord?: boolean) => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
     if (webview && webview.findInPage) {
       try {
-        webview.findInPage(text, { forward, findNext: true });
+        webview.findInPage(text, { forward, findNext: true, matchCase, wordStart: wholeWord });
       } catch (e) {}
     } else {
       // Basic fallback for standard browser
-      try { (window as any).find(text, false, !forward, true, false, false, false); } catch(e) {}
+      try { (window as any).find(text, matchCase, !forward, true, wholeWord, false, false); } catch(e) {}
     }
   }, [activeTabId]);
 
