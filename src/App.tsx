@@ -641,18 +641,32 @@ function App() {
 
 
   const handleNavigate = useCallback((url: string) => {
+    let newTitle: string | undefined = undefined;
     const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
+    if (isNewTabUrl) newTitle = 'New Tab';
+    else if (url === 'nova://settings') newTitle = 'Settings';
+    else if (url === 'nova://history') newTitle = 'History';
+    else if (url === 'nova://downloads') newTitle = 'Downloads';
+
+    const isInternalPage = !!newTitle;
+
     setTabs(prev => {
       const activeTab = prev.find(t => t.id === activeTabId);
       if (activeTab && activeTab.url === url) {
-        // URL is exactly the same, force a reload
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-        if (webview) webview.reload();
-        return prev.map(t => t.id === activeTabId ? { ...t, isLoading: !isNewTabUrl } : t);
+        // URL is exactly the same, force a reload if it's a webview
+        if (!isInternalPage) {
+          const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+          if (webview) webview.reload();
+        }
+        return prev.map(t => t.id === activeTabId ? { ...t, isLoading: !isInternalPage } : t);
       }
-      // Update the tab URL — BrowserView's useEffect will call webview.loadURL()
-      // DO NOT call loadURL here directly to avoid double-load race conditions
-      return prev.map(t => t.id === activeTabId ? { ...t, url, isLoading: !isNewTabUrl } : t);
+      
+      return prev.map(t => t.id === activeTabId ? { 
+        ...t, 
+        url, 
+        isLoading: !isInternalPage,
+        ...(newTitle ? { title: newTitle } : {})
+      } : t);
     });
   }, [activeTabId]);
 
