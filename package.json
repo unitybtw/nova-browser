@@ -3,7 +3,7 @@
   "description": "An open source browser built with React and Electron",
   "author": "unitybtw",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "build": {
@@ -29,7 +29,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "artifactName": "Nova-Browser-Setup.exe"
@@ -38,7 +40,10 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "category": "public.app-category.productivity",
