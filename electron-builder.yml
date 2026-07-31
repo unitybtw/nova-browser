@@ -15,13 +15,13 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: "Nova-Browser-Setup-${version}.exe"
+  artifactName: "Nova-Browser-Setup.exe"
 mac:
   target:
     - target: dmg
       arch: [x64, arm64]
   category: public.app-category.productivity
-  artifactName: "Nova-Browser-${version}-${arch}.dmg"
+  artifactName: "Nova-Browser-${arch}.dmg"
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
