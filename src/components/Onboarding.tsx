@@ -152,11 +152,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const steps = [
     // Step 0 — Welcome
     <motion.div key="welcome" className="flex flex-col items-center justify-center h-full text-center px-8">
+      {/* Draggable Top Area */}
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-        className="mb-8"
+        className="mb-8 mt-10"
       >
         <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-6 mx-auto">
           <img src="/nova-icon.jpg" alt="Nova" className="w-20 h-20 rounded-2xl object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -193,8 +196,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     </motion.div>,
 
     // Step 1 — Import Data
-    <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8">
-      <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-2xl">
+    <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-2xl mt-10">
         <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
@@ -239,8 +243,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     </motion.div>,
 
     // Step 2 — Theme
-    <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8">
-      <h2 className="text-4xl font-bold text-white mb-3">Tema Seçin</h2>
+    <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Tema Seçin</h2>
       <p className="text-slate-400 text-lg mb-10">Nova Browser'ın görünümünü kişiselleştirin.</p>
       <div className="flex gap-5 mb-12 flex-wrap justify-center">
         {THEMES.map(t => (
@@ -270,9 +275,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
     </motion.div>,
 
-    // Step 2 — Search Engine
-    <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto">
-      <h2 className="text-4xl font-bold text-white mb-3">Arama Motorunuz</h2>
+    // Step 3 — Search Engine
+    <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Arama Motorunuz</h2>
       <p className="text-slate-400 text-lg mb-8">Varsayılan arama motorunu seçin. Daha sonra ayarlardan değiştirebilirsiniz.</p>
       <div className="flex flex-col gap-3 w-full mb-8">
         {SEARCH_ENGINES.map(engine => (
@@ -304,9 +310,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
     </motion.div>,
 
-    // Step 3 — Privacy Shield
-    <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8">
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30">
+    // Step 4 — Privacy Shield
+    <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30 mt-10">
         <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
@@ -333,9 +340,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       <div className="flex items-center gap-4">
         <button
           onClick={() => setPrivacyShield(!privacyShield)}
-          className={`relative w-16 h-8 rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-600'}`}
+          className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-600'}`}
         >
-          <span className={`absolute top-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-9' : 'translate-x-1'}`} />
+          <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-9' : 'translate-x-1'}`} />
         </button>
         <span className="text-white font-medium text-lg">
           {privacyShield ? 'Gizlilik Kalkanı Aktif' : 'Gizlilik Kalkanı Kapalı'}
@@ -343,8 +350,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
     </motion.div>,
 
-    // Step 4 — Done
-    <motion.div key="done" className="flex flex-col items-center justify-center h-full text-center px-8">
+    // Step 5 — Done
+    <motion.div key="done" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
+      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <motion.div
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
