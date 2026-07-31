@@ -300,18 +300,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                   onClick={() => onNavigate(dial.url)}
                   className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md hover:scale-105 active:scale-95 bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700/60 flex items-center justify-center overflow-hidden p-2 shadow-inner">
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-sm shrink-0">
                     <img 
-                      src={`https://www.google.com/s2/favicons?domain=${dial.domain}&sz=64`}
+                      src={`https://www.google.com/s2/favicons?domain=${dial.domain || dial.url}&sz=64`}
                       alt={dial.name}
-                      className="w-6 h-6 object-contain"
-                      onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
-                      }}
+                      className="w-full h-full object-contain"
                     />
-                    <Globe className="w-5 h-5 opacity-40" />
                   </div>
-                  <span className="text-xs font-semibold truncate max-w-full">{dial.name}</span>
+                  <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-100">{dial.name}</span>
                 </button>
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs">
                   <button 
