@@ -253,7 +253,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         {/* Omnibox / Search Form */}
         <motion.div variants={itemVariants} className="w-full">
           <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-accent transition-colors">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-accent transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
