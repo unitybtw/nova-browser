@@ -527,12 +527,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }`}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
-                {activeTab?.zoomLevel !== undefined && activeTab.zoomLevel !== 0 && (
+                {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
                   <div 
                     className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all ${isIncognito ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}
                     title="Zoom Level"
                   >
-                    {Math.round(Math.pow(1.2, activeTab.zoomLevel) * 100)}%
+                    {Math.round(activeTab.zoomFactor * 100)}%
                   </div>
                 )}
 

@@ -12,7 +12,7 @@ export interface Tab {
   thumbnail?: string;
   workspaceId?: string;
   folderId?: string;
-  zoomLevel?: number;
+  zoomFactor?: number;
   isPlayingAudio?: boolean;
   blockedAdsCount?: number;
   webContentsId?: number;

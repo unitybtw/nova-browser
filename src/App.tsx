@@ -97,7 +97,10 @@ function App() {
   
   const [activeTabId, setActiveTabId] = useState<string>(() => {
     const saved = localStorage.getItem('active_tab_session');
-    return saved || (tabs[0]?.id || '1');
+    if (saved && tabs.some(t => t.id === saved)) {
+      return saved;
+    }
+    return tabs[0]?.id || '1';
   });
 
   const [folders, setFolders] = useState<Folder[]>(() => {
@@ -554,20 +557,22 @@ function App() {
     setActiveTabId(newTab.id);
   }, []);
 
+  const ZOOM_FACTORS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
+
   const handleZoomIn = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.getZoomLevel) {
+    if (webview && webview.getZoomFactor) {
       try {
-        const result = webview.getZoomLevel();
+        const result = webview.getZoomFactor();
         if (typeof result === 'number') {
-          const newLevel = result + 0.5;
-          webview.setZoomLevel(newLevel);
-          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomLevel: newLevel } : t));
+          const nextFactor = ZOOM_FACTORS.find(f => f > result + 0.01) || ZOOM_FACTORS[ZOOM_FACTORS.length - 1];
+          webview.setZoomFactor(nextFactor);
+          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomFactor: nextFactor } : t));
         } else if (result && typeof result.then === 'function') {
-          result.then((level: number) => {
-            const newLevel = level + 0.5;
-            webview.setZoomLevel(newLevel);
-            setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomLevel: newLevel } : t));
+          result.then((currentFactor: number) => {
+            const nextFactor = ZOOM_FACTORS.find(f => f > currentFactor + 0.01) || ZOOM_FACTORS[ZOOM_FACTORS.length - 1];
+            webview.setZoomFactor(nextFactor);
+            setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomFactor: nextFactor } : t));
           });
         }
       } catch (e) {
@@ -578,18 +583,18 @@ function App() {
 
   const handleZoomOut = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.getZoomLevel) {
+    if (webview && webview.getZoomFactor) {
       try {
-        const result = webview.getZoomLevel();
+        const result = webview.getZoomFactor();
         if (typeof result === 'number') {
-          const newLevel = result - 0.5;
-          webview.setZoomLevel(newLevel);
-          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomLevel: newLevel } : t));
+          const nextFactor = [...ZOOM_FACTORS].reverse().find(f => f < result - 0.01) || ZOOM_FACTORS[0];
+          webview.setZoomFactor(nextFactor);
+          setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomFactor: nextFactor } : t));
         } else if (result && typeof result.then === 'function') {
-          result.then((level: number) => {
-            const newLevel = level - 0.5;
-            webview.setZoomLevel(newLevel);
-            setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomLevel: newLevel } : t));
+          result.then((currentFactor: number) => {
+            const nextFactor = [...ZOOM_FACTORS].reverse().find(f => f < currentFactor - 0.01) || ZOOM_FACTORS[0];
+            webview.setZoomFactor(nextFactor);
+            setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomFactor: nextFactor } : t));
           });
         }
       } catch (e) {
