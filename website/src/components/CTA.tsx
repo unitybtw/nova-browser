@@ -1,9 +1,23 @@
 import { motion } from 'framer-motion';
 import { Download, Monitor } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
+import { useEffect, useState } from 'react';
 
 export const CTA = () => {
   const { t } = useLang();
+  
+  const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    if (userAgent.includes('win')) {
+      setOs('win');
+    } else if (userAgent.includes('mac')) {
+      setOs('mac');
+    } else {
+      setOs('other');
+    }
+  }, []);
 
   return (
     <section className="py-24 relative overflow-hidden">
@@ -26,20 +40,31 @@ export const CTA = () => {
               {t.cta.sub}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-1.0.1-arm64.dmg"
-                className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 backdrop-blur-sm"
-              >
-                <Download className="w-5 h-5" />
-                {t.cta.downloadMac}
-              </a>
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.0.1.exe"
-                className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2"
-              >
-                <Monitor className="w-5 h-5" />
-                {t.cta.downloadWin}
-              </a>
+              {os === 'win' ? (
+                <a
+                  href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.0.1.exe"
+                  className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Monitor className="w-5 h-5" />
+                  {t.cta.downloadWin}
+                </a>
+              ) : os === 'mac' ? (
+                <a
+                  href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-1.0.1-arm64.dmg"
+                  className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 backdrop-blur-sm"
+                >
+                  <Download className="w-5 h-5" />
+                  {t.cta.downloadMac}
+                </a>
+              ) : (
+                <a
+                  href="https://github.com/unitybtw/nova-browser/releases/latest"
+                  className="w-full sm:w-auto bg-white/20 hover:bg-white/30 text-white border border-white/30 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-2 backdrop-blur-sm"
+                >
+                  <Download className="w-5 h-5" />
+                  {t.nav.download}
+                </a>
+              )}
               <a
                 href="https://github.com/unitybtw/nova-browser"
                 target="_blank"
