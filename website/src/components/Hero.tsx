@@ -83,12 +83,12 @@ export const Hero = () => {
           >
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
               {os === 'win' ? (
-                <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.0.1.exe" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 group">
+                <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.0.2.exe" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 group">
                   <Monitor className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
                   {t.hero.downloadWin}
                 </a>
               ) : os === 'mac' ? (
-                <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-1.0.1-arm64.dmg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
+                <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-1.0.2-arm64.dmg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
                   <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
                   {t.hero.downloadMac}
                 </a>

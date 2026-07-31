@@ -10,6 +10,7 @@ publish:
   provider: github
   owner: unitybtw
   repo: nova-browser
+  releaseType: release
 win:
   target:
     - target: nsis
