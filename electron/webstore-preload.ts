@@ -87,9 +87,7 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
       });
   });
 
-  // 2. Inject spoofing script into the MAIN WORLD
-  const script = document.createElement('script');
-  script.textContent = `
+  const mainWorldScript = `
     Object.defineProperty(navigator, 'userAgent', {
       get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
       configurable: true
@@ -170,8 +168,18 @@ if (window.location.hostname.includes('chrome.google.com') || window.location.ho
       isInIncognitoMode: (callback) => callback(false)
     };
   `;
-  document.documentElement.appendChild(script);
-  script.remove();
+
+  import('electron').then(({ webFrame }) => {
+    webFrame.executeJavaScript(mainWorldScript);
+  }).catch(() => {
+    // Fallback to script tag if webFrame is not available for some reason
+    try {
+      const script = document.createElement('script');
+      script.textContent = mainWorldScript;
+      document.documentElement.appendChild(script);
+      script.remove();
+    } catch(e) {}
+  });
 
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
