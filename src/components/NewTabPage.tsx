@@ -242,7 +242,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="w-full max-w-3xl flex flex-col items-center gap-8 z-10"
+        className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
         <motion.div variants={itemVariants} className="text-center mb-4">
@@ -357,7 +357,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {showTasksWidget && (
       <motion.div 
         variants={itemVariants}
-        className="absolute bottom-8 right-8 w-84 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
+        className="absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
         style={{ maxHeight: '380px' }}
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
