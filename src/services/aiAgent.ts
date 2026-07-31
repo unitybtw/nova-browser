@@ -437,17 +437,30 @@ class AIAgent {
         
         // Auto-read page content to prevent the AI from getting stuck in a loop
         const script = `(() => {
-          let currentId = 1;
-          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])'));
+          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 300); // cap to 300 to prevent freeze
           
-          const items = interactiveElements.map(el => {
+          // Phase 1: Reads (avoid layout thrashing)
+          const visibleEls = [];
+          for (const el of interactiveElements) {
             const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0 || window.getComputedStyle(el).visibility === 'hidden') return null;
-            
+            if (rect.width > 0 && rect.height > 0) {
+              const style = window.getComputedStyle(el);
+              if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
+                visibleEls.push(el);
+              }
+            }
+          }
+          
+          // Phase 2: Writes (DOM mutations)
+          let currentId = 1;
+          const items = visibleEls.map(el => {
             const aiId = currentId++;
             el.setAttribute('data-ai-id', aiId.toString());
             
+            // Use innerText which is now safe since we separated reads and writes
             let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+            // Remove excessive whitespace
+            text = text.replace(/\\s+/g, ' ');
             if (text.length > 50) text = text.substring(0, 50) + '...';
             
             return {
@@ -456,9 +469,10 @@ class AIAgent {
               type: el.getAttribute('type') || undefined,
               text: text
             };
-          }).filter(Boolean);
+          });
           
-          const text = document.body.innerText.substring(0, 1500);
+          // Fallback read for general text (innerText ignores hidden scripts and styles)
+          const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
           return JSON.stringify({ text, interactable_elements: items.slice(0, 50) });
         })();`;
         
@@ -474,18 +488,30 @@ class AIAgent {
 
       else if (functionName === "read_page_content") {
         const script = `(() => {
-          let currentId = 1;
-          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])'));
+          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 300); // cap to 300 to prevent freeze
           
-          const items = interactiveElements.map(el => {
-            // Skip hidden elements
+          // Phase 1: Reads (avoid layout thrashing)
+          const visibleEls = [];
+          for (const el of interactiveElements) {
             const rect = el.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0 || window.getComputedStyle(el).visibility === 'hidden') return null;
-            
+            if (rect.width > 0 && rect.height > 0) {
+              const style = window.getComputedStyle(el);
+              if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
+                visibleEls.push(el);
+              }
+            }
+          }
+          
+          // Phase 2: Writes (DOM mutations)
+          let currentId = 1;
+          const items = visibleEls.map(el => {
             const aiId = currentId++;
             el.setAttribute('data-ai-id', aiId.toString());
             
+            // Use innerText which is now safe since we separated reads and writes
             let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+            // Remove excessive whitespace
+            text = text.replace(/\\s+/g, ' ');
             if (text.length > 50) text = text.substring(0, 50) + '...';
             
             return {
@@ -494,9 +520,10 @@ class AIAgent {
               type: el.getAttribute('type') || undefined,
               text: text
             };
-          }).filter(Boolean);
+          });
           
-          const text = document.body.innerText.substring(0, 1500);
+          // Fallback read for general text (innerText ignores hidden scripts and styles)
+          const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
           return JSON.stringify({ text, interactable_elements: items.slice(0, 50) }); // limit to 50 elements to save context window
         })();`;
         const data = await this.actionContext.onExecuteScript(script);
