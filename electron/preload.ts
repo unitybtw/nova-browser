@@ -49,6 +49,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('extension-installed-silently', callback);
     return () => ipcRenderer.removeListener('extension-installed-silently', callback);
   },
+  onExtensionChanged: (callback: () => void) => {
+    ipcRenderer.on('extension-changed', callback);
+    return () => ipcRenderer.removeListener('extension-changed', callback);
+  },
   // Tab thumbnails
   captureTabThumbnail: (webContentsId: number) => ipcRenderer.invoke('capture-tab-thumbnail', webContentsId),
   onTabThumbnailUpdate: (callback: (event: any, data: { webContentsId: number; dataUrl: string }) => void) => {

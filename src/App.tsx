@@ -162,6 +162,36 @@ function App() {
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
   const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(DEFAULT_VPN_LOCATIONS);
 
+  // Load extensions on mount and periodically
+  useEffect(() => {
+    const fetchExtensions = async () => {
+      try {
+        if ((window as any).electronAPI?.listExtensions) {
+          const loaded = await (window as any).electronAPI.listExtensions();
+          setExtensions(loaded || []);
+        }
+      } catch (err) {
+        console.error('Failed to load extensions', err);
+      }
+    };
+    fetchExtensions();
+    
+    // Periodically fetch extensions to keep it up to date
+    const interval = setInterval(fetchExtensions, 3000); // Check every 3 seconds for fast updates
+    
+    let cleanup: (() => void) | undefined;
+    if ((window as any).electronAPI?.onExtensionChanged) {
+      cleanup = (window as any).electronAPI.onExtensionChanged(() => {
+        fetchExtensions();
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (cleanup) cleanup();
+    };
+  }, []);
+
   const closeAllModals = useCallback(() => {
     setIsShareOpen(false);
     setIsScreenshotOpen(false);

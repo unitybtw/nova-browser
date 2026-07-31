@@ -662,6 +662,7 @@ ipcMain.handle('remove-extension', async (_event, extensionId: string) => {
   try {
     await win.webContents.session.removeExtension(extensionId);
     loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+    if (win) win.webContents.send('extension-changed');
     return { success: true };
   } catch (err) {
     console.error('Failed to remove extension', err);
@@ -718,6 +719,9 @@ ipcMain.handle('install-from-webstore', async (_event, urlOrId: string) => {
     }
     
     try { fs.unlinkSync(crxFilePath); } catch (e) {}
+    
+    // Notify the frontend immediately so it doesn't wait for polling
+    if (win) win.webContents.send('extension-changed');
     
     return { success: true, extension: extInfo };
   } catch (err: any) {
