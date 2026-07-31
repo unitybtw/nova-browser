@@ -111,6 +111,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
 
+  const [extensions, setExtensions] = useState<any[]>([]);
+
   const fetchMcpStatus = useCallback(async () => {
     if ((window as any).electronAPI?.getMcpStatus) {
       const status = await (window as any).electronAPI.getMcpStatus();
@@ -121,6 +123,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
     if ((window as any).electronAPI?.getMcpToolSettings) {
       setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
+    }
+    
+    // Fetch extensions
+    if ((window as any).electronAPI?.listExtensions) {
+      setExtensions(await (window as any).electronAPI.listExtensions() || []);
     }
   }, []);
 
@@ -1045,18 +1052,58 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <p className="text-sm text-slate-500 dark:text-slate-400">Manage your browser extensions.</p>
                   </div>
                 </div>
-                
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
-                  <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400">
-                    <Puzzle className="w-8 h-8" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">Extension Management</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
-                      Extensions are loaded from your local extensions folder. You can enable or disable them from the extensions menu in the top bar. Advanced management will be available in a future update.
-                    </p>
-                  </div>
-                </div>
+                  {/* Extension Management */}
+                  {(!extensions || extensions.length === 0) ? (
+                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
+                      <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400">
+                        <Puzzle className="w-8 h-8" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">No extensions installed</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
+                          You can install extensions from the Chrome Web Store.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
+                      <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
+                        {extensions.map((ext: any) => (
+                          <div key={ext.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                            <div className="flex items-center gap-4 flex-1">
+                              <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                                {ext.iconData ? (
+                                  <img src={ext.iconData} alt={ext.name} className="w-8 h-8 object-contain" />
+                                ) : (
+                                  <Puzzle className="w-6 h-6 text-slate-400" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-slate-800 dark:text-slate-200 text-base">{ext.name}</div>
+                                <div className="text-sm text-slate-500 dark:text-slate-400 truncate">{ext.description || 'No description available'}</div>
+                                <div className="text-xs text-slate-400 dark:text-slate-500 mt-1">v{ext.version} • {ext.id}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <button 
+                                onClick={async () => {
+                                  if (window.confirm('Bu eklentiyi kaldırmak istediğinize emin misiniz?')) {
+                                    try {
+                                      await (window as any).electronAPI?.removeExtension?.(ext.id);
+                                    } catch (e) {}
+                                  }
+                                }}
+                                className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                title="Remove Extension"
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
               </section>
             </div>
           )}

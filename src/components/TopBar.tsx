@@ -827,7 +827,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-accent-dark/30 text-accent hover:bg-slate-700' : 'bg-accent/10 text-accent-hover hover:bg-accent/20 dark:bg-accent-dark/30 dark:text-accent dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
               title={ext.name}
               onClick={() => {
-                // Future: Trigger extension popup
+                if (ext.popupUrl) {
+                  const url = `chrome-extension://${ext.id}/${ext.popupUrl}`;
+                  onNewTab(url);
+                } else {
+                  alert(ext.name + ' eklentisinin popup ekranı yok veya henüz desteklenmiyor.');
+                }
               }}
             >
               {ext.iconData ? (

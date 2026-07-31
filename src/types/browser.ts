@@ -49,6 +49,7 @@ export interface Extension {
   version?: string;
   enabled?: boolean;
   iconData?: string;
+  popupUrl?: string;
 }
 
 export interface Bookmark {

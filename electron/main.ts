@@ -124,34 +124,18 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
     // Auto-install CRX extensions from Chrome Web Store
     if (filename.endsWith('.crx')) {
-      const tempPath = path.join(app.getPath('userData'), 'temp_extensions');
-      if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
-      const crxFilePath = path.join(tempPath, `${downloadId}_${filename}`);
-      item.setSavePath(crxFilePath);
-      
-      item.once('done', async (event, state) => {
+      // Chrome Web Store extensions are usually named like "extension_1_2_3.crx"
+      // or "cjpalhdlnbpafiamejdnhcphjbkeiagm.crx"
+      // Since it's hard to get the ID from here, we will just let install-from-webstore IPC handle it
+      // and we CANCEL the native download to prevent duplicate installation!
+      item.cancel();
+    } else {
+      item.setSavePath(path.join(app.getPath('downloads'), filename));
+      item.once('done', (_event, state) => {
         if (state === 'completed') {
-          try {
-            const extractPath = path.join(app.getPath('userData'), 'extensions', downloadId);
-            if (!fs.existsSync(extractPath)) fs.mkdirSync(extractPath, { recursive: true });
-            
-            await unzip(crxFilePath, extractPath);
-            
-            const extInfo = await session.defaultSession.loadExtension(extractPath);
-            loadedExtensions.push(extInfo);
-            
-            // Cleanup the crx file
-            try { fs.unlinkSync(crxFilePath); } catch (e) {}
-            
-            // Notify frontend
-            mainWindow?.webContents.send('extension-installed-silently', { success: true, name: extInfo.name });
-            
-          } catch (err) {
-            console.error('Failed to install extension from crx', err);
-          }
+          activeDownloads.delete(downloadId);
         }
       });
-      return; // Do not show in normal downloads manager
     }
 
     mainWindow?.webContents.send('download-update', {
@@ -263,13 +247,21 @@ app.whenReady().then(async () => {
       const extensionDirs = fs.readdirSync(extensionsPath);
       for (const dir of extensionDirs) {
         const extPath = path.join(extensionsPath, dir);
-        if (fs.statSync(extPath).isDirectory() && fs.existsSync(path.join(extPath, 'manifest.json'))) {
-          session.defaultSession.loadExtension(extPath).then(extInfo => {
-            loadedExtensions.push(extInfo);
-            console.log(`Loaded extension: ${extInfo.name}`);
-          }).catch(err => {
-            console.error(`Failed to load extension at ${extPath}:`, err);
-          });
+        if (fs.statSync(extPath).isDirectory()) {
+          // Cleanup old corrupted timestamp folders
+          if (dir.match(/^\d+$/) || dir.match(/^\d+_.*\.crx$/)) {
+            try { fs.rmSync(extPath, { recursive: true, force: true }); } catch(e) {}
+            continue;
+          }
+          
+          if (fs.existsSync(path.join(extPath, 'manifest.json'))) {
+            session.defaultSession.loadExtension(extPath).then(extInfo => {
+              loadedExtensions.push(extInfo);
+              console.log(`Loaded extension: ${extInfo.name}`);
+            }).catch(err => {
+              console.error(`Failed to load extension at ${extPath}:`, err);
+            });
+          }
         }
       }
     } catch (err) {
@@ -620,10 +612,19 @@ ipcMain.handle('install-extension', async (_event, folderPath: string) => {
 ipcMain.handle('list-extensions', async () => {
   return Promise.all(loadedExtensions.map(async (e) => {
     let iconData = undefined;
+    let popupUrl = undefined;
     try {
       const manifestPath = path.join(e.path, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        
+        // Find popup URL
+        if (manifest.action?.default_popup) {
+          popupUrl = manifest.action.default_popup;
+        } else if (manifest.browser_action?.default_popup) {
+          popupUrl = manifest.browser_action.default_popup;
+        }
+
         if (manifest.icons) {
           // Find largest icon
           const sizes = Object.keys(manifest.icons).map(Number).sort((a, b) => b - a);
@@ -648,7 +649,8 @@ ipcMain.handle('list-extensions', async () => {
       path: e.path,
       version: e.version,
       description: e.description,
-      iconData
+      iconData,
+      popupUrl
     };
   }));
 });
@@ -698,14 +700,23 @@ ipcMain.handle('install-from-webstore', async (_event, urlOrId: string) => {
     fs.writeFileSync(crxFilePath, buffer);
     
     const extractPath = path.join(app.getPath('userData'), 'extensions', extensionId);
-    if (!fs.existsSync(extractPath)) fs.mkdirSync(extractPath, { recursive: true });
-    
-    await unzip(crxFilePath, extractPath);
+    if (!fs.existsSync(extractPath)) {
+      fs.mkdirSync(extractPath, { recursive: true });
+      await unzip(crxFilePath, extractPath);
+    }
     
     const win = BrowserWindow.getAllWindows()[0];
-    const extInfo = await win?.webContents.session.loadExtension(extractPath) || await session.defaultSession.loadExtension(extractPath);
     
-    loadedExtensions.push(extInfo);
+    // Check if it's already loaded to prevent duplicate loading
+    const isAlreadyLoaded = loadedExtensions.some(e => e.id === extensionId);
+    let extInfo;
+    if (!isAlreadyLoaded) {
+      extInfo = await win?.webContents.session.loadExtension(extractPath) || await session.defaultSession.loadExtension(extractPath);
+      loadedExtensions.push(extInfo);
+    } else {
+      extInfo = loadedExtensions.find(e => e.id === extensionId);
+    }
+    
     try { fs.unlinkSync(crxFilePath); } catch (e) {}
     
     return { success: true, extension: extInfo };
