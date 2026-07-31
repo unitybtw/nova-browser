@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent } from '../services/aiAgent';
@@ -228,13 +228,22 @@ export const SidePanel: React.FC<SidePanelProps> = ({
               >
                 <Brain className="w-4 h-4" />
               </button>
-              {isReady && messages.length > 0 && (
+              {isReady && messages.length > 0 && !isLoading && (
                 <button
                   onClick={() => setMessages([{ role: 'assistant', content: 'Sohbet sıfırlandı. Sana nasıl yardımcı olabilirim?' }])}
                   className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors"
                   title="Sohbeti Sıfırla"
                 >
                   <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
+              {isLoading && (
+                <button
+                  onClick={() => aiAgent.interrupt()}
+                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                  title="Ajanı Durdur"
+                >
+                  <Square className="w-4 h-4 fill-current" />
                 </button>
               )}
               {isSpeaking ? (

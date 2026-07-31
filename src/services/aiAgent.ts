@@ -24,6 +24,14 @@ class AIAgent {
   private engine: MLCEngine | null = null;
   private actionContext: AIActionContext | null = null;
   private isInitializing = false;
+  private isInterrupted = false;
+  
+  public interrupt() {
+    this.isInterrupted = true;
+    if (this.engine) {
+      this.engine.interruptGenerate();
+    }
+  }
   
   // Model identifier. Hermes models support tool calling in WebLLM.
   private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
@@ -951,6 +959,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
   public async chat(messages: ChatCompletionMessageParam[], onChunk?: (chunk: string) => void): Promise<ChatCompletionMessageParam[]> {
     if (!this.engine) throw new Error("Engine not initialized");
+    this.isInterrupted = false;
 
     const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
 You are an advanced AI agent integrated into a web browser.
@@ -989,6 +998,11 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
     let lastToolName = '';
 
     while (!isDone) {
+      if (this.isInterrupted) {
+        currentMessages.push({ role: 'assistant', content: 'İşlem kullanıcı tarafından durduruldu.' } as ChatCompletionMessageParam);
+        break;
+      }
+
       // Truncate old tool messages to prevent WebGPU OOM crashes
       const optimizedMessages = currentMessages.map((msg, idx) => {
         if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
@@ -1024,7 +1038,9 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
           let result;
           
           // Prevent infinite tool loops (calling same tool consecutively)
-          if (funcName === lastToolName && responseMessage.tool_calls.length === 1) {
+          if (this.isInterrupted) {
+             result = JSON.stringify({ error: "İşlem iptal edildi." });
+          } else if (funcName === lastToolName && responseMessage.tool_calls.length === 1) {
             result = JSON.stringify({ error: `CRITICAL ERROR: You just called '${funcName}' again! You are stuck in an infinite loop. You MUST call a different tool now (like read_page_content) or provide your final response to the user!` });
           } else {
             result = await this.handleToolCall(toolCall);
