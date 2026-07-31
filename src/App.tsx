@@ -515,6 +515,14 @@ function App() {
     });
   }, []);
 
+  const handleReorderFullList = useCallback((reorderedWorkspaceTabs: Tab[]) => {
+    setTabs(prevTabs => {
+      const workspaceIds = new Set(reorderedWorkspaceTabs.map(t => t.id));
+      const nonWorkspaceTabs = prevTabs.filter(t => !workspaceIds.has(t.id));
+      return [...reorderedWorkspaceTabs, ...nonWorkspaceTabs];
+    });
+  }, []);
+
 
 
   // Listen to IPC events from main process (Shortcuts & Downloads) with cleanups
@@ -1564,6 +1572,7 @@ function App() {
           onToggleMuteTab={handleToggleMuteTab}
           onSuspendTab={handleSuspendTab}
           onReorderTabs={handleReorderTabs}
+          onReorderFullList={handleReorderFullList}
           onTogglePip={handleTogglePip}
           onSelectTab={handleSelectTab}
           onNewTab={handleNewTab}

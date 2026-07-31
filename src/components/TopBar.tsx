@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
   ArrowLeft,
   ArrowRight,
@@ -85,6 +85,7 @@ interface TopBarProps {
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onSuspendTab?: (id: string) => void;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
+  onReorderFullList?: (newTabs: Tab[]) => void;
   onTogglePip?: (id: string) => void;
   onSelectTab: (id: string) => void;
   onNewTab: (url?: string) => void;
@@ -131,6 +132,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onToggleMuteTab,
   onSuspendTab,
   onReorderTabs,
+  onReorderFullList,
   onTogglePip,
   onSelectTab,
   onNewTab,
@@ -162,7 +164,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
 
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
@@ -189,14 +191,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     if (!tabsContainerRef.current) return;
     const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
     if (activeTabEl) {
-      // Delay scrolling slightly to allow Framer Motion layout animations to calculate correct positions
       setTimeout(() => {
         activeTabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
       }, 150);
     }
   }, [activeTabId, tabs.length]);
 
-  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = (e: React.WheelEvent<any>) => {
     if (tabsContainerRef.current) {
       if (e.deltaY !== 0) {
         tabsContainerRef.current.scrollLeft += e.deltaY;
@@ -428,66 +429,36 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
 
-          <div 
+          <Reorder.Group
+            axis="x"
+            values={tabs}
+            onReorder={(newTabs) => {
+              if (onReorderFullList) {
+                onReorderFullList(newTabs);
+              }
+            }}
             ref={tabsContainerRef}
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region"
           >
-            <AnimatePresence>
+            <AnimatePresence initial={false}>
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               return (
-                <motion.div
-                  layout="position"
+                <Reorder.Item
+                  key={tab.id}
+                  value={tab}
                   initial={{ opacity: 0, scale: 0.9, y: 15 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
-                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  whileTap={{ scale: 0.98 }}
-                  key={tab.id}
-                  data-tab-id={tab.id}
-                  draggable={true}
-                  onDragStart={(e: any) => {
-                    if (e.dataTransfer) {
-                      e.dataTransfer.setData('text/plain', tab.id);
-                      e.dataTransfer.effectAllowed = 'move';
-                    }
-                    setDraggedTabId(tab.id);
-                  }}
-                  onDragOver={(e: any) => {
-                    if (e.preventDefault) e.preventDefault();
-                    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-                    if (dragOverTabId !== tab.id) {
-                      setDragOverTabId(tab.id);
-                    }
-                  }}
-                  onDragLeave={() => {
-                    if (dragOverTabId === tab.id) {
-                      setDragOverTabId(null);
-                    }
-                  }}
-                  onDrop={(e: any) => {
-                    if (e.preventDefault) e.preventDefault();
-                    const sourceId = e.dataTransfer?.getData('text/plain') || draggedTabId;
-                    if (sourceId && sourceId !== tab.id && onReorderTabs) {
-                      onReorderTabs(sourceId, tab.id);
-                    }
-                    setDraggedTabId(null);
-                    setDragOverTabId(null);
-                  }}
-                  onDragEnd={() => {
-                    setDraggedTabId(null);
-                    setDragOverTabId(null);
-                  }}
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+                  whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
                   onClick={() => onSelectTab(tab.id)}
-                  className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-grab active:cursor-grabbing transition-all no-drag ${
+                  data-tab-id={tab.id}
+                  className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
                     tabStyle === 'floating' ? 'rounded-lg mx-0.5 my-1 border' : 
                     tabStyle === 'square' ? 'rounded-none border-t border-x' : 
                     'rounded-t-xl border-t border-x'
-                  } ${
-                    draggedTabId === tab.id ? 'opacity-30 scale-95' : ''
-                  } ${
-                    dragOverTabId === tab.id && draggedTabId !== tab.id ? 'ring-2 ring-blue-500 z-30 scale-105 shadow-xl border-blue-500' : ''
                   } ${
                     isActive
                       ? isIncognito
@@ -498,15 +469,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                   }`}
                 >
-                  <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden"
-                       onMouseEnter={(e) => {
-                         if (isActive) return;
-                         const rect = e.currentTarget.getBoundingClientRect();
-                         setHoveredTab(tab);
-                         setHoverPos({ left: rect.left, width: rect.width });
-                       }}
-                       onMouseLeave={() => setHoveredTab(null)}
-                  >
+                  <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
                     {tab.isLoading ? (
                       <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
                     ) : tab.favicon ? (
@@ -579,7 +542,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   {isActive && (
                     <div className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`} />
                   )}
-                </motion.div>
+                </Reorder.Item>
               );
             })}
             </AnimatePresence>
@@ -601,7 +564,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             >
               <ShieldOff className="w-4 h-4" />
             </button>
-          </div>
+          </Reorder.Group>
 
           {canScrollRight && (
             <button
