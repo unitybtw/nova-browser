@@ -86,8 +86,8 @@ class AIAgent {
         parameters: {
           type: "object",
           properties: {
-            selector: { type: "string", description: "CSS selector (e.g. 'button.submit', '#search-btn', 'a[href*=\"login\"]')" },
-            text: { type: "string", description: "Optional: visible text content of the element to find and click if CSS selector doesn't work" }
+            ai_id: { type: "string", description: "The numeric ID of the element from read_page_content (e.g. '1', '24')" },
+            fallback_text: { type: "string", description: "Optional: visible text content of the element to find and click if ID doesn't work" }
           },
           required: [],
         },
@@ -101,11 +101,11 @@ class AIAgent {
         parameters: {
           type: "object",
           properties: {
-            selector: { type: "string", description: "CSS selector of the input element" },
+            ai_id: { type: "string", description: "The numeric ID of the input element from read_page_content" },
             value: { type: "string", description: "The text to type into the input" },
             submit: { type: "boolean", description: "If true, presses Enter after filling" }
           },
-          required: ["selector", "value"],
+          required: ["ai_id", "value"],
         },
       }
     },
@@ -456,19 +456,30 @@ class AIAgent {
 
       else if (functionName === "read_page_content") {
         const script = `(() => {
-          const text = document.body.innerText.substring(0, 4000);
-          const inputs = Array.from(document.querySelectorAll('input, textarea')).map(el => ({
-            tag: el.tagName,
-            type: el.type,
-            name: el.name,
-            placeholder: el.placeholder,
-            id: el.id
-          }));
-          const linksAndButtons = Array.from(document.querySelectorAll('a, button, [role="button"]')).slice(0, 50).map(el => ({
-            text: el.innerText.trim().substring(0, 30),
-            id: el.id
-          })).filter(e => e.text);
-          return JSON.stringify({ text, inputs, linksAndButtons });
+          let currentId = 1;
+          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])'));
+          
+          const items = interactiveElements.map(el => {
+            // Skip hidden elements
+            const rect = el.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0 || window.getComputedStyle(el).visibility === 'hidden') return null;
+            
+            const aiId = currentId++;
+            el.setAttribute('data-ai-id', aiId.toString());
+            
+            let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+            if (text.length > 50) text = text.substring(0, 50) + '...';
+            
+            return {
+              ai_id: aiId.toString(),
+              tag: el.tagName.toLowerCase(),
+              type: el.getAttribute('type') || undefined,
+              text: text
+            };
+          }).filter(Boolean);
+          
+          const text = document.body.innerText.substring(0, 3000);
+          return JSON.stringify({ text, interactable_elements: items.slice(0, 80) }); // limit to 80 elements to save context window
         })();`;
         const data = await this.actionContext.onExecuteScript(script);
         result = { success: true, pageData: JSON.parse(data) };
@@ -480,17 +491,17 @@ class AIAgent {
       }
 
       else if (functionName === "click_element") {
-        const { selector, text } = args;
+        const { ai_id, fallback_text } = args;
         const colorHex = this.getThemeColor();
         const script = `(async () => {
           let el = null;
-          if (${JSON.stringify(selector)}) {
-            try { el = document.querySelector(${JSON.stringify(selector)}); } catch(e) {}
+          if (${JSON.stringify(ai_id)}) {
+            el = document.querySelector('[data-ai-id="' + ${JSON.stringify(ai_id)} + '"]');
           }
-          if (!el && ${JSON.stringify(text ?? '')}) {
+          if (!el && ${JSON.stringify(fallback_text ?? '')}) {
             const allEls = document.querySelectorAll('a, button, [role="button"], input[type="submit"], label');
             for (const candidate of allEls) {
-              if (candidate.textContent?.trim().toLowerCase().includes(${JSON.stringify((text ?? '').toLowerCase())})) {
+              if (candidate.textContent?.trim().toLowerCase().includes(${JSON.stringify((fallback_text ?? '').toLowerCase())})) {
                 el = candidate;
                 break;
               }
@@ -509,14 +520,12 @@ class AIAgent {
               // 1. Setup Cursor
               const cursor = document.createElement('div');
               cursor.style.position = 'fixed';
-              // Start off-screen right-bottom
               cursor.style.top = (window.innerHeight + 50) + 'px';
               cursor.style.left = (window.innerWidth + 50) + 'px';
               cursor.style.width = '28px';
               cursor.style.height = '28px';
-              cursor.style.zIndex = '2147483647'; // max z-index
+              cursor.style.zIndex = '2147483647';
               cursor.style.pointerEvents = 'none';
-              // Custom smooth spring-like curve
               cursor.style.transition = 'top 0.6s cubic-bezier(0.22, 1, 0.36, 1), left 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.2s ease, opacity 0.3s ease';
               cursor.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));"><path d="M4.68114 2.85243C4.24647 2.21323 3.32839 2.45784 3.20816 3.24584L1.07724 17.1994C0.97034 17.8997 1.70613 18.4239 2.34863 18.106L8.14088 15.2415C8.36737 15.1295 8.63155 15.1274 8.85974 15.2359L15.3406 18.3188C15.986 18.6258 16.7118 18.082 16.5911 17.3813L14.2882 4.02008C14.1528 3.23438 13.2209 2.99343 12.7885 3.63319L4.68114 2.85243Z" fill="' + color + '" stroke="white" stroke-width="1.5"/></svg>';
               document.body.appendChild(cursor);
@@ -534,24 +543,21 @@ class AIAgent {
               highlight.style.borderRadius = '6px';
               highlight.style.opacity = '0';
               highlight.style.border = '2px solid ' + color;
-              highlight.style.backgroundColor = color + '20'; // 20 hex alpha
+              highlight.style.backgroundColor = color + '20';
               highlight.style.boxShadow = '0 0 15px ' + color + '60';
               document.body.appendChild(highlight);
               
-              // Move cursor to target
-              await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); // double RAF
+              await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
               cursor.style.top = centerY + 'px';
               cursor.style.left = centerX + 'px';
               
-              await new Promise(r => setTimeout(r, 450)); // wait for movement
+              await new Promise(r => setTimeout(r, 450));
               
-              // Hover effect
               highlight.style.opacity = '1';
-              cursor.style.transform = 'scale(0.85)'; // click press down
+              cursor.style.transform = 'scale(0.85)';
               
               await new Promise(r => setTimeout(r, 150));
               
-              // Ripple effect
               const ripple = document.createElement('div');
               ripple.style.position = 'fixed';
               ripple.style.top = centerY + 'px';
@@ -580,7 +586,7 @@ class AIAgent {
             el.click();
             return { success: true, clicked: el.tagName + (el.id ? '#' + el.id : '') };
           }
-          return { error: 'Element not found', tried: { selector: ${JSON.stringify(selector)}, text: ${JSON.stringify(text)} } };
+          return { error: 'Element not found', tried: { ai_id: ${JSON.stringify(ai_id)}, fallback_text: ${JSON.stringify(fallback_text)} } };
         })();`;
         const res = await this.actionContext.onExecuteScript(script);
         if (res.error) throw new Error(res.error);
@@ -590,11 +596,11 @@ class AIAgent {
       }
 
       else if (functionName === "fill_input") {
-        const { selector, value, submit } = args;
+        const { ai_id, value, submit } = args;
         const colorHex = this.getThemeColor();
         const script = `(async () => {
-          const el = document.querySelector(${JSON.stringify(selector)});
-          if (!el) return { error: 'Input not found: ' + ${JSON.stringify(selector)} };
+          const el = document.querySelector('[data-ai-id="' + ${JSON.stringify(ai_id)} + '"]');
+          if (!el) return { error: 'Input not found for ID: ' + ${JSON.stringify(ai_id)} };
           
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           await new Promise(r => setTimeout(r, 400));
