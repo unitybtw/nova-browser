@@ -50,6 +50,13 @@ export const SidePanel: React.FC<SidePanelProps> = ({
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe(actions => {
       setQueuedActions(actions);
+      
+      // Auto-clear completed/failed/denied actions after 3 seconds to prevent memory leak
+      const completedActions = actions.filter(a => a.state === 'completed' || a.state === 'failed' || a.state === 'denied');
+      if (completedActions.length > 5) {
+        // Keep only the 5 most recent completed actions
+        orchestrator.clearQueue();
+      }
     });
     return () => { unsubscribe(); };
   }, []);
@@ -88,19 +95,23 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     recognition.onend = () => setIsListening(false);
   }, []);
 
-  // Poll TTS state
+  // Poll TTS state (reduced from 300ms to 1000ms to save CPU)
   useEffect(() => {
     const interval = setInterval(() => {
       setIsSpeaking(tts.isSpeaking);
-    }, 300);
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
+  // Only scroll into view on new messages, not on every streaming chunk
+  const prevMessageCount = useRef(0);
   useEffect(() => {
-    if (messagesEndRef.current) {
+    const currentCount = messages.length;
+    if (messagesEndRef.current && (currentCount !== prevMessageCount.current || !isLoading)) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      prevMessageCount.current = currentCount;
     }
-  }, [messages, isLoading, streamingText]);
+  }, [messages.length, isLoading]);
 
   useEffect(() => {
     if (showMemoryVault) {

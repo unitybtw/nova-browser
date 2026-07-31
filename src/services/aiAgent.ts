@@ -20,6 +20,40 @@ export interface AIActionContext {
 
 export type InitProgressHandler = (progress: number, text: string) => void;
 
+// Shared DOM scanning script — extracted to avoid duplicating 40 lines in every tool call
+const DOM_SCAN_SCRIPT = `(() => {
+  const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 150);
+  const visibleEls = [];
+  for (const el of interactiveElements) {
+    const rect = el.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      const style = window.getComputedStyle(el);
+      if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
+        visibleEls.push(el);
+      }
+    }
+  }
+  let currentId = 1;
+  const items = visibleEls.map(el => {
+    const aiId = currentId++;
+    el.setAttribute('data-ai-id', aiId.toString());
+    let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+    text = text.replace(/\\s+/g, ' ');
+    if (text.length > 50) text = text.substring(0, 50) + '...';
+    return {
+      ai_id: aiId.toString(),
+      tag: el.tagName.toLowerCase(),
+      type: el.getAttribute('type') || undefined,
+      text: text
+    };
+  });
+  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
+  return JSON.stringify({ text, interactable_elements: items.slice(0, 50) });
+})();`;
+
+// Maximum number of messages to keep in the conversation history for inference
+const MAX_HISTORY_MESSAGES = 12;
+
 class AIAgent {
   private engine: MLCEngine | null = null;
   private actionContext: AIActionContext | null = null;
@@ -435,48 +469,8 @@ class AIAgent {
         this.actionContext.onNavigate(url);
         await new Promise(r => setTimeout(r, 2500));
         
-        // Auto-read page content to prevent the AI from getting stuck in a loop
-        const script = `(() => {
-          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 300); // cap to 300 to prevent freeze
-          
-          // Phase 1: Reads (avoid layout thrashing)
-          const visibleEls = [];
-          for (const el of interactiveElements) {
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              const style = window.getComputedStyle(el);
-              if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
-                visibleEls.push(el);
-              }
-            }
-          }
-          
-          // Phase 2: Writes (DOM mutations)
-          let currentId = 1;
-          const items = visibleEls.map(el => {
-            const aiId = currentId++;
-            el.setAttribute('data-ai-id', aiId.toString());
-            
-            // Use innerText which is now safe since we separated reads and writes
-            let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
-            // Remove excessive whitespace
-            text = text.replace(/\\s+/g, ' ');
-            if (text.length > 50) text = text.substring(0, 50) + '...';
-            
-            return {
-              ai_id: aiId.toString(),
-              tag: el.tagName.toLowerCase(),
-              type: el.getAttribute('type') || undefined,
-              text: text
-            };
-          });
-          
-          // Fallback read for general text (innerText ignores hidden scripts and styles)
-          const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
-          return JSON.stringify({ text, interactable_elements: items.slice(0, 50) });
-        })();`;
-        
-        const pageData = await this.actionContext.onExecuteScript(script);
+        // Auto-read page content using the shared scan script
+        const pageData = await this.actionContext.onExecuteScript(DOM_SCAN_SCRIPT);
         
         result = { 
           success: true, 
@@ -487,46 +481,7 @@ class AIAgent {
       }
 
       else if (functionName === "read_page_content") {
-        const script = `(() => {
-          const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 300); // cap to 300 to prevent freeze
-          
-          // Phase 1: Reads (avoid layout thrashing)
-          const visibleEls = [];
-          for (const el of interactiveElements) {
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-              const style = window.getComputedStyle(el);
-              if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
-                visibleEls.push(el);
-              }
-            }
-          }
-          
-          // Phase 2: Writes (DOM mutations)
-          let currentId = 1;
-          const items = visibleEls.map(el => {
-            const aiId = currentId++;
-            el.setAttribute('data-ai-id', aiId.toString());
-            
-            // Use innerText which is now safe since we separated reads and writes
-            let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
-            // Remove excessive whitespace
-            text = text.replace(/\\s+/g, ' ');
-            if (text.length > 50) text = text.substring(0, 50) + '...';
-            
-            return {
-              ai_id: aiId.toString(),
-              tag: el.tagName.toLowerCase(),
-              type: el.getAttribute('type') || undefined,
-              text: text
-            };
-          });
-          
-          // Fallback read for general text (innerText ignores hidden scripts and styles)
-          const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
-          return JSON.stringify({ text, interactable_elements: items.slice(0, 50) }); // limit to 50 elements to save context window
-        })();`;
-        const data = await this.actionContext.onExecuteScript(script);
+        const data = await this.actionContext.onExecuteScript(DOM_SCAN_SCRIPT);
         result = { success: true, pageData: JSON.parse(data) };
       }
 
@@ -1030,12 +985,26 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
         break;
       }
 
+      // Sliding window: keep only the last N messages to prevent WebGPU OOM
+      let windowedMessages = currentMessages;
+      if (currentMessages.length > MAX_HISTORY_MESSAGES) {
+        // Always keep the first message (contains system instructions) and the last N
+        windowedMessages = [
+          currentMessages[0],
+          ...currentMessages.slice(-MAX_HISTORY_MESSAGES + 1)
+        ];
+      }
+
       // Truncate old tool messages to prevent WebGPU OOM crashes
-      const optimizedMessages = currentMessages.map((msg, idx) => {
-        if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 500) {
-          // If this is not one of the last 3 messages, truncate it heavily
-          if (idx < currentMessages.length - 3) {
-            return { ...msg, content: '{"status":"[Truncated to save memory]"}' };
+      const optimizedMessages = windowedMessages.map((msg, idx) => {
+        if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 300) {
+          // If this is not one of the last 2 messages, truncate it heavily
+          if (idx < windowedMessages.length - 2) {
+            return { ...msg, content: '{"status":"done"}' };
+          }
+          // Even recent tool messages get truncated if too long
+          if (msg.content.length > 1000) {
+            return { ...msg, content: msg.content.substring(0, 1000) + '..."}}' };
           }
         }
         return msg;
@@ -1102,20 +1071,25 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
         currentMessages.push({ role: 'assistant', content } as ChatCompletionMessageParam);
 
         // Record Task Summary in background if tools were used
+        // Defer by 3 seconds to let the GPU cool down and avoid contention with potential next user message
         if (toolsCalled && this.engine) {
-          this.engine.chat.completions.create({
-            messages: [
-              ...currentMessages, 
-              { role: 'user', content: 'Kısaca az önce tarayıcıda hangi görevi tamamladığını tek cümleyle özetle. (Örn: "Google\'da arama yapıp sonuçları buldum")' }
-            ],
-            stream: false
-          }).then(res => {
-            const summary = res.choices[0]?.message?.content;
-            if (summary) {
-              console.log('[AI Task Summary]', summary);
-              aiMemory.addTaskSummary(summary);
-            }
-          }).catch(console.error);
+          const engineRef = this.engine;
+          const summaryMessages = [
+            currentMessages[currentMessages.length - 1], // just the last assistant response
+            { role: 'user', content: 'Kısaca az önce tarayıcıda hangi görevi tamamladığını tek cümleyle özetle. (Örn: "Google\'da arama yapıp sonuçları buldum")' }
+          ];
+          setTimeout(() => {
+            engineRef.chat.completions.create({
+              messages: summaryMessages as ChatCompletionMessageParam[],
+              stream: false
+            }).then(res => {
+              const summary = res.choices[0]?.message?.content;
+              if (summary) {
+                console.log('[AI Task Summary]', summary);
+                aiMemory.addTaskSummary(summary);
+              }
+            }).catch(console.error);
+          }, 3000);
         }
       }
     }
