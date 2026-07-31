@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
+import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Clock, Download } from 'lucide-react';
 import { Tab, Workspace, Folder } from '../types/browser';
 
 const WORKSPACE_COLORS: Record<string, string> = {
@@ -175,6 +175,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <div className="w-4 h-4 border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
             ) : tab.favicon ? (
               <img src={tab.favicon} alt="" className="w-4 h-4 rounded-sm" />
+            ) : tab.url === 'nova://settings' ? (
+              <Settings className="w-4 h-4 opacity-70" />
+            ) : tab.url === 'nova://history' ? (
+              <Clock className="w-4 h-4 opacity-70" />
+            ) : tab.url === 'nova://downloads' ? (
+              <Download className="w-4 h-4 opacity-70" />
+            ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
+              <Plus className="w-4 h-4 opacity-70" />
             ) : (
               <Globe className="w-4 h-4 opacity-70" />
             )}

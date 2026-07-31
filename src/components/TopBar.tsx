@@ -395,6 +395,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
                   ) : tab.favicon ? (
                     <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
+                  ) : tab.url === 'nova://settings' ? (
+                    <Settings className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  ) : tab.url === 'nova://history' ? (
+                    <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  ) : tab.url === 'nova://downloads' ? (
+                    <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
+                    <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   ) : (
                     <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   )}
