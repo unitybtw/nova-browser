@@ -871,7 +871,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           )}
 
           {/* SHORTCUTS */}
-          {activeTab === 'shortcuts' && (
+          {activeTab === 'shortcuts' && (() => {
+            const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
+            const [shortcutInputValue, setShortcutInputValue] = useState('');
+
+            return (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -912,7 +916,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'downloads', label: 'Open Downloads' },
                     { id: 'findInPage', label: 'Find in Page' },
                   ].map(action => {
-                    const currentBinding = settings.shortcuts?.[action.id] || { key: '?', meta: true };
+                    const currentBinding = settings.shortcuts?.[action.id as keyof typeof settings.shortcuts] || { key: '?', meta: true };
                     
                     const formatBinding = (b: { key: string, shift?: boolean, meta?: boolean }) => {
                       let str = '';
@@ -922,6 +926,27 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       return str;
                     };
 
+                    const isEditing = editingShortcut === action.id;
+
+                    const handleSave = () => {
+                      if (shortcutInputValue.trim()) {
+                        const input = shortcutInputValue.trim();
+                        const newBinding = {
+                          key: input.toLowerCase(),
+                          shift: input.toLowerCase() !== input,
+                          meta: true
+                        };
+                        onUpdateSettings({
+                          shortcuts: {
+                            ...settings.shortcuts,
+                            [action.id]: newBinding
+                          } as any
+                        });
+                      }
+                      setEditingShortcut(null);
+                      setShortcutInputValue('');
+                    };
+
                     return (
                       <div key={action.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 group hover:bg-slate-50 dark:hover:bg-slate-700/20 rounded-xl transition-colors">
                         <div>
@@ -929,31 +954,41 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           <p className="text-xs text-slate-500">ID: {action.id}</p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-slate-600 dark:text-slate-300 shadow-sm min-w-[100px] text-center">
-                            {formatBinding(currentBinding)}
-                          </div>
-                          <button
-                            onClick={() => {
-                              const input = prompt('Enter new key combination (e.g. "t", "T" for shift+t). Note: Cmd/Ctrl is always assumed.');
-                              if (input) {
-                                const newBinding = {
-                                  key: input.toLowerCase(),
-                                  shift: input.toLowerCase() !== input,
-                                  meta: true
-                                };
-                                onUpdateSettings({
-                                  shortcuts: {
-                                    ...settings.shortcuts,
-                                    [action.id]: newBinding
-                                  }
-                                });
-                              }
-                            }}
-                            className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                            title="Edit Shortcut"
-                          >
-                            <Keyboard className="w-4 h-4" />
-                          </button>
+                          {isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs font-mono text-slate-500">⌘/Ctrl +</span>
+                              <input 
+                                type="text"
+                                autoFocus
+                                maxLength={2}
+                                value={shortcutInputValue}
+                                onChange={e => setShortcutInputValue(e.target.value)}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') handleSave();
+                                  if (e.key === 'Escape') setEditingShortcut(null);
+                                }}
+                                onBlur={handleSave}
+                                placeholder="Key..."
+                                className="w-16 px-2 py-1 bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-xs font-mono outline-none"
+                              />
+                            </div>
+                          ) : (
+                            <>
+                              <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-slate-600 dark:text-slate-300 shadow-sm min-w-[100px] text-center">
+                                {formatBinding(currentBinding)}
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setShortcutInputValue(currentBinding.shift ? currentBinding.key.toUpperCase() : currentBinding.key.toLowerCase());
+                                  setEditingShortcut(action.id);
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                title="Edit Shortcut"
+                              >
+                                <Keyboard className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
@@ -961,7 +996,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </section>
             </div>
-          )}
+            );
+          })()}
 
           {activeTab === 'extensions' && (
             <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
