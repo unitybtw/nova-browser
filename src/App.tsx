@@ -612,9 +612,9 @@ function App() {
     const finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
     let initialTitle = 'New Tab';
-    if (finalUrl === 'nova://settings') initialTitle = 'Settings';
-    else if (finalUrl === 'nova://history') initialTitle = 'History';
-    else if (finalUrl === 'nova://downloads') initialTitle = 'Downloads';
+    if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
+    else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
+    else if (finalUrl.startsWith('nova://downloads')) initialTitle = 'Downloads';
     
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
@@ -718,9 +718,9 @@ function App() {
     let newTitle: string | undefined = undefined;
     const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
     if (isNewTabUrl) newTitle = 'New Tab';
-    else if (url === 'nova://settings') newTitle = 'Settings';
-    else if (url === 'nova://history') newTitle = 'History';
-    else if (url === 'nova://downloads') newTitle = 'Downloads';
+    else if (url.startsWith('nova://settings')) newTitle = 'Settings';
+    else if (url.startsWith('nova://history')) newTitle = 'History';
+    else if (url.startsWith('nova://downloads')) newTitle = 'Downloads';
 
     const isInternalPage = !!newTitle;
 

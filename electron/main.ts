@@ -9,7 +9,7 @@ import { ElectronBlocker } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 
 // Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
-app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
 // Performance and GPU flags
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -100,6 +100,14 @@ function createWindow() {
 // Privacy Shield: Inject Do Not Track & Global Privacy Control headers
 session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
   const requestHeaders = { ...details.requestHeaders };
+  
+  if (details.url.includes('chrome.google.com') || details.url.includes('chromewebstore.google.com')) {
+    requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"';
+    requestHeaders['sec-ch-ua-mobile'] = '?0';
+    requestHeaders['sec-ch-ua-platform'] = '"macOS"';
+    requestHeaders['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  }
+
   if (isPrivacyShieldEnabled) {
     requestHeaders['DNT'] = '1';
     requestHeaders['Sec-GPC'] = '1';
