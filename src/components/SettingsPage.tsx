@@ -79,6 +79,78 @@ export interface SettingsPageProps {
   onImportData?: (file: File) => void;
 }
 
+interface UpdateInfo {
+  version: string;
+  releaseDate: string;
+}
+
+const UpdateWidget = () => {
+  const [status, setStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloaded' | 'error'>('idle');
+  const [errorMsg, setErrorMsg] = React.useState('');
+
+  React.useEffect(() => {
+    let unsubs: (() => void)[] = [];
+    if ((window as any).electronAPI) {
+      const api = (window as any).electronAPI;
+      if (api.onUpdateAvailable) unsubs.push(api.onUpdateAvailable(() => setStatus('available')));
+      if (api.onUpdateDownloaded) unsubs.push(api.onUpdateDownloaded(() => setStatus('downloaded')));
+      if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: string) => {
+        setStatus('error');
+        setErrorMsg(err);
+      }));
+    }
+    return () => unsubs.forEach(u => u());
+  }, []);
+
+  const check = () => {
+    setStatus('checking');
+    if ((window as any).electronAPI?.checkForUpdates) {
+      (window as any).electronAPI.checkForUpdates();
+    }
+  };
+
+  const install = () => {
+    if ((window as any).electronAPI?.installUpdate) {
+      (window as any).electronAPI.installUpdate();
+    }
+  };
+
+  if (status === 'downloaded') {
+    return (
+      <button onClick={install} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2">
+        <Download className="w-4 h-4" /> Restart & Install Update
+      </button>
+    );
+  }
+
+  if (status === 'available') {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Downloading update...</span>
+        <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'error') {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-red-500">Failed: {errorMsg.substring(0, 30)}...</span>
+        <button onClick={check} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-sm">
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50">
+      {status === 'checking' ? <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+      {status === 'checking' ? 'Checking...' : 'Check for Updates'}
+    </button>
+  );
+};
+
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   url,
   settings,
@@ -273,6 +345,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {/* GENERAL */}
           {activeTab === 'general' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">About Nova</h2>
+                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version 1.0.0 (Open Source Edition)</p>
+                  </div>
+                  <UpdateWidget />
+                </div>
+              </section>
+
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">On Startup</h2>
                 <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">

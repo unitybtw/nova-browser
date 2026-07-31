@@ -6,6 +6,17 @@
   "version": "1.0.0",
   "type": "module",
   "main": "dist-electron/main.cjs",
+  "build": {
+    "appId": "com.nova.browser",
+    "productName": "Nova Browser",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "unitybtw",
+        "repo": "nova-browser"
+      }
+    ]
+  },
   "scripts": {
     "dev:web": "vite",
     "build:electron": "esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:cross-fetch --external:express --external:@modelcontextprotocol/sdk --format=cjs --out-extension:.js=.cjs",
@@ -25,6 +36,7 @@
     "@mozilla/readability": "^0.6.0",
     "cross-fetch": "^4.1.0",
     "dompurify": "^3.4.12",
+    "electron-updater": "^6.8.9",
     "eventsource": "^4.1.0",
     "express": "^5.2.1",
     "framer-motion": "^12.42.2",

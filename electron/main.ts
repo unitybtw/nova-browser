@@ -7,6 +7,7 @@ import fs from 'fs';
 import unzip from 'unzip-crx-3';
 import { ElectronBlocker } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
+import { autoUpdater } from 'electron-updater';
 
 // Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -239,6 +240,38 @@ app.whenReady().then(async () => {
   } catch (err) {
     console.error('[MCP] Failed to start server:', err);
   }
+
+  // Auto Updater Configuration
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info);
+    mainWindow?.webContents.send('update-available', info);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info);
+    mainWindow?.webContents.send('update-downloaded', info);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('AutoUpdater error:', err);
+    mainWindow?.webContents.send('update-error', err.message);
+  });
+
+  ipcMain.handle('check-for-updates', () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
+
+  ipcMain.handle('install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  // Wait a few seconds before checking to not slow down startup
+  setTimeout(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Update check failed:", err));
+  }, 5000);
 
   // Load persistent extensions from disk
   const extensionsPath = path.join(app.getPath('userData'), 'extensions');

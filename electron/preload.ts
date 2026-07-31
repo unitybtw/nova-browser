@@ -11,6 +11,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelDownload: (id: string) => ipcRenderer.invoke('cancel-download', id),
   openDownload: (pathStr: string) => ipcRenderer.invoke('open-download', pathStr),
   showDownloadInFolder: (pathStr: string) => ipcRenderer.invoke('show-download-in-folder', pathStr),
+  // Auto Updater APIs
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateAvailable: (callback: (event: any, info: any) => void) => {
+    ipcRenderer.on('update-available', callback);
+    return () => ipcRenderer.removeListener('update-available', callback);
+  },
+  onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
+    ipcRenderer.on('update-downloaded', callback);
+    return () => ipcRenderer.removeListener('update-downloaded', callback);
+  },
+  onUpdateError: (callback: (event: any, error: string) => void) => {
+    ipcRenderer.on('update-error', callback);
+    return () => ipcRenderer.removeListener('update-error', callback);
+  },
   // MCP Server
   startMcpServer: () => ipcRenderer.invoke('start-mcp-server'),
   stopMcpServer: () => ipcRenderer.invoke('stop-mcp-server'),
