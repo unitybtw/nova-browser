@@ -68,9 +68,8 @@ export const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col items-center justify-center gap-4 w-full sm:w-auto"
+            className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full max-w-md sm:max-w-none mx-auto"
           >
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
               {os === 'win' ? (
                 <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe" className="w-full sm:w-auto bg-[#0078D7] hover:bg-[#005A9E] text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-blue-500/30 flex items-center justify-center gap-2 group">
                   <Monitor className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
@@ -87,9 +86,7 @@ export const Hero = () => {
                   {t.nav.download}
                 </a>
               )}
-            </div>
             <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="w-full sm:w-auto glass hover:bg-foreground/10 text-foreground px-8 py-4 rounded-2xl font-bold text-lg transition-all flex items-center justify-center gap-2 group">
-
               {t.hero.viewSource}
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </a>
@@ -101,7 +98,7 @@ export const Hero = () => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="mt-16 max-w-5xl mx-auto"
+          className="mt-16 max-w-5xl mx-auto hidden sm:block"
         >
           <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
             <InteractiveMockup />
