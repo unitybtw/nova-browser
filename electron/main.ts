@@ -809,6 +809,13 @@ ipcMain.handle('remove-extension', async (_event, extensionId: string) => {
   try {
     await win.webContents.session.removeExtension(extensionId);
     loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+    
+    // Also delete it from disk so it doesn't load on next startup
+    const extDir = path.join(app.getPath('userData'), 'extensions', extensionId);
+    if (fs.existsSync(extDir)) {
+      fs.rmSync(extDir, { recursive: true, force: true });
+    }
+    
     if (win) win.webContents.send('extension-changed');
     return { success: true };
   } catch (err) {
