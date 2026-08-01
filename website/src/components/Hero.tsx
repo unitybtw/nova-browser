@@ -98,7 +98,7 @@ export const Hero = () => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, delay: 0.5 }}
-          className="mt-16 max-w-5xl mx-auto hidden sm:block"
+          className="mt-16 w-full max-w-5xl mx-auto block px-2 sm:px-0"
         >
           <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
             <InteractiveMockup />

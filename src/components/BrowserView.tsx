@@ -567,7 +567,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             title={tab.title}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             onLoad={() => {
-              onUpdateTab(tab.id, { isLoading: false });
+              if (tab.isLoading) {
+                onUpdateTab(tab.id, { isLoading: false });
+              }
             }}
           />
         )}
