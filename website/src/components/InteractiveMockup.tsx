@@ -54,7 +54,7 @@ export const InteractiveMockup = () => {
   }, [theme]);
 
   return (
-    <div className="w-full max-w-5xl mx-auto rounded-2xl overflow-hidden flex flex-col relative hidden sm:flex font-sans shadow-2xl border border-slate-200 dark:border-slate-800" style={{ height: '650px' }}>
+    <div className="w-full max-w-5xl mx-auto rounded-2xl overflow-hidden flex flex-col relative font-sans shadow-2xl border border-slate-200 dark:border-slate-800 h-[500px] md:h-[650px]">
       {/* 
         We wrap the App in a container that simulates the Electron frameless window.
         We disable dragging (drag-region) since it's inside a web page.
