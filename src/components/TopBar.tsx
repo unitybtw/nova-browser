@@ -591,6 +591,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
         </div>
+        
+        {/* Spacer for Windows controls */}
+        {window.navigator.userAgent.toLowerCase().includes('win') && (
+          <div className="w-[140px] shrink-0" />
+        )}
       </div>
       )}
 

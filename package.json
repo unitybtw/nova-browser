@@ -34,7 +34,8 @@
           ]
         }
       ],
-      "artifactName": "Nova-Browser-Setup.exe"
+      "artifactName": "Nova-Browser-Setup.exe",
+      "icon": "build/icon.ico"
     },
     "mac": {
       "target": [

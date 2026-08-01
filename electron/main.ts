@@ -75,6 +75,13 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 650,
     titleBarStyle: 'hiddenInset',
+    ...(process.platform === 'win32' ? {
+      titleBarOverlay: {
+        color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+        symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+        height: 44
+      }
+    } : {}),
     trafficLightPosition: { x: 16, y: 16 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
