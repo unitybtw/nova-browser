@@ -88,6 +88,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   ), [tab.url]);
 
   const domReadyRef = useRef(false);
+  const latestTabRef = useRef(tab);
+  
+  useEffect(() => {
+    latestTabRef.current = tab;
+  }, [tab]);
 
   // IMPORTANT: The `src` attribute of <webview> handles the navigation automatically when it changes.
   // DO NOT call webview.loadURL() here when tab.url changes, because doing both causes ERR_ABORTED (white screen).
@@ -113,8 +118,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       });
 
       try {
-        const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
-        webview.setZoomFactor(zoomMap[settings.fontSize || 'medium'] || 1.0);
+        if (latestTabRef.current.zoomFactor !== undefined) {
+          webview.setZoomFactor(latestTabRef.current.zoomFactor);
+        } else {
+          const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
+          webview.setZoomFactor(zoomMap[settings.fontSize || 'medium'] || 1.0);
+        }
       } catch (err) {
         console.error('Failed to set zoom factor', err);
       }
