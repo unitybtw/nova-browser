@@ -650,7 +650,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL`}
                 className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
                   isIncognito 
-                    ? 'pl-[5.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
+                    ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
                 }`}
               />
