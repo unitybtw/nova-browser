@@ -560,9 +560,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         ) : (
           /* Web / Dev IFrame Fallback for standard browser preview */
           <iframe
-            ref={webviewRef}
+            ref={webviewRef as any}
             data-tab-id={tab.id}
-            src={tab.url}
+            src={tab.url.startsWith('nova://') ? 'about:blank' : tab.url}
             className="w-full h-full border-none"
             title={tab.title}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
