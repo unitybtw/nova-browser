@@ -548,7 +548,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       <div className="flex-1 w-full relative">
         {/* Electron Webview Tag for Native Browser Experience */}
-        {typeof window !== 'undefined' && (window as any).electronAPI ? (
+        {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
