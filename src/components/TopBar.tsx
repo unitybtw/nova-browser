@@ -619,7 +619,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   const sec = getUrlSecurityInfo(activeTab?.url || '');
                   return (
                     <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
-                      {isIncognito && <VenetianMask className="w-3.5 h-3.5 mr-0.5" />}
+                      {isIncognito && (
+                        <div className="flex items-center gap-1 mr-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">
+                          <VenetianMask className="w-3.5 h-3.5" />
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Gizli</span>
+                        </div>
+                      )}
                       {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
                       {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
                       {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
