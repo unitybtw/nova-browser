@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Download, Sun, Moon, ChevronDown } from 'lucide-react';
+import { Menu, X, Download, Sun, Moon, ChevronDown, Apple, Monitor } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useLang } from '../i18n/LanguageContext';
 import { languageList } from '../i18n/translations';
@@ -12,6 +12,19 @@ export const Navbar = () => {
   const { theme, setTheme } = useTheme();
   const { lang, setLang, t } = useLang();
   const langRef = useRef<HTMLDivElement>(null);
+
+  const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
+
+  useEffect(() => {
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    if (userAgent.includes('win')) {
+      setOs('win');
+    } else if (userAgent.includes('mac')) {
+      setOs('mac');
+    } else {
+      setOs('other');
+    }
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -128,15 +141,33 @@ export const Navbar = () => {
             </button>
 
             {/* Download */}
-            <a
-              href="https://github.com/unitybtw/nova-browser/releases/latest"
-              target="_blank"
-              rel="noreferrer"
-              className="bg-foreground hover:bg-foreground/90 text-background px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              {t.nav.download}
-            </a>
+            {os === 'win' ? (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
+                className="bg-[#0078D7] hover:bg-[#005A9E] text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Monitor className="w-4 h-4" />
+                {t.hero.downloadWin}
+              </a>
+            ) : os === 'mac' ? (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
+                className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Apple className="w-4 h-4" />
+                {t.hero.downloadMac}
+              </a>
+            ) : (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest"
+                target="_blank"
+                rel="noreferrer"
+                className="bg-foreground hover:bg-foreground/90 text-background px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                {t.nav.download}
+              </a>
+            )}
           </div>
 
           {/* Mobile Menu Toggle */}
@@ -185,15 +216,33 @@ export const Navbar = () => {
               </div>
             </div>
 
-            <a
-              href="https://github.com/unitybtw/nova-browser/releases/latest"
-              target="_blank"
-              rel="noreferrer"
-              className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              {t.nav.download}
-            </a>
+            {os === 'win' ? (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
+                className="bg-[#0078D7] hover:bg-[#005A9E] text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
+              >
+                <Monitor className="w-4 h-4" />
+                {t.hero.downloadWin}
+              </a>
+            ) : os === 'mac' ? (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
+                className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
+              >
+                <Apple className="w-4 h-4" />
+                {t.hero.downloadMac}
+              </a>
+            ) : (
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest"
+                target="_blank"
+                rel="noreferrer"
+                className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                {t.nav.download}
+              </a>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

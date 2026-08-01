@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Download, ChevronRight, Zap, Monitor } from 'lucide-react';
+import { Download, ChevronRight, Zap, Monitor, Apple } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
@@ -77,7 +77,7 @@ export const Hero = () => {
                 </a>
               ) : os === 'mac' ? (
                 <a href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-white px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-lg shadow-primary/30 flex items-center justify-center gap-2 group">
-                  <Download className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
+                  <Apple className="w-5 h-5 group-hover:-translate-y-1 transition-transform" />
                   {t.hero.downloadMac}
                 </a>
               ) : (
