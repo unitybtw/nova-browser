@@ -283,10 +283,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     
     fetchExtensions();
     
-    const handleExtUpdated = () => fetchExtensions();
-    window.addEventListener('extensions-updated', handleExtUpdated);
+    let cleanup: (() => void) | undefined;
+    if ((window as any).electronAPI?.onExtensionChanged) {
+      cleanup = (window as any).electronAPI.onExtensionChanged(() => {
+        fetchExtensions();
+      });
+    }
     
-    return () => window.removeEventListener('extensions-updated', handleExtUpdated);
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, []);
 
   const [isFocused, setIsFocused] = useState(false);
