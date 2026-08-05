@@ -205,7 +205,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   useEffect(() => {
     fetchMcpStatus();
-    const interval = setInterval(fetchMcpStatus, 2000);
 
     let cleanup: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
@@ -214,7 +213,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       });
     }
     return () => {
-      clearInterval(interval);
       if (typeof cleanup === 'function') cleanup();
     };
   }, [fetchMcpStatus]);
