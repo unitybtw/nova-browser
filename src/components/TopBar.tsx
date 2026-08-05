@@ -249,7 +249,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     fetchWhitelist();
   }, []);
   
-  // Poll MCP status every 3 seconds for the badge
+  // Fetch MCP status on mount and listen for client changes
   useEffect(() => {
     const fetchMcp = async () => {
       if ((window as any).electronAPI?.getMcpStatus) {
@@ -259,14 +259,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       }
     };
     fetchMcp();
-    const iv = setInterval(fetchMcp, 3000);
     let cleanup: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpClientCount(data.count);
       });
     }
-    return () => { clearInterval(iv); if (typeof cleanup === 'function') cleanup(); };
+    return () => { if (typeof cleanup === 'function') cleanup(); };
   }, []);
   const activeTab = React.useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
   const isBookmarked = React.useMemo(() => bookmarks.some(b => b.url === activeTab?.url), [bookmarks, activeTab?.url]);
