@@ -106,20 +106,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     latestTabRef.current = tab;
   }, [tab]);
 
-  // IMPORTANT: We use loadURL manually instead of binding src={tab.url} to avoid in-page navigations (like YouTube Shorts) causing full page reloads.
-  // When an internal navigation happens, lastLoadedUrl is updated before this effect, so it skips loadURL.
-  useEffect(() => {
-    if (!tab.url || tab.url === lastLoadedUrl.current) return;
-    lastLoadedUrl.current = tab.url;
-    
-    if (webviewRef.current) {
-      if (webviewRef.current.loadURL) {
-        webviewRef.current.loadURL(tab.url).catch(() => {});
-      } else {
-        webviewRef.current.src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
-      }
-    }
-  }, [tab.url]);
 
   useEffect(() => {
     const webview = webviewRef.current;
