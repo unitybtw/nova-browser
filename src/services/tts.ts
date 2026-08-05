@@ -5,6 +5,20 @@
 class TTSService {
   private utterance: SpeechSynthesisUtterance | null = null;
   private _isSpeaking = false;
+  private listeners: Set<(isSpeaking: boolean) => void> = new Set();
+
+  public subscribe(listener: (isSpeaking: boolean) => void): () => void {
+    this.listeners.add(listener);
+    listener(this.isSpeaking);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify() {
+    const speaking = this.isSpeaking;
+    this.listeners.forEach(listener => listener(speaking));
+  }
 
   public speak(text: string, lang: string = 'tr-TR'): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -23,6 +37,7 @@ class TTSService {
       const speakNext = () => {
         if (index >= chunks.length) {
           this._isSpeaking = false;
+          this.notify();
           resolve();
           return;
         }
@@ -39,10 +54,15 @@ class TTSService {
         if (preferredVoice) utt.voice = preferredVoice;
 
         utt.onend = speakNext;
-        utt.onerror = (e) => { this._isSpeaking = false; reject(e); };
+        utt.onerror = (e) => { 
+          this._isSpeaking = false; 
+          this.notify();
+          reject(e); 
+        };
 
         this.utterance = utt;
         this._isSpeaking = true;
+        this.notify();
         window.speechSynthesis.speak(utt);
       };
 
@@ -61,6 +81,7 @@ class TTSService {
     }
     this._isSpeaking = false;
     this.utterance = null;
+    this.notify();
   }
 
   public get isSpeaking(): boolean {

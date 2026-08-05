@@ -346,23 +346,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       } catch (err) {}
     }, 500);
 
-    // Failsafe: Continuously sync actual webview loading state to fix any stuck spinners
-    const syncInterval = setInterval(() => {
-      try {
-        if (webview && typeof webview.isLoading === 'function') {
-          const actualLoading = webview.isLoading();
-          // If webview says it's not loading, but our state says it is, forcefully clear it
-          // We can't access tab.isLoading directly here because it's stale, but we can call onUpdateTab
-          // We just send isLoading: false. App.tsx will ignore it if it's already false.
-          if (!actualLoading) {
-             onUpdateTab(tab.id, { isLoading: false });
-          }
-        }
-      } catch (err) {}
-    }, 2000);
-
     return () => {
-      clearInterval(syncInterval);
       webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
       webview.removeEventListener('did-stop-loading', handleStopLoading);

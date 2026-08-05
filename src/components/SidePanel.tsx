@@ -95,12 +95,9 @@ export const SidePanel: React.FC<SidePanelProps> = ({
     recognition.onend = () => setIsListening(false);
   }, []);
 
-  // Poll TTS state (reduced from 300ms to 1000ms to save CPU)
+  // Subscribe to TTS state changes
   useEffect(() => {
-    const interval = setInterval(() => {
-      setIsSpeaking(tts.isSpeaking);
-    }, 1000);
-    return () => clearInterval(interval);
+    return tts.subscribe(setIsSpeaking);
   }, []);
 
   // Only scroll into view on new messages, not on every streaming chunk
