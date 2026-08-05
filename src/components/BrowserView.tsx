@@ -59,7 +59,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 }) => {
   const webviewRef = useRef<any>(null);
   const lastLoadedUrl = useRef<string>('');
-  const webviewInitialSrc = useRef<string | null>(null);
+  const webviewInitialSrc = useRef<string>('about:blank');
 
   const isNewTab = React.useMemo(() => (
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
@@ -486,6 +486,24 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
   }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab.isLoading, tab.id, onUpdateTab]);
 
+  useEffect(() => {
+    if (!tab.url || tab.url === lastLoadedUrl.current) return;
+    lastLoadedUrl.current = tab.url;
+    
+    if (webviewRef.current) {
+      if ((webviewRef.current as any).loadURL) {
+        // Delay loadURL slightly to ensure Electron has fully created the underlying WebContents.
+        setTimeout(() => {
+          if (webviewRef.current && (webviewRef.current as any).loadURL) {
+            (webviewRef.current as any).loadURL(tab.url).catch((err: any) => console.error('loadURL failed:', err));
+          }
+        }, 150);
+      } else {
+        (webviewRef.current as any).src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
+      }
+    }
+  }, [tab.url]);
+
   if (tab.isSuspended) {
     return (
       <div 
@@ -574,31 +592,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       />
     );
   }
-
-  // We always start with about:blank to prevent Electron Webview initialization bugs (black screens).
-  // The useEffect will handle the actual navigation via loadURL shortly after.
-  if (!webviewInitialSrc.current) {
-    webviewInitialSrc.current = 'about:blank';
-  }
-
-  useEffect(() => {
-    if (!tab.url || tab.url === lastLoadedUrl.current) return;
-    lastLoadedUrl.current = tab.url;
-    
-    if (webviewRef.current) {
-      if ((webviewRef.current as any).loadURL) {
-        // Delay loadURL slightly to ensure Electron has fully created the underlying WebContents.
-        // Calling this too early causes fatal crashes. Not calling it causes white/black screens on heavy sites.
-        setTimeout(() => {
-          if (webviewRef.current && (webviewRef.current as any).loadURL) {
-            (webviewRef.current as any).loadURL(tab.url).catch((err: any) => console.error('loadURL failed:', err));
-          }
-        }, 150);
-      } else {
-        (webviewRef.current as any).src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
-      }
-    }
-  }, [tab.url]);
 
   return (
     <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
