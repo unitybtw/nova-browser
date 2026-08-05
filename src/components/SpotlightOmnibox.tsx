@@ -49,7 +49,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!inputValue || inputValue.includes('://') || inputValue.includes('.')) {
+    if (isAIMode || !inputValue || inputValue.includes('://') || inputValue.includes('.')) {
       setSuggestions([]);
       return;
     }
@@ -77,7 +77,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
     const timer = setTimeout(fetchSuggestions, 150);
     return () => clearTimeout(timer);
-  }, [inputValue]);
+  }, [inputValue, isAIMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

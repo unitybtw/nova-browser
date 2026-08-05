@@ -313,7 +313,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   }, [activeTab?.url, isFocused]);
 
   useEffect(() => {
-    if (!searchValue || searchValue.includes('://') || searchValue.includes('.')) {
+    if (isAIMode || !searchValue || searchValue.includes('://') || searchValue.includes('.')) {
       setSuggestions([]);
       return;
     }
@@ -341,7 +341,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
     const timer = setTimeout(fetchSuggestions, 150);
     return () => clearTimeout(timer);
-  }, [searchValue]);
+  }, [searchValue, isAIMode]);
 
   const handleSearchSubmit = React.useCallback((e: React.FormEvent) => {
     e.preventDefault();
