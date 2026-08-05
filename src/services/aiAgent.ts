@@ -979,8 +979,16 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
     let currentMessages = [...requestMessages];
     let toolsCalled = false;
     let lastToolName = '';
+    let loopCount = 0;
+    const MAX_LOOPS = 5; // Prevent infinite AI loops
 
     while (!isDone) {
+      loopCount++;
+      if (loopCount > MAX_LOOPS) {
+        currentMessages.push({ role: 'assistant', content: 'Üzgünüm, çok fazla işlem yaptım ve kafam karıştı. Lütfen bana daha net bir komut verin.' } as ChatCompletionMessageParam);
+        break;
+      }
+
       if (this.isInterrupted) {
         currentMessages.push({ role: 'assistant', content: 'İşlem kullanıcı tarafından durduruldu.' } as ChatCompletionMessageParam);
         break;
@@ -1003,9 +1011,9 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
           if (idx < windowedMessages.length - 2) {
             return { ...msg, content: '{"status":"done"}' };
           }
-          // Even recent tool messages get truncated if too long
-          if (msg.content.length > 1000) {
-            return { ...msg, content: msg.content.substring(0, 1000) + '..."}}' };
+          // Even recent tool messages get truncated if extremely long
+          if (msg.content.length > 8000) {
+            return { ...msg, content: msg.content.substring(0, 8000) + '... (truncated)"}}' };
           }
         }
         return msg;

@@ -291,7 +291,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleFailLoad = (e: any) => {
       if (!e.isMainFrame) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
-      onUpdateTab(tab.id, { isLoading: false });
+      onUpdateTab(tab.id, { isLoading: false, title: `Error: ${e.errorDescription || 'Failed'}` });
+      console.error('[Webview] Failed to load:', e.errorDescription, 'Code:', e.errorCode);
     };
 
     const handleNavigateEvent = (e: any) => {
@@ -574,12 +575,30 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     );
   }
 
-  if (!isNewTab && !isSettingsTab && !isHistoryTab && !isDownloadsTab && !webviewInitialSrc.current) {
-    const startUrl = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
-    webviewInitialSrc.current = startUrl;
-    // Set lastLoadedUrl synchronously to avoid double-loading in the useEffect on first mount
-    lastLoadedUrl.current = tab.url;
+  // We always start with about:blank to prevent Electron Webview initialization bugs (black screens).
+  // The useEffect will handle the actual navigation via loadURL shortly after.
+  if (!webviewInitialSrc.current) {
+    webviewInitialSrc.current = 'about:blank';
   }
+
+  useEffect(() => {
+    if (!tab.url || tab.url === lastLoadedUrl.current) return;
+    lastLoadedUrl.current = tab.url;
+    
+    if (webviewRef.current) {
+      if ((webviewRef.current as any).loadURL) {
+        // Delay loadURL slightly to ensure Electron has fully created the underlying WebContents.
+        // Calling this too early causes fatal crashes. Not calling it causes white/black screens on heavy sites.
+        setTimeout(() => {
+          if (webviewRef.current && (webviewRef.current as any).loadURL) {
+            (webviewRef.current as any).loadURL(tab.url).catch((err: any) => console.error('loadURL failed:', err));
+          }
+        }, 150);
+      } else {
+        (webviewRef.current as any).src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
+      }
+    }
+  }, [tab.url]);
 
   return (
     <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
@@ -611,13 +630,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       </AnimatePresence>
 
       <div className="flex-1 w-full relative">
+        {/* Debug Banner */}
+        {!(typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup) && (
+          <div className="absolute top-0 left-0 right-0 bg-red-600 text-white font-bold p-2 z-[9999] text-center">
+            UYARI: ELECTRON API BULUNAMADI! IFRAME (GÜVENLİ MOD) KULLANILIYOR! 
+            Bu yüzden YouTube ve Reddit gibi siteler (X-Frame-Options engeli nedeniyle) SİYAH EKRAN verecektir!
+          </div>
+        )}
+
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
             src={webviewInitialSrc.current || 'about:blank'}
-            className="w-full h-full border-none"
+            className="w-full h-full border-none bg-white"
             allowpopups={"true" as any}
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           />
@@ -627,7 +654,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef as any}
             data-tab-id={tab.id}
             src={webviewInitialSrc.current || 'about:blank'}
-            className="w-full h-full border-none"
+            className="w-full h-full border-none bg-white"
             title={tab.title}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
             onLoad={() => {
