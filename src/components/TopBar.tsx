@@ -673,6 +673,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 type="text"
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Tab' && searchValue.trim().toLowerCase() === '@ai') {
+                    e.preventDefault();
+                    setIsAIMode(true);
+                    setSearchValue('');
+                  }
+                }}
                 onFocus={(e) => {
                   setIsFocused(true);
                   setShowSuggestions(true);
@@ -683,11 +690,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
                 placeholder={isAIMode ? "AI: Ne yapmamı istersiniz? (Örn: YouTube'u açıp Tarkan arat)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
-                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
+                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
                   isIncognito 
                     ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-                } ${isAIMode ? 'border-purple-300 ring-2 ring-purple-100 bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' : ''}`}
+                } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''}`}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                 {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (

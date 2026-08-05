@@ -30,6 +30,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [isAIMode, setIsAIMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -39,6 +40,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     if (isOpen) {
       setInputValue('');
       setSuggestions([]);
+      setIsAIMode(false);
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
@@ -84,13 +86,14 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
-    if (inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
+    if (isAIMode || inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
       let prompt = inputValue;
       if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
       if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
       
       window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
       setInputValue('');
+      setIsAIMode(false);
       onClose();
       return;
     }
@@ -111,19 +114,26 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       
       <div 
         ref={containerRef}
-        className="relative w-full max-w-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-[var(--glass-border)] dark:border-slate-700/50 overflow-hidden animate-float outline-none"
+        className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden animate-float outline-none transition-all duration-500 ${isAIMode ? 'bg-purple-50/95 dark:bg-purple-900/40 border-purple-400/50 dark:border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.4)]' : 'bg-white/95 dark:bg-slate-900/95 border-[var(--glass-border)] dark:border-slate-700/50'}`}
         tabIndex={-1}
       >
         
-        <form onSubmit={handleSubmit} className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 dark:border-slate-800/80">
-          <Search className="w-5 h-5 text-gray-400 dark:text-slate-500" />
+        <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${isAIMode ? 'border-purple-200 dark:border-purple-800/50' : 'border-gray-100 dark:border-slate-800/80'}`}>
+          <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-500' : 'text-gray-400 dark:text-slate-500'}`} />
           <input
             ref={inputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={`Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
-            className="flex-1 bg-transparent border-none outline-none text-lg text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 font-sans"
+            onKeyDown={(e) => {
+              if (e.key === 'Tab' && inputValue.trim().toLowerCase() === '@ai') {
+                e.preventDefault();
+                setIsAIMode(true);
+                setInputValue('');
+              }
+            }}
+            placeholder={isAIMode ? "AI: Ne yapmamı istersiniz? (Örn: Trendyol'dan mavi tişört bul)" : `Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
+            className={`flex-1 bg-transparent border-none outline-none text-lg font-sans transition-all duration-300 ${isAIMode ? 'text-purple-900 dark:text-purple-100 placeholder-purple-400 dark:placeholder-purple-300' : 'text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500'}`}
             autoFocus
           />
           <div className="flex gap-2">
