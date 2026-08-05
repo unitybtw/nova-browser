@@ -621,8 +621,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 opacity: { duration: 0.3, delay: 0.15 }
               } 
             }}
+            style={{ willChange: 'opacity, width', boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
             className="absolute top-0 left-0 h-[2.5px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-50 origin-left shadow-lg"
-            style={{ boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
           />
         )}
       </AnimatePresence>
@@ -702,5 +702,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       )}
     </div>
   );
+}, (prevProps, nextProps) => {
+  if (prevProps.isActive !== nextProps.isActive) return false;
+  if (prevProps.tab.url !== nextProps.tab.url) return false;
+  if (prevProps.tab.isLoading !== nextProps.tab.isLoading) return false;
+  if (prevProps.tab.title !== nextProps.tab.title) return false;
+  if (prevProps.tab.favicon !== nextProps.tab.favicon) return false;
+  if (prevProps.tab.isSuspended !== nextProps.tab.isSuspended) return false;
+  if (prevProps.tab.thumbnail !== nextProps.tab.thumbnail) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  
+  // Deep comparison for settings object changes that affect rendering
+  if (prevProps.settings !== nextProps.settings) return false;
+  if (prevProps.history !== nextProps.history) return false;
+  if (prevProps.downloads !== nextProps.downloads) return false;
+  
+  return true;
 });
 

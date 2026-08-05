@@ -24,10 +24,10 @@ interface SidePanelProps {
   onClose: () => void;
 }
 
-export const SidePanel: React.FC<SidePanelProps> = ({ 
+export const SidePanel = React.memo(({ 
   isOpen, 
   onClose
-}) => {
+}: SidePanelProps) => {
   const [messages, setMessages] = useState<ChatCompletionMessageParam[]>([]);
   const [input, setInput] = useState('');
   const [isInitializing, setIsInitializing] = useState(false);
@@ -541,4 +541,4 @@ export const SidePanel: React.FC<SidePanelProps> = ({
       )}
     </AnimatePresence>
   );
-};
+});
