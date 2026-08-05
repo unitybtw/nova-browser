@@ -241,6 +241,57 @@ app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
 
+  // --- STRICT PERMISSION SYSTEM (SECURITY) ---
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    const url = details.requestingUrl || webContents.getURL();
+    
+    // Auto-allow internal app pages
+    if (url.startsWith('nova://') || url.startsWith('http://localhost:5173') || url.startsWith('devtools://')) {
+      return callback(true);
+    }
+    
+    // Map permission names to Turkish for the user dialog
+    const permissionNames: Record<string, string> = {
+      'media': 'Kamera ve Mikrofon',
+      'geolocation': 'Konum (GPS)',
+      'notifications': 'Bildirimler',
+      'midiSysex': 'Müzik Cihazları (MIDI)',
+      'pointerLock': 'Fare Kilidi',
+      'fullscreen': 'Tam Ekran',
+      'openExternal': 'Dış Uygulama Açma',
+      'clipboard-read': 'Panoyu Okuma'
+    };
+    
+    const permissionName = permissionNames[permission] || permission;
+
+    dialog.showMessageBox(mainWindow!, {
+      type: 'warning',
+      buttons: ['İzin Ver', 'Engelle'],
+      defaultId: 1, // Default to Block
+      cancelId: 1,
+      title: 'Güvenlik Uyarısı: İzin İsteği',
+      message: 'Bir site donanımınıza erişmek istiyor!',
+      detail: `Site: ${url}\n\nBu site "${permissionName}" izni istiyor.\nNe yapmak istersiniz?`
+    }).then(({ response }) => {
+      // response === 0 means "İzin Ver"
+      callback(response === 0);
+    }).catch(() => {
+      callback(false);
+    });
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    // If it's a silent check from the browser itself, allow it
+    if (requestingOrigin.startsWith('nova://') || requestingOrigin.startsWith('http://localhost:5173')) {
+      return true; 
+    }
+    
+    // For external websites, deny by default for silent checks.
+    // If they actually need it, they will trigger setPermissionRequestHandler via an active API call (like getUserMedia).
+    // This prevents silent fingerprinting based on permission status.
+    return false;
+  });
+
   // Initialize and auto-start MCP Server
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
