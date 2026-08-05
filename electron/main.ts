@@ -535,6 +535,7 @@ ipcMain.handle('show-download-in-folder', (_event, pathStr: string) => {
 ipcMain.handle('start-mcp-server', async () => {
   if (mcpServer && !mcpServer.isRunning()) {
     await mcpServer.start();
+    mainWindow?.webContents.send('mcp-status-changed', true);
     return true;
   }
   return false;
@@ -543,6 +544,7 @@ ipcMain.handle('start-mcp-server', async () => {
 ipcMain.handle('stop-mcp-server', () => {
   if (mcpServer && mcpServer.isRunning()) {
     mcpServer.stop();
+    mainWindow?.webContents.send('mcp-status-changed', false);
     return true;
   }
   return false;

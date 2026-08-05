@@ -207,13 +207,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     fetchMcpStatus();
 
     let cleanup: (() => void) | void;
+    let cleanupStatus: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
       });
     }
+    if ((window as any).electronAPI?.onMcpStatusChanged) {
+      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, isRunning: boolean) => {
+        setMcpStatus(prev => prev ? { ...prev, running: isRunning } : { running: isRunning, port: 3020, clientCount: 0, clients: [] });
+      });
+    }
     return () => {
       if (typeof cleanup === 'function') cleanup();
+      if (typeof cleanupStatus === 'function') cleanupStatus();
     };
   }, [fetchMcpStatus]);
 

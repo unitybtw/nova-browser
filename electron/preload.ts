@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mcp-client-changed', callback);
     return () => ipcRenderer.removeListener('mcp-client-changed', callback);
   },
+  onMcpStatusChanged: (callback: (event: any, isRunning: boolean) => void) => {
+    ipcRenderer.on('mcp-status-changed', callback);
+    return () => ipcRenderer.removeListener('mcp-status-changed', callback);
+  },
   getMcpToken: () => ipcRenderer.invoke('get-mcp-token'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),

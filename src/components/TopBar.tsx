@@ -260,12 +260,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     };
     fetchMcp();
     let cleanup: (() => void) | void;
+    let cleanupStatus: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpClientCount(data.count);
       });
     }
-    return () => { if (typeof cleanup === 'function') cleanup(); };
+    if ((window as any).electronAPI?.onMcpStatusChanged) {
+      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, isRunning: boolean) => {
+        setMcpRunning(isRunning);
+      });
+    }
+    return () => { 
+      if (typeof cleanup === 'function') cleanup();
+      if (typeof cleanupStatus === 'function') cleanupStatus();
+    };
   }, []);
   const activeTab = React.useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
   const isBookmarked = React.useMemo(() => bookmarks.some(b => b.url === activeTab?.url), [bookmarks, activeTab?.url]);
