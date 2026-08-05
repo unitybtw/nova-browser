@@ -244,7 +244,11 @@ export const SidePanel = React.memo(({
               )}
               {isLoading && (
                 <button
-                  onClick={() => aiAgent.interrupt()}
+                  onClick={() => {
+                    aiAgent.interrupt();
+                    tts.stop();
+                    orchestrator.clearQueue();
+                  }}
                   className="p-1.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                   title="Ajanı Durdur"
                 >
