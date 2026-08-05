@@ -67,8 +67,8 @@ class AIAgent {
     }
   }
   
-  // Model identifier. Hermes models support tool calling in WebLLM.
-  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
+  // Model identifier. Llama 3.2 3B is much lighter and faster for web.
+  private modelId = "Llama-3.2-3B-Instruct-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -589,7 +589,7 @@ class AIAgent {
           return { error: 'Element not found', tried: { ai_id: ${JSON.stringify(ai_id)}, fallback_text: ${JSON.stringify(fallback_text)} } };
         })();`;
         const res = await this.actionContext.onExecuteScript(script);
-        if (res.error) throw new Error(res.error);
+        if (res.error) return JSON.stringify(res);
         await new Promise(r => setTimeout(r, 1000));
         res.hint = "Action completed. You MUST now call read_page_content to see the updated page state before doing anything else.";
         result = res;
@@ -726,7 +726,7 @@ class AIAgent {
           return { success: true };
         })();`;
         const res = await this.actionContext.onExecuteScript(script);
-        if (res.error) throw new Error(res.error);
+        if (res.error) return JSON.stringify(res);
         await new Promise(r => setTimeout(r, 1000));
         res.hint = "Input filled. If you submitted the form, you MUST now call read_page_content to see the results.";
         result = res;
@@ -1039,7 +1039,12 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
           } else if (funcName === lastToolName && responseMessage.tool_calls.length === 1) {
             result = JSON.stringify({ error: `CRITICAL ERROR: You just called '${funcName}' again! You are stuck in an infinite loop. You MUST call a different tool now (like read_page_content) or provide your final response to the user!` });
           } else {
-            result = await this.handleToolCall(toolCall);
+            try {
+              result = await this.handleToolCall(toolCall);
+            } catch (toolErr: any) {
+              console.error("[AI Agent] Tool call failed:", toolErr);
+              result = JSON.stringify({ error: toolErr.message || String(toolErr) });
+            }
           }
           
           currentMessages.push({
