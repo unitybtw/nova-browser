@@ -1,6 +1,10 @@
 import { motion } from 'framer-motion';
 import { Brain, ShieldCheck, LayoutPanelLeft, FolderTree } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
+import { AiMockup } from './mockups/AiMockup';
+import { ShieldMockup } from './mockups/ShieldMockup';
+import { TabsMockup } from './mockups/TabsMockup';
+import { SplitMockup } from './mockups/SplitMockup';
 
 const listVariants = {
   hidden: {},
@@ -19,6 +23,7 @@ export const FeatureShowcase = () => {
   const showcaseConfigs = [
     {
       icon: <Brain className="w-8 h-8 text-purple-500" />,
+      mockup: <AiMockup />,
       color: 'from-purple-500/20 to-pink-500/20',
       accent: 'text-purple-500',
       border: 'border-purple-500/20',
@@ -26,6 +31,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <ShieldCheck className="w-8 h-8 text-emerald-500" />,
+      mockup: <ShieldMockup />,
       color: 'from-emerald-500/20 to-teal-500/20',
       accent: 'text-emerald-500',
       border: 'border-emerald-500/20',
@@ -33,6 +39,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <FolderTree className="w-8 h-8 text-blue-500" />,
+      mockup: <TabsMockup />,
       color: 'from-blue-500/20 to-indigo-500/20',
       accent: 'text-blue-500',
       border: 'border-blue-500/20',
@@ -40,6 +47,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <LayoutPanelLeft className="w-8 h-8 text-orange-500" />,
+      mockup: <SplitMockup />,
       color: 'from-orange-500/20 to-amber-500/20',
       accent: 'text-orange-500',
       border: 'border-orange-500/20',
@@ -111,17 +119,15 @@ export const FeatureShowcase = () => {
                 </div>
 
                 {/* Visual Side */}
-                <div className="flex-1 w-full max-w-lg">
-                  <div className={`relative rounded-3xl bg-gradient-to-br ${config.color} p-1 border ${config.border} shadow-2xl`}>
-                    <div className="rounded-[1.4rem] glass overflow-hidden p-8 flex flex-col items-center justify-center min-h-[260px] gap-4">
-                      <div className="p-5 rounded-3xl bg-white dark:bg-foreground/10 shadow-lg">
-                        {config.icon}
-                      </div>
-                      <span className="text-2xl font-bold text-foreground">{item.badge}</span>
-                      <span className="text-sm text-foreground/50 text-center max-w-xs">{item.desc.split('.')[0]}.</span>
-                    </div>
+                <motion.div 
+                  className="flex-1 w-full max-w-2xl perspective-1000 h-[400px]"
+                  whileHover={{ rotateY: config.reverse ? -4 : 4, rotateX: 4, scale: 1.02 }}
+                  transition={{ type: "spring", stiffness: 150, damping: 20 }}
+                >
+                  <div className={`w-full h-full p-1 rounded-2xl bg-gradient-to-br ${config.color} border ${config.border} shadow-2xl`}>
+                    {config.mockup}
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             );
           })}
