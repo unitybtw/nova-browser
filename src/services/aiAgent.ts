@@ -47,8 +47,8 @@ const DOM_SCAN_SCRIPT = `(() => {
       text: text
     };
   });
-  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1500);
-  return JSON.stringify({ text, interactable_elements: items.slice(0, 50) });
+  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1000);
+  return JSON.stringify({ text, interactable_elements: items.slice(0, 30) });
 })();`;
 
 // Maximum number of messages to keep in the conversation history for inference
@@ -67,8 +67,8 @@ class AIAgent {
     }
   }
   
-  // Model identifier. Llama 3.2 3B is much lighter and faster for web.
-  private modelId = "Llama-3.2-3B-Instruct-q4f16_1-MLC"; 
+  // Model identifier. We MUST use a Hermes model because WebLLM only supports tool calling (function calling) on Hermes fine-tunes.
+  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -943,19 +943,20 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
 
-    const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
-You are an advanced AI agent integrated into a web browser.
-Your goals:
-1. Assist the user with their requests.
-2. Use the provided tools to navigate the web, read pages, and interact with elements.
+    const systemInstruction = `\n\n[SİSTEM TALİMATI]
+Sen gelişmiş bir Tarayıcı Yapay Zeka Asistanısın.
+Görevlerin:
+1. Kullanıcıya web'de gezinmesi ve bilgi bulması için Türkçe olarak yardımcı olmak.
+2. Sayfaları okumak, butonlara tıklamak ve form doldurmak için sana verilen ARAÇLARI (tools) kullanmak.
 
-CRITICAL RULES for tool usage:
-- If the user asks to open a "new tab" (yeni sekme), you MUST use the 'manage_tabs' tool with action="create" first! Do NOT use navigate_to_url to open a new tab.
-- When you call 'navigate_to_url', the result will AUTOMATICALLY include the page's text, inputs, and buttons. You DO NOT need to call 'read_page_content' immediately after navigating!
-- NEVER call 'navigate_to_url' twice in a row. Once you navigate, interact with the page (fill_input, click_element, scroll_page) or answer the user.
-- Always complete the user's entire multi-step request. Do not stop halfway. If the user asks to search and summarize, you must navigate, fill input, read again (if the page changed), and then summarize.
+ARAÇ KULLANIMI İÇİN KRİTİK KURALLAR:
+- Yeni bir sekme (new tab) açman istenirse, 'navigate_to_url' YERİNE önce 'manage_tabs' (action="create") aracını kullanmalısın!
+- 'navigate_to_url' aracını kullandığında, sonucunda sana GÜNCEL SAYFA İÇERİĞİ VE ELEMENTLER (butonlar vb.) OTOMATİK OLARAK dönecektir. Gezindikten hemen sonra gereksiz yere tekrar 'read_page_content' ÇAĞIRMA!
+- ASLA 'navigate_to_url' aracını arka arkaya iki kere çağırma. Bir sayfaya gittiysen, o sayfayla etkileşime gir (fill_input, click_element) veya kullanıcıya cevap ver.
+- Kullanıcının isteğini yarım bırakma. Çok adımlı bir işse (Örn: Arama yap ve özetle), önce ara, sonra sayfayı oku, sonra özetle.
+- Her zaman kısa ve öz konuş. Asla gereksiz uzatma.
 
-MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselves or gives you a preference (e.g. "my name is John", "always reply in Turkish"), you MUST call 'save_to_memory' to remember it for future conversations.\n`;
+HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih verirse (örneğin "benim adım Ali", "hep Türkçe konuş"), bunu gelecekte de hatırlamak için 'save_to_memory' aracını KULLANMAK ZORUNDASIN.\n`;
 
     // Inject memory prompt if present
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();

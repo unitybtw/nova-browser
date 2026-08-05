@@ -59,6 +59,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 }) => {
   const webviewRef = useRef<any>(null);
   const lastLoadedUrl = useRef<string>('');
+  const webviewInitialSrc = useRef<string | null>(null);
 
   const isNewTab = React.useMemo(() => (
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
@@ -102,11 +103,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     latestTabRef.current = tab;
   }, [tab]);
 
-  // IMPORTANT: The `src` attribute of <webview> handles the navigation automatically when it changes.
-  // DO NOT call webview.loadURL() here when tab.url changes, because doing both causes ERR_ABORTED (white screen).
+  // IMPORTANT: We use loadURL manually instead of binding src={tab.url} to avoid in-page navigations (like YouTube Shorts) causing full page reloads.
+  // When an internal navigation happens, lastLoadedUrl is updated before this effect, so it skips loadURL.
   useEffect(() => {
     if (!tab.url || tab.url === lastLoadedUrl.current) return;
     lastLoadedUrl.current = tab.url;
+    
+    if (webviewRef.current) {
+      if (webviewRef.current.loadURL) {
+        webviewRef.current.loadURL(tab.url).catch(() => {});
+      } else {
+        webviewRef.current.src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
+      }
+    }
   }, [tab.url]);
 
   useEffect(() => {
@@ -333,9 +342,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleCrashed = () => {
       onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
-      if (webviewRef.current) {
-        webviewRef.current.reload();
-      }
+      console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab.url);
+      // We removed the automatic reload because if the page crashes on mount, 
+      // reloading it will cause an infinite crash loop (black screen).
     };
 
     const handleFoundInPage = (e: any) => {
@@ -565,6 +574,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     );
   }
 
+  if (!isNewTab && !isSettingsTab && !isHistoryTab && !isDownloadsTab && !webviewInitialSrc.current) {
+    const startUrl = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
+    webviewInitialSrc.current = startUrl;
+    // Set lastLoadedUrl synchronously to avoid double-loading in the useEffect on first mount
+    lastLoadedUrl.current = tab.url;
+  }
+
   return (
     <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
       {/* Top Progress Bar */}
@@ -600,7 +616,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
-            src={tab.url}
+            src={webviewInitialSrc.current || 'about:blank'}
             className="w-full h-full border-none"
             allowpopups={"true" as any}
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
@@ -610,7 +626,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <iframe
             ref={webviewRef as any}
             data-tab-id={tab.id}
-            src={tab.url.startsWith('nova://') ? 'about:blank' : tab.url}
+            src={webviewInitialSrc.current || 'about:blank'}
             className="w-full h-full border-none"
             title={tab.title}
             sandbox="allow-same-origin allow-scripts allow-forms allow-popups"

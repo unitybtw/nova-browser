@@ -34,15 +34,14 @@ class AgentOrchestrator {
       id,
       toolName,
       args,
-      state: 'pending'
+      state: 'executing' // Automatically skip pending state
     };
     
     this.queue.push(action);
     this.notify();
 
-    return new Promise((resolve, reject) => {
-      this.resolvers.set(id, { resolve, reject });
-    });
+    // Auto-approve the action immediately
+    return Promise.resolve(true);
   }
 
   public approveAction(id: string) {

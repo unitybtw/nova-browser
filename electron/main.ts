@@ -12,10 +12,7 @@ import { autoUpdater } from 'electron-updater';
 // Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-// Performance and GPU flags
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
+// GPU flags removed to prevent black screen bugs on macOS Webviews
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 

@@ -630,7 +630,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
 
         {/* Omnibox / Address Bar */}
-        <div className="flex-1 flex px-2 lg:px-6 max-w-[1400px] mx-auto transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
+        <div className="flex-1 flex px-2 lg:px-6 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
           <div className="w-full relative">
             <form onSubmit={handleSearchSubmit} className="relative group w-full">
               <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
