@@ -100,9 +100,9 @@ const THEMES = [
 const TOTAL_STEPS = 6;
 
 const slideVariants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 80 : -80, opacity: 0 }),
-  center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -80 : 80, opacity: 0 }),
+  enter: (dir: number) => ({ x: dir > 0 ? 100 : -100, opacity: 0, scale: 0.95 }),
+  center: { x: 0, opacity: 1, scale: 1 },
+  exit: (dir: number) => ({ x: dir > 0 ? -100 : 100, opacity: 0, scale: 1.05 }),
 };
 
 export function Onboarding({ onComplete }: OnboardingProps) {
@@ -178,7 +178,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-300 text-xl max-w-md leading-relaxed mb-12"
+        className="text-slate-200 text-xl max-w-md leading-relaxed mb-12"
       >
         Daha hızlı, daha gizli ve daha akıllı bir web deneyimi sizi bekliyor. Birlikte ayarlayalım.
       </motion.p>
@@ -187,9 +187,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
         onClick={goNext}
-        whileHover={{ scale: 1.05, y: -2 }}
-        whileTap={{ scale: 0.97 }}
-        className="bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-400 hover:to-violet-500 text-white px-10 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-blue-500/30 transition-all"
+        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
+        whileTap={{ scale: 0.95 }}
+        className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all"
       >
         Hadi Başlayalım →
       </motion.button>
@@ -204,7 +204,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         </svg>
       </div>
       <h2 className="text-4xl font-bold text-white mb-3">Eski Tarayıcınızdan Aktarın</h2>
-      <p className="text-slate-400 text-lg max-w-md mb-8">
+      <p className="text-slate-200 text-lg max-w-md mb-8">
         Google Chrome (ve Chromium tabanlı diğer tarayıcılardaki) yer işaretlerinizi tek tıkla Nova'ya aktarabilirsiniz.
       </p>
       
@@ -246,15 +246,15 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <h2 className="text-4xl font-bold text-white mb-3 mt-10">Tema Seçin</h2>
-      <p className="text-slate-400 text-lg mb-10">Nova Browser'ın görünümünü kişiselleştirin.</p>
+      <p className="text-slate-200 text-lg mb-10">Nova Browser'ın görünümünü kişiselleştirin.</p>
       <div className="flex gap-5 mb-12 flex-wrap justify-center">
         {THEMES.map(t => (
           <button
             key={t.id}
             onClick={() => setTheme(t.id)}
-            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all w-40 ${
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all w-40 backdrop-blur-xl ${
               theme === t.id
-                ? 'border-blue-500 bg-blue-500/10 scale-105 shadow-xl shadow-blue-500/20'
+                ? 'border-blue-400 bg-blue-500/20 scale-105 shadow-xl shadow-blue-500/20'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
             }`}
           >
@@ -279,16 +279,16 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <h2 className="text-4xl font-bold text-white mb-3 mt-10">Arama Motorunuz</h2>
-      <p className="text-slate-400 text-lg mb-8">Varsayılan arama motorunu seçin. Daha sonra ayarlardan değiştirebilirsiniz.</p>
+      <p className="text-slate-200 text-lg mb-8">Varsayılan arama motorunu seçin. Daha sonra ayarlardan değiştirebilirsiniz.</p>
       <div className="flex flex-col gap-3 w-full mb-8">
         {SEARCH_ENGINES.map(engine => (
           <button
             key={engine.id}
             onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all ${
+            className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all backdrop-blur-xl ${
               searchEngine === engine.id
-                ? 'border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/10'
-                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/8'
+                ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/20 scale-105'
+                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-lg'
             }`}
           >
             <div className="w-10 h-10 flex items-center justify-center shrink-0">
@@ -319,7 +319,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         </svg>
       </div>
       <h2 className="text-4xl font-bold text-white mb-3">Gizlilik Kalkanı</h2>
-      <p className="text-slate-400 text-lg max-w-md mb-10 leading-relaxed">
+      <p className="text-slate-200 text-lg max-w-md mb-10 leading-relaxed">
         Nova Browser'ın yerleşik gizlilik kalkanı; reklamları, izleyicileri ve kötü amaçlı içerikleri otomatik olarak engeller.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-lg w-full">
@@ -328,7 +328,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'İzleyiciler' },
           { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Kötü Yazılım' },
         ].map(item => (
-          <div key={item.label} className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
+          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
             {item.icon}
             <span className="text-slate-300 text-sm font-medium">{item.label}</span>
             <span className={`text-xs font-bold px-3 py-1 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
@@ -375,7 +375,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-300 text-xl max-w-md leading-relaxed mb-4"
+        className="text-slate-200 text-xl max-w-md leading-relaxed mb-4"
       >
         Nova Browser hazır. Tüm ayarlarınız kaydedildi ve istediğiniz zaman değiştirebilirsiniz.
       </motion.p>
@@ -396,9 +396,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.7 }}
         onClick={handleFinish}
-        whileHover={{ scale: 1.05, y: -2 }}
-        whileTap={{ scale: 0.97 }}
-        className="bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-400 hover:to-violet-500 text-white px-12 py-4 rounded-2xl font-bold text-xl shadow-xl shadow-blue-500/30 transition-all"
+        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
+        whileTap={{ scale: 0.95 }}
+        className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
       >
         Gezintiye Başla 🚀
       </motion.button>
@@ -406,10 +406,26 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 flex flex-col overflow-hidden">
-      {/* Ambient glow orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl pointer-events-none" />
+    <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col overflow-hidden">
+      {/* Dynamic blob background */}
+      <motion.div 
+        animate={{ 
+          x: [0, 50, -50, 0], 
+          y: [0, -50, 50, 0],
+          scale: [1, 1.1, 0.9, 1]
+        }}
+        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
+        className="absolute -top-20 -left-20 w-[30rem] h-[30rem] bg-blue-600/30 rounded-full blur-[100px] pointer-events-none" 
+      />
+      <motion.div 
+        animate={{ 
+          x: [0, -60, 40, 0], 
+          y: [0, 60, -40, 0],
+          scale: [1, 1.2, 0.8, 1]
+        }}
+        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+        className="absolute top-1/2 right-0 w-[25rem] h-[25rem] bg-violet-600/30 rounded-full blur-[100px] pointer-events-none" 
+      />
 
       {/* Progress Bar */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
@@ -447,7 +463,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.35, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="absolute inset-0 flex items-center justify-center"
           >
             {steps[step]}

@@ -42,6 +42,7 @@ export interface UserSettings {
   tabHibernationEnabled?: boolean;
   hibernationTimeoutMinutes?: number;
   shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
+  aiLinkPreviewEnabled?: boolean;
 }
 import { ShareModal } from './components/ShareModal';
 import { ExtensionsModal } from './components/ExtensionsModal';

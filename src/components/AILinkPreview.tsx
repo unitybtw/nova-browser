@@ -162,7 +162,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
                 {displayedSummary}
                 <motion.span
                   animate={{ opacity: [1, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.8, ease: "steps(2)" }}
+                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
                   className="inline-block w-[3px] h-[14px] bg-indigo-500 ml-[2px] align-middle rounded-full"
                 />
               </p>
