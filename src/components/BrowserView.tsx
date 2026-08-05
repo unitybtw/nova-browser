@@ -58,8 +58,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onImportData
 }) => {
   const webviewRef = useRef<any>(null);
-  const lastLoadedUrl = useRef<string>('');
-  const webviewInitialSrc = useRef<string>('about:blank');
+  
+  const getSafeUrl = (u: string) => (u && u.startsWith('nova://')) ? 'about:blank' : (u || 'about:blank');
+  const lastLoadedUrl = useRef<string>(tab.url || '');
+  const webviewInitialSrc = useRef<string>(getSafeUrl(tab.url));
+  const isWebviewReady = useRef<boolean>(false);
 
   const isNewTab = React.useMemo(() => (
     !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
@@ -486,20 +489,36 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
   }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab.isLoading, tab.id, onUpdateTab]);
 
+  // Listen for dom-ready to know when it's safe to call loadURL
+  useEffect(() => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+
+    const onReady = () => {
+      isWebviewReady.current = true;
+    };
+    wv.addEventListener('dom-ready', onReady);
+    
+    return () => {
+      wv.removeEventListener('dom-ready', onReady);
+    };
+  }, []);
+
   useEffect(() => {
     if (!tab.url || tab.url === lastLoadedUrl.current) return;
     lastLoadedUrl.current = tab.url;
     
-    if (webviewRef.current) {
-      if ((webviewRef.current as any).loadURL) {
-        // Delay loadURL slightly to ensure Electron has fully created the underlying WebContents.
-        setTimeout(() => {
-          if (webviewRef.current && (webviewRef.current as any).loadURL) {
-            (webviewRef.current as any).loadURL(tab.url).catch((err: any) => console.error('loadURL failed:', err));
-          }
-        }, 150);
+    const wv = webviewRef.current as any;
+    if (wv && wv.loadURL) {
+      if (isWebviewReady.current) {
+        wv.loadURL(tab.url).catch((err: any) => console.error('loadURL failed:', err));
       } else {
-        (webviewRef.current as any).src = tab.url.startsWith('nova://') ? 'about:blank' : tab.url;
+        // If the webview was just created but the user navigated immediately, wait for dom-ready before calling loadURL!
+        const pendingLoad = () => {
+          wv.loadURL(tab.url).catch((err: any) => console.error('loadURL failed (pending):', err));
+          wv.removeEventListener('dom-ready', pendingLoad);
+        };
+        wv.addEventListener('dom-ready', pendingLoad);
       }
     }
   }, [tab.url]);
