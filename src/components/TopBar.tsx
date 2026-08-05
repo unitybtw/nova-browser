@@ -170,6 +170,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
+  const [isAIMode, setIsAIMode] = useState(false);
 
   const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -346,6 +347,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     e.preventDefault();
     if (!searchValue.trim()) return;
 
+    if (isAIMode || searchValue.startsWith('@ai ') || searchValue.startsWith('ai:')) {
+      let prompt = searchValue;
+      if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
+      if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
+      
+      window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
+      setSearchValue('');
+      setIsAIMode(false);
+      setShowSuggestions(false);
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      return;
+    }
+
     const url = formatSearchUrl(searchValue, searchEngine);
     onNavigate(url);
     setShowSuggestions(false);
@@ -354,7 +370,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  }, [searchValue, searchEngine, onNavigate]);
+  }, [searchValue, searchEngine, onNavigate, isAIMode]);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
@@ -666,12 +682,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   setIsFocused(false);
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
-                placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL`}
+                placeholder={isAIMode ? "AI: Ne yapmamı istersiniz? (Örn: YouTube'u açıp Tarkan arat)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
                 className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all shadow-2xs ${
                   isIncognito 
                     ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-                }`}
+                } ${isAIMode ? 'border-purple-300 ring-2 ring-purple-100 bg-purple-50 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100' : ''}`}
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                 {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
@@ -693,6 +709,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     <BookOpen className="w-3.5 h-3.5" />
                   </button>
                 )}
+                
+                <button
+                  type="button"
+                  onClick={() => setIsAIMode(!isAIMode)}
+                  className={`p-1 rounded-full transition-all flex items-center gap-1 ${isAIMode ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400' : (isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700')}`}
+                  title={isAIMode ? "AI Modu Açık - Komut Yazın" : "AI Modunu Aç"}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                </button>
+
                 <button 
                   type="button" 
                   onClick={onToggleBookmark}

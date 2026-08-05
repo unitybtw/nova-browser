@@ -84,6 +84,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
+    if (inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
+      let prompt = inputValue;
+      if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
+      if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
+      
+      window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
+      setInputValue('');
+      onClose();
+      return;
+    }
+
     const url = formatSearchUrl(inputValue, searchEngine);
     onNavigate(url);
     onClose();
@@ -111,7 +122,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={`Search ${getSearchEngineName(searchEngine)} or type a URL...`}
+            placeholder={`Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
             className="flex-1 bg-transparent border-none outline-none text-lg text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500 font-sans"
             autoFocus
           />
