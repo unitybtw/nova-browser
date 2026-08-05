@@ -174,6 +174,7 @@ const en: Translation = {
       { badge: 'Privacy Shield', title: 'Private by default, not by option', desc: 'Nova blocks ads, trackers, and malicious scripts at the network level before they even load. No extensions needed.', highlights: ['Blocks 95%+ of known ad networks', 'Fingerprinting protection built-in', 'Per-site whitelist control', 'Zero telemetry — we see nothing'] },
       { badge: 'Workspaces', title: 'Your whole context, one click away', desc: 'Switch between work, personal, and research browsing instantly. Each workspace has its own tabs, bookmarks, and history.', highlights: ['Color-coded workspace labels', 'Independent tab sessions per workspace', 'Drag-and-drop tab organization', 'Sync-free — everything stays local'] },
       { badge: 'Split Screen', title: 'Two pages, zero windows', desc: 'View any two tabs side-by-side in a single window. Research while you write. Code while you read the docs.', highlights: ['Native split view — no extensions', 'Adjustable split ratio', 'Works with any website', 'Keyboard shortcut support'] },
+      { badge: 'AI Link Preview', title: 'Know before you click', desc: 'Hover over any link and let Nova\'s AI instantly summarize the destination page for you. Save time and avoid clickbait.', highlights: ['1.5s auto-hover preview', 'Instant AI summary generation', 'Works on any hyperlink', 'Customizable delay timer'] },
     ],
   },
   comparison: {
@@ -261,6 +262,7 @@ const tr: Translation = {
       { badge: 'Gizlilik Kalkanı', title: 'Varsayılan olarak gizli, seçenek olarak değil', desc: 'Nova, reklamları, izleyicileri ve kötü amaçlı komut dosyalarını yüklenmeden önce ağ seviyesinde engeller.', highlights: ['Bilinen reklam ağlarının %95\'ini engeller', 'Yerleşik parmak izi koruması', 'Site başına beyaz liste kontrolü', 'Sıfır telemetri — hiçbir şey görmüyoruz'] },
       { badge: 'Çalışma Alanları', title: 'Tüm bağlamın, tek tıklama uzakta', desc: 'İş, kişisel ve araştırma taraması arasında anında geçiş yap. Her çalışma alanının kendi sekmeleri, yer imleri ve geçmişi var.', highlights: ['Renk kodlu çalışma alanı etiketleri', 'Çalışma alanı başına bağımsız sekme oturumları', 'Sürükle-bırak sekme organizasyonu', 'Senkronizasyon yok — her şey yerel kalır'] },
       { badge: 'Bölünmüş Ekran', title: 'İki sayfa, sıfır pencere', desc: 'Tek pencerede herhangi iki sekmeyi yan yana görüntüle. Yazarken araştır. Dokümanları okurken kodla.', highlights: ['Uzantı gerektirmeyen yerel bölünmüş görünüm', 'Ayarlanabilir bölme oranı', 'Her web sitesiyle çalışır', 'Klavye kısayolu desteği'] },
+      { badge: 'AI Link Önizleme', title: 'Tıklamadan önce ne olduğunu bil', desc: 'Herhangi bir bağlantının üzerine gelin ve Nova\'nın yapay zekası hedef sayfayı sizin için anında özetlesin. Tık tuzağına son.', highlights: ['1.5 saniye bekleme ile anında özet', 'Gerçek zamanlı yapay zeka üretimi', 'Tüm linklerde çalışır', 'Kişiselleştirilebilir bekleme süresi'] },
     ],
   },
   comparison: {
@@ -348,6 +350,7 @@ const ru: Translation = {
       { badge: 'Щит конфиденциальности', title: 'Приватно по умолчанию, не по выбору', desc: 'Nova блокирует рекламу, трекеры и вредоносные скрипты на сетевом уровне до их загрузки.', highlights: ['Блокирует 95%+ известных рекламных сетей', 'Встроенная защита от фингерпринтинга', 'Белый список для каждого сайта', 'Нулевая телеметрия — мы ничего не видим'] },
       { badge: 'Рабочие пространства', title: 'Весь контекст, в один клик', desc: 'Мгновенно переключайтесь между работой, личным и исследовательским серфингом. Каждое рабочее пространство имеет свои вкладки, закладки и историю.', highlights: ['Цветные метки рабочих пространств', 'Независимые сессии вкладок', 'Организация перетаскиванием', 'Без синхронизации — всё локально'] },
       { badge: 'Разделённый экран', title: 'Две страницы, ноль окон', desc: 'Просматривайте любые две вкладки рядом в одном окне. Исследуйте пока пишете. Читайте документацию пока кодируете.', highlights: ['Нативный вид без расширений', 'Настраиваемое соотношение разделения', 'Работает с любым сайтом', 'Поддержка горячих клавиш'] },
+      { badge: 'ИИ Предпросмотр Ссылок', title: 'Узнай до клика', desc: 'Наведите курсор на любую ссылку, и ИИ Nova мгновенно создаст краткую сводку целевой страницы. Экономьте время и избегайте кликбейта.', highlights: ['Автоматический предпросмотр при наведении (1.5с)', 'Мгновенная генерация ИИ-сводки', 'Работает с любыми ссылками', 'Настраиваемое время задержки'] },
     ],
   },
   comparison: {
@@ -435,6 +438,7 @@ const de: Translation = {
       { badge: 'Datenschutzschild', title: 'Privat standardmäßig, nicht optional', desc: 'Nova blockiert Werbung, Tracker und bösartige Skripte auf Netzwerkebene bevor sie geladen werden.', highlights: ['Blockiert 95%+ bekannter Werbenetzwerke', 'Eingebauter Fingerprint-Schutz', 'Pro-Website Whitelist-Kontrolle', 'Null Telemetrie — wir sehen nichts'] },
       { badge: 'Arbeitsbereiche', title: 'Dein ganzer Kontext, einen Klick entfernt', desc: 'Wechsle sofort zwischen Arbeit, Privat und Recherche. Jeder Arbeitsbereich hat eigene Tabs, Lesezeichen und Verlauf.', highlights: ['Farbkodierte Arbeitsbereich-Labels', 'Unabhängige Tab-Sitzungen', 'Drag-and-Drop Tab-Organisation', 'Kein Sync — alles bleibt lokal'] },
       { badge: 'Geteilter Bildschirm', title: 'Zwei Seiten, kein Fenster', desc: 'Zeige beliebige zwei Tabs nebeneinander in einem Fenster an. Recherchiere während du schreibst.', highlights: ['Nativer Split-View ohne Erweiterungen', 'Einstellbares Split-Verhältnis', 'Funktioniert mit jeder Website', 'Tastaturkürzel-Unterstützung'] },
+      { badge: 'KI Link-Vorschau', title: 'Wissen, bevor man klickt', desc: 'Fahren Sie mit der Maus über einen Link und lassen Sie die KI von Nova die Zielseite sofort für Sie zusammenfassen. Sparen Sie Zeit und vermeiden Sie Clickbait.', highlights: ['1.5s Auto-Hover Vorschau', 'Sofortige KI-Zusammenfassung', 'Funktioniert mit jedem Link', 'Anpassbare Verzögerung'] },
     ],
   },
   comparison: {
@@ -522,6 +526,7 @@ const fr: Translation = {
       { badge: 'Bouclier de confidentialité', title: 'Privé par défaut, pas en option', desc: 'Nova bloque les publicités, traqueurs et scripts malveillants au niveau réseau avant même qu\'ils se chargent.', highlights: ['Bloque 95%+ des réseaux publicitaires connus', 'Protection contre le fingerprinting intégrée', 'Contrôle de la liste blanche par site', 'Télémétrie zéro — nous ne voyons rien'] },
       { badge: 'Espaces de travail', title: 'Tout votre contexte, à un clic', desc: 'Passez instantanément entre travail, personnel et recherche. Chaque espace de travail a ses propres onglets, favoris et historique.', highlights: ['Étiquettes d\'espace de travail codées par couleur', 'Sessions d\'onglets indépendantes', 'Organisation par glisser-déposer', 'Sans synchronisation — tout reste local'] },
       { badge: 'Écran partagé', title: 'Deux pages, zéro fenêtre', desc: 'Affichez deux onglets côte à côte dans une seule fenêtre. Recherchez pendant que vous écrivez.', highlights: ['Vue partagée native sans extensions', 'Ratio de division ajustable', 'Fonctionne avec n\'importe quel site', 'Support des raccourcis clavier'] },
+      { badge: 'Aperçu IA', title: 'Savoir avant de cliquer', desc: 'Survolez n\'importe quel lien et laissez l\'IA de Nova résumer instantanément la page de destination pour vous. Gagnez du temps et évitez le clic-appât.', highlights: ['Aperçu auto-survol 1.5s', 'Génération de résumé IA instantanée', 'Fonctionne sur n\'importe quel lien', 'Délai personnalisable'] },
     ],
   },
   comparison: {
@@ -609,6 +614,7 @@ const es: Translation = {
       { badge: 'Escudo de privacidad', title: 'Privado por defecto, no por opción', desc: 'Nova bloquea anuncios, rastreadores y scripts maliciosos a nivel de red antes de que se carguen.', highlights: ['Bloquea 95%+ de redes publicitarias conocidas', 'Protección contra fingerprinting integrada', 'Control de lista blanca por sitio', 'Telemetría cero — no vemos nada'] },
       { badge: 'Espacios de trabajo', title: 'Todo tu contexto, a un clic', desc: 'Cambia instantáneamente entre trabajo, personal e investigación. Cada espacio tiene sus propias pestañas, marcadores e historial.', highlights: ['Etiquetas de espacio de trabajo con código de color', 'Sesiones de pestañas independientes', 'Organización por arrastrar y soltar', 'Sin sincronización — todo se queda local'] },
       { badge: 'Pantalla dividida', title: 'Dos páginas, cero ventanas', desc: 'Ve cualquier dos pestañas en paralelo en una sola ventana. Investiga mientras escribes.', highlights: ['Vista dividida nativa sin extensiones', 'Ratio de división ajustable', 'Funciona con cualquier sitio web', 'Soporte de atajos de teclado'] },
+      { badge: 'Vista previa IA', title: 'Saber antes de hacer clic', desc: 'Pasa el ratón sobre cualquier enlace y deja que la IA de Nova resuma instantáneamente la página de destino para ti. Ahorra tiempo y evita el clickbait.', highlights: ['Vista previa al pasar el ratón 1.5s', 'Generación instantánea de resumen de IA', 'Funciona en cualquier enlace', 'Retraso personalizable'] },
     ],
   },
   comparison: {

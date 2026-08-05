@@ -5,6 +5,8 @@ import { AiMockup } from './mockups/AiMockup';
 import { ShieldMockup } from './mockups/ShieldMockup';
 import { TabsMockup } from './mockups/TabsMockup';
 import { SplitMockup } from './mockups/SplitMockup';
+import { LinkPreviewMockup } from './mockups/LinkPreviewMockup';
+import { ScanText } from 'lucide-react';
 
 const listVariants = {
   hidden: {},
@@ -52,6 +54,14 @@ export const FeatureShowcase = () => {
       accent: 'text-orange-500',
       border: 'border-orange-500/20',
       reverse: true,
+    },
+    {
+      icon: <ScanText className="w-8 h-8 text-indigo-500" />,
+      mockup: <LinkPreviewMockup />,
+      color: 'from-indigo-500/20 to-violet-500/20',
+      accent: 'text-indigo-500',
+      border: 'border-indigo-500/20',
+      reverse: false,
     },
   ];
 

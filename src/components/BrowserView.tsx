@@ -10,6 +10,7 @@ import { PasswordPromptModal } from './PasswordPromptModal';
 import { HistoryItem } from '../App';
 import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
+import { AILinkPreview } from './AILinkPreview';
 
 interface BrowserViewProps {
   tab: Tab;
@@ -73,6 +74,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     hostname: '',
     username: '',
     password: ''
+  });
+  
+  const [aiPreview, setAiPreview] = useState<{ isOpen: boolean; x: number; y: number; url: string }>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    url: ''
   });
   
   const isSettingsTab = React.useMemo(() => (
@@ -188,6 +196,46 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   console.log('NOVA_SAVE_PW::' + JSON.stringify({ hostname: window.location.hostname, username, password: pwdInput.value }));
                 }
               }
+            });
+          })();
+          
+          (function() {
+            if (!${settings.aiLinkPreviewEnabled}) return;
+            if (window.__nova_hover_injected) return;
+            window.__nova_hover_injected = true;
+            let hoverTimer = null;
+            let currentLink = null;
+            
+            document.addEventListener('mouseover', (e) => {
+              const a = e.target.closest('a');
+              if (a && a.href && a.href.startsWith('http')) {
+                if (currentLink === a) return;
+                currentLink = a;
+                clearTimeout(hoverTimer);
+                hoverTimer = setTimeout(() => {
+                  const rect = a.getBoundingClientRect();
+                  console.log('NOVA_LINK_HOVER::' + JSON.stringify({
+                    url: a.href,
+                    x: rect.left + rect.width / 2,
+                    y: rect.top + rect.height / 2
+                  }));
+                }, 1500);
+              }
+            });
+            
+            document.addEventListener('mouseout', (e) => {
+              const a = e.target.closest('a');
+              if (a) {
+                clearTimeout(hoverTimer);
+                if (currentLink === a) currentLink = null;
+                console.log('NOVA_LINK_HOVER_OUT::');
+              }
+            });
+            
+            document.addEventListener('click', () => {
+              clearTimeout(hoverTimer);
+              currentLink = null;
+              console.log('NOVA_LINK_HOVER_OUT::');
             });
           })();
         `;
@@ -318,6 +366,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           setPasswordPrompt({ isOpen: true, hostname: data.hostname, username: data.username, password: data.password });
         } catch (err) {}
       }
+      if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
+        try {
+          const data = JSON.parse(e.message.substring(17));
+          setAiPreview({ isOpen: true, url: data.url, x: data.x, y: data.y });
+        } catch (err) {}
+      }
+      if (e.message && e.message.startsWith('NOVA_LINK_HOVER_OUT::')) {
+        setAiPreview(prev => ({ ...prev, isOpen: false }));
+      }
     };
 
     webview.addEventListener('dom-ready', handleDomReady);
@@ -411,6 +468,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       capture();
     }
   }, [isActive, isNewTab, tab.id, onUpdateTab]);
+
+  // Immediately clear loading state for internal React pages since they don't use webview
+  useEffect(() => {
+    if ((isSettingsTab || isHistoryTab || isDownloadsTab || isNewTab) && tab.isLoading) {
+      onUpdateTab(tab.id, { isLoading: false });
+    }
+  }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab.isLoading, tab.id, onUpdateTab]);
 
   if (tab.isSuspended) {
     return (
@@ -586,6 +650,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }));
         }}
       />
+      
+      {settings.aiLinkPreviewEnabled && (
+        <AILinkPreview 
+          url={aiPreview.url}
+          x={aiPreview.x}
+          y={aiPreview.y}
+          isOpen={aiPreview.isOpen}
+        />
+      )}
     </div>
   );
 });

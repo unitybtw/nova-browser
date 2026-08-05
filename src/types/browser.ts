@@ -40,6 +40,7 @@ export const defaultSettings = {
   mcpServerEnabled: false,
   tabHibernationEnabled: true,
   hibernationTimeoutMinutes: 10,
+  aiLinkPreviewEnabled: false,
 };
 
 export interface Extension {

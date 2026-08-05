@@ -1104,6 +1104,21 @@ MEMORY SYSTEM (CRITICAL): If the user tells you a persistent fact about themselv
 
     return currentMessages;
   }
+
+  // A fast, lightweight method exclusively for background tasks like Link Preview (No tools, no orchestrator)
+  public async summarize(text: string): Promise<string> {
+    if (!this.engine) throw new Error("Engine not initialized");
+    
+    const reply = await this.engine.chat.completions.create({
+      messages: [
+        { role: "system", content: "You are a fast summarization AI. Summarize the provided text in exactly 1 or 2 short sentences in Turkish. Do NOT include any conversational filler like 'İşte özet:' or 'Özet:'. ONLY return the summary text." },
+        { role: "user", content: text }
+      ],
+      temperature: 0.3
+    });
+    
+    return reply.choices[0].message.content || "";
+  }
 }
 
 export const aiAgent = new AIAgent();

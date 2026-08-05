@@ -645,6 +645,33 @@ ipcMain.handle('set-vpn', async (_event, config: { enabled: boolean; proxyUrl?: 
   return true;
 });
 
+// IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview)
+ipcMain.handle('fetch-page-html', async (_event, url: string) => {
+  if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(5000) // 5s timeout
+    });
+    if (res.ok) {
+      let html = await res.text();
+      // Strip massive non-content tags before IPC transfer to prevent UI freezes
+      html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+      html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+      html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
+      html = html.replace(/<!--[\s\S]*?-->/g, ''); // strip comments
+      return { success: true, html };
+    }
+    return { error: 'HTTP ' + res.status };
+  } catch (err: any) {
+    return { error: err.message };
+  }
+});
+
 // IPC Handler for Autocomplete Suggestions (Bypasses CORS)
 ipcMain.handle('get-suggestions', async (_event, query: string) => {
   if (!query || typeof query !== 'string') return [];
