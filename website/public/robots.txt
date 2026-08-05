@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://nova-browser.vercel.app/sitemap.xml
