@@ -1647,6 +1647,17 @@ function App() {
         onToggleAIAssistant={() => {
           setIsSidePanelOpen(!isSidePanelOpen);
         }}
+        onTabDragStart={() => setIsDraggingTab(true)}
+        onTabDragEnd={() => {
+          setIsDraggingTab(false);
+          setIsDragOverMain(false);
+        }}
+        onTabDrag={(y) => setIsDragOverMain(y > 60)}
+        onDropToSplitScreen={(tabId) => {
+          if (tabId !== activeTabId) {
+            setSplitTabId(tabId);
+          }
+        }}
       />
 
       {/* MAIN BROWSER CONTENT */}

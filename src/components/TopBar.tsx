@@ -105,6 +105,10 @@ interface TopBarProps {
   showBookmarksBar?: boolean;
   onToggleReaderMode?: () => void;
   onOpenExtensions: () => void;
+  onTabDragStart?: () => void;
+  onTabDragEnd?: () => void;
+  onTabDrag?: (y: number) => void;
+  onDropToSplitScreen?: (tabId: string) => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = React.memo(({
@@ -150,9 +154,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   isVpnEnabled = false,
   onToggleVpn,
   onToggleAIAssistant,
-  showBookmarksBar = true,
+  showBookmarksBar = false,
   onToggleReaderMode,
-  onOpenExtensions
+  onOpenExtensions,
+  onTabDragStart,
+  onTabDragEnd,
+  onTabDrag,
+  onDropToSplitScreen
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
@@ -490,6 +498,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
+                  onDragStart={() => onTabDragStart?.()}
+                  onDrag={(e, info) => onTabDrag?.(info.point.y)}
+                  onDragEnd={(e, info) => {
+                    onTabDragEnd?.();
+                    if (info.point.y > 60) {
+                      onDropToSplitScreen?.(tab.id);
+                    }
+                  }}
                   onClick={() => onSelectTab(tab.id)}
                   data-tab-id={tab.id}
                   className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
