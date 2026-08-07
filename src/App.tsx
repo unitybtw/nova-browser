@@ -1713,7 +1713,7 @@ function App() {
         />
 
         {/* Primary View */}
-        <div style={{ width: secondaryTab ? `${splitRatio}%` : '100%' }} className="h-full relative transition-all duration-150">
+        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : '100%' }} className="h-full relative transition-none">
           {[...tabs].sort((a, b) => a.id.localeCompare(b.id)).map((tab) => {
             if (secondaryTab && tab.id === secondaryTab.id) {
               return null;
@@ -1765,12 +1765,24 @@ function App() {
                 const containerWidth = document.body.clientWidth;
                 let newRatio = startRatio + (deltaX / containerWidth) * 100;
                 newRatio = Math.max(20, Math.min(80, newRatio)); // Limit to 20%-80%
-                setSplitRatio(newRatio);
+                
+                const primary = document.getElementById('primary-view-container');
+                const secondary = document.getElementById('secondary-view-container');
+                if (primary && secondary) {
+                  primary.style.width = `${newRatio}%`;
+                  secondary.style.width = `${100 - newRatio}%`;
+                }
               };
               
-              const handleMouseUp = () => {
+              const handleMouseUp = (upEvent: MouseEvent) => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
+                
+                const deltaX = upEvent.pageX - startX;
+                const containerWidth = document.body.clientWidth;
+                let finalRatio = startRatio + (deltaX / containerWidth) * 100;
+                finalRatio = Math.max(20, Math.min(80, finalRatio));
+                setSplitRatio(finalRatio);
               };
               
               document.addEventListener('mousemove', handleMouseMove);
@@ -1781,7 +1793,7 @@ function App() {
 
         {/* Secondary View (Split Screen) */}
         {secondaryTab && (
-          <div style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-all duration-150">
+          <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none">
             <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
               <div className="px-2 py-1 bg-slate-800/80 text-white rounded text-[10px] font-medium backdrop-blur-xs shadow-md">
                 Split View: {secondaryTab.title || secondaryTab.url}
