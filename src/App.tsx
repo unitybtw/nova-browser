@@ -502,8 +502,22 @@ function App() {
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setTabs(prevTabs => {
-      if (prevTabs.length <= 1) return prevTabs;
       const targetTab = prevTabs.find(t => t.id === id);
+      
+      if (prevTabs.length <= 1) {
+        if (targetTab && targetTab.url !== 'nova://newtab') {
+          return [{
+            ...targetTab,
+            url: 'nova://newtab',
+            title: 'New Tab',
+            favicon: undefined,
+            isLoading: false,
+            canGoBack: false,
+            canGoForward: false
+          }];
+        }
+        return prevTabs;
+      }
       if (targetTab) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
