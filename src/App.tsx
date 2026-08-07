@@ -1714,7 +1714,7 @@ function App() {
 
         {/* Primary View */}
         <div style={{ width: secondaryTab ? `${splitRatio}%` : '100%' }} className="h-full relative transition-all duration-150">
-          {tabs.map((tab) => {
+          {[...tabs].sort((a, b) => a.id.localeCompare(b.id)).map((tab) => {
             if (secondaryTab && tab.id === secondaryTab.id) {
               return null;
             }
