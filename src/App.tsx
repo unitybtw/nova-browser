@@ -1428,7 +1428,14 @@ function App() {
 
       if (matches('newTab')) {
         e.preventDefault();
-        setIsSpotlightOpen(true);
+        if (settings.useVerticalTabs) {
+          setIsSpotlightOpen(true);
+        } else {
+          handleNewTab();
+          setTimeout(() => {
+            document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
+          }, 100);
+        }
         return;
       }
       
