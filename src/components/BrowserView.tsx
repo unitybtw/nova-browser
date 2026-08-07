@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap } from 'lucide-react';
 import { Tab } from '../types/browser';
-import { NewTabPage } from './NewTabPage';
+import { GlassNewTab } from './GlassNewTab';
 import { SettingsPage } from './SettingsPage';
 import { HistoryPage } from './HistoryPage';
 import { DownloadsPage } from './DownloadsPage';
@@ -544,23 +544,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   }
 
   if (isNewTab) {
-    return (
-      <NewTabPage 
-        onNavigate={(url) => {
-          // Update the tab URL so BrowserView's useEffect fires loadURL
-          onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
-          // Also call parent navigate if available
-          if (onNavigate) onNavigate(url);
-        }} 
-        searchEngine={searchEngine}
-        privacyShield={privacyShield}
-        newTabBackground={newTabBackground}
-        backgroundCustomUrl={settings.backgroundCustomUrl}
-        unsplashCategory={settings.unsplashCategory}
-        showTasksWidget={settings.showTasksWidget}
-        isIncognito={isIncognito}
-      />
-    );
+    return <GlassNewTab />;
   }
 
   if (isSettingsTab) {
