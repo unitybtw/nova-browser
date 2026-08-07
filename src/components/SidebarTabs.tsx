@@ -34,6 +34,7 @@ interface SidebarTabsProps {
   onRenameFolder?: (id: string, name: string) => void;
   onDeleteFolder?: (id: string) => void;
   onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
+  onOpenSpotlight?: () => void;
 }
 
 // Tab Peek Popover rendered via Portal to escape Framer Motion's transform context
@@ -101,7 +102,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onToggleFolder,
   onRenameFolder,
   onDeleteFolder,
-  onMoveTabToFolder
+  onMoveTabToFolder,
+  onOpenSpotlight
 }) => {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
@@ -144,18 +146,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     const isActive = tab.id === activeTabId;
     return (
       <motion.div
-        layout
         draggable
         onDragStart={(e: any) => {
           e.dataTransfer.setData('text/plain', tab.id);
           e.dataTransfer.effectAllowed = 'move';
         }}
-        initial={{ opacity: 0, x: -20, scale: 0.9 }}
-        animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.8, height: 0, marginTop: 0, marginBottom: 0 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 35, mass: 1 }}
-        whileHover={{ x: 2, scale: 1.01 }}
-        whileTap={{ scale: 0.98 }}
+        initial={{ opacity: 0, x: -8 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
+        transition={{ duration: 0.15, ease: 'easeOut' }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
@@ -324,10 +323,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               const folderTabs = tabs.filter(t => t.folderId === folder.id);
               return (
                 <motion.div
-                  layout
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.15, ease: 'easeOut' }}
                   key={folder.id}
                   className="flex flex-col gap-1"
                 >
@@ -370,7 +369,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         {/* Footer / New Tab & New Folder */}
         <div className="p-3 flex items-center gap-2 no-drag border-t border-slate-200/50 dark:border-slate-700/50">
           <button
-            onClick={() => onNewTab()}
+            onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
             className={`flex flex-1 items-center gap-3 h-10 px-3 rounded-xl transition-all shadow-sm ${
               isIncognito
                 ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
@@ -383,6 +382,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <span className="text-[13px] font-medium truncate">
               New Tab
             </span>
+            <span className="ml-auto text-[11px] text-slate-400 font-mono">⌘K</span>
           </button>
           
           <button

@@ -1568,6 +1568,7 @@ function App() {
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
             onMoveTabToFolder={handleMoveTabToFolder}
+            onOpenSpotlight={() => setIsSpotlightOpen(true)}
           />
         </div>
       )}
