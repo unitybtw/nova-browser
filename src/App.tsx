@@ -1409,7 +1409,7 @@ function App() {
 
       if (matches('newTab')) {
         e.preventDefault();
-        handleNewTab();
+        setIsSpotlightOpen(true);
         return;
       }
       

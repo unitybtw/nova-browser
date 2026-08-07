@@ -382,7 +382,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <span className="text-[13px] font-medium truncate">
               New Tab
             </span>
-            <span className="ml-auto text-[11px] text-slate-400 font-mono">⌘K</span>
+            <span className="ml-auto text-[11px] text-slate-400 font-mono">⌘T</span>
           </button>
           
           <button
