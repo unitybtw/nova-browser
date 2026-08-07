@@ -186,7 +186,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <div className="flex w-full items-center h-full px-1 py-1">
               {/* Primary Tab Half */}
               <div 
-                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer bg-black/5 dark:bg-white/5"
+                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
                 title={tab.title}
               >
