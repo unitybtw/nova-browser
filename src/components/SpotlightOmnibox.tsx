@@ -99,7 +99,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     }
 
     const url = formatSearchUrl(inputValue, searchEngine);
-    onNavigate(url);
+    onNewTab(url);
     onClose();
   };
 
@@ -158,7 +158,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                   key={`sug-${idx}`}
                   onClick={() => {
                     setInputValue(suggestion);
-                    onNavigate(formatSearchUrl(suggestion, searchEngine));
+                    onNewTab(formatSearchUrl(suggestion, searchEngine));
                     onClose();
                   }}
                   className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/80 hover:text-gray-800 dark:hover:text-slate-200"

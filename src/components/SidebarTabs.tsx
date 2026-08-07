@@ -317,7 +317,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             }
           }}
         >
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence>
             {/* Folders */}
             {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
               const folderTabs = tabs.filter(t => t.folderId === folder.id);
@@ -354,7 +354,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <AnimatePresence mode="popLayout">
+                  <AnimatePresence>
                     {folder.isExpanded && folderTabs.map(tab => renderTab(tab, true))}
                   </AnimatePresence>
                 </motion.div>
