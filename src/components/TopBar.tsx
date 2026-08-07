@@ -109,6 +109,8 @@ interface TopBarProps {
   onTabDragEnd?: () => void;
   onTabDrag?: (y: number) => void;
   onDropToSplitScreen?: (tabId: string) => void;
+  splitTabId?: string | null;
+  onCloseSplit?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = React.memo(({
@@ -160,7 +162,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onTabDragStart,
   onTabDragEnd,
   onTabDrag,
-  onDropToSplitScreen
+  onDropToSplitScreen,
+  splitTabId,
+  onCloseSplit
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
@@ -491,9 +495,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <AnimatePresence initial={false}>
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
+              const isSplitChild = tab.id === splitTabId;
+              
+              if (isSplitChild && splitTabId && activeTabId) return null;
+
+              const splitTab = isActive && splitTabId ? tabs.find(t => t.id === splitTabId) : null;
+
               return (
                 <Reorder.Item
-                  key={tab.id}
+                  key={`split-${tab.id}-${splitTab?.id || 'none'}`}
                   value={tab}
                   initial={{ opacity: 0, scale: 0.9, y: 15 }}
                   animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
@@ -518,7 +528,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   }}
                   onClick={() => onSelectTab(tab.id)}
                   data-tab-id={tab.id}
-                  className={`group flex items-center justify-between px-3 py-1.5 flex-1 min-w-[120px] max-w-[240px] text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
+                  className={`group flex items-center justify-between px-2 py-1 flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
                     tabStyle === 'floating' ? 'rounded-lg mx-0.5 my-1 border' : 
                     tabStyle === 'square' ? 'rounded-none border-t border-x' : 
                     'rounded-t-xl border-t border-x'
@@ -532,74 +542,112 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                   }`}
                 >
-                  <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
-                    {tab.isLoading ? (
-                      <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
-                    ) : tab.favicon ? (
-                      <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
-                    ) : tab.url === 'nova://settings' ? (
-                      <Settings className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    ) : tab.url === 'nova://history' ? (
-                      <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    ) : tab.url === 'nova://downloads' ? (
-                      <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
-                      tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    ) : (
-                      <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                    )}
-                    <span className="truncate">{tab.title || tab.url || 'New Tab'}</span>
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    {tab.isMuted ? (
-                      <button
-                        onClick={(e) => onToggleMuteTab(tab.id, e)}
-                        className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
-                        title="Unmute Tab"
+                  {splitTab ? (
+                    <div className="flex w-full items-center h-full">
+                      {/* Primary Tab Half */}
+                      <div 
+                        className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
+                        title={tab.title}
                       >
-                        <VolumeX className="w-3.5 h-3.5 text-red-500" />
-                      </button>
-                    ) : tab.isPlayingAudio ? (
-                      <div className="flex items-center gap-1">
-                        {onTogglePip && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onTogglePip(tab.id); }}
-                            className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-blue-500 dark:hover:bg-slate-700 transition-all shrink-0"
-                            title="Picture in Picture"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-picture-in-picture-2"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
-                          </button>
+                        {tab.isLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+                        ) : tab.favicon ? (
+                          <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" />
+                        ) : (
+                          <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
                         )}
-                        <button
-                          onClick={(e) => onToggleMuteTab(tab.id, e)}
-                          className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
-                          title="Mute Tab"
-                        >
-                          <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                        <span className="truncate text-[12px] font-semibold">{tab.title || tab.url || 'New Tab'}</span>
+                      </div>
+
+                      <div className="w-[1px] h-4 bg-slate-300/80 dark:bg-slate-600/80 shrink-0 mx-0.5" />
+
+                      {/* Secondary Tab Half */}
+                      <div 
+                        className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                        onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
+                        title={splitTab.title}
+                      >
+                        {splitTab.favicon ? <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
+                        <span className="truncate text-[12px] font-semibold flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
+                        
+                        <button onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} className="ml-auto p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors">
+                          <X className="w-3 h-3" />
                         </button>
                       </div>
-                    ) : null}
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden px-1">
+                        {tab.isLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+                        ) : tab.favicon ? (
+                          <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
+                        ) : tab.url === 'nova://settings' ? (
+                          <Settings className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        ) : tab.url === 'nova://history' ? (
+                          <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        ) : tab.url === 'nova://downloads' ? (
+                          <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
+                          tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        ) : (
+                          <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        )}
+                        <span className="truncate">{tab.title || tab.url || 'New Tab'}</span>
+                      </div>
 
-                    {tab.isSuspended && (
-                      <span className="p-0.5 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
-                        <Moon className="w-3.5 h-3.5 opacity-80" />
-                      </span>
-                    )}
+                      <div className="flex items-center gap-1 shrink-0 ml-1">
+                        {tab.isMuted ? (
+                          <button
+                            onClick={(e) => onToggleMuteTab(tab.id, e)}
+                            className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
+                            title="Unmute Tab"
+                          >
+                            <VolumeX className="w-3.5 h-3.5 text-red-500" />
+                          </button>
+                        ) : tab.isPlayingAudio ? (
+                          <div className="flex items-center gap-1">
+                            {onTogglePip && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); onTogglePip(tab.id); }}
+                                className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-blue-500 dark:hover:bg-slate-700 transition-all shrink-0"
+                                title="Picture in Picture"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-picture-in-picture-2"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => onToggleMuteTab(tab.id, e)}
+                              className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
+                              title="Mute Tab"
+                            >
+                              <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                            </button>
+                          </div>
+                        ) : null}
 
-                    {tabs.length > 1 && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCloseTab(tab.id, e);
-                        }}
-                        className="opacity-50 hover:opacity-100 p-0.5 rounded-full hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-slate-100 transition-all shrink-0"
-                        title="Close Tab"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
+                        {tab.isSuspended && (
+                          <span className="p-0.5 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
+                            <Moon className="w-3.5 h-3.5 opacity-80" />
+                          </span>
+                        )}
+
+                        {tabs.length > 1 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onCloseTab(tab.id, e);
+                            }}
+                            className="opacity-50 hover:opacity-100 p-0.5 rounded-full hover:bg-slate-200 hover:text-slate-900 dark:hover:bg-slate-700 dark:hover:text-slate-100 transition-all shrink-0"
+                            title="Close Tab"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
                   
                   {/* Active Tab Bottom Cover (to blend with the toolbar below) */}
                   {isActive && (
