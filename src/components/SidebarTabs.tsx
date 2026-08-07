@@ -37,6 +37,8 @@ interface SidebarTabsProps {
   onOpenSpotlight?: () => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
+  splitTabId?: string | null;
+  onCloseSplit?: () => void;
 }
 
 // Tab Peek Popover rendered via Portal to escape Framer Motion's transform context
@@ -148,6 +150,69 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   const renderTab = (tab: Tab, isNested: boolean = false) => {
     const isActive = tab.id === activeTabId;
+    const isSplitChild = tab.id === splitTabId;
+
+    if (isSplitChild && splitTabId && activeTabId) {
+      return null; // Hide the secondary tab from its normal position
+    }
+
+    if (isActive && splitTabId) {
+      const splitTab = tabs.find(t => t.id === splitTabId);
+      if (splitTab) {
+        return (
+          <motion.div
+            draggable
+            onDragStart={(e: any) => {
+              e.dataTransfer.setData('text/plain', tab.id);
+              onTabDragStart?.();
+            }}
+            onDragEnd={() => {
+              setHoverPos({ top: 0, left: 0 });
+              onTabDragEnd?.();
+            }}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            key={`split-${tab.id}-${splitTab.id}`}
+            className={`relative flex items-center h-10 rounded-xl transition-all overflow-hidden ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
+              isIncognito
+                ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50'
+                : 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200/50 dark:bg-slate-800/90 dark:text-white dark:ring-slate-700/50'
+            }`}
+          >
+            <div className="flex w-full items-center h-full px-1 py-1">
+              {/* Primary Tab Half */}
+              <div 
+                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer bg-black/5 dark:bg-white/5"
+                onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
+                title={tab.title}
+              >
+                {tab.favicon ? <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
+                <span className="truncate text-[11px] font-semibold">{tab.title || tab.url || 'New Tab'}</span>
+              </div>
+
+              <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700 shrink-0 mx-0.5" />
+
+              {/* Secondary Tab Half */}
+              <div 
+                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
+                title={splitTab.title}
+              >
+                {splitTab.favicon ? <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
+                <span className="truncate text-[11px] font-semibold flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
+                
+                <button onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} className="p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        );
+      }
+    }
+
     return (
       <motion.div
         draggable

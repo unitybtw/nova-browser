@@ -1590,6 +1590,8 @@ function App() {
             onOpenSpotlight={() => setIsSpotlightOpen(true)}
             onTabDragStart={() => setIsDraggingTab(true)}
             onTabDragEnd={() => setIsDraggingTab(false)}
+            splitTabId={splitTabId}
+            onCloseSplit={() => setSplitTabId(null)}
           />
         </div>
       )}
