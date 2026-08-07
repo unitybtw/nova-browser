@@ -85,49 +85,111 @@ interface UpdateInfo {
 }
 
 const UpdateWidget = () => {
-  const [status, setStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloaded' | 'error'>('idle');
+  const [status, setStatus] = React.useState<'idle' | 'checking' | 'available' | 'downloading' | 'downloaded' | 'up-to-date' | 'error'>('idle');
   const [errorMsg, setErrorMsg] = React.useState('');
+  const [progress, setProgress] = React.useState(0);
+  const [updateVersion, setUpdateVersion] = React.useState('');
 
   React.useEffect(() => {
     let unsubs: (() => void)[] = [];
-    if ((window as any).electronAPI) {
-      const api = (window as any).electronAPI;
-      if (api.onUpdateAvailable) unsubs.push(api.onUpdateAvailable(() => setStatus('available')));
-      if (api.onUpdateDownloaded) unsubs.push(api.onUpdateDownloaded(() => setStatus('downloaded')));
+    const api = (window as any).electronAPI;
+    if (api) {
+      if (api.onUpdateChecking) unsubs.push(api.onUpdateChecking(() => setStatus('checking')));
+      if (api.onUpdateAvailable) unsubs.push(api.onUpdateAvailable((_: any, info: any) => {
+        setStatus('available');
+        setUpdateVersion(info?.version || '');
+      }));
+      if (api.onUpdateNotAvailable) unsubs.push(api.onUpdateNotAvailable((_: any, info: any) => {
+        setStatus('up-to-date');
+        setUpdateVersion(info?.version || '');
+      }));
+      if (api.onUpdateDownloadProgress) unsubs.push(api.onUpdateDownloadProgress((_: any, p: any) => {
+        setStatus('downloading');
+        setProgress(Math.round(p?.percent || 0));
+      }));
+      if (api.onUpdateDownloaded) unsubs.push(api.onUpdateDownloaded((_: any, info: any) => {
+        setStatus('downloaded');
+        setUpdateVersion(info?.version || '');
+      }));
       if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: string) => {
         setStatus('error');
-        setErrorMsg(err);
+        setErrorMsg(typeof err === 'string' ? err : 'Unknown error');
       }));
     }
     return () => unsubs.forEach(u => u());
   }, []);
 
-  const check = () => {
+  const check = async () => {
     setStatus('checking');
-    if ((window as any).electronAPI?.checkForUpdates) {
-      (window as any).electronAPI.checkForUpdates();
+    setErrorMsg('');
+    const api = (window as any).electronAPI;
+    if (api?.checkForUpdates) {
+      try {
+        await api.checkForUpdates();
+      } catch {
+        setStatus('error');
+        setErrorMsg('Could not check for updates');
+      }
+    } else {
+      setStatus('error');
+      setErrorMsg('Update API not available');
     }
   };
 
   const install = () => {
-    if ((window as any).electronAPI?.installUpdate) {
-      (window as any).electronAPI.installUpdate();
+    const api = (window as any).electronAPI;
+    if (api?.installUpdate) {
+      api.installUpdate();
     }
   };
 
   if (status === 'downloaded') {
     return (
-      <button onClick={install} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2">
-        <Download className="w-4 h-4" /> Restart & Install Update
-      </button>
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
+          v{updateVersion || 'new'} ready to install!
+        </span>
+        <button onClick={install} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2">
+          <Download className="w-4 h-4" /> Restart & Install
+        </button>
+      </div>
+    );
+  }
+
+  if (status === 'downloading') {
+    return (
+      <div className="flex items-center gap-3 w-full max-w-xs">
+        <div className="flex-1">
+          <div className="flex justify-between text-xs mb-1">
+            <span className="text-blue-600 dark:text-blue-400 font-medium">Downloading{updateVersion ? ` v${updateVersion}` : ''}...</span>
+            <span className="text-slate-500">{progress}%</span>
+          </div>
+          <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      </div>
     );
   }
 
   if (status === 'available') {
     return (
       <div className="flex items-center gap-3">
-        <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Downloading update...</span>
+        <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Update v{updateVersion || '?'} found, downloading...</span>
         <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  if (status === 'up-to-date') {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+          <Check className="w-4 h-4" /> Up to date (v{updateVersion || '?'})
+        </span>
+        <button onClick={check} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+          Check again
+        </button>
       </div>
     );
   }
@@ -135,7 +197,7 @@ const UpdateWidget = () => {
   if (status === 'error') {
     return (
       <div className="flex items-center gap-3">
-        <span className="text-xs text-red-500">Failed: {errorMsg.substring(0, 30)}...</span>
+        <span className="text-xs text-red-500">Failed: {errorMsg.substring(0, 50)}{errorMsg.length > 50 ? '...' : ''}</span>
         <button onClick={check} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-sm">
           Try Again
         </button>

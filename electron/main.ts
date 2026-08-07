@@ -306,33 +306,64 @@ app.whenReady().then(async () => {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
 
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for updates...');
+    mainWindow?.webContents.send('update-checking');
+  });
+
   autoUpdater.on('update-available', (info) => {
-    console.log('Update available:', info);
-    mainWindow?.webContents.send('update-available', info);
+    console.log('Update available:', info.version);
+    mainWindow?.webContents.send('update-available', { version: info.version, releaseDate: info.releaseDate });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('No update available. Current version is up to date:', info.version);
+    mainWindow?.webContents.send('update-not-available', { version: info.version });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    console.log(`Download progress: ${Math.round(progress.percent)}%`);
+    mainWindow?.webContents.send('update-download-progress', {
+      percent: progress.percent,
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total
+    });
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log('Update downloaded:', info);
-    mainWindow?.webContents.send('update-downloaded', info);
+    console.log('Update downloaded:', info.version);
+    mainWindow?.webContents.send('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
   });
 
   autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
-    mainWindow?.webContents.send('update-error', err.message);
+    mainWindow?.webContents.send('update-error', err?.message || 'Unknown update error');
   });
 
-  ipcMain.handle('check-for-updates', () => {
-    autoUpdater.checkForUpdatesAndNotify();
+  ipcMain.handle('check-for-updates', async () => {
+    try {
+      const result = await autoUpdater.checkForUpdatesAndNotify();
+      return { success: true, version: result?.updateInfo?.version || null };
+    } catch (err: any) {
+      console.error('Check for updates failed:', err);
+      mainWindow?.webContents.send('update-error', err?.message || 'Check failed');
+      return { success: false, error: err?.message || 'Check failed' };
+    }
   });
 
   ipcMain.handle('install-update', () => {
-    autoUpdater.quitAndInstall();
+    try {
+      autoUpdater.quitAndInstall(false, true);
+    } catch (err: any) {
+      console.error('Install update failed:', err);
+    }
   });
 
   // Wait a few seconds before checking to not slow down startup
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Update check failed:", err));
-  }, 5000);
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Startup update check failed:", err));
+  }, 8000);
 
   // Load persistent extensions from disk
   const extensionsPath = path.join(app.getPath('userData'), 'extensions');
