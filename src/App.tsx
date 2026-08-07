@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PanelRight } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 export interface HistoryItem {
@@ -159,6 +161,7 @@ function App() {
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
+  const [isDragOverMain, setIsDragOverMain] = useState(false);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
@@ -1644,7 +1647,42 @@ function App() {
       />
 
       {/* MAIN BROWSER CONTENT */}
-      <main className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden">
+      <main 
+        className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden"
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes('text/plain')) {
+            e.preventDefault();
+            setIsDragOverMain(true);
+          }
+        }}
+        onDragLeave={() => setIsDragOverMain(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOverMain(false);
+          const tabId = e.dataTransfer.getData('text/plain');
+          const draggedTab = tabs.find(t => t.id === tabId);
+          if (draggedTab && tabId !== activeTabId) {
+            setSplitTabId(tabId);
+          }
+        }}
+      >
+        {/* Split Screen Drop Overlay */}
+        <AnimatePresence>
+          {isDragOverMain && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-y-0 right-0 w-[45%] bg-blue-500/10 border-l-2 border-blue-500/50 backdrop-blur-sm z-[999] flex items-center justify-center pointer-events-none"
+            >
+              <div className="bg-blue-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center gap-2 text-sm font-medium">
+                <PanelRight className="w-8 h-8" />
+                Drop to Split View
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Find in page widget */}
         <FindInPage
           isOpen={isFindInPageOpen}
