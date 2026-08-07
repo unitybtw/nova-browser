@@ -92,7 +92,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       webviewTag: true,
-      sandbox: false
+      sandbox: true
     }
   });
 
@@ -385,6 +385,26 @@ app.whenReady().then(async () => {
 });
 
 app.on('web-contents-created', (_event, contents) => {
+  // 🔒 Security: Force secure webPreferences for any <webview> tags
+  contents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Force entirely secure environment for webviews
+    webPreferences.nodeIntegration = false;
+    webPreferences.nodeIntegrationInWorker = false;
+    webPreferences.nodeIntegrationInSubFrames = false;
+    webPreferences.contextIsolation = true;
+    webPreferences.webSecurity = true;
+    webPreferences.allowRunningInsecureContent = false;
+    webPreferences.experimentalFeatures = false;
+  });
+
+  // 🔒 Security: Block arbitrary window popups and route them to our secure tab system
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http')) {
+      mainWindow?.webContents.send('new-tab', url);
+    }
+    return { action: 'deny' };
+  });
+
   if (contents.getType() === 'webview') {
     contents.on('will-navigate', (e, navigationUrl) => {
       // 1. Phishing Check
@@ -702,6 +722,17 @@ ipcMain.handle('set-vpn', async (_event, config: { enabled: boolean; proxyUrl?: 
 // IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview)
 ipcMain.handle('fetch-page-html', async (_event, url: string) => {
   if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
+  
+  // 🔒 Security: Prevent SSRF and local file reads (e.g. file://, ftp://)
+  try {
+    const parsedUrl = new URL(url);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
+    }
+  } catch (err) {
+    return { error: 'Invalid URL format' };
+  }
+
   try {
     const res = await fetch(url, {
       headers: {
