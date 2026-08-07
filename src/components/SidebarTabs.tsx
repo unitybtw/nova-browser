@@ -109,7 +109,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onMoveTabToFolder,
   onOpenSpotlight,
   onTabDragStart,
-  onTabDragEnd
+  onTabDragEnd,
+  splitTabId,
+  onCloseSplit
 }) => {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
