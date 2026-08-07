@@ -223,7 +223,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-8 backdrop-blur-3xl shadow-sm ${
+      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-14 backdrop-blur-3xl shadow-sm ${
         isIncognito
           ? 'bg-slate-900/80 dark'
           : 'bg-white/60 dark:bg-slate-900/60'
@@ -367,34 +367,32 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* Footer / New Tab & New Folder */}
-        <div className="p-3 flex items-center gap-2 no-drag border-t border-slate-200/50 dark:border-slate-700/50">
+        <div className="p-3 flex items-center gap-1 no-drag mt-auto">
           <button
             onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-            className={`flex flex-1 items-center gap-3 h-10 px-3 rounded-xl transition-all shadow-sm ${
+            className={`flex flex-1 items-center gap-2 h-9 px-3 rounded-lg transition-colors ${
               isIncognito
-                ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'
+                ? 'text-slate-300 hover:bg-white/10'
+                : 'text-slate-600 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/10'
             }`}
           >
-            <div className="w-5 h-5 flex items-center justify-center shrink-0">
-              <Plus className="w-5 h-5" />
-            </div>
+            <Plus className="w-4 h-4 opacity-70" />
             <span className="text-[13px] font-medium truncate">
               New Tab
             </span>
-            <span className="ml-auto text-[11px] text-slate-400 font-mono">⌘T</span>
+            <span className="ml-auto text-[11px] opacity-40 font-mono">⌘T</span>
           </button>
           
           <button
             onClick={() => onCreateFolder?.()}
-            className={`flex items-center justify-center shrink-0 w-10 h-10 rounded-xl transition-all shadow-sm ${
+            className={`flex items-center justify-center shrink-0 w-9 h-9 rounded-lg transition-colors ${
               isIncognito
-                ? 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-                : 'bg-white text-slate-700 hover:bg-slate-50 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-700'
+                ? 'text-slate-300 hover:bg-white/10'
+                : 'text-slate-600 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/10'
             }`}
             title="New Folder"
           >
-            <FolderPlus className="w-5 h-5" />
+            <FolderPlus className="w-4 h-4 opacity-70" />
           </button>
         </div>
       </div>
