@@ -56,8 +56,6 @@ import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { ReaderMode } from './components/ReaderMode';
 import { Onboarding } from './components/Onboarding';
-import { GlassSidebar } from './components/GlassSidebar';
-import { GlassTopBar } from './components/GlassTopBar';
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension } from './types/browser';
@@ -1545,36 +1543,92 @@ function App() {
   }
 
   return (
-    <div className={`flex flex-row h-full w-full overflow-hidden text-on-background bg-background font-body-md relative ${settings.theme === 'dark' ? 'dark' : ''}`}>
-      {/* Animated Background Map */}
-      <div 
-        className="absolute inset-0 z-0 opacity-20 pointer-events-none mix-blend-screen bg-cover bg-center" 
-        style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuC7il4JzfguIxbzkCdwOuuS98YbRAABEXwrCVd5L0X7MORfG6rXJw4EA7cBGBwXY1Ys9RC2nOfQ4NA7vPx6LGO3E6GIAxzfrzK37yOLMnuPfqMHc3z_NIiTNbKmxxUGz2peDrw8FSdio4N3dRziIqhVrtpaDQXIww_RKdgFQeW4bd91K8b2ZkRsLjGROaTPm_wcR5L1GW9wpq9Feouai7XAY0kej54JCJietvW7JaBT9FHS_cXHmGRM')" }}
-      ></div>
+    <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
+      settings.useVerticalTabs 
+        ? activeTab?.isIncognito ? 'bg-slate-950' : 'bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900'
+        : 'bg-slate-50 dark:bg-slate-900'
+    }`}>
+      
+      {settings.useVerticalTabs && (
+        <div className="h-full flex flex-col shrink-0 drag-region relative z-50">
+          <SidebarTabs
+            tabs={workspaceTabs}
+            folders={folders}
+            activeTabId={activeTabId}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onToggleMuteTab={handleToggleMuteTab}
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            onSelectWorkspace={handleSelectWorkspace}
+            isIncognito={activeTab?.isIncognito}
+            onCreateFolder={handleCreateFolder}
+            onToggleFolder={handleToggleFolder}
+            onRenameFolder={handleRenameFolder}
+            onDeleteFolder={handleDeleteFolder}
+            onMoveTabToFolder={handleMoveTabToFolder}
+          />
+        </div>
+      )}
 
-      <GlassSidebar 
-        tabs={workspaceTabs}
-        activeTabId={activeTabId}
-        onSelectTab={handleSelectTab}
-        onCloseTab={handleCloseTab}
-        onNewTab={handleNewTab}
-        onOpenSettings={handleOpenSettings}
-      />
-
-      <div className="flex-1 flex flex-col h-screen relative z-10">
-        <GlassTopBar 
-          activeTabId={activeTabId}
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${settings.useVerticalTabs ? 'rounded-xl shadow-2xl shadow-black/20 m-2' : ''}`}>
+        {/* TOP NAVIGATION BAR */}
+        <TopBar 
           tabs={workspaceTabs}
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+          onSelectWorkspace={handleSelectWorkspace}
+          activeTabId={activeTabId}
+          bookmarks={bookmarks}
+          activeDownloadsCount={activeDownloadsCount}
+          downloads={downloads}
+          onClearDownloads={handleClearDownloads}
+          showBookmarksBar={settings.showBookmarksBar}
+          useVerticalTabs={settings.useVerticalTabs}
+          onToggleReaderMode={() => setIsReaderModeOpen(prev => !prev)}
+          isSplitView={!!splitTabId}
+          tabStyle={settings.tabStyle}
+          isIncognito={activeTab?.isIncognito}
+          searchEngine={settings.searchEngine}
+          onToggleBookmark={handleToggleBookmarkActive}
+          onOpenHistory={handleOpenHistory}
+          onOpenDownloads={handleOpenDownloads}
+          onOpenSettings={handleOpenSettings}
+          onOpenExtensions={handleOpenExtensions}
+          onOpenShare={handleOpenShare}
+          onTakeScreenshot={handleTakeScreenshot}
+          onOpenFindInPage={handleOpenFindInPage}
+          onToggleSplitView={handleToggleSplitView}
+          onZoomIn={handleZoomIn}
+          onZoomOut={handleZoomOut}
+          onDuplicateTab={handleDuplicateTab}
+          onTogglePinTab={handleTogglePinTab}
+          onToggleMuteTab={handleToggleMuteTab}
+          onSuspendTab={handleSuspendTab}
+          onReorderTabs={handleReorderTabs}
+          onReorderFullList={handleReorderFullList}
+          onTogglePip={handleTogglePip}
+          onSelectTab={handleSelectTab}
+          onNewTab={handleNewTab}
+          onNewIncognitoTab={handleNewIncognitoTab}
+          onCloseTab={handleCloseTab}
           onNavigate={handleNavigate}
           onGoBack={handleGoBack}
           onGoForward={handleGoForward}
           onReload={handleReload}
-          onOpenSettings={handleOpenSettings}
-          onOpenExtensions={handleOpenExtensions}
-        />
+          isVpnEnabled={vpnEnabled}
+          onToggleVpn={() => {
+          closeAllModals();
+          setIsVpnPopoverOpen(!isVpnPopoverOpen);
+        }}
+        onToggleAIAssistant={() => {
+          setIsSidePanelOpen(!isSidePanelOpen);
+        }}
+      />
 
-        {/* MAIN BROWSER CONTENT */}
-        <main className="flex-1 relative w-full h-full flex overflow-hidden p-lg">
+      {/* MAIN BROWSER CONTENT */}
+      <main className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden">
         {/* Find in page widget */}
         <FindInPage
           isOpen={isFindInPageOpen}
