@@ -528,7 +528,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   }}
                   onClick={() => onSelectTab(tab.id)}
                   data-tab-id={tab.id}
-                  className={`group flex items-center justify-between px-2 py-1 flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
+                  className={`group flex items-center justify-between ${splitTab ? 'px-1.5 py-1.5' : 'px-3 py-1.5'} flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
                     tabStyle === 'floating' ? 'rounded-lg mx-0.5 my-1 border' : 
                     tabStyle === 'square' ? 'rounded-none border-t border-x' : 
                     'rounded-t-xl border-t border-x'
