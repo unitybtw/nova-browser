@@ -479,6 +479,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             axis="x"
             values={tabs}
             onReorder={(newTabs) => {
+              if (ghostTab) return;
               if (onReorderFullList) {
                 onReorderFullList(newTabs);
               }
@@ -495,7 +496,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   key={tab.id}
                   value={tab}
                   initial={{ opacity: 0, scale: 0.9, y: 15 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
