@@ -710,6 +710,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.tab.favicon !== nextProps.tab.favicon) return false;
   if (prevProps.tab.isSuspended !== nextProps.tab.isSuspended) return false;
   if (prevProps.tab.thumbnail !== nextProps.tab.thumbnail) return false;
+  if (prevProps.tab.isMuted !== nextProps.tab.isMuted) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
   
   // Deep comparison for settings object changes that affect rendering
