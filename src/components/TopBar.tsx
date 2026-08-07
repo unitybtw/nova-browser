@@ -720,8 +720,24 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   isIncognito 
                     ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                     : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-                } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''}`}
+                } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} ${
+                  (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
+                }`}
               />
+
+              {/* Title & URL Overlay for Vertical Tabs Mode */}
+              {useVerticalTabs && !isFocused && !isAIMode && (
+                <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-[7.5rem]' : 'pl-11'}`}>
+                  <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
+                    {activeTab?.title || 'New Tab'}
+                  </span>
+                  {activeTab?.url && activeTab.url !== 'nova://newtab' && (
+                    <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
+                      {formatSearchUrl(activeTab.url)}
+                    </span>
+                  )}
+                </div>
+              )}
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
                 {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
                   <div 
