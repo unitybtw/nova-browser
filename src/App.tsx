@@ -162,6 +162,7 @@ function App() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
+  const [isDraggingTab, setIsDraggingTab] = useState(false);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
@@ -1587,6 +1588,8 @@ function App() {
             onDeleteFolder={handleDeleteFolder}
             onMoveTabToFolder={handleMoveTabToFolder}
             onOpenSpotlight={() => setIsSpotlightOpen(true)}
+            onTabDragStart={() => setIsDraggingTab(true)}
+            onTabDragEnd={() => setIsDraggingTab(false)}
           />
         </div>
       )}
@@ -1682,6 +1685,11 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Prevent Webview from swallowing drag events during tab drag */}
+        {isDraggingTab && (
+          <div className="absolute inset-0 z-[990] pointer-events-auto" />
+        )}
 
         {/* Find in page widget */}
         <FindInPage

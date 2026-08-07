@@ -35,6 +35,8 @@ interface SidebarTabsProps {
   onDeleteFolder?: (id: string) => void;
   onMoveTabToFolder?: (tabId: string, folderId?: string) => void;
   onOpenSpotlight?: () => void;
+  onTabDragStart?: () => void;
+  onTabDragEnd?: () => void;
 }
 
 // Tab Peek Popover rendered via Portal to escape Framer Motion's transform context
@@ -103,7 +105,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onRenameFolder,
   onDeleteFolder,
   onMoveTabToFolder,
-  onOpenSpotlight
+  onOpenSpotlight,
+  onTabDragStart,
+  onTabDragEnd
 }) => {
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
@@ -149,7 +153,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         draggable
         onDragStart={(e: any) => {
           e.dataTransfer.setData('text/plain', tab.id);
-          e.dataTransfer.effectAllowed = 'move';
+          onTabDragStart?.();
+        }}
+        onDragEnd={() => {
+          setHoverPos({ top: 0, left: 0 });
+          onTabDragEnd?.();
         }}
         initial={{ opacity: 0, x: -8 }}
         animate={{ opacity: 1, x: 0 }}
