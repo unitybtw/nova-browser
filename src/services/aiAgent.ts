@@ -22,17 +22,24 @@ export type InitProgressHandler = (progress: number, text: string) => void;
 
 // Shared DOM scanning script — extracted to avoid duplicating 40 lines in every tool call
 const DOM_SCAN_SCRIPT = `(() => {
-  const interactiveElements = Array.from(document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])')).slice(0, 150);
+  const allInteractive = document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])');
   const visibleEls = [];
-  for (const el of interactiveElements) {
+  const vh = window.innerHeight || document.documentElement.clientHeight;
+  const vw = window.innerWidth || document.documentElement.clientWidth;
+  
+  for (const el of allInteractive) {
+    if (visibleEls.length >= 30) break; // Don't process more than we need to avoid freezing the renderer
+    
     const rect = el.getBoundingClientRect();
-    if (rect.width > 0 && rect.height > 0) {
+    // Only process elements that are visible in the current viewport
+    if (rect.width > 0 && rect.height > 0 && rect.top < vh && rect.bottom > 0 && rect.left < vw && rect.right > 0) {
       const style = window.getComputedStyle(el);
       if (style.visibility !== 'hidden' && style.display !== 'none' && style.opacity !== '0') {
         visibleEls.push(el);
       }
     }
   }
+  
   let currentId = 1;
   const items = visibleEls.map(el => {
     const aiId = currentId++;
@@ -40,15 +47,20 @@ const DOM_SCAN_SCRIPT = `(() => {
     let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
     text = text.replace(/\\s+/g, ' ');
     if (text.length > 50) text = text.substring(0, 50) + '...';
+    
+    const tag = el.tagName.toLowerCase();
+    const type = el.getAttribute('type');
+    
     return {
       ai_id: aiId.toString(),
-      tag: el.tagName.toLowerCase(),
-      type: el.getAttribute('type') || undefined,
-      text: text
+      tag,
+      ...(type && { type }),
+      ...(text && { text })
     };
   });
-  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 1000);
-  return JSON.stringify({ text, interactable_elements: items.slice(0, 30) });
+  
+  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 800);
+  return JSON.stringify({ text, interactable_elements: items });
 })();`;
 
 // Maximum number of messages to keep in the conversation history for inference
@@ -983,6 +995,9 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
     const MAX_LOOPS = 5; // Prevent infinite AI loops
 
     while (!isDone) {
+      // Yield to the main thread so React can render and the browser doesn't freeze
+      await new Promise(r => setTimeout(r, 100));
+
       loopCount++;
       if (loopCount > MAX_LOOPS) {
         currentMessages.push({ role: 'assistant', content: 'Üzgünüm, çok fazla işlem yaptım ve kafam karıştı. Lütfen bana daha net bir komut verin.' } as ChatCompletionMessageParam);

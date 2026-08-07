@@ -154,9 +154,16 @@ export const SidePanel = React.memo(({
       }
 
       let streamedSoFar = '';
+      let lastRenderTime = 0;
+      const THROTTLE_MS = 80; // Only update UI max ~12 times a second to prevent React freezing
+      
       const updatedMessages = await aiAgent.chat(newMessages, (chunk) => {
         streamedSoFar += chunk;
-        setStreamingText(streamedSoFar);
+        const now = performance.now();
+        if (now - lastRenderTime > THROTTLE_MS) {
+          setStreamingText(streamedSoFar);
+          lastRenderTime = now;
+        }
       });
 
       setStreamingText('');
