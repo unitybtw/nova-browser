@@ -360,10 +360,15 @@ app.whenReady().then(async () => {
     }
   });
 
-  // Wait a few seconds before checking to not slow down startup
+  // Wait 8 seconds before checking on startup to not slow down startup
   setTimeout(() => {
     autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Startup update check failed:", err));
   }, 8000);
+
+  // Periodically check for updates every hour
+  setInterval(() => {
+    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Periodic update check failed:", err));
+  }, 1000 * 60 * 60);
 
   // Load persistent extensions from disk
   const extensionsPath = path.join(app.getPath('userData'), 'extensions');
