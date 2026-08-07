@@ -179,6 +179,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
   const [isAIMode, setIsAIMode] = useState(false);
+  const [ghostTab, setGhostTab] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -499,9 +500,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   transition={{ type: 'spring', stiffness: 500, damping: 35 }}
                   whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
                   onDragStart={() => onTabDragStart?.()}
-                  onDrag={(e, info) => onTabDrag?.(info.point.y)}
+                  onDrag={(e, info) => {
+                    onTabDrag?.(info.point.y);
+                    if (info.point.y > 60) {
+                      setGhostTab({ id: tab.id, x: info.point.x, y: info.point.y });
+                    } else {
+                      setGhostTab(null);
+                    }
+                  }}
                   onDragEnd={(e, info) => {
                     onTabDragEnd?.();
+                    setGhostTab(null);
                     if (info.point.y > 60) {
                       onDropToSplitScreen?.(tab.id);
                     }
@@ -1128,6 +1137,26 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           </div>
         </motion.div>
       </AnimatePresence>,
+      document.body
+    )}
+
+    {/* Drag to Split Screen Ghost Tab */}
+    {ghostTab && createPortal(
+      <div 
+        className="fixed pointer-events-none z-[999999] opacity-90 transition-none"
+        style={{ left: ghostTab.x - 100, top: ghostTab.y - 20 }}
+      >
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${
+          isIncognito 
+            ? 'bg-slate-800/90 border-slate-600 text-slate-200' 
+            : 'bg-white/90 border-blue-500/50 text-slate-800 dark:bg-slate-800/90 dark:border-blue-500/50 dark:text-slate-200'
+        }`}>
+          <Globe className="w-4 h-4 opacity-70" />
+          <span className="text-[13px] font-medium max-w-[160px] truncate">
+            {tabs.find(t => t.id === ghostTab.id)?.title || 'Drop to Split Screen'}
+          </span>
+        </div>
+      </div>,
       document.body
     )}
     </>
