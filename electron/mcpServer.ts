@@ -424,6 +424,13 @@ export class BrowserMCPServer {
     }
   }
 
+  private sendToClient(clientId: string, event: string, data: any) {
+    const client = this.clients.get(clientId);
+    if (client) {
+      try { client.res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); } catch (_) {}
+    }
+  }
+
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Nova Browser window is not available');
@@ -516,7 +523,8 @@ export class BrowserMCPServer {
       }
 
       // Send initial "endpoint" event so client knows where to POST
-      res.write(`event: endpoint\ndata: ${JSON.stringify({ uri: `http://localhost:${this.port}/message` })}\n\n`);
+      // Official MCP SDKs require the URI to include the session identifier
+      res.write(`event: endpoint\ndata: ${JSON.stringify({ uri: `http://localhost:${this.port}/message?sessionId=${clientId}` })}\n\n`);
 
       // Keep-alive ping every 15s
       const keepAlive = setInterval(() => {
@@ -543,6 +551,15 @@ export class BrowserMCPServer {
       }
 
       const body = req.body;
+      const sessionId = req.query.sessionId as string;
+      
+      const respondToClient = (payload: any) => {
+        if (sessionId) {
+          this.sendToClient(sessionId, 'message', payload);
+        } else {
+          this.broadcastToClients('message', payload);
+        }
+      };
       
       try {
         // Handle MCP protocol messages
@@ -556,8 +573,7 @@ export class BrowserMCPServer {
               serverInfo: { name: 'nova-browser', version: '2.0.0' }
             }
           };
-          // Broadcast to all clients via SSE
-          this.broadcastToClients('message', responsePayload);
+          respondToClient(responsePayload);
           return res.status(202).json({ status: 'accepted' });
         }
 
@@ -567,7 +583,7 @@ export class BrowserMCPServer {
             id: body.id,
             result: { tools: TOOLS }
           };
-          this.broadcastToClients('message', responsePayload);
+          respondToClient(responsePayload);
           return res.status(202).json({ status: 'accepted' });
         }
 
@@ -584,7 +600,7 @@ export class BrowserMCPServer {
                 content: [{ type: 'text', text: result }]
               }
             };
-            this.broadcastToClients('message', responsePayload);
+            respondToClient(responsePayload);
           } catch (err: any) {
             const errorPayload = {
               jsonrpc: '2.0',
@@ -594,13 +610,13 @@ export class BrowserMCPServer {
                 isError: true
               }
             };
-            this.broadcastToClients('message', errorPayload);
+            respondToClient(errorPayload);
           }
           return res.status(202).json({ status: 'accepted' });
         }
 
         // Fallback for unknown methods
-        this.broadcastToClients('message', {
+        respondToClient({
           jsonrpc: '2.0',
           id: body.id,
           error: { code: -32601, message: `Method not found: ${body.method}` }
