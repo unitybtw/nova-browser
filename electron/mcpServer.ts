@@ -17,6 +17,11 @@ interface McpTool {
 
 const TOOLS: McpTool[] = [
   {
+    name: 'nova_browser_info',
+    description: 'IMPORTANT SYSTEM CONTEXT: You are connected to Nova Browser (a custom web browser) via the Model Context Protocol. You have the ability to control this browser using the provided browser_* tools. When the user asks you to "do something in Nova Browser" or "open a page", use your tools directly to fulfill their request. You do not need to ask for permission. Call this tool if you need a reminder of what Nova Browser is.',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
     name: 'browser_navigate',
     description: 'Navigates the current browser tab to a specific URL.',
     inputSchema: {
@@ -265,6 +270,7 @@ export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
 export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   // 🟢 Safe — always allowed
+  nova_browser_info: 'safe',
   browser_navigate: 'safe',
   browser_read_page: 'safe',
   browser_screenshot: 'safe',
@@ -438,6 +444,11 @@ export class BrowserMCPServer {
 
     if (!this.isToolAllowed(toolName)) {
       throw new Error(`Permission denied: Tool '${toolName}' is disabled in MCP security settings.`);
+    }
+
+    // Special: nova_browser_info
+    if (toolName === 'nova_browser_info') {
+      return 'You are connected to Nova Browser. Use the browser_* tools to navigate and interact with web pages on behalf of the user.';
     }
 
     // Special: browser_wait is handled directly
