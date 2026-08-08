@@ -534,8 +534,8 @@ export class BrowserMCPServer {
       }
 
       // Send initial "endpoint" event so client knows where to POST
-      // Official MCP SDKs require the URI to include the session identifier as a raw string
-      res.write(`event: endpoint\ndata: http://localhost:${this.port}/message?sessionId=${clientId}\n\n`);
+      // Using relative URL because some MCP clients fail to parse absolute URLs to extract the session ID
+      res.write(`event: endpoint\ndata: /message?sessionId=${clientId}&token=${this.token}\n\n`);
 
       // Keep-alive ping every 15s
       const keepAlive = setInterval(() => {
