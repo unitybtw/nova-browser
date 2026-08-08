@@ -523,8 +523,8 @@ export class BrowserMCPServer {
       }
 
       // Send initial "endpoint" event so client knows where to POST
-      // Official MCP SDKs require the URI to include the session identifier
-      res.write(`event: endpoint\ndata: ${JSON.stringify({ uri: `http://localhost:${this.port}/message?sessionId=${clientId}` })}\n\n`);
+      // Official MCP SDKs require the URI to include the session identifier as a raw string
+      res.write(`event: endpoint\ndata: http://localhost:${this.port}/message?sessionId=${clientId}\n\n`);
 
       // Keep-alive ping every 15s
       const keepAlive = setInterval(() => {
