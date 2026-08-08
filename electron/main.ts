@@ -721,6 +721,7 @@ ipcMain.handle('clear-incognito-session', async () => {
 // Generic Secure Storage API (for future password manager, etc.)
 ipcMain.handle('secure-store-set', async (_event, key: string, value: string) => {
   try {
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     const encrypted = safeStorage.isEncryptionAvailable() 
       ? safeStorage.encryptString(value) 
@@ -735,6 +736,7 @@ ipcMain.handle('secure-store-set', async (_event, key: string, value: string) =>
 
 ipcMain.handle('secure-store-get', async (_event, key: string) => {
   try {
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     if (fs.existsSync(keyPath)) {
       const encrypted = fs.readFileSync(keyPath);
@@ -751,6 +753,7 @@ ipcMain.handle('secure-store-get', async (_event, key: string) => {
 // Generic JSON Storage API (for highlights, stats, whitelists, etc.)
 ipcMain.handle('store-set', async (_event, key: string, value: string) => {
   try {
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     fs.writeFileSync(keyPath, value, 'utf-8');
     return true;
@@ -762,6 +765,7 @@ ipcMain.handle('store-set', async (_event, key: string, value: string) => {
 
 ipcMain.handle('store-get', async (_event, key: string) => {
   try {
+    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     if (fs.existsSync(keyPath)) {
       return fs.readFileSync(keyPath, 'utf-8');

@@ -528,7 +528,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <div 
                   ref={contentRef}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-blue-500 hover:prose-a:text-blue-600 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
-                  dangerouslySetInnerHTML={{ __html: content }} 
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} 
                 />
               </motion.div>
             )}
