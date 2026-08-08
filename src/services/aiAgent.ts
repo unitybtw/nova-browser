@@ -28,7 +28,7 @@ const DOM_SCAN_SCRIPT = `(() => {
   const vw = window.innerWidth || document.documentElement.clientWidth;
   
   for (const el of allInteractive) {
-    if (visibleEls.length >= 30) break; // Don't process more than we need to avoid freezing the renderer
+    if (visibleEls.length >= 20) break; // Don't process more than we need to avoid freezing the renderer
     
     const rect = el.getBoundingClientRect();
     // Only process elements that are visible in the current viewport
@@ -59,7 +59,7 @@ const DOM_SCAN_SCRIPT = `(() => {
     };
   });
   
-  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 800);
+  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 500);
   return JSON.stringify({ text, interactable_elements: items });
 })();`;
 
@@ -80,7 +80,8 @@ class AIAgent {
   }
   
   // Model identifier. We MUST use a Hermes model because WebLLM only supports tool calling (function calling) on Hermes fine-tunes.
-  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
+  // Using a much lighter model (Llama-3.2 1B) to prevent GPU stuttering and memory crashes
+  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -418,7 +419,7 @@ class AIAgent {
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
       this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
         initProgressCallback,
-        context_window_size: 8192 // Increased from 4096 to prevent ContextWindowSizeExceededError
+        context_window_size: 2048
       } as any) as any;
 
     } catch (err) {
