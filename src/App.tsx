@@ -623,7 +623,7 @@ function App() {
     if ((window as any).electronAPI?.onExtensionInstalledSilently) {
       cleanupExtInstall = (window as any).electronAPI.onExtensionInstalledSilently((_event: any, data: any) => {
         if (data.success) {
-          alert(`Eklenti başarıyla yüklendi: ${data.name}`);
+          alert(`Extension successfully installed: ${data.name}`);
         }
       });
     }
@@ -678,7 +678,7 @@ function App() {
   const handleNewTab = useCallback((url?: string | any) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
-    // Güvenlik: Kötü niyetli protokolleri engelle
+    // Security: Block malicious protocols
     const lowerUrl = finalUrl.toLowerCase();
     if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('file:') || lowerUrl.startsWith('data:text/html')) {
       finalUrl = 'nova://newtab';

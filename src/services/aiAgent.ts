@@ -679,7 +679,7 @@ class AIAgent {
             typeBox.style.pointerEvents = 'none';
             typeBox.style.border = '1px solid rgba(255,255,255,0.4)';
             typeBox.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
-            typeBox.innerHTML = '<span style="color:' + color + '">✨ AI Yazıyor:</span> <span id="ai-typing-text"></span><span id="ai-cursor" style="animation: blink 1s step-end infinite; color:' + color + '">|</span>';
+            typeBox.innerHTML = '<span style="color:' + color + '">✨ AI Typing:</span> <span id="ai-typing-text"></span><span id="ai-cursor" style="animation: blink 1s step-end infinite; color:' + color + '">|</span>';
             
             // Add keyframes for cursor blink if not exists
             if (!document.getElementById('ai-blink-style')) {
@@ -956,20 +956,20 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
 
-    const systemInstruction = `\n\n[SİSTEM TALİMATI]
-Sen gelişmiş bir Tarayıcı Yapay Zeka Asistanısın.
-Görevlerin:
-1. Kullanıcıya web'de gezinmesi ve bilgi bulması için Türkçe olarak yardımcı olmak.
-2. Sayfaları okumak, butonlara tıklamak ve form doldurmak için sana verilen ARAÇLARI (tools) kullanmak.
+    const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
+You are an advanced Browser AI Assistant.
+Your tasks:
+1. Help the user navigate the web and find information in English.
+2. Use the provided TOOLS to read pages, click buttons, and fill forms.
 
-ARAÇ KULLANIMI İÇİN KRİTİK KURALLAR:
-- Yeni bir sekme (new tab) açman istenirse, 'navigate_to_url' YERİNE önce 'manage_tabs' (action="create") aracını kullanmalısın!
-- 'navigate_to_url' aracını kullandığında, sonucunda sana GÜNCEL SAYFA İÇERİĞİ VE ELEMENTLER (butonlar vb.) OTOMATİK OLARAK dönecektir. Gezindikten hemen sonra gereksiz yere tekrar 'read_page_content' ÇAĞIRMA!
-- ASLA 'navigate_to_url' aracını arka arkaya iki kere çağırma. Bir sayfaya gittiysen, o sayfayla etkileşime gir (fill_input, click_element) veya kullanıcıya cevap ver.
-- Kullanıcının isteğini yarım bırakma. Çok adımlı bir işse (Örn: Arama yap ve özetle), önce ara, sonra sayfayı oku, sonra özetle.
-- Her zaman kısa ve öz konuş. Asla gereksiz uzatma.
+CRITICAL RULES FOR TOOL USAGE:
+- If asked to open a new tab, use 'manage_tabs' (action="create") INSTEAD OF 'navigate_to_url'!
+- When you use 'navigate_to_url', the CURRENT PAGE CONTENT AND ELEMENTS (buttons, etc.) will AUTOMATICALLY be returned to you. DO NOT unnecessarily call 'read_page_content' right after navigating!
+- NEVER call 'navigate_to_url' twice in a row. If you navigate to a page, interact with it (fill_input, click_element) or reply to the user.
+- Do not leave the user's request half-done. If it's a multi-step task (e.g. search and summarize), first search, then read the page, then summarize.
+- Always be concise. Never prolong unnecessarily.
 
-HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih verirse (örneğin "benim adım Ali", "hep Türkçe konuş"), bunu gelecekte de hatırlamak için 'save_to_memory' aracını KULLANMAK ZORUNDASIN.\n`;
+MEMORY SYSTEM (CRITICAL): If the user gives you persistent info or a preference (e.g. "my name is Ali", "always speak English"), you MUST use the 'save_to_memory' tool to remember this for the future.\n`;
 
     // Inject memory prompt if present
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
@@ -1001,12 +1001,12 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
 
       loopCount++;
       if (loopCount > MAX_LOOPS) {
-        currentMessages.push({ role: 'assistant', content: 'Üzgünüm, çok fazla işlem yaptım ve kafam karıştı. Lütfen bana daha net bir komut verin.' } as ChatCompletionMessageParam);
+        currentMessages.push({ role: 'assistant', content: 'Sorry, I did too many operations and got confused. Please give me a clearer command.' } as ChatCompletionMessageParam);
         break;
       }
 
       if (this.isInterrupted) {
-        currentMessages.push({ role: 'assistant', content: 'İşlem kullanıcı tarafından durduruldu.' } as ChatCompletionMessageParam);
+        currentMessages.push({ role: 'assistant', content: 'Process stopped by the user.' } as ChatCompletionMessageParam);
         break;
       }
 
@@ -1052,7 +1052,7 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
         } as ChatCompletionMessageParam);
 
         const toolNames = responseMessage.tool_calls.map(tc => tc.function.name).join(', ');
-        if (onChunk) onChunk(`\n> *Araç çalıştırılıyor: ${toolNames}...*\n\n`);
+        if (onChunk) onChunk(`\n> *Tool running: ${toolNames}...*\n\n`);
 
         for (const toolCall of responseMessage.tool_calls) {
           const funcName = toolCall.function.name;
@@ -1060,7 +1060,7 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
           
           // Prevent infinite tool loops (calling same tool consecutively)
           if (this.isInterrupted) {
-             result = JSON.stringify({ error: "İşlem iptal edildi." });
+             result = JSON.stringify({ error: "Process cancelled." });
           } else if (funcName === lastToolName && responseMessage.tool_calls.length === 1) {
             result = JSON.stringify({ error: `CRITICAL ERROR: You just called '${funcName}' again! You are stuck in an infinite loop. You MUST call a different tool now (like read_page_content) or provide your final response to the user!` });
           } else {
@@ -1081,13 +1081,13 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
           lastToolName = funcName;
         }
         
-        if (onChunk) onChunk('\n> *Ajan düşünüyor...*\n\n');
+        if (onChunk) onChunk('\n> *Agent thinking...*\n\n');
       } else {
         isDone = true;
         // Final response
         let content = (responseMessage.content as string) ?? '';
         if (toolsCalled && content.trim() === '') {
-          content = "İstediğiniz işlemleri tamamladım.";
+          content = "I have completed the requested operations.";
         }
         
         if (onChunk && content) {
@@ -1106,7 +1106,7 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
           const engineRef = this.engine;
           const summaryMessages = [
             currentMessages[currentMessages.length - 1], // just the last assistant response
-            { role: 'user', content: 'Kısaca az önce tarayıcıda hangi görevi tamamladığını tek cümleyle özetle. (Örn: "Google\'da arama yapıp sonuçları buldum")' }
+            { role: 'user', content: 'Briefly summarize the task you just completed in the browser in a single sentence. (e.g. "I searched Google and found the results")' }
           ];
           setTimeout(() => {
             engineRef.chat.completions.create({
@@ -1141,7 +1141,7 @@ HAFIZA SİSTEMİ (KRİTİK): Kullanıcı sana kalıcı bir bilgi veya tercih ver
     
     const reply = await this.engine.chat.completions.create({
       messages: [
-        { role: "system", content: "You are a fast summarization AI. Summarize the provided text in exactly 1 or 2 short sentences in Turkish. Do NOT include any conversational filler like 'İşte özet:' or 'Özet:'. ONLY return the summary text." },
+        { role: "system", content: "You are a fast summarization AI. Summarize the provided text in exactly 1 or 2 short sentences in English. Do NOT include any conversational filler like 'Here is the summary:' or 'Summary:'. ONLY return the summary text." },
         { role: "user", content: text }
       ],
       temperature: 0.3

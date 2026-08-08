@@ -18,7 +18,7 @@ const PasswordList = () => {
   }, []);
 
   const handleDelete = async (index: number) => {
-    if (!window.confirm('Bu şifreyi silmek istediğinize emin misiniz?')) return;
+    if (!window.confirm('Are you sure you want to delete this password?')) return;
     const newPasses = [...passwords];
     newPasses.splice(index, 1);
     setPasswords(newPasses);
@@ -35,7 +35,7 @@ const PasswordList = () => {
   };
 
   if (passwords.length === 0) {
-    return <div className="p-6 text-center text-slate-500">Henüz kaydedilmiş şifre yok.</div>;
+    return <div className="p-6 text-center text-slate-500">No saved passwords yet.</div>;
   }
 
   return (
@@ -1255,7 +1255,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             <div className="flex items-center gap-3">
                               <button 
                                 onClick={async () => {
-                                  if (window.confirm('Bu eklentiyi kaldırmak istediğinize emin misiniz?')) {
+                                  if (window.confirm('Are you sure you want to remove this extension?')) {
                                     try {
                                       await (window as any).electronAPI?.removeExtension?.(ext.id);
                                     } catch (e) {}

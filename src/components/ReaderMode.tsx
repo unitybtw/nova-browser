@@ -352,14 +352,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       setContent(null);
 
       if (!url || url.startsWith('nova://') || url.startsWith('about:')) {
-        setError('Okuma modu bu özel sayfada kullanılamaz.');
+        setError('Reader mode is not available on this special page.');
         setIsLoading(false);
         return;
       }
 
       try {
         const webview = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
-        if (!webview) throw new Error('Web tarayıcı bileşeni yüklenemedi.');
+        if (!webview) throw new Error('Web browser component failed to load.');
 
         const html = await webview.executeJavaScript(`document.documentElement.outerHTML`);
         
@@ -382,10 +382,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           const cleanHtml = DOMPurify.sanitize(article.content, { ADD_ATTR: ['target'] });
           setContent(cleanHtml);
         } else {
-          setError('Bu sayfadaki metin içeriği okuma modu için uygun bulunamadı.');
+          setError('The text content on this page is not suitable for reader mode.');
         }
       } catch (err: any) {
-        setError(err.message || 'Sayfa içeriği okunamadı.');
+        setError(err.message || 'Page content could not be read.');
       } finally {
         setIsLoading(false);
       }
@@ -436,7 +436,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 onClick={onClose}
                 className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
               >
-                <ArrowLeft className="w-4 h-4" /> Kapat
+                <ArrowLeft className="w-4 h-4" /> Close
               </button>
             </div>
             
@@ -445,7 +445,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <button 
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                  title={isPlaying ? "Duraklat" : "Sesli Oku"}
+                  title={isPlaying ? "Pause" : "Read Aloud"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                 </button>
@@ -453,7 +453,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <button 
                     onClick={stopSpeech}
                     className={`p-1.5 rounded-full transition-colors text-red-500 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                    title="Durdur"
+                    title="Stop"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                   </button>
@@ -462,7 +462,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <button
                   onClick={changeSpeechRate}
                   className={`flex items-center gap-1 p-1.5 rounded-full transition-colors text-xs font-bold w-12 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                  title="Okuma Hızı"
+                  title="Reading Speed"
                 >
                   {speechRate}x
                 </button>
@@ -471,7 +471,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               <button 
                 onClick={() => setShowControls(!showControls)}
                 className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
-                title="Görünüm Ayarları"
+                title="Appearance Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
@@ -479,22 +479,22 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               {showControls && (
                 <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[260px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">TEMA</div>
+                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">THEME</div>
                     <div className="flex gap-2">
-                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Açık Tema"><Sun className="w-5 h-5 mx-auto"/></button>
-                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepya Tema">A</button>
-                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Karanlık Tema"><Moon className="w-5 h-5 mx-auto"/></button>
+                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5 mx-auto"/></button>
+                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
+                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Dark Theme"><Moon className="w-5 h-5 mx-auto"/></button>
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">YAZI TİPİ</div>
+                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">FONT</div>
                     <div className="flex gap-2">
                       <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded-lg border text-sm font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Klasik</button>
+                      <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">BOYUT</div>
+                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">SIZE</div>
                     <div className="flex gap-2 items-center">
                       <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-sm transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
                       <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-base font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
@@ -510,7 +510,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4" />
-                <p>İçerik ayıklanıyor...</p>
+                <p>Extracting content...</p>
               </div>
             )}
             
@@ -566,7 +566,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <textarea 
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
-                  placeholder="Not ekle (Markdown)..."
+                  placeholder="Add note (Markdown)..."
                   className="w-full h-20 p-2 rounded mb-2 resize-none outline-none border transition-colors"
                   style={{
                     backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
@@ -582,13 +582,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       color: theme === 'dark' ? '#cbd5e1' : '#64748b'
                     }}
                   >
-                    İptal
+                    Cancel
                   </button>
                   <button 
                     onClick={saveHighlight} 
                     className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs font-medium"
                   >
-                    Kaydet
+                    Save
                   </button>
                 </div>
               </motion.div>
@@ -613,7 +613,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 }}
               >
                 <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">Not</span>
+                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">Note</span>
                   <button onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} className="opacity-50 hover:opacity-100">
                     &times;
                   </button>

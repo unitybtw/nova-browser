@@ -26,14 +26,14 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({ isOpen
                 <KeyRound size={20} />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-800 dark:text-slate-200">Şifre Kaydedilsin mi?</h3>
+                <h3 className="font-semibold text-slate-800 dark:text-slate-200">Save Password?</h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate w-48">{hostname}</p>
               </div>
             </div>
             
             {username && (
               <div className="bg-slate-50 dark:bg-slate-900/50 p-2 rounded-md border border-slate-100 dark:border-slate-700/50">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Kullanıcı Adı</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Username</p>
                 <p className="text-sm text-slate-700 dark:text-slate-300 font-medium truncate">{username}</p>
               </div>
             )}
@@ -44,14 +44,14 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({ isOpen
                 className="flex-1 py-1.5 px-3 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex items-center justify-center gap-1.5"
               >
                 <X size={16} />
-                <span>Şimdi Değil</span>
+                <span>Not Now</span>
               </button>
               <button
                 onClick={onSave}
                 className="flex-1 py-1.5 px-3 rounded-lg bg-blue-600 text-white font-medium text-sm hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
               >
                 <Check size={16} />
-                <span>Kaydet</span>
+                <span>Save</span>
               </button>
             </div>
           </div>

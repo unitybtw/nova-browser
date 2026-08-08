@@ -527,7 +527,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
           <p className="text-sm text-slate-400 mb-8 leading-relaxed">
-            Bellek tasarrufu için bu sekme askıya alındı. Tıklayarak anında uyandırın.
+            This tab was suspended to save memory. Click to wake it up instantly.
           </p>
           <button 
             onClick={(e) => {
@@ -537,7 +537,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 group-hover:scale-105"
           >
             <Zap className="w-4 h-4" />
-            Sekmeyi Yeniden Yükle
+            Reload Tab
           </button>
         </div>
       </div>
@@ -632,8 +632,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         {/* Debug Banner */}
         {!(typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup) && (
           <div className="absolute top-0 left-0 right-0 bg-red-600 text-white font-bold p-2 z-[9999] text-center">
-            UYARI: ELECTRON API BULUNAMADI! IFRAME (GÜVENLİ MOD) KULLANILIYOR! 
-            Bu yüzden YouTube ve Reddit gibi siteler (X-Frame-Options engeli nedeniyle) SİYAH EKRAN verecektir!
+            WARNING: ELECTRON API NOT FOUND! USING IFRAME (SAFE MODE)! 
+            Therefore, sites like YouTube and Reddit will show a BLACK SCREEN (due to X-Frame-Options block)!
           </div>
         )}
 

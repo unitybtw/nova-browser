@@ -200,9 +200,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-2xl shadow-black/50">
               <VenetianMask className="w-16 h-16 text-slate-300" strokeWidth={1.5} />
             </div>
-            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">Gizli Sekmedesiniz</h1>
+            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">You are in Incognito Tab</h1>
             <p className="text-lg text-slate-400 max-w-lg">
-              Tarama geçmişiniz, çerezler, site verileri ve formlara girilen bilgiler kaydedilmeyecek.
+              Your browsing history, cookies, site data, and information entered in forms will not be saved.
             </p>
           </motion.div>
 
@@ -215,7 +215,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Gizli modda ara veya adres yaz..."
+                placeholder="Search or type URL in incognito mode..."
                 className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-all shadow-xl backdrop-blur-xl"
                 autoFocus
               />

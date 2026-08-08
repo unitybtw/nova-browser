@@ -47,7 +47,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
       setIsSummarizing(true);
       setError(null);
       setSummary('');
-      setLoadingText('Sayfa içeriği indiriliyor...');
+      setLoadingText('Downloading page content...');
       
       try {
         // 1. Fetch HTML from Main Process
@@ -61,7 +61,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           throw new Error(result.error || "Failed to fetch");
         }
 
-        setLoadingText('İçerik analiz ediliyor...');
+        setLoadingText('Analyzing content...');
 
         // 2. Parse HTML directly (Main process already stripped scripts/styles for perf & safety)
         const parser = new DOMParser();
@@ -75,26 +75,26 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
         contentToSummarize = contentToSummarize.replace(/\s+/g, ' ').substring(0, 3000);
         
         if (contentToSummarize.length < 50) {
-          throw new Error("Metin bulunamadı");
+          throw new Error("Text not found");
         }
 
         if (isCancelled) return;
 
         // 4. Summarize with WebLLM
         if (!aiAgent.isReady()) {
-          setLoadingText("AI Modeli İndiriliyor (4GB)...");
+          setLoadingText("Downloading AI Model (4GB)...");
           await aiAgent.init((progress, text) => {
             if (progress < 100) {
-              setLoadingText(`AI İndiriliyor: %${Math.round(progress)}`);
+              setLoadingText(`Downloading AI: %${Math.round(progress)}`);
             } else {
-              setLoadingText("AI modeli hazırlandı! Özet çıkarılıyor...");
+              setLoadingText("AI model ready! Extracting summary...");
             }
           });
         }
         
         if (isCancelled) return;
         
-        setLoadingText('Yapay Zeka Okuyor...'); 
+        setLoadingText('AI is reading...'); 
 
         const finalSummary = await aiAgent.summarize(contentToSummarize);
         
@@ -106,7 +106,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
       } catch (err: any) {
         if (!isCancelled) {
           console.error(err);
-          setError("Özet alınamadı.");
+          setError("Failed to get summary.");
         }
       } finally {
         if (!isCancelled) {

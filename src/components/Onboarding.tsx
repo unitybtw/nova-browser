@@ -15,7 +15,7 @@ const SEARCH_ENGINES = [
   {
     id: 'google' as const,
     name: 'Google',
-    desc: 'En popüler, kapsamlı sonuçlar',
+    desc: 'Most popular, comprehensive results',
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -28,7 +28,7 @@ const SEARCH_ENGINES = [
   {
     id: 'duckduckgo' as const,
     name: 'DuckDuckGo',
-    desc: 'Sizi takip etmez, gizliliğinizi korur',
+    desc: 'Does not track you, protects your privacy',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#DE5833] flex items-center justify-center">
         <Shield className="w-5 h-5 text-white" />
@@ -38,7 +38,7 @@ const SEARCH_ENGINES = [
   {
     id: 'brave' as const,
     name: 'Brave Search',
-    desc: 'Bağımsız, reklamsız, hızlı',
+    desc: 'Independent, ad-free, fast',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#FB542B] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -48,7 +48,7 @@ const SEARCH_ENGINES = [
   {
     id: 'bing' as const,
     name: 'Bing',
-    desc: 'Microsoft yapay zekası ile güçlendirilmiş',
+    desc: 'Powered by Microsoft AI',
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#0078D4" d="M10 5l8 3v26l-8-5z"/>
@@ -61,7 +61,7 @@ const SEARCH_ENGINES = [
   {
     id: 'ecosia' as const,
     name: 'Ecosia',
-    desc: 'Her aramada ağaç dikiyor',
+    desc: 'Plants trees with every search',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#00894A] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -73,7 +73,7 @@ const SEARCH_ENGINES = [
 const THEMES = [
   {
     id: 'light' as const,
-    name: 'Açık',
+    name: 'Light',
     icon: <Sun className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-white border-2 border-slate-200',
     dot: 'bg-slate-800',
@@ -81,7 +81,7 @@ const THEMES = [
   },
   {
     id: 'dark' as const,
-    name: 'Koyu',
+    name: 'Dark',
     icon: <Moon className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-slate-900 border-2 border-slate-700',
     dot: 'bg-white',
@@ -89,7 +89,7 @@ const THEMES = [
   },
   {
     id: 'system' as const,
-    name: 'Sistem',
+    name: 'System',
     icon: <Monitor className="w-4 h-4 inline-block -mt-0.5" />,
     preview: 'bg-gradient-to-br from-white to-slate-900 border-2 border-slate-400',
     dot: 'bg-slate-500',
@@ -171,8 +171,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.3 }}
         className="text-5xl font-bold text-white mb-4 tracking-tight"
       >
-        Nova Browser'a<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Hoş Geldiniz</span>
+        Welcome to<br />
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Nova Browser</span>
       </motion.h1>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -180,7 +180,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.45 }}
         className="text-slate-200 text-xl max-w-md leading-relaxed mb-12"
       >
-        Daha hızlı, daha gizli ve daha akıllı bir web deneyimi sizi bekliyor. Birlikte ayarlayalım.
+        A faster, more private, and smarter web experience awaits you. Let's set it up together.
       </motion.p>
       <motion.button
         initial={{ y: 20, opacity: 0 }}
@@ -191,7 +191,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         whileTap={{ scale: 0.95 }}
         className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all"
       >
-        Hadi Başlayalım →
+        Let's Get Started →
       </motion.button>
     </motion.div>,
 
@@ -203,9 +203,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Eski Tarayıcınızdan Aktarın</h2>
+      <h2 className="text-4xl font-bold text-white mb-3">Import from Your Old Browser</h2>
       <p className="text-slate-200 text-lg max-w-md mb-8">
-        Google Chrome (ve Chromium tabanlı diğer tarayıcılardaki) yer işaretlerinizi tek tıkla Nova'ya aktarabilirsiniz.
+        You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to Nova with a single click.
       </p>
       
       {importStatus === 'idle' && (
@@ -219,34 +219,34 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           ) : (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           )}
-          {isImporting ? 'Aktarılıyor...' : 'Chrome Yer İşaretlerini Aktar'}
+          {isImporting ? 'Importing...' : 'Import Chrome Bookmarks'}
         </button>
       )}
 
       {importStatus === 'success' && (
         <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Yer işaretleri başarıyla aktarıldı!
+          Bookmarks imported successfully!
         </div>
       )}
 
       {importStatus === 'error' && (
         <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          Chrome verisi bulunamadı veya okunamadı.
+          Chrome data could not be found or read.
         </div>
       )}
 
       <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4">
-        {importStatus === 'success' ? 'Devam Et' : 'Şimdilik Atla'}
+        {importStatus === 'success' ? 'Continue' : 'Skip for now'}
       </button>
     </motion.div>,
 
     // Step 2 — Theme
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Tema Seçin</h2>
-      <p className="text-slate-200 text-lg mb-10">Nova Browser'ın görünümünü kişiselleştirin.</p>
+      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Choose a Theme</h2>
+      <p className="text-slate-200 text-lg mb-10">Personalize the look of Nova Browser.</p>
       <div className="flex gap-5 mb-12 flex-wrap justify-center">
         {THEMES.map(t => (
           <button
@@ -268,7 +268,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
             <span className="text-white font-semibold text-sm">{t.icon} {t.name}</span>
             {theme === t.id && (
-              <span className="text-blue-400 text-xs font-medium">✓ Seçildi</span>
+              <span className="text-blue-400 text-xs font-medium">✓ Selected</span>
             )}
           </button>
         ))}
@@ -278,8 +278,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     // Step 3 — Search Engine
     <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Arama Motorunuz</h2>
-      <p className="text-slate-200 text-lg mb-8">Varsayılan arama motorunu seçin. Daha sonra ayarlardan değiştirebilirsiniz.</p>
+      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Your Search Engine</h2>
+      <p className="text-slate-200 text-lg mb-8">Select your default search engine. You can change this later in settings.</p>
       <div className="flex flex-col gap-3 w-full mb-8">
         {SEARCH_ENGINES.map(engine => (
           <button
@@ -318,21 +318,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Gizlilik Kalkanı</h2>
+      <h2 className="text-4xl font-bold text-white mb-3">Privacy Shield</h2>
       <p className="text-slate-200 text-lg max-w-md mb-10 leading-relaxed">
-        Nova Browser'ın yerleşik gizlilik kalkanı; reklamları, izleyicileri ve kötü amaçlı içerikleri otomatik olarak engeller.
+        Nova Browser's built-in privacy shield automatically blocks ads, trackers, and malicious content.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-lg w-full">
         {[
-          { icon: <Ban className="w-8 h-8 text-slate-400" />, label: 'Reklamlar' },
-          { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'İzleyiciler' },
-          { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Kötü Yazılım' },
+          { icon: <Ban className="w-8 h-8 text-slate-400" />, label: 'Ads' },
+          { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'Trackers' },
+          { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Malware' },
         ].map(item => (
           <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
             {item.icon}
             <span className="text-slate-300 text-sm font-medium">{item.label}</span>
             <span className={`text-xs font-bold px-3 py-1 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
-              {privacyShield ? 'Engellendi' : 'Açık'}
+              {privacyShield ? 'Blocked' : 'Allowed'}
             </span>
           </div>
         ))}
@@ -345,7 +345,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-9' : 'translate-x-1'}`} />
         </button>
         <span className="text-white font-medium text-lg">
-          {privacyShield ? 'Gizlilik Kalkanı Aktif' : 'Gizlilik Kalkanı Kapalı'}
+          {privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Off'}
         </span>
       </div>
     </motion.div>,
@@ -369,7 +369,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.3 }}
         className="text-5xl font-bold text-white mb-4"
       >
-        Hazırsınız! 🎉
+        You're all set! 🎉
       </motion.h2>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -377,7 +377,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.45 }}
         className="text-slate-200 text-xl max-w-md leading-relaxed mb-4"
       >
-        Nova Browser hazır. Tüm ayarlarınız kaydedildi ve istediğiniz zaman değiştirebilirsiniz.
+        Nova Browser is ready. All your settings are saved and can be changed anytime.
       </motion.p>
       <motion.div
         initial={{ y: 20, opacity: 0 }}
@@ -385,11 +385,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.55 }}
         className="flex gap-6 mb-12 text-sm text-slate-400"
       >
-        <span>Tema: <strong className="text-white capitalize">{theme}</strong></span>
+        <span>Theme: <strong className="text-white capitalize">{theme}</strong></span>
         <span>·</span>
-        <span>Arama: <strong className="text-white capitalize">{searchEngine}</strong></span>
+        <span>Search: <strong className="text-white capitalize">{searchEngine}</strong></span>
         <span>·</span>
-        <span>Kalkan: <strong className={privacyShield ? 'text-emerald-400' : 'text-red-400'}>{privacyShield ? 'Açık' : 'Kapalı'}</strong></span>
+        <span>Shield: <strong className={privacyShield ? 'text-emerald-400' : 'text-red-400'}>{privacyShield ? 'On' : 'Off'}</strong></span>
       </motion.div>
       <motion.button
         initial={{ y: 20, opacity: 0 }}
@@ -400,7 +400,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         whileTap={{ scale: 0.95 }}
         className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
       >
-        Gezintiye Başla 🚀
+        Start Browsing 🚀
       </motion.button>
     </motion.div>,
   ];
@@ -478,13 +478,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             onClick={goBack}
             className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2"
           >
-            ← Geri
+            ← Back
           </button>
           <button
             onClick={goNext}
             className="bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-400 hover:to-violet-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20"
           >
-            {step === TOTAL_STEPS - 2 ? 'Tamamla ✓' : 'İleri →'}
+            {step === TOTAL_STEPS - 2 ? 'Complete ✓' : 'Next →'}
           </button>
         </div>
       )}

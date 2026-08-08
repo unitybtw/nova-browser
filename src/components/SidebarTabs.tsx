@@ -284,7 +284,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             </div>
           ) : null}
           {tab.isSuspended && (
-            <span className="p-1 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
+            <span className="p-1 text-indigo-400 shrink-0" title="Suspended Tab (Memory Saver)">
               <Moon className="w-3.5 h-3.5 opacity-80" />
             </span>
           )}

@@ -132,7 +132,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                 setInputValue('');
               }
             }}
-            placeholder={isAIMode ? "AI: Ne yapmamı istersiniz? (Örn: Trendyol'dan mavi tişört bul)" : `Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
+            placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find a blue t-shirt on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
             className={`flex-1 bg-transparent border-none outline-none text-lg font-sans transition-all duration-300 ${isAIMode ? 'text-purple-900 dark:text-purple-100 placeholder-purple-400 dark:placeholder-purple-300' : 'text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500'}`}
             autoFocus
           />
@@ -148,7 +148,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
         <div className="max-h-[50vh] overflow-y-auto p-2">
           <div className="px-3 py-2 text-xs font-serif italic text-gray-400 dark:text-slate-500 flex items-center justify-between">
-            <span>{suggestions.length > 0 ? 'Arama Önerileri' : 'Açık Sekmeler'}</span>
+            <span>{suggestions.length > 0 ? 'Search Suggestions' : 'Open Tabs'}</span>
           </div>
 
           <div className="space-y-1">
@@ -184,7 +184,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     ) : (
                       <Globe className="w-4 h-4 text-gray-400 dark:text-slate-500" />
                     )}
-                    <span className="truncate text-sm font-medium">{tab.title || tab.url || 'Yeni Sekme'}</span>
+                    <span className="truncate text-sm font-medium">{tab.title || tab.url || 'New Tab'}</span>
                   </div>
                 </div>
               ))

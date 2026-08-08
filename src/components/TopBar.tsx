@@ -635,7 +635,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         ) : null}
 
                         {tab.isSuspended && (
-                          <span className="p-0.5 text-indigo-400 shrink-0" title="Askıda Sekme (Bellek Tasarrufu)">
+                          <span className="p-0.5 text-indigo-400 shrink-0" title="Suspended Tab (Memory Saver)">
                             <Moon className="w-3.5 h-3.5 opacity-80" />
                           </span>
                         )}
@@ -738,7 +738,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       {isIncognito && (
                         <div className="flex items-center gap-1 mr-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">
                           <VenetianMask className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">Gizli</span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
                         </div>
                       )}
                       {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
@@ -770,7 +770,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   setIsFocused(false);
                   setTimeout(() => setShowSuggestions(false), 200);
                 }}
-                placeholder={isAIMode ? "AI: Ne yapmamı istersiniz? (Örn: YouTube'u açıp Tarkan arat)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
+                placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
                 className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
                   isIncognito 
                     ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
@@ -818,7 +818,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   type="button"
                   onClick={() => setIsAIMode(!isAIMode)}
                   className={`p-1 rounded-full transition-all flex items-center gap-1 ${isAIMode ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400' : (isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700')}`}
-                  title={isAIMode ? "AI Modu Açık - Komut Yazın" : "AI Modunu Aç"}
+                  title={isAIMode ? "AI Mode On - Type Command" : "Turn On AI Mode"}
                 >
                   <Sparkles className="w-3.5 h-3.5" />
                 </button>
@@ -896,7 +896,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     )}
 
                     <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Arama Önerileri
+                      Search Suggestions
                     </div>
 
                     {suggestions
@@ -924,7 +924,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 {bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).length > 0 && (
                   <div className="py-1">
                     <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Yer İmleri
+                      Bookmarks
                     </div>
                     {bookmarks
                       .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
@@ -997,7 +997,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     onNewTab(url); // fallback
                   }
                 } else {
-                  alert(ext.name + ' eklentisinin popup ekranı yok veya henüz desteklenmiyor.');
+                  alert(ext.name + ' extension has no popup screen or is not supported yet.');
                 }
               }}
             >

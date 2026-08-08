@@ -105,11 +105,11 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
     if (checkPhishingDomain(url)) {
       return {
         level: 'dangerous',
-        label: 'Tehlikeli',
+        label: 'Dangerous',
         color: 'text-red-600',
         bgColor: 'bg-red-50 dark:bg-red-500/10',
         icon: 'ShieldAlert',
-        tooltip: 'Potansiyel kimlik avı veya tehlikeli site'
+        tooltip: 'Potential phishing or dangerous site'
       };
     }
 
@@ -117,30 +117,30 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
     if (protocol === 'https:') {
       return {
         level: 'secure',
-        label: 'Güvenli',
+        label: 'Secure',
         color: 'text-emerald-600',
         bgColor: 'bg-emerald-50 dark:bg-emerald-500/10',
         icon: 'Lock',
-        tooltip: 'Bağlantı şifrelenmiş ve güvenli'
+        tooltip: 'Connection is encrypted and secure'
       };
     } else {
       return {
         level: 'http',
-        label: 'Güvenli Değil',
+        label: 'Not Secure',
         color: 'text-amber-600',
         bgColor: 'bg-amber-50 dark:bg-amber-500/10',
         icon: 'Unlock',
-        tooltip: 'Bağlantı şifrelenmemiş (HTTP)'
+        tooltip: 'Connection is not encrypted (HTTP)'
       };
     }
   } catch {
     return {
       level: 'unknown',
-      label: 'Bilinmiyor',
+      label: 'Unknown',
       color: 'text-slate-500',
       bgColor: 'bg-slate-100 dark:bg-slate-800',
       icon: 'Globe',
-      tooltip: 'Geçersiz veya bilinmeyen bağlantı'
+      tooltip: 'Invalid or unknown connection'
     };
   }
 }

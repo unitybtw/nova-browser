@@ -52,14 +52,14 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/80">
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-blue-500" />
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">İndirmeler</h3>
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Downloads</h3>
           </div>
           {downloads.length > 0 && (
             <button
               onClick={onClearDownloads}
               className="text-xs text-slate-500 hover:text-red-500 transition-colors"
             >
-              Temizle
+              Clear
             </button>
           )}
         </div>
@@ -68,7 +68,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
           {downloads.length === 0 ? (
             <div className="py-8 flex flex-col items-center justify-center text-center px-4">
               <Download className="w-8 h-8 text-slate-300 dark:text-slate-600 mb-2" />
-              <p className="text-sm text-slate-500 dark:text-slate-400">Henüz indirilen bir dosya yok.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">No downloaded files yet.</p>
             </div>
           ) : (
             downloads.map(item => {
@@ -95,7 +95,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       <div className="mt-1">
                         <div className="flex items-center justify-between text-[10px] text-slate-500 mb-1">
                           <span>{progress}%</span>
-                          {item.totalBytes ? <span>{(item.totalBytes / 1024 / 1024).toFixed(1)} MB</span> : <span>İndiriliyor...</span>}
+                          {item.totalBytes ? <span>{(item.totalBytes / 1024 / 1024).toFixed(1)} MB</span> : <span>Downloading...</span>}
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                           <div className="h-full bg-blue-500 rounded-full transition-all duration-300" style={{ width: `${progress}%` }} />
@@ -105,7 +105,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                     
                     {!isProgressing && (
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        {isCompleted ? 'Tamamlandı' : isCancelled ? 'İptal edildi' : 'Kesintiye uğradı'}
+                        {isCompleted ? 'Completed' : isCancelled ? 'Cancelled' : 'Interrupted'}
                       </div>
                     )}
                   </div>
@@ -115,7 +115,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       <button
                         onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
                         className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
-                        title="Klasörde Göster"
+                        title="Show in Folder"
                       >
                         <FolderIcon className="w-3.5 h-3.5" />
                       </button>
@@ -125,7 +125,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       <button
                         onClick={() => (window as any).electronAPI?.cancelDownload?.(item.id)}
                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
-                        title="İptal Et"
+                        title="Cancel"
                       >
                         <XCircle className="w-3.5 h-3.5" />
                       </button>

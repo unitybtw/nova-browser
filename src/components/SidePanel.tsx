@@ -16,7 +16,7 @@ if (SpeechRecognition) {
   recognition = new SpeechRecognition();
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.lang = 'tr-TR';
+  recognition.lang = 'en-US';
 }
 
 interface SidePanelProps {
@@ -124,11 +124,11 @@ export const SidePanel = React.memo(({
         setProgressText(text);
       });
       setIsReady(true);
-      setMessages([{ role: 'assistant', content: 'Merhaba! Tarayıcını kontrol etmem, sayfaları analiz etmem veya sorularını yanıtlamam için hazırım. Ne yapmamı istersin?' }]);
+      setMessages([{ role: 'assistant', content: 'Hello! I am ready to control your browser, analyze pages, or answer your questions. What would you like me to do?' }]);
     } catch (err: any) {
       console.error(err);
-      setInitError('AI motoru başlatılamadı. Lütfen tekrar deneyin.');
-      setProgressText('Başlatma başarısız.');
+      setInitError('Failed to initialize AI engine. Please try again.');
+      setProgressText('Initialization failed.');
     } finally {
       setIsInitializing(false);
     }
@@ -149,7 +149,7 @@ export const SidePanel = React.memo(({
       }
 
       if (!aiAgent.isReady()) {
-        setMessages([...newMessages, { role: 'assistant', content: 'AI motoru başlatılamadı. Lütfen "AI\'ı Başlat" butonuna basın.' }]);
+        setMessages([...newMessages, { role: 'assistant', content: 'AI engine not initialized. Please click the "Start AI" button.' }]);
         return;
       }
 
@@ -174,13 +174,13 @@ export const SidePanel = React.memo(({
       const rawMsg = err?.message ?? err?.toString() ?? '';
       let errMsg: string;
       if (rawMsg.includes('Engine not initialized')) {
-        errMsg = 'AI motoru henüz yüklenmedi. Lütfen önce "AI\'ı Başlat" butonuna tıklayın.';
+        errMsg = 'AI engine is not loaded yet. Please click the "Start AI" button first.';
       } else if (rawMsg.includes('ContentTypeError')) {
-        errMsg = 'Mesaj formatı hatası oluştu. Sohbeti sıfırlayıp tekrar deneyin.';
+        errMsg = 'Message format error occurred. Please reset the chat and try again.';
       } else if (rawMsg) {
-        errMsg = `Hata: ${rawMsg}`;
+        errMsg = `Error: ${rawMsg}`;
       } else {
-        errMsg = 'Bilinmeyen bir hata oluştu. Konsolu kontrol edin.';
+        errMsg = 'An unknown error occurred. Check the console.';
       }
       setMessages([...newMessages, { role: 'assistant', content: errMsg }]);
     } finally {
@@ -236,15 +236,15 @@ export const SidePanel = React.memo(({
               <button
                 onClick={() => setShowMemoryVault(!showMemoryVault)}
                 className={`p-1.5 rounded-lg transition-colors ${showMemoryVault ? 'bg-accent/20 dark:bg-accent-dark/50 text-accent-hover' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
-                title="AI Kalıcı Hafıza Paneli"
+                title="AI Persistent Memory Panel"
               >
                 <Brain className="w-4 h-4" />
               </button>
               {isReady && messages.length > 0 && !isLoading && (
                 <button
-                  onClick={() => setMessages([{ role: 'assistant', content: 'Sohbet sıfırlandı. Sana nasıl yardımcı olabilirim?' }])}
+                  onClick={() => setMessages([{ role: 'assistant', content: 'Chat reset. How can I help you?' }])}
                   className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors"
-                  title="Sohbeti Sıfırla"
+                  title="Reset Chat"
                 >
                   <RefreshCw className="w-4 h-4" />
                 </button>
@@ -257,7 +257,7 @@ export const SidePanel = React.memo(({
                     orchestrator.clearQueue();
                   }}
                   className="p-1.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                  title="Ajanı Durdur"
+                  title="Stop Agent"
                 >
                   <Square className="w-4 h-4 fill-current" />
                 </button>
@@ -266,7 +266,7 @@ export const SidePanel = React.memo(({
                 <button
                   onClick={() => tts.stop()}
                   className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 animate-pulse transition-colors"
-                  title="Okumayı Durdur"
+                  title="Stop Reading"
                 >
                   <VolumeX className="w-4 h-4" />
                 </button>
@@ -288,9 +288,9 @@ export const SidePanel = React.memo(({
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <Brain className="w-4 h-4 text-accent" /> AI Hafıza Kasası
+                      <Brain className="w-4 h-4 text-accent" /> AI Memory Vault
                     </h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Yapay zekanın öğrendikleri ve yaptıkları</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">What the AI has learned and done</p>
                   </div>
                 </div>
 
@@ -299,13 +299,13 @@ export const SidePanel = React.memo(({
                     onClick={() => setVaultTab('memory')}
                     className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'memory' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
-                    Kalıcı Bilgiler
+                    Persistent Info
                   </button>
                   <button
                     onClick={() => setVaultTab('tasks')}
                     className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
-                    Görev Geçmişi
+                    Task History
                   </button>
                 </div>
 
@@ -325,7 +325,7 @@ export const SidePanel = React.memo(({
                   type="text"
                   value={newFact}
                   onChange={(e) => setNewFact(e.target.value)}
-                  placeholder="Hafızaya bilgi ekle (ör: 'Kısa yanıt ver')"
+                  placeholder="Add memory info (e.g. 'Keep answers short')"
                   className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent"
                 />
                 <button
@@ -340,7 +340,7 @@ export const SidePanel = React.memo(({
               <div className="flex-1 space-y-2 overflow-y-auto">
                 {memories.length === 0 ? (
                   <div className="text-center py-8 text-xs text-slate-400">
-                    Henüz kaydedilmiş hafıza yok. Konuştukça AI otomatik öğrenecektir.
+                    No saved memories yet. The AI will automatically learn as you converse.
                   </div>
                 ) : (
                   memories.map((m) => (
@@ -357,7 +357,7 @@ export const SidePanel = React.memo(({
                           setMemories(aiMemory.getMemories());
                         }}
                         className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Bu hafızayı sil"
+                        title="Delete this memory"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -370,7 +370,7 @@ export const SidePanel = React.memo(({
                   <div className="flex-1 space-y-2 overflow-y-auto">
                     {tasks.length === 0 ? (
                       <div className="text-center py-8 text-xs text-slate-400">
-                        Henüz tamamlanmış görev geçmişi yok.
+                        No completed task history yet.
                       </div>
                     ) : (
                       tasks.map((t) => (
@@ -379,7 +379,7 @@ export const SidePanel = React.memo(({
                           className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs group flex flex-col gap-1"
                         >
                           <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-slate-400 font-medium">Görev Özeti</span>
+                            <span className="text-[10px] text-slate-400 font-medium">Task Summary</span>
                             <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString()}</span>
                           </div>
                           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
@@ -395,8 +395,8 @@ export const SidePanel = React.memo(({
               <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
                 <Bot className="w-12 h-12 text-slate-300 dark:text-slate-600" />
                 <div className="space-y-2 w-full px-4">
-                  <h3 className="font-medium text-slate-700 dark:text-slate-300">Yerel AI Motoru</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">WebGPU üzerinde çalışan yerel bir AI modeli yükler. İlk yükleme biraz zaman alabilir.</p>
+                  <h3 className="font-medium text-slate-700 dark:text-slate-300">Local AI Engine</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loads a local AI model running on WebGPU. The first load may take some time.</p>
                   
                   {isInitializing ? (
                     <div className="space-y-2 mt-4">
@@ -418,7 +418,7 @@ export const SidePanel = React.memo(({
                         className="px-4 py-2 w-full bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                       >
                         <Sparkles className="w-4 h-4" />
-                        AI'ı Başlat
+                        Start AI
                       </button>
                     </div>
                   )}
@@ -450,9 +450,9 @@ export const SidePanel = React.memo(({
                       <button
                         onClick={() => tts.speak(msg.content as string)}
                         className="flex items-center gap-1 px-2 py-1 mt-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                        title="Sesli Oku"
+                        title="Read Aloud"
                       >
-                        <Volume2 className="w-3 h-3" /> Oku
+                        <Volume2 className="w-3 h-3" /> Read
                       </button>
                     )}
                   </motion.div>
@@ -478,7 +478,7 @@ export const SidePanel = React.memo(({
                   >
                     <div className="flex items-center gap-2 text-slate-400">
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-xs">Düşünüyor...</span>
+                      <span className="text-xs">Thinking...</span>
                     </div>
                     
                     {queuedActions.filter(a => a.state === 'executing').map(action => (
@@ -490,7 +490,7 @@ export const SidePanel = React.memo(({
                       >
                         <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 text-sm font-medium">
                           <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                          Aksiyon Yürütülüyor...
+                          Executing Action...
                         </div>
                         <p className="text-xs text-slate-500 font-mono">
                           {action.toolName}
@@ -523,7 +523,7 @@ export const SidePanel = React.memo(({
                         ? 'bg-red-500 text-white animate-pulse shadow-red-500/30' 
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
-                    title="Bas Konuş"
+                    title="Push to Talk"
                   >
                     {isListening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
                   </button>
@@ -533,7 +533,7 @@ export const SidePanel = React.memo(({
                     type="text"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isListening ? "Dinleniyor..." : "Bir şey sor, gezdir, analiz et..."}
+                    placeholder={isListening ? "Listening..." : "Ask something, navigate, analyze..."}
                     className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-accent rounded-xl py-2.5 pl-4 pr-10 text-xs outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 transition-colors"
                     disabled={isLoading}
                   />
