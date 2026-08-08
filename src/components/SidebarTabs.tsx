@@ -176,11 +176,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
+            whileHover={{ scale: 1.01 }}
             key={`split-${tab.id}-${splitTab.id}`}
-            className={`relative flex items-center h-10 rounded-xl transition-all overflow-hidden ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
+            className={`relative flex items-center h-10 rounded-[10px] transition-all overflow-hidden ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
               isIncognito
-                ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50'
-                : 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200/50 dark:bg-slate-800/90 dark:text-white dark:ring-slate-700/50'
+                ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50 relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
+                : 'bg-white text-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/60 dark:bg-slate-800/95 dark:text-white dark:ring-slate-700/50 dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
             }`}
           >
             <div className="flex w-full items-center h-full px-1 py-1">
@@ -230,18 +231,19 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
         transition={{ duration: 0.15, ease: 'easeOut' }}
+        whileHover={{ scale: 1.01 }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-10 rounded-xl cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-6 w-[calc(100%-24px)]' : 'w-full'} ${
+        className={`relative flex items-center h-10 rounded-[10px] cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
           isActive
             ? isIncognito
-              ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50'
-              : 'bg-white text-slate-900 shadow-md ring-1 ring-slate-200/50 dark:bg-slate-800/90 dark:text-white dark:ring-slate-700/50'
+              ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50 relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
+              : 'bg-white text-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/60 dark:bg-slate-800/95 dark:text-white dark:ring-slate-700/50 dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
             : isIncognito
-              ? 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
-              : 'text-slate-600 hover:bg-white/50 dark:text-slate-400 dark:hover:bg-white/5'
+              ? 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
+              : 'text-slate-600 hover:bg-white/60 dark:text-slate-400 dark:hover:bg-white/10'
         }`}
       >
         <div className="flex items-center gap-3 px-3 flex-1 min-w-0">
@@ -266,7 +268,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {tab.title || tab.url || 'New Tab'}
           </span>
         </div>
-        <div className={`flex items-center gap-1 pr-2 transition-opacity shrink-0 ${isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'}`}>
+        <div className={`flex items-center gap-1 pr-2 transition-all duration-200 ease-out shrink-0 ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 group-hover/tab:opacity-100 group-hover/tab:translate-x-0'}`}>
           {tab.isMuted ? (
             <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500">
               <VolumeX className="w-3.5 h-3.5" />
@@ -298,10 +300,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-14 backdrop-blur-3xl shadow-sm ${
+      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-14 backdrop-blur-[40px] shadow-sm border-r ${
         isIncognito
-          ? 'bg-slate-900/80 dark'
-          : 'bg-white/60 dark:bg-slate-900/60'
+          ? 'bg-slate-900/75 border-slate-800/80 dark'
+          : 'bg-white/50 border-slate-200/50 dark:bg-slate-900/50 dark:border-slate-800/50'
       }`}>
 
         {/* Workspace Header & Switcher */}
@@ -332,8 +334,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 initial={{ opacity: 0, y: -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute top-12 left-2 right-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden z-50 py-1"
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="absolute top-12 left-2 right-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200/60 dark:border-slate-700/60 overflow-hidden z-50 py-1"
               >
                 <div className="max-h-60 overflow-y-auto no-scrollbar py-1">
                   {workspaces.map(w => (
@@ -415,22 +417,36 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className="flex items-center gap-2 h-9 px-2 rounded-lg cursor-pointer text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 transition-colors group/folder"
+                    className="flex items-center gap-2 h-9 px-2 rounded-lg cursor-pointer text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all group/folder"
                   >
                     <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                      {folder.isExpanded ? <ChevronDown className="w-4 h-4 opacity-70" /> : <ChevronRight className="w-4 h-4 opacity-70" />}
+                      {folder.isExpanded ? <ChevronDown className="w-4 h-4 opacity-60" /> : <ChevronRight className="w-4 h-4 opacity-60" />}
                     </div>
-                    <FolderIcon className="w-4 h-4 opacity-70" />
-                    <span className="text-sm font-medium flex-1 truncate">{folder.name}</span>
+                    <FolderIcon className="w-4 h-4 opacity-60 group-hover/folder:opacity-90 transition-opacity" />
+                    <span className="text-[13px] font-semibold flex-1 truncate">{folder.name}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
-                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
+                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 translate-x-2 group-hover/folder:opacity-100 group-hover/folder:translate-x-0 transition-all duration-200 ease-out text-slate-400 hover:text-red-500"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <AnimatePresence>
-                    {folder.isExpanded && folderTabs.map(tab => renderTab(tab, true))}
+                    {folder.isExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="relative"
+                      >
+                        {/* Indentation Guide Line */}
+                        <div className="absolute left-[13px] top-1 bottom-1 w-[2px] bg-slate-200/50 dark:bg-slate-700/50 rounded-full" />
+                        <div className="flex flex-col gap-1 pb-1">
+                          {folderTabs.map(tab => renderTab(tab, true))}
+                        </div>
+                      </motion.div>
+                    )}
                   </AnimatePresence>
                 </motion.div>
               );
