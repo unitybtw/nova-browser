@@ -79,9 +79,9 @@ class AIAgent {
     }
   }
   
-  // Model identifier. We MUST use a Hermes model because WebLLM only supports tool calling (function calling) on Hermes fine-tunes.
-  // Using a much lighter model (Llama-3.2 1B) to prevent GPU stuttering and memory crashes
-  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
+  // We MUST use a Hermes model because WebLLM only supports function calling on Hermes fine-tunes in this version.
+  // Kept context window at 2048 to prevent the lag we experienced earlier.
+  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
