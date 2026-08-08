@@ -714,9 +714,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
   
   // Deep comparison for settings object changes that affect rendering
-  if (prevProps.settings !== nextProps.settings) return false;
-  if (prevProps.history !== nextProps.history) return false;
-  if (prevProps.downloads !== nextProps.downloads) return false;
+  if (prevProps.tab.url === 'nova://settings' && prevProps.settings !== nextProps.settings) return false;
+  if (prevProps.tab.url === 'nova://history' && prevProps.history !== nextProps.history) return false;
+  if (prevProps.tab.url === 'nova://downloads' && prevProps.downloads !== nextProps.downloads) return false;
   
   return true;
 });

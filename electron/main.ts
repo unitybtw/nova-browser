@@ -250,6 +250,9 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
 let nextDownloadAsSaveAs = false;
 
+// Track URLs that failed HTTPS upgrade to prevent infinite loops
+const upgradedUrls = new Set<string>();
+
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
@@ -478,7 +481,13 @@ app.on('web-contents-created', (_event, contents) => {
       try {
         const urlObj = new URL(navigationUrl);
         if (urlObj.protocol === 'http:' && urlObj.hostname !== 'localhost' && !urlObj.hostname.startsWith('127.')) {
+          if (upgradedUrls.has(navigationUrl)) {
+            // Zaten denedik ve patladı (SSL hatası vs.), sonsuz döngüye girmemek için devam et
+            return;
+          }
+          
           e.preventDefault();
+          upgradedUrls.add(navigationUrl);
           const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
           
           // Try loading HTTPS. If it fails, fallback to HTTP.
@@ -617,8 +626,8 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 5. Standard Navigation (if clicking on empty space)
       if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
-        menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.canGoBack() }));
-        menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.canGoForward() }));
+        menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.navigationHistory.canGoBack() }));
+        menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.navigationHistory.canGoForward() }));
         menu.append(new MenuItem({ label: 'Yeniden Yükle', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
