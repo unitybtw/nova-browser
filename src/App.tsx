@@ -842,22 +842,35 @@ function App() {
 
         case 'browser_click':
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
+            const result = await activeWebview.executeJavaScript(`
               (() => {
                 const el = document.querySelector("${args.selector}");
-                if (el) { el.click(); return "Successfully clicked element."; }
-                return "Error: Element not found with selector: ${args.selector}";
+                if (el) { 
+                  const rect = el.getBoundingClientRect();
+                  el.click(); 
+                  return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                }
+                return { success: false, error: "Element not found with selector: ${args.selector}" };
               })();
             `);
+            if (result && result.success) {
+              const bounds = activeWebview.getBoundingClientRect();
+              window.dispatchEvent(new CustomEvent('ai-cursor', {
+                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'click' }
+              }));
+              return "Successfully clicked element.";
+            }
+            return result.error || "Error";
           }
           return "Error: No active webview.";
 
         case 'browser_type':
           if (activeWebview && activeWebview.executeJavaScript) {
-            return await activeWebview.executeJavaScript(`
+            const result = await activeWebview.executeJavaScript(`
               (() => {
                 const el = document.querySelector("${args.selector}");
                 if (el) { 
+                  const rect = el.getBoundingClientRect();
                   el.value = "${args.text}";
                   el.dispatchEvent(new Event('input', { bubbles: true }));
                   el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -865,11 +878,19 @@ function App() {
                     const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
                     el.dispatchEvent(enterEvent);
                   }
-                  return "Successfully typed text."; 
+                  return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                 }
-                return "Error: Element not found with selector: ${args.selector}";
+                return { success: false, error: "Element not found with selector: ${args.selector}" };
               })();
             `);
+            if (result && result.success) {
+              const bounds = activeWebview.getBoundingClientRect();
+              window.dispatchEvent(new CustomEvent('ai-cursor', {
+                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: args.text }
+              }));
+              return "Successfully typed text."; 
+            }
+            return result.error || "Error";
           }
           return "Error: No active webview.";
 
