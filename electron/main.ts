@@ -523,6 +523,10 @@ ipcMain.handle('capture-tab-thumbnail', async (_event, webContentsId: number) =>
   try {
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return null;
+    
+    // 🔒 Security: Only allow capturing webviews (tabs)
+    if (wc.getType() !== 'webview') return null;
+
     const image = await wc.capturePage();
     if (image.isEmpty()) return null;
     return image.resize({ width: 320, height: 200 }).toDataURL();
@@ -657,13 +661,16 @@ ipcMain.handle('cancel-download', (_event, id: string) => {
 });
 
 ipcMain.handle('open-download', (_event, pathStr: string) => {
-  if (pathStr && fs.existsSync(pathStr)) {
+  const downloadsPath = app.getPath('downloads');
+  // 🔒 Security: Ensure path actually exists inside the Downloads folder
+  if (pathStr && pathStr.startsWith(downloadsPath) && fs.existsSync(pathStr)) {
     shell.openPath(pathStr);
   }
 });
 
 ipcMain.handle('show-download-in-folder', (_event, pathStr: string) => {
-  if (pathStr && fs.existsSync(pathStr)) {
+  const downloadsPath = app.getPath('downloads');
+  if (pathStr && pathStr.startsWith(downloadsPath) && fs.existsSync(pathStr)) {
     shell.showItemInFolder(pathStr);
   }
 });
