@@ -238,6 +238,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           })();
         `;
         webview.executeJavaScript(autofillScript);
+        if (webview.setAudioMuted) webview.setAudioMuted(!!tab.isMuted);
       } catch (e) {}
     };
 
