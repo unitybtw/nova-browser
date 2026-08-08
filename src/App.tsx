@@ -666,7 +666,13 @@ function App() {
   }, []);
 
   const handleNewTab = useCallback((url?: string | any) => {
-    const finalUrl = typeof url === 'string' ? url : 'nova://newtab';
+    let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
+    
+    // Güvenlik: Kötü niyetli protokolleri engelle
+    const lowerUrl = finalUrl.toLowerCase();
+    if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('file:') || lowerUrl.startsWith('data:text/html')) {
+      finalUrl = 'nova://newtab';
+    }
     
     let initialTitle = 'New Tab';
     if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
