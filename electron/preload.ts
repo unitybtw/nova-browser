@@ -63,10 +63,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   // VPN
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
-  // Shortcuts & Downloads events
+  // Shortcuts, Navigation & Downloads events
   onShortcut: (callback: (event: any, command: string) => void) => {
     ipcRenderer.on('shortcut', callback);
     return () => ipcRenderer.removeListener('shortcut', callback);
+  },
+  onNewTab: (callback: (event: any, url: string) => void) => {
+    ipcRenderer.on('new-tab', callback);
+    return () => ipcRenderer.removeListener('new-tab', callback);
   },
   onDownloadUpdate: (callback: (event: any, data: any) => void) => {
     ipcRenderer.on('download-update', callback);

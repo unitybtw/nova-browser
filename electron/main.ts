@@ -135,11 +135,13 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
     // Auto-install CRX extensions from Chrome Web Store
     if (filename.endsWith('.crx')) {
-      // Chrome Web Store extensions are usually named like "extension_1_2_3.crx"
-      // or "cjpalhdlnbpafiamejdnhcphjbkeiagm.crx"
-      // Since it's hard to get the ID from here, we will just let install-from-webstore IPC handle it
-      // and we CANCEL the native download to prevent duplicate installation!
       item.cancel();
+    } else if (nextDownloadAsSaveAs) {
+      nextDownloadAsSaveAs = false;
+      // Do not set save path so Electron shows the Save Dialog automatically
+      item.once('done', (_event, state) => {
+        if (state === 'completed') activeDownloads.delete(downloadId);
+      });
     } else {
       item.setSavePath(path.join(app.getPath('downloads'), filename));
       item.once('done', (_event, state) => {
@@ -236,6 +238,8 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
   });
 }
+
+let nextDownloadAsSaveAs = false;
 
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
@@ -533,29 +537,11 @@ app.on('web-contents-created', (_event, wc) => {
       const { Menu, MenuItem, clipboard } = require('electron');
       const menu = new Menu();
 
-      // Seçili metin varsa
-      if (params.selectionText) {
-        menu.append(new MenuItem({
-          label: 'Kopyala',
-          accelerator: 'CmdOrCtrl+C',
-          click: () => clipboard.writeText(params.selectionText)
-        }));
-        menu.append(new MenuItem({
-          label: `Google'da Ara: "${params.selectionText.length > 15 ? params.selectionText.substring(0, 15) + '...' : params.selectionText}"`,
-          click: () => {
-            mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`);
-          }
-        }));
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      // Link varsa
+      // 1. Link Actions
       if (params.linkURL) {
         menu.append(new MenuItem({
           label: 'Bağlantıyı Yeni Sekmede Aç',
-          click: () => {
-            mainWindow?.webContents.send('new-tab', params.linkURL);
-          }
+          click: () => mainWindow?.webContents.send('new-tab', params.linkURL)
         }));
         menu.append(new MenuItem({
           label: 'Bağlantı Adresini Kopyala',
@@ -564,17 +550,16 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
-      // Resim varsa
+      // 2. Image Actions
       if (params.srcURL && params.mediaType === 'image') {
         menu.append(new MenuItem({
           label: 'Resmi Yeni Sekmede Aç',
-          click: () => {
-            mainWindow?.webContents.send('new-tab', params.srcURL);
-          }
+          click: () => mainWindow?.webContents.send('new-tab', params.srcURL)
         }));
         menu.append(new MenuItem({
           label: 'Resmi Farklı Kaydet...',
           click: () => {
+            nextDownloadAsSaveAs = true;
             wc.downloadURL(params.srcURL);
           }
         }));
@@ -585,14 +570,40 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
-      // Standart Gezinme (boşluğa tıklanınca)
-      if (!params.linkURL && !params.selectionText && params.mediaType === 'none') {
+      // 3. Text Selection Actions (Non-editable)
+      if (params.selectionText && !params.isEditable) {
+        menu.append(new MenuItem({ role: 'copy', label: 'Kopyala', accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({
+          label: `Google'da Ara: "${params.selectionText.length > 20 ? params.selectionText.substring(0, 20) + '...' : params.selectionText}"`,
+          click: () => mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`)
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 4. Editable Field Actions (Inputs, Textareas)
+      if (params.isEditable) {
+        menu.append(new MenuItem({ role: 'undo', label: 'Geri Al' }));
+        menu.append(new MenuItem({ role: 'redo', label: 'Yeniden Yap' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'cut', label: 'Kes' }));
+        menu.append(new MenuItem({ role: 'copy', label: 'Kopyala' }));
+        menu.append(new MenuItem({ role: 'paste', label: 'Yapıştır' }));
+        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: 'Stilsiz Yapıştır' }));
+        menu.append(new MenuItem({ role: 'delete', label: 'Sil' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'selectAll', label: 'Tümünü Seç' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 5. Standard Navigation (if clicking on empty space)
+      if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
         menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.canGoBack() }));
         menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.canGoForward() }));
         menu.append(new MenuItem({ label: 'Yeniden Yükle', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
+      // 6. Developer Tools
       menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
       
       menu.popup({ window: mainWindow || undefined });

@@ -575,12 +575,22 @@ function App() {
   useEffect(() => {
     let cleanupShortcut: (() => void) | void;
     let cleanupDownloads: (() => void) | void;
+    let cleanupNewTab: (() => void) | void;
 
     if (window.electronAPI?.onShortcut) {
       cleanupShortcut = window.electronAPI.onShortcut((_event: any, command: string) => {
         if (command === 'search' || command === 'toggle-omnibox') {
           setIsSpotlightOpen(prev => !prev);
         }
+        if (command === 'new-tab') {
+          handleNewTab();
+        }
+      });
+    }
+
+    if (window.electronAPI?.onNewTab) {
+      cleanupNewTab = window.electronAPI.onNewTab((_event: any, url: string) => {
+        handleNewTab(url);
       });
     }
 
@@ -616,6 +626,7 @@ function App() {
 
     return () => {
       if (typeof cleanupShortcut === 'function') cleanupShortcut();
+      if (typeof cleanupNewTab === 'function') cleanupNewTab();
       if (typeof cleanupDownloads === 'function') cleanupDownloads();
       if (typeof cleanupExtInstall === 'function') cleanupExtInstall();
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
