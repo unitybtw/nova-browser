@@ -148,7 +148,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
         <div className="max-h-[50vh] overflow-y-auto p-2">
           <div className="px-3 py-2 text-xs font-serif italic text-gray-400 dark:text-slate-500 flex items-center justify-between">
-            <span>Açık Sekmeler</span>
+            <span>{suggestions.length > 0 ? 'Arama Önerileri' : 'Açık Sekmeler'}</span>
           </div>
 
           <div className="space-y-1">
