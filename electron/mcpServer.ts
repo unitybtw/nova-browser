@@ -319,7 +319,7 @@ export class BrowserMCPServer {
   private clients: Map<string, SseClient> = new Map();
   private requestCounter = 0;
   private pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
-  private token: string = '';
+  private token: string;
   private disabledTools: Set<string> = new Set(DEFAULT_DISABLED_TOOLS);
   private tokenFilePath: string = '';
 
@@ -329,9 +329,13 @@ export class BrowserMCPServer {
     // Set token file path in app userData
     try {
       this.tokenFilePath = path.join(electronApp.getPath('userData'), 'nova-mcp-token');
-      this.token = this.loadOrGenerateToken();
+      if (process.env.MCP_TOKEN) {
+        this.token = process.env.MCP_TOKEN;
+      } else {
+        this.token = this.loadOrGenerateToken();
+      }
     } catch {
-      this.token = randomUUID();
+      this.token = process.env.MCP_TOKEN || randomUUID();
     }
     this.setupRoutes();
   }
@@ -339,24 +343,22 @@ export class BrowserMCPServer {
   private loadOrGenerateToken(): string {
     try {
       if (fs.existsSync(this.tokenFilePath)) {
-        const raw = fs.readFileSync(this.tokenFilePath);
-        if (safeStorage.isEncryptionAvailable()) {
-          return safeStorage.decryptString(raw);
-        }
-        return raw.toString('utf-8');
+        const raw = fs.readFileSync(this.tokenFilePath, 'utf-8');
+        return raw;
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[MCP Server] Error reading token file:', e);
+    }
     return this.saveNewToken();
   }
 
   private saveNewToken(): string {
     const newToken = randomUUID();
     try {
-      const data = safeStorage.isEncryptionAvailable()
-        ? safeStorage.encryptString(newToken)
-        : Buffer.from(newToken, 'utf-8');
-      fs.writeFileSync(this.tokenFilePath, data);
-    } catch {}
+      fs.writeFileSync(this.tokenFilePath, newToken, 'utf-8');
+    } catch (e) {
+      console.warn('[MCP Server] Error saving token file:', e);
+    }
     return newToken;
   }
 
@@ -672,6 +674,7 @@ export class BrowserMCPServer {
           console.log(`[MCP Server] ✓ Running at http://localhost:${this.port}`);
           console.log(`[MCP Server] SSE endpoint: http://localhost:${this.port}/sse`);
           console.log(`[MCP Server] Health: http://localhost:${this.port}/health`);
+          console.log(`[MCP Server] RAW TOKEN: ${this.token}`);
           resolve();
         });
 
