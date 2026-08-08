@@ -236,7 +236,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         onClick={() => onSelectTab(tab.id)}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-10 rounded-[10px] cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
+        className={`relative flex items-center h-11 rounded-[10px] cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
           isActive
             ? isIncognito
               ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50 relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
@@ -247,24 +247,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         }`}
       >
         <div className="flex items-center gap-3 px-3 flex-1 min-w-0">
-          <div className="w-5 h-5 flex items-center justify-center shrink-0 drop-shadow-sm">
+          <div className="w-6 h-6 flex items-center justify-center shrink-0 drop-shadow-sm">
             {tab.isLoading ? (
-              <div className="w-4 h-4 border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
+              <div className="w-[18px] h-[18px] border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
             ) : tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-4 h-4 rounded-sm" />
+              <img src={tab.favicon} alt="" className="w-[18px] h-[18px] rounded-sm object-contain" />
             ) : tab.url === 'nova://settings' ? (
-              <Settings className="w-4 h-4 opacity-70" />
+              <Settings className="w-[18px] h-[18px] opacity-70" />
             ) : tab.url === 'nova://history' ? (
-              <Clock className="w-4 h-4 opacity-70" />
+              <Clock className="w-[18px] h-[18px] opacity-70" />
             ) : tab.url === 'nova://downloads' ? (
-              <Download className="w-4 h-4 opacity-70" />
+              <Download className="w-[18px] h-[18px] opacity-70" />
             ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
-              tab.isIncognito ? <VenetianMask className="w-4 h-4 opacity-70" /> : <Plus className="w-4 h-4 opacity-70" />
+              tab.isIncognito ? <VenetianMask className="w-[18px] h-[18px] opacity-70" /> : <Plus className="w-[18px] h-[18px] opacity-70" />
             ) : (
-              <Globe className="w-4 h-4 opacity-70" />
+              <Globe className="w-[18px] h-[18px] opacity-70" />
             )}
           </div>
-          <span className={`truncate text-[13px] transition-opacity duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
+          <span className={`truncate text-sm transition-opacity duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
             {tab.title || tab.url || 'New Tab'}
           </span>
         </div>

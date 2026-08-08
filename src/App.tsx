@@ -1439,14 +1439,10 @@ function App() {
 
       if (matches('newTab')) {
         e.preventDefault();
-        if (settings.useVerticalTabs) {
-          setIsSpotlightOpen(true);
-        } else {
-          handleNewTab();
-          setTimeout(() => {
-            document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
-          }, 100);
-        }
+        handleNewTab();
+        setTimeout(() => {
+          document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
+        }, 100);
         return;
       }
       
