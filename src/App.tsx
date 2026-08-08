@@ -253,6 +253,13 @@ function App() {
     };
   });
 
+  // Sync settings with backend
+  useEffect(() => {
+    if ((window as any).electronAPI?.storeSet) {
+      (window as any).electronAPI.storeSet('settings', JSON.stringify(settings));
+    }
+  }, [settings]);
+
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
     if (savedVpn) {
@@ -287,6 +294,9 @@ function App() {
     localStorage.setItem('user_settings', JSON.stringify(settings));
     if (window.electronAPI?.setPrivacyShield) {
       window.electronAPI.setPrivacyShield(settings.privacyShield);
+    }
+    if ((window as any).electronAPI?.setDoNotTrack) {
+      (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
     }
   }, [settings]);
 

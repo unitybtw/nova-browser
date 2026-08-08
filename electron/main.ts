@@ -12,6 +12,17 @@ import { autoUpdater } from 'electron-updater';
 // Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
 app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
+// Hardware acceleration config
+try {
+  const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
+  if (fs.existsSync(settingsPath)) {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    if (settings.hardwareAcceleration === false) {
+      app.disableHardwareAcceleration();
+    }
+  }
+} catch (e) {}
+
 // Aggressive GPU Acceleration flags for buttery smooth scrolling
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
@@ -57,6 +68,7 @@ function isPhishing(urlStr: string) {
 }
 
 let isPrivacyShieldEnabled = true;
+let isDoNotTrackEnabled = true;
 let blocker: ElectronBlocker | null = null;
 const activeDownloads = new Map<string, Electron.DownloadItem>();
 let mcpServer: BrowserMCPServer | null = null;
@@ -128,7 +140,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     requestHeaders['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
   }
 
-  if (isPrivacyShieldEnabled) {
+  if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
     requestHeaders['DNT'] = '1';
     requestHeaders['Sec-GPC'] = '1';
   }
@@ -503,6 +515,17 @@ app.on('web-contents-created', (_event, contents) => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  
+  try {
+    const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      if (settings.clearOnExit) {
+        session.defaultSession.clearStorageData();
+        session.defaultSession.clearCache();
+      }
+    }
+  } catch (e) {}
 });
 
 app.on('window-all-closed', () => {
@@ -520,6 +543,10 @@ ipcMain.handle('set-privacy-shield', (_event, enabled: boolean) => {
     }
   }
   return isPrivacyShieldEnabled;
+});
+
+ipcMain.handle('set-do-not-track', (_event, enabled: boolean) => {
+  isDoNotTrackEnabled = Boolean(enabled);
 });
 
 // Set theme source for dark mode rendering on pages
@@ -633,7 +660,15 @@ app.on('web-contents-created', (_event, wc) => {
       }
 
       // 6. Developer Tools
-      menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+      try {
+        const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
+        if (fs.existsSync(settingsPath)) {
+          const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+          if (settings.developerMode) {
+            menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+          }
+        }
+      } catch (e) {}
       
       menu.popup({ window: mainWindow || undefined });
     }
