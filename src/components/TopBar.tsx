@@ -431,10 +431,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 <div className="w-2 h-2 rounded-full" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace.color] || '#64748b' }} />
                 <span>{activeWorkspace.name}</span>
               </button>
+              <AnimatePresence>
               {isWorkspaceDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsWorkspaceDropdownOpen(false)} />
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
+                  <motion.div 
+                    initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                    transition={{ duration: 0.15, ease: 'easeOut' }}
+                    className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50">
                     {workspaces.map(w => (
                       <button
                         key={w.id}
@@ -459,9 +465,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       <Plus className="w-3.5 h-3.5" />
                       <span>Manage Workspaces</span>
                     </button>
-                  </div>
+                  </motion.div>
                 </>
               )}
+              </AnimatePresence>
             </div>
           )}
 
@@ -705,18 +712,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       >
         {/* Navigation Buttons */}
         <div className="flex items-center gap-1">
-          <button onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Back">
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoBack} disabled={!activeTab?.canGoBack} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Back">
             <ArrowLeft className="w-4 h-4" />
-          </button>
-          <button onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Forward">
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onGoForward} disabled={!activeTab?.canGoForward} className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Go Forward">
             <ArrowRight className="w-4 h-4" />
-          </button>
-          <button onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Reload Page">
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={onReload} className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="Reload Page">
             <RotateCw className={`w-4 h-4 transition-transform duration-500 active:rotate-180 ${activeTab?.isLoading ? 'animate-spin' : ''}`} />
-          </button>
-          <button onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="New Tab Page">
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={() => onNavigate('nova://newtab')} className={`p-1.5 rounded-lg transition-colors ml-0.5 ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`} title="New Tab Page">
             <Home className="w-4 h-4" />
-          </button>
+          </motion.button>
         </div>
 
         {/* Omnibox / Address Bar */}
