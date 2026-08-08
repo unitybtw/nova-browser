@@ -96,6 +96,15 @@ function createWindow() {
     }
   });
 
+  // 🔒 Security: Prevent Drag and Drop navigation on the main UI window
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Only allow navigation to localhost dev server or local file in prod
+    if (url.startsWith('http://localhost:5173') || url.startsWith('file://')) {
+      return;
+    }
+    event.preventDefault();
+  });
+
   // Inject webstore API into all webviews
   session.defaultSession.setPreloads([
     path.join(__dirname, 'webstore-preload.cjs')
@@ -447,6 +456,13 @@ app.on('web-contents-created', (_event, contents) => {
 
   if (contents.getType() === 'webview') {
     contents.on('will-navigate', (e, navigationUrl) => {
+      // 0. Prevent Local File Access
+      if (navigationUrl.startsWith('file://')) {
+        e.preventDefault();
+        console.warn('Blocked navigation to local file:', navigationUrl);
+        return;
+      }
+
       // 1. Phishing Check
       if (isPhishing(navigationUrl)) {
         e.preventDefault();
