@@ -108,27 +108,64 @@ npm run build
 
 ## 🏗️ Architecture
 
+Nova Browser employs a modern Electron architecture with strict context isolation, a React-based renderer, and a dedicated AI integration layer via the Model Context Protocol (MCP).
+
+```mermaid
+graph TD
+    subgraph Electron["Electron (Main Process)"]
+        main[main.ts<br/>App Lifecycle & IPC]
+        mcp[BrowserMCPServer<br/>Local Port: 3020]
+        adblock[AdBlocker Engine]
+        downloads[Downloads Manager]
+    end
+
+    subgraph Preload["Context Bridge (Preload)"]
+        api[window.electronAPI]
+    end
+
+    subgraph Renderer["React (Renderer Process)"]
+        app[App.tsx<br/>Tab & State Management]
+        router[Internal Router]
+        
+        subgraph InternalPages["nova:// Pages"]
+            settings[SettingsPage.tsx]
+            history[HistoryPage.tsx]
+            newtab[NewTabPage.tsx]
+        end
+        
+        webview["&lt;webview&gt;<br/>External Sites"]
+        ai[AI Sidebar / WebWorkers]
+    end
+
+    subgraph External["External Clients"]
+        claude[Claude Desktop / Cursor]
+    end
+
+    main <-->|IPC Comm| api
+    api <-->|Method Calls| app
+    app --> router
+    router --> settings
+    router --> history
+    router --> newtab
+    app --> webview
+    app --> ai
+    main --> adblock
+    main --> downloads
+    
+    claude <-->|JSON-RPC / SSE| mcp
+    mcp <-->|DOM Manipulation<br/>click, type, screenshot| webview
+    
+    style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
+    style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
+    style Renderer fill:#0f172a,stroke:#61DAFB,stroke-width:2px,color:#fff
+    style External fill:#172554,stroke:#3b82f6,stroke-width:2px,color:#fff
 ```
-nova-browser/
-├── electron/                 # Electron Main Process & Preloads
-│   ├── main.ts               # App lifecycle, IPC handlers, downloads, session logic
-│   ├── preload.ts            # Secure contextBridge API bindings
-│   └── webstore-preload.ts   # Preload script for Web Store CRX installations
-├── src/                      # React Renderer Process
-│   ├── components/           # UI Components & Internal Pages
-│   │   ├── BrowserView.tsx   # Webview wrapper & nova:// internal router
-│   │   ├── TopBar.tsx        # Omnibox, navigation, extension buttons
-│   │   ├── NewTabPage.tsx    # Start page, speed dials, tasks widget
-│   │   ├── SettingsPage.tsx  # nova://settings page
-│   │   ├── HistoryPage.tsx   # nova://history page
-│   │   ├── DownloadsPage.tsx # nova://downloads page
-│   │   ├── ExtensionsPage.js # nova://extensions page
-│   │   └── SidePanel.tsx     # AI Assistant sidebar panel
-│   ├── services/             # AI & IPC background services
-│   └── utils/                # Search engine formatters & helpers
-├── assets/                   # README images & logos
-└── package.json              # Scripts & dependencies
-```
+
+### Component Breakdown
+- **Main Process**: Handles native OS integration, window management, hardware acceleration, and runs the MCP Server to listen for AI client connections.
+- **Preload Scripts**: Securely bridges communication between Node.js (`ipcMain`) and the React frontend (`ipcRenderer`) without exposing Node primitives to the DOM.
+- **Renderer Process**: Built with React, Vite, and TailwindCSS. Manages the browser's UI layout, internal `nova://` protocol pages, and embeds external sites using Electron's secure `<webview>` tags.
+- **MCP Bridge**: A built-in HTTP/SSE server that allows external LLMs to read the DOM, inject JavaScript, and autonomously navigate the browser.
 
 ---
 
