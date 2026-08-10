@@ -155,17 +155,21 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   };
 
   const containerVariants = {
-    hidden: { opacity: 0, y: 15 },
+    hidden: { opacity: 0 },
     visible: { 
       opacity: 1, 
-      y: 0,
-      transition: { duration: 0.4, staggerChildren: 0.08 }
+      transition: { staggerChildren: 0.1, delayChildren: 0.1 }
     }
   };
 
-  const itemVariants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: { opacity: 1, y: 0 }
+  const itemVariants: any = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: { 
+      opacity: 1, 
+      y: 0, 
+      scale: 1,
+      transition: { type: 'spring', stiffness: 300, damping: 24 }
+    }
   };
 
   const getBackgroundStyle = () => {
@@ -369,9 +373,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             {speedDials.map((dial: any, idx: number) => (
               <motion.div 
                 key={idx} 
-                whileHover={{ scale: 1.08, y: -4 }}
+                whileHover={{ scale: 1.08, y: -6 }}
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                 className="relative group w-[100px] sm:w-[110px]"
               >
                 <button

@@ -415,7 +415,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">About Nova</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version 1.0.0 (Open Source Edition)</p>
@@ -426,7 +426,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">On Startup</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex flex-col sm:flex-row gap-2">
                   {[
                     { id: 'newTab', label: 'Open New Tab Page' },
                     { id: 'continue', label: 'Continue where you left off' },
@@ -449,7 +449,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Search Engine</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-1">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-1">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-1">
                     {[
                       { id: 'google', name: 'Google', desc: 'Fast & Accurate' },
@@ -477,7 +477,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Font Size</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
                   {(['small', 'medium', 'large'] as const).map(size => (
                     <button
                       key={size}
@@ -496,7 +496,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Clear Browsing Data</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Clear History & Cache</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Clear your browsing history, cookies, cache, and more.</p>
@@ -522,7 +522,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Theme Mode</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
                   {[
                     { id: 'light', label: 'Light' },
                     { id: 'dark', label: 'Dark' },
@@ -668,7 +668,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Layout & Navigation</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Bookmarks Bar</div>
@@ -716,7 +716,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {activeTab === 'privacy' && (
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
                   <div className="p-6 flex items-start gap-4">
                     <div className="p-3 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 rounded-2xl">
                       <ShieldCheck className="w-6 h-6" />
@@ -744,7 +744,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tracking & Cookies</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Send a "Do Not Track" request</div>
@@ -782,7 +782,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Saved Passwords</h2>
                 </div>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
                   <PasswordList />
                 </div>
               </section>
@@ -794,7 +794,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Features</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">AI Link Preview (Hover Summaries)</div>
@@ -812,7 +812,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Memory & Performance</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automatic Tab Hibernation (Memory Saver)</div>
@@ -849,7 +849,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">System & Developer</h2>
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50">
                   <div className="p-5 flex items-center justify-between">
                     <div>
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Use hardware acceleration</div>
@@ -945,7 +945,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
 
               {/* Status Card */}
-              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+              <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-3 h-3 rounded-full ${mcpStatus?.running ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
@@ -982,7 +982,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
 
               {/* API Token Card */}
-              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+              <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
                 <div className="flex items-center gap-2">
                   <Key className="w-4 h-4 text-purple-500" />
                   <p className="font-semibold text-slate-800 dark:text-slate-100">API Token Authentication</p>
@@ -1020,7 +1020,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
 
               {/* Config snippet */}
-              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+              <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-slate-800 dark:text-slate-100">Setup Guide</p>
@@ -1040,7 +1040,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
 
               {/* Tools list & Permissions */}
-              <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
+              <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
                 <div className="flex items-center gap-2">
                   <ShieldAlert className="w-4 h-4 text-orange-500" />
                   <p className="font-semibold text-slate-800 dark:text-slate-100">Tool Permissions ({MCP_TOOLS.length})</p>
@@ -1113,7 +1113,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   </button>
                 </div>
                 
-                <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 divide-y divide-slate-100 dark:divide-slate-700/50">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 divide-y divide-slate-100 dark:divide-slate-700/50">
                   {[
                     { id: 'newTab', label: 'New Tab' },
                     { id: 'reopenTab', label: 'Reopen Closed Tab' },
@@ -1222,7 +1222,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
                   {/* Extension Management */}
                   {(!extensions || extensions.length === 0) ? (
-                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
+                    <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col items-center justify-center text-center space-y-4 shadow-sm">
                       <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400">
                         <Puzzle className="w-8 h-8" />
                       </div>
@@ -1234,7 +1234,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
+                    <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-sm overflow-hidden">
                       <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                         {extensions.map((ext: any) => (
                           <div key={ext.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">

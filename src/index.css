@@ -76,6 +76,25 @@ h1, h2, h3, h4, h5, h6, .font-serif {
   animation: float-up 0.2s ease-out forwards;
 }
 
+/* Premium Interactive Globals */
+button {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.premium-card {
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.premium-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
 /* Top bar specific styles */
 .top-bar {
   background: var(--bg-main);
