@@ -278,30 +278,30 @@ app.whenReady().then(async () => {
       return callback(true);
     }
     
-    // Map permission names to Turkish for the user dialog
+    // Map permission names for the user dialog
     const permissionNames: Record<string, string> = {
-      'media': 'Kamera ve Mikrofon',
-      'geolocation': 'Konum (GPS)',
-      'notifications': 'Bildirimler',
-      'midiSysex': 'Müzik Cihazları (MIDI)',
-      'pointerLock': 'Fare Kilidi',
-      'fullscreen': 'Tam Ekran',
-      'openExternal': 'Dış Uygulama Açma',
-      'clipboard-read': 'Panoyu Okuma'
+      'media': 'Camera and Microphone',
+      'geolocation': 'Location (GPS)',
+      'notifications': 'Notifications',
+      'midiSysex': 'Music Devices (MIDI)',
+      'pointerLock': 'Pointer Lock',
+      'fullscreen': 'Fullscreen',
+      'openExternal': 'Open External App',
+      'clipboard-read': 'Read Clipboard'
     };
     
     const permissionName = permissionNames[permission] || permission;
 
     dialog.showMessageBox(mainWindow!, {
       type: 'warning',
-      buttons: ['İzin Ver', 'Engelle'],
+      buttons: ['Allow', 'Block'],
       defaultId: 1, // Default to Block
       cancelId: 1,
-      title: 'Güvenlik Uyarısı: İzin İsteği',
-      message: 'Bir site donanımınıza erişmek istiyor!',
-      detail: `Site: ${url}\n\nBu site "${permissionName}" izni istiyor.\nNe yapmak istersiniz?`
+      title: 'Security Warning: Permission Request',
+      message: 'A site wants to access your device!',
+      detail: `Site: ${url}\n\nThis site is requesting "${permissionName}" permission.\nWhat would you like to do?`
     }).then(({ response }) => {
-      // response === 0 means "İzin Ver"
+      // response === 0 means "Allow"
       callback(response === 0);
     }).catch(() => {
       callback(false);
@@ -484,7 +484,7 @@ app.on('web-contents-created', (_event, contents) => {
         mainWindow?.webContents.send('blocked-site', { url: navigationUrl, reason: 'phishing' });
         // Optional: you can inject a warning HTML directly or navigate to a local warning page
         contents.executeJavaScript(`
-          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Tehlikeli Site Engellendi</h1><p>Bu sitenin (${navigationUrl}) oltalama (phishing) veya zararlı yazılım içerdiği tespit edildi.</p></div>';
+          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (${navigationUrl}) has been identified as containing phishing or malicious software.</p></div>';
         `).catch(() => {});
         return;
       }
@@ -588,7 +588,7 @@ app.on('web-contents-created', (_event, wc) => {
 
   // Native Context Menu for webviews
   wc.on('context-menu', (e, params) => {
-    // Sadece webview'ler için göster
+    // Only show for webviews
     if (wc.getType() === 'webview') {
       const { Menu, MenuItem, clipboard } = require('electron');
       const menu = new Menu();
@@ -596,11 +596,11 @@ app.on('web-contents-created', (_event, wc) => {
       // 1. Link Actions
       if (params.linkURL) {
         menu.append(new MenuItem({
-          label: 'Bağlantıyı Yeni Sekmede Aç',
+          label: 'Open Link in New Tab',
           click: () => mainWindow?.webContents.send('new-tab', params.linkURL)
         }));
         menu.append(new MenuItem({
-          label: 'Bağlantı Adresini Kopyala',
+          label: 'Copy Link Address',
           click: () => clipboard.writeText(params.linkURL)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
@@ -609,18 +609,18 @@ app.on('web-contents-created', (_event, wc) => {
       // 2. Image Actions
       if (params.srcURL && params.mediaType === 'image') {
         menu.append(new MenuItem({
-          label: 'Resmi Yeni Sekmede Aç',
+          label: 'Open Image in New Tab',
           click: () => mainWindow?.webContents.send('new-tab', params.srcURL)
         }));
         menu.append(new MenuItem({
-          label: 'Resmi Farklı Kaydet...',
+          label: 'Save Image As...',
           click: () => {
             nextDownloadAsSaveAs = true;
             wc.downloadURL(params.srcURL);
           }
         }));
         menu.append(new MenuItem({
-          label: 'Resim Adresini Kopyala',
+          label: 'Copy Image Address',
           click: () => clipboard.writeText(params.srcURL)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
@@ -628,9 +628,9 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 3. Text Selection Actions (Non-editable)
       if (params.selectionText && !params.isEditable) {
-        menu.append(new MenuItem({ role: 'copy', label: 'Kopyala', accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({ role: 'copy', label: 'Copy', accelerator: 'CmdOrCtrl+C' }));
         menu.append(new MenuItem({
-          label: `Google'da Ara: "${params.selectionText.length > 20 ? params.selectionText.substring(0, 20) + '...' : params.selectionText}"`,
+          label: `Search Google for: "${params.selectionText.length > 20 ? params.selectionText.substring(0, 20) + '...' : params.selectionText}"`,
           click: () => mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
@@ -638,24 +638,24 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 4. Editable Field Actions (Inputs, Textareas)
       if (params.isEditable) {
-        menu.append(new MenuItem({ role: 'undo', label: 'Geri Al' }));
-        menu.append(new MenuItem({ role: 'redo', label: 'Yeniden Yap' }));
+        menu.append(new MenuItem({ role: 'undo', label: 'Undo' }));
+        menu.append(new MenuItem({ role: 'redo', label: 'Redo' }));
         menu.append(new MenuItem({ type: 'separator' }));
-        menu.append(new MenuItem({ role: 'cut', label: 'Kes' }));
-        menu.append(new MenuItem({ role: 'copy', label: 'Kopyala' }));
-        menu.append(new MenuItem({ role: 'paste', label: 'Yapıştır' }));
-        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: 'Stilsiz Yapıştır' }));
-        menu.append(new MenuItem({ role: 'delete', label: 'Sil' }));
+        menu.append(new MenuItem({ role: 'cut', label: 'Cut' }));
+        menu.append(new MenuItem({ role: 'copy', label: 'Copy' }));
+        menu.append(new MenuItem({ role: 'paste', label: 'Paste' }));
+        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: 'Paste and Match Style' }));
+        menu.append(new MenuItem({ role: 'delete', label: 'Delete' }));
         menu.append(new MenuItem({ type: 'separator' }));
-        menu.append(new MenuItem({ role: 'selectAll', label: 'Tümünü Seç' }));
+        menu.append(new MenuItem({ role: 'selectAll', label: 'Select All' }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
       // 5. Standard Navigation (if clicking on empty space)
       if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
-        menu.append(new MenuItem({ label: 'Geri', click: () => wc.goBack(), enabled: wc.navigationHistory.canGoBack() }));
-        menu.append(new MenuItem({ label: 'İleri', click: () => wc.goForward(), enabled: wc.navigationHistory.canGoForward() }));
-        menu.append(new MenuItem({ label: 'Yeniden Yükle', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
+        menu.append(new MenuItem({ label: 'Back', click: () => wc.goBack(), enabled: wc.navigationHistory.canGoBack() }));
+        menu.append(new MenuItem({ label: 'Forward', click: () => wc.goForward(), enabled: wc.navigationHistory.canGoForward() }));
+        menu.append(new MenuItem({ label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
@@ -665,7 +665,7 @@ app.on('web-contents-created', (_event, wc) => {
         if (fs.existsSync(settingsPath)) {
           const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
           if (settings.developerMode) {
-            menu.append(new MenuItem({ label: 'Öğeyi İncele (DevTools)', click: () => wc.inspectElement(params.x, params.y) }));
+            menu.append(new MenuItem({ label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) }));
           }
         }
       } catch (e) {}
@@ -756,7 +756,7 @@ ipcMain.handle('get-mcp-status', () => {
   };
 });
 
-// Gizli mod session temizleme
+// Clear incognito mode session
 ipcMain.handle('clear-incognito-session', async () => {
   try {
     const incogSession = session.fromPartition('incognito');
@@ -764,7 +764,7 @@ ipcMain.handle('clear-incognito-session', async () => {
     await incogSession.clearCache();
     return true;
   } catch (err) {
-    console.error('Gizli mod temizlenirken hata:', err);
+    console.error('Error clearing incognito session:', err);
     return false;
   }
 });
