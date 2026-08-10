@@ -169,6 +169,74 @@ graph TD
 
 ---
 
+## 🤖 MCP (Model Context Protocol) Setup Guide
+
+Nova Browser natively supports the Model Context Protocol (MCP), allowing AI assistants to browse the web autonomously. 
+
+To connect **Claude Desktop** to Nova Browser, add the following configuration to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "nova-browser": {
+      "command": "node",
+      "args": ["/ABSOLUTE_PATH_TO_YOUR_PROJECT/mcp-bridge.mjs"]
+    }
+  }
+}
+```
+*Note: Make sure Nova Browser is running before using the Claude Desktop integration.*
+
+---
+
+## 🗺️ Roadmap
+
+- [x] Basic Browser Engine (Tabs, Navigation, Webviews)
+- [x] Native MCP AI Agent Integration
+- [x] Glassmorphic UI & Productivity Tools (Workspaces, Tasks)
+- [x] Built-in Privacy Shield (Adblocker)
+- [ ] Direct Chrome Web Store Extension Installation
+- [ ] Cross-Device Tab & History Synchronization
+- [ ] Built-in Local LLM Support (Web-LLM)
+- [ ] Mobile App Companion
+
+---
+
+## 🛡️ Security & Privacy
+
+Nova Browser takes security seriously:
+- **Strict Context Isolation**: The renderer process is completely isolated from Node.js primitives.
+- **Sandboxed Webviews**: External sites are loaded in securely partitioned `<webview>` tags that prevent malicious code from escaping into the browser's main process.
+- **Phishing Protection**: Built-in detection for known phishing URLs and domains.
+- **Zero Telemetry**: We do not track your browsing history. Everything is stored locally on your machine.
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions from the community! To contribute:
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+---
+
+## ❓ FAQ
+
+**Q: Can I use Google Chrome Extensions?**
+A: Yes! You can install packed `.crx` files directly via the `nova://extensions` page. Direct Chrome Web Store installations are on our roadmap.
+
+**Q: Does Nova track my data?**
+A: No. Nova is 100% privacy-focused. Your history, bookmarks, and passwords remain on your local disk.
+
+**Q: Why does the AI cursor fail to click sometimes?**
+A: Make sure you have the exact correct absolute path to `mcp-bridge.mjs` in your Claude configuration, and ensure that Nova Browser is actively running.
+
+---
+
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
