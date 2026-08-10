@@ -844,13 +844,13 @@ function App() {
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector("${args.selector}");
+                const el = document.querySelector(${JSON.stringify(args.selector)});
                 if (el) { 
                   const rect = el.getBoundingClientRect();
                   el.click(); 
                   return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                 }
-                return { success: false, error: "Element not found with selector: ${args.selector}" };
+                return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
               })();
             `);
             if (result && result.success) {
@@ -868,10 +868,10 @@ function App() {
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector("${args.selector}");
+                const el = document.querySelector(${JSON.stringify(args.selector)});
                 if (el) { 
                   const rect = el.getBoundingClientRect();
-                  el.value = "${args.text}";
+                  el.value = ${JSON.stringify(args.text)};
                   el.dispatchEvent(new Event('input', { bubbles: true }));
                   el.dispatchEvent(new Event('change', { bubbles: true }));
                   if (${args.pressEnter ? 'true' : 'false'}) {
@@ -880,7 +880,7 @@ function App() {
                   }
                   return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                 }
-                return { success: false, error: "Element not found with selector: ${args.selector}" };
+                return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
               })();
             `);
             if (result && result.success) {
