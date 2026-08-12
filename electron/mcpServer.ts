@@ -473,10 +473,22 @@ export class BrowserMCPServer {
   }
 
   private setupRoutes() {
-    // CORS for all routes
-    this.app.use((_req, res, next) => {
-      res.header('Access-Control-Allow-Origin', '*');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept');
+    // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*)
+    this.app.use((req, res, next) => {
+      const origin = req.headers.origin;
+      if (origin) {
+        try {
+          const url = new URL(origin);
+          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.protocol === 'nova:') {
+            res.header('Access-Control-Allow-Origin', origin);
+          }
+        } catch (_) {
+          if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+          }
+        }
+      }
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Accept, Authorization');
       res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
       next();
     });

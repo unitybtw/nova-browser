@@ -5,10 +5,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import * as EventSourceLib from 'eventsource';
+import EventSource from 'eventsource';
 
 // Required for SSEClientTransport in Node.js
-(global as any).EventSource = EventSourceLib.default || EventSourceLib;
+(global as any).EventSource = (EventSource as any).default || EventSource;
 
 async function main() {
   const sseTransport = new SSEClientTransport(new URL('http://localhost:3020/mcp'));

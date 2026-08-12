@@ -13,7 +13,7 @@ import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
 
 interface BrowserViewProps {
-  tab: Tab;
+  tab?: Tab | null;
   isActive: boolean;
   onUpdateTab: (id: string, updates: Partial<Tab>) => void;
   onCloseTab: (id: string) => void;
@@ -59,14 +59,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 }) => {
   const webviewRef = useRef<any>(null);
   
-  const getSafeUrl = (u: string) => (u && u.startsWith('nova://')) ? 'about:blank' : (u || 'about:blank');
-  const lastLoadedUrl = useRef<string>(tab.url || '');
-  const webviewInitialSrc = useRef<string>(getSafeUrl(tab.url));
+  const getSafeUrl = (u?: string) => (u && u.startsWith('nova://')) ? 'about:blank' : (u || 'about:blank');
+  const lastLoadedUrl = useRef<string>(tab?.url || '');
+  const webviewInitialSrc = useRef<string>(getSafeUrl(tab?.url));
   const isWebviewReady = useRef<boolean>(false);
 
   const isNewTab = React.useMemo(() => (
-    !tab.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
-  ), [tab.url]);
+    !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
+  ), [tab?.url]);
   
   const [passwordPrompt, setPasswordPrompt] = useState<{
     isOpen: boolean;
@@ -88,16 +88,16 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   });
   
   const isSettingsTab = React.useMemo(() => (
-    tab.url.startsWith('nova://settings') || tab.url.startsWith('about:settings')
-  ), [tab.url]);
+    Boolean(tab?.url?.startsWith('nova://settings') || tab?.url?.startsWith('about:settings'))
+  ), [tab?.url]);
   
   const isHistoryTab = React.useMemo(() => (
-    tab.url === 'nova://history' || tab.url === 'about:history'
-  ), [tab.url]);
+    tab?.url === 'nova://history' || tab?.url === 'about:history'
+  ), [tab?.url]);
   
   const isDownloadsTab = React.useMemo(() => (
-    tab.url === 'nova://downloads' || tab.url === 'about:downloads'
-  ), [tab.url]);
+    tab?.url === 'nova://downloads' || tab?.url === 'about:downloads'
+  ), [tab?.url]);
 
   const domReadyRef = useRef(false);
   const latestTabRef = useRef(tab);
@@ -109,7 +109,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   useEffect(() => {
     const webview = webviewRef.current;
-    if (!webview) return;
+    if (!webview || !tab?.id) return;
 
     const handleDomReady = async () => {
       domReadyRef.current = true;
@@ -119,13 +119,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         isLoading: false,
         canGoBack: webview.canGoBack?.() || false,
         canGoForward: webview.canGoForward?.() || false,
-        title: webview.getTitle?.() || tab.url,
+        title: webview.getTitle?.() || tab?.url || '',
         webContentsId: wcId
       });
 
       try {
-        if (latestTabRef.current.zoomFactor !== undefined) {
-          webview.setZoomFactor(latestTabRef.current.zoomFactor);
+        const currentTab = latestTabRef.current;
+        if (currentTab?.zoomFactor !== undefined) {
+          webview.setZoomFactor(currentTab.zoomFactor);
         } else {
           const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
           webview.setZoomFactor(zoomMap[settings.fontSize || 'medium'] || 1.0);
@@ -138,7 +139,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       try {
         // Fetch saved passwords for current domain
         let hostname = '';
-        try { hostname = new URL(tab.url).hostname; } catch (e) {}
+        try { hostname = new URL(tab?.url || '').hostname; } catch (e) {}
         
         let savedPasswords: any[] = [];
         try {
@@ -238,23 +239,23 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           })();
         `;
         webview.executeJavaScript(autofillScript);
-        if (webview.setAudioMuted) webview.setAudioMuted(!!tab.isMuted);
+        if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
       } catch (e) {}
     };
 
     const handleStartNavigation = (e: any) => {
-      if (e.isMainFrame) {
+      if (e.isMainFrame && tab?.id) {
         onUpdateTab(tab.id, { isLoading: true, blockedAdsCount: 0 });
       }
     };
 
     const handleFinishLoad = (e: any) => {
-      if (e.isMainFrame || e.isMainFrame === undefined) {
+      if ((e.isMainFrame || e.isMainFrame === undefined) && tab?.id) {
         onUpdateTab(tab.id, {
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || tab.url
+          title: webview.getTitle?.() || tab?.url || ''
         });
       }
     };
@@ -270,23 +271,25 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       } catch (err) {}
 
       // Fallback for when all frames finish loading
-      onUpdateTab(tab.id, {
-        isLoading: false,
-        canGoBack: webview.canGoBack?.() || false,
-        canGoForward: webview.canGoForward?.() || false,
-        title: webview.getTitle?.() || tab.url,
-        ...(thumbnailDataUrl ? { thumbnail: thumbnailDataUrl } : {})
-      });
+      if (tab?.id) {
+        onUpdateTab(tab.id, {
+          isLoading: false,
+          canGoBack: webview.canGoBack?.() || false,
+          canGoForward: webview.canGoForward?.() || false,
+          title: webview.getTitle?.() || tab?.url || '',
+          ...(thumbnailDataUrl ? { thumbnail: thumbnailDataUrl } : {})
+        });
+      }
     };
 
     const handleFailLoad = (e: any) => {
-      if (!e.isMainFrame) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
+      if (!e.isMainFrame || !tab?.id) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
       onUpdateTab(tab.id, { isLoading: false, title: `Error: ${e.errorDescription || 'Failed'}` });
       console.error('[Webview] Failed to load:', e.errorDescription, 'Code:', e.errorCode);
     };
 
     const handleNavigateEvent = (e: any) => {
-      if (e.isMainFrame && e.url) {
+      if (e.isMainFrame && e.url && tab?.id) {
         lastLoadedUrl.current = e.url;
         onUpdateTab(tab.id, {
           url: e.url,
@@ -298,7 +301,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleNavigateInPage = (e: any) => {
-      if (e.isMainFrame && e.url) {
+      if (e.isMainFrame && e.url && tab?.id) {
         lastLoadedUrl.current = e.url;
         onUpdateTab(tab.id, {
           url: e.url,
@@ -310,13 +313,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleTitleUpdate = (e: any) => {
-      if (e.title) {
+      if (e.title && tab?.id) {
         onUpdateTab(tab.id, { title: e.title });
       }
     };
 
     const handleFaviconUpdate = (e: any) => {
-      if (e.favicons && e.favicons.length > 0) {
+      if (e.favicons && e.favicons.length > 0 && tab?.id) {
         onUpdateTab(tab.id, { favicon: e.favicons[0] });
       }
     };
@@ -332,10 +335,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleCrashed = () => {
-      onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
-      console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab.url);
-      // We removed the automatic reload because if the page crashes on mount, 
-      // reloading it will cause an infinite crash loop (black screen).
+      if (tab?.id) {
+        onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
+        console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab?.url);
+      }
     };
 
     const handleFoundInPage = (e: any) => {
@@ -345,11 +348,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleMediaStarted = () => {
-      onUpdateTab(tab.id, { isPlayingAudio: true });
+      if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: true });
     };
 
     const handleMediaPaused = () => {
-      onUpdateTab(tab.id, { isPlayingAudio: false });
+      if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: false });
     };
 
     const handleIpcMessage = (e: any) => {
@@ -397,7 +400,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     // Initial check: if webview is already not loading, ensure isLoading is false
     setTimeout(() => {
       try {
-        if (webview && typeof webview.isLoading === 'function' && !webview.isLoading()) {
+        if (webview && typeof webview.isLoading === 'function' && !webview.isLoading() && tab?.id) {
           onUpdateTab(tab.id, { isLoading: false });
         }
       } catch (err) {}
@@ -421,60 +424,60 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('ipc-message', handleIpcMessage);
       webview.removeEventListener('console-message', handleConsoleMessage);
     };
-  }, [tab.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
+  }, [tab?.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;
     if (webview && webview.setAudioMuted) {
       try {
-        webview.setAudioMuted(!!tab.isMuted);
+        webview.setAudioMuted(!!tab?.isMuted);
       } catch (err) {
         // webview might not be dom-ready yet
       }
     }
-  }, [tab.isMuted]);
+  }, [tab?.isMuted]);
 
   // Receive thumbnails pushed from the main process (via web-contents-created + did-stop-loading)
   useEffect(() => {
     const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.onTabThumbnailUpdate || isNewTab) return;
+    if (!electronAPI?.onTabThumbnailUpdate || isNewTab || !tab?.id) return;
 
     const unsubscribe = electronAPI.onTabThumbnailUpdate((_event: any, { webContentsId, dataUrl }: { webContentsId: number; dataUrl: string }) => {
       // Check if this thumbnail belongs to our webview
       const webview = webviewRef.current;
       try {
         const ourWcId = webview?.getWebContentsId?.();
-        if (ourWcId && ourWcId === webContentsId && dataUrl) {
+        if (ourWcId && ourWcId === webContentsId && dataUrl && tab?.id) {
           onUpdateTab(tab.id, { thumbnail: dataUrl });
         }
       } catch (_) {}
     });
 
     return () => { try { unsubscribe?.(); } catch (_) {} };
-  }, [isNewTab, tab.id, onUpdateTab]);
+  }, [isNewTab, tab?.id, onUpdateTab]);
 
   // Capture thumbnail when switching away from this tab
   useEffect(() => {
-    if (!isActive && webviewRef.current && !isNewTab && (window as any).electronAPI?.captureTabThumbnail) {
+    if (!isActive && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
       const capture = async () => {
         try {
           const wcId = webviewRef.current.getWebContentsId();
           const thumbnailDataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
-          if (thumbnailDataUrl) {
+          if (thumbnailDataUrl && tab?.id) {
             onUpdateTab(tab.id, { thumbnail: thumbnailDataUrl });
           }
         } catch (err) {}
       };
       capture();
     }
-  }, [isActive, isNewTab, tab.id, onUpdateTab]);
+  }, [isActive, isNewTab, tab?.id, onUpdateTab]);
 
   // Immediately clear loading state for internal React pages since they don't use webview
   useEffect(() => {
-    if ((isSettingsTab || isHistoryTab || isDownloadsTab || isNewTab) && tab.isLoading) {
+    if ((isSettingsTab || isHistoryTab || isDownloadsTab || isNewTab) && tab?.isLoading && tab?.id) {
       onUpdateTab(tab.id, { isLoading: false });
     }
-  }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab.isLoading, tab.id, onUpdateTab]);
+  }, [isSettingsTab, isHistoryTab, isDownloadsTab, isNewTab, tab?.isLoading, tab?.id, onUpdateTab]);
 
   // Listen for dom-ready to know when it's safe to call loadURL
   useEffect(() => {
@@ -492,7 +495,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   }, []);
 
   useEffect(() => {
-    if (!tab.url || tab.url === lastLoadedUrl.current) return;
+    if (!tab?.url || tab.url === lastLoadedUrl.current) return;
     lastLoadedUrl.current = tab.url;
     
     const wv = webviewRef.current as any;
@@ -502,13 +505,17 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       } else {
         // If the webview was just created but the user navigated immediately, wait for dom-ready before calling loadURL!
         const pendingLoad = () => {
-          wv.loadURL(tab.url).catch((err: any) => console.error('loadURL failed (pending):', err));
+          if (tab?.url) wv.loadURL(tab.url).catch((err: any) => console.error('loadURL failed (pending):', err));
           wv.removeEventListener('dom-ready', pendingLoad);
         };
         wv.addEventListener('dom-ready', pendingLoad);
       }
     }
-  }, [tab.url]);
+  }, [tab?.url]);
+
+  if (!tab) {
+    return null;
+  }
 
   if (tab.isSuspended) {
     return (
@@ -705,19 +712,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   );
 }, (prevProps, nextProps) => {
   if (prevProps.isActive !== nextProps.isActive) return false;
-  if (prevProps.tab.url !== nextProps.tab.url) return false;
-  if (prevProps.tab.isLoading !== nextProps.tab.isLoading) return false;
-  if (prevProps.tab.title !== nextProps.tab.title) return false;
-  if (prevProps.tab.favicon !== nextProps.tab.favicon) return false;
-  if (prevProps.tab.isSuspended !== nextProps.tab.isSuspended) return false;
-  if (prevProps.tab.thumbnail !== nextProps.tab.thumbnail) return false;
-  if (prevProps.tab.isMuted !== nextProps.tab.isMuted) return false;
+  if (prevProps.tab?.url !== nextProps.tab?.url) return false;
+  if (prevProps.tab?.isLoading !== nextProps.tab?.isLoading) return false;
+  if (prevProps.tab?.title !== nextProps.tab?.title) return false;
+  if (prevProps.tab?.favicon !== nextProps.tab?.favicon) return false;
+  if (prevProps.tab?.isSuspended !== nextProps.tab?.isSuspended) return false;
+  if (prevProps.tab?.thumbnail !== nextProps.tab?.thumbnail) return false;
+  if (prevProps.tab?.isMuted !== nextProps.tab?.isMuted) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
   
   // Deep comparison for settings object changes that affect rendering
-  if ((prevProps.tab.url.startsWith('nova://settings') || prevProps.tab.url.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;
-  if ((prevProps.tab.url.startsWith('nova://history') || prevProps.tab.url.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
-  if ((prevProps.tab.url.startsWith('nova://downloads') || prevProps.tab.url.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
+  if ((prevProps.tab?.url?.startsWith('nova://settings') || prevProps.tab?.url?.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;
+  if ((prevProps.tab?.url?.startsWith('nova://history') || prevProps.tab?.url?.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
+  if ((prevProps.tab?.url?.startsWith('nova://downloads') || prevProps.tab?.url?.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
   
   return true;
 });

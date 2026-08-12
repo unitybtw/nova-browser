@@ -216,8 +216,7 @@ function App() {
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {
-    const saved = localStorage.getItem('user_settings');
-    return saved ? JSON.parse(saved) : {
+    const defaultSettings: UserSettings = {
       searchEngine: 'google',
       privacyShield: true,
       theme: 'system',
@@ -251,6 +250,18 @@ function App() {
         findInPage: { key: 'f', shift: false, meta: true },
       }
     };
+    try {
+      const saved = localStorage.getItem('user_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return { ...defaultSettings, ...parsed };
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load user_settings from localStorage:', e);
+    }
+    return defaultSettings;
   });
 
   // Sync settings with backend
@@ -319,8 +330,16 @@ function App() {
 
   // History state
   const [history, setHistory] = useState<HistoryItem[]>(() => {
-    const saved = localStorage.getItem('browsing_history');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('browsing_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load browsing_history from localStorage:', e);
+    }
+    return [];
   });
 
   useEffect(() => {
@@ -461,8 +480,16 @@ function App() {
   }, [settings.theme, settings.accentColor, settings.customAccentColor]);
   
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
-    const saved = localStorage.getItem('bookmarks');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('bookmarks');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.error('Failed to load bookmarks from localStorage:', e);
+    }
+    return [];
   });
 
   // Save bookmarks to localStorage whenever they change
@@ -821,12 +848,17 @@ function App() {
   useEffect(() => {
     // 1. Expose executeMcpAction globally for the main process to call
     (window as any).executeMcpAction = async (toolName: string, args: any) => {
+      if (!toolName || typeof toolName !== 'string') {
+        return "Error: Invalid toolName parameter";
+      }
+      const safeArgs = (args && typeof args === 'object') ? args : {};
       const activeWebview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
       
       switch (toolName) {
         case 'browser_navigate':
-          handleNavigate(args.url);
-          return `Navigated to ${args.url}`;
+          if (!safeArgs.url || typeof safeArgs.url !== 'string') return "Error: Missing or invalid 'url' parameter";
+          handleNavigate(safeArgs.url);
+          return `Navigated to ${safeArgs.url}`;
 
         case 'browser_read_page':
           if (activeWebview && activeWebview.executeJavaScript) {

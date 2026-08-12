@@ -20,6 +20,24 @@ interface ReaderModeProps {
   onClose: () => void;
 }
 
+const safeBase64 = (str: string): string => {
+  if (!str) return '';
+  const wellFormed = typeof (str as any).toWellFormed === 'function'
+    ? (str as any).toWellFormed()
+    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+
+  try {
+    return btoa(unescape(encodeURIComponent(wellFormed)));
+  } catch (e) {
+    try {
+      const sanitized = wellFormed.replace(/%/g, '_');
+      return btoa(sanitized);
+    } catch (e2) {
+      return wellFormed.replace(/[^a-zA-Z0-9]/g, '_');
+    }
+  }
+};
+
 export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, onClose }) => {
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -75,7 +93,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   // Load highlights from storage when content is ready
   useEffect(() => {
     if (content && url) {
-      const storageKey = 'reader_highlights_' + btoa(url);
+      const storageKey = 'reader_highlights_' + safeBase64(url);
       (window as any).electronAPI?.storeGet(storageKey).then((saved: string) => {
         if (saved) {
           try {
@@ -203,7 +221,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
     setHighlights(updated);
     if (url) {
-      const storageKey = 'reader_highlights_' + btoa(url);
+      const storageKey = 'reader_highlights_' + safeBase64(url);
       (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
     }
     

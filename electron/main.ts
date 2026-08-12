@@ -262,8 +262,19 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
 let nextDownloadAsSaveAs = false;
 
-// Track URLs that failed HTTPS upgrade to prevent infinite loops
+// Track URLs that failed HTTPS upgrade to prevent infinite loops with eviction cap (max 1000 items)
+const MAX_UPGRADED_URLS = 1000;
 const upgradedUrls = new Set<string>();
+
+function addUpgradedUrl(url: string): void {
+  if (upgradedUrls.size >= MAX_UPGRADED_URLS) {
+    const oldest = upgradedUrls.values().next().value;
+    if (oldest !== undefined) {
+      upgradedUrls.delete(oldest);
+    }
+  }
+  upgradedUrls.add(url);
+}
 
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
@@ -499,7 +510,7 @@ app.on('web-contents-created', (_event, contents) => {
           }
           
           e.preventDefault();
-          upgradedUrls.add(navigationUrl);
+          addUpgradedUrl(navigationUrl);
           const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
           
           // Try loading HTTPS. If it fails, fallback to HTTP.
@@ -586,7 +597,8 @@ app.on('web-contents-created', (_event, wc) => {
     } catch (_) {}
   });
 
-  // Native Context Menu for webviews
+  // Native Context Menu for webviews (ensure single listener attachment / clean removal)
+  wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
     if (wc.getType() === 'webview') {

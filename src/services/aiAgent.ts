@@ -432,12 +432,28 @@ class AIAgent {
   }
 
   public async handleToolCall(toolCall: any): Promise<string> {
+    if (!toolCall || !toolCall.function || typeof toolCall.function.name !== 'string') {
+      return JSON.stringify({ error: "Invalid tool call format" });
+    }
     if (!this.actionContext) {
       return JSON.stringify({ error: "Action context not set" });
     }
 
     const functionName = toolCall.function.name;
-    const args = JSON.parse(toolCall.function.arguments);
+    let args: any = {};
+    try {
+      if (typeof toolCall.function.arguments === 'string') {
+        args = JSON.parse(toolCall.function.arguments || '{}');
+      } else if (toolCall.function.arguments && typeof toolCall.function.arguments === 'object') {
+        args = toolCall.function.arguments;
+      }
+    } catch (e) {
+      console.error('[AI Agent] Failed to parse tool call arguments:', e);
+      args = {};
+    }
+    if (!args || typeof args !== 'object') {
+      args = {};
+    }
 
     console.log(`[AI Agent] Executing ${functionName} with args:`, args);
 
