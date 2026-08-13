@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/nova-icon-transparent.png" alt="Nova Browser Logo" width="160" style="filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); margin-bottom: 20px;" />
+  <img src="assets/nova-icon-clean.png" alt="Nova Browser Logo" width="160" />
 
   # 🚀 Nova Browser
 
