@@ -48,8 +48,15 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
   const handleCopy = async () => {
     if (!currentImage) return;
     try {
-      const response = await fetch(currentImage);
-      const blob = await response.blob();
+      const base64Data = currentImage.split(',')[1];
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'image/png' });
+      
       await navigator.clipboard.write([
         new ClipboardItem({ [blob.type]: blob })
       ]);
