@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/logo.jpg" alt="Nova Browser Logo" width="160" style="border-radius: 20%; box-shadow: 0 20px 40px rgba(0,0,0,0.3);" />
+  <img src="assets/nova-icon.png" alt="Nova Browser Logo" width="160" style="border-radius: 20%; box-shadow: 0 20px 40px rgba(0,0,0,0.3);" />
 
   # 🚀 Nova Browser
 
