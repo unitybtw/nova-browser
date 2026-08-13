@@ -214,9 +214,12 @@ function App() {
   }, [closeAllModals]);
 
   // Onboarding state
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(
-    () => !localStorage.getItem('nova_onboarding_complete')
-  );
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true') {
+      return false;
+    }
+    return !localStorage.getItem('nova_onboarding_complete');
+  });
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {

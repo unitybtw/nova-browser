@@ -27,10 +27,10 @@ export const InteractiveMockup = () => {
 
       {/* Real Browser iframe */}
       <iframe 
-        src="/browser-demo/index.html" 
-        className={`w-full h-full border-none transition-opacity duration-1000 ${isReady ? 'opacity-100' : 'opacity-0'}`}
+        src="/browser-demo/index.html?demo=true" 
+        className={`w-full h-full border-none transition-opacity duration-1000 ${isReady ? 'opacity-100' : 'opacity-0'} pointer-events-none`}
         title="Nova Browser Interactive Demo"
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+        sandbox="allow-scripts allow-same-origin"
       />
       
       {/* Subtle overlay reflection for glass effect */}
