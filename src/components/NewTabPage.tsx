@@ -234,7 +234,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search or type URL in incognito mode..."
                 className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-all shadow-xl backdrop-blur-xl"
-                autoFocus
               />
               <button 
                 type="submit"
@@ -489,7 +488,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               onChange={(e) => setQuery(e.target.value)}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
               className="w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-800/60 backdrop-blur-md border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-800/90 focus:border-accent dark:focus:border-accent/80 focus:ring-4 focus:ring-accent/15 dark:focus:ring-accent/20"
-              autoFocus
             />
             <button
               type="submit"

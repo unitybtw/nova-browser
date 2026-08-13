@@ -63,6 +63,7 @@ export const InteractiveMockup = ({
             ref={iframeRef}
             src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
             onLoad={handleIframeLoad}
+            tabIndex={-1}
             style={{
               width: `${(100 / scale).toFixed(1)}%`,
               height: `${(100 / scale).toFixed(1)}%`,
@@ -79,6 +80,7 @@ export const InteractiveMockup = ({
           ref={iframeRef}
           src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
           onLoad={handleIframeLoad}
+          tabIndex={-1}
           className={`w-full h-full border-none transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
           title={`Nova Browser Demo - ${feature}`}
           sandbox="allow-scripts allow-same-origin"
