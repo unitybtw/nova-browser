@@ -7,7 +7,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 // @ts-ignore
 import unzip from 'unzip-crx-3';
-import { ElectronBlocker } from '@cliqz/adblocker-electron';
+import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { autoUpdater } from 'electron-updater';
 
@@ -75,6 +75,20 @@ let blocker: ElectronBlocker | null = null;
 const activeDownloads = new Map<string, Electron.DownloadItem>();
 let mcpServer: BrowserMCPServer | null = null;
 
+let currentWhitelistFilters: any[] = [];
+
+function updateAdblockWhitelist(whitelist: string[]) {
+  if (!blocker) return;
+  const newFilters = whitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
+  
+  blocker.update({
+    newNetworkFilters: newFilters,
+    removedNetworkFilters: currentWhitelistFilters
+  });
+  
+  currentWhitelistFilters = newFilters;
+}
+
 // Initialize AdBlocker globally so IPC can access it
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
@@ -83,6 +97,14 @@ ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
       mainWindow.webContents.send('ad-blocked', request.tabId);
     }
   });
+
+  try {
+    const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
+    if (fs.existsSync(settingsPath)) {
+      const wl = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+    }
+  } catch(e) {}
 });
 
 function createWindow() {
@@ -850,6 +872,14 @@ ipcMain.handle('store-set', async (_event, key: string, value: string) => {
     }
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     fs.writeFileSync(keyPath, value, 'utf-8');
+    
+    if (key === 'adblocker_whitelist') {
+      try {
+        const wl = JSON.parse(value);
+        if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+      } catch(e) {}
+    }
+    
     return true;
   } catch (err) {
     console.error('Store set error:', err);
