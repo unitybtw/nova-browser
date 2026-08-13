@@ -52,6 +52,8 @@ import { ScreenshotModal } from './components/ScreenshotModal';
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
 import { VpnPopover, VpnLocation } from './components/VpnPopover';
+import { ReaderMode } from './components/ReaderMode';
+import { DownloadToast } from './components/DownloadToast';
 import { SidePanel } from './components/SidePanel';
 import { WorkspaceManager } from './components/WorkspaceManager';
 import { UpdateToast } from './components/UpdateToast';
@@ -2023,6 +2025,7 @@ function App() {
         isIncognito={activeTab?.isIncognito} 
       />
 
+      <DownloadToast downloads={downloads} />
       <UpdateToast />
 
       <AICursorOverlay />
