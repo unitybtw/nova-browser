@@ -649,9 +649,22 @@ ipcMain.handle('capture-full-page', async (_event, webContentsId: number) => {
       const width = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
       const height = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
 
+      // Force the viewport to expand to the full height of the page to ensure off-screen content is rendered
+      await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+        mobile: false,
+        width,
+        height,
+        deviceScaleFactor: 1,
+        screenOrientation: { angle: 0, type: 'portraitPrimary' }
+      });
+
+      // Wait a moment for the page to layout and paint the newly exposed areas
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       const response = await wc.debugger.sendCommand('Page.captureScreenshot', {
         format: 'png',
         captureBeyondViewport: true,
+        fromSurface: true,
         clip: {
           x: 0,
           y: 0,
@@ -660,6 +673,10 @@ ipcMain.handle('capture-full-page', async (_event, webContentsId: number) => {
           scale: 1
         }
       });
+
+      // Restore original device metrics
+      await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+
       if (response && (response as any).data) {
         dataUrl = `data:image/png;base64,${(response as any).data}`;
       }
