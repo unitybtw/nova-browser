@@ -626,6 +626,39 @@ ipcMain.handle('capture-tab-thumbnail', async (_event, webContentsId: number) =>
   }
 });
 
+// Capture full page screenshot using CDP
+ipcMain.handle('capture-full-page', async (_event, webContentsId: number) => {
+  try {
+    const wc = webContents.fromId(webContentsId);
+    if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return null;
+
+    let attached = false;
+    try {
+      if (!wc.debugger.isAttached()) {
+        wc.debugger.attach('1.3');
+        attached = true;
+      }
+    } catch (err) {
+      console.error('Debugger attach failed: ', err);
+      return null;
+    }
+
+    const { data } = await wc.debugger.sendCommand('Page.captureScreenshot', {
+      format: 'png',
+      captureBeyondViewport: true,
+    });
+    
+    if (attached) {
+      wc.debugger.detach();
+    }
+    
+    return `data:image/png;base64,${data}`;
+  } catch (err) {
+    console.error('Failed to capture full page:', err);
+    return null;
+  }
+});
+
 // Auto-capture thumbnails when any webview finishes loading and push to renderer
 app.on('web-contents-created', (_event, wc) => {
   // Native Context Menu for webviews (ensure single listener attachment / clean removal)

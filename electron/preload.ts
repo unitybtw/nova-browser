@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setDoNotTrack: (enabled: boolean) => ipcRenderer.invoke('set-do-not-track', enabled),
   getSuggestions: (query: string) => ipcRenderer.invoke('get-suggestions', query),
   fetchPageHtml: (url: string) => ipcRenderer.invoke('fetch-page-html', url),
+  captureFullPage: (wcId: number) => ipcRenderer.invoke('capture-full-page', wcId),
   // Downloads
   pauseDownload: (id: string) => ipcRenderer.invoke('pause-download', id),
   resumeDownload: (id: string) => ipcRenderer.invoke('resume-download', id),

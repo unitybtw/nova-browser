@@ -1348,6 +1348,21 @@ function App() {
       }
     }
   }, [activeTabId, tabs]);
+
+  const handleCaptureFullPage = useCallback(async () => {
+    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+    if (webview && typeof webview.getWebContentsId === 'function' && (window as any).electronAPI?.captureFullPage) {
+      try {
+        const wcId = webview.getWebContentsId();
+        const dataUrl = await (window as any).electronAPI.captureFullPage(wcId);
+        return dataUrl;
+      } catch (err) {
+        console.error('Full page screenshot failed:', err);
+        return null;
+      }
+    }
+    return null;
+  }, [activeTabId]);
   const handleOpenFindInPage = useCallback(() => setIsFindInPageOpen(prev => !prev), []);
   
   const handleToggleSplitView = useCallback(() => {
@@ -1990,6 +2005,7 @@ function App() {
         onClose={() => setIsScreenshotOpen(false)}
         imageDataUrl={screenshotDataUrl}
         pageTitle={activeTab?.title || ''}
+        onCaptureFullPage={handleCaptureFullPage}
       />
 
 
