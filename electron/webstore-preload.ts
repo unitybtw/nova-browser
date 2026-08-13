@@ -212,10 +212,17 @@ if ((window as any).__novaPreloadInjected) {
           extensionId: window.location.pathname.split('/').pop()?.split('?')[0] 
         }, window.location.origin);
       });
+    } else {
+      const existingBanner = document.getElementById('nova-extension-banner');
+      if (existingBanner) {
+        existingBanner.remove();
+        document.body.style.marginTop = '0px';
+      }
     }
   };
 
   window.addEventListener('DOMContentLoaded', injectNovaBanner);
+  setInterval(injectNovaBanner, 500);
 }
 
 // Password Manager Form Detection
