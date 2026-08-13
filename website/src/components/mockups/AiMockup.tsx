@@ -1,10 +1,21 @@
+import { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { BrowserWindow } from './BrowserWindow';
-import { Bot, Sparkles, Send, Cpu } from 'lucide-react';
+import { Bot, Sparkles, Send, Cpu, Terminal } from 'lucide-react';
 import { useTheme } from '../ThemeProvider';
 
 export const AiMockup = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  const [activeLine, setActiveLine] = useState(3);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveLine((prev) => (prev >= 6 ? 2 : prev + 1));
+    }, 2200);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <BrowserWindow
@@ -31,23 +42,41 @@ export const AiMockup = () => {
             <span className={`ml-auto text-[11px] ${isDark ? 'text-white/40' : 'text-slate-400'}`}>TypeScript • 98.4%</span>
           </div>
 
-          <div className={`p-4 rounded-xl border space-y-2 leading-relaxed flex-1 overflow-hidden ${
+          <div className={`p-4 rounded-xl border space-y-2 leading-relaxed flex-1 overflow-hidden relative ${
             isDark ? 'bg-[#161b22] border-white/10 text-white/80' : 'bg-slate-50 border-slate-200 text-slate-800'
           }`}>
             <div className={`text-[11px] pb-2 border-b flex items-center justify-between ${
               isDark ? 'border-white/5 text-white/40' : 'border-slate-200 text-slate-400'
             }`}>
-              <span>electron / mcpServer.ts</span>
-              <span>64 lines • 2.1 KB</span>
+              <div className="flex items-center gap-1.5">
+                <Terminal className="w-3 h-3 text-purple-400" />
+                <span>electron / mcpServer.ts</span>
+              </div>
+              <span className="text-[10px] text-emerald-500 font-semibold">● Live Inspection</span>
             </div>
-            <p><span className="text-purple-500 font-semibold">import</span> &#123; <span className="text-amber-500">Server</span> &#125; <span className="text-purple-500 font-semibold">from</span> <span className="text-emerald-500">'@modelcontextprotocol/sdk'</span>;</p>
-            <p><span className="text-purple-500 font-semibold">export class</span> <span className="text-amber-500 font-semibold">BrowserMCPServer</span> &#123;</p>
-            <p className="pl-4"><span className="text-purple-500 font-semibold">private</span> port = <span className="text-emerald-500">3020</span>;</p>
-            <p className="pl-4 pt-1"><span className="text-purple-500 font-semibold">async</span> <span className="text-blue-500">executeAutonomousAction</span>(command: <span className="text-amber-500">string</span>) &#123;</p>
-            <p className="pl-8 text-emerald-600 dark:text-emerald-400">// Direct AI browser control bridge with sandboxed WebGPU execution</p>
-            <p className="pl-8"><span className="text-purple-500 font-semibold">return await</span> this.mainWindow.webContents.executeJavaScript(command);</p>
-            <p className="pl-4">&#125;</p>
-            <p>&#125;</p>
+
+            <div className="space-y-1.5 pt-1">
+              <p className={activeLine === 1 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-purple-300 font-bold transition-colors' : 'transition-colors'}>
+                <span className="text-purple-500 font-semibold">import</span> &#123; <span className="text-amber-500">Server</span> &#125; <span className="text-purple-500 font-semibold">from</span> <span className="text-emerald-500">'@modelcontextprotocol/sdk'</span>;
+              </p>
+              <p className={activeLine === 2 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-purple-300 font-bold transition-colors' : 'transition-colors'}>
+                <span className="text-purple-500 font-semibold">export class</span> <span className="text-amber-500 font-semibold">BrowserMCPServer</span> &#123;
+              </p>
+              <p className={`pl-4 ${activeLine === 3 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-purple-300 font-bold transition-colors' : 'transition-colors'}`}>
+                <span className="text-purple-500 font-semibold">private</span> port = <span className="text-emerald-500">3020</span>;
+              </p>
+              <p className={`pl-4 pt-1 ${activeLine === 4 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-purple-300 font-bold transition-colors' : 'transition-colors'}`}>
+                <span className="text-purple-500 font-semibold">async</span> <span className="text-blue-500">executeAutonomousAction</span>(command: <span className="text-amber-500">string</span>) &#123;
+              </p>
+              <p className={`pl-8 text-emerald-600 dark:text-emerald-400 ${activeLine === 5 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-emerald-300 font-bold transition-colors' : 'transition-colors'}`}>
+                // Direct AI browser control bridge with sandboxed WebGPU execution
+              </p>
+              <p className={`pl-8 ${activeLine === 6 ? 'bg-purple-500/15 rounded px-1 -mx-1 text-purple-300 font-bold transition-colors' : 'transition-colors'}`}>
+                <span className="text-purple-500 font-semibold">return await</span> this.mainWindow.webContents.executeJavaScript(command);
+              </p>
+              <p className="pl-4">&#125;</p>
+              <p>&#125;</p>
+            </div>
           </div>
         </div>
 
@@ -58,37 +87,58 @@ export const AiMockup = () => {
           {/* Header */}
           <div className={`flex items-center justify-between pb-3 border-b ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white">
+              <motion.div 
+                animate={{ scale: [1, 1.1, 1] }} 
+                transition={{ duration: 2.5, repeat: Infinity }}
+                className="w-6 h-6 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-purple-500/30"
+              >
                 <Bot className="w-3.5 h-3.5" />
-              </div>
+              </motion.div>
               <span className="text-xs font-bold">Nova AI Assistant</span>
             </div>
-            <div className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <motion.div 
+              animate={{ opacity: [0.7, 1, 0.7] }} 
+              transition={{ duration: 2, repeat: Infinity }}
+              className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20"
+            >
               <Cpu className="w-2.5 h-2.5" />
               <span>WebGPU</span>
-            </div>
+            </motion.div>
           </div>
 
           {/* Chat Messages */}
           <div className="space-y-3 py-3 flex-1 overflow-hidden">
-            <div className={`p-2.5 rounded-xl text-xs ${
-              isDark ? 'bg-white/5 border border-white/5 text-white/70' : 'bg-white border border-slate-200 text-slate-700 shadow-xs'
-            }`}>
+            <motion.div 
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`p-2.5 rounded-xl text-xs ${
+                isDark ? 'bg-white/5 border border-white/5 text-white/70' : 'bg-white border border-slate-200 text-slate-700 shadow-xs'
+              }`}
+            >
               <p className="font-semibold text-purple-500 mb-1 text-[10px]">User Query</p>
               "Explain how the MCP server coordinates AI actions with the browser."
-            </div>
+            </motion.div>
 
-            <div className={`p-2.5 rounded-xl text-xs space-y-1.5 ${
-              isDark ? 'bg-purple-950/30 border border-purple-500/20 text-purple-200' : 'bg-purple-50 border border-purple-200 text-purple-900'
-            }`}>
+            <motion.div 
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className={`p-2.5 rounded-xl text-xs space-y-1.5 ${
+                isDark ? 'bg-purple-950/30 border border-purple-500/20 text-purple-200' : 'bg-purple-50 border border-purple-200 text-purple-900'
+              }`}
+            >
               <div className="flex items-center gap-1.5 text-[10px] font-bold text-purple-500">
-                <Sparkles className="w-3 h-3" />
+                <Sparkles className="w-3 h-3 animate-spin" style={{ animationDuration: '4s' }} />
                 <span>Nova Engine (Local 100%)</span>
               </div>
               <p className="text-[11px] leading-relaxed">
                 The MCP Server exposes a native IPC bridge allowing local LLM models to perform safe DOM queries and automate actions with zero cloud latency.
               </p>
-            </div>
+              <div className="flex items-center gap-1 text-[9px] text-emerald-400 font-mono pt-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                <span>Response streamed in 42ms</span>
+              </div>
+            </motion.div>
           </div>
 
           {/* Chat Input */}
@@ -103,9 +153,13 @@ export const AiMockup = () => {
                 isDark ? 'text-white placeholder:text-white/30' : 'text-slate-900 placeholder:text-slate-400'
               }`} 
             />
-            <button className="p-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors">
+            <motion.button 
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              className="p-1.5 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition-colors shadow-md shadow-purple-600/30"
+            >
               <Send className="w-3 h-3" />
-            </button>
+            </motion.button>
           </div>
         </div>
       </div>
