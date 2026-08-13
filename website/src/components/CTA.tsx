@@ -80,8 +80,8 @@ export const CTA = () => {
           </div>
           
           {/* Bottom Mockup with Matrix Background */}
-          <div className="relative z-10 mx-auto mt-20 transform scale-90 translate-y-16 lg:translate-y-24 origin-top pointer-events-none hidden md:block">
-            <InteractiveMockup bg="matrix" />
+          <div className="relative z-10 mx-auto mt-20 transform scale-90 translate-y-16 lg:translate-y-24 origin-top pointer-events-none hidden md:block h-[520px]">
+            <InteractiveMockup bg="matrix" feature="default" />
           </div>
         </motion.div>
       </div>

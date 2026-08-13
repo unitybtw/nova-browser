@@ -74,8 +74,50 @@ const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
 
 const EMPTY_ARRAY: any[] = [];
 
+// Demo mode query parameter inspection
+const getDemoParams = () => {
+  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default' };
+  const params = new URLSearchParams(window.location.search);
+  return {
+    isDemo: params.get('demo') === 'true',
+    feature: params.get('feature') || 'default',
+    bg: params.get('bg') || 'default'
+  };
+};
+
 function App() {
+  const demoParams = useMemo(() => getDemoParams(), []);
+
   const [tabs, setTabs] = useState<Tab[]>(() => {
+    if (demoParams.isDemo) {
+      if (demoParams.feature === 'ai') {
+        return [
+          { id: '1', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false }
+        ];
+      }
+      if (demoParams.feature === 'vertical_tabs') {
+        return [
+          { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', isLoading: false },
+          { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', isLoading: false },
+          { id: '3', url: 'https://spotify.com', title: 'Spotify Web (Playing)', isMuted: false, workspaceId: 'default', isLoading: false },
+          { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', isLoading: false }
+        ];
+      }
+      if (demoParams.feature === 'split') {
+        return [
+          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false },
+          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false }
+        ];
+      }
+      if (demoParams.feature === 'shield') {
+        return [
+          { id: '1', url: 'https://techinsider.io/ai-revolution', title: 'Tech News & Privacy', blockedAdsCount: 148, isLoading: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false }
+        ];
+      }
+    }
+
     let startupBehavior = 'newTab';
     try {
       const savedSettings = localStorage.getItem('user_settings');
@@ -115,6 +157,12 @@ function App() {
   });
 
   const [folders, setFolders] = useState<Folder[]>(() => {
+    if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
+      return [
+        { id: 'f1', name: 'Frontend Stack', color: '#3b82f6', isOpen: true, tabIds: ['1', '2'] },
+        { id: 'f2', name: 'Research Papers', color: '#a855f7', isOpen: false, tabIds: ['4'] }
+      ];
+    }
     const saved = localStorage.getItem('folders_session');
     if (saved) {
       try {
@@ -155,13 +203,17 @@ function App() {
   }, [workspaces, activeWorkspaceId]);
 
   // AI Assistant State
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+  const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => {
+    return demoParams.isDemo && demoParams.feature === 'ai';
+  });
 
   const [isReaderModeOpen, setIsReaderModeOpen] = useState(false);
   const [isFindInPageOpen, setIsFindInPageOpen] = useState(false);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
-  const [splitTabId, setSplitTabId] = useState<string | null>(null);
+  const [splitTabId, setSplitTabId] = useState<string | null>(() => {
+    return demoParams.isDemo && demoParams.feature === 'split' ? '2' : null;
+  });
   const [splitRatio, setSplitRatio] = useState(50);
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [extensions, setExtensions] = useState<Extension[]>([]);
@@ -232,9 +284,9 @@ function App() {
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
       showBookmarksBar: false,
-      useVerticalTabs: false,
+      useVerticalTabs: demoParams.isDemo ? demoParams.feature === 'vertical_tabs' : false,
       mcpServerEnabled: false,
-      newTabBackground: (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bg')) as any || 'default',
+      newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',
       unsplashCategory: 'nature,architecture',
       startupBehavior: 'newTab',
