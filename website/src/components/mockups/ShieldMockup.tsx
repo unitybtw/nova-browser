@@ -1,5 +1,4 @@
-import { Shield, EyeOff, Lock } from 'lucide-react';
-import { useTheme } from '../ThemeProvider';
+
 
 export const ShieldMockup = () => {
   return (

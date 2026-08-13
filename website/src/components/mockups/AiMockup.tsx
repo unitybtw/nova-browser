@@ -1,5 +1,4 @@
-import { Sparkles, Brain, Send } from 'lucide-react';
-import { useTheme } from '../ThemeProvider';
+
 
 export const AiMockup = () => {
   return (

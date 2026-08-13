@@ -1,5 +1,4 @@
-import { Search, Sparkles, Shield, Puzzle, Settings, AlignLeft, EyeOff, Send, Brain } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+
 
 export const InteractiveMockup = () => {
   return (
