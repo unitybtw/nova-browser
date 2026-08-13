@@ -668,7 +668,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         ) : (
           /* Web Demo Mode: Render rich simulated pages for mockups or fallback iframe cleanly */
           (() => {
-            const isDarkTheme = settings.theme === 'dark' || (settings.theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            const isDarkTheme = settings.theme === 'dark' || (settings.theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
             
             if (tab.url?.includes('github.com')) {
               return (

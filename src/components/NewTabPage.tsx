@@ -181,7 +181,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       return 'text-white';
     }
     if (!isDarkTheme) {
-      return 'bg-slate-50 text-slate-900';
+      return 'bg-white text-slate-900';
     }
     switch (newTabBackground) {
       case 'gradient':
@@ -197,11 +197,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       case 'glass':
         return 'bg-slate-900/90 text-white backdrop-blur-xl';
       default:
-        return 'bg-slate-50 text-slate-900 dark:bg-[#0B0F19] dark:text-white';
+        return 'bg-[#0B0F19] text-white';
     }
   };
 
-  const isCustomDarkBg = isDarkTheme && newTabBackground !== 'default';
   const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
   if (isIncognito) {
@@ -249,7 +248,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   }
 
   return (
-    <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isCustomDarkBg ? 'dark' : ''}`}>
+    <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}>
       
       {/* Settings Button */}
       <div className="absolute top-6 right-6 z-50">

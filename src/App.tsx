@@ -325,6 +325,11 @@ function App() {
         findInPage: { key: 'f', shift: false, meta: true },
       }
     };
+
+    if (demoParams.isDemo) {
+      return defaultSettings;
+    }
+
     try {
       const saved = localStorage.getItem('user_settings');
       if (saved) {
