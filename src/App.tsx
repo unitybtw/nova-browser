@@ -2022,8 +2022,15 @@ function App() {
         onToggleExtension={(id) => {
           setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
         }}
-        onRemoveExtension={(id) => {
-          setExtensions(prev => prev.filter(e => e.id !== id));
+        onRemoveExtension={async (id) => {
+          if (window.confirm('Are you sure you want to remove this extension?')) {
+            try {
+              await (window as any).electronAPI?.removeExtension?.(id);
+              setExtensions(prev => prev.filter(e => e.id !== id));
+            } catch (e) {
+              console.error('Failed to remove extension:', e);
+            }
+          }
         }}
         onManageExtensions={() => handleNewTab('nova://settings#extensions')}
       />

@@ -1262,7 +1262,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                   if (window.confirm('Are you sure you want to remove this extension?')) {
                                     try {
                                       await (window as any).electronAPI?.removeExtension?.(ext.id);
-                                    } catch (e) {}
+                                      setExtensions(prev => prev.filter(e => e.id !== ext.id));
+                                    } catch (e) {
+                                      console.error('Failed to remove extension:', e);
+                                    }
                                   }
                                 }}
                                 className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
