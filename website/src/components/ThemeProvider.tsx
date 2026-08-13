@@ -20,34 +20,47 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+function getStoredTheme(key: string, fallback: Theme): Theme {
+  try {
+    return (localStorage.getItem(key) as Theme) || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function applyTheme(theme: Theme) {
+  const root = window.document.documentElement;
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  root.classList.toggle('dark', isDark);
+  root.classList.toggle('light', !isDark);
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
   storageKey = 'nova-website-theme',
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
-  );
+  const [theme, setTheme] = useState<Theme>(() => getStoredTheme(storageKey, defaultTheme));
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    applyTheme(theme);
+  }, [theme]);
 
-    if (isDark) {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
+  // Listen for system color scheme changes when theme is 'system'
+  useEffect(() => {
+    if (theme !== 'system') return;
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = () => applyTheme('system');
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
   const value = {
     theme,
-    setTheme: (theme: Theme) => {
-      localStorage.setItem(storageKey, theme);
-      setTheme(theme);
+    setTheme: (t: Theme) => {
+      try { localStorage.setItem(storageKey, t); } catch {}
+      setTheme(t);
     },
   };
 

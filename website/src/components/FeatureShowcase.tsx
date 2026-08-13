@@ -1,12 +1,39 @@
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, ShieldCheck, LayoutPanelLeft, FolderTree } from 'lucide-react';
+import { Brain, ShieldCheck, LayoutPanelLeft, FolderTree, ScanText } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
 import { AiMockup } from './mockups/AiMockup';
 import { ShieldMockup } from './mockups/ShieldMockup';
 import { TabsMockup } from './mockups/TabsMockup';
 import { SplitMockup } from './mockups/SplitMockup';
 import { LinkPreviewMockup } from './mockups/LinkPreviewMockup';
-import { ScanText } from 'lucide-react';
+
+// Lazy-mount wrapper: only renders children when scrolled into view
+function LazyMockup({ children }: { children: React.ReactNode }) {
+  const [visible, setVisible] = useState(false);
+  const ref = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); observer.disconnect(); } },
+      { rootMargin: '200px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="w-full h-full">
+      {visible ? children : (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full border-2 border-blue-500/20 border-t-blue-500 animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 const listVariants = {
   hidden: {},
@@ -25,7 +52,7 @@ export const FeatureShowcase = () => {
   const showcaseConfigs = [
     {
       icon: <Brain className="w-8 h-8 text-purple-500" />,
-      mockup: <AiMockup />,
+      mockup: <LazyMockup><AiMockup /></LazyMockup>,
       color: 'from-purple-500/20 to-pink-500/20',
       accent: 'text-purple-500',
       border: 'border-purple-500/20',
@@ -33,7 +60,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <ShieldCheck className="w-8 h-8 text-emerald-500" />,
-      mockup: <ShieldMockup />,
+      mockup: <LazyMockup><ShieldMockup /></LazyMockup>,
       color: 'from-emerald-500/20 to-teal-500/20',
       accent: 'text-emerald-500',
       border: 'border-emerald-500/20',
@@ -41,7 +68,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <FolderTree className="w-8 h-8 text-blue-500" />,
-      mockup: <TabsMockup />,
+      mockup: <LazyMockup><TabsMockup /></LazyMockup>,
       color: 'from-blue-500/20 to-indigo-500/20',
       accent: 'text-blue-500',
       border: 'border-blue-500/20',
@@ -49,7 +76,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <LayoutPanelLeft className="w-8 h-8 text-orange-500" />,
-      mockup: <SplitMockup />,
+      mockup: <LazyMockup><SplitMockup /></LazyMockup>,
       color: 'from-orange-500/20 to-amber-500/20',
       accent: 'text-orange-500',
       border: 'border-orange-500/20',
@@ -57,7 +84,7 @@ export const FeatureShowcase = () => {
     },
     {
       icon: <ScanText className="w-8 h-8 text-indigo-500" />,
-      mockup: <LinkPreviewMockup />,
+      mockup: <LazyMockup><LinkPreviewMockup /></LazyMockup>,
       color: 'from-indigo-500/20 to-violet-500/20',
       accent: 'text-indigo-500',
       border: 'border-indigo-500/20',

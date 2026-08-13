@@ -86,12 +86,8 @@ export const Comparison = () => {
               {rowsData.map((row, i) => {
                 const featureLabel = t.comparison.features[i] || '';
                 return (
-                  <motion.tr
+                  <tr
                     key={i}
-                    initial={{ opacity: 0, x: -10 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: i * 0.04 }}
                     className={`border-b border-border/50 last:border-0 ${i % 2 === 0 ? 'bg-foreground/[0.015]' : ''}`}
                   >
                     <td className="py-4 px-6 text-foreground/80 font-medium text-sm">{featureLabel}</td>
@@ -103,7 +99,7 @@ export const Comparison = () => {
                         <Cell value={row[b.key]} />
                       </td>
                     ))}
-                  </motion.tr>
+                  </tr>
                 );
               })}
             </tbody>

@@ -21,6 +21,7 @@ function FAQItem({ faq, index }: FAQItemProps) {
     >
       <button
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
         className="w-full flex items-center justify-between p-6 text-left gap-4 hover:bg-foreground/5 transition-colors"
       >
         <span className="font-semibold text-foreground">{faq.q}</span>

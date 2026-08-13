@@ -26,8 +26,9 @@ export const InteractiveMockup = ({
   // Stable initial theme ref so the iframe src NEVER reloads on theme toggle
   const initialThemeRef = useRef(currentTheme);
 
+  // Fallback: mark ready after 3s if iframe onLoad never fires
   useEffect(() => {
-    const timer = setTimeout(() => setIsReady(true), 300);
+    const timer = setTimeout(() => setIsReady(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
@@ -64,6 +65,7 @@ export const InteractiveMockup = ({
             src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
             onLoad={handleIframeLoad}
             tabIndex={-1}
+            loading="lazy"
             style={{
               width: `${(100 / scale).toFixed(1)}%`,
               height: `${(100 / scale).toFixed(1)}%`,
@@ -81,6 +83,7 @@ export const InteractiveMockup = ({
           src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
           onLoad={handleIframeLoad}
           tabIndex={-1}
+          loading="lazy"
           className={`w-full h-full border-none transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
           title={`Nova Browser Demo - ${feature}`}
           sandbox="allow-scripts allow-same-origin"

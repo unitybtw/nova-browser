@@ -1,24 +1,20 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Stats } from './components/Stats';
 import { Features } from './components/Features';
-import { FeatureShowcase } from './components/FeatureShowcase';
-import { Comparison } from './components/Comparison';
-import { Testimonials } from './components/Testimonials';
-import { TrustAndChangelog } from './components/TrustAndChangelog';
-import { FAQ } from './components/FAQ';
-import { CTA } from './components/CTA';
-import { Footer } from './components/Footer';
+
+const FeatureShowcase = lazy(() => import('./components/FeatureShowcase').then(m => ({ default: m.FeatureShowcase })));
+const Comparison = lazy(() => import('./components/Comparison').then(m => ({ default: m.Comparison })));
+const Testimonials = lazy(() => import('./components/Testimonials').then(m => ({ default: m.Testimonials })));
+const TrustAndChangelog = lazy(() => import('./components/TrustAndChangelog').then(m => ({ default: m.TrustAndChangelog })));
+const FAQ = lazy(() => import('./components/FAQ').then(m => ({ default: m.FAQ })));
+const CTA = lazy(() => import('./components/CTA').then(m => ({ default: m.CTA })));
+const Footer = lazy(() => import('./components/Footer').then(m => ({ default: m.Footer })));
 
 function App() {
   useEffect(() => {
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname + window.location.search);
-    }
     window.scrollTo(0, 0);
-    const id = setTimeout(() => window.scrollTo(0, 0), 100);
-    return () => clearTimeout(id);
   }, []);
 
   return (
@@ -35,26 +31,20 @@ function App() {
         {/* 3. Feature grid — quick overview */}
         <Features />
 
-        {/* 4. Feature showcase — deep dive alternating sections */}
-        <FeatureShowcase />
-
-        {/* 5. Comparison — vs Chrome/Firefox/Brave */}
-        <Comparison />
-
-        {/* 6. Testimonials — user reviews */}
-        <Testimonials />
-
-        {/* 7. Trust badges + Changelog */}
-        <TrustAndChangelog />
-
-        {/* 8. FAQ */}
-        <FAQ />
-
-        {/* 9. CTA — download call to action */}
-        <CTA />
+        {/* 4+ Below-the-fold sections, lazy-loaded */}
+        <Suspense fallback={null}>
+          <FeatureShowcase />
+          <Comparison />
+          <Testimonials />
+          <TrustAndChangelog />
+          <FAQ />
+          <CTA />
+        </Suspense>
       </main>
 
-      <Footer />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
     </div>
   );
 }

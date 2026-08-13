@@ -1,17 +1,11 @@
 import { motion } from 'framer-motion';
 import { Download, ChevronRight, Zap, Monitor, Apple } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLang } from '../i18n/LanguageContext';
 import { InteractiveMockup } from './InteractiveMockup';
 
 export const Hero = () => {
-  const { theme } = useTheme();
   const { t } = useLang();
-  useEffect(() => {
-    // Theme logic can be simplified or removed if Hero doesn't need to track isDark directly anymore.
-    // The ThemeProvider already handles the 'dark' class on the HTML element.
-  }, [theme]);
 
   const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
 
