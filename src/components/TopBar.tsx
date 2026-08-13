@@ -871,37 +871,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   )}
                 </button>
 
-                {/* Suggestions with 'Bunu mu kastettiniz?' badge */}
+                {/* Search Suggestions */}
                 {suggestions.length > 0 && (
                   <div className="py-1">
-                    {suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchValue(suggestions[0]);
-                          setShowSuggestions(false);
-                          onNavigate(formatSearchUrl(suggestions[0], searchEngine));
-                          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                        }}
-                        className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-amber-50/80 text-slate-800 text-sm text-left transition-colors group bg-amber-50/30"
-                      >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <Search className="w-4 h-4 text-amber-500 shrink-0" />
-                          <span className="truncate font-semibold text-slate-900">{suggestions[0]}</span>
-                        </div>
-                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/90 px-2 py-0.5 rounded-full shrink-0">
-                          Bunu mu kastettiniz?
-                        </span>
-                      </button>
-                    )}
-
                     <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                       Search Suggestions
                     </div>
 
-                    {suggestions
-                      .slice(suggestions[0] && suggestions[0].toLowerCase() !== searchValue.trim().toLowerCase() ? 1 : 0)
-                      .map((suggestion, idx) => (
+                    {suggestions.map((suggestion, idx) => (
                         <button
                           key={idx}
                           type="button"
