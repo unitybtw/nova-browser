@@ -1,5 +1,4 @@
-import { AlignLeft } from 'lucide-react';
-import { useTheme } from '../ThemeProvider';
+
 
 export const TabsMockup = () => {
   return (

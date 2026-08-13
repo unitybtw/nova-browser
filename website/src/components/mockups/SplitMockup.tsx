@@ -1,5 +1,4 @@
-import { Columns } from 'lucide-react';
-import { useTheme } from '../ThemeProvider';
+
 
 export const SplitMockup = () => {
   return (
