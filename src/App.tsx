@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PanelRight } from 'lucide-react';
 import { TopBar } from './components/TopBar';
@@ -70,6 +70,8 @@ const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'uk-1', name: 'United Kingdom (Public)', url: 'http://188.166.38.163:8080', type: 'free' },
   { id: 'de-1', name: 'Germany (Public)', url: 'http://167.235.215.35:8080', type: 'free' },
 ];
+
+const EMPTY_ARRAY: any[] = [];
 
 function App() {
   const [tabs, setTabs] = useState<Tab[]>(() => {
@@ -314,11 +316,12 @@ function App() {
   }, [settings]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlocked) {
-      const removeListener = (window as any).electronAPI.onAdBlocked((event: any, tabId: number) => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlockedBatch) {
+      const removeListener = (window as any).electronAPI.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
         setTabs(prev => prev.map(t => {
-          if (t.webContentsId === tabId) {
-            return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + 1 };
+          const count = t.webContentsId !== undefined ? batch[t.webContentsId] : undefined;
+          if (count) {
+            return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + count };
           }
           return t;
         }));
@@ -347,7 +350,7 @@ function App() {
   useEffect(() => {
     const timer = setTimeout(() => {
       localStorage.setItem('browsing_history', JSON.stringify(history));
-    }, 150);
+    }, 2000);
     return () => clearTimeout(timer);
   }, [history]);
 
@@ -357,7 +360,7 @@ function App() {
       .filter(t => !t.isIncognito);
     const timer = setTimeout(() => {
       localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
-    }, 100);
+    }, 2000);
 
     return () => clearTimeout(timer);
   }, [tabs]);
@@ -635,17 +638,36 @@ function App() {
     }
 
     if (window.electronAPI?.onDownloadUpdate) {
+      let pendingUpdates: Record<string, DownloadItem> = {};
+      let throttleTimer: any = null;
+
       cleanupDownloads = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
-        setDownloads(prev => {
-          const existingIdx = prev.findIndex(d => d.id === data.id);
-          if (existingIdx !== -1) {
-            const updated = [...prev];
-            updated[existingIdx] = { ...updated[existingIdx], ...data };
-            return updated;
-          } else {
-            return [data, ...prev];
-          }
-        });
+        pendingUpdates[data.id] = data;
+        
+        if (!throttleTimer) {
+          throttleTimer = setTimeout(() => {
+            setDownloads(prev => {
+              const updated = [...prev];
+              let hasChanges = false;
+              
+              Object.values(pendingUpdates).forEach(pendingData => {
+                const existingIdx = updated.findIndex(d => d.id === pendingData.id);
+                if (existingIdx !== -1) {
+                  updated[existingIdx] = { ...updated[existingIdx], ...pendingData };
+                  hasChanges = true;
+                } else {
+                  updated.unshift(pendingData);
+                  hasChanges = true;
+                }
+              });
+              
+              pendingUpdates = {};
+              throttleTimer = null;
+              
+              return hasChanges ? updated : prev;
+            });
+          }, 500); // UI throttled to 500ms
+        }
       });
     }
 
@@ -674,7 +696,7 @@ function App() {
     };
   }, []);
 
-  const activeTab = tabs.find(t => t.id === activeTabId);
+  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
 
   // Folder Management
   const handleCreateFolder = useCallback(() => {
@@ -1491,6 +1513,33 @@ function App() {
   const handleFoundInPage = useCallback((idx: number, count: number) => setFindMatches({ index: idx, count }), []);
   const handleCloseFindInPage = useCallback(() => setIsFindInPageOpen(false), []);
 
+  // Stable callbacks for TopBar (prevents re-renders from inline arrows)
+  const handleToggleVpn = useCallback(() => {
+    closeAllModals();
+    setIsVpnPopoverOpen(prev => !prev);
+  }, [closeAllModals]);
+
+  const handleToggleAIAssistant = useCallback(() => {
+    setIsSidePanelOpen(prev => !prev);
+  }, []);
+
+  const handleTabDragStart = useCallback(() => setIsDraggingTab(true), []);
+  const handleTabDragEnd = useCallback(() => {
+    setIsDraggingTab(false);
+    setIsDragOverMain(false);
+  }, []);
+  const handleTabDrag = useCallback((y: number) => setIsDragOverMain(y > 60), []);
+  const handleDropToSplitScreen = useCallback((tabId: string) => {
+    setActiveTabId(prev => {
+      if (tabId !== prev) setSplitTabId(tabId);
+      return prev;
+    });
+  }, []);
+  const handleToggleReaderMode = useCallback(() => setIsReaderModeOpen(prev => !prev), []);
+  const handleCloseSplitView = useCallback(() => setSplitTabId(null), []);
+  const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
+  const handleOpenSpotlight = useCallback(() => setIsSpotlightOpen(true), []);
+
   const handleFind = useCallback((text: string, forward?: boolean, matchCase?: boolean, wholeWord?: boolean) => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
     if (webview && webview.findInPage) {
@@ -1645,16 +1694,16 @@ function App() {
 
 
 
-  const activeDownloadsCount = downloads.filter(d => d.state === 'progressing').length;
+  const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
 
   // Compute second tab for split view (if available)
-  const secondaryTab = splitTabId ? tabs.find(t => t.id === splitTabId) : undefined;
+  const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
   // If active tab is the same as split tab, reset split view or switch split tab
   if (secondaryTab && activeTabId === secondaryTab.id) {
     setSplitTabId(null);
   }
 
-  const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
+  const workspaceTabs = useMemo(() => tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default')), [tabs, activeWorkspaceId]);
 
   if (showOnboarding) {
     return (
@@ -1704,11 +1753,11 @@ function App() {
             onRenameFolder={handleRenameFolder}
             onDeleteFolder={handleDeleteFolder}
             onMoveTabToFolder={handleMoveTabToFolder}
-            onOpenSpotlight={() => setIsSpotlightOpen(true)}
-            onTabDragStart={() => setIsDraggingTab(true)}
-            onTabDragEnd={() => setIsDraggingTab(false)}
+            onOpenSpotlight={handleOpenSpotlight}
+            onTabDragStart={handleTabDragStart}
+            onTabDragEnd={handleTabDragEnd}
             splitTabId={splitTabId}
-            onCloseSplit={() => setSplitTabId(null)}
+            onCloseSplit={handleCloseSplitView}
           />
         </div>
       )}
@@ -1727,7 +1776,7 @@ function App() {
           onClearDownloads={handleClearDownloads}
           showBookmarksBar={settings.showBookmarksBar}
           useVerticalTabs={settings.useVerticalTabs}
-          onToggleReaderMode={() => setIsReaderModeOpen(prev => !prev)}
+          onToggleReaderMode={handleToggleReaderMode}
           isSplitView={!!splitTabId}
           tabStyle={settings.tabStyle}
           isIncognito={activeTab?.isIncognito}
@@ -1759,25 +1808,13 @@ function App() {
           onGoForward={handleGoForward}
           onReload={handleReload}
           isVpnEnabled={vpnEnabled}
-          onToggleVpn={() => {
-          closeAllModals();
-          setIsVpnPopoverOpen(!isVpnPopoverOpen);
-        }}
-        onToggleAIAssistant={() => {
-          setIsSidePanelOpen(!isSidePanelOpen);
-        }}
-        onTabDragStart={() => setIsDraggingTab(true)}
-        onTabDragEnd={() => {
-          setIsDraggingTab(false);
-          setIsDragOverMain(false);
-        }}
-        onTabDrag={(y) => setIsDragOverMain(y > 60)}
-        onDropToSplitScreen={(tabId) => {
-          if (tabId !== activeTabId) {
-            setSplitTabId(tabId);
-          }
-        }}
-      />
+          onToggleVpn={handleToggleVpn}
+          onToggleAIAssistant={handleToggleAIAssistant}
+          onTabDragStart={handleTabDragStart}
+          onTabDragEnd={handleTabDragEnd}
+          onTabDrag={handleTabDrag}
+          onDropToSplitScreen={handleDropToSplitScreen}
+        />
 
       {/* MAIN BROWSER CONTENT */}
       <main 
@@ -1859,8 +1896,8 @@ function App() {
                   isActive={tab.id === activeTabId || tab.id === splitTabId}
                   onCloseTab={handleCloseTab}
                   isIncognito={tab.isIncognito || false}
-                  history={history}
-                  downloads={downloads}
+                  history={tab.url?.includes('nova://history') ? history : EMPTY_ARRAY}
+                  downloads={tab.url?.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
                   onClearHistory={handleClearHistory}
                   onRemoveHistoryItem={handleRemoveHistoryItem}
                   onClearDownloads={handleClearDownloads}
@@ -1918,7 +1955,7 @@ function App() {
                 Split View: {secondaryTab.title || secondaryTab.url}
               </div>
               <button 
-                onClick={() => setSplitTabId(null)}
+                onClick={handleCloseSplitView}
                 className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-colors"
                 title="Close Split View"
               >
@@ -1940,8 +1977,8 @@ function App() {
               isActive={true}
               onCloseTab={handleCloseTab}
               isIncognito={secondaryTab.isIncognito || false}
-              history={history}
-              downloads={downloads}
+              history={secondaryTab.url?.includes('nova://history') ? history : EMPTY_ARRAY}
+              downloads={secondaryTab.url?.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
               onClearHistory={handleClearHistory}
               onRemoveHistoryItem={handleRemoveHistoryItem}
               onClearDownloads={handleClearDownloads}
@@ -1952,7 +1989,7 @@ function App() {
         {/* AI Assistant Side Panel */}
         <SidePanel 
           isOpen={isSidePanelOpen} 
-          onClose={() => setIsSidePanelOpen(false)} 
+          onClose={handleCloseSidePanel} 
         />
       </main>
 

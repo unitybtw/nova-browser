@@ -99,8 +99,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tab-thumbnail-update', callback);
     return () => ipcRenderer.removeListener('tab-thumbnail-update', callback);
   },
-  onAdBlocked: (callback: (event: any, tabId: number) => void) => {
-    ipcRenderer.on('ad-blocked', callback);
-    return () => ipcRenderer.removeListener('ad-blocked', callback);
+  onAdBlockedBatch: (callback: (event: any, batch: Record<number, number>) => void) => {
+    ipcRenderer.on('ad-blocked-batch', callback);
+    return () => ipcRenderer.removeListener('ad-blocked-batch', callback);
   },
 });

@@ -1,30 +1,37 @@
 # Original User Request
 
-## Initial Request — 2026-07-22T07:51:59Z
+## 2026-08-12T20:52:55Z
 
-Fix all bugs, refine UI/UX flaws, and optimize performance across the Electron React browser codebase.
+<USER_REQUEST>
+# Teamwork Project Prompt — Draft
 
-Working directory: /Users/siracsimsek/Desktop/open source browser
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+
+Scan the Nova Browser codebase for bugs, runtime errors, and vulnerabilities, implement fixes, and push the changes directly to the `main` branch on GitHub.
+
+Working directory: /Users/siracsimsek/Desktop/novabrowser
 Integrity mode: development
 
 ## Requirements
 
-### R1. Bug Fixes & Code Health Audit
-Identify and fix any hidden runtime errors, memory leaks, React re-render loops, component state desynchronizations, or IPC event listener memory leaks across Electron main, preload, and React components.
+### R1. Backend & Security Audit
+Scan the codebase with a primary focus on the Electron backend/main process logic and security/privacy vulnerabilities.
 
-### R2. UI/UX Refinement & Polish
-Smooth out layout alignment, spacing, transitions, and component states across the TopBar, Modals (Settings, History, Reader Mode, Downloads, Share, FindInPage), and NewTabPage. Ensure no modal overlaps or visual bugs occur when multiple dialogs or split views are active.
+### R2. Bug Fixing & Stabilization
+Implement robust fixes for identified issues without altering the core architecture or breaking existing features.
 
-### R3. Performance & Memory Optimization
-Optimize bundle size, WebGPU/WASM memory usage, webview lifecycle cleanup, and state updates for maximum speed, fast tab switching, and low RAM consumption.
+### R3. Version Control Integration
+Commit all verified fixes to the local Git repository and push them directly to the `main` branch (`origin/main`).
 
 ## Acceptance Criteria
 
-### Automated Build & Code Quality
-- [ ] `npm run build` succeeds cleanly with zero TypeScript or Vite errors.
-- [ ] All IPC listeners (`shortcut`, `download-update`) and webview event listeners (`did-stop-loading`, `page-title-updated`) are properly cleaned up upon component unmount.
+### Code Quality & Security
+- [ ] Project successfully compiles (`npm run build`) with zero TypeScript errors.
+- [ ] Application launches without runtime crashes in the Electron main process.
+- [ ] No new security vulnerabilities are introduced.
 
-### UI/UX & Functional Stability
-- [ ] Tab switching, pinning, muting, duplicating, split screen mode, and tab closing operate smoothly with no state corruption.
-- [ ] All 6 modals (Settings, History, Downloads, Share, Reader Mode, FindInPage) open and close cleanly without overlay collisions or focus trap bugs.
-- [ ] Privacy Shield and custom search engine selections function reliably.
+### Version Control
+- [ ] Changes are cleanly committed to the `main` branch.
+- [ ] Changes are successfully pushed to `origin/main`.
+</USER_REQUEST>

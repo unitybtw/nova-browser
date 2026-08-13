@@ -15,7 +15,7 @@
 | 4 | E2E Test Suite Harness | Wire `tests/runAll.ts` to execute tests in `tests/e2e/` so `npm test` runs full automated verification | M2 | survey | DONE |
 | 5 | Build & Compilation Verification | Ensure `npm run build` succeeds with 0 TypeScript compilation errors | M2 | survey | DONE |
 | 6 | Runtime Stability & Forensic Audit | Verify Electron main process runtime stability and perform Lead Forensic Integrity Audit | M3 | survey | DONE |
-| 7 | Git Commit & Push Release | Commit all verified changes to local `main` branch and push to `origin/main` on GitHub | M4 | survey | IN_PROGRESS |
+| 7 | Git Commit & Push Release | Commit all verified changes to local `main` branch and push to `origin/main` on GitHub | M4 | survey | DONE |
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
@@ -23,7 +23,7 @@
 | M1 | Backend & Renderer Bug Fixes | Fix main process leaks, security headers, renderer crash vectors, and TS error in mcp-bridge.ts | none | DONE |
 | M2 | Test Harness & Build Verification | Wire `tests/runAll.ts` to run E2E test suite, verify `npm run build` passes with 0 TS errors and `npm test` passes 100% | M1 | DONE |
 | M3 | Runtime Stability & Forensic Audit | Perform main process runtime stability check and Forensic Integrity Audit (verdict CLEAN) | M2 | DONE |
-| M4 | Git Commit & Push Release | Commit verified changes to `main` branch and push to `origin/main` | M3 | IN_PROGRESS |
+| M4 | Git Commit & Push Release | Commit verified changes to `main` branch and push to `origin/main` | M3 | DONE |
 
 ## Interface Contracts
 ### Main Process ↔ Renderer Process

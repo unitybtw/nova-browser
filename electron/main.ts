@@ -82,8 +82,8 @@ function updateAdblockWhitelist(whitelist: string[]) {
   const newFilters = whitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
   
   blocker.update({
-    newNetworkFilters: newFilters,
-    removedNetworkFilters: currentWhitelistFilters
+    newNetworkFilters: newFilters as any[],
+    removedNetworkFilters: currentWhitelistFilters as any[]
   });
   
   currentWhitelistFilters = newFilters;
@@ -92,9 +92,30 @@ function updateAdblockWhitelist(whitelist: string[]) {
 // Initialize AdBlocker globally so IPC can access it
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
+  
+  // Batch ad-blocked notifications to avoid IPC flooding (can be 50-100+ per page)
+  const pendingAdBlocks = new Map<number, number>();
+  let adBlockFlushTimer: ReturnType<typeof setInterval> | null = null;
+  
   blocker.on('request-blocked', (request: any) => {
-    if (request.tabId && mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('ad-blocked', request.tabId);
+    if (request.tabId) {
+      pendingAdBlocks.set(request.tabId, (pendingAdBlocks.get(request.tabId) || 0) + 1);
+      
+      if (!adBlockFlushTimer) {
+        adBlockFlushTimer = setInterval(() => {
+          if (pendingAdBlocks.size === 0) {
+            if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
+            adBlockFlushTimer = null;
+            return;
+          }
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            // Send batched counts as a single IPC message
+            const batch = Object.fromEntries(pendingAdBlocks);
+            mainWindow.webContents.send('ad-blocked-batch', batch);
+          }
+          pendingAdBlocks.clear();
+        }, 2000);
+      }
     }
   });
 
