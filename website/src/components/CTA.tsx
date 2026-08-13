@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import { Download, Monitor } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
 import { useEffect, useState } from 'react';
-import { InteractiveMockup } from './InteractiveMockup';
 
 export const CTA = () => {
   const { t } = useLang();
@@ -38,7 +37,7 @@ export const CTA = () => {
             <p className="text-lg text-white/85 mb-10">
               {t.cta.sub}
             </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full">
               {os === 'win' ? (
                 <a
                   href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
@@ -77,11 +76,6 @@ export const CTA = () => {
                 {t.cta.github}
               </a>
             </div>
-          </div>
-          
-          {/* Bottom Mockup with Matrix Background */}
-          <div className="relative z-10 mx-auto mt-20 transform scale-90 translate-y-16 lg:translate-y-24 origin-top pointer-events-none hidden md:block h-[520px]">
-            <InteractiveMockup bg="matrix" feature="default" />
           </div>
         </motion.div>
       </div>
