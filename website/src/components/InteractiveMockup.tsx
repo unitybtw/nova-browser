@@ -22,25 +22,32 @@ export const InteractiveMockup = ({
 
   const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const currentTheme = isDark ? 'dark' : 'light';
+  
+  // Stable initial theme ref so the iframe src NEVER reloads on theme toggle
+  const initialThemeRef = useRef(currentTheme);
 
   useEffect(() => {
-    // Smooth fade in
-    const timer = setTimeout(() => setIsReady(true), 350);
+    const timer = setTimeout(() => setIsReady(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Post message to iframe on theme change for instant seamless switch
+  // Post message to iframe for instant, zero-reload theme update
   useEffect(() => {
     if (iframeRef.current?.contentWindow) {
       iframeRef.current.contentWindow.postMessage({ type: 'NOVA_THEME_CHANGE', theme: currentTheme }, '*');
     }
   }, [currentTheme]);
 
+  const handleIframeLoad = () => {
+    setIsReady(true);
+    iframeRef.current?.contentWindow?.postMessage({ type: 'NOVA_THEME_CHANGE', theme: currentTheme }, '*');
+  };
+
   return (
-    <div className={`w-full h-full rounded-2xl overflow-hidden shadow-2xl relative border transition-all duration-700 ${
+    <div className={`w-full h-full rounded-2xl overflow-hidden relative border transition-colors duration-300 ${
       isDark 
-        ? 'border-white/10 bg-slate-950/90 shadow-[0_0_50px_rgba(0,0,0,0.5)]' 
-        : 'border-slate-200/80 bg-white/95 shadow-[0_10px_40px_rgba(0,0,0,0.08)]'
+        ? 'border-white/10 bg-slate-950/90 shadow-2xl' 
+        : 'border-slate-200/80 bg-white/95 shadow-xl'
     } ${className}`}>
       {/* Loading Spinner */}
       {!isReady && (
@@ -49,19 +56,20 @@ export const InteractiveMockup = ({
         </div>
       )}
 
-      {/* Real Nova Browser iframe (with crisp scale transformation when scaled) */}
+      {/* Real Nova Browser iframe */}
       {scale !== 1 ? (
         <div className="w-full h-full overflow-hidden relative">
           <iframe 
             ref={iframeRef}
-            src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${currentTheme}`}
+            src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
+            onLoad={handleIframeLoad}
             style={{
               width: `${(100 / scale).toFixed(1)}%`,
               height: `${(100 / scale).toFixed(1)}%`,
               transform: `scale(${scale})`,
               transformOrigin: 'top left'
             }}
-            className={`border-none transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
+            className={`border-none transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
             title={`Nova Browser Demo - ${feature}`}
             sandbox="allow-scripts allow-same-origin"
           />
@@ -69,8 +77,9 @@ export const InteractiveMockup = ({
       ) : (
         <iframe 
           ref={iframeRef}
-          src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${currentTheme}`}
-          className={`w-full h-full border-none transition-opacity duration-700 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
+          src={`/browser-demo/index.html?demo=true&feature=${feature}&bg=${bg}&theme=${initialThemeRef.current}`}
+          onLoad={handleIframeLoad}
+          className={`w-full h-full border-none transition-opacity duration-500 ${isReady ? 'opacity-100' : 'opacity-0'} ${interactive ? 'pointer-events-auto' : 'pointer-events-none'}`}
           title={`Nova Browser Demo - ${feature}`}
           sandbox="allow-scripts allow-same-origin"
         />
