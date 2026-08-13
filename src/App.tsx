@@ -1316,19 +1316,36 @@ function App() {
   const handleOpenShare = useCallback(() => openModal('share'), [openModal]);
   const handleTakeScreenshot = useCallback(async () => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.capturePage) {
+    if (webview) {
       try {
-        const image = await webview.capturePage();
-        const dataUrl = image.toDataURL();
-        setScreenshotDataUrl(dataUrl);
-        setIsScreenshotOpen(true);
+        let dataUrl: string | null = null;
+        if (typeof webview.getWebContentsId === 'function' && (window as any).electronAPI?.captureTabThumbnail) {
+           const wcId = webview.getWebContentsId();
+           dataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
+        } else if (typeof webview.capturePage === 'function') {
+           const image = await webview.capturePage();
+           dataUrl = image.toDataURL();
+        }
+        
+        if (dataUrl) {
+          setScreenshotDataUrl(dataUrl);
+          setIsScreenshotOpen(true);
+        } else {
+          alert("Failed to capture screenshot. The page might not be fully loaded.");
+        }
       } catch (err) {
         console.error('Screenshot capture failed:', err);
       }
     } else {
-      alert("Screenshot feature is only available in the desktop app.");
+      // Check if it's an internal page by looking at activeTab url
+      const tab = tabs.find(t => t.id === activeTabId);
+      if (tab?.url?.startsWith('nova://')) {
+         alert("Screenshots cannot be taken on internal pages (Settings, New Tab, etc.).");
+      } else {
+         alert("Screenshot feature is only available in the desktop app.");
+      }
     }
-  }, [activeTabId]);
+  }, [activeTabId, tabs]);
   const handleOpenFindInPage = useCallback(() => setIsFindInPageOpen(prev => !prev), []);
   
   const handleToggleSplitView = useCallback(() => {
