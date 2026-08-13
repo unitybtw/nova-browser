@@ -183,6 +183,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       case 'aurora_waves':
       case 'cyber_grid':
       case 'hyper_space':
+      case 'fireflies':
         return 'bg-[#0B0F19] text-white';
       case 'glass':
         return 'bg-slate-900/90 text-white backdrop-blur-xl';
@@ -373,6 +374,38 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                }}
                transition={{
                  duration: Math.random() * 4 + 2,
+                 repeat: Infinity,
+                 ease: "easeInOut",
+                 delay: Math.random() * 5
+               }}
+             />
+           ))}
+        </div>
+      )}
+
+      {/* Fireflies */}
+      {newTabBackground === 'fireflies' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-[#0f172a]">
+           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-[#1e40af]/20 via-[#0f172a] to-black"></div>
+           {[...Array(30)].map((_, i) => (
+             <motion.div
+               key={`firefly-${i}`}
+               className="absolute bg-[#fef08a] rounded-full"
+               style={{
+                 width: Math.random() * 4 + 2 + 'px',
+                 height: Math.random() * 4 + 2 + 'px',
+                 top: Math.random() * 100 + '%',
+                 left: Math.random() * 100 + '%',
+                 boxShadow: '0 0 15px 3px rgba(253, 224, 71, 0.6)'
+               }}
+               animate={{
+                 y: [0, -50, 0],
+                 x: [0, Math.random() * 40 - 20, 0],
+                 opacity: [0, 1, 0.5, 1, 0],
+                 scale: [0.8, 1.2, 0.8]
+               }}
+               transition={{
+                 duration: Math.random() * 6 + 4,
                  repeat: Infinity,
                  ease: "easeInOut",
                  delay: Math.random() * 5

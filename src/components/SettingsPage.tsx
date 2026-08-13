@@ -624,6 +624,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'aurora_waves', name: 'Aurora Waves (Animated)', style: 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500' },
                     { id: 'cyber_grid', name: 'Cyber Grid (Animated)', style: 'bg-black border-cyan-500/30' },
                     { id: 'hyper_space', name: 'Hyper Space (Animated)', style: 'bg-slate-950 border-white/20' },
+                    { id: 'fireflies', name: 'Fireflies (Animated)', style: 'bg-[#0f172a] border-[#eab308]/30' },
                     { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-accent-dark/50 backdrop-blur' },
                     { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
                   ].map(bg => (
