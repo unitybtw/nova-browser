@@ -643,16 +643,35 @@ ipcMain.handle('capture-full-page', async (_event, webContentsId: number) => {
       return null;
     }
 
-    const { data } = await wc.debugger.sendCommand('Page.captureScreenshot', {
-      format: 'png',
-      captureBeyondViewport: true,
-    });
-    
-    if (attached) {
-      wc.debugger.detach();
+    let dataUrl = null;
+    try {
+      const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
+      const width = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
+      const height = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
+
+      const response = await wc.debugger.sendCommand('Page.captureScreenshot', {
+        format: 'png',
+        captureBeyondViewport: true,
+        clip: {
+          x: 0,
+          y: 0,
+          width,
+          height,
+          scale: 1
+        }
+      });
+      if (response && (response as any).data) {
+        dataUrl = `data:image/png;base64,${(response as any).data}`;
+      }
+    } catch (err) {
+      console.error('Screenshot CDP command failed:', err);
+    } finally {
+      if (attached) {
+        wc.debugger.detach();
+      }
     }
     
-    return `data:image/png;base64,${data}`;
+    return dataUrl;
   } catch (err) {
     console.error('Failed to capture full page:', err);
     return null;
