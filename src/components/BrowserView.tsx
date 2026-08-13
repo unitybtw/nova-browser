@@ -654,14 +654,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       </AnimatePresence>
 
       <div className="flex-1 w-full relative">
-        {/* Debug Banner */}
-        {!(typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup) && (
-          <div className="absolute top-0 left-0 right-0 bg-red-600 text-white font-bold p-2 z-[9999] text-center">
-            WARNING: ELECTRON API NOT FOUND! USING IFRAME (SAFE MODE)! 
-            Therefore, sites like YouTube and Reddit will show a BLACK SCREEN (due to X-Frame-Options block)!
-          </div>
-        )}
-
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
@@ -673,20 +665,121 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           />
         ) : (
-          /* Web / Dev IFrame Fallback for standard browser preview */
-          <iframe
-            ref={webviewRef as any}
-            data-tab-id={tab.id}
-            src={webviewInitialSrc.current || 'about:blank'}
-            className="w-full h-full border-none bg-white"
-            title={tab.title}
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            onLoad={() => {
-              if (tab.isLoading) {
-                onUpdateTab(tab.id, { isLoading: false });
-              }
-            }}
-          />
+          /* Web Demo Mode: Render rich simulated pages for mockups or fallback iframe cleanly */
+          tab.url?.includes('github.com') ? (
+            <div className="w-full h-full bg-[#0d1117] text-white p-6 overflow-auto font-mono text-xs select-text">
+              <div className="flex items-center gap-2 pb-4 mb-4 border-b border-white/10 text-white/90">
+                <div className="w-4 h-4 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center text-[10px]">📁</div>
+                <span className="font-semibold text-sm">unitybtw / nova-browser</span>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 font-sans ml-2">Public</span>
+                <span className="ml-auto text-xs text-white/50 font-sans">TypeScript • 98.4%</span>
+              </div>
+              <div className="p-4 rounded-xl bg-[#161b22] border border-white/10 space-y-2 text-white/80 leading-relaxed">
+                <div className="text-white/40 text-[11px] pb-2 border-b border-white/5 flex items-center justify-between">
+                  <span>electron / mcpServer.ts</span>
+                  <span>64 lines • 2.1 KB</span>
+                </div>
+                <p><span className="text-purple-400">import</span> &#123; <span className="text-yellow-300">Server</span> &#125; <span className="text-purple-400">from</span> <span className="text-emerald-400">'@modelcontextprotocol/sdk'</span>;</p>
+                <p><span className="text-purple-400">export class</span> <span className="text-yellow-300">BrowserMCPServer</span> &#123;</p>
+                <p className="pl-4"><span className="text-purple-400">private</span> port = <span className="text-emerald-400">3020</span>;</p>
+                <p className="pl-4 pt-1"><span className="text-purple-400">async</span> <span className="text-blue-400">executeAutonomousAction</span>(command: <span className="text-yellow-300">string</span>) &#123;</p>
+                <p className="pl-8 text-emerald-400">// Direct AI browser control bridge with sandboxed WebGPU execution</p>
+                <p className="pl-8"><span className="text-purple-400">return await</span> this.mainWindow.webContents.executeJavaScript(command);</p>
+                <p className="pl-4">&#125;</p>
+                <p>&#125;</p>
+              </div>
+            </div>
+          ) : tab.url?.includes('techinsider.io') ? (
+            <div className="w-full h-full bg-[#0a0e1a] text-white p-8 overflow-auto select-none">
+              <div className="max-w-2xl mx-auto space-y-6">
+                <div className="space-y-2">
+                  <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    AI & Privacy Revolution
+                  </span>
+                  <h1 className="text-2xl font-bold text-white tracking-tight pt-2">
+                    Next-Gen Browsers: Running LLMs 100% Locally with Zero Cloud Latency
+                  </h1>
+                  <p className="text-xs text-white/50">By Elena Vance • Published Oct 2026 • 4 min read</p>
+                </div>
+
+                <div className="w-full h-24 rounded-2xl border border-dashed border-emerald-500/40 bg-emerald-950/20 flex items-center justify-center gap-3 text-emerald-400 text-xs font-medium">
+                  <span className="p-1.5 rounded-lg bg-emerald-500/20">🛡️</span>
+                  <span>Targeted Ad Banner Blocked by Nova Privacy Shield (3 Trackers Stopped)</span>
+                </div>
+
+                <div className="space-y-3 text-xs text-white/70 leading-relaxed">
+                  <p>
+                    Local AI models powered by WebGPU transform how users navigate the web. Unlike traditional browsers that upload your personal browsing history to third-party servers, Nova executes all inference directly on local silicon.
+                  </p>
+                  <p>
+                    By preventing telemetry and fingerprinting at the engine level, pages render up to 64% faster with zero data leakage.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : tab.url?.includes('react.dev') ? (
+            <div className="w-full h-full bg-[#16181d] text-white p-8 overflow-auto select-none">
+              <div className="max-w-2xl mx-auto space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-white/10">
+                  <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">⚛️</div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">React 19 Documentation</h2>
+                    <p className="text-xs text-white/50">Server Components & Actions Architecture</p>
+                  </div>
+                  <span className="ml-auto text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">v19.0.0</span>
+                </div>
+
+                <div className="space-y-3 text-xs text-white/80 leading-relaxed">
+                  <p>
+                    React 19 introduces automatic action transitions, async data primitives, and first-class compiler optimizations that optimize rendering cycles.
+                  </p>
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] text-cyan-300/90 space-y-1">
+                    <p className="text-white/40">// Example: Async Action Transition</p>
+                    <p><span className="text-purple-400">const</span> [isPending, startTransition] = <span className="text-blue-400">useTransition</span>();</p>
+                    <p><span className="text-purple-400">const</span> [state, formAction] = <span className="text-blue-400">useActionState</span>(updateItem, null);</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : tab.url?.includes('tailwindcss.com') ? (
+            <div className="w-full h-full bg-[#0b1120] text-white p-8 overflow-auto select-none">
+              <div className="max-w-2xl mx-auto space-y-6">
+                <div className="flex items-center gap-3 pb-4 border-b border-white/10">
+                  <div className="w-8 h-8 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400 font-bold text-sm">🎨</div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white">Tailwind CSS v4 Oxide Engine</h2>
+                    <p className="text-xs text-white/50">High Performance Unified CSS Engine</p>
+                  </div>
+                  <span className="ml-auto text-xs px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">v4.0</span>
+                </div>
+
+                <div className="space-y-3 text-xs text-white/80 leading-relaxed">
+                  <p>
+                    Tailwind CSS v4 is rewritten in Rust from the ground up, delivering 10x faster compile times with zero-configuration CSS imports.
+                  </p>
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/10 font-mono text-[11px] text-sky-300/90 space-y-1">
+                    <p className="text-white/40">/* app.css */</p>
+                    <p><span className="text-purple-400">@import</span> <span className="text-emerald-400">"tailwindcss"</span>;</p>
+                    <p><span className="text-purple-400">@theme</span> &#123; <span className="text-blue-400">--color-brand</span>: <span className="text-yellow-300">#6366f1</span>; &#125;</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <iframe
+              ref={webviewRef as any}
+              data-tab-id={tab.id}
+              src={webviewInitialSrc.current || 'about:blank'}
+              className="w-full h-full border-none bg-white"
+              title={tab.title}
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+              onLoad={() => {
+                if (tab.isLoading) {
+                  onUpdateTab(tab.id, { isLoading: false });
+                }
+              }}
+            />
+          )
         )}
       </div>
 
