@@ -37,6 +37,26 @@
       "artifactName": "Nova-Browser-Setup.exe",
       "icon": "build/icon.ico"
     },
+    "dmg": {
+      "background": "build/dmg-background.png",
+      "iconSize": 128,
+      "window": {
+        "width": 540,
+        "height": 380
+      },
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
     "mac": {
       "target": [
         {
