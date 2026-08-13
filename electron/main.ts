@@ -2,6 +2,8 @@ console.log('Main process starting...');
 import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme, safeStorage } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
+import dns from 'dns';
+import { promisify } from 'util';
 import fs from 'fs';
 // @ts-ignore
 import unzip from 'unzip-crx-3';
@@ -110,8 +112,20 @@ function createWindow() {
 
   // 🔒 Security: Prevent Drag and Drop navigation on the main UI window
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    // Only allow navigation to localhost dev server or local file in prod
-    if (url.startsWith('http://localhost:5173') || url.startsWith('file://')) {
+    // Only allow navigation to localhost dev server or the specific dist/index.html in prod
+    if (url.startsWith('http://localhost:5173')) {
+      return;
+    }
+    if (url.startsWith('file://')) {
+      const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
+      try {
+        const navPath = decodeURIComponent(new URL(url).pathname);
+        if (path.resolve(navPath) === allowedPath) {
+          return;
+        }
+      } catch {}
+      event.preventDefault();
+      console.warn('Blocked file:// navigation to non-app path:', url);
       return;
     }
     event.preventDefault();
@@ -215,7 +229,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     });
   });
 
-  // Handle headers for WebGPU / WASM SharedArrayBuffer
+  // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const responseHeaders: Record<string, string[]> = {};
     if (details.responseHeaders) {
@@ -229,6 +243,13 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     if (details.url.includes('localhost:5173')) {
       responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
       responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
+    }
+
+    // VULN-16: Add Content Security Policy for the app's own pages
+    if (details.url.startsWith('file://') || details.url.includes('localhost:5173')) {
+      responseHeaders['Content-Security-Policy'] = [
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https:;"
+      ];
     }
 
     if (isPrivacyShieldEnabled) {
@@ -493,9 +514,10 @@ app.on('web-contents-created', (_event, contents) => {
       if (isPhishing(navigationUrl)) {
         e.preventDefault();
         mainWindow?.webContents.send('blocked-site', { url: navigationUrl, reason: 'phishing' });
-        // Optional: you can inject a warning HTML directly or navigate to a local warning page
+        // VULN-05: HTML-escape the URL before interpolating to prevent XSS
+        const escapedUrl = navigationUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
         contents.executeJavaScript(`
-          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (${navigationUrl}) has been identified as containing phishing or malicious software.</p></div>';
+          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (${escapedUrl}) has been identified as containing phishing or malicious software.</p></div>';
         `).catch(() => {});
         return;
       }
@@ -718,16 +740,19 @@ ipcMain.handle('cancel-download', (_event, id: string) => {
 
 ipcMain.handle('open-download', (_event, pathStr: string) => {
   const downloadsPath = app.getPath('downloads');
-  // 🔒 Security: Ensure path actually exists inside the Downloads folder
-  if (pathStr && pathStr.startsWith(downloadsPath) && fs.existsSync(pathStr)) {
-    shell.openPath(pathStr);
+  // VULN-10: Resolve path first to prevent traversal with .. segments
+  const resolvedPath = path.resolve(pathStr);
+  if (resolvedPath && resolvedPath.startsWith(downloadsPath + path.sep) && fs.existsSync(resolvedPath)) {
+    shell.openPath(resolvedPath);
   }
 });
 
 ipcMain.handle('show-download-in-folder', (_event, pathStr: string) => {
   const downloadsPath = app.getPath('downloads');
-  if (pathStr && pathStr.startsWith(downloadsPath) && fs.existsSync(pathStr)) {
-    shell.showItemInFolder(pathStr);
+  // VULN-10: Resolve path first to prevent traversal with .. segments
+  const resolvedPath = path.resolve(pathStr);
+  if (resolvedPath && resolvedPath.startsWith(downloadsPath + path.sep) && fs.existsSync(resolvedPath)) {
+    shell.showItemInFolder(resolvedPath);
   }
 });
 
@@ -786,10 +811,15 @@ ipcMain.handle('secure-store-set', async (_event, key: string, value: string) =>
   try {
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
-    const encrypted = safeStorage.isEncryptionAvailable() 
-      ? safeStorage.encryptString(value) 
-      : Buffer.from(value, 'utf-8');
-    fs.writeFileSync(keyPath, encrypted);
+    // VULN-06: Warn and mark when encryption is unavailable
+    if (safeStorage.isEncryptionAvailable()) {
+      const encrypted = safeStorage.encryptString(value);
+      fs.writeFileSync(keyPath, encrypted);
+    } else {
+      console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Storing key "${key}" with [UNENCRYPTED] marker.`);
+      const markedValue = Buffer.from('[UNENCRYPTED]' + value, 'utf-8');
+      fs.writeFileSync(keyPath, markedValue);
+    }
     return true;
   } catch (err) {
     console.error('Secure store set error:', err);
@@ -802,10 +832,18 @@ ipcMain.handle('secure-store-get', async (_event, key: string) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     if (fs.existsSync(keyPath)) {
-      const encrypted = fs.readFileSync(keyPath);
-      return safeStorage.isEncryptionAvailable() 
-        ? safeStorage.decryptString(encrypted) 
-        : encrypted.toString('utf-8');
+      const raw = fs.readFileSync(keyPath);
+      // VULN-06: Handle encrypted vs unencrypted data
+      if (safeStorage.isEncryptionAvailable()) {
+        return safeStorage.decryptString(raw);
+      } else {
+        const str = raw.toString('utf-8');
+        console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Reading key "${key}" as unencrypted.`);
+        if (str.startsWith('[UNENCRYPTED]')) {
+          return str.slice('[UNENCRYPTED]'.length);
+        }
+        return str;
+      }
     }
   } catch (err) {
     console.error('Secure store get error:', err);
@@ -817,6 +855,12 @@ ipcMain.handle('secure-store-get', async (_event, key: string) => {
 ipcMain.handle('store-set', async (_event, key: string, value: string) => {
   try {
     if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    // VULN-23: Enforce max value size of 10MB
+    const MAX_STORE_VALUE_SIZE = 10 * 1024 * 1024; // 10MB
+    if (typeof value === 'string' && Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
+      console.error('Store set error: Value exceeds maximum size of 10MB');
+      return { error: 'Value exceeds maximum allowed size of 10MB' };
+    }
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     fs.writeFileSync(keyPath, value, 'utf-8');
     return true;
@@ -842,25 +886,69 @@ ipcMain.handle('store-get', async (_event, key: string) => {
 // IPC Handler for VPN
 ipcMain.handle('set-vpn', async (_event, config: { enabled: boolean; proxyUrl?: string }) => {
   if (config.enabled && config.proxyUrl) {
-    await session.defaultSession.setProxy({ proxyRules: config.proxyUrl });
+    // VULN-17: Validate proxy URL protocol
+    const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
+    const proxyUrl = config.proxyUrl.trim();
+    if (!allowedProxyProtocols.some(proto => proxyUrl.startsWith(proto))) {
+      console.error('Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://');
+      return { error: 'Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://' };
+    }
+    await session.defaultSession.setProxy({ proxyRules: proxyUrl });
   } else {
     await session.defaultSession.setProxy({ proxyRules: 'direct://' });
   }
   return true;
 });
 
+// VULN-18: Helper to check if an IP is in a private/reserved range
+function isPrivateIP(ip: string): boolean {
+  // IPv4 private ranges
+  if (/^127\./.test(ip)) return true;
+  if (/^10\./.test(ip)) return true;
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
+  if (/^192\.168\./.test(ip)) return true;
+  if (/^169\.254\./.test(ip)) return true;
+  if (ip === '0.0.0.0') return true;
+  // IPv6 loopback
+  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true;
+  return false;
+}
+
+const dnsLookup = promisify(dns.lookup);
+
 // IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview)
 ipcMain.handle('fetch-page-html', async (_event, url: string) => {
   if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
   
   // 🔒 Security: Prevent SSRF and local file reads (e.g. file://, ftp://)
+  let parsedUrl: URL;
   try {
-    const parsedUrl = new URL(url);
+    parsedUrl = new URL(url);
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
     }
   } catch (err) {
     return { error: 'Invalid URL format' };
+  }
+
+  // VULN-18: Block requests to private IP ranges, localhost, and MCP server port
+  try {
+    const hostname = parsedUrl.hostname.toLowerCase();
+    if (hostname === 'localhost') {
+      return { error: 'Requests to localhost are blocked.' };
+    }
+    // Resolve hostname to IP and check for private ranges
+    const { address } = await dnsLookup(hostname);
+    if (isPrivateIP(address)) {
+      return { error: 'Requests to private/internal IP addresses are blocked.' };
+    }
+    // Block MCP server port
+    const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
+    if (port === '3020') {
+      return { error: 'Requests to MCP server port are blocked.' };
+    }
+  } catch (err: any) {
+    return { error: 'DNS resolution failed: ' + err.message };
   }
 
   try {
@@ -922,8 +1010,17 @@ let loadedExtensions: any[] = [];
 ipcMain.handle('install-extension', async (_event, folderPath: string) => {
   const win = BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No window available' };
+  // VULN-15: Validate that folderPath is within userData/extensions and has no traversal
+  if (folderPath.includes('..')) {
+    return { error: 'Invalid extension path: path traversal detected.' };
+  }
+  const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  const resolvedFolder = path.resolve(folderPath);
+  if (!resolvedFolder.startsWith(extensionsDir + path.sep) && resolvedFolder !== extensionsDir) {
+    return { error: 'Extension must be within the app extensions directory.' };
+  }
   try {
-    const extInfo = await win.webContents.session.loadExtension(folderPath);
+    const extInfo = await win.webContents.session.loadExtension(resolvedFolder);
     loadedExtensions.push(extInfo);
     return { success: true, extension: extInfo };
   } catch (err) {
@@ -981,6 +1078,25 @@ ipcMain.handle('list-extensions', async () => {
 
 // Open Extension Popup Window
 ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
+  // VULN-14: Validate URL protocol for extension popups
+  const blockedProtocols = ['javascript:', 'data:', 'vbscript:'];
+  if (typeof url !== 'string' || blockedProtocols.some(proto => url.trim().toLowerCase().startsWith(proto))) {
+    return { error: 'Blocked: dangerous URL protocol.' };
+  }
+  const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  if (url.startsWith('file://')) {
+    try {
+      const filePath = path.resolve(decodeURIComponent(new URL(url).pathname));
+      if (!filePath.startsWith(extensionsDir + path.sep)) {
+        return { error: 'Blocked: file:// URL must be within extensions directory.' };
+      }
+    } catch {
+      return { error: 'Invalid file URL.' };
+    }
+  } else if (!url.startsWith('chrome-extension://')) {
+    return { error: 'Blocked: only chrome-extension:// and local extension file:// URLs are allowed.' };
+  }
+
   const popupWin = new BrowserWindow({
     width: 380,
     height: 500,

@@ -343,8 +343,13 @@ export class BrowserMCPServer {
   private loadOrGenerateToken(): string {
     try {
       if (fs.existsSync(this.tokenFilePath)) {
-        const raw = fs.readFileSync(this.tokenFilePath, 'utf-8');
-        return raw;
+        if (safeStorage.isEncryptionAvailable()) {
+          const encrypted = fs.readFileSync(this.tokenFilePath);
+          return safeStorage.decryptString(encrypted);
+        } else {
+          // Fallback: read as plain text when safeStorage is unavailable
+          return fs.readFileSync(this.tokenFilePath, 'utf-8');
+        }
       }
     } catch (e) {
       console.warn('[MCP Server] Error reading token file:', e);
@@ -355,7 +360,13 @@ export class BrowserMCPServer {
   private saveNewToken(): string {
     const newToken = randomUUID();
     try {
-      fs.writeFileSync(this.tokenFilePath, newToken, 'utf-8');
+      if (safeStorage.isEncryptionAvailable()) {
+        const encrypted = safeStorage.encryptString(newToken);
+        fs.writeFileSync(this.tokenFilePath, encrypted);
+      } else {
+        // Fallback: write as plain text when safeStorage is unavailable
+        fs.writeFileSync(this.tokenFilePath, newToken, 'utf-8');
+      }
     } catch (e) {
       console.warn('[MCP Server] Error saving token file:', e);
     }
@@ -501,18 +512,27 @@ export class BrowserMCPServer {
       }
     });
 
-    // Health check endpoint
-    this.app.get('/health', (_req, res) => {
-      res.json({
-        status: 'ok',
-        server: 'nova-browser-mcp',
-        version: '2.0.0',
-        port: this.port,
-        connected_clients: this.clients.size,
-        clients: this.getConnectedClientsInfo(),
-        tools_count: TOOLS.length,
-        timestamp: Date.now()
-      });
+    // Health check endpoint — only return minimal info without auth
+    this.app.get('/health', (req, res) => {
+      if (this.isAuthenticated(req)) {
+        // Authenticated: return detailed info
+        res.json({
+          status: 'ok',
+          server: 'nova-browser-mcp',
+          version: '2.0.0',
+          port: this.port,
+          connected_clients: this.clients.size,
+          clients: this.getConnectedClientsInfo(),
+          tools_count: TOOLS.length,
+          timestamp: Date.now()
+        });
+      } else {
+        // Unauthenticated: minimal response only
+        res.json({
+          status: 'ok',
+          version: '2.0.0'
+        });
+      }
     });
 
     // MCP over SSE — client connects here
@@ -549,7 +569,7 @@ export class BrowserMCPServer {
 
       // Send initial "endpoint" event so client knows where to POST
       // Using relative URL because some MCP clients fail to parse absolute URLs to extract the session ID
-      res.write(`event: endpoint\ndata: /message?sessionId=${clientId}&token=${this.token}\n\n`);
+      res.write(`event: endpoint\ndata: /message?sessionId=${clientId}\n\n`);
 
       // Keep-alive ping every 15s
       const keepAlive = setInterval(() => {
@@ -682,11 +702,13 @@ export class BrowserMCPServer {
   public start(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        // SECURITY NOTE: Fixed port 3020 is used for backward compatibility with existing
+        // integrations. A dynamic or configurable port would reduce predictability for attackers.
         this.server = this.app.listen(this.port, '127.0.0.1', () => {
           console.log(`[MCP Server] ✓ Running at http://localhost:${this.port}`);
           console.log(`[MCP Server] SSE endpoint: http://localhost:${this.port}/sse`);
           console.log(`[MCP Server] Health: http://localhost:${this.port}/health`);
-          console.log(`[MCP Server] RAW TOKEN: ${this.token}`);
+          console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
           resolve();
         });
 

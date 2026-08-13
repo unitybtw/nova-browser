@@ -391,8 +391,9 @@ function App() {
     }
     
     if (settings.accentColor === 'custom' && settings.customAccentColor) {
-      // Use custom hex
-      const hex = settings.customAccentColor;
+      // VULN-26 FIX: Validate hex color to prevent CSS injection
+      const isValidHex = /^#[0-9a-fA-F]{3,8}$/.test(settings.customAccentColor);
+      const hex = isValidHex ? settings.customAccentColor : '#3b82f6';
       accentStyleEl.innerHTML = `
         :root {
           --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
@@ -846,8 +847,11 @@ function App() {
 
   // Setup AI Agent Action Context and MCP Action Bridge
   useEffect(() => {
-    // 1. Expose executeMcpAction globally for the main process to call
-    (window as any).executeMcpAction = async (toolName: string, args: any) => {
+    // 1. Define executeMcpAction as a local function (not exposed on window)
+    // VULN-11 FIX: Removed global window assignment to prevent any webpage or extension
+    // from invoking browser control APIs. The MCP server in the main process can invoke
+    // this function via webContents.executeJavaScript() instead of relying on a global.
+    const executeMcpAction = async (toolName: string, args: any) => {
       if (!toolName || typeof toolName !== 'string') {
         return "Error: Invalid toolName parameter";
       }

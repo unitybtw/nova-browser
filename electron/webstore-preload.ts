@@ -10,7 +10,7 @@ if ((window as any).__novaPreloadInjected) {
   if ((window as any).trustedTypes && (window as any).trustedTypes.createPolicy) {
     try {
       policy = (window as any).trustedTypes.createPolicy('nova-extension', {
-        createHTML: (s: string) => s,
+        createHTML: (s: string) => s.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, ''),
         createScript: (s: string) => s,
         createScriptURL: (s: string) => s
       });
@@ -42,7 +42,8 @@ if ((window as any).__novaPreloadInjected) {
       iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
     }
 
-    toast.innerHTML = toHTML(`${iconSvg} <span>${message}</span>`);
+    const escapedMessage = message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    toast.innerHTML = toHTML(`${iconSvg} <span>${escapedMessage}</span>`);
     document.body.appendChild(toast);
 
     setTimeout(() => {
@@ -62,6 +63,8 @@ if ((window as any).__novaPreloadInjected) {
   };
 
   window.addEventListener('message', (event) => {
+    const currentHost = window.location.hostname;
+    if (!currentHost.includes('chromewebstore.google.com') && !currentHost.includes('chrome.google.com')) return;
     if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
     
     const extensionId = event.data.extensionId;
@@ -72,17 +75,17 @@ if ((window as any).__novaPreloadInjected) {
         loadingToast.remove();
         if (result.error) {
           showNovaToast('Kurulum hatası: ' + result.error, 'error');
-          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: result.error }, '*');
+          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: result.error }, window.location.origin);
         } else {
           showNovaToast('Eklenti başarıyla kuruldu!', 'success');
-          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, '*');
+          window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, window.location.origin);
           setTimeout(() => window.location.reload(), 1500);
         }
       })
       .catch(err => {
         loadingToast.remove();
         showNovaToast('Kurulum hatası: ' + err.message, 'error');
-        window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, '*');
+        window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, window.location.origin);
       });
   });
 
@@ -151,7 +154,7 @@ if ((window as any).__novaPreloadInjected) {
         };
         window.addEventListener('message', listener);
         
-        window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, '*');
+        window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, window.location.origin);
       }
     };
     
@@ -207,7 +210,7 @@ if ((window as any).__novaPreloadInjected) {
         window.postMessage({ 
           type: 'NOVA_INSTALL_EXTENSION', 
           extensionId: window.location.pathname.split('/').pop()?.split('?')[0] 
-        }, '*');
+        }, window.location.origin);
       });
     }
   };
@@ -252,8 +255,9 @@ const attemptAutofill = async () => {
     if (!rawPasswords) return;
     
     const passwords = JSON.parse(rawPasswords);
-    const saved = passwords.find((p: any) => p.hostname === hostname);
-    if (!saved) return;
+    const filteredPasswords = passwords.filter((entry: any) => entry.hostname === hostname);
+    if (filteredPasswords.length === 0) return;
+    const saved = filteredPasswords[0];
     
     const checkAndFill = () => {
       const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
