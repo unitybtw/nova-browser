@@ -606,19 +606,6 @@ ipcMain.handle('capture-tab-thumbnail', async (_event, webContentsId: number) =>
 
 // Auto-capture thumbnails when any webview finishes loading and push to renderer
 app.on('web-contents-created', (_event, wc) => {
-  wc.on('did-stop-loading', async () => {
-    if (!mainWindow || wc.isDestroyed()) return;
-    const wcId = wc.id;
-    try {
-      await new Promise(r => setTimeout(r, 800)); // Wait for render
-      if (wc.isDestroyed()) return;
-      const image = await wc.capturePage();
-      if (image.isEmpty()) return;
-      const dataUrl = image.resize({ width: 320, height: 200 }).toDataURL();
-      mainWindow.webContents.send('tab-thumbnail-update', { webContentsId: wcId, dataUrl });
-    } catch (_) {}
-  });
-
   // Native Context Menu for webviews (ensure single listener attachment / clean removal)
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {

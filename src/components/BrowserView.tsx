@@ -260,24 +260,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
-    const handleStopLoading = async () => {
-      
-      let thumbnailDataUrl;
-      try {
-        if (webviewRef.current && (window as any).electronAPI?.captureTabThumbnail) {
-          const wcId = webviewRef.current.getWebContentsId();
-          thumbnailDataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
-        }
-      } catch (err) {}
-
-      // Fallback for when all frames finish loading
+    const handleStopLoading = () => {
+      // PERFORMANCE FIX: Removed aggressive thumbnail capture on every page load.
       if (tab?.id) {
         onUpdateTab(tab.id, {
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || tab?.url || '',
-          ...(thumbnailDataUrl ? { thumbnail: thumbnailDataUrl } : {})
+          title: webview.getTitle?.() || tab?.url || ''
         });
       }
     };
