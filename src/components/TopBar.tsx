@@ -174,6 +174,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [mcpClientCount, setMcpClientCount] = useState(0);
   const [mcpRunning, setMcpRunning] = useState(false);
@@ -353,6 +354,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     };
 
     const timer = setTimeout(fetchSuggestions, 150);
+    setSelectedIndex(-1);
     return () => clearTimeout(timer);
   }, [searchValue, isAIMode]);
 
@@ -360,8 +362,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     e.preventDefault();
     if (!searchValue.trim()) return;
 
-    if (isAIMode || searchValue.startsWith('@ai ') || searchValue.startsWith('ai:')) {
-      let prompt = searchValue;
+    let targetValue = searchValue;
+    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
+      targetValue = suggestions[selectedIndex];
+    }
+
+    if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
+      let prompt = targetValue;
       if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
       if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
       
@@ -369,21 +376,23 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       setSearchValue('');
       setIsAIMode(false);
       setShowSuggestions(false);
+      setSelectedIndex(-1);
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
       }
       return;
     }
 
-    const url = formatSearchUrl(searchValue, searchEngine);
+    const url = formatSearchUrl(targetValue, searchEngine);
     onNavigate(url);
     setShowSuggestions(false);
+    setSelectedIndex(-1);
     
     // Blur the active element to drop focus
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  }, [searchValue, searchEngine, onNavigate, isAIMode]);
+  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions]);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
@@ -759,6 +768,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     e.preventDefault();
                     setIsAIMode(true);
                     setSearchValue('');
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
                   }
                 }}
                 onFocus={(e) => {
@@ -882,15 +897,20 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         <button
                           key={idx}
                           type="button"
+                          onMouseEnter={() => setSelectedIndex(idx)}
                           onClick={() => {
                             setSearchValue(suggestion);
                             setShowSuggestions(false);
                             onNavigate(formatSearchUrl(suggestion, searchEngine));
                             if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                           }}
-                          className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
+                          className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
+                            selectedIndex === idx 
+                              ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                          }`}
                         >
-                          <Search className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
                           <span className="truncate">{suggestion}</span>
                         </button>
                       ))}

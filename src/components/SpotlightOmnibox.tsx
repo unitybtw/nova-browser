@@ -30,6 +30,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isAIMode, setIsAIMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -76,18 +77,30 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     };
 
     const timer = setTimeout(fetchSuggestions, 150);
+    setSelectedIndex(-1);
     return () => clearTimeout(timer);
   }, [inputValue, isAIMode]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!inputValue.trim() && suggestions.length === 0 && selectedIndex > -1 && selectedIndex < tabs.length) {
+      onSelectTab(tabs[selectedIndex].id);
+      onClose();
+      return;
+    }
+
     if (!inputValue.trim()) {
       onClose();
       return;
     }
 
-    if (isAIMode || inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
-      let prompt = inputValue;
+    let targetValue = inputValue;
+    if (suggestions.length > 0 && selectedIndex > -1 && selectedIndex < suggestions.length) {
+      targetValue = suggestions[selectedIndex];
+    }
+
+    if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
+      let prompt = targetValue;
       if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
       if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
       
@@ -98,7 +111,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
-    const url = formatSearchUrl(inputValue, searchEngine);
+    const url = formatSearchUrl(targetValue, searchEngine);
     onNewTab(url);
     onClose();
   };
@@ -130,6 +143,13 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                 e.preventDefault();
                 setIsAIMode(true);
                 setInputValue('');
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const listLength = suggestions.length > 0 ? suggestions.length : tabs.length;
+                setSelectedIndex(prev => (prev < listLength - 1 ? prev + 1 : prev));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
               }
             }}
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find a blue t-shirt on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
@@ -156,25 +176,31 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
               suggestions.map((suggestion, idx) => (
                 <div
                   key={`sug-${idx}`}
+                  onMouseEnter={() => setSelectedIndex(idx)}
                   onClick={() => {
                     setInputValue(suggestion);
                     onNewTab(formatSearchUrl(suggestion, searchEngine));
                     onClose();
                   }}
-                  className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/80 hover:text-gray-800 dark:hover:text-slate-200"
+                  className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                    selectedIndex === idx
+                      ? 'bg-blue-50 dark:bg-slate-800/80 text-blue-600 dark:text-blue-400'
+                      : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-800 dark:hover:text-slate-200'
+                  }`}
                 >
-                  <Search className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                  <Search className={`w-4 h-4 ${selectedIndex === idx ? 'text-blue-500' : 'text-gray-400 dark:text-slate-500'}`} />
                   <span className="truncate text-sm font-medium">{suggestion}</span>
                 </div>
               ))
             ) : (
-              tabs.map(tab => (
+              tabs.map((tab, idx) => (
                 <div 
                   key={tab.id}
+                  onMouseEnter={() => setSelectedIndex(idx)}
                   onClick={() => { onSelectTab(tab.id); onClose(); }}
                   className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                    tab.id === activeTabId 
-                      ? 'bg-gray-50 dark:bg-slate-800/80 text-gray-800 dark:text-slate-200' 
+                    selectedIndex === idx || (selectedIndex === -1 && tab.id === activeTabId)
+                      ? 'bg-blue-50 dark:bg-slate-800/80 text-blue-600 dark:text-blue-400' 
                       : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-800 dark:hover:text-slate-200'
                   }`}
                 >
@@ -182,7 +208,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     {tab.favicon ? (
                       <img src={tab.favicon} className="w-4 h-4 rounded-sm" alt="" />
                     ) : (
-                      <Globe className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                      <Globe className={`w-4 h-4 ${selectedIndex === idx || (selectedIndex === -1 && tab.id === activeTabId) ? 'text-blue-500' : 'text-gray-400 dark:text-slate-500'}`} />
                     )}
                     <span className="truncate text-sm font-medium">{tab.title || tab.url || 'New Tab'}</span>
                   </div>
