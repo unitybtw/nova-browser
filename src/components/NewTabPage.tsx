@@ -263,11 +263,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             />
           ) : (
             <img 
-              src={newTabBackground === 'unsplash' ? `https://source.unsplash.com/1920x1080/?${encodeURIComponent(unsplashCategory)}` : backgroundCustomUrl} 
+              src={newTabBackground === 'unsplash' ? `https://loremflickr.com/1920/1080/${encodeURIComponent((unsplashCategory || 'nature,space').replace(/\\s+/g, ''))}/all` : backgroundCustomUrl} 
               alt="Background" 
               className="w-full h-full object-cover"
               onError={(e) => {
-                // If Unsplash API fails (it was recently deprecated for source.unsplash.com), fallback to a generic placeholder service
                 if (newTabBackground === 'unsplash') {
                   e.currentTarget.src = `https://picsum.photos/1920/1080?blur=2`;
                 }
