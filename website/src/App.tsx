@@ -13,7 +13,12 @@ import { Footer } from './components/Footer';
 
 function App() {
   useEffect(() => {
+    if (window.location.hash) {
+      history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
     window.scrollTo(0, 0);
+    const id = setTimeout(() => window.scrollTo(0, 0), 100);
+    return () => clearTimeout(id);
   }, []);
 
   return (
