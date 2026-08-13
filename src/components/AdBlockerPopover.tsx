@@ -42,14 +42,15 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
         <div className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-900/50 rounded-lg border border-slate-100 dark:border-slate-700/50">
           <div className="flex flex-col">
             <span className="text-sm font-medium text-slate-800 dark:text-slate-200">Block ads on this site</span>
-            <span className="text-[11px] text-slate-500 truncate max-w-[140px]">{hostname}</span>
+            <span className="text-[11px] text-slate-500 truncate max-w-[140px]">{hostname || 'Not available'}</span>
           </div>
           <button
             onClick={onToggleWhitelist}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${!isWhitelisted ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+            disabled={!hostname}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${!hostname ? 'bg-slate-200 dark:bg-slate-700 opacity-50 cursor-not-allowed' : (!isWhitelisted ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600')}`}
           >
             <span
-              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${!isWhitelisted ? 'translate-x-5' : 'translate-x-1'}`}
+              className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${!hostname ? 'translate-x-1' : (!isWhitelisted ? 'translate-x-5' : 'translate-x-1')}`}
             />
           </button>
         </div>

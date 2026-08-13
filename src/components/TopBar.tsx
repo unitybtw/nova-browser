@@ -401,7 +401,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   let currentHostname = '';
   try {
     if (currentUrl && !currentUrl.startsWith('nova://')) {
-      currentHostname = new URL(currentUrl).hostname;
+      const urlToParse = currentUrl.includes('://') ? currentUrl : `http://${currentUrl}`;
+      currentHostname = new URL(urlToParse).hostname;
     }
   } catch(e) {}
   const isWhitelisted = adblockWhitelist.includes(currentHostname);
