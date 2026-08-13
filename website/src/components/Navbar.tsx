@@ -9,7 +9,7 @@ export const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { isDark, setTheme } = useTheme();
   const { lang, setLang, t } = useLang();
   const langRef = useRef<HTMLDivElement>(null);
 
@@ -53,14 +53,9 @@ export const Navbar = () => {
   }, []);
 
   const toggleTheme = () => {
-    if (theme === 'system') {
-      setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark');
-    } else {
-      setTheme(theme === 'dark' ? 'light' : 'dark');
-    }
+    setTheme(isDark ? 'light' : 'dark');
   };
 
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const currentLang = languageList.find(l => l.code === lang)!;
 
   return (

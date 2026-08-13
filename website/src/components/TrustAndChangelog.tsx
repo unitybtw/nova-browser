@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, Code, Heart, Lock } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
@@ -5,7 +6,7 @@ import { useLang } from '../i18n/LanguageContext';
 export const TrustAndChangelog = () => {
   const { t, lang } = useLang();
 
-  const badges = [
+  const badges = useMemo(() => [
     {
       icon: <Code className="w-6 h-6 text-blue-500" />,
       title: t.trust.openSource,
@@ -34,9 +35,9 @@ export const TrustAndChangelog = () => {
       color: 'from-rose-500/10 to-rose-500/5',
       border: 'border-rose-500/20',
     },
-  ];
+  ], [t.trust]);
 
-  const changelog = [
+  const changelog = useMemo(() => [
     {
       version: 'v1.2.0',
       date: lang === 'tr' ? 'Temmuz 2025' : lang === 'ru' ? 'Июль 2025' : lang === 'de' ? 'Juli 2025' : lang === 'fr' ? 'Juillet 2025' : lang === 'es' ? 'Julio 2025' : 'July 2025',
@@ -76,7 +77,7 @@ export const TrustAndChangelog = () => {
     },
     {
       version: 'v1.1.0',
-      date: lang === 'tr' ? 'Haziran 2025' : lang === 'ru' ? 'Июнь 2025' : lang === 'de' ? 'Juni 2025' : lang === 'fr' ? 'Juin 2025' : lang === 'es' ? 'Junio 2025' : 'June 2025',
+      date: lang === 'tr' ? 'Haziran 2025' : lang === 'ru' ? 'İюнь 2025' : lang === 'de' ? 'Juni 2025' : lang === 'fr' ? 'Juin 2025' : lang === 'es' ? 'Junio 2025' : 'June 2025',
       tag: t.trust.stable,
       tagColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
       items: lang === 'tr' ? [
@@ -148,7 +149,7 @@ export const TrustAndChangelog = () => {
         'Dark / Light / System theme',
       ]
     },
-  ];
+  ], [lang, t.trust]);
 
   return (
     <section className="py-24 relative overflow-hidden">
@@ -216,7 +217,7 @@ export const TrustAndChangelog = () => {
                 className="sm:pl-14 relative"
               >
                 {/* Dot */}
-                <div className="absolute left-0 top-1.5 w-[46px] h-[46px] rounded-full bg-white dark:bg-slate-800 border-2 border-primary flex items-center justify-center text-[10px] font-bold text-primary hidden sm:flex">
+                <div className="absolute left-0 top-1.5 w-[46px] h-[46px] rounded-full bg-background border-2 border-primary shadow-sm flex items-center justify-center text-[10px] font-bold text-primary hidden sm:flex">
                   {entry.version.replace('v', '')}
                 </div>
 

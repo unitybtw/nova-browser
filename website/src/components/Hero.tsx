@@ -20,10 +20,10 @@ export const Hero = () => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-24 pb-16 overflow-hidden">
-      {/* Background Orbs (Hardware-Accelerated) */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob transform-gpu will-change-transform" />
-      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-accent/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob animation-delay-2000 transform-gpu will-change-transform" />
-      <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-secondary/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob animation-delay-4000 transform-gpu will-change-transform" />
+      {/* Background Orbs (Hardware-Accelerated Glow) */}
+      <div className="absolute top-1/4 left-1/4 w-80 md:w-96 h-80 md:h-96 bg-primary/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-glow-1 transform-gpu will-change-transform" />
+      <div className="absolute top-1/3 right-1/4 w-80 md:w-96 h-80 md:h-96 bg-accent/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-glow-2 transform-gpu will-change-transform" />
+      <div className="absolute bottom-1/4 left-1/2 w-80 md:w-96 h-80 md:h-96 bg-secondary/20 rounded-full filter blur-3xl opacity-50 pointer-events-none animate-glow-3 transform-gpu will-change-transform" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
@@ -94,7 +94,7 @@ export const Hero = () => {
           transition={{ duration: 0.7, delay: 0.5 }}
           className="mt-16 w-full max-w-5xl mx-auto block px-2 sm:px-0"
         >
-          <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden h-[560px] md:h-[680px] transition-shadow duration-300 hover:shadow-primary/10">
+          <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden h-[380px] sm:h-[480px] md:h-[600px] lg:h-[680px] transition-shadow duration-300 hover:shadow-primary/10">
             <InteractiveMockup bg="nebula" feature="default" />
           </div>
         </motion.div>

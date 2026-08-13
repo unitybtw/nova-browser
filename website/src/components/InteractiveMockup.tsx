@@ -17,10 +17,9 @@ export const InteractiveMockup = ({
   scale = 1
 }: InteractiveMockupProps) => {
   const [isReady, setIsReady] = useState(false);
-  const { theme } = useTheme();
+  const { isDark } = useTheme();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const isDark = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const currentTheme = isDark ? 'dark' : 'light';
   
   // Stable initial theme ref so the iframe src NEVER reloads on theme toggle

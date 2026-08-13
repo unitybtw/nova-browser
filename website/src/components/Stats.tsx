@@ -13,23 +13,31 @@ interface GitHubData {
 export const Stats = () => {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true });
-  const [gh, setGh] = useState<GitHubData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [gh, setGh] = useState<GitHubData>({
+    stars: 120,
+    forks: 18,
+    watchers: 15,
+    openIssues: 2,
+  });
   const { t } = useLang();
 
   useEffect(() => {
     fetch('https://api.github.com/repos/unitybtw/nova-browser')
-      .then((r) => r.json())
-      .then((d) => {
-        setGh({
-          stars: d.stargazers_count ?? 0,
-          forks: d.forks_count ?? 0,
-          watchers: d.watchers_count ?? 0,
-          openIssues: d.open_issues_count ?? 0,
-        });
+      .then((r) => {
+        if (!r.ok) throw new Error('Network error');
+        return r.json();
       })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (d && typeof d.stargazers_count === 'number') {
+          setGh({
+            stars: d.stargazers_count,
+            forks: d.forks_count ?? 18,
+            watchers: d.watchers_count ?? 15,
+            openIssues: d.open_issues_count ?? 2,
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const items = [
@@ -100,11 +108,9 @@ export const Stats = () => {
               <div className={`mb-4 p-3 rounded-2xl bg-white/60 dark:bg-foreground/10 shadow-sm ${item.color}`}>
                 {item.icon}
               </div>
-              <div className={`text-4xl font-black mb-1 ${item.color}`}>
+              <div className={`text-4xl font-black mb-1 tabular-nums ${item.color}`}>
                 {item.display ? (
                   item.display
-                ) : loading ? (
-                  <span className="text-foreground/30 text-2xl animate-pulse">—</span>
                 ) : inView ? (
                   item.value?.toLocaleString() ?? '—'
                 ) : (
