@@ -32,7 +32,7 @@ export interface UserSettings {
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
   showTasksWidget?: boolean;
-  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url';
+  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space';
   backgroundCustomUrl?: string;
   unsplashCategory?: string;
   startupBehavior: 'newTab' | 'continue' | 'specificPages';

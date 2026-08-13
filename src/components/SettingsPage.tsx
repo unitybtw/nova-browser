@@ -621,6 +621,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'gradient', name: 'Vibrant Gradient', style: 'bg-gradient-to-br from-blue-500 via-purple-500 to-rose-500' },
                     { id: 'mesh', name: 'Mesh Aurora', style: 'bg-gradient-to-tr from-emerald-400 via-cyan-500 to-blue-500' },
                     { id: 'glass', name: 'Dark Glass', style: 'bg-slate-900' },
+                    { id: 'aurora_waves', name: 'Aurora Waves (Animated)', style: 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500' },
+                    { id: 'cyber_grid', name: 'Cyber Grid (Animated)', style: 'bg-black border-cyan-500/30' },
+                    { id: 'hyper_space', name: 'Hyper Space (Animated)', style: 'bg-slate-950 border-white/20' },
                     { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-accent-dark/50 backdrop-blur' },
                     { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
                   ].map(bg => (

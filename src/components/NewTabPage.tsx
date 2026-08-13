@@ -180,6 +180,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       case 'gradient':
         return 'bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 text-white';
       case 'mesh':
+      case 'aurora_waves':
+      case 'cyber_grid':
+      case 'hyper_space':
         return 'bg-[#0B0F19] text-white';
       case 'glass':
         return 'bg-slate-900/90 text-white backdrop-blur-xl';
@@ -309,6 +312,73 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
             className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/20 rounded-full blur-[120px]" 
           />
+        </div>
+      )}
+
+      {/* Aurora Waves */}
+      {newTabBackground === 'aurora_waves' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-slate-950">
+          <motion.div 
+            animate={{ 
+              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+            }}
+            transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
+            className="absolute -inset-[50%] opacity-60 blur-[100px]"
+            style={{
+              background: 'linear-gradient(-45deg, #4f46e5, #ec4899, #8b5cf6, #3b82f6)',
+              backgroundSize: '400% 400%'
+            }}
+          />
+          <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[60px]"></div>
+        </div>
+      )}
+
+      {/* Cyber Grid */}
+      {newTabBackground === 'cyber_grid' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black">
+          <motion.div 
+            animate={{ 
+              backgroundPosition: ['0px 0px', '0px 40px'],
+            }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+            className="absolute inset-0 opacity-40 origin-bottom"
+            style={{
+              backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+              transform: 'perspective(500px) rotateX(60deg) scale(2)'
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-black/80 to-black"></div>
+        </div>
+      )}
+
+      {/* Hyper Space */}
+      {newTabBackground === 'hyper_space' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-slate-950">
+           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black"></div>
+           {[...Array(60)].map((_, i) => (
+             <motion.div
+               key={`star-${i}`}
+               className="absolute bg-white rounded-full"
+               style={{
+                 width: Math.random() * 2 + 1 + 'px',
+                 height: Math.random() * 2 + 1 + 'px',
+                 top: Math.random() * 100 + '%',
+                 left: Math.random() * 100 + '%',
+                 boxShadow: '0 0 12px 2px rgba(255,255,255,0.7)'
+               }}
+               animate={{
+                 scale: [0, 1.8, 0],
+                 opacity: [0, 1, 0],
+               }}
+               transition={{
+                 duration: Math.random() * 4 + 2,
+                 repeat: Infinity,
+                 ease: "easeInOut",
+                 delay: Math.random() * 5
+               }}
+             />
+           ))}
         </div>
       )}
 
