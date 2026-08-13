@@ -931,11 +931,7 @@ function App() {
           return "Error: No active webview.";
 
         case 'browser_run_js':
-          if (activeWebview && activeWebview.executeJavaScript) {
-            const result = await activeWebview.executeJavaScript(args.script);
-            return typeof result === 'object' ? JSON.stringify(result) : String(result);
-          }
-          return "Error: No active webview.";
+          return "Error: browser_run_js has been removed for security reasons (VULN-01).";
 
         case 'browser_list_tabs':
           return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));

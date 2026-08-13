@@ -11,8 +11,8 @@ import { ElectronBlocker } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { autoUpdater } from 'electron-updater';
 
-// Spoof user agent so Chrome Web Store enables the "Add to Chrome" button
-app.userAgentFallback = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+// Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
+// We still spoof User-Agent in onBeforeSendHeaders only for Chrome Web Store domains.
 
 // Hardware acceleration config
 try {
@@ -1138,6 +1138,22 @@ ipcMain.handle('import-chrome-bookmarks', async () => {
 
   if (!fs.existsSync(bookmarksPath)) {
     return { success: false, error: 'Chrome Bookmarks file not found.' };
+  }
+
+  // VULN-27: Add user confirmation before reading another app's data
+  if (mainWindow) {
+    const { response } = await dialog.showMessageBox(mainWindow, {
+      type: 'question',
+      buttons: ['Import', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      title: 'Import Chrome Bookmarks',
+      message: 'Nova Browser would like to read your Google Chrome bookmarks to import them.',
+      detail: `Path: ${bookmarksPath}`
+    });
+    if (response !== 0) {
+      return { success: false, error: 'Import cancelled by user.' };
+    }
   }
 
   try {

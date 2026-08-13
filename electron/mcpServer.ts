@@ -1,4 +1,5 @@
 import express from 'express';
+import rateLimit from 'express-rate-limit';
 import { BrowserWindow, safeStorage } from 'electron';
 import { randomUUID } from 'crypto';
 import fs from 'fs';
@@ -66,17 +67,7 @@ const TOOLS: McpTool[] = [
       required: ['selector', 'text']
     }
   },
-  {
-    name: 'browser_run_js',
-    description: 'Executes arbitrary JavaScript in the context of the active page and returns the result.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        script: { type: 'string', description: 'JavaScript code to execute' }
-      },
-      required: ['script']
-    }
-  },
+
   {
     name: 'browser_scroll',
     description: 'Scrolls the active page in a given direction.',
@@ -296,14 +287,14 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_zoom: 'medium',
   // 🔴 Sensitive — disabled by default, user must enable
   browser_type: 'sensitive',
-  browser_run_js: 'sensitive',
+
   browser_press_key: 'sensitive',
   browser_select_option: 'sensitive',
   browser_full_page_screenshot: 'safe',
 };
 
 // Default disabled tools (sensitive level)
-const DEFAULT_DISABLED_TOOLS = new Set(['browser_run_js']);
+const DEFAULT_DISABLED_TOOLS = new Set<string>();
 
 interface SseClient {
   id: string;
@@ -325,6 +316,8 @@ export class BrowserMCPServer {
 
   constructor(private port: number = 3020) {
     this.app = express();
+    // VULN-28: Add rate limiting
+    this.app.use(rateLimit({ windowMs: 60 * 1000, max: 120, message: 'Too many requests' }));
     this.app.use(express.json({ limit: '10mb' }));
     // Set token file path in app userData
     try {
