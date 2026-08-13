@@ -223,7 +223,7 @@ function App() {
     const defaultSettings: UserSettings = {
       searchEngine: 'google',
       privacyShield: true,
-      theme: 'system',
+      theme: 'dark',
       fontSize: 'medium',
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
