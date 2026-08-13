@@ -19,6 +19,7 @@ interface NewTabPageProps {
   unsplashCategory?: string;
   showTasksWidget?: boolean;
   isIncognito?: boolean;
+  theme?: UserSettings['theme'];
 }
 
 const DEFAULT_SPEED_DIALS = [
@@ -38,6 +39,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   unsplashCategory = 'nature,architecture',
   showTasksWidget = true,
   isIncognito = false,
+  theme = 'dark',
 }) => {
   const [query, setQuery] = useState('');
   const [speedDials, setSpeedDials] = useState(() => {
@@ -172,9 +174,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     }
   };
 
+  const isDarkTheme = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+
   const getBackgroundStyle = () => {
     if (newTabBackground === 'unsplash' || newTabBackground === 'custom_url') {
       return 'text-white';
+    }
+    if (!isDarkTheme) {
+      return 'bg-slate-50 text-slate-900';
     }
     switch (newTabBackground) {
       case 'gradient':
@@ -194,7 +201,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     }
   };
 
-  const isCustomDarkBg = newTabBackground !== 'default';
+  const isCustomDarkBg = isDarkTheme && newTabBackground !== 'default';
   const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
   if (isIncognito) {
@@ -256,100 +263,81 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         </button>
       </div>
       
-      {/* Dynamic Backgrounds (Unsplash / Custom) */}
-      {(newTabBackground === 'unsplash' || (newTabBackground === 'custom_url' && backgroundCustomUrl)) && (
-        <div className="absolute inset-0 z-0">
-          {isVideoBg ? (
-            <video 
-              src={backgroundCustomUrl} 
-              autoPlay 
-              loop 
-              muted 
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <img 
-              src={newTabBackground === 'unsplash' ? `https://loremflickr.com/1920/1080/${encodeURIComponent((unsplashCategory || 'nature,space').replace(/\\s+/g, ''))}/all` : backgroundCustomUrl} 
-              alt="Background" 
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                if (newTabBackground === 'unsplash') {
-                  e.currentTarget.src = `https://picsum.photos/1920/1080?blur=2`;
-                }
-              }}
-            />
-          )}
-          {/* Overlay to ensure text remains readable */}
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" />
+      {/* Unsplash Background */}
+      {newTabBackground === 'unsplash' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div 
+            className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
+            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80')` }}
+          />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
         </div>
       )}
 
-      {/* Background Decorative Mesh Orbs */}
+      {/* Custom URL Background */}
+      {newTabBackground === 'custom_url' && backgroundCustomUrl && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {isVideoBg ? (
+            <video 
+              autoPlay 
+              loop 
+              muted 
+              playsInline
+              className="absolute inset-0 w-full h-full object-cover"
+              src={backgroundCustomUrl}
+            />
+          ) : (
+            <div 
+              className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
+              style={{ backgroundImage: `url('${backgroundCustomUrl}')` }}
+            />
+          )}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+        </div>
+      )}
+
+      {/* Mesh Gradient */}
       {newTabBackground === 'mesh' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ willChange: 'transform' }}>
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.15, 1],
-              opacity: [0.2, 0.35, 0.2],
-              x: [0, 20, 0],
-              y: [0, -15, 0]
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-accent-hover/25 rounded-full blur-[140px]" 
-            style={{ willChange: 'transform, opacity' }}
-          />
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.2, 1],
-              opacity: [0.15, 0.3, 0.15],
-              x: [0, -25, 0],
-              y: [0, 20, 0]
-            }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-            className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-purple-600/25 rounded-full blur-[130px]" 
-            style={{ willChange: 'transform, opacity' }}
-          />
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.1, 1],
-              opacity: [0.1, 0.25, 0.1]
-            }}
-            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-            className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/20 rounded-full blur-[120px]" 
-            style={{ willChange: 'transform, opacity' }}
-          />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-[40%] -left-[20%] w-[70vw] h-[70vw] rounded-full bg-purple-600/20 blur-[120px] animate-pulse"></div>
+          <div className="absolute -bottom-[40%] -right-[20%] w-[70vw] h-[70vw] rounded-full bg-blue-600/20 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute top-[20%] right-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-600/20 blur-[100px] animate-pulse" style={{ animationDelay: '4s' }}></div>
         </div>
       )}
 
       {/* Aurora Waves */}
       {newTabBackground === 'aurora_waves' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-slate-950">
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
           <motion.div 
             animate={{ 
               x: ['0%', '-50%', '0%'],
             }}
             transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-            className="absolute top-[-50%] bottom-[-50%] left-0 w-[400%] opacity-60 blur-[100px]"
+            className={`absolute top-[-50%] bottom-[-50%] left-0 w-[400%] blur-[100px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
             style={{
-              background: 'linear-gradient(-45deg, #4f46e5, #ec4899, #8b5cf6, #3b82f6)',
+              background: isDarkTheme 
+                ? 'linear-gradient(-45deg, #4f46e5, #ec4899, #8b5cf6, #3b82f6)' 
+                : 'linear-gradient(-45deg, #818cf8, #f472b6, #c084fc, #60a5fa)',
               willChange: 'transform'
             }}
           />
-          <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[60px]"></div>
+          <div className={`absolute inset-0 backdrop-blur-[60px] ${isDarkTheme ? 'bg-slate-950/30' : 'bg-white/40'}`}></div>
         </div>
       )}
 
       {/* Cyber Grid */}
       {newTabBackground === 'cyber_grid' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black">
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-black' : 'bg-slate-50'}`}>
           <motion.div 
             animate={{ 
               y: [0, 40],
             }}
             transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-            className="absolute -top-[40px] bottom-0 left-0 right-0 opacity-40 origin-bottom"
+            className={`absolute -top-[40px] bottom-0 left-0 right-0 origin-bottom ${isDarkTheme ? 'opacity-40' : 'opacity-25'}`}
             style={{
-              backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)',
+              backgroundImage: isDarkTheme
+                ? 'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)'
+                : 'linear-gradient(rgba(6, 182, 212, 0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.35) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
               perspective: 500,
               rotateX: 60,
@@ -357,24 +345,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               willChange: 'transform'
             }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-black/80 to-black"></div>
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-gradient-to-t from-transparent via-black/80 to-black' : 'bg-gradient-to-t from-transparent via-white/80 to-white'}`}></div>
         </div>
       )}
 
       {/* Hyper Space */}
       {newTabBackground === 'hyper_space' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-slate-950">
-           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black"></div>
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
+           <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black' : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-100 via-slate-100 to-slate-50'}`}></div>
            {[...Array(60)].map((_, i) => (
              <motion.div
                key={`star-${i}`}
-               className="absolute bg-white rounded-full"
+               className={`absolute rounded-full ${isDarkTheme ? 'bg-white' : 'bg-indigo-600'}`}
                style={{
                  width: Math.random() * 2 + 1 + 'px',
                  height: Math.random() * 2 + 1 + 'px',
                  top: Math.random() * 100 + '%',
                  left: Math.random() * 100 + '%',
-                 boxShadow: '0 0 10px 1px rgba(255,255,255,0.5)',
+                 boxShadow: isDarkTheme ? '0 0 10px 1px rgba(255,255,255,0.5)' : '0 0 8px 1px rgba(79,70,229,0.4)',
                  willChange: 'transform, opacity'
                }}
                animate={{
@@ -394,18 +382,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
       {/* Fireflies */}
       {newTabBackground === 'fireflies' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-[#0f172a]">
-           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-[#1e40af]/20 via-[#0f172a] to-black"></div>
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+           <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-[#1e40af]/20 via-[#0f172a] to-black' : 'bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-amber-100/30 via-slate-50 to-white'}`}></div>
            {[...Array(30)].map((_, i) => (
              <motion.div
                key={`firefly-${i}`}
-               className="absolute bg-[#fef08a] rounded-full"
+               className="absolute bg-[#f59e0b] rounded-full"
                style={{
                  width: Math.random() * 4 + 2 + 'px',
                  height: Math.random() * 4 + 2 + 'px',
                  top: Math.random() * 100 + '%',
                  left: Math.random() * 100 + '%',
-                 boxShadow: '0 0 12px 2px rgba(253, 224, 71, 0.4)',
+                 boxShadow: '0 0 12px 2px rgba(245, 158, 11, 0.4)',
                  willChange: 'transform, opacity'
                }}
                animate={{
@@ -427,31 +415,33 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
       {/* Nebula Flow */}
       {newTabBackground === 'nebula' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-[#09090b]">
-           <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900 via-[#09090b] to-black"></div>
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#09090b]' : 'bg-slate-50'}`}>
+           <div className={`absolute inset-0 ${isDarkTheme ? 'opacity-40 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900 via-[#09090b] to-black' : 'opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-300 via-slate-50 to-white'}`}></div>
            <motion.div
              animate={{
                rotate: [0, 360],
                scale: [1, 1.2, 1]
              }}
              transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-             className="absolute -inset-[100%] opacity-50 blur-[120px]"
+             className={`absolute -inset-[100%] blur-[120px] ${isDarkTheme ? 'opacity-50' : 'opacity-30'}`}
              style={{
-               background: 'conic-gradient(from 0deg at 50% 50%, #4f46e5, #ec4899, #8b5cf6, #3b82f6, #4f46e5)',
+               background: isDarkTheme
+                 ? 'conic-gradient(from 0deg at 50% 50%, #4f46e5, #ec4899, #8b5cf6, #3b82f6, #4f46e5)'
+                 : 'conic-gradient(from 0deg at 50% 50%, #818cf8, #f472b6, #c084fc, #60a5fa, #818cf8)',
                willChange: 'transform'
              }}
            />
-           <div className="absolute inset-0 bg-black/40 backdrop-blur-[80px]"></div>
+           <div className={`absolute inset-0 backdrop-blur-[80px] ${isDarkTheme ? 'bg-black/40' : 'bg-white/50'}`}></div>
         </div>
       )}
 
       {/* Digital Rain / Matrix */}
       {newTabBackground === 'matrix' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black">
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-black' : 'bg-slate-50'}`}>
            {[...Array(40)].map((_, i) => (
              <motion.div
                key={`rain-${i}`}
-               className="absolute w-[2px] bg-gradient-to-b from-transparent via-emerald-500 to-emerald-200"
+               className={`absolute w-[2px] ${isDarkTheme ? 'bg-gradient-to-b from-transparent via-emerald-500 to-emerald-200' : 'bg-gradient-to-b from-transparent via-emerald-600 to-emerald-300'}`}
                style={{
                  left: Math.random() * 100 + '%',
                  height: Math.random() * 40 + 20 + '%',
