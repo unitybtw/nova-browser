@@ -130,11 +130,11 @@ export const FeatureShowcase = () => {
 
                 {/* Visual Side */}
                 <motion.div 
-                  className="flex-1 w-full max-w-2xl perspective-1000 h-[400px]"
-                  whileHover={{ rotateY: config.reverse ? -4 : 4, rotateX: 4, scale: 1.02 }}
+                  className="flex-1 w-full max-w-2xl perspective-1000 h-[440px] md:h-[500px]"
+                  whileHover={{ rotateY: config.reverse ? -3 : 3, rotateX: 3, scale: 1.015 }}
                   transition={{ type: "spring", stiffness: 150, damping: 20 }}
                 >
-                  <div className={`w-full h-full p-1 rounded-2xl bg-gradient-to-br ${config.color} border ${config.border} shadow-2xl`}>
+                  <div className={`w-full h-full p-1.5 rounded-3xl bg-gradient-to-br ${config.color} border ${config.border} shadow-2xl overflow-hidden`}>
                     {config.mockup}
                   </div>
                 </motion.div>

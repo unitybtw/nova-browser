@@ -5,7 +5,8 @@ export const AiMockup = () => {
     <InteractiveMockup 
       feature="ai" 
       bg="nebula" 
-      className="h-[440px] md:h-[480px]" 
+      scale={0.78}
+      className="h-full w-full" 
     />
   );
 };

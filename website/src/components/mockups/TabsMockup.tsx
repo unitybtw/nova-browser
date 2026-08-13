@@ -5,7 +5,8 @@ export const TabsMockup = () => {
     <InteractiveMockup 
       feature="vertical_tabs" 
       bg="cyber_grid" 
-      className="h-[440px] md:h-[480px]" 
+      scale={0.78}
+      className="h-full w-full" 
     />
   );
 };
