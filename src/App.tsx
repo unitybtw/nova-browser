@@ -76,17 +76,32 @@ const EMPTY_ARRAY: any[] = [];
 
 // Demo mode query parameter inspection
 const getDemoParams = () => {
-  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default' };
+  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark' as const };
   const params = new URLSearchParams(window.location.search);
   return {
     isDemo: params.get('demo') === 'true',
     feature: params.get('feature') || 'default',
-    bg: params.get('bg') || 'default'
+    bg: params.get('bg') || 'default',
+    theme: ((params.get('theme') === 'light' ? 'light' : 'dark') as 'dark' | 'light')
   };
 };
 
 function App() {
   const demoParams = useMemo(() => getDemoParams(), []);
+
+  // Sync theme dynamically when running in an embedded demo iframe
+  useEffect(() => {
+    if (demoParams.isDemo) {
+      const handleMessage = (e: MessageEvent) => {
+        if (e.data && e.data.type === 'NOVA_THEME_CHANGE') {
+          const newTheme = e.data.theme === 'light' ? 'light' : 'dark';
+          setSettings(s => ({ ...s, theme: newTheme }));
+        }
+      };
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [demoParams.isDemo]);
 
   const [tabs, setTabs] = useState<Tab[]>(() => {
     if (demoParams.isDemo) {
@@ -279,7 +294,7 @@ function App() {
     const defaultSettings: UserSettings = {
       searchEngine: 'google',
       privacyShield: true,
-      theme: 'dark',
+      theme: demoParams.isDemo ? demoParams.theme : 'dark',
       fontSize: 'medium',
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
