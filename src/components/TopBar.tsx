@@ -829,14 +829,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   </button>
                 )}
                 
-                <button
-                  type="button"
-                  onClick={() => setIsAIMode(!isAIMode)}
-                  className={`p-1 rounded-full transition-all flex items-center gap-1 ${isAIMode ? 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400' : (isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700')}`}
-                  title={isAIMode ? "AI Mode On - Type Command" : "Turn On AI Mode"}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                </button>
+
 
                 <button 
                   type="button" 
