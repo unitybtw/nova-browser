@@ -129,15 +129,11 @@ export const FeatureShowcase = () => {
                 </div>
 
                 {/* Visual Side */}
-                <motion.div 
-                  className="flex-1 w-full max-w-2xl perspective-1000 h-[440px] md:h-[500px]"
-                  whileHover={{ rotateY: config.reverse ? -3 : 3, rotateX: 3, scale: 1.015 }}
-                  transition={{ type: "spring", stiffness: 150, damping: 20 }}
-                >
-                  <div className={`w-full h-full p-1.5 rounded-3xl bg-gradient-to-br ${config.color} border ${config.border} shadow-2xl overflow-hidden`}>
+                <div className="flex-1 w-full max-w-2xl h-[440px] md:h-[500px]">
+                  <div className={`w-full h-full p-1.5 rounded-3xl bg-gradient-to-br ${config.color} border ${config.border} shadow-2xl overflow-hidden transition-all duration-300 hover:shadow-[0_20px_50px_rgba(59,130,246,0.15)]`}>
                     {config.mockup}
                   </div>
-                </motion.div>
+                </div>
               </motion.div>
             );
           })}
