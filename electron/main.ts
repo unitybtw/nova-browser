@@ -31,6 +31,9 @@ app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-webgl');
 app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+app.commandLine.appendSwitch('enable-accelerated-video-decode');
+app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization,SmoothScrolling,ParallelDownloading');
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
@@ -557,10 +560,11 @@ app.on('web-contents-created', (_event, contents) => {
       if (isPhishing(navigationUrl)) {
         e.preventDefault();
         mainWindow?.webContents.send('blocked-site', { url: navigationUrl, reason: 'phishing' });
-        // VULN-05: HTML-escape the URL before interpolating to prevent XSS
+        // VULN-05: HTML-escape and JSON.stringify to prevent script injection breakout
         const escapedUrl = navigationUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+        const safeUrlJson = JSON.stringify(escapedUrl);
         contents.executeJavaScript(`
-          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (${escapedUrl}) has been identified as containing phishing or malicious software.</p></div>';
+          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.</p></div>';
         `).catch(() => {});
         return;
       }
@@ -1009,77 +1013,95 @@ ipcMain.handle('set-vpn', async (_event, config: { enabled: boolean; proxyUrl?: 
 
 // VULN-18: Helper to check if an IP is in a private/reserved range
 function isPrivateIP(ip: string): boolean {
+  if (!ip) return true;
+  // IPv4-mapped IPv6
+  if (ip.startsWith('::ffff:')) {
+    return isPrivateIP(ip.substring(7));
+  }
   // IPv4 private ranges
-  if (/^127\./.test(ip)) return true;
-  if (/^10\./.test(ip)) return true;
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true;
-  if (/^192\.168\./.test(ip)) return true;
-  if (/^169\.254\./.test(ip)) return true;
-  if (ip === '0.0.0.0') return true;
-  // IPv6 loopback
-  if (ip === '::1' || ip === '0:0:0:0:0:0:0:1') return true;
+  if (/^127\./.test(ip)) return true; // Loopback
+  if (/^10\./.test(ip)) return true; // Class A private
+  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true; // Class B private
+  if (/^192\.168\./.test(ip)) return true; // Class C private
+  if (/^169\.254\./.test(ip)) return true; // Link-local / Cloud Metadata
+  if (/^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(ip)) return true; // CGNAT RFC 6598
+  if (/^0\./.test(ip) || ip === '0.0.0.0') return true;
+  if (/^255\.255\.255\.255$/.test(ip)) return true;
+  // IPv6 loopback / local / documentation
+  if (ip === '::1' || ip === '::' || ip === '0:0:0:0:0:0:0:1' || ip === '0:0:0:0:0:0:0:0') return true;
+  if (/^(fe80|fc00|fd00):/i.test(ip)) return true;
   return false;
 }
 
 const dnsLookup = promisify(dns.lookup);
 
-// IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview)
+// IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview with SSRF protection)
 ipcMain.handle('fetch-page-html', async (_event, url: string) => {
   if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
   
-  // 🔒 Security: Prevent SSRF and local file reads (e.g. file://, ftp://)
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(url);
-    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-      return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
+  let currentUrl = url;
+  const MAX_REDIRECTS = 3;
+  
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(currentUrl);
+      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+        return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
+      }
+    } catch (err) {
+      return { error: 'Invalid URL format' };
     }
-  } catch (err) {
-    return { error: 'Invalid URL format' };
+
+    try {
+      const hostname = parsedUrl.hostname.toLowerCase();
+      if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+        return { error: 'Requests to local hostnames are blocked.' };
+      }
+      const { address } = await dnsLookup(hostname);
+      if (isPrivateIP(address)) {
+        return { error: 'Requests to private/internal IP addresses are blocked.' };
+      }
+      const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
+      if (port === '3020') {
+        return { error: 'Requests to MCP server port are blocked.' };
+      }
+    } catch (err: any) {
+      return { error: 'DNS resolution failed: ' + err.message };
+    }
+
+    try {
+      const res = await fetch(currentUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get('location');
+        if (!location) return { error: 'Redirect without Location header' };
+        currentUrl = new URL(location, currentUrl).href;
+        continue;
+      }
+
+      if (res.ok) {
+        let html = await res.text();
+        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+        html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
+        html = html.replace(/<!--[\s\S]*?-->/g, '');
+        return { success: true, html };
+      }
+      return { error: 'HTTP ' + res.status };
+    } catch (err: any) {
+      return { error: err.message };
+    }
   }
 
-  // VULN-18: Block requests to private IP ranges, localhost, and MCP server port
-  try {
-    const hostname = parsedUrl.hostname.toLowerCase();
-    if (hostname === 'localhost') {
-      return { error: 'Requests to localhost are blocked.' };
-    }
-    // Resolve hostname to IP and check for private ranges
-    const { address } = await dnsLookup(hostname);
-    if (isPrivateIP(address)) {
-      return { error: 'Requests to private/internal IP addresses are blocked.' };
-    }
-    // Block MCP server port
-    const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
-    if (port === '3020') {
-      return { error: 'Requests to MCP server port are blocked.' };
-    }
-  } catch (err: any) {
-    return { error: 'DNS resolution failed: ' + err.message };
-  }
-
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
-      },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(5000) // 5s timeout
-    });
-    if (res.ok) {
-      let html = await res.text();
-      // Strip massive non-content tags before IPC transfer to prevent UI freezes
-      html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-      html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-      html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
-      html = html.replace(/<!--[\s\S]*?-->/g, ''); // strip comments
-      return { success: true, html };
-    }
-    return { error: 'HTTP ' + res.status };
-  } catch (err: any) {
-    return { error: err.message };
-  }
+  return { error: 'Too many redirects' };
 });
 
 // IPC Handler for Autocomplete Suggestions (Bypasses CORS)

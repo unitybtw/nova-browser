@@ -3,14 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap } from 'lucide-react';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
-import { SettingsPage } from './SettingsPage';
-import { HistoryPage } from './HistoryPage';
-import { DownloadsPage } from './DownloadsPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
 import { HistoryItem } from '../App';
 import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
+
+// Performance: Code-split internal browser pages
+const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
+const HistoryPage = React.lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
+const DownloadsPage = React.lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
 
 interface BrowserViewProps {
   tab?: Tab | null;
@@ -21,7 +23,7 @@ interface BrowserViewProps {
   onNewTab?: (url?: string) => void;
   onNavigate?: (url: string) => void;
   onFoundInPage?: (activeMatchOrdinal: number, numberOfMatches: number) => void;
-  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+  searchEngine?: UserSettings['searchEngine'];
   privacyShield: boolean;
   newTabBackground?: string;
   settings: UserSettings;
@@ -356,13 +358,33 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
         try {
           const data = JSON.parse(e.message.substring(14));
-          setPasswordPrompt({ isOpen: true, hostname: data.hostname, username: data.username, password: data.password });
+          // Security: Bind saved password hostname strictly to the actual tab's current domain
+          let actualHostname = '';
+          try {
+            actualHostname = new URL(tab?.url || '').hostname;
+          } catch (_) {}
+          
+          if (actualHostname && actualHostname === data.hostname && data.username && data.password) {
+            setPasswordPrompt({
+              isOpen: true,
+              hostname: actualHostname,
+              username: String(data.username).substring(0, 100),
+              password: String(data.password).substring(0, 500)
+            });
+          }
         } catch (err) {}
       }
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
         try {
           const data = JSON.parse(e.message.substring(17));
-          setAiPreview({ isOpen: true, url: data.url, x: data.x, y: data.y });
+          if (typeof data.url === 'string' && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
+            setAiPreview({
+              isOpen: true,
+              url: data.url,
+              x: Number(data.x) || 0,
+              y: Number(data.y) || 0
+            });
+          }
         } catch (err) {}
       }
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER_OUT::')) {
@@ -563,64 +585,70 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isSettingsTab) {
     return (
-      <SettingsPage
-        url={tab.url}
-        settings={settings}
-        onUpdateSettings={onUpdateSettings || (() => {})}
-        onExportData={onExportData}
-        onImportData={onImportData}
-      />
+      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading Settings...</div>}>
+        <SettingsPage
+          url={tab.url}
+          settings={settings}
+          onUpdateSettings={onUpdateSettings || (() => {})}
+          onExportData={onExportData}
+          onImportData={onImportData}
+        />
+      </React.Suspense>
     );
   }
 
   if (isHistoryTab) {
     return (
-      <HistoryPage
-        history={history}
-        onNavigate={(url) => {
-          onUpdateTab(tab.id, { url, isLoading: true });
-          if (onNavigate) onNavigate(url);
-        }}
-        onClearHistory={onClearHistory || (() => {})}
-        onRemoveHistoryItem={onRemoveHistoryItem || (() => {})}
-      />
+      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading History...</div>}>
+        <HistoryPage
+          history={history}
+          onNavigate={(url) => {
+            onUpdateTab(tab.id, { url, isLoading: true });
+            if (onNavigate) onNavigate(url);
+          }}
+          onClearHistory={onClearHistory || (() => {})}
+          onRemoveHistoryItem={onRemoveHistoryItem || (() => {})}
+        />
+      </React.Suspense>
     );
   }
 
   if (isDownloadsTab) {
     return (
-      <DownloadsPage
-        downloads={downloads}
-        onClearDownloads={onClearDownloads || (() => {})}
-      />
+      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading Downloads...</div>}>
+        <DownloadsPage
+          downloads={downloads}
+          onClearDownloads={onClearDownloads || (() => {})}
+        />
+      </React.Suspense>
     );
   }
 
   return (
     <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
-      {/* Top Progress Bar */}
+      {/* Top Progress Bar (GPU Composited scaleX) */}
       <AnimatePresence>
         {tab.isLoading && (
           <motion.div
-            initial={{ opacity: 0, width: '0%' }}
+            initial={{ opacity: 0, scaleX: 0 }}
             animate={{ 
               opacity: 1, 
-              width: '85%',
+              scaleX: 0.85,
               transition: { 
-                width: { duration: 8, ease: [0.16, 1, 0.3, 1] },
+                scaleX: { duration: 8, ease: [0.16, 1, 0.3, 1] },
                 opacity: { duration: 0.2 }
               } 
             }}
             exit={{ 
               opacity: 0, 
-              width: '100%', 
+              scaleX: 1, 
               transition: { 
-                width: { duration: 0.25, ease: 'easeOut' },
+                scaleX: { duration: 0.25, ease: 'easeOut' },
                 opacity: { duration: 0.3, delay: 0.15 }
               } 
             }}
-            style={{ willChange: 'opacity, width', boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
-            className="absolute top-0 left-0 h-[2.5px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-50 origin-left shadow-lg"
+            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
+            className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-50 shadow-lg"
           />
         )}
       </AnimatePresence>

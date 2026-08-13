@@ -20,6 +20,8 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
           return `https://www.bing.com/search?q=${q}`;
         case 'ecosia':
           return `https://www.ecosia.org/search?q=${q}`;
+        case 'yahoo':
+          return `https://search.yahoo.com/search?p=${q}`;
         case 'google':
         default:
           return `https://www.google.com/search?q=${q}`;
@@ -39,6 +41,8 @@ export function getSearchEngineName(engine: UserSettings['searchEngine'] = 'goog
       return 'Microsoft Bing';
     case 'ecosia':
       return 'Ecosia';
+    case 'yahoo':
+      return 'Yahoo';
     case 'google':
     default:
       return 'Google';

@@ -184,6 +184,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       case 'cyber_grid':
       case 'hyper_space':
       case 'fireflies':
+      case 'nebula':
+      case 'matrix':
         return 'bg-[#0B0F19] text-white';
       case 'glass':
         return 'bg-slate-900/90 text-white backdrop-blur-xl';
@@ -284,7 +286,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
       {/* Background Decorative Mesh Orbs */}
       {newTabBackground === 'mesh' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ willChange: 'transform' }}>
           <motion.div 
             animate={{ 
               scale: [1, 1.15, 1],
@@ -294,6 +296,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             }}
             transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
             className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-accent-hover/25 rounded-full blur-[140px]" 
+            style={{ willChange: 'transform, opacity' }}
           />
           <motion.div 
             animate={{ 
@@ -304,6 +307,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             }}
             transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
             className="absolute bottom-1/4 right-1/3 w-[450px] h-[450px] bg-purple-600/25 rounded-full blur-[130px]" 
+            style={{ willChange: 'transform, opacity' }}
           />
           <motion.div 
             animate={{ 
@@ -312,6 +316,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             }}
             transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
             className="absolute top-1/2 right-1/4 w-[350px] h-[350px] bg-blue-600/20 rounded-full blur-[120px]" 
+            style={{ willChange: 'transform, opacity' }}
           />
         </div>
       )}
@@ -321,13 +326,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <div className="absolute inset-0 overflow-hidden pointer-events-none bg-slate-950">
           <motion.div 
             animate={{ 
-              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              x: ['0%', '-50%', '0%'],
             }}
             transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-            className="absolute -inset-[50%] opacity-60 blur-[100px]"
+            className="absolute top-[-50%] bottom-[-50%] left-0 w-[400%] opacity-60 blur-[100px]"
             style={{
               background: 'linear-gradient(-45deg, #4f46e5, #ec4899, #8b5cf6, #3b82f6)',
-              backgroundSize: '400% 400%'
+              willChange: 'transform'
             }}
           />
           <div className="absolute inset-0 bg-slate-950/30 backdrop-blur-[60px]"></div>
@@ -339,14 +344,17 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black">
           <motion.div 
             animate={{ 
-              backgroundPosition: ['0px 0px', '0px 40px'],
+              y: [0, 40],
             }}
             transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-            className="absolute inset-0 opacity-40 origin-bottom"
+            className="absolute -top-[40px] bottom-0 left-0 right-0 opacity-40 origin-bottom"
             style={{
               backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)',
               backgroundSize: '40px 40px',
-              transform: 'perspective(500px) rotateX(60deg) scale(2)'
+              perspective: 500,
+              rotateX: 60,
+              scale: 2,
+              willChange: 'transform'
             }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-transparent via-black/80 to-black"></div>
@@ -366,7 +374,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                  height: Math.random() * 2 + 1 + 'px',
                  top: Math.random() * 100 + '%',
                  left: Math.random() * 100 + '%',
-                 boxShadow: '0 0 12px 2px rgba(255,255,255,0.7)'
+                 boxShadow: '0 0 10px 1px rgba(255,255,255,0.5)',
+                 willChange: 'transform, opacity'
                }}
                animate={{
                  scale: [0, 1.8, 0],
@@ -396,7 +405,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                  height: Math.random() * 4 + 2 + 'px',
                  top: Math.random() * 100 + '%',
                  left: Math.random() * 100 + '%',
-                 boxShadow: '0 0 15px 3px rgba(253, 224, 71, 0.6)'
+                 boxShadow: '0 0 12px 2px rgba(253, 224, 71, 0.4)',
+                 willChange: 'transform, opacity'
                }}
                animate={{
                  y: [0, -50, 0],
@@ -409,6 +419,55 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                  repeat: Infinity,
                  ease: "easeInOut",
                  delay: Math.random() * 5
+               }}
+             />
+           ))}
+        </div>
+      )}
+
+      {/* Nebula Flow */}
+      {newTabBackground === 'nebula' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-[#09090b]">
+           <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900 via-[#09090b] to-black"></div>
+           <motion.div
+             animate={{
+               rotate: [0, 360],
+               scale: [1, 1.2, 1]
+             }}
+             transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+             className="absolute -inset-[100%] opacity-50 blur-[120px]"
+             style={{
+               background: 'conic-gradient(from 0deg at 50% 50%, #4f46e5, #ec4899, #8b5cf6, #3b82f6, #4f46e5)',
+               willChange: 'transform'
+             }}
+           />
+           <div className="absolute inset-0 bg-black/40 backdrop-blur-[80px]"></div>
+        </div>
+      )}
+
+      {/* Digital Rain / Matrix */}
+      {newTabBackground === 'matrix' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-black">
+           {[...Array(40)].map((_, i) => (
+             <motion.div
+               key={`rain-${i}`}
+               className="absolute w-[2px] bg-gradient-to-b from-transparent via-emerald-500 to-emerald-200"
+               style={{
+                 left: Math.random() * 100 + '%',
+                 height: Math.random() * 40 + 20 + '%',
+                 top: '-50%',
+                 opacity: Math.random() * 0.5 + 0.2,
+                 boxShadow: '0 0 10px 2px rgba(16, 185, 129, 0.4)',
+                 willChange: 'transform'
+               }}
+               animate={{
+                 y: ['0vh', '150vh'],
+               }}
+               transition={{
+                 duration: Math.random() * 2 + 3,
+                 repeat: Infinity,
+                 ease: "linear",
+                 delay: Math.random() * 3
                }}
              />
            ))}

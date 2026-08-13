@@ -42,8 +42,14 @@ if ((window as any).__novaPreloadInjected) {
       iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
     }
 
-    const escapedMessage = message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    toast.innerHTML = toHTML(`${iconSvg} <span>${escapedMessage}</span>`);
+    const textSpan = document.createElement('span');
+    textSpan.textContent = message;
+    
+    const svgWrap = document.createElement('div');
+    svgWrap.innerHTML = toHTML(iconSvg);
+    
+    toast.appendChild(svgWrap.firstChild!);
+    toast.appendChild(textSpan);
     document.body.appendChild(toast);
 
     setTimeout(() => {
@@ -192,7 +198,7 @@ if ((window as any).__novaPreloadInjected) {
 
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
-    if (window.location.pathname.startsWith('/detail/')) {
+    if (window.location.pathname.includes('/detail/')) {
       const existingBanner = document.getElementById('nova-extension-banner');
       if (existingBanner) return;
 
@@ -200,17 +206,44 @@ if ((window as any).__novaPreloadInjected) {
       banner.id = 'nova-extension-banner';
       banner.style.cssText = "position: fixed; top: 0; left: 0; right: 0; background: linear-gradient(90deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; z-index: 9999999; display: flex; justify-content: space-between; align-items: center; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);";
 
-      const htmlContent = "<div style='display: flex; align-items: center; gap: 12px;'><svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg><div><div style='font-weight: 600; font-size: 15px;'>Nova Browser Eklenti Sistemi</div><div style='font-size: 13px; opacity: 0.9;'>Bu eklentiyi tek tikla Nova Browser'a kurabilirsiniz.</div></div></div><button id='nova-install-btn' style='background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>Nova'ya Ekle</button>";
-      banner.innerHTML = toHTML(htmlContent);
+      const leftContainer = document.createElement('div');
+      leftContainer.style.cssText = 'display: flex; align-items: center; gap: 12px;';
+      
+      const iconWrap = document.createElement('div');
+      iconWrap.innerHTML = toHTML("<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg>");
+      
+      const textWrap = document.createElement('div');
+      const title = document.createElement('div');
+      title.style.cssText = 'font-weight: 600; font-size: 15px;';
+      title.textContent = "Nova Browser Eklenti Sistemi";
+      const subtitle = document.createElement('div');
+      subtitle.style.cssText = 'font-size: 13px; opacity: 0.9;';
+      subtitle.textContent = "Bu eklentiyi tek tikla Nova Browser'a kurabilirsiniz.";
+      
+      textWrap.appendChild(title);
+      textWrap.appendChild(subtitle);
+      leftContainer.appendChild(iconWrap.firstChild!);
+      leftContainer.appendChild(textWrap);
+
+      const btn = document.createElement('button');
+      btn.id = 'nova-install-btn';
+      btn.style.cssText = "background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
+      btn.textContent = "Nova'ya Ekle";
+
+      banner.appendChild(leftContainer);
+      banner.appendChild(btn);
 
       document.body.prepend(banner);
       document.body.style.marginTop = '60px';
 
-      document.getElementById('nova-install-btn')?.addEventListener('click', () => {
-        window.postMessage({ 
-          type: 'NOVA_INSTALL_EXTENSION', 
-          extensionId: window.location.pathname.split('/').pop()?.split('?')[0] 
-        }, window.location.origin);
+      btn.addEventListener('click', () => {
+        const match = window.location.href.match(/[a-p]{32}/);
+        if (match) {
+          window.postMessage({ 
+            type: 'NOVA_INSTALL_EXTENSION', 
+            extensionId: match[0]
+          }, window.location.origin);
+        }
       });
     } else {
       const existingBanner = document.getElementById('nova-extension-banner');

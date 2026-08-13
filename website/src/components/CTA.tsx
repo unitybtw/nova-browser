@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { Download, Monitor } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
 import { useEffect, useState } from 'react';
+import { InteractiveMockup } from './InteractiveMockup';
 
 export const CTA = () => {
   const { t } = useLang();
@@ -76,6 +77,11 @@ export const CTA = () => {
                 {t.cta.github}
               </a>
             </div>
+          </div>
+          
+          {/* Bottom Mockup with Matrix Background */}
+          <div className="relative z-10 mx-auto mt-20 transform scale-90 translate-y-16 lg:translate-y-24 origin-top pointer-events-none hidden md:block">
+            <InteractiveMockup bg="matrix" />
           </div>
         </motion.div>
       </div>

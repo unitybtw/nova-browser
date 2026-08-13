@@ -456,7 +456,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privacy focused' },
                       { id: 'brave', name: 'Brave Search', desc: 'Independent index' },
                       { id: 'bing', name: 'Bing', desc: 'AI powered' },
-                      { id: 'ecosia', name: 'Ecosia', desc: 'Plant trees' }
+                      { id: 'ecosia', name: 'Ecosia', desc: 'Plant trees' },
+                      { id: 'yahoo', name: 'Yahoo', desc: 'Classic search' }
                     ].map(engine => (
                       <button
                         key={engine.id}
@@ -625,6 +626,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'cyber_grid', name: 'Cyber Grid (Animated)', style: 'bg-black border-cyan-500/30' },
                     { id: 'hyper_space', name: 'Hyper Space (Animated)', style: 'bg-slate-950 border-white/20' },
                     { id: 'fireflies', name: 'Fireflies (Animated)', style: 'bg-[#0f172a] border-[#eab308]/30' },
+                    { id: 'nebula', name: 'Nebula Flow (Animated)', style: 'bg-[#09090b] border-purple-500/30' },
+                    { id: 'matrix', name: 'Digital Rain (Animated)', style: 'bg-black border-emerald-500/30' },
                     { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-accent-dark/50 backdrop-blur' },
                     { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
                   ].map(bg => (

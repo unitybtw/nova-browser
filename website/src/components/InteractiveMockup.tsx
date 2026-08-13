@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export const InteractiveMockup = () => {
+export const InteractiveMockup = ({ bg = 'nebula' }: { bg?: string }) => {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export const InteractiveMockup = () => {
 
       {/* Real Browser iframe */}
       <iframe 
-        src="/browser-demo/index.html?demo=true" 
+        src={`/browser-demo/index.html?demo=true&bg=${bg}`}
         className={`w-full h-full border-none transition-opacity duration-1000 ${isReady ? 'opacity-100' : 'opacity-0'} pointer-events-none`}
         title="Nova Browser Interactive Demo"
         sandbox="allow-scripts allow-same-origin"

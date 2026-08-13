@@ -22,7 +22,7 @@ export interface DownloadItem {
   savePath?: string;
 }
 export interface UserSettings {
-  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia' | 'yahoo';
   privacyShield: boolean;
   theme: 'light' | 'dark' | 'system';
   fontSize: 'small' | 'medium' | 'large';
@@ -46,21 +46,22 @@ export interface UserSettings {
   shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
   aiLinkPreviewEnabled?: boolean;
 }
-import { ShareModal } from './components/ShareModal';
-import { ExtensionsModal } from './components/ExtensionsModal';
-import { ScreenshotModal } from './components/ScreenshotModal';
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
 import { VpnPopover, VpnLocation } from './components/VpnPopover';
-import { ReaderMode } from './components/ReaderMode';
 import { DownloadToast } from './components/DownloadToast';
-import { SidePanel } from './components/SidePanel';
-import { WorkspaceManager } from './components/WorkspaceManager';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 
-import { Onboarding } from './components/Onboarding';
+// Performance: Lazy load heavy modals and panels to reduce initial bundle size & boot time
+const ShareModal = React.lazy(() => import('./components/ShareModal').then(m => ({ default: m.ShareModal })));
+const ExtensionsModal = React.lazy(() => import('./components/ExtensionsModal').then(m => ({ default: m.ExtensionsModal })));
+const ScreenshotModal = React.lazy(() => import('./components/ScreenshotModal').then(m => ({ default: m.ScreenshotModal })));
+const ReaderMode = React.lazy(() => import('./components/ReaderMode').then(m => ({ default: m.ReaderMode })));
+const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
+const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
+const Onboarding = React.lazy(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension } from './types/browser';
@@ -233,7 +234,7 @@ function App() {
       showBookmarksBar: false,
       useVerticalTabs: false,
       mcpServerEnabled: false,
-      newTabBackground: 'default',
+      newTabBackground: (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('bg')) as any || 'default',
       backgroundCustomUrl: '',
       unsplashCategory: 'nature,architecture',
       startupBehavior: 'newTab',
@@ -843,6 +844,15 @@ function App() {
 
 
   const handleNavigate = useCallback((url: string) => {
+    if (!url || typeof url !== 'string') return;
+    
+    // Security: Block malicious protocols
+    const lowerUrl = url.trim().toLowerCase();
+    if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('file:') || lowerUrl.startsWith('data:text/html') || lowerUrl.startsWith('vbscript:')) {
+      console.warn('Blocked malicious navigation protocol:', url);
+      return;
+    }
+
     let newTitle: string | undefined = undefined;
     const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
     if (isNewTabUrl) newTitle = 'New Tab';
@@ -983,11 +993,11 @@ function App() {
           return "Error: Could not take screenshot.";
 
         case 'browser_scroll': {
-          const direction = args.direction || 'down';
-          const amount = args.amount || 500;
+          const direction = String(args.direction || 'down');
+          const cleanAmount = Math.abs(Number(args.amount) || 500);
           if (activeWebview && activeWebview.executeJavaScript) {
-            if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${amount})`);
-            else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${amount})`);
+            if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
+            else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
             else if (direction === 'top') await activeWebview.executeJavaScript(`window.scrollTo(0, 0)`);
             else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
             return `Scrolled ${direction}`;
@@ -1177,9 +1187,10 @@ function App() {
       onGetAllTabs: () => tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: (direction, amount) => {
         const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const cleanAmount = Math.abs(Number(amount) || 500);
         if (webview && webview.executeJavaScript) {
-          if (direction === 'up') webview.executeJavaScript(`window.scrollBy(0, -${amount || 500})`);
-          if (direction === 'down') webview.executeJavaScript(`window.scrollBy(0, ${amount || 500})`);
+          if (direction === 'up') webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
+          if (direction === 'down') webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
           if (direction === 'top') webview.executeJavaScript(`window.scrollTo(0, 0)`);
           if (direction === 'bottom') webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
         } else {
@@ -1710,8 +1721,9 @@ function App() {
 
   if (showOnboarding) {
     return (
-      <Onboarding
-        onComplete={(prefs) => {
+      <React.Suspense fallback={<div className="w-full h-full bg-slate-950 flex items-center justify-center text-white">Loading...</div>}>
+        <Onboarding
+          onComplete={(prefs) => {
           setShowOnboarding(false);
           setSettings(s => ({
             ...s,
@@ -1727,6 +1739,7 @@ function App() {
           }
         }}
       />
+      </React.Suspense>
     );
   }
 
@@ -1990,10 +2003,12 @@ function App() {
         )}
 
         {/* AI Assistant Side Panel */}
-        <SidePanel 
-          isOpen={isSidePanelOpen} 
-          onClose={handleCloseSidePanel} 
-        />
+        <React.Suspense fallback={null}>
+          <SidePanel 
+            isOpen={isSidePanelOpen} 
+            onClose={handleCloseSidePanel} 
+          />
+        </React.Suspense>
       </main>
 
       {/* SPOTLIGHT OMNIBOX */}
@@ -2018,44 +2033,54 @@ function App() {
       />
 
       {/* EXTENSIONS MODAL */}
-      <ExtensionsModal
-        isOpen={isExtensionsOpen}
-        onClose={() => setIsExtensionsOpen(false)}
-        extensions={extensions}
-        onToggleExtension={(id) => {
-          setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
-        }}
-        onRemoveExtension={async (id) => {
-          if (window.confirm('Are you sure you want to remove this extension?')) {
-            try {
-              await (window as any).electronAPI?.removeExtension?.(id);
-              setExtensions(prev => prev.filter(e => e.id !== id));
-            } catch (e) {
-              console.error('Failed to remove extension:', e);
-            }
-          }
-        }}
-        onManageExtensions={() => handleNewTab('nova://settings#extensions')}
-      />
+      <React.Suspense fallback={null}>
+        {isExtensionsOpen && (
+          <ExtensionsModal
+            isOpen={isExtensionsOpen}
+            onClose={() => setIsExtensionsOpen(false)}
+            extensions={extensions}
+            onToggleExtension={(id) => {
+              setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
+            }}
+            onRemoveExtension={async (id) => {
+              if (window.confirm('Are you sure you want to remove this extension?')) {
+                try {
+                  await (window as any).electronAPI?.removeExtension?.(id);
+                  setExtensions(prev => prev.filter(e => e.id !== id));
+                } catch (e) {
+                  console.error('Failed to remove extension:', e);
+                }
+              }
+            }}
+            onManageExtensions={() => handleNewTab('nova://settings#extensions')}
+          />
+        )}
+      </React.Suspense>
 
       {/* SHARE & QR CODE MODAL */}
-      <ShareModal
-        isOpen={isShareOpen}
-        onClose={handleCloseShare}
-        url={activeTab?.url || ''}
-        title={activeTab?.title || ''}
-      />
+      <React.Suspense fallback={null}>
+        {isShareOpen && (
+          <ShareModal
+            isOpen={isShareOpen}
+            onClose={handleCloseShare}
+            url={activeTab?.url || ''}
+            title={activeTab?.title || ''}
+          />
+        )}
+      </React.Suspense>
 
       {/* SCREENSHOT MODAL */}
-      <ScreenshotModal
-        isOpen={isScreenshotOpen}
-        onClose={() => setIsScreenshotOpen(false)}
-        imageDataUrl={screenshotDataUrl}
-        pageTitle={activeTab?.title || ''}
-        onCaptureFullPage={handleCaptureFullPage}
-      />
-
-
+      <React.Suspense fallback={null}>
+        {isScreenshotOpen && (
+          <ScreenshotModal
+            isOpen={isScreenshotOpen}
+            onClose={() => setIsScreenshotOpen(false)}
+            imageDataUrl={screenshotDataUrl}
+            pageTitle={activeTab?.title || ''}
+            onCaptureFullPage={handleCaptureFullPage}
+          />
+        )}
+      </React.Suspense>
 
       {/* VPN POPOVER */}
       <VpnPopover
@@ -2071,22 +2096,30 @@ function App() {
 
       </div>
 
-      <ReaderMode 
-        url={activeTab?.url || ''} 
-        tabId={activeTabId} 
-        isActive={isReaderModeOpen} 
-        onClose={() => setIsReaderModeOpen(false)} 
-      />
+      <React.Suspense fallback={null}>
+        {isReaderModeOpen && (
+          <ReaderMode 
+            url={activeTab?.url || ''} 
+            tabId={activeTabId} 
+            isActive={isReaderModeOpen} 
+            onClose={() => setIsReaderModeOpen(false)} 
+          />
+        )}
+      </React.Suspense>
 
-      <WorkspaceManager 
-        isOpen={isWorkspaceManagerOpen} 
-        onClose={() => setIsWorkspaceManagerOpen(false)} 
-        workspaces={workspaces} 
-        onUpdateWorkspaces={setWorkspaces} 
-        activeWorkspaceId={activeWorkspaceId} 
-        onSelectWorkspace={handleSelectWorkspace} 
-        isIncognito={activeTab?.isIncognito} 
-      />
+      <React.Suspense fallback={null}>
+        {isWorkspaceManagerOpen && (
+          <WorkspaceManager 
+            isOpen={isWorkspaceManagerOpen} 
+            onClose={() => setIsWorkspaceManagerOpen(false)} 
+            workspaces={workspaces} 
+            onUpdateWorkspaces={setWorkspaces} 
+            activeWorkspaceId={activeWorkspaceId} 
+            onSelectWorkspace={handleSelectWorkspace} 
+            isIncognito={activeTab?.isIncognito} 
+          />
+        )}
+      </React.Suspense>
 
       <DownloadToast downloads={downloads} />
       <UpdateToast />

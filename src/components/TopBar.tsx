@@ -70,7 +70,7 @@ interface TopBarProps {
   isIncognito?: boolean;
   useVerticalTabs?: boolean;
   tabStyle?: 'rounded' | 'square' | 'floating';
-  searchEngine?: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia';
+  searchEngine?: UserSettings['searchEngine'];
   onToggleBookmark: () => void;
   onOpenHistory: () => void;
   onOpenDownloads: () => void;
@@ -550,8 +550,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     if (!searchValue.trim()) return;
 
     let targetValue = searchValue;
+    const matchedBookmarks = bookmarks
+      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
+      .slice(0, 3);
+
     if (selectedIndex > -1 && selectedIndex < suggestions.length) {
       targetValue = suggestions[selectedIndex];
+    } else if (selectedIndex >= suggestions.length && selectedIndex < suggestions.length + matchedBookmarks.length) {
+      targetValue = matchedBookmarks[selectedIndex - suggestions.length].url;
     }
 
     if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
@@ -827,7 +833,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     setSearchValue('');
                   } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : prev));
+                    const matchedBookmarksCount = bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).slice(0, 3).length;
+                    const maxIndex = suggestions.length + matchedBookmarksCount - 1;
+                    setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
                   } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
                     setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
@@ -903,102 +911,123 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
             {/* Search Suggestions Dropdown */}
             <AnimatePresence>
-              {showSuggestions && searchValue.trim().length > 0 && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.18, ease: 'easeOut' }}
-                  className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
-                  onMouseDown={(e) => e.preventDefault()}
-                >
+              {showSuggestions && searchValue.trim().length > 0 && (() => {
+                const matchedBookmarks = bookmarks
+                  .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
+                  .slice(0, 3);
                 
-                {/* Primary Direct Action */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowSuggestions(false);
-                      onNavigate(formatSearchUrl(searchValue, searchEngine));
-                      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${isIncognito ? 'hover:bg-slate-700 text-slate-200' : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'}`}
+                const totalItems = 1 + suggestions.length + matchedBookmarks.length;
+
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                    transition={{ duration: 0.18, ease: 'easeOut' }}
+                    className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
+                    onMouseDown={(e) => e.preventDefault()}
                   >
-                  {searchValue.includes('.') || searchValue.includes('://') ? (
-                    <>
-                      <Globe className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className="truncate font-medium text-blue-600">Siteye Git: <span className="underline">{searchValue}</span></span>
-                    </>
-                  ) : (
-                    <>
-                      <Search className="w-4 h-4 text-slate-400 group-hover:text-blue-500 shrink-0" />
-                      <span className="truncate">{getSearchEngineName(searchEngine)} ile Ara: <strong className="text-slate-900">{searchValue}</strong></span>
-                    </>
-                  )}
-                </button>
+                  
+                  {/* Primary Direct Action (Index -1) */}
+                    <button
+                      type="button"
+                      onMouseEnter={() => setSelectedIndex(-1)}
+                      onClick={() => {
+                        setShowSuggestions(false);
+                        onNavigate(formatSearchUrl(searchValue, searchEngine));
+                        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
+                        selectedIndex === -1 
+                          ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                          : isIncognito 
+                            ? 'hover:bg-slate-700 text-slate-200' 
+                            : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                      }`}
+                    >
+                    {searchValue.includes('.') || searchValue.includes('://') ? (
+                      <>
+                        <Globe className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-blue-500'}`} />
+                        <span className="truncate font-medium text-blue-600">Siteye Git: <span className="underline">{searchValue}</span></span>
+                      </>
+                    ) : (
+                      <>
+                        <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`} />
+                        <span className="truncate">{getSearchEngineName(searchEngine)} ile Ara: <strong className="text-slate-900">{searchValue}</strong></span>
+                      </>
+                    )}
+                  </button>
 
-                {/* Search Suggestions */}
-                {suggestions.length > 0 && (
-                  <div className="py-1">
-                    <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Search Suggestions
+                  {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
+                  {suggestions.length > 0 && (
+                    <div className="py-1">
+                      <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Search Suggestions
+                      </div>
+
+                      {suggestions.map((suggestion, idx) => (
+                          <button
+                            key={`sug-${idx}`}
+                            type="button"
+                            onMouseEnter={() => setSelectedIndex(idx)}
+                            onClick={() => {
+                              setSearchValue(suggestion);
+                              setShowSuggestions(false);
+                              onNavigate(formatSearchUrl(suggestion, searchEngine));
+                              if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
+                              selectedIndex === idx 
+                                ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                                : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                            }`}
+                          >
+                            <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
+                            <span className="truncate">{suggestion}</span>
+                          </button>
+                        ))}
                     </div>
-
-                    {suggestions.map((suggestion, idx) => (
-                        <button
-                          key={idx}
-                          type="button"
-                          onMouseEnter={() => setSelectedIndex(idx)}
-                          onClick={() => {
-                            setSearchValue(suggestion);
-                            setShowSuggestions(false);
-                            onNavigate(formatSearchUrl(suggestion, searchEngine));
-                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                          }}
-                          className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                            selectedIndex === idx 
-                              ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
-                          }`}
-                        >
-                          <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
-                          <span className="truncate">{suggestion}</span>
-                        </button>
-                      ))}
-                  </div>
-                )}
-
-                {/* Matching Bookmarks */}
-                {bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).length > 0 && (
-                  <div className="py-1">
-                    <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                      Bookmarks
-                    </div>
-                    {bookmarks
-                      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-                      .slice(0, 3)
-                      .map((bookmark) => (
-                        <button
-                          key={bookmark.id}
-                          type="button"
-                          onClick={() => {
-                            setSearchValue(bookmark.url);
-                            setShowSuggestions(false);
-                            onNavigate(bookmark.url);
-                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                          }}
-                          className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200 text-sm text-left transition-colors"
-                        >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 shrink-0" />
-                            <span className="truncate font-medium">{bookmark.title}</span>
-                          </div>
-                          <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
-                        </button>
-                      ))}
-                  </div>
                   )}
-                </motion.div>
-              )}
+
+                  {/* Matching Bookmarks (Index suggestions.length to ...) */}
+                  {matchedBookmarks.length > 0 && (
+                    <div className="py-1">
+                      <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        Bookmarks
+                      </div>
+                      {matchedBookmarks
+                        .map((bookmark, idx) => {
+                          const bookmarkIdx = suggestions.length + idx;
+                          return (
+                            <button
+                              key={`bm-${bookmark.id}`}
+                              type="button"
+                              onMouseEnter={() => setSelectedIndex(bookmarkIdx)}
+                              onClick={() => {
+                                setSearchValue(bookmark.url);
+                                setShowSuggestions(false);
+                                onNavigate(bookmark.url);
+                                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                              }}
+                              className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
+                                selectedIndex === bookmarkIdx
+                                  ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400'
+                                  : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 overflow-hidden">
+                                <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-blue-500 fill-blue-500' : 'text-amber-400 fill-amber-400'}`} />
+                                <span className="truncate font-medium">{bookmark.title}</span>
+                              </div>
+                              <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                    )}
+                  </motion.div>
+                );
+              })()}
             </AnimatePresence>
           </div>
         </div>
