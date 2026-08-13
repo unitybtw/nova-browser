@@ -987,7 +987,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     onNewTab(url); // fallback
                   }
                 } else {
-                  alert(ext.name + ' extension has no popup screen or is not supported yet.');
+                  console.log(ext.name + ' extension has no popup screen or uses a background action.');
                 }
               }}
             >
