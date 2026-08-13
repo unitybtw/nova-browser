@@ -3,14 +3,11 @@ import { Download, ChevronRight, Zap, Monitor, Apple } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import { useEffect, useState } from 'react';
 import { useLang } from '../i18n/LanguageContext';
-import { InteractiveMockup } from './InteractiveMockup';
 
 export const Hero = () => {
   const { theme } = useTheme();
   const { t } = useLang();
   useEffect(() => {
-    // Theme logic can be simplified or removed if Hero doesn't need to track isDark directly anymore.
-    // The ThemeProvider already handles the 'dark' class on the HTML element.
   }, [theme]);
 
   const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
@@ -100,8 +97,8 @@ export const Hero = () => {
           transition={{ duration: 0.7, delay: 0.5 }}
           className="mt-16 w-full max-w-5xl mx-auto block px-2 sm:px-0"
         >
-          <div className="rounded-3xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700">
-            <InteractiveMockup />
+          <div className="rounded-2xl glass p-2 shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden transform perspective-1000 rotate-x-2 hover:rotate-x-0 transition-transform duration-700 bg-slate-900">
+            <img src="/browser-assets/hero-mockup.jpg" alt="Nova Browser Interface" className="w-full h-auto rounded-xl object-cover" />
           </div>
         </motion.div>
       </div>
