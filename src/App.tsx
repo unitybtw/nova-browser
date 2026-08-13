@@ -59,7 +59,7 @@ import { WorkspaceManager } from './components/WorkspaceManager';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
-import { ReaderMode } from './components/ReaderMode';
+
 import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
