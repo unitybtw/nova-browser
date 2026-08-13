@@ -26,10 +26,10 @@ export const Hero = () => {
 
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-24 pb-16 overflow-hidden">
-      {/* Background Orbs */}
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob" />
-      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-accent/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-2000" />
-      <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-secondary/20 rounded-full mix-blend-multiply filter blur-3xl opacity-70 animate-blob animation-delay-4000" />
+      {/* Background Orbs (Hardware-Accelerated) */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob transform-gpu will-change-transform" />
+      <div className="absolute top-1/3 right-1/4 w-96 h-96 bg-accent/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob animation-delay-2000 transform-gpu will-change-transform" />
+      <div className="absolute bottom-1/4 left-1/2 w-96 h-96 bg-secondary/20 rounded-full filter blur-3xl opacity-60 pointer-events-none animate-blob animation-delay-4000 transform-gpu will-change-transform" />
 
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-4xl mx-auto text-center">
