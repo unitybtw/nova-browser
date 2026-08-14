@@ -1168,7 +1168,14 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
       }
 
       if (res.ok) {
+        const contentLength = res.headers.get('content-length');
+        if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
+          return { error: 'Response body exceeds 5MB size limit' };
+        }
         let html = await res.text();
+        if (html.length > 5 * 1024 * 1024) {
+          html = html.substring(0, 5 * 1024 * 1024);
+        }
         html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
@@ -1375,17 +1382,22 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     const data = JSON.parse(fs.readFileSync(bookmarksPath, 'utf8'));
     const importedBookmarks: any[] = [];
     
-    // Recursive function to extract URLs
-    const extractNodes = (node: any) => {
-      if (node.type === 'url') {
+    // Recursive function to extract URLs safely
+    const extractNodes = (node: any, depth = 0) => {
+      if (depth > 20 || !node) return;
+      if (node.type === 'url' && typeof node.url === 'string') {
+        let domain = '';
+        try {
+          domain = new URL(node.url).hostname;
+        } catch (_) {}
         importedBookmarks.push({
-          id: `imported-${Date.now()}-${Math.random()}`,
-          title: node.name,
+          id: `imported-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          title: String(node.name || node.url).substring(0, 200),
           url: node.url,
-          favicon: `https://www.google.com/s2/favicons?domain=${new URL(node.url).hostname}&sz=32`
+          favicon: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
         });
-      } else if (node.type === 'folder' && node.children) {
-        node.children.forEach(extractNodes);
+      } else if (node.type === 'folder' && Array.isArray(node.children)) {
+        node.children.forEach((child: any) => extractNodes(child, depth + 1));
       }
     };
 
@@ -1471,6 +1483,19 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     if (!fs.existsSync(extractPath)) {
       fs.mkdirSync(extractPath, { recursive: true });
       await unzip(crxFilePath, extractPath);
+
+      // Verify realpath of extractPath to prevent directory escaping
+      try {
+        const realExtract = fs.realpathSync(extractPath);
+        const realBase = fs.realpathSync(extensionsBaseDir);
+        if (!realExtract.startsWith(realBase + path.sep)) {
+          fs.rmSync(extractPath, { recursive: true, force: true });
+          throw new Error('Extension extraction path escaped target directory.');
+        }
+      } catch (err) {
+        fs.rmSync(extractPath, { recursive: true, force: true });
+        throw err;
+      }
     }
     
     const win = BrowserWindow.getAllWindows()[0];

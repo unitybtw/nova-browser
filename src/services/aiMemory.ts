@@ -81,6 +81,9 @@ class AIMemoryService {
     };
 
     this.memories.push(newItem);
+    if (this.memories.length > 100) {
+      this.memories = this.memories.slice(-100);
+    }
     this.saveMemories();
     return newItem;
   }
