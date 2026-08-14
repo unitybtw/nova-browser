@@ -237,6 +237,19 @@ function App() {
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHoverRevealing, setIsHoverRevealing] = useState(false);
+  const hoverCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleHoverSidebarOpen = useCallback(() => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    setIsHoverRevealing(true);
+  }, []);
+
+  const handleHoverSidebarClose = useCallback(() => {
+    if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
+    hoverCloseTimerRef.current = setTimeout(() => {
+      setIsHoverRevealing(false);
+    }, 280);
+  }, []);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
@@ -1916,8 +1929,8 @@ function App() {
         <>
           {/* Invisible Left Edge Mouse Sensor */}
           <div 
-            className="fixed top-0 left-0 bottom-0 w-4 z-40"
-            onMouseEnter={() => setIsHoverRevealing(true)}
+            className="fixed top-0 left-0 bottom-0 w-6 z-40"
+            onMouseEnter={handleHoverSidebarOpen}
           />
 
           {/* Smooth Sliding Overlay Sidebar on Hover */}
@@ -1927,8 +1940,9 @@ function App() {
                 initial={{ x: -250, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: -250, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                onMouseLeave={() => setIsHoverRevealing(false)}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                onMouseEnter={handleHoverSidebarOpen}
+                onMouseLeave={handleHoverSidebarClose}
                 className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-[#151122]/98 backdrop-blur-3xl border-r border-white/10"
               >
                 <SidebarTabs
@@ -1978,9 +1992,12 @@ function App() {
         </>
       )}
 
+      {/* Main Viewport Card */}
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden transition-all duration-200 ${
         settings.useVerticalTabs 
-          ? `rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ${isSidebarCollapsed ? 'ml-2' : 'ml-0'}` 
+          ? isSidebarCollapsed
+            ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] mx-2 mb-2 mt-7'
+            : 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ml-0' 
           : ''
       }`}>
         {/* TOP NAVIGATION BAR (Rendered only in horizontal tabs mode) */}
@@ -2216,7 +2233,6 @@ function App() {
           />
         </React.Suspense>
       </main>
-
       {/* SPOTLIGHT OMNIBOX */}
       <SpotlightOmnibox
         isOpen={isSpotlightOpen}
