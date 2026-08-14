@@ -1872,67 +1872,67 @@ function App() {
         }}
       />
     );
-  }
-
-  return (
-    <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
+  }  return (
+    <div className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
       settings.useVerticalTabs 
         ? activeTab?.isIncognito ? 'bg-[#0a0812]' : 'bg-[#151122]'
         : 'bg-slate-50 dark:bg-slate-900'
-    }`}>
+    } transition-colors duration-300`}>
       
-      {/* Pinned Vertical Sidebar */}
-      {settings.useVerticalTabs && !isSidebarCollapsed && (
-        <motion.div 
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 240, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
-          className="h-full flex flex-col shrink-0 drag-region relative z-50 overflow-hidden"
-        >
-          <SidebarTabs
-            tabs={workspaceTabs}
-            folders={folders}
-            activeTabId={activeTabId}
-            onSelectTab={handleSelectTab}
-            onCloseTab={handleCloseTab}
-            onNewTab={handleNewTab}
-            onToggleMuteTab={handleToggleMuteTab}
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            onSelectWorkspace={handleSelectWorkspace}
-            isIncognito={activeTab?.isIncognito}
-            onCreateFolder={handleCreateFolder}
-            onToggleFolder={handleToggleFolder}
-            onRenameFolder={handleRenameFolder}
-            onDeleteFolder={handleDeleteFolder}
-            onMoveTabToFolder={handleMoveTabToFolder}
-            onOpenSpotlight={handleOpenSpotlight}
-            onTabDragStart={handleTabDragStart}
-            onTabDragEnd={handleTabDragEnd}
-            splitTabId={splitTabId}
-            onCloseSplit={handleCloseSplitView}
-            onNavigate={handleNavigate}
-            onGoBack={handleGoBack}
-            onGoForward={handleGoForward}
-            onReload={handleReload}
-            canGoBack={activeTab?.canGoBack}
-            canGoForward={activeTab?.canGoForward}
-            isLoading={activeTab?.isLoading}
-            searchEngine={settings.searchEngine}
-            privacyShield={settings.privacyShield}
-            onOpenDownloads={handleOpenDownloads}
-            onOpenHistory={handleOpenHistory}
-            onOpenSettings={handleOpenSettings}
-            onOpenExtensions={handleOpenExtensions}
-            bookmarks={bookmarks}
-            onToggleCollapse={() => {
-              setIsSidebarCollapsed(true);
-              setIsHoverRevealing(false);
-            }}
-          />
-        </motion.div>
-      )}
+      {/* Pinned Vertical Sidebar with smooth slide animation */}
+      <AnimatePresence initial={false}>
+        {settings.useVerticalTabs && !isSidebarCollapsed && (
+          <motion.div 
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 240, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className="h-full flex flex-col shrink-0 drag-region relative z-50 overflow-hidden"
+          >
+            <SidebarTabs
+              tabs={workspaceTabs}
+              folders={folders}
+              activeTabId={activeTabId}
+              onSelectTab={handleSelectTab}
+              onCloseTab={handleCloseTab}
+              onNewTab={handleNewTab}
+              onToggleMuteTab={handleToggleMuteTab}
+              workspaces={workspaces}
+              activeWorkspaceId={activeWorkspaceId}
+              onSelectWorkspace={handleSelectWorkspace}
+              isIncognito={activeTab?.isIncognito}
+              onCreateFolder={handleCreateFolder}
+              onToggleFolder={handleToggleFolder}
+              onRenameFolder={handleRenameFolder}
+              onDeleteFolder={handleDeleteFolder}
+              onMoveTabToFolder={handleMoveTabToFolder}
+              onOpenSpotlight={handleOpenSpotlight}
+              onTabDragStart={handleTabDragStart}
+              onTabDragEnd={handleTabDragEnd}
+              splitTabId={splitTabId}
+              onCloseSplit={handleCloseSplitView}
+              onNavigate={handleNavigate}
+              onGoBack={handleGoBack}
+              onGoForward={handleGoForward}
+              onReload={handleReload}
+              canGoBack={activeTab?.canGoBack}
+              canGoForward={activeTab?.canGoForward}
+              isLoading={activeTab?.isLoading}
+              searchEngine={settings.searchEngine}
+              privacyShield={settings.privacyShield}
+              onOpenDownloads={handleOpenDownloads}
+              onOpenHistory={handleOpenHistory}
+              onOpenSettings={handleOpenSettings}
+              onOpenExtensions={handleOpenExtensions}
+              bookmarks={bookmarks}
+              onToggleCollapse={() => {
+                setIsSidebarCollapsed(true);
+                setIsHoverRevealing(false);
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
@@ -2002,68 +2002,78 @@ function App() {
         </>
       )}
 
-      {/* Main Viewport Card */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden transition-all duration-200 ${
+      {/* Main Viewport Card with fluid margin & border radius transition */}
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
             ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2'
             : 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ml-0' 
-          : ''
+          : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
-        {/* TOP NAVIGATION BAR (Rendered only in horizontal tabs mode) */}
-        {!settings.useVerticalTabs && (
-          <TopBar 
-            tabs={workspaceTabs}
-            workspaces={workspaces}
-            activeWorkspaceId={activeWorkspaceId}
-            onSelectWorkspace={handleSelectWorkspace}
-            activeTabId={activeTabId}
-            bookmarks={bookmarks}
-            activeDownloadsCount={activeDownloadsCount}
-            downloads={downloads}
-            onClearDownloads={handleClearDownloads}
-            showBookmarksBar={settings.showBookmarksBar}
-            useVerticalTabs={settings.useVerticalTabs}
-            onToggleReaderMode={handleToggleReaderMode}
-            isSplitView={!!splitTabId}
-            tabStyle={settings.tabStyle}
-            isIncognito={activeTab?.isIncognito}
-            searchEngine={settings.searchEngine}
-            onToggleBookmark={handleToggleBookmarkActive}
-            onOpenHistory={handleOpenHistory}
-            onOpenDownloads={handleOpenDownloads}
-            onOpenSettings={handleOpenSettings}
-            onOpenExtensions={handleOpenExtensions}
-            onOpenShare={handleOpenShare}
-            onTakeScreenshot={handleTakeScreenshot}
-            onOpenFindInPage={handleOpenFindInPage}
-            onToggleSplitView={handleToggleSplitView}
-            onZoomIn={handleZoomIn}
-            onZoomOut={handleZoomOut}
-            onDuplicateTab={handleDuplicateTab}
-            onTogglePinTab={handleTogglePinTab}
-            onToggleMuteTab={handleToggleMuteTab}
-            onSuspendTab={handleSuspendTab}
-            onReorderTabs={handleReorderTabs}
-            onReorderFullList={handleReorderFullList}
-            onTogglePip={handleTogglePip}
-            onSelectTab={handleSelectTab}
-            onNewTab={handleNewTab}
-            onNewIncognitoTab={handleNewIncognitoTab}
-            onCloseTab={handleCloseTab}
-            onNavigate={handleNavigate}
-            onGoBack={handleGoBack}
-            onGoForward={handleGoForward}
-            onReload={handleReload}
-            isVpnEnabled={vpnEnabled}
-            onToggleVpn={handleToggleVpn}
-            onToggleAIAssistant={handleToggleAIAssistant}
-            onTabDragStart={handleTabDragStart}
-            onTabDragEnd={handleTabDragEnd}
-            onTabDrag={handleTabDrag}
-            onDropToSplitScreen={handleDropToSplitScreen}
-          />
-        )}
+        {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
+        <AnimatePresence initial={false}>
+          {!settings.useVerticalTabs && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+              className="w-full shrink-0 overflow-hidden"
+            >
+              <TopBar 
+                tabs={workspaceTabs}
+                workspaces={workspaces}
+                activeWorkspaceId={activeWorkspaceId}
+                onSelectWorkspace={handleSelectWorkspace}
+                activeTabId={activeTabId}
+                bookmarks={bookmarks}
+                activeDownloadsCount={activeDownloadsCount}
+                downloads={downloads}
+                onClearDownloads={handleClearDownloads}
+                showBookmarksBar={settings.showBookmarksBar}
+                useVerticalTabs={settings.useVerticalTabs}
+                onToggleReaderMode={handleToggleReaderMode}
+                isSplitView={!!splitTabId}
+                tabStyle={settings.tabStyle}
+                isIncognito={activeTab?.isIncognito}
+                searchEngine={settings.searchEngine}
+                onToggleBookmark={handleToggleBookmarkActive}
+                onOpenHistory={handleOpenHistory}
+                onOpenDownloads={handleOpenDownloads}
+                onOpenSettings={handleOpenSettings}
+                onOpenExtensions={handleOpenExtensions}
+                onOpenShare={handleOpenShare}
+                onTakeScreenshot={handleTakeScreenshot}
+                onOpenFindInPage={handleOpenFindInPage}
+                onToggleSplitView={handleToggleSplitView}
+                onZoomIn={handleZoomIn}
+                onZoomOut={handleZoomOut}
+                onDuplicateTab={handleDuplicateTab}
+                onTogglePinTab={handleTogglePinTab}
+                onToggleMuteTab={handleToggleMuteTab}
+                onSuspendTab={handleSuspendTab}
+                onReorderTabs={handleReorderTabs}
+                onReorderFullList={handleReorderFullList}
+                onTogglePip={handleTogglePip}
+                onSelectTab={handleSelectTab}
+                onCloseTab={handleCloseTab}
+                onNewTab={handleNewTab}
+                onNewIncognitoTab={handleNewIncognitoTab}
+                onNavigate={handleNavigate}
+                onGoBack={handleGoBack}
+                onGoForward={handleGoForward}
+                onReload={handleReload}
+                isVpnEnabled={vpnEnabled}
+                onToggleVpn={handleToggleVpn}
+                onToggleAIAssistant={handleToggleAIAssistant}
+                onTabDragStart={handleTabDragStart}
+                onTabDragEnd={handleTabDragEnd}
+                onTabDrag={handleTabDrag}
+                onDropToSplitScreen={handleDropToSplitScreen}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       {/* MAIN BROWSER CONTENT */}
       <main 
