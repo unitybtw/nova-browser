@@ -28,14 +28,12 @@ const safeBase64 = (str: string): string => {
     : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
 
   try {
-    return btoa(unescape(encodeURIComponent(wellFormed)));
+    return btoa(unescape(encodeURIComponent(wellFormed)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
   } catch (e) {
-    try {
-      const sanitized = wellFormed.replace(/%/g, '_');
-      return btoa(sanitized);
-    } catch (e2) {
-      return wellFormed.replace(/[^a-zA-Z0-9]/g, '_');
-    }
+    return wellFormed.replace(/[^a-zA-Z0-9_-]/g, '_');
   }
 };
 

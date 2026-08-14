@@ -301,7 +301,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     // VULN-16: Add Content Security Policy for the app's own pages
     if (details.url.startsWith('file://') || details.url.includes('localhost:5173')) {
       responseHeaders['Content-Security-Policy'] = [
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com;"
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; base-uri 'self' https: http:;"
       ];
     }
 
@@ -1565,10 +1565,9 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
   if (process.platform === 'darwin') {
     return new Promise((resolve) => {
-      const args: string[] = [];
-      if (voiceName) {
-        args.push('-v', voiceName);
-      }
+      const cleanVoice = voiceName ? voiceName.split('(')[0].trim() : 'Yelda';
+      const args: string[] = ['-v', cleanVoice];
+      
       if (rate && typeof rate === 'number') {
         const wpm = Math.round(175 * rate);
         args.push('-r', String(wpm));
