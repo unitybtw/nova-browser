@@ -258,7 +258,7 @@ if ((window as any).__novaPreloadInjected) {
   setInterval(injectNovaBanner, 500);
 }
 
-// Password Manager Form Detection
+// Password Manager Form Detection (Host notification only)
 const detectPasswordForms = () => {
   document.addEventListener('submit', (e) => {
     const form = e.target as HTMLFormElement;
@@ -274,11 +274,11 @@ const detectPasswordForms = () => {
          usernameInput = form.querySelector('input[type="text"], input[type="email"]') as HTMLInputElement;
       }
       
-      const username = usernameInput ? usernameInput.value : '';
-      const password = passwordInput.value;
+      const username = usernameInput ? String(usernameInput.value).substring(0, 100) : '';
+      const password = String(passwordInput.value).substring(0, 500);
       const hostname = window.location.hostname;
       
-      if (password) {
+      if (password && hostname) {
         // Send to the webview host (BrowserView.tsx)
         ipcRenderer.sendToHost('password-form-submitted', { hostname, username, password });
       }
@@ -286,49 +286,6 @@ const detectPasswordForms = () => {
   }, true);
 };
 
-const attemptAutofill = async () => {
-  const hostname = window.location.hostname;
-  if (!hostname) return;
-  
-  try {
-    const rawPasswords = await ipcRenderer.invoke('secure-store-get', 'passwords');
-    if (!rawPasswords) return;
-    
-    const passwords = JSON.parse(rawPasswords);
-    const filteredPasswords = passwords.filter((entry: any) => entry.hostname === hostname);
-    if (filteredPasswords.length === 0) return;
-    const saved = filteredPasswords[0];
-    
-    const checkAndFill = () => {
-      const passwordInput = document.querySelector('input[type="password"]') as HTMLInputElement;
-      if (passwordInput && !passwordInput.value) {
-        passwordInput.value = saved.password;
-        passwordInput.dispatchEvent(new Event('input', { bubbles: true }));
-        passwordInput.dispatchEvent(new Event('change', { bubbles: true }));
-        
-        const inputs = Array.from(document.querySelectorAll('input:not([type="hidden"])'));
-        const passIndex = inputs.indexOf(passwordInput);
-        let usernameInput = inputs[passIndex - 1] as HTMLInputElement;
-        
-        if (!usernameInput || (usernameInput.type !== 'text' && usernameInput.type !== 'email')) {
-           usernameInput = document.querySelector('input[type="text"], input[type="email"]') as HTMLInputElement;
-        }
-        
-        if (usernameInput && !usernameInput.value) {
-          usernameInput.value = saved.username;
-          usernameInput.dispatchEvent(new Event('input', { bubbles: true }));
-          usernameInput.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }
-    };
-    
-    checkAndFill();
-    setTimeout(checkAndFill, 1000);
-    setTimeout(checkAndFill, 3000);
-  } catch (e) {}
-};
-
 window.addEventListener('DOMContentLoaded', () => {
   detectPasswordForms();
-  attemptAutofill();
 });

@@ -477,6 +477,16 @@ export class BrowserMCPServer {
   }
 
   private setupRoutes() {
+    // 🔒 Security: Prevent DNS rebinding attacks by strictly validating the Host header
+    this.app.use((req, res, next) => {
+      const host = req.headers.host || '';
+      const allowedHosts = [`localhost:${this.port}`, `127.0.0.1:${this.port}`, 'localhost', '127.0.0.1'];
+      if (!allowedHosts.includes(host)) {
+        return res.status(403).json({ error: 'Forbidden: Invalid Host header' });
+      }
+      next();
+    });
+
     // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*)
     this.app.use((req, res, next) => {
       const origin = req.headers.origin;

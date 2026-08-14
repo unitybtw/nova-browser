@@ -11,7 +11,11 @@ import EventSource from 'eventsource';
 (global as any).EventSource = (EventSource as any).default || EventSource;
 
 async function main() {
-  const sseTransport = new SSEClientTransport(new URL('http://localhost:3020/mcp'));
+  const sseUrl = new URL(process.env.MCP_SSE_URL || 'http://localhost:3020/sse');
+  if (process.env.MCP_TOKEN) {
+    sseUrl.searchParams.set('token', process.env.MCP_TOKEN);
+  }
+  const sseTransport = new SSEClientTransport(sseUrl);
   const client = new Client({ name: 'mcp-bridge', version: '1.0.0' }, { capabilities: {} });
   
   try {
