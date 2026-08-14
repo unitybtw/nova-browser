@@ -588,6 +588,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions]);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
 
   const currentUrl = activeTab?.url || '';
@@ -1169,43 +1170,63 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <Columns className="w-4 h-4" />
           </button>
           
-          <div className="relative group/menu">
-            <button className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors" title="More Options">
+          <div className="relative">
+            <button 
+              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+              className={`p-1.5 rounded transition-colors ${
+                isMoreMenuOpen ? 'bg-slate-200 dark:bg-slate-700 text-blue-500' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+              }`}
+              title="More Options"
+            >
               <Menu className="w-4 h-4" />
             </button>
-            <div className="absolute right-0 top-full mt-1 w-64 bg-white rounded-xl shadow-lg border border-slate-100 opacity-0 invisible group-hover/menu:opacity-100 group-hover/menu:visible transition-all z-50 flex flex-col py-2 dark:bg-slate-800 dark:border-slate-700">
-              <div className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">
-                <span className="text-sm text-slate-700 dark:text-slate-300">Zoom</span>
-                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-                  <button onClick={onZoomOut} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
-                  <button onClick={onZoomIn} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
-                </div>
-              </div>
-              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-              <button onClick={onTakeScreenshot} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <Camera className="w-4 h-4 text-slate-400" /> Screenshot
-              </button>
-              <button onClick={onOpenShare} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <Share2 className="w-4 h-4 text-slate-400" /> Share Link
-              </button>
-              <button onClick={onOpenFindInPage} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <Search className="w-4 h-4 text-slate-400" /> Find in Page
-              </button>
-              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-              <button onClick={onOpenDownloads} className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <div className="flex items-center gap-3">
-                  <Download className="w-4 h-4 text-slate-400" /> Downloads
-                </div>
-                {(activeDownloadsCount || 0) > 0 && <span className="bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">{activeDownloadsCount}</span>}
-              </button>
-              <button onClick={onOpenHistory} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <Clock className="w-4 h-4 text-slate-400" /> History
-              </button>
-              <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-              <button onClick={onOpenSettings} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                <Settings className="w-4 h-4 text-slate-400" /> Settings
-              </button>
-            </div>
+
+            <AnimatePresence>
+              {isMoreMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
+                  <motion.div 
+                    initial={{ opacity: 0, y: -4, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -4, scale: 0.96 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-1.5 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 flex flex-col py-2"
+                  >
+                    <div className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">
+                      <span className="text-sm text-slate-700 dark:text-slate-300">Zoom</span>
+                      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
+                        <button onClick={onZoomOut} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
+                        <button onClick={onZoomIn} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                    <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <Camera className="w-4 h-4 text-slate-400" /> Screenshot
+                    </button>
+                    <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <Share2 className="w-4 h-4 text-slate-400" /> Share Link
+                    </button>
+                    <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <Search className="w-4 h-4 text-slate-400" /> Find in Page
+                    </button>
+                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                    <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <div className="flex items-center gap-3">
+                        <Download className="w-4 h-4 text-slate-400" /> Downloads
+                      </div>
+                      {(activeDownloadsCount || 0) > 0 && <span className="bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">{activeDownloadsCount}</span>}
+                    </button>
+                    <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <Clock className="w-4 h-4 text-slate-400" /> History
+                    </button>
+                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
+                    <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
+                      <Settings className="w-4 h-4 text-slate-400" /> Settings
+                    </button>
+                  </motion.div>
+                </>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

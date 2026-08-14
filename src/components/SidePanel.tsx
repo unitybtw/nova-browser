@@ -233,8 +233,8 @@ export const SidePanel = React.memo(({
           initial={{ x: '100%', opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-          className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col h-full shrink-0 z-30 shadow-2xl"
+          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
+          className="absolute top-0 right-0 bottom-0 w-80 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/95 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">

@@ -2003,7 +2003,7 @@ function App() {
       )}
 
       {/* Main Viewport Card with fluid margin & border radius transition */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
             ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2'
@@ -2018,7 +2018,7 @@ function App() {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-              className="w-full shrink-0 overflow-hidden"
+              className="w-full shrink-0 relative z-50 overflow-visible"
             >
               <TopBar 
                 tabs={workspaceTabs}
