@@ -61,7 +61,7 @@ const ScreenshotModal = React.lazy(() => import('./components/ScreenshotModal').
 const ReaderMode = React.lazy(() => import('./components/ReaderMode').then(m => ({ default: m.ReaderMode })));
 const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
 const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
-const Onboarding = React.lazy(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
+import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension } from './types/browser';
@@ -1822,9 +1822,8 @@ function App() {
 
   if (showOnboarding) {
     return (
-      <React.Suspense fallback={<div className="w-full h-full bg-slate-950 flex items-center justify-center text-white">Loading...</div>}>
-        <Onboarding
-          onComplete={(prefs) => {
+      <Onboarding
+        onComplete={(prefs) => {
           setShowOnboarding(false);
           setSettings(s => ({
             ...s,
@@ -1840,7 +1839,6 @@ function App() {
           }
         }}
       />
-      </React.Suspense>
     );
   }
 
