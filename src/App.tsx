@@ -1908,13 +1908,13 @@ function App() {
 
       {/* Floating Expand Sidebar Button when collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
-        <div className="absolute top-2.5 left-2.5 z-50 flex items-center gap-2 no-drag">
+        <div className="absolute top-2.5 left-[84px] z-50 flex items-center gap-2 no-drag">
           <button
             onClick={() => setIsSidebarCollapsed(false)}
-            className="p-2 rounded-xl bg-[#1e1930]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white shadow-xl hover:bg-white/15 transition-all group cursor-pointer"
+            className="p-1.5 rounded-lg bg-[#1e1930]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white shadow-xl hover:bg-white/15 transition-all group cursor-pointer"
             title="Show Sidebar (⌘S)"
           >
-            <PanelLeft className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+            <PanelLeft className="w-3.5 h-3.5 text-slate-300 group-hover:text-white group-hover:scale-105 transition-transform" />
           </button>
         </div>
       )}

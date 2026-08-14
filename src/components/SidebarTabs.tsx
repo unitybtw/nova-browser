@@ -240,7 +240,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [favorites, setFavorites] = useState<FavoriteApp[]>(() => {
     try {
       const saved = localStorage.getItem('nova_top_favorites');
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
     } catch (_) {}
     return DEFAULT_FAVORITE_APPS;
   });
@@ -487,8 +490,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div className="h-11 pt-2.5 px-3 flex items-center justify-between drag-region shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="w-[56px] h-full shrink-0" />
+          <div className="flex items-center gap-1">
+            <div className="w-[72px] h-full shrink-0" />
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
