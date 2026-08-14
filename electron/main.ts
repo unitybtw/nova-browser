@@ -144,7 +144,7 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 650,
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'hidden',
     ...(process.platform === 'win32' ? {
       titleBarOverlay: {
         color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
@@ -152,7 +152,7 @@ function createWindow() {
         height: 44
       }
     } : {}),
-    trafficLightPosition: { x: 16, y: 16 },
+    trafficLightPosition: { x: 14, y: 14 },
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
