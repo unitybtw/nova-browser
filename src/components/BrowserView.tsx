@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Zap } from 'lucide-react';
+import { Moon, Zap, Folder, Shield, Code2, Palette } from 'lucide-react';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
@@ -678,9 +678,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                   <div className={`flex items-center gap-2 pb-4 mb-4 border-b ${
                     isDarkTheme ? 'border-white/10 text-white/90' : 'border-slate-200 text-slate-900'
                   }`}>
-                    <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] ${
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
                       isDarkTheme ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'
-                    }`}>📁</div>
+                    }`}>
+                      <Folder className="w-3.5 h-3.5" />
+                    </div>
                     <span className="font-semibold text-sm">unitybtw / nova-browser</span>
                     <span className={`text-[10px] px-2 py-0.5 rounded font-sans ml-2 ${
                       isDarkTheme ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'
@@ -730,7 +732,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                     <div className={`w-full h-24 rounded-2xl border border-dashed flex items-center justify-center gap-3 text-xs font-medium ${
                       isDarkTheme ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-400' : 'border-emerald-400 bg-emerald-50/80 text-emerald-800'
                     }`}>
-                      <span className="p-1.5 rounded-lg bg-emerald-500/20">🛡️</span>
+                      <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
+                        <Shield className="w-4 h-4" />
+                      </div>
                       <span>Targeted Ad Banner Blocked by Nova Privacy Shield (3 Trackers Stopped)</span>
                     </div>
 
@@ -754,7 +758,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 }`}>
                   <div className="max-w-2xl mx-auto space-y-6">
                     <div className={`flex items-center gap-3 pb-4 border-b ${isDarkTheme ? 'border-white/10' : 'border-slate-200'}`}>
-                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">⚛️</div>
+                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">
+                        <Code2 className="w-4 h-4" />
+                      </div>
                       <div>
                         <h2 className={`text-lg font-bold ${isDarkTheme ? 'text-white' : 'text-slate-900'}`}>React 19 Documentation</h2>
                         <p className={`text-xs ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>Server Components & Actions Architecture</p>
@@ -786,7 +792,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 }`}>
                   <div className="max-w-2xl mx-auto space-y-6">
                     <div className={`flex items-center gap-3 pb-4 border-b ${isDarkTheme ? 'border-white/10' : 'border-slate-200'}`}>
-                      <div className="w-8 h-8 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400 font-bold text-sm">🎨</div>
+                      <div className="w-8 h-8 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400 font-bold text-sm">
+                        <Palette className="w-4 h-4" />
+                      </div>
                       <div>
                         <h2 className={`text-lg font-bold ${isDarkTheme ? 'text-white' : 'text-slate-900'}`}>Tailwind CSS v4 Oxide Engine</h2>
                         <p className={`text-xs ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>High Performance Unified CSS Engine</p>

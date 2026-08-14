@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Monitor, Search, Shield, Ban, EyeOff, Bug } from 'lucide-react';
+import { Sun, Moon, Monitor, Search, Shield, Ban, EyeOff, Bug, ArrowRight } from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (prefs: {
@@ -369,7 +369,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.3 }}
         className="text-5xl font-bold text-white mb-4"
       >
-        You're all set! 🎉
+        You're all set!
       </motion.h2>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -398,9 +398,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         onClick={handleFinish}
         whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
         whileTap={{ scale: 0.95 }}
-        className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
+        className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
       >
-        Start Browsing 🚀
+        <span>Start Browsing</span>
+        <ArrowRight className="w-5 h-5" />
       </motion.button>
     </motion.div>,
   ];

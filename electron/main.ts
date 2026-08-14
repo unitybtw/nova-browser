@@ -586,7 +586,7 @@ app.on('web-contents-created', (_event, contents) => {
         const escapedUrl = navigationUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
         const safeUrlJson = JSON.stringify(escapedUrl);
         contents.executeJavaScript(`
-          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1>🚨 Dangerous Site Blocked</h1><p>This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.</p></div>';
+          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1 style="font-size:24px;font-weight:700;margin-bottom:12px;">Dangerous Site Blocked</h1><p style="font-size:14px;color:#7f1d1d;">This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.</p></div>';
         `).catch(() => {});
         return;
       }

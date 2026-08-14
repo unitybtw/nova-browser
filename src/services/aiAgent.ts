@@ -695,7 +695,7 @@ class AIAgent {
             typeBox.style.pointerEvents = 'none';
             typeBox.style.border = '1px solid rgba(255,255,255,0.4)';
             typeBox.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
-            typeBox.innerHTML = '<span style="color:' + color + '">✨ AI Typing:</span> <span id="ai-typing-text"></span><span id="ai-cursor" style="animation: blink 1s step-end infinite; color:' + color + '">|</span>';
+            typeBox.innerHTML = '<span style="color:' + color + '">AI Typing:</span> <span id="ai-typing-text"></span><span id="ai-cursor" style="animation: blink 1s step-end infinite; color:' + color + '">|</span>';
             
             // Add keyframes for cursor blink if not exists
             if (!document.getElementById('ai-blink-style')) {

@@ -719,14 +719,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                           }`}
                         >
                           <option value="">
-                            ✨ {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Doğal)' : 'Samantha (Apple Natural)') : 'En İyi Doğal Ses'}
+                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Doğal)' : 'Samantha (Apple Natural)') : 'En İyi Doğal Ses'}
                           </option>
                           
                           {activeNativeVoices.length > 0 && (
                             <optgroup label="macOS Sistem Sesleri">
                               {activeNativeVoices.map((v) => (
                                 <option key={v.name} value={v.name}>
-                                  🍎 {v.name}
+                                  {v.name}
                                 </option>
                               ))}
                             </optgroup>
@@ -782,7 +782,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   </span>
                   <span className="flex items-center gap-1 text-blue-500 font-medium">
                     <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    {isMac ? (effectiveLanguage.startsWith('tr') ? '🍎 macOS Yelda Sesi' : '🍎 macOS Samantha Sesi') : 'Doğal İnsan Sesi'}
+                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Sesi' : 'macOS Samantha Sesi') : 'Doğal İnsan Sesi'}
                   </span>
                 </div>
 
