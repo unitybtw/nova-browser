@@ -1079,18 +1079,21 @@ ipcMain.handle('store-get', async (event, key: string) => {
 // IPC Handler for VPN
 ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: string }) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  const proxyRules = (config.enabled && config.proxyUrl) ? config.proxyUrl.trim() : 'direct://';
+  
   if (config.enabled && config.proxyUrl) {
-    // VULN-17: Validate proxy URL protocol
+    // 🔒 Security: Validate proxy URL protocol
     const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
-    const proxyUrl = config.proxyUrl.trim();
-    if (!allowedProxyProtocols.some(proto => proxyUrl.startsWith(proto))) {
+    if (!allowedProxyProtocols.some(proto => proxyRules.startsWith(proto))) {
       console.error('Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://');
       return { error: 'Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://' };
     }
-    await session.defaultSession.setProxy({ proxyRules: proxyUrl });
-  } else {
-    await session.defaultSession.setProxy({ proxyRules: 'direct://' });
   }
+
+  await Promise.all([
+    session.defaultSession.setProxy({ proxyRules }),
+    session.fromPartition('incognito').setProxy({ proxyRules }),
+  ]);
   return true;
 });
 
@@ -1348,6 +1351,17 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
     }
   });
 
+  // 🔒 Security: Block arbitrary window popups from extension popup content
+  popupWin.webContents.setWindowOpenHandler(({ url }) => {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        mainWindow?.webContents.send('new-tab', url);
+      }
+    } catch {}
+    return { action: 'deny' };
+  });
+
   // Close popup when it loses focus
   popupWin.on('blur', () => {
     if (!popupWin.isDestroyed()) popupWin.close();
@@ -1398,16 +1412,19 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     const extractNodes = (node: any, depth = 0) => {
       if (depth > 20 || !node) return;
       if (node.type === 'url' && typeof node.url === 'string') {
-        let domain = '';
         try {
-          domain = new URL(node.url).hostname;
+          const parsed = new URL(node.url);
+          // 🔒 Security: Only allow http and https protocols in imported bookmarks
+          if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+            const domain = parsed.hostname;
+            importedBookmarks.push({
+              id: `imported-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              title: String(node.name || node.url).substring(0, 200),
+              url: node.url,
+              favicon: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
+            });
+          }
         } catch (_) {}
-        importedBookmarks.push({
-          id: `imported-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          title: String(node.name || node.url).substring(0, 200),
-          url: node.url,
-          favicon: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
-        });
       } else if (node.type === 'folder' && Array.isArray(node.children)) {
         node.children.forEach((child: any) => extractNodes(child, depth + 1));
       }

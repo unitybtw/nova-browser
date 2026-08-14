@@ -18,28 +18,34 @@ contextBridge.exposeInMainWorld('electronAPI', {
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateChecking: (callback: (event: any) => void) => {
-    ipcRenderer.on('update-checking', callback);
-    return () => ipcRenderer.removeListener('update-checking', callback);
+    const handler = () => callback(null);
+    ipcRenderer.on('update-checking', handler);
+    return () => ipcRenderer.removeListener('update-checking', handler);
   },
   onUpdateAvailable: (callback: (event: any, info: any) => void) => {
-    ipcRenderer.on('update-available', callback);
-    return () => ipcRenderer.removeListener('update-available', callback);
+    const handler = (_event: any, info: any) => callback(null, info);
+    ipcRenderer.on('update-available', handler);
+    return () => ipcRenderer.removeListener('update-available', handler);
   },
   onUpdateNotAvailable: (callback: (event: any, info: any) => void) => {
-    ipcRenderer.on('update-not-available', callback);
-    return () => ipcRenderer.removeListener('update-not-available', callback);
+    const handler = (_event: any, info: any) => callback(null, info);
+    ipcRenderer.on('update-not-available', handler);
+    return () => ipcRenderer.removeListener('update-not-available', handler);
   },
   onUpdateDownloadProgress: (callback: (event: any, progress: any) => void) => {
-    ipcRenderer.on('update-download-progress', callback);
-    return () => ipcRenderer.removeListener('update-download-progress', callback);
+    const handler = (_event: any, progress: any) => callback(null, progress);
+    ipcRenderer.on('update-download-progress', handler);
+    return () => ipcRenderer.removeListener('update-download-progress', handler);
   },
   onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
-    ipcRenderer.on('update-downloaded', callback);
-    return () => ipcRenderer.removeListener('update-downloaded', callback);
+    const handler = (_event: any, info: any) => callback(null, info);
+    ipcRenderer.on('update-downloaded', handler);
+    return () => ipcRenderer.removeListener('update-downloaded', handler);
   },
   onUpdateError: (callback: (event: any, error: string) => void) => {
-    ipcRenderer.on('update-error', callback);
-    return () => ipcRenderer.removeListener('update-error', callback);
+    const handler = (_event: any, error: string) => callback(null, error);
+    ipcRenderer.on('update-error', handler);
+    return () => ipcRenderer.removeListener('update-error', handler);
   },
   // MCP Server
   startMcpServer: () => ipcRenderer.invoke('start-mcp-server'),
@@ -47,12 +53,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   stopMcpServer: () => ipcRenderer.invoke('stop-mcp-server'),
   getMcpStatus: () => ipcRenderer.invoke('get-mcp-status'),
   onMcpClientChanged: (callback: (event: any, data: { count: number; clients: any[] }) => void) => {
-    ipcRenderer.on('mcp-client-changed', callback);
-    return () => ipcRenderer.removeListener('mcp-client-changed', callback);
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('mcp-client-changed', handler);
+    return () => ipcRenderer.removeListener('mcp-client-changed', handler);
   },
   onMcpStatusChanged: (callback: (event: any, isRunning: boolean) => void) => {
-    ipcRenderer.on('mcp-status-changed', callback);
-    return () => ipcRenderer.removeListener('mcp-status-changed', callback);
+    const handler = (_event: any, isRunning: boolean) => callback(null, isRunning);
+    ipcRenderer.on('mcp-status-changed', handler);
+    return () => ipcRenderer.removeListener('mcp-status-changed', handler);
   },
   getMcpToken: () => ipcRenderer.invoke('get-mcp-token'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
@@ -67,16 +75,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
   // Shortcuts, Navigation & Downloads events
   onShortcut: (callback: (event: any, command: string) => void) => {
-    ipcRenderer.on('shortcut', callback);
-    return () => ipcRenderer.removeListener('shortcut', callback);
+    const handler = (_event: any, command: string) => callback(null, command);
+    ipcRenderer.on('shortcut', handler);
+    return () => ipcRenderer.removeListener('shortcut', handler);
   },
   onNewTab: (callback: (event: any, url: string) => void) => {
-    ipcRenderer.on('new-tab', callback);
-    return () => ipcRenderer.removeListener('new-tab', callback);
+    const handler = (_event: any, url: string) => callback(null, url);
+    ipcRenderer.on('new-tab', handler);
+    return () => ipcRenderer.removeListener('new-tab', handler);
   },
   onDownloadUpdate: (callback: (event: any, data: any) => void) => {
-    ipcRenderer.on('download-update', callback);
-    return () => ipcRenderer.removeListener('download-update', callback);
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('download-update', handler);
+    return () => ipcRenderer.removeListener('download-update', handler);
   },
   // Extension management
   installExtension: (folderPath: string) => ipcRenderer.invoke('install-extension', folderPath),
@@ -86,22 +97,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
   installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
   onExtensionInstalledSilently: (callback: (event: any, data: any) => void) => {
-    ipcRenderer.on('extension-installed-silently', callback);
-    return () => ipcRenderer.removeListener('extension-installed-silently', callback);
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('extension-installed-silently', handler);
+    return () => ipcRenderer.removeListener('extension-installed-silently', handler);
   },
   onExtensionChanged: (callback: () => void) => {
-    ipcRenderer.on('extension-changed', callback);
-    return () => ipcRenderer.removeListener('extension-changed', callback);
+    const handler = () => callback();
+    ipcRenderer.on('extension-changed', handler);
+    return () => ipcRenderer.removeListener('extension-changed', handler);
   },
   // Tab thumbnails
   captureTabThumbnail: (webContentsId: number) => ipcRenderer.invoke('capture-tab-thumbnail', webContentsId),
   onTabThumbnailUpdate: (callback: (event: any, data: { webContentsId: number; dataUrl: string }) => void) => {
-    ipcRenderer.on('tab-thumbnail-update', callback);
-    return () => ipcRenderer.removeListener('tab-thumbnail-update', callback);
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('tab-thumbnail-update', handler);
+    return () => ipcRenderer.removeListener('tab-thumbnail-update', handler);
   },
   onAdBlockedBatch: (callback: (event: any, batch: Record<number, number>) => void) => {
-    ipcRenderer.on('ad-blocked-batch', callback);
-    return () => ipcRenderer.removeListener('ad-blocked-batch', callback);
+    const handler = (_event: any, batch: any) => callback(null, batch);
+    ipcRenderer.on('ad-blocked-batch', handler);
+    return () => ipcRenderer.removeListener('ad-blocked-batch', handler);
   },
   // Native OS TTS (macOS high quality voices)
   nativeTtsGetVoices: () => ipcRenderer.invoke('native-tts-get-voices'),
