@@ -236,6 +236,7 @@ function App() {
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isHoverRevealing, setIsHoverRevealing] = useState(false);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
@@ -1857,6 +1858,7 @@ function App() {
         : 'bg-slate-50 dark:bg-slate-900'
     }`}>
       
+      {/* Pinned Vertical Sidebar */}
       {settings.useVerticalTabs && !isSidebarCollapsed && (
         <motion.div 
           initial={{ width: 0, opacity: 0 }}
@@ -1901,22 +1903,79 @@ function App() {
             onOpenSettings={handleOpenSettings}
             onOpenExtensions={handleOpenExtensions}
             bookmarks={bookmarks}
-            onToggleCollapse={() => setIsSidebarCollapsed(true)}
+            onToggleCollapse={() => {
+              setIsSidebarCollapsed(true);
+              setIsHoverRevealing(false);
+            }}
           />
         </motion.div>
       )}
 
-      {/* Floating Expand Sidebar Button when collapsed */}
+      {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
-        <div className="absolute top-2.5 left-[84px] z-50 flex items-center gap-2 no-drag">
-          <button
-            onClick={() => setIsSidebarCollapsed(false)}
-            className="p-1.5 rounded-lg bg-[#1e1930]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white shadow-xl hover:bg-white/15 transition-all group cursor-pointer"
-            title="Show Sidebar (⌘S)"
-          >
-            <PanelLeft className="w-3.5 h-3.5 text-slate-300 group-hover:text-white group-hover:scale-105 transition-transform" />
-          </button>
-        </div>
+        <>
+          {/* Invisible Left Edge Mouse Sensor */}
+          <div 
+            className="fixed top-0 left-0 bottom-0 w-4 z-40"
+            onMouseEnter={() => setIsHoverRevealing(true)}
+          />
+
+          {/* Smooth Sliding Overlay Sidebar on Hover */}
+          <AnimatePresence>
+            {isHoverRevealing && (
+              <motion.div
+                initial={{ x: -250, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: -250, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                onMouseLeave={() => setIsHoverRevealing(false)}
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-[#151122]/98 backdrop-blur-3xl border-r border-white/10"
+              >
+                <SidebarTabs
+                  tabs={workspaceTabs}
+                  folders={folders}
+                  activeTabId={activeTabId}
+                  onSelectTab={handleSelectTab}
+                  onCloseTab={handleCloseTab}
+                  onNewTab={handleNewTab}
+                  onToggleMuteTab={handleToggleMuteTab}
+                  workspaces={workspaces}
+                  activeWorkspaceId={activeWorkspaceId}
+                  onSelectWorkspace={handleSelectWorkspace}
+                  isIncognito={activeTab?.isIncognito}
+                  onCreateFolder={handleCreateFolder}
+                  onToggleFolder={handleToggleFolder}
+                  onRenameFolder={handleRenameFolder}
+                  onDeleteFolder={handleDeleteFolder}
+                  onMoveTabToFolder={handleMoveTabToFolder}
+                  onOpenSpotlight={handleOpenSpotlight}
+                  onTabDragStart={handleTabDragStart}
+                  onTabDragEnd={handleTabDragEnd}
+                  splitTabId={splitTabId}
+                  onCloseSplit={handleCloseSplitView}
+                  onNavigate={handleNavigate}
+                  onGoBack={handleGoBack}
+                  onGoForward={handleGoForward}
+                  onReload={handleReload}
+                  canGoBack={activeTab?.canGoBack}
+                  canGoForward={activeTab?.canGoForward}
+                  isLoading={activeTab?.isLoading}
+                  searchEngine={settings.searchEngine}
+                  privacyShield={settings.privacyShield}
+                  onOpenDownloads={handleOpenDownloads}
+                  onOpenHistory={handleOpenHistory}
+                  onOpenSettings={handleOpenSettings}
+                  onOpenExtensions={handleOpenExtensions}
+                  bookmarks={bookmarks}
+                  onToggleCollapse={() => {
+                    setIsSidebarCollapsed(false);
+                    setIsHoverRevealing(false);
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
       )}
 
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden transition-all duration-200 ${

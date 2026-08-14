@@ -489,13 +489,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#151122]/95 backdrop-blur-3xl border-r border-white/[0.06] font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
-        <div className="h-11 pt-2.5 px-3 flex items-center justify-between drag-region shrink-0">
+        <div className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0">
           <div className="flex items-center gap-1">
             <div className="w-[72px] h-full shrink-0" />
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors no-drag"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors no-drag flex items-center justify-center"
                 title="Hide Sidebar (⌘S)"
               >
                 <PanelLeft className="w-3.5 h-3.5" />
