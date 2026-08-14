@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square } from 'lucide-react';
+import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Copy, Check, Clock, BookOpen } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
 
@@ -42,12 +42,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const [wordCount, setWordCount] = useState(0);
+  const [readingTime, setReadingTime] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('light');
-  const [font, setFont] = useState<'serif' | 'sans'>('sans');
+  const [font, setFont] = useState<'sans' | 'serif' | 'mono'>('sans');
   const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
+  const [columnWidth, setColumnWidth] = useState<'narrow' | 'normal' | 'wide'>('normal');
   const [showControls, setShowControls] = useState(false);
 
   // TTS State
@@ -75,7 +78,36 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   }>({ visible: false, top: 0, left: 0, text: '' });
   const [noteText, setNoteText] = useState('');
   const [highlightColor, setHighlightColor] = useState('#fef08a');
-  const [viewingNote, setViewingNote] = useState<{ visible: boolean; note: string; top: number; left: number }>({ visible: false, note: '', top: 0, left: 0 });
+  const [viewingNote, setViewingNote] = useState<{
+    visible: boolean;
+    id?: string;
+    note: string;
+    top: number;
+    left: number;
+  }>({ visible: false, note: '', top: 0, left: 0 });
+  const [copiedNote, setCopiedNote] = useState(false);
+
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+
+  // Escape key support to close modals or reader mode
+  useEffect(() => {
+    if (!isActive) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (popoverState.visible) {
+          setPopoverState(prev => ({ ...prev, visible: false }));
+        } else if (viewingNote.visible) {
+          setViewingNote({ visible: false, note: '', top: 0, left: 0 });
+        } else if (showControls) {
+          setShowControls(false);
+        } else {
+          onClose();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isActive, popoverState.visible, viewingNote.visible, showControls, onClose]);
 
   // Close controls dropdown on click outside
   useEffect(() => {
@@ -132,6 +164,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       e.stopPropagation();
                       setViewingNote({
                         visible: true,
+                        id: h.id,
                         note: h.note,
                         top: e.clientY,
                         left: e.clientX
@@ -207,6 +240,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         e.stopPropagation();
         setViewingNote({
           visible: true,
+          id,
           note: newHighlight.note,
           top: e.clientY,
           left: e.clientX
@@ -227,6 +261,29 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
     window.getSelection()?.removeAllRanges();
+  };
+
+  const deleteHighlight = (id?: string) => {
+    const targetId = id || viewingNote.id;
+    if (!targetId) return;
+
+    const updated = highlights.filter(h => h.id !== targetId);
+    setHighlights(updated);
+
+    if (contentRef.current) {
+      const mark = contentRef.current.querySelector(`mark[data-id="${targetId}"]`);
+      if (mark && mark.parentNode) {
+        const textNode = document.createTextNode(mark.textContent || '');
+        mark.parentNode.replaceChild(textNode, mark);
+      }
+    }
+
+    if (url) {
+      const storageKey = 'reader_highlights_' + safeBase64(url);
+      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
+    }
+
+    setViewingNote({ visible: false, note: '', top: 0, left: 0 });
   };
 
   const closePopover = () => {
@@ -269,19 +326,18 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
     utterance.rate = rate;
-    utterance.pitch = 1.1; // Slightly higher pitch to sound less robotic
+    utterance.pitch = 1.05;
     
-    let voices = window.speechSynthesis.getVoices();
-    // Prefer higher quality local or Google voices
+    const voices = window.speechSynthesis.getVoices();
     let betterVoice = voices.find(v => 
       (v.name.includes('Google') && !v.name.includes('Translate')) || 
       v.name.includes('Siri') || 
       v.name.includes('Premium') ||
+      v.name.includes('Natural') ||
       v.name === 'Samantha' ||
       v.name === 'Yelda'
     );
     
-    // Fallback avoiding known robotic voices
     if (!betterVoice) {
       betterVoice = voices.find(v => !v.name.includes('Alex') && !v.name.includes('Fred') && !v.name.includes('Zarvox') && !v.name.includes('Trinoids')) || voices[0];
     }
@@ -335,7 +391,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       }
 
       if (currentSentences.length > 0) {
-        isPlayingRef.current = true; // Synchronous ref update
+        isPlayingRef.current = true;
         setIsPlaying(true);
         setIsPaused(false);
         speakSentence(currentSentenceIndex, speechRate, currentSentences);
@@ -391,13 +447,34 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           clonedDoc.head.appendChild(base);
         } catch (e) {}
 
+        // Fix lazy-loaded images where source is in data-src, data-original, etc.
+        const images = clonedDoc.querySelectorAll('img');
+        images.forEach((img) => {
+          const lazySrc = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('data-lazy-src') || img.getAttribute('srcset')?.split(' ')[0];
+          if (lazySrc && (!img.src || img.src.startsWith('data:image/svg') || img.src.startsWith('data:image/gif') || img.src.length < 50)) {
+            try {
+              img.src = new URL(lazySrc, url).href;
+            } catch (_) {}
+          }
+        });
+
         const reader = new Readability(clonedDoc);
         const article = reader.parse();
 
         if (article && article.content) {
           setTitle(article.title || '');
           setAuthor(article.byline || '');
-          const cleanHtml = DOMPurify.sanitize(article.content, { ADD_ATTR: ['target'] });
+          
+          // Calculate reading stats
+          const textContent = article.textContent || '';
+          const words = textContent.trim().split(/\s+/).filter(Boolean).length;
+          setWordCount(words);
+          setReadingTime(Math.max(1, Math.ceil(words / 200)));
+
+          const cleanHtml = DOMPurify.sanitize(article.content, { 
+            ADD_ATTR: ['target', 'src', 'srcset', 'alt', 'title'],
+            ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark']
+          });
           setContent(cleanHtml);
         } else {
           setError('The text content on this page is not suitable for reader mode.');
@@ -419,14 +496,21 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   };
 
   const fonts = {
+    sans: 'font-sans',
     serif: 'font-serif',
-    sans: 'font-sans'
+    mono: 'font-mono'
   };
 
   const sizes = {
     sm: 'text-base leading-relaxed',
     md: 'text-lg leading-loose',
     lg: 'text-xl leading-loose'
+  };
+
+  const columnWidths = {
+    narrow: 'max-w-xl',
+    normal: 'max-w-3xl',
+    wide: 'max-w-5xl'
   };
 
   const highlightColors = [
@@ -439,33 +523,34 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     <AnimatePresence>
       {isActive && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          transition={{ duration: 0.2 }}
+          exit={{ opacity: 0, y: 15 }}
+          transition={{ duration: 0.18 }}
           className={`fixed inset-0 z-50 overflow-y-auto ${bgColors[theme]} ${fonts[font]}`}
         >
           {/* Header Bar */}
           <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-900/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f4ecd8]/90' : 'border-black/5 bg-white/90'}`}>
             <div className="flex items-center gap-2 no-drag">
               {/* Mac Traffic Lights Spacer */}
-              <div className="w-[68px] shrink-0" />
+              {isMac && <div className="w-[68px] shrink-0" />}
               <button 
                 onClick={onClose}
-                className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
+                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
               >
                 <ArrowLeft className="w-4 h-4" /> Close
               </button>
             </div>
             
             <div className="relative flex items-center gap-1 no-drag" ref={controlsRef}>
-              <div className={`flex items-center gap-1 rounded-full px-2 mr-2 no-drag ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+              {/* Audio Read Aloud Player */}
+              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-2 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
                 <button 
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title={isPlaying ? "Pause" : "Read Aloud"}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                  {isPlaying ? <Pause className="w-4 h-4 text-blue-500" /> : <Play className="w-4 h-4 ml-0.5 text-blue-500" />}
                 </button>
                 {(isPlaying || isPaused) && (
                   <button 
@@ -479,7 +564,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <div className={`h-4 w-px mx-1 ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-300'}`}></div>
                 <button
                   onClick={changeSpeechRate}
-                  className={`flex items-center gap-1 p-1.5 rounded-full transition-colors text-xs font-bold w-12 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                  className={`flex items-center gap-1 p-1 rounded-full transition-colors text-xs font-bold w-10 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title="Reading Speed"
                 >
                   {speechRate}x
@@ -488,35 +573,51 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               
               <button 
                 onClick={() => setShowControls(!showControls)}
-                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
                 title="Appearance Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
               
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[260px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[280px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                  {/* Theme */}
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">THEME</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
                     <div className="flex gap-2">
-                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5 mx-auto"/></button>
-                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
-                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Dark Theme"><Moon className="w-5 h-5 mx-auto"/></button>
+                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
+                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
+                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Dark Theme"><Moon className="w-5 h-5"/></button>
                     </div>
                   </div>
+
+                  {/* Font */}
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">FONT</div>
-                    <div className="flex gap-2">
-                      <button onClick={() => setFont('sans')} className={`flex-1 p-2 rounded-lg border text-sm font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => setFont('serif')} className={`flex-1 p-2 rounded-lg border text-sm font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Typeface</div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setFont('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
+                      <button onClick={() => setFont('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
+                      <button onClick={() => setFont('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
                     </div>
                   </div>
+
+                  {/* Font Size */}
                   <div>
-                    <div className="text-xs font-bold text-slate-400 mb-3 tracking-wider">SIZE</div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Text Size</div>
                     <div className="flex gap-2 items-center">
-                      <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-sm transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
-                      <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-base font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
-                      <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-lg font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-600 hover:bg-slate-700' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
+                      <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-xs transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
+                      <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
+                      <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-base font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
+                    </div>
+                  </div>
+
+                  {/* Column Width */}
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Column Width</div>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => setColumnWidth('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Narrow</button>
+                      <button onClick={() => setColumnWidth('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Standard</button>
+                      <button onClick={() => setColumnWidth('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
                     </div>
                   </div>
                 </div>
@@ -524,25 +625,38 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             </div>
           </div>
 
-          <div className="max-w-3xl mx-auto px-6 py-12 pb-32">
+          <div className={`${columnWidths[columnWidth]} mx-auto px-6 py-12 pb-32 transition-all duration-300`}>
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4" />
-                <p>Extracting content...</p>
+                <p className="text-sm font-medium">Extracting article content...</p>
               </div>
             )}
             
             {error && (
               <div className="text-center py-20 text-red-500">
                 <ShieldAlert className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>{error}</p>
+                <p className="text-base font-medium">{error}</p>
               </div>
             )}
 
             {content && !isLoading && !error && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={sizes[fontSize]}>
-                <h1 className="text-4xl md:text-5xl font-bold mb-4 leading-tight">{title}</h1>
-                {author && <p className="text-sm opacity-60 mb-8 uppercase tracking-wider font-semibold">{author}</p>}
+                <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight tracking-tight">{title}</h1>
+                
+                {/* Article Metadata Bar */}
+                <div className="flex flex-wrap items-center gap-4 text-xs opacity-70 mb-8 border-b pb-4 border-current/10">
+                  {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
+                    {readingTime} min read
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    {wordCount.toLocaleString()} words
+                  </span>
+                </div>
+
                 <div 
                   ref={contentRef}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-blue-500 hover:prose-a:text-blue-600 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
@@ -559,7 +673,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="fixed z-[100] shadow-2xl rounded-xl p-3 border w-64 text-sm"
+                className="fixed z-[100] shadow-2xl rounded-2xl p-3.5 border w-72 text-sm"
                 style={{ 
                   top: Math.max(10, popoverState.top - 10), 
                   left: popoverState.left, 
@@ -570,22 +684,25 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 }}
                 onMouseDown={e => e.stopPropagation()}
               >
-                <div className="flex gap-2 mb-3">
-                  {highlightColors.map(c => (
-                    <button 
-                      key={c.name}
-                      onClick={() => setHighlightColor(c.hex)}
-                      className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-blue-500 scale-110' : 'border-transparent'}`}
-                      style={{ backgroundColor: c.hex }}
-                      title={c.name}
-                    />
-                  ))}
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</span>
+                  <div className="flex gap-2">
+                    {highlightColors.map(c => (
+                      <button 
+                        key={c.name}
+                        onClick={() => setHighlightColor(c.hex)}
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-blue-500 scale-110 shadow-xs' : 'border-transparent'}`}
+                        style={{ backgroundColor: c.hex }}
+                        title={c.name}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <textarea 
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
-                  placeholder="Add note (Markdown)..."
-                  className="w-full h-20 p-2 rounded mb-2 resize-none outline-none border transition-colors"
+                  placeholder="Add note (optional)..."
+                  className="w-full h-20 p-2.5 rounded-xl mb-2.5 resize-none outline-none border text-xs transition-colors"
                   style={{
                     backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
                     borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
@@ -595,7 +712,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <div className="flex justify-end gap-2">
                   <button 
                     onClick={closePopover} 
-                    className="px-3 py-1 rounded transition-colors text-xs font-medium"
+                    className="px-3 py-1.5 rounded-lg transition-colors text-xs font-medium"
                     style={{
                       color: theme === 'dark' ? '#cbd5e1' : '#64748b'
                     }}
@@ -604,9 +721,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   </button>
                   <button 
                     onClick={saveHighlight} 
-                    className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors text-xs font-medium"
+                    className="px-3.5 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors text-xs font-medium shadow-xs"
                   >
-                    Save
+                    Highlight
                   </button>
                 </div>
               </motion.div>
@@ -615,12 +732,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
           {/* View Note Popover */}
           <AnimatePresence>
-            {viewingNote.visible && viewingNote.note && (
+            {viewingNote.visible && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="fixed z-[100] shadow-2xl rounded-xl p-4 border max-w-sm"
+                className="fixed z-[100] shadow-2xl rounded-2xl p-4 border max-w-sm w-80"
                 style={{ 
                   top: viewingNote.top + 10, 
                   left: viewingNote.left, 
@@ -630,13 +747,27 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   color: theme === 'dark' ? '#f8fafc' : '#0f172a'
                 }}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider opacity-50">Note</span>
-                  <button onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} className="opacity-50 hover:opacity-100">
-                    &times;
-                  </button>
+                <div className="flex justify-between items-center mb-2.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Highlight Note</span>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => deleteHighlight(viewingNote.id)}
+                      className="p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                      title="Delete Highlight"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                      onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} 
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors text-sm"
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
-                <div className="text-sm whitespace-pre-wrap">{viewingNote.note}</div>
+                <div className="text-xs whitespace-pre-wrap leading-relaxed">
+                  {viewingNote.note || <span className="italic text-slate-400">No note attached to this highlight.</span>}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
