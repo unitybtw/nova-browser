@@ -314,7 +314,7 @@ function App() {
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
       showBookmarksBar: false,
-      useVerticalTabs: demoParams.isDemo ? demoParams.feature === 'vertical_tabs' : false,
+      useVerticalTabs: true,
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',
