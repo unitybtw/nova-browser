@@ -2006,7 +2006,7 @@ function App() {
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
-            ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2'
+            ? 'bg-[#0e0c15] m-0 rounded-none border-0'
             : 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ml-0' 
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>

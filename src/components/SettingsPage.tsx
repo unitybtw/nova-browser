@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle } from 'lucide-react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles } from 'lucide-react';
 import { UserSettings } from '../App';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
+import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
 
 const PasswordList = () => {
   const [passwords, setPasswords] = useState<any[]>([]);
@@ -67,6 +68,62 @@ const PasswordList = () => {
           </button>
         </div>
       ))}
+    </div>
+  );
+};
+
+const DailyWallpaperSection = () => {
+  const { photo: currentPhoto, isLoading, shuffleNext } = useLiveUnsplashPhoto();
+
+  return (
+    <div className="mt-6 p-5 bg-white dark:bg-slate-800/80 rounded-2xl border border-slate-200 dark:border-slate-700/60 shadow-sm space-y-4 animate-in fade-in slide-in-from-top-2">
+      <div className="flex items-center justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              Daily 4K Wallpaper (Ultra HD)
+            </h3>
+            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-500 rounded-full border border-blue-500/20">
+              3840 × 2160 UHD
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Automatically updates every day with curated high-resolution photography.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={shuffleNext}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm"
+        >
+          <Shuffle className="w-3.5 h-3.5" />
+          <span>Shuffle / Next Photo</span>
+        </button>
+      </div>
+
+      {currentPhoto && (
+        <div className="mt-3 animate-in fade-in slide-in-from-bottom-2">
+          <div className="w-full aspect-video rounded-xl overflow-hidden bg-slate-900 border border-slate-700 relative group shadow-lg">
+            <img 
+              src={currentPhoto.imageUrl} 
+              alt={currentPhoto.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-3.5">
+              <div className="text-white flex items-center justify-between w-full">
+                <div className="max-w-[75%]">
+                  <p className="text-xs font-bold truncate">{currentPhoto.title}</p>
+                  <p className="text-[10px] text-white/70 truncate">{currentPhoto.author} • {currentPhoto.source}</p>
+                </div>
+                <span className="text-[10px] px-2.5 py-1 rounded-full bg-white/20 backdrop-blur-md text-white font-medium flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-amber-300" /> Active 4K
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -628,7 +685,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     { id: 'fireflies', name: 'Bioluminescent Fireflies', style: 'bg-[#0a0f1d] border border-amber-500/30' },
                     { id: 'nebula', name: 'Cosmic Nebula Flow', style: 'bg-[#07070b] border border-purple-500/30' },
                     { id: 'matrix', name: 'Digital Matrix Rain', style: 'bg-[#020503] border border-emerald-500/30' },
-                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-cover bg-center', extraStyle: { backgroundImage: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=75')" } },
+                    { id: 'unsplash', name: 'Daily 4K Wallpaper (Ultra HD)', style: 'bg-cover bg-center', extraStyle: { backgroundImage: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=75')" } },
                     { id: 'custom_url', name: 'Video / Image URL', style: 'bg-gradient-to-br from-slate-800 to-slate-900' }
                   ].map(bg => (
                     <button
@@ -651,16 +708,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   ))}
                 </div>
                 {settings.newTabBackground === 'unsplash' && (
-                  <div className="mt-4 animate-in fade-in slide-in-from-top-2">
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unsplash Category/Keywords:</label>
-                    <input 
-                      type="text" 
-                      value={settings.unsplashCategory || 'nature,architecture'}
-                      onChange={(e) => onUpdateSettings({ unsplashCategory: e.target.value })}
-                      className="w-full px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm outline-none focus:border-blue-500"
-                      placeholder="e.g. nature,city,dark"
-                    />
-                  </div>
+                  <DailyWallpaperSection />
                 )}
                 {settings.newTabBackground === 'custom_url' && (
                   <div className="mt-4 animate-in fade-in slide-in-from-top-2">

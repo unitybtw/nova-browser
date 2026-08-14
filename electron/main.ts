@@ -681,6 +681,72 @@ ipcMain.handle('set-window-button-visibility', (event, visible: boolean) => {
   }
 });
 
+// Daily 4K Ultra HD Wallpaper Engine (Bing 4K UHD Archive + 4K Desktop Masterpieces)
+ipcMain.handle('fetch-wallpaper-photos', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  const results: any[] = [];
+
+  // Provider 1: Bing Official Daily 4K UHD Image Archive (3840x2160 Ultra HD)
+  try {
+    const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US');
+    if (bingRes.ok) {
+      const bingData = await bingRes.json();
+      if (bingData.images && Array.isArray(bingData.images)) {
+        for (const img of bingData.images) {
+          const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+          results.push({
+            id: `bing-${img.hsh || img.startdate}`,
+            title: img.title || 'Bing Daily 4K Wallpaper',
+            author: img.copyright || 'Microsoft Bing Daily',
+            authorUrl: 'https://bing.com',
+            imageUrl: uhdUrl,
+            thumbnailUrl: `https://www.bing.com${img.url}`,
+            source: 'Bing 4K UHD Daily',
+            resolution: '3840x2160',
+            date: img.startdate
+          });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Bing daily IPC fetch error:', e);
+  }
+
+  // Provider 2: Wallhaven Top 4K Desktop Wallpaper Feed
+  try {
+    const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
+    const whRes = await fetch(whUrl, {
+      headers: { 'User-Agent': 'Mozilla/5.0 NovaBrowser/1.0', 'Accept': 'application/json' }
+    });
+    if (whRes.ok) {
+      const whData = await whRes.json();
+      if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
+        for (const item of whData.data.slice(0, 10)) {
+          results.push({
+            id: `wh-${item.id}`,
+            title: `4K Desktop Wallpaper (${item.category || 'Landscape'})`,
+            author: 'Wallhaven 4K Curated',
+            authorUrl: item.url || 'https://wallhaven.cc',
+            imageUrl: item.path,
+            thumbnailUrl: item.thumbs?.large || item.thumbs?.small || item.path,
+            source: '4K Ultra HD',
+            resolution: item.resolution || '3840x2160'
+          });
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Wallhaven toplist fetch error:', err);
+  }
+
+  return results;
+});
+
+// Legacy alias for compatibility
+ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
+  return [];
+});
+
 // Set theme source for dark mode rendering on pages
 ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;

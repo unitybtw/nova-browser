@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings, VenetianMask } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings, VenetianMask, Camera, Shuffle } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../App';
 
 interface Todo {
@@ -71,6 +72,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   // Clock & Greeting
   const [timeStr, setTimeStr] = useState('');
   const [greeting, setGreeting] = useState('');
+
+  // Resolved Daily 4K Ultra HD Wallpaper
+  const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto();
 
   useEffect(() => {
     const updateTime = () => {
@@ -290,13 +294,32 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {newTabBackground === 'unsplash' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div 
-            className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
+            key={unsplashUrl}
+            className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in duration-1000"
             style={{ 
-              backgroundImage: `url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=2560&q=85')` 
+              backgroundImage: `url('${unsplashUrl}')` 
             }}
           />
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60"></div>
+          <div className="absolute inset-0 bg-black/25"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40"></div>
+          
+          {/* Daily 4K Wallpaper Credit & Shuffle Button */}
+          {unsplashPhoto && (
+            <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2.5 text-white/90 hover:text-white text-xs bg-black/50 hover:bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-xl transition-all pointer-events-auto group">
+              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-blue-500/30 text-blue-300 rounded border border-blue-400/30">4K UHD</span>
+              <span className="font-medium max-w-[220px] truncate">{unsplashPhoto.title}</span>
+              <span className="opacity-40">•</span>
+              <span className="opacity-80 max-w-[180px] truncate">{unsplashPhoto.author}</span>
+              <button
+                type="button"
+                onClick={shuffleWallpaper}
+                className="ml-1 p-1 hover:bg-white/20 rounded-full transition-colors flex items-center gap-1 text-white/90 hover:text-white"
+                title="Shuffle / Next Daily Photo"
+              >
+                <Shuffle className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
         </div>
       )}
 

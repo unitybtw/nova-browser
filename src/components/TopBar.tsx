@@ -125,10 +125,10 @@ const MemoizedTabItem = React.memo(({
     <Reorder.Item
       key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 0.92 }}
-      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
-      transition={{ duration: 0.15 }}
+      initial={{ opacity: 0, scale: 0.8, y: 10 }}
+      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+      transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
       whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => onTabDragStart?.()}
       onDrag={(e, info) => {
@@ -296,7 +296,8 @@ const MemoizedTabItem = React.memo(({
     prevProps.tab.isMuted === nextProps.tab.isMuted &&
     prevProps.tab.isPlayingAudio === nextProps.tab.isPlayingAudio &&
     prevProps.tab.isSuspended === nextProps.tab.isSuspended &&
-    prevProps.tabsLength === nextProps.tabsLength
+    prevProps.tabsLength === nextProps.tabsLength &&
+    prevProps.tabStyle === nextProps.tabStyle
   );
 });
 
@@ -620,8 +621,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       {/* 
         ROW 1: Tabs & Window Controls spacer
       */}
+      <AnimatePresence initial={false}>
       {!useVerticalTabs && (
-        <div className="flex items-end px-2 pt-2.5 h-11 gap-1">
+        <motion.div 
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 44, opacity: 1, transitionEnd: { overflow: 'visible' } }}
+          exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
+          transition={{ duration: 0.2 }}
+          className="flex items-end px-2 pt-2.5 gap-1"
+        >
           {/* Spacer for Mac traffic lights (usually ~70px on left) */}
           <div className="w-[70px] shrink-0" />
           
@@ -774,8 +782,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         {window.navigator.userAgent.toLowerCase().includes('win') && (
           <div className="w-[140px] shrink-0" />
         )}
-      </div>
+      </motion.div>
       )}
+      </AnimatePresence>
 
       {/* 
         ROW 2: Toolbar (Nav, Omnibox, Extensions)
