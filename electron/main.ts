@@ -358,55 +358,63 @@ app.whenReady().then(async () => {
   createWindow();
 
   // --- STRICT PERMISSION SYSTEM (SECURITY) ---
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    const url = details.requestingUrl || webContents.getURL();
-    
-    // Auto-allow internal app pages
-    if (url.startsWith('nova://') || url.startsWith('http://localhost:5173') || url.startsWith('devtools://')) {
-      return callback(true);
-    }
-    
-    // Map permission names for the user dialog
-    const permissionNames: Record<string, string> = {
-      'media': 'Camera and Microphone',
-      'geolocation': 'Location (GPS)',
-      'notifications': 'Notifications',
-      'midiSysex': 'Music Devices (MIDI)',
-      'pointerLock': 'Pointer Lock',
-      'fullscreen': 'Fullscreen',
-      'openExternal': 'Open External App',
-      'clipboard-read': 'Read Clipboard'
-    };
-    
-    const permissionName = permissionNames[permission] || permission;
+  const applyStrictSecurityToSession = (targetSession: Electron.Session) => {
+    targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+      const url = details.requestingUrl || webContents.getURL() || '';
+      
+      // Auto-allow internal app pages
+      if (url.startsWith('nova://') || url.startsWith('http://localhost:5173') || url.startsWith('devtools://')) {
+        return callback(true);
+      }
+      
+      // Map permission names for the user dialog
+      const permissionNames: Record<string, string> = {
+        'media': 'Camera and Microphone',
+        'geolocation': 'Location (GPS)',
+        'notifications': 'Notifications',
+        'midiSysex': 'Music Devices (MIDI)',
+        'pointerLock': 'Pointer Lock',
+        'fullscreen': 'Fullscreen',
+        'openExternal': 'Open External App',
+        'clipboard-read': 'Read Clipboard'
+      };
+      
+      const permissionName = permissionNames[permission] || permission;
 
-    dialog.showMessageBox(mainWindow!, {
-      type: 'warning',
-      buttons: ['Allow', 'Block'],
-      defaultId: 1, // Default to Block
-      cancelId: 1,
-      title: 'Security Warning: Permission Request',
-      message: 'A site wants to access your device!',
-      detail: `Site: ${url}\n\nThis site is requesting "${permissionName}" permission.\nWhat would you like to do?`
-    }).then(({ response }) => {
-      // response === 0 means "Allow"
-      callback(response === 0);
-    }).catch(() => {
-      callback(false);
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        return callback(false);
+      }
+
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        buttons: ['Allow', 'Block'],
+        defaultId: 1, // Default to Block
+        cancelId: 1,
+        title: 'Security Warning: Permission Request',
+        message: 'A site wants to access your device!',
+        detail: `Site: ${url}\n\nThis site is requesting "${permissionName}" permission.\nWhat would you like to do?`
+      }).then(({ response }) => {
+        // response === 0 means "Allow"
+        callback(response === 0);
+      }).catch(() => {
+        callback(false);
+      });
     });
-  });
 
-  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    // If it's a silent check from the browser itself, allow it
-    if (requestingOrigin.startsWith('nova://') || requestingOrigin.startsWith('http://localhost:5173')) {
-      return true; 
-    }
-    
-    // For external websites, deny by default for silent checks.
-    // If they actually need it, they will trigger setPermissionRequestHandler via an active API call (like getUserMedia).
-    // This prevents silent fingerprinting based on permission status.
-    return false;
-  });
+    targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      // If it's a silent check from the browser itself, allow it
+      if (requestingOrigin.startsWith('nova://') || requestingOrigin.startsWith('http://localhost:5173')) {
+        return true; 
+      }
+      
+      // For external websites, deny by default for silent checks.
+      // This prevents silent fingerprinting based on permission status.
+      return false;
+    });
+  };
+
+  applyStrictSecurityToSession(session.defaultSession);
+  applyStrictSecurityToSession(session.fromPartition('incognito'));
 
   // Initialize and auto-start MCP Server
   mcpServer = new BrowserMCPServer(3020);
@@ -1533,7 +1541,7 @@ ipcMain.handle('native-tts-get-voices', async (event) => {
   if (!isTrustedSender(event)) return [];
   if (process.platform === 'darwin') {
     try {
-      const output = child_process.execSync('say -v "?"', { encoding: 'utf8' });
+      const output = child_process.execFileSync('/usr/bin/say', ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
       const lines = output.split('\n');
       const list: { name: string; lang: string; description: string }[] = [];
       for (const line of lines) {
@@ -1559,6 +1567,11 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
   if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
 
+  // Limit text length to 500,000 chars to avoid memory exhaustion
+  if (text.length > 500000) {
+    text = text.substring(0, 500000);
+  }
+
   if (activeTtsProcess) {
     try {
       activeTtsProcess.kill();
@@ -1568,18 +1581,32 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
   if (process.platform === 'darwin') {
     return new Promise((resolve) => {
-      const cleanVoice = voiceName ? voiceName.split('(')[0].trim() : 'Yelda';
+      // 🔒 Security: Sanitize voice name strictly against command flag injection
+      let cleanVoice = 'Yelda';
+      if (voiceName && typeof voiceName === 'string') {
+        const rawName = voiceName.split('(')[0].trim();
+        if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
+          cleanVoice = rawName;
+        }
+      }
+
       const args: string[] = ['-v', cleanVoice];
       
-      if (rate && typeof rate === 'number') {
-        const wpm = Math.round(175 * rate);
+      if (rate && typeof rate === 'number' && Number.isFinite(rate)) {
+        const clampedRate = Math.max(0.5, Math.min(2.5, rate));
+        const wpm = Math.round(175 * clampedRate);
         args.push('-r', String(wpm));
       }
-      args.push(text);
 
       try {
-        const proc = child_process.spawn('say', args);
+        // 🔒 Security: Pipe text via stdin instead of CLI arguments to prevent argument length limits (E2BIG)
+        const proc = child_process.spawn('/usr/bin/say', args, {
+          stdio: ['pipe', 'ignore', 'pipe']
+        });
         activeTtsProcess = proc;
+
+        proc.stdin.write(text, 'utf8');
+        proc.stdin.end();
 
         proc.on('close', (code) => {
           if (activeTtsProcess === proc) activeTtsProcess = null;
