@@ -123,12 +123,12 @@ const MemoizedTabItem = React.memo(({
 
   return (
     <Reorder.Item
-      key={tab.id}
+      key={`${tab.id}-${tabStyle}`}
       value={tab}
-      initial={false}
-      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1 }}
-      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
-      transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+      initial={{ opacity: 0, scale: 0.88, y: -4 }}
+      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.12 } }}
+      transition={{ type: 'spring', stiffness: 450, damping: 30 }}
       whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => onTabDragStart?.()}
       onDrag={(e, info) => {
@@ -703,7 +703,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px]"
           >
-            <AnimatePresence initial={false}>
+            <AnimatePresence>
             {tabs.map((tab) => {
               const isActive = tab.id === activeTabId;
               const isSplitChild = tab.id === splitTabId;
@@ -714,7 +714,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
               return (
                 <MemoizedTabItem
-                  key={tab.id}
+                  key={`${tab.id}-${tabStyle}`}
                   tab={tab}
                   isActive={isActive}
                   isSplitChild={isSplitChild}
