@@ -79,8 +79,8 @@ class AIAgent {
     }
   }
   
-  // Using ultra-optimized Llama-3.2-3B which is 4x faster and lightweight on WebGPU to prevent browser freezing
-  private modelId = "Llama-3.2-3B-Instruct-q4f16_1-MLC"; 
+  // Function calling in WebLLM requires Hermes-family models
+  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -1054,6 +1054,8 @@ MEMORY SYSTEM (CRITICAL): If the user gives you persistent info or a preference 
         messages: optimizedMessages,
         tools: this.tools,
         tool_choice: "auto",
+        max_tokens: 512,
+        temperature: 0.2,
         stream: false
       });
 
