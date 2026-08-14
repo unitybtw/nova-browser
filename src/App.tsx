@@ -282,14 +282,10 @@ function App() {
   }, [closeAllModals]);
 
   // Onboarding state
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true') {
-      return false;
-    }
-    return true;
-  });
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(true);
 
   useEffect(() => {
+    setShowOnboarding(true);
     (window as any).openOnboarding = () => setShowOnboarding(true);
   }, []);
 
