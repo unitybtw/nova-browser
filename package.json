@@ -38,19 +38,21 @@
       "icon": "build/icon.ico"
     },
     "dmg": {
+      "title": "Nova Browser Installer",
       "background": "build/dmg-background.png",
       "iconSize": 128,
       "window": {
-        "width": 540,
-        "height": 380
+        "width": 660,
+        "height": 440
       },
       "contents": [
         {
-          "x": 130,
-          "y": 220
+          "x": 180,
+          "y": 220,
+          "type": "file"
         },
         {
-          "x": 410,
+          "x": 480,
           "y": 220,
           "type": "link",
           "path": "/Applications"
@@ -69,7 +71,11 @@
       ],
       "category": "public.app-category.productivity",
       "artifactName": "Nova-Browser-${arch}.dmg",
-      "icon": "build/icon.icns"
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist"
     },
     "nsis": {
       "oneClick": false,
