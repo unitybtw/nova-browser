@@ -913,6 +913,18 @@ function App() {
     }
   }, [activeTabId]);
 
+  const handleResetZoom = useCallback(() => {
+    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+    if (webview && webview.setZoomFactor) {
+      try {
+        webview.setZoomFactor(1.0);
+        setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, zoomFactor: 1.0 } : t));
+      } catch (e) {
+        console.error("Zoom reset error:", e);
+      }
+    }
+  }, [activeTabId]);
+
 
   const handleNavigate = useCallback((url: string) => {
     if (!url || typeof url !== 'string') return;
@@ -1398,6 +1410,7 @@ function App() {
   }, []);
 
   const handleToggleBookmark = useCallback((tab: Tab) => {
+    if (!tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank') return;
     setBookmarks(prev => {
       const isBookmarked = prev.some(b => b.url === tab.url);
       if (isBookmarked) {
@@ -1765,33 +1778,41 @@ function App() {
         return;
       }
 
-      // Hardcoded Zoom (Cmd + +, Cmd + -)
-      if (meta && (key === '+' || key === '=')) {
+      // Reset Zoom (Cmd + 0)
+      if (meta && key === '0') {
         e.preventDefault();
-        handleZoomIn();
+        handleResetZoom();
         return;
       }
-      if (meta && key === '-') {
+
+      // History navigation (Cmd + [ / Cmd + ], Alt + Left / Alt + Right)
+      if ((meta && key === '[') || (e.altKey && key === 'ArrowLeft')) {
         e.preventDefault();
-        handleZoomOut();
+        handleGoBack();
+        return;
+      }
+      if ((meta && key === ']') || (e.altKey && key === 'ArrowRight')) {
+        e.preventDefault();
+        handleGoForward();
         return;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleCloseTab, settings.shortcuts]);
-
-
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
 
+  // If active tab is the same as split tab, reset split view cleanly in effect
+  useEffect(() => {
+    if (splitTabId && activeTabId === splitTabId) {
+      setSplitTabId(null);
+    }
+  }, [splitTabId, activeTabId]);
+
   // Compute second tab for split view (if available)
   const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
-  // If active tab is the same as split tab, reset split view or switch split tab
-  if (secondaryTab && activeTabId === secondaryTab.id) {
-    setSplitTabId(null);
-  }
 
   const workspaceTabs = useMemo(() => tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default')), [tabs, activeWorkspaceId]);
 
