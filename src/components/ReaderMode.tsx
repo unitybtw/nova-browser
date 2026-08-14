@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Clock, BookOpen, Volume2, Globe } from 'lucide-react';
+import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Clock, BookOpen, Volume2, Globe, Sparkles } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
-import { detectLanguage, getBestVoice } from '../services/tts';
+import { detectLanguage, getBestVoice, getMacDefaultVoice, NativeVoiceInfo } from '../services/tts';
 
 interface HighlightData {
   id: string;
@@ -54,7 +54,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [columnWidth, setColumnWidth] = useState<'narrow' | 'normal' | 'wide'>('normal');
   const [showControls, setShowControls] = useState(false);
 
-  // Natural TTS & Language State
+  // Native macOS & TTS State
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
@@ -62,8 +62,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [sentences, setSentences] = useState<string[]>([]);
   const [detectedLang, setDetectedLang] = useState('tr-TR');
   const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
-  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
+  
+  // Voices (Native OS + Web Speech)
+  const [nativeVoices, setNativeVoices] = useState<NativeVoiceInfo[]>([]);
+  const [webVoices, setWebVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string>('');
   
   const contentRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -93,17 +96,24 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
 
-  // Load available system voices
+  // Fetch Native macOS voices & Web Speech voices
   useEffect(() => {
-    const updateVoices = () => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsGetVoices) {
+      (window as any).electronAPI.nativeTtsGetVoices().then((voices: NativeVoiceInfo[]) => {
+        if (Array.isArray(voices) && voices.length > 0) {
+          setNativeVoices(voices);
+        }
+      });
+    }
+
+    const updateWebVoices = () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        const voices = window.speechSynthesis.getVoices();
-        setAvailableVoices(voices);
+        setWebVoices(window.speechSynthesis.getVoices());
       }
     };
-    updateVoices();
+    updateWebVoices();
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = updateVoices;
+      window.speechSynthesis.onvoiceschanged = updateWebVoices;
     }
   }, []);
 
@@ -150,7 +160,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             const parsed = JSON.parse(saved);
             setHighlights(parsed);
             
-            // Re-apply to DOM
             setTimeout(() => {
               if (!contentRef.current) return;
               const walkDOM = (node: Node, textToFind: string): Range | null => {
@@ -326,20 +335,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
   useEffect(() => {
     if (!isActive) {
-      isPlayingRef.current = false;
-      window.speechSynthesis.cancel();
-      setIsPlaying(false);
-      setIsPaused(false);
+      stopSpeech();
     }
     return () => {
-      isPlayingRef.current = false;
-      window.speechSynthesis.cancel();
+      stopSpeech();
     };
   }, [isActive]);
 
   const effectiveLanguage = selectedLanguage === 'auto' ? detectedLang : selectedLanguage;
 
-  const speakSentence = (index: number, rate: number = speechRate, targetSentences: string[] = sentences) => {
+  const speakSentence = async (index: number, rate: number = speechRate, targetSentences: string[] = sentences) => {
     if (!isPlayingRef.current || index >= targetSentences.length) {
       isPlayingRef.current = false;
       setIsPlaying(false);
@@ -347,61 +352,82 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       setCurrentSentenceIndex(0);
       return;
     }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
-    utterance.lang = effectiveLanguage;
-    utterance.rate = rate;
-    utterance.pitch = 1.0; // Natural human pitch
-    
-    const voices = window.speechSynthesis.getVoices();
-    let chosenVoice: SpeechSynthesisVoice | null = null;
 
-    if (selectedVoiceURI) {
-      chosenVoice = voices.find(v => v.voiceURI === selectedVoiceURI) || null;
+    const currentSentence = targetSentences[index];
+
+    // Check if macOS native TTS is available
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsSpeak) {
+      const voice = selectedVoiceName || getMacDefaultVoice(effectiveLanguage);
+      try {
+        const res = await (window as any).electronAPI.nativeTtsSpeak(currentSentence, voice, rate);
+        if (!isPlayingRef.current) return;
+        if (res && res.success) {
+          const next = index + 1;
+          if (next < targetSentences.length) {
+            setCurrentSentenceIndex(next);
+            setTimeout(() => speakSentence(next, rate, targetSentences), 40);
+          } else {
+            isPlayingRef.current = false;
+            setIsPlaying(false);
+            setIsPaused(false);
+            setCurrentSentenceIndex(0);
+          }
+          return;
+        }
+      } catch (e) {
+        console.warn('Native TTS error, falling back to Web Speech:', e);
+      }
     }
 
-    if (!chosenVoice) {
-      chosenVoice = getBestVoice(voices, effectiveLanguage);
-    }
-    
-    if (chosenVoice) {
-      utterance.voice = chosenVoice;
-    }
-    
-    utterance.onend = () => {
-      if (!isPlayingRef.current) return;
-      const next = index + 1;
-      if (next < targetSentences.length) {
-        setCurrentSentenceIndex(next);
-        setTimeout(() => speakSentence(next, rate, targetSentences), 30);
-      } else {
+    // Web Speech Fallback
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(currentSentence);
+      utterance.lang = effectiveLanguage;
+      utterance.rate = rate;
+      utterance.pitch = 1.0;
+      
+      const voices = window.speechSynthesis.getVoices();
+      let chosenVoice: SpeechSynthesisVoice | null = null;
+      if (selectedVoiceName) {
+        chosenVoice = voices.find(v => v.name.includes(selectedVoiceName) || v.voiceURI === selectedVoiceName) || null;
+      }
+      if (!chosenVoice) {
+        chosenVoice = getBestVoice(voices, effectiveLanguage);
+      }
+      if (chosenVoice) utterance.voice = chosenVoice;
+
+      utterance.onend = () => {
+        if (!isPlayingRef.current) return;
+        const next = index + 1;
+        if (next < targetSentences.length) {
+          setCurrentSentenceIndex(next);
+          setTimeout(() => speakSentence(next, rate, targetSentences), 30);
+        } else {
+          isPlayingRef.current = false;
+          setIsPlaying(false);
+          setIsPaused(false);
+          setCurrentSentenceIndex(0);
+        }
+      };
+
+      utterance.onerror = () => {
         isPlayingRef.current = false;
         setIsPlaying(false);
         setIsPaused(false);
-        setCurrentSentenceIndex(0);
-      }
-    };
+      };
 
-    utterance.onerror = () => {
-      isPlayingRef.current = false;
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    window.speechSynthesis.speak(utterance);
+      window.speechSynthesis.speak(utterance);
+    }
   };
 
   const toggleSpeech = () => {
     if (isPlaying) {
       isPlayingRef.current = false;
-      window.speechSynthesis.pause();
+      if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
       setIsPlaying(false);
       setIsPaused(true);
-    } else if (isPaused) {
-      isPlayingRef.current = true;
-      window.speechSynthesis.resume();
-      setIsPlaying(true);
-      setIsPaused(false);
     } else {
       let currentSentences = sentences;
       if (currentSentences.length === 0 && contentRef.current) {
@@ -423,7 +449,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
   const stopSpeech = () => {
     isPlayingRef.current = false;
-    window.speechSynthesis.cancel();
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsStop) {
+      (window as any).electronAPI.nativeTtsStop();
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     setIsPlaying(false);
     setIsPaused(false);
     setCurrentSentenceIndex(0);
@@ -434,7 +465,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     setSpeechRate(nextRate);
     if (isPlaying) {
       isPlayingRef.current = true;
-      window.speechSynthesis.cancel();
+      if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
+      if (window.speechSynthesis) window.speechSynthesis.cancel();
       speakSentence(currentSentenceIndex, nextRate);
     }
   };
@@ -469,7 +501,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           clonedDoc.head.appendChild(base);
         } catch (e) {}
 
-        // Fix lazy-loaded images where source is in data-src, data-original, etc.
         const images = clonedDoc.querySelectorAll('img');
         images.forEach((img) => {
           const lazySrc = img.getAttribute('data-src') || img.getAttribute('data-original') || img.getAttribute('data-lazy-src') || img.getAttribute('srcset')?.split(' ')[0];
@@ -487,7 +518,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           setTitle(article.title || '');
           setAuthor(article.byline || '');
           
-          // Calculate reading stats
           const textContent = article.textContent || '';
           const words = textContent.trim().split(/\s+/).filter(Boolean).length;
           setWordCount(words);
@@ -542,9 +572,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   ];
 
   // Voices matching the effective language
-  const languageFilteredVoices = availableVoices.filter(v => 
-    v.lang.toLowerCase().startsWith(effectiveLanguage.toLowerCase().split('-')[0])
-  );
+  const targetPrefix = effectiveLanguage.toLowerCase().split('-')[0];
+  const activeNativeVoices = nativeVoices.filter(v => v.lang.toLowerCase().startsWith(targetPrefix));
+  const activeWebVoices = webVoices.filter(v => v.lang.toLowerCase().startsWith(targetPrefix));
 
   return (
     <AnimatePresence>
@@ -559,7 +589,6 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           {/* Header Bar */}
           <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-900/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f4ecd8]/90' : 'border-black/5 bg-white/90'}`}>
             <div className="flex items-center gap-2 no-drag">
-              {/* Mac Traffic Lights Spacer */}
               {isMac && <div className="w-[68px] shrink-0" />}
               <button 
                 onClick={onClose}
@@ -575,7 +604,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <button 
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
-                  title={isPlaying ? "Pause" : "Read Aloud"}
+                  title={isPlaying ? "Pause" : "Read Aloud with Natural Voice"}
                 >
                   {isPlaying ? <Pause className="w-4 h-4 text-blue-500" /> : <Play className="w-4 h-4 ml-0.5 text-blue-500" />}
                 </button>
@@ -601,13 +630,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               <button 
                 onClick={() => setShowControls(!showControls)}
                 className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
-                title="Appearance & Voice Settings"
+                title="Appearance & macOS Natural Voice Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
               
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[300px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
@@ -648,57 +677,74 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                     </div>
                   </div>
 
-                  {/* Voice / Language Options */}
+                  {/* Apple / macOS High Quality Voice Options */}
                   <div className="border-t pt-4 border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
-                      <Volume2 className="w-3.5 h-3.5" /> Reading Voice & Language
+                      <Volume2 className="w-3.5 h-3.5" /> macOS Doğal Ses & Dil
                     </div>
                     
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {/* Language Selection */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Globe className="w-3 h-3" /> Language
+                          <Globe className="w-3 h-3" /> Dil
                         </span>
                         <select
                           value={selectedLanguage}
                           onChange={(e) => {
                             setSelectedLanguage(e.target.value as any);
-                            setSelectedVoiceURI('');
+                            setSelectedVoiceName('');
                           }}
-                          className={`text-xs px-2 py-1 rounded-lg border outline-none cursor-pointer ${
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
                             theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                           }`}
                         >
-                          <option value="auto">Auto ({detectedLang.startsWith('tr') ? 'Türkçe' : detectedLang.startsWith('de') ? 'Deutsch' : detectedLang.startsWith('fr') ? 'Français' : detectedLang.startsWith('es') ? 'Español' : 'English'})</option>
-                          <option value="tr-TR">Türkçe (TR)</option>
-                          <option value="en-US">English (US/UK)</option>
-                          <option value="de-DE">Deutsch (DE)</option>
-                          <option value="fr-FR">Français (FR)</option>
-                          <option value="es-ES">Español (ES)</option>
+                          <option value="auto">Otomatik ({detectedLang.startsWith('tr') ? 'Türkçe' : detectedLang.startsWith('de') ? 'Almanca' : detectedLang.startsWith('fr') ? 'Fransızca' : detectedLang.startsWith('es') ? 'İspanyolca' : 'İngilizce'})</option>
+                          <option value="tr-TR">Türkçe (Yelda)</option>
+                          <option value="en-US">İngilizce (Samantha)</option>
+                          <option value="de-DE">Almanca (Anna)</option>
+                          <option value="fr-FR">Fransızca (Thomas)</option>
+                          <option value="es-ES">İspanyolca (Mónica)</option>
                         </select>
                       </div>
 
-                      {/* Specific Voice Picker */}
-                      {languageFilteredVoices.length > 0 && (
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Voice</span>
-                          <select
-                            value={selectedVoiceURI}
-                            onChange={(e) => setSelectedVoiceURI(e.target.value)}
-                            className={`text-xs px-2 py-1 rounded-lg border outline-none cursor-pointer max-w-[170px] truncate ${
-                              theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
-                            }`}
-                          >
-                            <option value="">✨ Best Natural Voice</option>
-                            {languageFilteredVoices.map((v) => (
-                              <option key={v.voiceURI} value={v.voiceURI}>
-                                {v.name.replace(/Google|Microsoft|Apple|Online \(Natural\)/gi, '').trim() || v.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
+                      {/* macOS Native Voice Picker */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-500" /> Ses
+                        </span>
+                        <select
+                          value={selectedVoiceName}
+                          onChange={(e) => setSelectedVoiceName(e.target.value)}
+                          className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer max-w-[190px] truncate ${
+                            theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        >
+                          <option value="">
+                            ✨ {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Doğal)' : 'Samantha (Apple Natural)') : 'En İyi Doğal Ses'}
+                          </option>
+                          
+                          {activeNativeVoices.length > 0 && (
+                            <optgroup label="macOS Sistem Sesleri">
+                              {activeNativeVoices.map((v) => (
+                                <option key={v.name} value={v.name}>
+                                  🍎 {v.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+
+                          {activeWebVoices.length > 0 && activeNativeVoices.length === 0 && (
+                            <optgroup label="Yüklü Sesler">
+                              {activeWebVoices.map((v) => (
+                                <option key={v.name} value={v.name}>
+                                  {v.name.replace(/Google|Microsoft|Apple|Online \(Natural\)/gi, '').trim() || v.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          )}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -730,15 +776,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {readingTime} min read
+                    {readingTime} dk okuma
                   </span>
                   <span className="flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5" />
-                    {wordCount.toLocaleString()} words
+                    {wordCount.toLocaleString()} kelime
                   </span>
                   <span className="flex items-center gap-1 text-blue-500 font-medium">
-                    <Volume2 className="w-3.5 h-3.5" />
-                    {effectiveLanguage.startsWith('tr') ? 'Türkçe Ses' : 'English / Natural Voice'}
+                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                    {isMac ? (effectiveLanguage.startsWith('tr') ? '🍎 macOS Yelda Sesi' : '🍎 macOS Samantha Sesi') : 'Doğal İnsan Sesi'}
                   </span>
                 </div>
 

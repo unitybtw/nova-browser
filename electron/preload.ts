@@ -103,4 +103,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ad-blocked-batch', callback);
     return () => ipcRenderer.removeListener('ad-blocked-batch', callback);
   },
+  // Native OS TTS (macOS high quality voices)
+  nativeTtsGetVoices: () => ipcRenderer.invoke('native-tts-get-voices'),
+  nativeTtsSpeak: (text: string, voiceName?: string, rate?: number) => ipcRenderer.invoke('native-tts-speak', text, voiceName, rate),
+  nativeTtsStop: () => ipcRenderer.invoke('native-tts-stop'),
 });

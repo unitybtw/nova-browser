@@ -5,6 +5,7 @@ import fetch from 'cross-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
 import fs from 'fs';
+import child_process from 'child_process';
 // @ts-ignore
 import unzip from 'unzip-crx-3';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
@@ -1521,3 +1522,91 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     return { error: err.message || 'Bilinmeyen bir hata oluştu.' };
   }
 });
+
+// --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
+let activeTtsProcess: child_process.ChildProcess | null = null;
+
+ipcMain.handle('native-tts-get-voices', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  if (process.platform === 'darwin') {
+    try {
+      const output = child_process.execSync('say -v "?"', { encoding: 'utf8' });
+      const lines = output.split('\n');
+      const list: { name: string; lang: string; description: string }[] = [];
+      for (const line of lines) {
+        const match = line.match(/^([^\t#]+?)\s+([a-zA-Z]{2}_[a-zA-Z0-9]+)\s+#\s*(.*)$/);
+        if (match) {
+          list.push({
+            name: match[1].trim(),
+            lang: match[2].replace('_', '-'),
+            description: match[3].trim()
+          });
+        }
+      }
+      return list;
+    } catch (e) {
+      console.error('Failed to get macOS native voices:', e);
+      return [];
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: string, rate?: number) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
+
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill();
+    } catch (_) {}
+    activeTtsProcess = null;
+  }
+
+  if (process.platform === 'darwin') {
+    return new Promise((resolve) => {
+      const args: string[] = [];
+      if (voiceName) {
+        args.push('-v', voiceName);
+      }
+      if (rate && typeof rate === 'number') {
+        const wpm = Math.round(175 * rate);
+        args.push('-r', String(wpm));
+      }
+      args.push(text);
+
+      try {
+        const proc = child_process.spawn('say', args);
+        activeTtsProcess = proc;
+
+        proc.on('close', (code) => {
+          if (activeTtsProcess === proc) activeTtsProcess = null;
+          resolve({ success: code === 0 });
+        });
+
+        proc.on('error', (err) => {
+          if (activeTtsProcess === proc) activeTtsProcess = null;
+          resolve({ success: false, error: err.message });
+        });
+      } catch (err: any) {
+        activeTtsProcess = null;
+        resolve({ success: false, error: err.message });
+      }
+    });
+  }
+
+  return { success: false, error: 'Native TTS is only available on macOS' };
+});
+
+ipcMain.handle('native-tts-stop', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill();
+    } catch (_) {}
+    activeTtsProcess = null;
+    return true;
+  }
+  return false;
+});
+
