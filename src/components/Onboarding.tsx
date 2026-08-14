@@ -1,6 +1,10 @@
-import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sun, Moon, Monitor, Search, Shield, Ban, EyeOff, Bug, ArrowRight } from 'lucide-react';
+import React, { useState } from 'react';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { 
+  Sun, Moon, Monitor, Search, Shield, ShieldCheck, Check, 
+  ArrowRight, ArrowLeft, Download, Sparkles, Zap, Lock, 
+  Sliders, CheckCircle2, AlertCircle, RefreshCw, Layers
+} from 'lucide-react';
 
 interface OnboardingProps {
   onComplete: (prefs: {
@@ -15,9 +19,10 @@ const SEARCH_ENGINES = [
   {
     id: 'google' as const,
     name: 'Google',
-    desc: 'Most popular, comprehensive results',
+    desc: 'Most comprehensive search engine with global indexing',
+    badge: 'Popular',
     icon: (
-      <svg viewBox="0 0 48 48" className="w-8 h-8">
+      <svg viewBox="0 0 48 48" className="w-6 h-6">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
         <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
         <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -28,29 +33,32 @@ const SEARCH_ENGINES = [
   {
     id: 'duckduckgo' as const,
     name: 'DuckDuckGo',
-    desc: 'Does not track you, protects your privacy',
+    desc: 'Privacy-focused search without search history tracking',
+    badge: 'Private',
     icon: (
-      <div className="w-8 h-8 rounded-full bg-[#DE5833] flex items-center justify-center">
-        <Shield className="w-5 h-5 text-white" />
+      <div className="w-6 h-6 rounded-full bg-[#DE5833] flex items-center justify-center">
+        <Shield className="w-3.5 h-3.5 text-white" />
       </div>
     ),
   },
   {
     id: 'brave' as const,
     name: 'Brave Search',
-    desc: 'Independent, ad-free, fast',
+    desc: 'Independent web index with zero tracking and ad-free results',
+    badge: 'Independent',
     icon: (
-      <div className="w-8 h-8 rounded-full bg-[#FB542B] flex items-center justify-center">
-        <Search className="w-5 h-5 text-white" />
+      <div className="w-6 h-6 rounded-full bg-[#FB542B] flex items-center justify-center">
+        <Search className="w-3.5 h-3.5 text-white" />
       </div>
     ),
   },
   {
     id: 'bing' as const,
-    name: 'Bing',
-    desc: 'Powered by Microsoft AI',
+    name: 'Microsoft Bing',
+    desc: 'Intelligent search augmented with deep generative answers',
+    badge: 'Copilot',
     icon: (
-      <svg viewBox="0 0 48 48" className="w-8 h-8">
+      <svg viewBox="0 0 48 48" className="w-6 h-6">
         <path fill="#0078D4" d="M10 5l8 3v26l-8-5z"/>
         <path fill="#00B4F0" d="M18 8l14 8-14 9z"/>
         <path fill="#FFB900" d="M18 25l14-9 6 18z"/>
@@ -61,10 +69,11 @@ const SEARCH_ENGINES = [
   {
     id: 'ecosia' as const,
     name: 'Ecosia',
-    desc: 'Plants trees with every search',
+    desc: 'Eco-conscious search engine funding tree planting initiatives',
+    badge: 'Eco',
     icon: (
-      <div className="w-8 h-8 rounded-full bg-[#00894A] flex items-center justify-center">
-        <Search className="w-5 h-5 text-white" />
+      <div className="w-6 h-6 rounded-full bg-[#00894A] flex items-center justify-center">
+        <Search className="w-3.5 h-3.5 text-white" />
       </div>
     ),
   },
@@ -72,48 +81,85 @@ const SEARCH_ENGINES = [
 
 const THEMES = [
   {
-    id: 'light' as const,
-    name: 'Light',
-    icon: <Sun className="w-4 h-4 inline-block -mt-0.5" />,
-    preview: 'bg-white border-2 border-slate-200',
-    dot: 'bg-slate-800',
-    bar: 'bg-slate-100 border-b border-slate-200',
+    id: 'dark' as const,
+    name: 'Dark OLED',
+    desc: 'Deep blacks, vibrant contrast, easy on the eyes',
+    icon: Moon,
+    previewBg: 'bg-[#0a0d14]',
+    barBg: 'bg-[#121824] border-b border-white/10',
+    contentBg: 'bg-[#0f1420]',
+    dotBg: 'bg-blue-400',
   },
   {
-    id: 'dark' as const,
-    name: 'Dark',
-    icon: <Moon className="w-4 h-4 inline-block -mt-0.5" />,
-    preview: 'bg-slate-900 border-2 border-slate-700',
-    dot: 'bg-white',
-    bar: 'bg-slate-800 border-b border-slate-700',
+    id: 'light' as const,
+    name: 'Clean Light',
+    desc: 'Crisp, high clarity for bright environments',
+    icon: Sun,
+    previewBg: 'bg-white',
+    barBg: 'bg-slate-100 border-b border-slate-200',
+    contentBg: 'bg-slate-50',
+    dotBg: 'bg-blue-600',
   },
   {
     id: 'system' as const,
-    name: 'System',
-    icon: <Monitor className="w-4 h-4 inline-block -mt-0.5" />,
-    preview: 'bg-gradient-to-br from-white to-slate-900 border-2 border-slate-400',
-    dot: 'bg-slate-500',
-    bar: 'bg-gradient-to-r from-slate-100 to-slate-800',
+    name: 'System Dynamic',
+    desc: 'Automatically synchronizes with your OS appearance',
+    icon: Monitor,
+    previewBg: 'bg-gradient-to-r from-white to-[#0a0d14]',
+    barBg: 'bg-gradient-to-r from-slate-100 to-[#121824] border-b border-white/10',
+    contentBg: 'bg-gradient-to-r from-slate-50 to-[#0f1420]',
+    dotBg: 'bg-indigo-400',
   },
 ];
 
 const TOTAL_STEPS = 6;
 
-const slideVariants = {
-  enter: (dir: number) => ({ x: dir > 0 ? 100 : -100, opacity: 0, scale: 0.95 }),
-  center: { x: 0, opacity: 1, scale: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -100 : 100, opacity: 0, scale: 1.05 }),
+const contentVariants: Variants = {
+  enter: (dir: number) => ({
+    x: dir > 0 ? 30 : -30,
+    opacity: 0,
+    scale: 0.98,
+  }),
+  center: {
+    x: 0,
+    opacity: 1,
+    scale: 1,
+    transition: {
+      duration: 0.35,
+    },
+  },
+  exit: (dir: number) => ({
+    x: dir > 0 ? -30 : 30,
+    opacity: 0,
+    scale: 0.98,
+    transition: {
+      duration: 0.25,
+    },
+  }),
+};
+
+const itemVariants: Variants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: (i: number = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      delay: (typeof i === 'number' ? i : 0) * 0.07 + 0.1,
+      duration: 0.4,
+    },
+  }),
 };
 
 export function Onboarding({ onComplete }: OnboardingProps) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('system');
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('dark');
   const [searchEngine, setSearchEngine] = useState<'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia'>('google');
   const [privacyShield, setPrivacyShield] = useState(true);
   
   const [isImporting, setIsImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [importedCount, setImportedCount] = useState(0);
   const [importedData, setImportedData] = useState<any[]>([]);
 
   const goNext = () => {
@@ -137,8 +183,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setIsImporting(true);
     try {
       const res = await (window as any).electronAPI.importChromeBookmarks();
-      if (res.success && res.bookmarks) {
+      if (res && res.success && Array.isArray(res.bookmarks)) {
         setImportedData(res.bookmarks);
+        setImportedCount(res.bookmarks.length);
         setImportStatus('success');
       } else {
         setImportStatus('error');
@@ -149,346 +196,480 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     setIsImporting(false);
   };
 
-  const steps = [
-    // Step 0 — Welcome
-    <motion.div key="welcome" className="flex flex-col items-center justify-center h-full text-center px-8">
-      {/* Draggable Top Area */}
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-        className="mb-8 mt-10"
-      >
-        <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-6 mx-auto">
-          <img src="/nova-icon-pure.png" alt="Nova" className="w-20 h-20 object-contain scale-110" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-        </div>
-      </motion.div>
-      <motion.h1
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-5xl font-bold text-white mb-4 tracking-tight"
-      >
-        Welcome to<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Nova Browser</span>
-      </motion.h1>
-      <motion.p
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.45 }}
-        className="text-slate-200 text-xl max-w-md leading-relaxed mb-12"
-      >
-        A faster, more private, and smarter web experience awaits you. Let's set it up together.
-      </motion.p>
-      <motion.button
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.6 }}
-        onClick={goNext}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
-        whileTap={{ scale: 0.95 }}
-        className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all"
-      >
-        Let's Get Started →
-      </motion.button>
-    </motion.div>,
-
-    // Step 1 — Import Data
-    <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-2xl mt-10">
-        <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-        </svg>
-      </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Import from Your Old Browser</h2>
-      <p className="text-slate-200 text-lg max-w-md mb-8">
-        You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to Nova with a single click.
-      </p>
-      
-      {importStatus === 'idle' && (
-        <button
-          onClick={handleImport}
-          disabled={isImporting}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-xl font-medium transition-colors mb-4 flex items-center gap-2"
-        >
-          {isImporting ? (
-            <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
-          ) : (
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-          )}
-          {isImporting ? 'Importing...' : 'Import Chrome Bookmarks'}
-        </button>
-      )}
-
-      {importStatus === 'success' && (
-        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          Bookmarks imported successfully!
-        </div>
-      )}
-
-      {importStatus === 'error' && (
-        <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          Chrome data could not be found or read.
-        </div>
-      )}
-
-      <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4">
-        {importStatus === 'success' ? 'Continue' : 'Skip for now'}
-      </button>
-    </motion.div>,
-
-    // Step 2 — Theme
-    <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Choose a Theme</h2>
-      <p className="text-slate-200 text-lg mb-10">Personalize the look of Nova Browser.</p>
-      <div className="flex gap-5 mb-12 flex-wrap justify-center">
-        {THEMES.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTheme(t.id)}
-            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all w-40 backdrop-blur-xl ${
-              theme === t.id
-                ? 'border-blue-400 bg-blue-500/20 scale-105 shadow-xl shadow-blue-500/20'
-                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
-            }`}
-          >
-            {/* Mini browser preview */}
-            <div className={`w-28 h-20 rounded-xl overflow-hidden ${t.preview} shadow-lg`}>
-              <div className={`h-5 ${t.bar} flex items-center gap-1 px-2`}>
-                <div className={`w-2 h-2 rounded-full ${t.dot} opacity-60`}></div>
-                <div className={`w-2 h-2 rounded-full ${t.dot} opacity-40`}></div>
-                <div className={`w-2 h-2 rounded-full ${t.dot} opacity-20`}></div>
-              </div>
-            </div>
-            <span className="text-white font-semibold text-sm">{t.icon} {t.name}</span>
-            {theme === t.id && (
-              <span className="text-blue-400 text-xs font-medium">✓ Selected</span>
-            )}
-          </button>
-        ))}
-      </div>
-    </motion.div>,
-
-    // Step 3 — Search Engine
-    <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Your Search Engine</h2>
-      <p className="text-slate-200 text-lg mb-8">Select your default search engine. You can change this later in settings.</p>
-      <div className="flex flex-col gap-3 w-full mb-8">
-        {SEARCH_ENGINES.map(engine => (
-          <button
-            key={engine.id}
-            onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all backdrop-blur-xl ${
-              searchEngine === engine.id
-                ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/20 scale-105'
-                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-lg'
-            }`}
-          >
-            <div className="w-10 h-10 flex items-center justify-center shrink-0">
-              {engine.icon}
-            </div>
-            <div className="flex-1 text-left">
-              <div className="text-white font-semibold">{engine.name}</div>
-              <div className="text-slate-400 text-sm">{engine.desc}</div>
-            </div>
-            {searchEngine === engine.id && (
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-    </motion.div>,
-
-    // Step 4 — Privacy Shield
-    <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30 mt-10">
-        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-        </svg>
-      </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Privacy Shield</h2>
-      <p className="text-slate-200 text-lg max-w-md mb-10 leading-relaxed">
-        Nova Browser's built-in privacy shield automatically blocks ads, trackers, and malicious content.
-      </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-lg w-full">
-        {[
-          { icon: <Ban className="w-8 h-8 text-slate-400" />, label: 'Ads' },
-          { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'Trackers' },
-          { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Malware' },
-        ].map(item => (
-          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
-            {item.icon}
-            <span className="text-slate-300 text-sm font-medium">{item.label}</span>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
-              {privacyShield ? 'Blocked' : 'Allowed'}
-            </span>
-          </div>
-        ))}
-      </div>
-      <div className="flex items-center gap-4">
-        <button
-          onClick={() => setPrivacyShield(!privacyShield)}
-          className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-600'}`}
-        >
-          <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-9' : 'translate-x-1'}`} />
-        </button>
-        <span className="text-white font-medium text-lg">
-          {privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Off'}
-        </span>
-      </div>
-    </motion.div>,
-
-    // Step 5 — Done
-    <motion.div key="done" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <motion.div
-        initial={{ scale: 0, rotate: -180 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center mb-8 shadow-2xl shadow-blue-500/40"
-      >
-        <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-        </svg>
-      </motion.div>
-      <motion.h2
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="text-5xl font-bold text-white mb-4"
-      >
-        You're all set!
-      </motion.h2>
-      <motion.p
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.45 }}
-        className="text-slate-200 text-xl max-w-md leading-relaxed mb-4"
-      >
-        Nova Browser is ready. All your settings are saved and can be changed anytime.
-      </motion.p>
-      <motion.div
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.55 }}
-        className="flex gap-6 mb-12 text-sm text-slate-400"
-      >
-        <span>Theme: <strong className="text-white capitalize">{theme}</strong></span>
-        <span>·</span>
-        <span>Search: <strong className="text-white capitalize">{searchEngine}</strong></span>
-        <span>·</span>
-        <span>Shield: <strong className={privacyShield ? 'text-emerald-400' : 'text-red-400'}>{privacyShield ? 'On' : 'Off'}</strong></span>
-      </motion.div>
-      <motion.button
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.7 }}
-        onClick={handleFinish}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
-        whileTap={{ scale: 0.95 }}
-        className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
-      >
-        <span>Start Browsing</span>
-        <ArrowRight className="w-5 h-5" />
-      </motion.button>
-    </motion.div>,
-  ];
-
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col overflow-hidden">
-      {/* Dynamic blob background */}
-      <motion.div 
-        animate={{ 
-          x: [0, 50, -50, 0], 
-          y: [0, -50, 50, 0],
-          scale: [1, 1.1, 0.9, 1]
-        }}
-        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className="absolute -top-20 -left-20 w-[30rem] h-[30rem] bg-blue-600/30 rounded-full blur-[100px] pointer-events-none" 
-      />
-      <motion.div 
-        animate={{ 
-          x: [0, -60, 40, 0], 
-          y: [0, 60, -40, 0],
-          scale: [1, 1.2, 0.8, 1]
-        }}
-        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        className="absolute top-1/2 right-0 w-[25rem] h-[25rem] bg-violet-600/30 rounded-full blur-[100px] pointer-events-none" 
-      />
-
-      {/* Progress Bar */}
-      {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="w-full h-1 bg-white/10">
-          <motion.div
-            className="h-full bg-gradient-to-r from-blue-500 to-violet-500"
-            initial={{ width: 0 }}
-            animate={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }}
-            transition={{ duration: 0.4, ease: 'easeInOut' }}
-          />
-        </div>
-      )}
-
-      {/* Step dots */}
-      {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="flex justify-center gap-2 pt-6">
-          {Array.from({ length: TOTAL_STEPS - 2 }).map((_, i) => (
-            <div
-              key={i}
-              className={`rounded-full transition-all duration-300 ${
-                i + 1 === step ? 'w-6 h-2 bg-blue-500' : i + 1 < step ? 'w-2 h-2 bg-blue-500/60' : 'w-2 h-2 bg-white/20'
-              }`}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Step Content */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
-        <AnimatePresence custom={dir} mode="wait">
-          <motion.div
-            key={step}
-            custom={dir}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="absolute inset-0 flex items-center justify-center"
-          >
-            {steps[step]}
-          </motion.div>
-        </AnimatePresence>
+    <div className="fixed inset-0 z-[9999] bg-[#06080e] text-slate-100 flex flex-col items-center justify-center select-none overflow-hidden font-sans">
+      {/* Ambient Aurora Glow Background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <motion.div 
+          animate={{
+            scale: [1, 1.15, 1],
+            opacity: [0.25, 0.4, 0.25],
+            x: [0, 30, 0],
+            y: [0, -30, 0]
+          }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-[20%] -left-[10%] w-[55vw] h-[55vw] rounded-full bg-blue-600/30 blur-[130px]"
+        />
+        <motion.div 
+          animate={{
+            scale: [1, 1.2, 1],
+            opacity: [0.2, 0.35, 0.2],
+            x: [0, -40, 0],
+            y: [0, 40, 0]
+          }}
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+          className="absolute -bottom-[20%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-600/25 blur-[140px]"
+        />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))]" />
+        
+        {/* Subtle grid pattern overlay */}
+        <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px]" />
       </div>
 
-      {/* Navigation Buttons */}
-      {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="flex justify-between items-center px-12 pb-10 pt-4">
-          <button
-            onClick={goBack}
-            className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2"
-          >
-            ← Back
-          </button>
-          <button
-            onClick={goNext}
-            className="bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-400 hover:to-violet-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20"
-          >
-            {step === TOTAL_STEPS - 2 ? 'Complete ✓' : 'Next →'}
-          </button>
+      {/* Top Drag Region for macOS */}
+      <div className="absolute top-0 left-0 right-0 h-10 z-50" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+
+      {/* Main Floating Glass Container */}
+      <motion.div 
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-2xl mx-4 bg-[#0c101a]/80 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-[0_24px_70px_rgba(0,0,0,0.6)] flex flex-col overflow-hidden z-10 min-h-[580px]"
+      >
+        {/* Top Header & Step Indicator */}
+        <div className="px-8 pt-7 pb-4 flex items-center justify-between border-b border-white/5">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 p-0.5 flex items-center justify-center shadow-md shadow-blue-500/20">
+              <Zap className="w-4 h-4 text-white fill-white" />
+            </div>
+            <span className="font-bold text-sm tracking-tight text-white/90">Nova Browser</span>
+          </div>
+
+          {/* Stepper Dots */}
+          <div className="flex items-center gap-1.5">
+            {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === step 
+                    ? 'w-6 bg-gradient-to-r from-blue-400 to-indigo-500 shadow-xs shadow-blue-500/50' 
+                    : i < step 
+                    ? 'w-2 bg-white/40' 
+                    : 'w-1.5 bg-white/10'
+                }`}
+              />
+            ))}
+          </div>
         </div>
-      )}
+
+        {/* Step Body Content */}
+        <div className="flex-1 flex flex-col items-center justify-center p-8 relative min-h-[400px]">
+          <AnimatePresence custom={dir} mode="wait">
+            {step === 0 && (
+              <motion.div
+                key="step-0"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                {/* Glowing Logo Badge */}
+                <motion.div
+                  custom={0}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="relative mb-6"
+                >
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 p-[1.5px] shadow-2xl shadow-blue-500/30 flex items-center justify-center">
+                    <div className="w-full h-full rounded-[14px] bg-[#0c101a] flex items-center justify-center overflow-hidden">
+                      <Zap className="w-10 h-10 text-blue-400 fill-blue-400/20" />
+                    </div>
+                  </div>
+                </motion.div>
+
+                {/* Subtitle Badge */}
+                <motion.div
+                  custom={1}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold uppercase tracking-wider mb-4"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Next-Generation Architecture</span>
+                </motion.div>
+
+                {/* Headline */}
+                <motion.h1
+                  custom={2}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="text-3xl sm:text-4xl font-bold tracking-tight text-white mb-3"
+                >
+                  Welcome to <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-indigo-300 to-violet-400">Nova Browser</span>
+                </motion.h1>
+
+                {/* Description */}
+                <motion.p
+                  custom={3}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  className="text-slate-400 text-sm sm:text-base leading-relaxed mb-8 max-w-md"
+                >
+                  Experience the web with zero-latency on-device AI, built-in privacy protection, and a fluid workspace designed for deep focus.
+                </motion.p>
+
+                {/* Primary Button */}
+                <motion.button
+                  custom={4}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  onClick={goNext}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-600 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-blue-500/25 transition-all cursor-pointer"
+                >
+                  <span>Start Configuration</span>
+                  <ArrowRight className="w-4 h-4" />
+                </motion.button>
+              </motion.div>
+            )}
+
+            {step === 1 && (
+              <motion.div
+                key="step-1"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                <motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-5 shadow-lg shadow-blue-500/10">
+                  <Download className="w-6 h-6" />
+                </motion.div>
+
+                <motion.h2 custom={1} variants={itemVariants} initial="hidden" animate="visible" className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+                  Import Your Bookmarks
+                </motion.h2>
+
+                <motion.p custom={2} variants={itemVariants} initial="hidden" animate="visible" className="text-slate-400 text-sm mb-6 max-w-md leading-relaxed">
+                  Seamlessly transfer your bookmarks and favorites from Google Chrome with one click.
+                </motion.p>
+
+                <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="w-full max-w-sm flex flex-col items-center gap-3 mb-6">
+                  {importStatus === 'idle' && (
+                    <button
+                      onClick={handleImport}
+                      disabled={isImporting}
+                      className="w-full py-3 px-5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-medium text-sm flex items-center justify-center gap-2.5 transition-all shadow-sm cursor-pointer"
+                    >
+                      {isImporting ? (
+                        <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
+                      ) : (
+                        <Download className="w-4 h-4 text-blue-400" />
+                      )}
+                      <span>{isImporting ? 'Reading Chrome database...' : 'Import Chrome Bookmarks'}</span>
+                    </button>
+                  )}
+
+                  {importStatus === 'success' && (
+                    <div className="w-full p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-medium flex items-center justify-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>Successfully imported {importedCount} bookmarks</span>
+                    </div>
+                  )}
+
+                  {importStatus === 'error' && (
+                    <div className="w-full p-3.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium flex items-center justify-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>Chrome profile was not found. You can import later.</span>
+                    </div>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div
+                key="step-2"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                <motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mb-5 shadow-lg shadow-indigo-500/10">
+                  <Sliders className="w-6 h-6" />
+                </motion.div>
+
+                <motion.h2 custom={1} variants={itemVariants} initial="hidden" animate="visible" className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+                  Select Visual Theme
+                </motion.h2>
+
+                <motion.p custom={2} variants={itemVariants} initial="hidden" animate="visible" className="text-slate-400 text-sm mb-6 max-w-md">
+                  Choose an interface style tailored for your workspace lighting.
+                </motion.p>
+
+                <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="grid grid-cols-3 gap-3.5 w-full mb-2">
+                  {THEMES.map((t) => {
+                    const IconComponent = t.icon;
+                    const isSelected = theme === t.id;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setTheme(t.id)}
+                        className={`group relative flex flex-col items-center p-3.5 rounded-2xl border transition-all text-left cursor-pointer ${
+                          isSelected 
+                            ? 'bg-blue-500/15 border-blue-500/60 ring-1 ring-blue-500/50 shadow-md shadow-blue-500/10' 
+                            : 'bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]'
+                        }`}
+                      >
+                        {/* Mini browser wireframe preview */}
+                        <div className={`w-full h-16 rounded-lg overflow-hidden border border-white/10 ${t.previewBg} mb-3 flex flex-col shadow-inner`}>
+                          <div className={`h-3.5 ${t.barBg} flex items-center gap-1 px-1.5`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${t.dotBg} opacity-80`} />
+                            <div className="w-1 h-1 rounded-full bg-white/20" />
+                            <div className="w-1 h-1 rounded-full bg-white/20" />
+                          </div>
+                          <div className="flex-1 p-1.5 flex gap-1">
+                            <div className={`w-1/3 h-full rounded ${t.contentBg}`} />
+                            <div className={`flex-1 h-full rounded ${t.contentBg}`} />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <IconComponent className={`w-3.5 h-3.5 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`} />
+                          <span className="text-xs font-semibold text-white">{t.name}</span>
+                        </div>
+
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-500 flex items-center justify-center">
+                            <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div
+                key="step-3"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                <motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mb-5 shadow-lg shadow-blue-500/10">
+                  <Search className="w-6 h-6" />
+                </motion.div>
+
+                <motion.h2 custom={1} variants={itemVariants} initial="hidden" animate="visible" className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+                  Default Search Engine
+                </motion.h2>
+
+                <motion.p custom={2} variants={itemVariants} initial="hidden" animate="visible" className="text-slate-400 text-sm mb-5 max-w-md">
+                  Choose your default omnibox provider. You can adjust this anytime in settings.
+                </motion.p>
+
+                <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="flex flex-col gap-2 w-full max-h-[220px] overflow-y-auto pr-1">
+                  {SEARCH_ENGINES.map((engine) => {
+                    const isSelected = searchEngine === engine.id;
+                    return (
+                      <button
+                        key={engine.id}
+                        onClick={() => setSearchEngine(engine.id)}
+                        className={`flex items-center gap-3.5 p-3 rounded-xl border transition-all text-left cursor-pointer ${
+                          isSelected
+                            ? 'bg-blue-500/15 border-blue-500/60 ring-1 ring-blue-500/40 shadow-xs'
+                            : 'bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center shrink-0">
+                          {engine.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-white truncate">{engine.name}</span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-slate-300 font-medium">
+                              {engine.badge}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-400 truncate">{engine.desc}</p>
+                        </div>
+                        <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected ? 'border-blue-500 bg-blue-500' : 'border-white/30'
+                        }`}>
+                          {isSelected && <Check className="w-2.5 h-2.5 text-white stroke-[3]" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              </motion.div>
+            )}
+
+            {step === 4 && (
+              <motion.div
+                key="step-4"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                <motion.div custom={0} variants={itemVariants} initial="hidden" animate="visible" className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mb-5 shadow-lg shadow-emerald-500/10">
+                  <ShieldCheck className="w-7 h-7" />
+                </motion.div>
+
+                <motion.h2 custom={1} variants={itemVariants} initial="hidden" animate="visible" className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+                  Nova Privacy Shield
+                </motion.h2>
+
+                <motion.p custom={2} variants={itemVariants} initial="hidden" animate="visible" className="text-slate-400 text-sm mb-6 max-w-md leading-relaxed">
+                  Engine-level ad blocking and tracker mitigation to keep browsing fast and confidential.
+                </motion.p>
+
+                {/* 3 Pillars of Protection */}
+                <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="grid grid-cols-3 gap-3 w-full mb-6">
+                  {[
+                    { title: 'Ad Blocker', desc: 'Banners & video popups', icon: Zap },
+                    { title: 'Anti-Tracking', desc: 'Fingerprinting blocks', icon: Lock },
+                    { title: 'Malware Guard', desc: 'Phishing containment', icon: Shield },
+                  ].map((p) => {
+                    const PillarIcon = p.icon;
+                    return (
+                      <div key={p.title} className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 flex flex-col items-center text-center">
+                        <PillarIcon className="w-4 h-4 text-emerald-400 mb-2" />
+                        <span className="text-xs font-semibold text-white mb-0.5">{p.title}</span>
+                        <span className="text-[11px] text-slate-400 leading-tight">{p.desc}</span>
+                      </div>
+                    );
+                  })}
+                </motion.div>
+
+                {/* Interactive Toggle Pill */}
+                <motion.div 
+                  custom={4} 
+                  variants={itemVariants} 
+                  initial="hidden" 
+                  animate="visible"
+                  onClick={() => setPrivacyShield(!privacyShield)}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-full bg-white/5 border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                >
+                  <div className={`w-9 h-5 rounded-full transition-colors duration-200 p-0.5 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}>
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${privacyShield ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </div>
+                  <span className="text-xs font-semibold text-white">
+                    {privacyShield ? 'Privacy Shield Enabled' : 'Privacy Shield Disabled'}
+                  </span>
+                </motion.div>
+              </motion.div>
+            )}
+
+            {step === 5 && (
+              <motion.div
+                key="step-5"
+                custom={dir}
+                variants={contentVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                className="w-full flex flex-col items-center text-center max-w-lg"
+              >
+                <motion.div 
+                  initial={{ scale: 0, rotate: -45 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                  className="w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center mb-5 shadow-2xl shadow-emerald-500/30 text-white"
+                >
+                  <Check className="w-8 h-8 stroke-[3]" />
+                </motion.div>
+
+                <motion.h2 custom={1} variants={itemVariants} initial="hidden" animate="visible" className="text-2xl sm:text-3xl font-bold text-white mb-2 tracking-tight">
+                  You're All Set
+                </motion.h2>
+
+                <motion.p custom={2} variants={itemVariants} initial="hidden" animate="visible" className="text-slate-400 text-sm mb-6 max-w-md leading-relaxed">
+                  Your customized environment is prepared and ready.
+                </motion.p>
+
+                {/* Configuration Summary Badges */}
+                <motion.div custom={3} variants={itemVariants} initial="hidden" animate="visible" className="flex flex-wrap items-center justify-center gap-2 mb-8">
+                  <span className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-medium">
+                    Theme: <strong className="text-white capitalize">{theme}</strong>
+                  </span>
+                  <span className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-medium">
+                    Search: <strong className="text-white capitalize">{searchEngine}</strong>
+                  </span>
+                  <span className="text-xs px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-300 font-medium">
+                    Shield: <strong className={privacyShield ? 'text-emerald-400' : 'text-slate-400'}>{privacyShield ? 'Active' : 'Off'}</strong>
+                  </span>
+                </motion.div>
+
+                {/* Launch Button */}
+                <motion.button
+                  custom={4}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  onClick={handleFinish}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-600 text-white font-semibold text-sm flex items-center gap-2 shadow-lg shadow-blue-500/30 transition-all cursor-pointer"
+                >
+                  <span>Launch Nova Browser</span>
+                  <ArrowRight className="w-4 h-4" />
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Footer Navigation Bar */}
+        {step > 0 && step < TOTAL_STEPS - 1 && (
+          <div className="px-8 py-4 border-t border-white/5 flex items-center justify-between bg-black/20">
+            <button
+              onClick={goBack}
+              className="text-xs font-semibold text-slate-400 hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer py-1.5 px-3 rounded-lg hover:bg-white/5"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
+            </button>
+
+            <div className="flex items-center gap-3">
+              {step === 1 && importStatus === 'idle' && (
+                <button
+                  onClick={goNext}
+                  className="text-xs font-semibold text-slate-400 hover:text-white transition-colors cursor-pointer py-1.5 px-3"
+                >
+                  Skip
+                </button>
+              )}
+              <button
+                onClick={goNext}
+                className="px-5 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition-all cursor-pointer"
+              >
+                <span>Continue</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+      </motion.div>
     </div>
   );
 }
