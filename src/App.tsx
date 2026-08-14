@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelRight } from 'lucide-react';
+import { PanelRight, PanelLeft } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 export interface HistoryItem {
@@ -235,6 +235,7 @@ function App() {
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [isDraggingTab, setIsDraggingTab] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
@@ -1741,6 +1742,13 @@ function App() {
         return;
       }
 
+      // Toggle Sidebar in Vertical Tabs Mode (⌘S / Ctrl+S)
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        setIsSidebarCollapsed(prev => !prev);
+        return;
+      }
+
       if (matches('bookmark')) {
         e.preventDefault();
         handleToggleBookmarkActive();
@@ -1849,8 +1857,14 @@ function App() {
         : 'bg-slate-50 dark:bg-slate-900'
     }`}>
       
-      {settings.useVerticalTabs && (
-        <div className="h-full flex flex-col shrink-0 drag-region relative z-50">
+      {settings.useVerticalTabs && !isSidebarCollapsed && (
+        <motion.div 
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 240, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
+          className="h-full flex flex-col shrink-0 drag-region relative z-50 overflow-hidden"
+        >
           <SidebarTabs
             tabs={workspaceTabs}
             folders={folders}
@@ -1887,13 +1901,27 @@ function App() {
             onOpenSettings={handleOpenSettings}
             onOpenExtensions={handleOpenExtensions}
             bookmarks={bookmarks}
+            onToggleCollapse={() => setIsSidebarCollapsed(true)}
           />
+        </motion.div>
+      )}
+
+      {/* Floating Expand Sidebar Button when collapsed */}
+      {settings.useVerticalTabs && isSidebarCollapsed && (
+        <div className="absolute top-2.5 left-2.5 z-50 flex items-center gap-2 no-drag">
+          <button
+            onClick={() => setIsSidebarCollapsed(false)}
+            className="p-2 rounded-xl bg-[#1e1930]/90 backdrop-blur-xl border border-white/15 text-slate-300 hover:text-white shadow-xl hover:bg-white/15 transition-all group cursor-pointer"
+            title="Show Sidebar (⌘S)"
+          >
+            <PanelLeft className="w-4 h-4 text-cyan-400 group-hover:scale-110 transition-transform" />
+          </button>
         </div>
       )}
 
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden transition-all duration-200 ${
         settings.useVerticalTabs 
-          ? 'rounded-2xl shadow-2xl border border-white/[0.08] bg-[#0e0c15] m-2.5 ml-0' 
+          ? `rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ${isSidebarCollapsed ? 'ml-2' : 'ml-0'}` 
           : ''
       }`}>
         {/* TOP NAVIGATION BAR (Rendered only in horizontal tabs mode) */}

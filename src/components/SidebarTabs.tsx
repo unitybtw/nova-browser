@@ -28,7 +28,8 @@ import {
   Orbit,
   Layers,
   LayoutGrid,
-  Trash2
+  Trash2,
+  PanelLeft
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
@@ -125,6 +126,7 @@ export interface SidebarTabsProps {
   onOpenSettings?: () => void;
   onOpenExtensions?: () => void;
   bookmarks?: Bookmark[];
+  onToggleCollapse?: () => void;
 }
 
 // Tab Peek Popover rendered via Portal
@@ -211,7 +213,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenHistory,
   onOpenSettings,
   onOpenExtensions,
-  bookmarks = []
+  bookmarks = [],
+  onToggleCollapse
 }) => {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
@@ -482,12 +485,23 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#151122]/95 backdrop-blur-3xl border-r border-white/[0.06] font-sans">
         
-        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Back/Forward/Reload */}
+        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div className="h-11 pt-2.5 px-3 flex items-center justify-between drag-region shrink-0">
-          <div className="w-[68px] h-full shrink-0" />
+          <div className="flex items-center gap-1.5">
+            <div className="w-[56px] h-full shrink-0" />
+            {onToggleCollapse && (
+              <button
+                onClick={onToggleCollapse}
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors no-drag"
+                title="Hide Sidebar (⌘S)"
+              >
+                <PanelLeft className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           {/* Navigation Controls in Arc style */}
-          <div className="flex items-center gap-1 no-drag">
+          <div className="flex items-center gap-0.5 no-drag">
             <button
               onClick={onGoBack}
               disabled={!canGoBack}
