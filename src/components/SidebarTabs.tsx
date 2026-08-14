@@ -227,10 +227,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           setHoverPos({ top: 0, left: 0 });
           onTabDragEnd?.();
         }}
-        initial={{ opacity: 0, x: -8 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
-        transition={{ duration: 0.15, ease: 'easeOut' }}
+        initial={false}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
+        transition={{ duration: 0.12, ease: 'easeOut' }}
         whileHover={{ scale: 1.01 }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}

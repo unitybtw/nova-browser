@@ -1969,8 +1969,8 @@ function App() {
             return (
               <div
                 key={tab.id}
-                className={`w-full h-full absolute inset-0 transition-opacity duration-150 ${
-                  tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none'
+                className={`w-full h-full absolute inset-0 ${
+                  tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto visible' : 'opacity-0 z-0 pointer-events-none invisible'
                 }`}
               >
                 <BrowserView 

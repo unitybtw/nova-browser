@@ -123,11 +123,11 @@ const MemoizedTabItem = React.memo(({
 
   return (
     <Reorder.Item
-      key={`split-${tab.id}-${splitTab?.id || 'none'}`}
+      key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 0.9, y: 15 }}
-      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
+      initial={false}
+      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1 }}
+      exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
       transition={{ type: 'spring', stiffness: 500, damping: 35 }}
       whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => onTabDragStart?.()}
@@ -713,7 +713,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
               return (
                 <MemoizedTabItem
-                  key={`split-${tab.id}-${splitTab?.id || 'none'}`}
+                  key={tab.id}
                   tab={tab}
                   isActive={isActive}
                   isSplitChild={isSplitChild}

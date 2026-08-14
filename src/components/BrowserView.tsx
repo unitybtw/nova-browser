@@ -654,7 +654,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         )}
       </AnimatePresence>
 
-      <div className="flex-1 w-full relative">
+      <div className="flex-1 w-full relative overflow-hidden">
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
