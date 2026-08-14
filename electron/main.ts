@@ -300,7 +300,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     // VULN-16: Add Content Security Policy for the app's own pages
     if (details.url.startsWith('file://') || details.url.includes('localhost:5173')) {
       responseHeaders['Content-Security-Policy'] = [
-        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https:;"
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com;"
       ];
     }
 
