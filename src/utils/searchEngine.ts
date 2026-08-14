@@ -4,9 +4,9 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
   const trimmed = query.trim();
   if (!trimmed) return '';
 
-  // Internal schemes and protocols
-  const internalSchemes = ['nova://', 'about:', 'chrome://', 'edge://', 'file://', 'view-source:', 'data:'];
-  if (internalSchemes.some(scheme => trimmed.toLowerCase().startsWith(scheme))) {
+  // Safe internal browser schemes
+  const safeInternalSchemes = ['nova://', 'about:'];
+  if (safeInternalSchemes.some(scheme => trimmed.toLowerCase().startsWith(scheme))) {
     return trimmed;
   }
 

@@ -333,6 +333,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    const handleRenderProcessGone = (e: any) => {
+      if (tab?.id) {
+        const reason = e?.details?.reason || e?.reason || 'crashed';
+        onUpdateTab(tab.id, { isLoading: false, title: `Page Crashed (${reason})` });
+        console.error('[Webview] Render process gone:', reason, 'Exit code:', e?.details?.exitCode || e?.exitCode);
+      }
+    };
+
     const handleFoundInPage = (e: any) => {
       if (e.result && onFoundInPage) {
         onFoundInPage(e.result.activeMatchOrdinal || 0, e.result.numberOfMatches || 0);
@@ -403,6 +411,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('page-favicon-updated', handleFaviconUpdate);
     webview.addEventListener('new-window', handleNewWindow);
     webview.addEventListener('crashed', handleCrashed);
+    webview.addEventListener('plugin-crashed', handleCrashed);
+    webview.addEventListener('render-process-gone', handleRenderProcessGone);
     webview.addEventListener('found-in-page', handleFoundInPage);
     webview.addEventListener('media-started-playing', handleMediaStarted);
     webview.addEventListener('media-paused', handleMediaPaused);
@@ -430,6 +440,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('page-favicon-updated', handleFaviconUpdate);
       webview.removeEventListener('new-window', handleNewWindow);
       webview.removeEventListener('crashed', handleCrashed);
+      webview.removeEventListener('plugin-crashed', handleCrashed);
+      webview.removeEventListener('render-process-gone', handleRenderProcessGone);
       webview.removeEventListener('found-in-page', handleFoundInPage);
       webview.removeEventListener('media-started-playing', handleMediaStarted);
       webview.removeEventListener('media-paused', handleMediaPaused);
