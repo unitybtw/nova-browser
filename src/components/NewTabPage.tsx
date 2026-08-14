@@ -163,6 +163,42 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     }
   };
 
+  // Memoize particle arrays to prevent jitter/regeneration on keystrokes
+  const starParticles = React.useMemo(() => {
+    return Array.from({ length: 65 }, (_, i) => ({
+      id: i,
+      size: (i % 3 === 0 ? 3 : i % 2 === 0 ? 2 : 1.5),
+      top: `${(i * 17 + 7) % 96}%`,
+      left: `${(i * 23 + 13) % 98}%`,
+      duration: 3 + (i % 4) * 1.5,
+      delay: (i % 5) * 0.8,
+    }));
+  }, []);
+
+  const fireflyParticles = React.useMemo(() => {
+    return Array.from({ length: 28 }, (_, i) => ({
+      id: i,
+      size: 3 + (i % 3) * 2,
+      top: `${(i * 19 + 5) % 92}%`,
+      left: `${(i * 29 + 11) % 94}%`,
+      driftX: ((i % 5) - 2) * 25,
+      driftY: -40 - (i % 4) * 20,
+      duration: 5 + (i % 4) * 2,
+      delay: (i % 6) * 0.7,
+    }));
+  }, []);
+
+  const matrixColumns = React.useMemo(() => {
+    return Array.from({ length: 36 }, (_, i) => ({
+      id: i,
+      left: `${(i / 36) * 100 + 1}%`,
+      height: `${35 + (i % 5) * 12}%`,
+      speed: 2.2 + (i % 4) * 0.8,
+      delay: (i % 7) * 0.4,
+      opacity: 0.35 + (i % 3) * 0.25,
+    }));
+  }, []);
+
   const isDarkTheme = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
   const getBackgroundStyle = () => {
@@ -255,9 +291,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div 
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
-            style={{ backgroundImage: `url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1920&q=80')` }}
+            style={{ 
+              backgroundImage: `url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=2560&q=85')` 
+            }}
           />
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60"></div>
         </div>
       )}
 
@@ -279,175 +318,238 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               style={{ backgroundImage: `url('${backgroundCustomUrl}')` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50"></div>
         </div>
       )}
 
-      {/* Mesh Gradient */}
+      {/* Default Clean Subtle Glow */}
+      {newTabBackground === 'default' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {isDarkTheme ? (
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_40%,rgba(30,58,138,0.15),rgba(11,15,25,0))]" />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_30%,rgba(219,234,254,0.6),rgba(255,255,255,0))]" />
+          )}
+        </div>
+      )}
+
+      {/* Vibrant Gradient Background */}
+      {newTabBackground === 'gradient' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <motion.div 
+            animate={{ 
+              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+            }}
+            transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
+            className="absolute -inset-[50%] blur-3xl opacity-80"
+            style={{
+              backgroundImage: isDarkTheme
+                ? 'linear-gradient(120deg, #1e1b4b, #0f172a, #3b0764, #022c22, #1e1b4b)'
+                : 'linear-gradient(120deg, #dbeafe, #fce7f3, #e0e7ff, #ccfbf1, #dbeafe)',
+              backgroundSize: '300% 300%',
+              willChange: 'background-position',
+            }}
+          />
+          <div className={`absolute inset-0 backdrop-blur-[50px] ${isDarkTheme ? 'bg-[#0B0F19]/60' : 'bg-white/50'}`}></div>
+        </div>
+      )}
+
+      {/* Glass Prism Background */}
+      {newTabBackground === 'glass' && (
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[#0a0d16]' : 'bg-slate-100'}`} />
+          <div className="absolute -top-[30%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-600/15 blur-[120px]" />
+          <div className="absolute -bottom-[30%] right-[10%] w-[60vw] h-[60vw] rounded-full bg-violet-600/15 blur-[120px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:20px_20px]" />
+          <div className={`absolute inset-0 backdrop-blur-2xl ${isDarkTheme ? 'bg-black/30' : 'bg-white/30'}`} />
+        </div>
+      )}
+
+      {/* Fluid Mesh Aurora */}
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-[40%] -left-[20%] w-[70vw] h-[70vw] rounded-full bg-purple-600/20 blur-[120px] animate-pulse"></div>
-          <div className="absolute -bottom-[40%] -right-[20%] w-[70vw] h-[70vw] rounded-full bg-blue-600/20 blur-[120px] animate-pulse" style={{ animationDelay: '2s' }}></div>
-          <div className="absolute top-[20%] right-[10%] w-[50vw] h-[50vw] rounded-full bg-indigo-600/20 blur-[100px] animate-pulse" style={{ animationDelay: '4s' }}></div>
+          <motion.div 
+            animate={{ x: [0, 40, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -top-[20%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-purple-600/25 blur-[130px]"
+          />
+          <motion.div 
+            animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
+            transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+            className="absolute -bottom-[20%] -right-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-600/25 blur-[130px]"
+          />
+          <motion.div 
+            animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.35, 0.2] }}
+            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+            className="absolute top-[25%] right-[20%] w-[45vw] h-[45vw] rounded-full bg-teal-500/20 blur-[110px]"
+          />
         </div>
       )}
 
       {/* Aurora Waves */}
       {newTabBackground === 'aurora_waves' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#080b12]' : 'bg-slate-50'}`}>
           <motion.div 
             animate={{ 
               x: ['0%', '-50%', '0%'],
             }}
-            transition={{ duration: 15, repeat: Infinity, ease: 'linear' }}
-            className={`absolute top-[-50%] bottom-[-50%] left-0 w-[400%] blur-[100px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
+            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
+            className={`absolute top-[-50%] bottom-[-50%] left-0 w-[400%] blur-[90px] ${isDarkTheme ? 'opacity-65' : 'opacity-35'}`}
             style={{
               background: isDarkTheme 
-                ? 'linear-gradient(-45deg, #4f46e5, #ec4899, #8b5cf6, #3b82f6)' 
-                : 'linear-gradient(-45deg, #818cf8, #f472b6, #c084fc, #60a5fa)',
+                ? 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)' 
+                : 'linear-gradient(-45deg, #818cf8, #f472b6, #a855f7, #38bdf8, #818cf8)',
               willChange: 'transform'
             }}
           />
-          <div className={`absolute inset-0 backdrop-blur-[60px] ${isDarkTheme ? 'bg-slate-950/30' : 'bg-white/40'}`}></div>
+          <div className={`absolute inset-0 backdrop-blur-[60px] ${isDarkTheme ? 'bg-[#080b12]/50' : 'bg-white/40'}`}></div>
         </div>
       )}
 
-      {/* Cyber Grid */}
+      {/* 3D Cyber Neon Grid */}
       {newTabBackground === 'cyber_grid' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-black' : 'bg-slate-50'}`}>
-          <motion.div 
-            animate={{ 
-              y: [0, 40],
-            }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-            className={`absolute -top-[40px] bottom-0 left-0 right-0 origin-bottom ${isDarkTheme ? 'opacity-40' : 'opacity-25'}`}
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#04060a]' : 'bg-slate-900'}`}>
+          {/* Horizon Glow Sun */}
+          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45vw] h-[45vw] rounded-full bg-gradient-to-b from-cyan-500/20 via-purple-500/15 to-transparent blur-[90px]" />
+          
+          <div 
+            className="absolute inset-0"
             style={{
-              backgroundImage: isDarkTheme
-                ? 'linear-gradient(rgba(6, 182, 212, 0.25) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.25) 1px, transparent 1px)'
-                : 'linear-gradient(rgba(6, 182, 212, 0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(6, 182, 212, 0.35) 1px, transparent 1px)',
-              backgroundSize: '40px 40px',
-              perspective: 500,
-              rotateX: 60,
-              scale: 2,
-              willChange: 'transform'
+              perspective: '500px',
+              perspectiveOrigin: '50% 50%',
             }}
-          />
-          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-gradient-to-t from-transparent via-black/80 to-black' : 'bg-gradient-to-t from-transparent via-white/80 to-white'}`}></div>
+          >
+            <motion.div 
+              animate={{ 
+                backgroundPositionY: ['0px', '48px'],
+              }}
+              transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
+              className="absolute bottom-0 left-[-50%] right-[-50%] h-[75vh]"
+              style={{
+                backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.4) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(6, 182, 212, 0.4) 1.5px, transparent 1.5px)',
+                backgroundSize: '48px 48px',
+                transform: 'rotateX(68deg) scale(2.4)',
+                transformOrigin: '50% 100%',
+                willChange: 'background-position',
+              }}
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-transparent via-[#04060a]/75 to-[#04060a]"></div>
         </div>
       )}
 
-      {/* Hyper Space */}
+      {/* Hyper Space (Stable Stars) */}
       {newTabBackground === 'hyper_space' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-50'}`}>
-           <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black' : 'bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-indigo-100 via-slate-100 to-slate-50'}`}></div>
-           {[...Array(60)].map((_, i) => (
-             <motion.div
-               key={`star-${i}`}
-               className={`absolute rounded-full ${isDarkTheme ? 'bg-white' : 'bg-indigo-600'}`}
-               style={{
-                 width: Math.random() * 2 + 1 + 'px',
-                 height: Math.random() * 2 + 1 + 'px',
-                 top: Math.random() * 100 + '%',
-                 left: Math.random() * 100 + '%',
-                 boxShadow: isDarkTheme ? '0 0 10px 1px rgba(255,255,255,0.5)' : '0 0 8px 1px rgba(79,70,229,0.4)',
-                 willChange: 'transform, opacity'
-               }}
-               animate={{
-                 scale: [0, 1.8, 0],
-                 opacity: [0, 1, 0],
-               }}
-               transition={{
-                 duration: Math.random() * 4 + 2,
-                 repeat: Infinity,
-                 ease: "easeInOut",
-                 delay: Math.random() * 5
-               }}
-             />
-           ))}
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#05070e]' : 'bg-slate-950'}`}>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(30,58,138,0.25)_0%,rgba(5,7,14,1)_70%)]" />
+          {starParticles.map((star) => (
+            <motion.div
+              key={`star-${star.id}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                width: `${star.size}px`,
+                height: `${star.size}px`,
+                top: star.top,
+                left: star.left,
+                boxShadow: '0 0 8px 1.5px rgba(255,255,255,0.7)',
+                willChange: 'transform, opacity'
+              }}
+              animate={{
+                scale: [0.6, 1.6, 0.6],
+                opacity: [0.2, 1, 0.2],
+              }}
+              transition={{
+                duration: star.duration,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: star.delay
+              }}
+            />
+          ))}
         </div>
       )}
 
-      {/* Fireflies */}
+      {/* Fireflies (Stable Particles) */}
       {newTabBackground === 'fireflies' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
-           <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-[#1e40af]/20 via-[#0f172a] to-black' : 'bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-amber-100/30 via-slate-50 to-white'}`}></div>
-           {[...Array(30)].map((_, i) => (
-             <motion.div
-               key={`firefly-${i}`}
-               className="absolute bg-[#f59e0b] rounded-full"
-               style={{
-                 width: Math.random() * 4 + 2 + 'px',
-                 height: Math.random() * 4 + 2 + 'px',
-                 top: Math.random() * 100 + '%',
-                 left: Math.random() * 100 + '%',
-                 boxShadow: '0 0 12px 2px rgba(245, 158, 11, 0.4)',
-                 willChange: 'transform, opacity'
-               }}
-               animate={{
-                 y: [0, -50, 0],
-                 x: [0, Math.random() * 40 - 20, 0],
-                 opacity: [0, 1, 0.5, 1, 0],
-                 scale: [0.8, 1.2, 0.8]
-               }}
-               transition={{
-                 duration: Math.random() * 6 + 4,
-                 repeat: Infinity,
-                 ease: "easeInOut",
-                 delay: Math.random() * 5
-               }}
-             />
-           ))}
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#0a0f1d]' : 'bg-slate-900'}`}>
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(30,64,175,0.25)_0%,rgba(10,15,29,1)_75%)]" />
+          {fireflyParticles.map((fly) => (
+            <motion.div
+              key={`firefly-${fly.id}`}
+              className="absolute bg-amber-400 rounded-full"
+              style={{
+                width: `${fly.size}px`,
+                height: `${fly.size}px`,
+                top: fly.top,
+                left: fly.left,
+                boxShadow: '0 0 14px 3px rgba(251, 191, 36, 0.5)',
+                willChange: 'transform, opacity'
+              }}
+              animate={{
+                y: [0, fly.driftY, 0],
+                x: [0, fly.driftX, 0],
+                opacity: [0.1, 0.9, 0.3, 0.9, 0.1],
+                scale: [0.8, 1.3, 0.8]
+              }}
+              transition={{
+                duration: fly.duration,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: fly.delay
+              }}
+            />
+          ))}
         </div>
       )}
 
       {/* Nebula Flow */}
       {newTabBackground === 'nebula' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#09090b]' : 'bg-slate-50'}`}>
-           <div className={`absolute inset-0 ${isDarkTheme ? 'opacity-40 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-900 via-[#09090b] to-black' : 'opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-purple-300 via-slate-50 to-white'}`}></div>
-           <motion.div
-             animate={{
-               rotate: [0, 360],
-               scale: [1, 1.2, 1]
-             }}
-             transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-             className={`absolute -inset-[100%] blur-[120px] ${isDarkTheme ? 'opacity-50' : 'opacity-30'}`}
-             style={{
-               background: isDarkTheme
-                 ? 'conic-gradient(from 0deg at 50% 50%, #4f46e5, #ec4899, #8b5cf6, #3b82f6, #4f46e5)'
-                 : 'conic-gradient(from 0deg at 50% 50%, #818cf8, #f472b6, #c084fc, #60a5fa, #818cf8)',
-               willChange: 'transform'
-             }}
-           />
-           <div className={`absolute inset-0 backdrop-blur-[80px] ${isDarkTheme ? 'bg-black/40' : 'bg-white/50'}`}></div>
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#07070b]' : 'bg-slate-950'}`}>
+          <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.3)_0%,rgba(7,7,11,1)_70%)]" />
+          <motion.div
+            animate={{
+              rotate: [0, 360],
+              scale: [1, 1.15, 1]
+            }}
+            transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
+            className="absolute -inset-[80%] blur-[110px] opacity-55"
+            style={{
+              background: 'conic-gradient(from 0deg at 50% 50%, #4338ca, #d946ef, #7c3aed, #06b6d4, #4338ca)',
+              willChange: 'transform'
+            }}
+          />
+          <div className="absolute inset-0 backdrop-blur-[70px] bg-black/40"></div>
         </div>
       )}
 
-      {/* Digital Rain / Matrix */}
+      {/* Digital Rain / Matrix (Stable Streams) */}
       {newTabBackground === 'matrix' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-black' : 'bg-slate-50'}`}>
-           {[...Array(40)].map((_, i) => (
-             <motion.div
-               key={`rain-${i}`}
-               className={`absolute w-[2px] ${isDarkTheme ? 'bg-gradient-to-b from-transparent via-emerald-500 to-emerald-200' : 'bg-gradient-to-b from-transparent via-emerald-600 to-emerald-300'}`}
-               style={{
-                 left: Math.random() * 100 + '%',
-                 height: Math.random() * 40 + 20 + '%',
-                 top: '-50%',
-                 opacity: Math.random() * 0.5 + 0.2,
-                 boxShadow: '0 0 10px 2px rgba(16, 185, 129, 0.4)',
-                 willChange: 'transform'
-               }}
-               animate={{
-                 y: ['0vh', '150vh'],
-               }}
-               transition={{
-                 duration: Math.random() * 2 + 3,
-                 repeat: Infinity,
-                 ease: "linear",
-                 delay: Math.random() * 3
-               }}
-             />
-           ))}
+        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#020503]' : 'bg-slate-950'}`}>
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,78,59,0.2)_0%,rgba(2,5,3,1)_80%)]" />
+          {matrixColumns.map((col) => (
+            <motion.div
+              key={`rain-${col.id}`}
+              className="absolute w-[2px] bg-gradient-to-b from-transparent via-emerald-400 to-emerald-200"
+              style={{
+                left: col.left,
+                height: col.height,
+                top: '-40%',
+                opacity: col.opacity,
+                boxShadow: '0 0 10px 2px rgba(16, 185, 129, 0.5)',
+                willChange: 'transform'
+              }}
+              animate={{
+                y: ['0vh', '140vh'],
+              }}
+              transition={{
+                duration: col.speed,
+                repeat: Infinity,
+                ease: "linear",
+                delay: col.delay
+              }}
+            />
+          ))}
         </div>
       )}
 

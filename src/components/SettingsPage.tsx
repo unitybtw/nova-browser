@@ -618,18 +618,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">New Tab Background</h2>
                 <div className="grid grid-cols-2 gap-4">
                   {[
-                    { id: 'default', name: 'Clean (Default)', style: 'bg-slate-100 dark:bg-slate-800' },
-                    { id: 'gradient', name: 'Vibrant Gradient', style: 'bg-gradient-to-br from-blue-500 via-purple-500 to-rose-500' },
-                    { id: 'mesh', name: 'Mesh Aurora', style: 'bg-gradient-to-tr from-emerald-400 via-cyan-500 to-blue-500' },
-                    { id: 'glass', name: 'Dark Glass', style: 'bg-slate-900' },
-                    { id: 'aurora_waves', name: 'Aurora Waves (Animated)', style: 'bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500' },
-                    { id: 'cyber_grid', name: 'Cyber Grid (Animated)', style: 'bg-black border-cyan-500/30' },
-                    { id: 'hyper_space', name: 'Hyper Space (Animated)', style: 'bg-slate-950 border-white/20' },
-                    { id: 'fireflies', name: 'Fireflies (Animated)', style: 'bg-[#0f172a] border-[#eab308]/30' },
-                    { id: 'nebula', name: 'Nebula Flow (Animated)', style: 'bg-[#09090b] border-purple-500/30' },
-                    { id: 'matrix', name: 'Digital Rain (Animated)', style: 'bg-black border-emerald-500/30' },
-                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-accent-dark/50 backdrop-blur' },
-                    { id: 'custom_url', name: 'Video / Image URL', style: 'bg-slate-800' }
+                    { id: 'default', name: 'Clean Minimalist', style: 'bg-gradient-to-b from-slate-900 via-[#0B0F19] to-slate-950' },
+                    { id: 'gradient', name: 'Dynamic Gradient', style: 'bg-gradient-to-br from-indigo-900 via-purple-900 to-rose-900' },
+                    { id: 'mesh', name: 'Mesh Aurora', style: 'bg-gradient-to-tr from-purple-800 via-indigo-900 to-teal-800' },
+                    { id: 'glass', name: 'Dark Glass & Prism', style: 'bg-slate-900 border border-white/10' },
+                    { id: 'aurora_waves', name: 'Aurora Waves', style: 'bg-gradient-to-r from-indigo-600 via-fuchsia-600 to-cyan-500' },
+                    { id: 'cyber_grid', name: 'Cyber Grid 3D', style: 'bg-[#04060a] border border-cyan-500/30' },
+                    { id: 'hyper_space', name: 'Hyper Space Stars', style: 'bg-[#05070e] border border-blue-500/20' },
+                    { id: 'fireflies', name: 'Bioluminescent Fireflies', style: 'bg-[#0a0f1d] border border-amber-500/30' },
+                    { id: 'nebula', name: 'Cosmic Nebula Flow', style: 'bg-[#07070b] border border-purple-500/30' },
+                    { id: 'matrix', name: 'Digital Matrix Rain', style: 'bg-[#020503] border border-emerald-500/30' },
+                    { id: 'unsplash', name: 'Daily Photo (Unsplash)', style: 'bg-cover bg-center', extraStyle: { backgroundImage: "url('https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=75')" } },
+                    { id: 'custom_url', name: 'Video / Image URL', style: 'bg-gradient-to-br from-slate-800 to-slate-900' }
                   ].map(bg => (
                     <button
                       key={bg.id}
@@ -640,8 +640,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           : 'border-transparent hover:border-slate-300 dark:hover:border-slate-700'
                       }`}
                     >
-                      <div className={`absolute inset-0 ${bg.style}`} />
-                      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/60 to-transparent">
+                      <div 
+                        className={`absolute inset-0 ${bg.style}`} 
+                        style={bg.extraStyle}
+                      />
+                      <div className="absolute inset-x-0 bottom-0 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
                         <p className="text-white font-medium text-sm text-left">{bg.name}</p>
                       </div>
                     </button>
