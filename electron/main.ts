@@ -671,6 +671,16 @@ ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
   isDoNotTrackEnabled = Boolean(enabled);
 });
 
+// Dynamic window traffic light visibility on macOS
+ipcMain.handle('set-window-button-visibility', (event, visible: boolean) => {
+  if (!isTrustedSender(event)) return;
+  if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'darwin') {
+    try {
+      mainWindow.setWindowButtonVisibility(Boolean(visible));
+    } catch (_) {}
+  }
+});
+
 // Set theme source for dark mode rendering on pages
 ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;

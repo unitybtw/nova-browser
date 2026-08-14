@@ -373,6 +373,16 @@ function App() {
     }
   }, [settings]);
 
+  // Control native macOS traffic lights (3 dots) visibility when vertical tabs sidebar is collapsed
+  useEffect(() => {
+    if (!settings.useVerticalTabs) {
+      (window as any).electronAPI?.setWindowButtonVisibility?.(true);
+      return;
+    }
+    const shouldShowButtons = !isSidebarCollapsed || isHoverRevealing;
+    (window as any).electronAPI?.setWindowButtonVisibility?.(shouldShowButtons);
+  }, [settings.useVerticalTabs, isSidebarCollapsed, isHoverRevealing]);
+
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
     if (savedVpn) {
@@ -1996,7 +2006,7 @@ function App() {
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden transition-all duration-200 ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
-            ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] mx-2 mb-2 mt-7'
+            ? 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2'
             : 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ml-0' 
           : ''
       }`}>
