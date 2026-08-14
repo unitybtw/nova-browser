@@ -131,7 +131,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           exit={{ opacity: 0, scale: 0.9, y: 10 }}
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           style={{
-            position: 'absolute',
+            position: 'fixed',
             left: Math.min(x + 20, window.innerWidth - 320),
             top: Math.min(y, window.innerHeight - 150),
             zIndex: 999999,
@@ -160,11 +160,13 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
             ) : (
               <p>
                 {displayedSummary}
-                <motion.span
-                  animate={{ opacity: [1, 0] }}
-                  transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                  className="inline-block w-[3px] h-[14px] bg-indigo-500 ml-[2px] align-middle rounded-full"
-                />
+                {displayedSummary.length < summary.length && (
+                  <motion.span
+                    animate={{ opacity: [1, 0] }}
+                    transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
+                    className="inline-block w-[3px] h-[14px] bg-indigo-500 ml-[2px] align-middle rounded-full"
+                  />
+                )}
               </p>
             )}
           </div>

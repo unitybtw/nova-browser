@@ -626,6 +626,16 @@ app.on('will-quit', () => {
   } catch (e) {}
 });
 
+app.on('before-quit', () => {
+  try {
+    if (mcpServer && mcpServer.isRunning()) {
+      mcpServer.stop();
+    }
+  } catch (e) {
+    console.error('Error stopping MCP server on quit:', e);
+  }
+});
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

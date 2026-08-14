@@ -79,7 +79,15 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
               const isProgressing = item.state === 'progressing';
 
               return (
-                <div key={item.id} className="group flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/30 rounded-xl transition-colors">
+                <div 
+                  key={item.id} 
+                  onClick={() => {
+                    if (isCompleted && item.savePath) {
+                      (window as any).electronAPI?.openDownload?.(item.savePath);
+                    }
+                  }}
+                  className={`group flex items-start gap-3 p-2 hover:bg-slate-50 dark:hover:bg-slate-700/30 rounded-xl transition-colors ${isCompleted ? 'cursor-pointer' : ''}`}
+                >
                   <div className="w-10 h-10 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-500">
                     {isCompleted ? <CheckCircle2 className="w-5 h-5 text-emerald-500" /> :
                      isCancelled || isInterrupted ? <AlertCircle className="w-5 h-5 text-red-500" /> :
@@ -105,7 +113,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                     
                     {!isProgressing && (
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                        {isCompleted ? 'Completed' : isCancelled ? 'Cancelled' : 'Interrupted'}
+                        {isCompleted ? 'Completed — click to open' : isCancelled ? 'Cancelled' : 'Interrupted'}
                       </div>
                     )}
                   </div>

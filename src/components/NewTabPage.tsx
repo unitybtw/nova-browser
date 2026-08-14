@@ -116,19 +116,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!query.trim()) return;
-
-    let targetUrl = query.trim();
-    const isUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/.*)?$/i.test(targetUrl);
-
-    if (isUrl) {
-      if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
-        targetUrl = 'https://' + targetUrl;
-      }
-      onNavigate(targetUrl);
-    } else {
-      const searchUrl = formatSearchUrl(targetUrl, searchEngine);
-      onNavigate(searchUrl);
-    }
+    const targetUrl = formatSearchUrl(query, searchEngine);
+    onNavigate(targetUrl);
   };
 
   const handleAddSpeedDial = () => {

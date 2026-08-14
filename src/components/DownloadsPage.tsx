@@ -44,22 +44,6 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => {
-                const testItem: DownloadItemPage = {
-                  id: 'dl_' + Date.now(),
-                  filename: 'sample_archive_package.zip',
-                  url: 'https://example.com/files/sample_archive_package.zip',
-                  receivedBytes: 15400000,
-                  totalBytes: 25000000,
-                  state: 'progressing'
-                };
-                downloads.unshift(testItem);
-              }}
-              className="px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 dark:text-blue-400 rounded-xl text-sm font-semibold transition-colors"
-            >
-              + Add Sample
-            </button>
             {downloads.length > 0 && (
               <button
                 onClick={onClearDownloads}

@@ -344,10 +344,17 @@ function App() {
     return defaultSettings;
   });
 
-  // Sync settings with backend
+  // Sync settings with local storage and backend
   useEffect(() => {
+    localStorage.setItem('user_settings', JSON.stringify(settings));
     if ((window as any).electronAPI?.storeSet) {
       (window as any).electronAPI.storeSet('settings', JSON.stringify(settings));
+    }
+    if (window.electronAPI?.setPrivacyShield) {
+      window.electronAPI.setPrivacyShield(settings.privacyShield);
+    }
+    if ((window as any).electronAPI?.setDoNotTrack) {
+      (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
     }
   }, [settings]);
 
@@ -380,16 +387,6 @@ function App() {
       });
     }
   }, [vpnEnabled, vpnLocation, vpnLocations]);
-
-  useEffect(() => {
-    localStorage.setItem('user_settings', JSON.stringify(settings));
-    if (window.electronAPI?.setPrivacyShield) {
-      window.electronAPI.setPrivacyShield(settings.privacyShield);
-    }
-    if ((window as any).electronAPI?.setDoNotTrack) {
-      (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
-    }
-  }, [settings]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlockedBatch) {
@@ -645,9 +642,11 @@ function App() {
       if (targetTab) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
+      const targetIdx = prevTabs.findIndex(t => t.id === id);
       const newTabs = prevTabs.filter(t => t.id !== id);
-      if (activeTabId === id) {
-        setActiveTabId(newTabs[newTabs.length - 1].id);
+      if (activeTabId === id && newTabs.length > 0) {
+        const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
+        setActiveTabId(newTabs[nextActiveIdx].id);
       }
       if (splitTabId === id) {
         setSplitTabId(null);
@@ -1328,8 +1327,13 @@ function App() {
           const targetUrl = updated.url;
           if (targetUrl && targetUrl !== 'nova://newtab' && targetUrl !== 'about:blank' && !targetUrl.startsWith('chrome://')) {
             setHistory(hPrev => {
-              // Avoid duplicate entry if same url was recorded recently
-              if (hPrev[0]?.url === targetUrl) return hPrev;
+              // If same URL was just recorded, update title/favicon if improved
+              if (hPrev.length > 0 && hPrev[0]?.url === targetUrl) {
+                if (updated.title && hPrev[0].title !== updated.title) {
+                  return [{ ...hPrev[0], title: updated.title, favicon: updated.favicon || hPrev[0].favicon }, ...hPrev.slice(1)];
+                }
+                return hPrev;
+              }
               return [{
                 id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
                 url: targetUrl,

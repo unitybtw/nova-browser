@@ -80,7 +80,7 @@ export const SidePanel = React.memo(({
 
   useEffect(() => {
     if (!recognition) return;
-    recognition.onresult = (event: any) => {
+    const handleResult = (event: any) => {
       let finalTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
@@ -91,8 +91,20 @@ export const SidePanel = React.memo(({
         setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
       }
     };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    const handleError = () => setIsListening(false);
+    const handleEnd = () => setIsListening(false);
+
+    recognition.onresult = handleResult;
+    recognition.onerror = handleError;
+    recognition.onend = handleEnd;
+
+    return () => {
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onerror = null;
+        recognition.onend = null;
+      }
+    };
   }, []);
 
   // Subscribe to TTS state changes
