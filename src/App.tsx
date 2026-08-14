@@ -1841,7 +1841,7 @@ function App() {
   return (
     <div className={`flex ${settings.useVerticalTabs ? 'flex-row' : 'flex-col'} h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
       settings.useVerticalTabs 
-        ? activeTab?.isIncognito ? 'bg-slate-950' : 'bg-gradient-to-br from-indigo-100 via-purple-50 to-blue-100 dark:from-slate-900 dark:via-indigo-950 dark:to-slate-900'
+        ? activeTab?.isIncognito ? 'bg-[#0a0812]' : 'bg-[#151122]'
         : 'bg-slate-50 dark:bg-slate-900'
     }`}>
       
@@ -1869,63 +1869,83 @@ function App() {
             onTabDragEnd={handleTabDragEnd}
             splitTabId={splitTabId}
             onCloseSplit={handleCloseSplitView}
+            onNavigate={handleNavigate}
+            onGoBack={handleGoBack}
+            onGoForward={handleGoForward}
+            onReload={handleReload}
+            canGoBack={activeTab?.canGoBack}
+            canGoForward={activeTab?.canGoForward}
+            isLoading={activeTab?.isLoading}
+            searchEngine={settings.searchEngine}
+            privacyShield={settings.privacyShield}
+            onOpenDownloads={handleOpenDownloads}
+            onOpenHistory={handleOpenHistory}
+            onOpenSettings={handleOpenSettings}
+            onOpenExtensions={handleOpenExtensions}
+            bookmarks={bookmarks}
           />
         </div>
       )}
 
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${settings.useVerticalTabs ? 'rounded-xl shadow-2xl shadow-black/20 m-2' : ''}`}>
-        {/* TOP NAVIGATION BAR */}
-        <TopBar 
-          tabs={workspaceTabs}
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspaceId}
-          onSelectWorkspace={handleSelectWorkspace}
-          activeTabId={activeTabId}
-          bookmarks={bookmarks}
-          activeDownloadsCount={activeDownloadsCount}
-          downloads={downloads}
-          onClearDownloads={handleClearDownloads}
-          showBookmarksBar={settings.showBookmarksBar}
-          useVerticalTabs={settings.useVerticalTabs}
-          onToggleReaderMode={handleToggleReaderMode}
-          isSplitView={!!splitTabId}
-          tabStyle={settings.tabStyle}
-          isIncognito={activeTab?.isIncognito}
-          searchEngine={settings.searchEngine}
-          onToggleBookmark={handleToggleBookmarkActive}
-          onOpenHistory={handleOpenHistory}
-          onOpenDownloads={handleOpenDownloads}
-          onOpenSettings={handleOpenSettings}
-          onOpenExtensions={handleOpenExtensions}
-          onOpenShare={handleOpenShare}
-          onTakeScreenshot={handleTakeScreenshot}
-          onOpenFindInPage={handleOpenFindInPage}
-          onToggleSplitView={handleToggleSplitView}
-          onZoomIn={handleZoomIn}
-          onZoomOut={handleZoomOut}
-          onDuplicateTab={handleDuplicateTab}
-          onTogglePinTab={handleTogglePinTab}
-          onToggleMuteTab={handleToggleMuteTab}
-          onSuspendTab={handleSuspendTab}
-          onReorderTabs={handleReorderTabs}
-          onReorderFullList={handleReorderFullList}
-          onTogglePip={handleTogglePip}
-          onSelectTab={handleSelectTab}
-          onNewTab={handleNewTab}
-          onNewIncognitoTab={handleNewIncognitoTab}
-          onCloseTab={handleCloseTab}
-          onNavigate={handleNavigate}
-          onGoBack={handleGoBack}
-          onGoForward={handleGoForward}
-          onReload={handleReload}
-          isVpnEnabled={vpnEnabled}
-          onToggleVpn={handleToggleVpn}
-          onToggleAIAssistant={handleToggleAIAssistant}
-          onTabDragStart={handleTabDragStart}
-          onTabDragEnd={handleTabDragEnd}
-          onTabDrag={handleTabDrag}
-          onDropToSplitScreen={handleDropToSplitScreen}
-        />
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 bg-white dark:bg-slate-900 overflow-hidden ${
+        settings.useVerticalTabs 
+          ? 'rounded-2xl shadow-2xl border border-white/[0.08] bg-[#0e0c15] m-2.5 ml-0' 
+          : ''
+      }`}>
+        {/* TOP NAVIGATION BAR (Rendered only in horizontal tabs mode) */}
+        {!settings.useVerticalTabs && (
+          <TopBar 
+            tabs={workspaceTabs}
+            workspaces={workspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            onSelectWorkspace={handleSelectWorkspace}
+            activeTabId={activeTabId}
+            bookmarks={bookmarks}
+            activeDownloadsCount={activeDownloadsCount}
+            downloads={downloads}
+            onClearDownloads={handleClearDownloads}
+            showBookmarksBar={settings.showBookmarksBar}
+            useVerticalTabs={settings.useVerticalTabs}
+            onToggleReaderMode={handleToggleReaderMode}
+            isSplitView={!!splitTabId}
+            tabStyle={settings.tabStyle}
+            isIncognito={activeTab?.isIncognito}
+            searchEngine={settings.searchEngine}
+            onToggleBookmark={handleToggleBookmarkActive}
+            onOpenHistory={handleOpenHistory}
+            onOpenDownloads={handleOpenDownloads}
+            onOpenSettings={handleOpenSettings}
+            onOpenExtensions={handleOpenExtensions}
+            onOpenShare={handleOpenShare}
+            onTakeScreenshot={handleTakeScreenshot}
+            onOpenFindInPage={handleOpenFindInPage}
+            onToggleSplitView={handleToggleSplitView}
+            onZoomIn={handleZoomIn}
+            onZoomOut={handleZoomOut}
+            onDuplicateTab={handleDuplicateTab}
+            onTogglePinTab={handleTogglePinTab}
+            onToggleMuteTab={handleToggleMuteTab}
+            onSuspendTab={handleSuspendTab}
+            onReorderTabs={handleReorderTabs}
+            onReorderFullList={handleReorderFullList}
+            onTogglePip={handleTogglePip}
+            onSelectTab={handleSelectTab}
+            onNewTab={handleNewTab}
+            onNewIncognitoTab={handleNewIncognitoTab}
+            onCloseTab={handleCloseTab}
+            onNavigate={handleNavigate}
+            onGoBack={handleGoBack}
+            onGoForward={handleGoForward}
+            onReload={handleReload}
+            isVpnEnabled={vpnEnabled}
+            onToggleVpn={handleToggleVpn}
+            onToggleAIAssistant={handleToggleAIAssistant}
+            onTabDragStart={handleTabDragStart}
+            onTabDragEnd={handleTabDragEnd}
+            onTabDrag={handleTabDrag}
+            onDropToSplitScreen={handleDropToSplitScreen}
+          />
+        )}
 
       {/* MAIN BROWSER CONTENT */}
       <main 

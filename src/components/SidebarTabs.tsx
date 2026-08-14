@@ -1,8 +1,47 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, X, Globe, VolumeX, Volume2, ChevronDown, ChevronRight, Folder as FolderIcon, MoreHorizontal, FolderPlus, Check, Settings, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Clock, Download, VenetianMask, Moon } from 'lucide-react';
-import { Tab, Workspace, Folder } from '../types/browser';
+import { 
+  Plus, 
+  X, 
+  Globe, 
+  VolumeX, 
+  Volume2, 
+  ChevronDown, 
+  ChevronRight, 
+  Folder as FolderIcon, 
+  FolderPlus, 
+  Check, 
+  Settings, 
+  LayoutGrid, 
+  Briefcase, 
+  User, 
+  Code, 
+  Sparkles, 
+  Gamepad2, 
+  GraduationCap, 
+  DollarSign, 
+  ShoppingCart, 
+  Clock, 
+  Download, 
+  VenetianMask, 
+  Moon,
+  ArrowLeft,
+  ArrowRight,
+  RotateCw,
+  Search,
+  Shield,
+  ShieldCheck,
+  Puzzle,
+  PanelLeft,
+  Package,
+  Layers,
+  Star,
+  ExternalLink
+} from 'lucide-react';
+import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
+import { UserSettings } from '../App';
+import { formatSearchUrl } from '../utils/searchEngine';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -17,13 +56,47 @@ const WORKSPACE_ICONS: Record<string, React.ElementType> = {
   LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Folder: FolderIcon
 };
 
-interface SidebarTabsProps {
+// Default Top Favorites (Arc style pinned app tiles)
+interface FavoriteApp {
+  id: string;
+  name: string;
+  url: string;
+  iconBg: string;
+  iconSvg: React.ReactNode;
+}
+
+const DEFAULT_FAVORITES: FavoriteApp[] = [
+  {
+    id: 'youtube',
+    name: 'YouTube',
+    url: 'https://youtube.com',
+    iconBg: '#ef4444',
+    iconSvg: (
+      <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+      </svg>
+    )
+  },
+  {
+    id: 'github',
+    name: 'GitHub',
+    url: 'https://github.com',
+    iconBg: '#24292f',
+    iconSvg: (
+      <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
+        <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
+      </svg>
+    )
+  }
+];
+
+export interface SidebarTabsProps {
   tabs: Tab[];
   folders?: Folder[];
   activeTabId: string;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
-  onNewTab: () => void;
+  onNewTab: (url?: string) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   workspaces: Workspace[];
   activeWorkspaceId: string;
@@ -39,9 +112,24 @@ interface SidebarTabsProps {
   onTabDragEnd?: () => void;
   splitTabId?: string | null;
   onCloseSplit?: () => void;
+  // Navigation & Omnibox controls
+  onNavigate?: (url: string) => void;
+  onGoBack?: () => void;
+  onGoForward?: () => void;
+  onReload?: () => void;
+  canGoBack?: boolean;
+  canGoForward?: boolean;
+  isLoading?: boolean;
+  searchEngine?: UserSettings['searchEngine'];
+  privacyShield?: boolean;
+  onOpenDownloads?: () => void;
+  onOpenHistory?: () => void;
+  onOpenSettings?: () => void;
+  onOpenExtensions?: () => void;
+  bookmarks?: Bookmark[];
 }
 
-// Tab Peek Popover rendered via Portal to escape Framer Motion's transform context
+// Tab Peek Popover rendered via Portal
 const TabPeekPortal: React.FC<{
   tab: Tab | null;
   pos: { top: number; left: number };
@@ -57,7 +145,7 @@ const TabPeekPortal: React.FC<{
           animate={{ opacity: 1, x: 0, scale: 1 }}
           exit={{ opacity: 0, x: -8, scale: 0.95 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none bg-white dark:bg-slate-800"
+          className="pointer-events-none bg-slate-900 text-white"
           style={{
             position: 'fixed',
             top: Math.min(pos.top, window.innerHeight - 220),
@@ -66,17 +154,17 @@ const TabPeekPortal: React.FC<{
             width: 272,
             borderRadius: 12,
             overflow: 'hidden',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
-            border: '1px solid rgba(0,0,0,0.08)',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2)',
+            border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="px-3 py-2 border-b border-white/10 bg-white/5">
+            <div className="text-xs font-semibold text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
               {tab.favicon && <img src={tab.favicon} alt="" style={{ width: 12, height: 12, marginRight: 6, display: 'inline', verticalAlign: 'middle', borderRadius: 2 }} />}
               {tab.title || tab.url || 'New Tab'}
             </div>
           </div>
-          <div className="bg-slate-100 dark:bg-slate-900 overflow-hidden" style={{ aspectRatio: '16/9' }}>
+          <div className="bg-slate-950 overflow-hidden" style={{ aspectRatio: '16/9' }}>
             <img
               src={tab.thumbnail}
               alt="Tab preview"
@@ -92,6 +180,7 @@ const TabPeekPortal: React.FC<{
 
 export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   tabs,
+  folders,
   activeTabId,
   onSelectTab,
   onCloseTab,
@@ -101,7 +190,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   activeWorkspaceId,
   onSelectWorkspace,
   isIncognito,
-  folders,
   onCreateFolder,
   onToggleFolder,
   onRenameFolder,
@@ -111,14 +199,104 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onTabDragStart,
   onTabDragEnd,
   splitTabId,
-  onCloseSplit
+  onCloseSplit,
+  onNavigate,
+  onGoBack,
+  onGoForward,
+  onReload,
+  canGoBack = false,
+  canGoForward = false,
+  isLoading = false,
+  searchEngine = 'google',
+  privacyShield = true,
+  onOpenDownloads,
+  onOpenHistory,
+  onOpenSettings,
+  onOpenExtensions,
+  bookmarks = []
 }) => {
+  const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
+
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
+  const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const libraryRef = useRef<HTMLDivElement>(null);
+
+  // Omnibox state
+  const [searchValue, setSearchValue] = useState('');
+  const [isOmniboxFocused, setIsOmniboxFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const omniboxInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync active tab URL into omnibox when not focused
+  useEffect(() => {
+    if (!isOmniboxFocused) {
+      const url = activeTab?.url || '';
+      if (url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') {
+        setSearchValue('');
+      } else {
+        setSearchValue(url);
+      }
+    }
+  }, [activeTab?.url, isOmniboxFocused]);
+
+  // Fetch suggestions
+  useEffect(() => {
+    if (!isOmniboxFocused || !searchValue.trim() || searchValue.includes('://')) {
+      setSuggestions([]);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
+          const results = await (window as any).electronAPI.getSuggestions(searchValue);
+          if (Array.isArray(results)) {
+            setSuggestions(results.slice(0, 5));
+            return;
+          }
+        }
+        const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(searchValue)}&type=list`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data) && data[1]) {
+            setSuggestions(data[1].slice(0, 5));
+          }
+        }
+      } catch (_) {}
+    }, 150);
+
+    return () => clearTimeout(timer);
+  }, [searchValue, isOmniboxFocused]);
+
+  // Handle Omnibox Submit
+  const handleOmniboxSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchValue.trim()) return;
+
+    let targetValue = searchValue.trim();
+    if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      targetValue = suggestions[selectedIndex];
+    }
+
+    const formattedUrl = formatSearchUrl(targetValue, searchEngine);
+    if (onNavigate) {
+      onNavigate(formattedUrl);
+    } else {
+      onNewTab(formattedUrl);
+    }
+
+    setShowSuggestions(false);
+    setIsOmniboxFocused(false);
+    omniboxInputRef.current?.blur();
+  };
 
   const handleMouseEnter = (tab: Tab, e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -140,10 +318,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsWorkspaceDropdownOpen(false);
       }
+      if (libraryRef.current && !libraryRef.current.contains(event.target as Node)) {
+        setIsLibraryDropdownOpen(false);
+      }
     };
     
     document.addEventListener('mousedown', handleClickOutside);
-    
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
       document.removeEventListener('mousedown', handleClickOutside);
@@ -155,65 +335,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     const isSplitChild = tab.id === splitTabId;
 
     if (isSplitChild && splitTabId && activeTabId) {
-      return null; // Hide the secondary tab from its normal position
-    }
-
-    if (isActive && splitTabId) {
-      const splitTab = tabs.find(t => t.id === splitTabId);
-      if (splitTab) {
-        return (
-          <motion.div
-            draggable
-            onDragStart={(e: any) => {
-              e.dataTransfer.setData('text/plain', tab.id);
-              onTabDragStart?.();
-            }}
-            onDragEnd={() => {
-              setHoverPos({ top: 0, left: 0 });
-              onTabDragEnd?.();
-            }}
-            initial={{ opacity: 0, x: -8 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -8, height: 0, marginTop: 0, marginBottom: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            whileHover={{ scale: 1.01 }}
-            key={`split-${tab.id}-${splitTab.id}`}
-            className={`relative flex items-center h-10 rounded-[10px] transition-all overflow-hidden ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
-              isIncognito
-                ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50 relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
-                : 'bg-white text-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/60 dark:bg-slate-800/95 dark:text-white dark:ring-slate-700/50 dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
-            }`}
-          >
-            <div className="flex w-full items-center h-full px-1 py-1">
-              {/* Primary Tab Half */}
-              <div 
-                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
-                title={tab.title}
-              >
-                {tab.favicon ? <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
-                <span className="truncate text-[11px] font-semibold">{tab.title || tab.url || 'New Tab'}</span>
-              </div>
-
-              <div className="w-[1px] h-4 bg-slate-200 dark:bg-slate-700 shrink-0 mx-0.5" />
-
-              {/* Secondary Tab Half */}
-              <div 
-                className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
-                title={splitTab.title}
-              >
-                {splitTab.favicon ? <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
-                <span className="truncate text-[11px] font-semibold flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
-                
-                <button onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} className="p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        );
-      }
+      return null;
     }
 
     return (
@@ -231,66 +353,64 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
         transition={{ duration: 0.12, ease: 'easeOut' }}
-        whileHover={{ scale: 1.01 }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-11 rounded-[10px] cursor-pointer transition-all overflow-hidden group/tab ${isNested ? 'ml-[18px] w-[calc(100%-18px)]' : 'w-full'} ${
+        className={`relative flex items-center h-9 px-2.5 rounded-xl cursor-pointer transition-all duration-150 group/tab select-none ${
+          isNested ? 'ml-4 w-[calc(100%-16px)]' : 'w-full'
+        } ${
           isActive
-            ? isIncognito
-              ? 'bg-slate-800 text-white shadow-md ring-1 ring-slate-700/50 relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
-              : 'bg-white text-slate-900 shadow-[0_2px_12px_rgba(0,0,0,0.06)] ring-1 ring-slate-200/60 dark:bg-slate-800/95 dark:text-white dark:ring-slate-700/50 dark:shadow-[0_2px_12px_rgba(0,0,0,0.2)] relative after:absolute after:left-0 after:top-2 after:bottom-2 after:w-[3px] after:bg-blue-500 after:rounded-r-md'
-            : isIncognito
-              ? 'text-slate-400 hover:bg-slate-800/60 hover:text-slate-200'
-              : 'text-slate-600 hover:bg-white/60 dark:text-slate-400 dark:hover:bg-white/10'
+            ? 'bg-white/12 text-white shadow-sm font-medium border border-white/10'
+            : 'text-slate-300/80 hover:bg-white/6 hover:text-white'
         }`}
       >
-        <div className="flex items-center gap-3 px-3 flex-1 min-w-0">
-          <div className="w-6 h-6 flex items-center justify-center shrink-0 drop-shadow-sm">
+        <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <div className="w-4 h-4 flex items-center justify-center shrink-0">
             {tab.isLoading ? (
-              <div className="w-[18px] h-[18px] border-2 border-slate-400/50 border-t-transparent rounded-full animate-spin" />
+              <div className="w-3.5 h-3.5 border-2 border-slate-300/40 border-t-white rounded-full animate-spin" />
             ) : tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-[18px] h-[18px] rounded-sm object-contain" />
+              <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-sm object-contain" />
             ) : tab.url === 'nova://settings' ? (
-              <Settings className="w-[18px] h-[18px] opacity-70" />
+              <Settings className="w-3.5 h-3.5 opacity-70" />
             ) : tab.url === 'nova://history' ? (
-              <Clock className="w-[18px] h-[18px] opacity-70" />
+              <Clock className="w-3.5 h-3.5 opacity-70" />
             ) : tab.url === 'nova://downloads' ? (
-              <Download className="w-[18px] h-[18px] opacity-70" />
+              <Download className="w-3.5 h-3.5 opacity-70" />
             ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
-              tab.isIncognito ? <VenetianMask className="w-[18px] h-[18px] opacity-70" /> : <Plus className="w-[18px] h-[18px] opacity-70" />
+              tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 opacity-70" /> : <Plus className="w-3.5 h-3.5 opacity-70" />
             ) : (
-              <Globe className="w-[18px] h-[18px] opacity-70" />
+              <Globe className="w-3.5 h-3.5 opacity-70" />
             )}
           </div>
-          <span className={`truncate text-sm transition-opacity duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
-            {tab.title || tab.url || 'New Tab'}
+          <span className="truncate text-[13px] tracking-tight">
+            {tab.title || (tab.url === 'nova://newtab' ? 'New Tab' : tab.url) || 'New Tab'}
           </span>
         </div>
-        <div className={`flex items-center gap-1 pr-2 transition-all duration-200 ease-out shrink-0 ${isActive ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-2 group-hover/tab:opacity-100 group-hover/tab:translate-x-0'}`}>
+
+        <div className={`flex items-center gap-1 transition-all duration-150 shrink-0 ${
+          isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+        }`}>
           {tab.isMuted ? (
-            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-red-500">
-              <VolumeX className="w-3.5 h-3.5" />
+            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-white/10 text-red-400">
+              <VolumeX className="w-3 h-3" />
             </button>
           ) : tab.isPlayingAudio ? (
-            <div className="flex items-center">
-              <button onClick={(e) => { e.stopPropagation(); const wv = document.querySelector(`webview[data-tab-id="${tab.id}"]`) as any; if(wv) wv.executeJavaScript(`(() => { const v = Array.from(document.querySelectorAll('video')).find(v=>!v.paused)||document.querySelector('video'); if(!v) return; if(document.pictureInPictureElement) document.exitPictureInPicture(); else v.requestPictureInPicture(); })();`, true); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500" title="Picture in Picture">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
-              </button>
-              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-blue-500">
-                <Volume2 className="w-3.5 h-3.5 animate-pulse" />
-              </button>
-            </div>
+            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-white/10 text-cyan-400">
+              <Volume2 className="w-3 h-3 animate-pulse" />
+            </button>
           ) : null}
           {tab.isSuspended && (
-            <span className="p-1 text-indigo-400 shrink-0" title="Suspended Tab (Memory Saver)">
-              <Moon className="w-3.5 h-3.5 opacity-80" />
+            <span className="p-0.5 text-indigo-300/70 shrink-0" title="Sleeping Tab">
+              <Moon className="w-3 h-3" />
             </span>
           )}
           {tabs.length > 1 && (
-            <button onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500 transition-colors">
-              <X className="w-3.5 h-3.5" />
+            <button 
+              onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
+              className="p-1 rounded-md hover:bg-white/15 text-slate-400 hover:text-white transition-colors"
+            >
+              <X className="w-3 h-3" />
             </button>
           )}
         </div>
@@ -300,44 +420,198 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className={`flex flex-col h-full w-[260px] overflow-hidden shrink-0 drag-region z-40 pt-14 backdrop-blur-[40px] shadow-sm border-r ${
-        isIncognito
-          ? 'bg-slate-900/75 border-slate-800/80 dark'
-          : 'bg-white/50 border-slate-200/50 dark:bg-slate-900/50 dark:border-slate-800/50'
-      }`}>
+      <div className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#161224]/85 backdrop-blur-3xl border-r border-white/[0.07] font-sans">
+        
+        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
+        <div className="h-10 pt-2 px-3 flex items-center justify-between drag-region shrink-0">
+          {/* Left: Space reserved for native macOS window traffic lights (red, yellow, green) */}
+          <div className="w-[70px] h-full shrink-0" />
 
-        {/* Workspace Header & Switcher */}
-        <div className="relative no-drag" ref={dropdownRef}>
-          <div className="flex items-center gap-3 px-3 h-12 shrink-0 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-               onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-          >
-            <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 shadow-sm"
-                 style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace?.color || 'slate'] || '#64748b' }}>
-              {activeWorkspace?.icon ? (
-                React.createElement(WORKSPACE_ICONS[activeWorkspace.icon] || LayoutGrid, { className: "w-3.5 h-3.5 text-white" })
-              ) : (
-                <span className="text-white text-xs font-bold">{activeWorkspace?.name.charAt(0)}</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0 transition-opacity duration-200 flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold truncate text-slate-800 dark:text-slate-200">{activeWorkspace?.name}</div>
-                <div className="text-[10px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Workspace</div>
-              </div>
-              <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isWorkspaceDropdownOpen ? 'rotate-180' : ''}`} />
-            </div>
+          {/* Right: Navigation Controls (Back, Forward, Reload) in clean Arc style */}
+          <div className="flex items-center gap-1 no-drag">
+            <button
+              onClick={onGoBack}
+              disabled={!canGoBack}
+              className={`p-1.5 rounded-lg transition-colors ${
+                canGoBack ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
+              }`}
+              title="Back (⌘[)"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onGoForward}
+              disabled={!canGoForward}
+              className={`p-1.5 rounded-lg transition-colors ${
+                canGoForward ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
+              }`}
+              title="Forward (⌘])"
+            >
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={onReload}
+              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+              title="Reload (⌘R)"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+            </button>
           </div>
+        </div>
 
+        {/* 2. INTEGRATED ARC OMNIBOX / URL SEARCH PILL */}
+        <div className="px-3 pt-2 pb-2.5 no-drag relative">
+          <form onSubmit={handleOmniboxSubmit}>
+            <div className={`relative flex items-center h-8.5 px-2.5 rounded-xl transition-all duration-200 border ${
+              isOmniboxFocused 
+                ? 'bg-white/12 border-white/20 shadow-lg ring-1 ring-white/10' 
+                : 'bg-white/6 hover:bg-white/8 border-white/[0.08]'
+            }`}>
+              <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
+              
+              <input
+                ref={omniboxInputRef}
+                type="text"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  setShowSuggestions(true);
+                  setSelectedIndex(-1);
+                }}
+                onFocus={() => {
+                  setIsOmniboxFocused(true);
+                  setShowSuggestions(true);
+                  if (activeTab?.url && activeTab.url !== 'nova://newtab') {
+                    setSearchValue(activeTab.url);
+                  }
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setIsOmniboxFocused(false);
+                    setShowSuggestions(false);
+                  }, 200);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.min(prev + 1, suggestions.length - 1));
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setSelectedIndex(prev => Math.max(prev - 1, -1));
+                  } else if (e.key === 'Escape') {
+                    setShowSuggestions(false);
+                    omniboxInputRef.current?.blur();
+                  }
+                }}
+                placeholder="Search or Enter URL..."
+                className="w-full bg-transparent text-[12.5px] text-white placeholder-slate-400/60 focus:outline-none tracking-tight"
+                spellCheck={false}
+                autoCapitalize="off"
+                autoComplete="off"
+              />
+
+              {/* Security Shield & Extensions Badges */}
+              <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+                {privacyShield ? (
+                  <span title="Privacy Shield Active" className="text-emerald-400/90">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                  </span>
+                ) : (
+                  <span title="Privacy Shield Disabled" className="text-slate-500">
+                    <Shield className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                {onOpenExtensions && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenExtensions(); }}
+                    className="text-slate-400 hover:text-white transition-colors"
+                    title="Extensions"
+                  >
+                    <Puzzle className="w-3.5 h-3.5 opacity-70" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </form>
+
+          {/* Suggestions Dropdown */}
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -4, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-12 left-3 right-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+              >
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    onMouseDown={() => {
+                      const formatted = formatSearchUrl(s, searchEngine);
+                      if (onNavigate) onNavigate(formatted);
+                      else onNewTab(formatted);
+                      setShowSuggestions(false);
+                    }}
+                    className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
+                      idx === selectedIndex ? 'bg-white/15 text-white font-medium' : 'text-slate-300 hover:bg-white/8'
+                    }`}
+                  >
+                    <Search className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span className="truncate">{s}</span>
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* 3. PINNED FAVORITES GRID (YouTube, GitHub, etc. Arc style tiles) */}
+        <div className="px-3 pb-3 grid grid-cols-2 gap-2 no-drag">
+          {DEFAULT_FAVORITES.map((fav) => (
+            <button
+              key={fav.id}
+              onClick={() => {
+                if (onNavigate) onNavigate(fav.url);
+                else onNewTab(fav.url);
+              }}
+              className="flex items-center justify-center h-10 rounded-xl bg-white/6 hover:bg-white/10 border border-white/[0.08] hover:border-white/15 transition-all duration-150 group shadow-sm"
+              title={fav.name}
+            >
+              <div className="w-6 h-6 rounded-md flex items-center justify-center transition-transform duration-150 group-hover:scale-110">
+                {fav.iconSvg}
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* 4. ACTIVE SPACE / PROFILE HEADER (e.g. 🪐 siraç göktuğ) */}
+        <div className="px-3 pb-2 no-drag relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/6 transition-colors text-left group"
+          >
+            <span className="text-sm shrink-0">🪐</span>
+            <span className="text-[13px] font-semibold text-slate-200 truncate flex-1 tracking-tight">
+              {activeWorkspace?.name || 'siraç göktuğ'}
+            </span>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
+              isWorkspaceDropdownOpen ? 'rotate-180' : ''
+            }`} />
+          </button>
+
+          {/* Workspace Dropdown */}
           <AnimatePresence>
             {isWorkspaceDropdownOpen && (
               <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                initial={{ opacity: 0, y: -6, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="absolute top-12 left-2 right-2 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200/60 dark:border-slate-700/60 overflow-hidden z-50 py-1"
+                exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-10 left-3 right-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
-                <div className="max-h-60 overflow-y-auto no-scrollbar py-1">
+                <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
                   {workspaces.map(w => (
                     <button
                       key={w.id}
@@ -345,35 +619,29 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         onSelectWorkspace(w.id);
                         setIsWorkspaceDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-3 px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/10 transition-colors text-left"
                     >
-                      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 shadow-sm"
+                      <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
                            style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
-                        {w.icon ? (
-                          React.createElement(WORKSPACE_ICONS[w.icon] || LayoutGrid, { className: "w-3 h-3 text-white" })
-                        ) : (
-                          <span className="text-white text-[10px] font-bold">{w.name.charAt(0)}</span>
-                        )}
+                        {w.name.charAt(0)}
                       </div>
-                      <span className={`text-[13px] flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'font-medium text-slate-600 dark:text-slate-300'}`}>
+                      <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-white' : 'text-slate-300'}`}>
                         {w.name}
                       </span>
-                      {w.id === activeWorkspaceId && (
-                        <Check className="w-3.5 h-3.5 text-blue-500" />
-                      )}
+                      {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-400" />}
                     </button>
                   ))}
                 </div>
-                <div className="border-t border-slate-100 dark:border-slate-700/60 mt-1 pt-1">
+                <div className="border-t border-white/10 mt-1 pt-1">
                   <button
                     onClick={() => {
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-[13px] font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 transition-colors"
                   >
-                    <Settings className="w-4 h-4" />
-                    Manage Workspaces
+                    <Settings className="w-3.5 h-3.5" />
+                    Manage Spaces
                   </button>
                 </div>
               </motion.div>
@@ -381,14 +649,25 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* Tabs & Folders List */}
+        {/* 5. NEW TAB BUTTON */}
+        <div className="px-3 pb-2 no-drag">
+          <button
+            onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
+            className="w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl hover:bg-white/6 text-slate-300/80 hover:text-white transition-all text-left group"
+          >
+            <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+            <span className="text-[13px] font-medium tracking-tight">New Tab</span>
+            <span className="ml-auto text-[10px] text-slate-500 font-mono">⌘T</span>
+          </button>
+        </div>
+
+        {/* 6. TAB & FOLDER LIST */}
         <div 
-          className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-3 no-scrollbar flex flex-col gap-1 no-drag"
+          className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-1 no-scrollbar flex flex-col gap-0.5 no-drag"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             const tabId = e.dataTransfer.getData('text/plain');
-            // Check if dropped on empty space (not on a folder)
             if (tabId && (e.target as HTMLElement).tagName === 'DIV' && (e.target === e.currentTarget)) {
               onMoveTabToFolder?.(tabId, undefined);
             }
@@ -403,32 +682,32 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.15, ease: 'easeOut' }}
+                  transition={{ duration: 0.15 }}
                   key={folder.id}
-                  className="flex flex-col gap-1"
+                  className="flex flex-col gap-0.5"
                 >
                   <div
                     onClick={() => onToggleFolder?.(folder.id)}
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-black/10', 'dark:bg-white/10'); }}
-                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-black/10', 'dark:bg-white/10')}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-white/10'); }}
+                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-white/10')}
                     onDrop={(e) => {
                       e.preventDefault();
-                      e.currentTarget.classList.remove('bg-black/10', 'dark:bg-white/10');
+                      e.currentTarget.classList.remove('bg-white/10');
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className="flex items-center gap-2 h-9 px-2 rounded-lg cursor-pointer text-slate-700 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all group/folder"
+                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-300 hover:bg-white/6 transition-all group/folder"
                   >
-                    <div className="w-5 h-5 flex items-center justify-center shrink-0">
-                      {folder.isExpanded ? <ChevronDown className="w-4 h-4 opacity-60" /> : <ChevronRight className="w-4 h-4 opacity-60" />}
+                    <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
+                      {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </div>
-                    <FolderIcon className="w-4 h-4 opacity-60 group-hover/folder:opacity-90 transition-opacity" />
-                    <span className="text-[13px] font-semibold flex-1 truncate">{folder.name}</span>
+                    <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
+                    <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
-                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-700 opacity-0 translate-x-2 group-hover/folder:opacity-100 group-hover/folder:translate-x-0 transition-all duration-200 ease-out text-slate-400 hover:text-red-500"
+                      className="p-1 rounded-md hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-400"
                     >
-                      <X className="w-3.5 h-3.5" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                   <AnimatePresence>
@@ -440,9 +719,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         transition={{ duration: 0.2 }}
                         className="relative"
                       >
-                        {/* Indentation Guide Line */}
-                        <div className="absolute left-[13px] top-1 bottom-1 w-[2px] bg-slate-200/50 dark:bg-slate-700/50 rounded-full" />
-                        <div className="flex flex-col gap-1 pb-1">
+                        <div className="flex flex-col gap-0.5 pb-1">
                           {folderTabs.map(tab => renderTab(tab, true))}
                         </div>
                       </motion.div>
@@ -452,43 +729,87 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               );
             })}
 
-            {/* Root Tabs (not in any folder) */}
+            {/* Root Tabs */}
             {tabs.filter(t => !t.folderId).map(tab => renderTab(tab, false))}
           </AnimatePresence>
         </div>
 
-        {/* Footer / New Tab & New Folder */}
-        <div className="p-3 flex items-center gap-1 no-drag mt-auto">
+        {/* 7. BOTTOM DOCK FOOTER: Library / Drawer Box & Action Plus Button */}
+        <div className="p-3 pt-2 border-t border-white/[0.07] flex items-center justify-between no-drag mt-auto relative" ref={libraryRef}>
+          {/* Library Drawer Icon */}
           <button
-            onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-            className={`flex flex-1 items-center gap-2 h-9 px-3 rounded-lg transition-colors ${
-              isIncognito
-                ? 'text-slate-300 hover:bg-white/10'
-                : 'text-slate-600 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/10'
-            }`}
+            onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
+            className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            title="Library (Downloads, History, Settings)"
           >
-            <Plus className="w-4 h-4 opacity-70" />
-            <span className="text-[13px] font-medium truncate">
-              New Tab
-            </span>
-            <span className="ml-auto text-[11px] opacity-40 font-mono">⌘T</span>
+            <Package className="w-4 h-4" />
           </button>
-          
-          <button
-            onClick={() => onCreateFolder?.()}
-            className={`flex items-center justify-center shrink-0 w-9 h-9 rounded-lg transition-colors ${
-              isIncognito
-                ? 'text-slate-300 hover:bg-white/10'
-                : 'text-slate-600 hover:bg-black/5 dark:text-slate-300 dark:hover:bg-white/10'
-            }`}
-            title="New Folder"
-          >
-            <FolderPlus className="w-4 h-4 opacity-70" />
-          </button>
+
+          {/* Library Dropdown */}
+          <AnimatePresence>
+            {isLibraryDropdownOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.96 }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-12 left-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+              >
+                {onOpenDownloads && (
+                  <button
+                    onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-400" />
+                    Downloads
+                  </button>
+                )}
+                {onOpenHistory && (
+                  <button
+                    onClick={() => { onOpenHistory(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                  >
+                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    History
+                  </button>
+                )}
+                {onOpenSettings && (
+                  <button
+                    onClick={() => { onOpenSettings(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-purple-400" />
+                    Settings
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Action Plus Button */}
+          <div className="flex items-center gap-1">
+            {onCreateFolder && (
+              <button
+                onClick={onCreateFolder}
+                className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                title="New Folder"
+              >
+                <FolderPlus className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={() => onNewTab()}
+              className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              title="New Tab"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          </div>
         </div>
+
       </div>
 
-      {/* Tab Peek rendered via Portal — escapes Framer Motion transform context */}
+      {/* Tab Peek Portal */}
       <TabPeekPortal tab={hoveredTab} pos={hoverPos} />
     </>
   );
