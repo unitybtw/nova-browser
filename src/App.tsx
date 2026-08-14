@@ -1694,10 +1694,14 @@ function App() {
 
       if (matches('newTab')) {
         e.preventDefault();
-        handleNewTab();
-        setTimeout(() => {
-          document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
-        }, 100);
+        if (settings.useVerticalTabs) {
+          handleOpenSpotlight();
+        } else {
+          handleNewTab();
+          setTimeout(() => {
+            document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
+          }, 100);
+        }
         return;
       }
       

@@ -33,10 +33,11 @@ import {
   Shield,
   ShieldCheck,
   Puzzle,
-  PanelLeft,
   Package,
+  Orbit,
   Layers,
-  Star,
+  Trash2,
+  Edit2,
   ExternalLink
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
@@ -56,37 +57,43 @@ const WORKSPACE_ICONS: Record<string, React.ElementType> = {
   LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, GraduationCap, DollarSign, ShoppingCart, Folder: FolderIcon
 };
 
-// Default Top Favorites (Arc style pinned app tiles)
-interface FavoriteApp {
+// Customizable Top Favorites Interface
+export interface FavoriteApp {
   id: string;
   name: string;
   url: string;
-  iconBg: string;
-  iconSvg: React.ReactNode;
+  domain?: string;
+  iconBg?: string;
 }
 
-const DEFAULT_FAVORITES: FavoriteApp[] = [
+const INITIAL_DEFAULT_FAVORITES: FavoriteApp[] = [
   {
-    id: 'youtube',
+    id: 'fav_yt',
     name: 'YouTube',
     url: 'https://youtube.com',
-    iconBg: '#ef4444',
-    iconSvg: (
-      <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
-        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-      </svg>
-    )
+    domain: 'youtube.com',
+    iconBg: '#ef4444'
   },
   {
-    id: 'github',
+    id: 'fav_gh',
     name: 'GitHub',
     url: 'https://github.com',
-    iconBg: '#24292f',
-    iconSvg: (
-      <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
-        <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
-      </svg>
-    )
+    domain: 'github.com',
+    iconBg: '#24292f'
+  },
+  {
+    id: 'fav_tw',
+    name: 'X',
+    url: 'https://x.com',
+    domain: 'x.com',
+    iconBg: '#0f1419'
+  },
+  {
+    id: 'fav_ai',
+    name: 'ChatGPT',
+    url: 'https://chatgpt.com',
+    domain: 'chatgpt.com',
+    iconBg: '#10a37f'
   }
 ];
 
@@ -234,6 +241,59 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const omniboxInputRef = useRef<HTMLInputElement>(null);
+
+  // Customizable Top Favorites state
+  const [favorites, setFavorites] = useState<FavoriteApp[]>(() => {
+    try {
+      const saved = localStorage.getItem('nova_top_favorites');
+      if (saved) return JSON.parse(saved);
+    } catch (_) {}
+    return INITIAL_DEFAULT_FAVORITES;
+  });
+
+  const [isAddFavoriteOpen, setIsAddFavoriteOpen] = useState(false);
+  const [newFavName, setNewFavName] = useState('');
+  const [newFavUrl, setNewFavUrl] = useState('');
+
+  const saveFavorites = (newFavs: FavoriteApp[]) => {
+    setFavorites(newFavs);
+    try {
+      localStorage.setItem('nova_top_favorites', JSON.stringify(newFavs));
+    } catch (_) {}
+  };
+
+  const handleAddFavorite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFavName.trim() || !newFavUrl.trim()) return;
+
+    let finalUrl = newFavUrl.trim();
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = 'https://' + finalUrl;
+    }
+
+    let domain = '';
+    try {
+      domain = new URL(finalUrl).hostname.replace('www.', '');
+    } catch (_) {}
+
+    const newFav: FavoriteApp = {
+      id: 'fav_' + Date.now(),
+      name: newFavName.trim(),
+      url: finalUrl,
+      domain: domain || newFavName.trim(),
+      iconBg: '#334155'
+    };
+
+    saveFavorites([...favorites, newFav]);
+    setNewFavName('');
+    setNewFavUrl('');
+    setIsAddFavoriteOpen(false);
+  };
+
+  const handleRemoveFavorite = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    saveFavorites(favorites.filter(f => f.id !== id));
+  };
 
   // Sync active tab URL into omnibox when not focused
   useEffect(() => {
@@ -420,14 +480,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#161224]/85 backdrop-blur-3xl border-r border-white/[0.07] font-sans">
+      <div className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#161224]/90 backdrop-blur-3xl border-r border-white/[0.07] font-sans">
         
-        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
+        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Back/Forward/Reload */}
         <div className="h-10 pt-2 px-3 flex items-center justify-between drag-region shrink-0">
-          {/* Left: Space reserved for native macOS window traffic lights (red, yellow, green) */}
           <div className="w-[70px] h-full shrink-0" />
 
-          {/* Right: Navigation Controls (Back, Forward, Reload) in clean Arc style */}
+          {/* Navigation Controls */}
           <div className="flex items-center gap-1 no-drag">
             <button
               onClick={onGoBack}
@@ -435,7 +494,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               className={`p-1.5 rounded-lg transition-colors ${
                 canGoBack ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
               }`}
-              title="Back (⌘[)"
+              title="Back"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
             </button>
@@ -445,21 +504,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               className={`p-1.5 rounded-lg transition-colors ${
                 canGoForward ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
               }`}
-              title="Forward (⌘])"
+              title="Forward"
             >
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={onReload}
               className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
-              title="Reload (⌘R)"
+              title="Reload"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
         </div>
 
-        {/* 2. INTEGRATED ARC OMNIBOX / URL SEARCH PILL */}
+        {/* 2. INTEGRATED OMNIBOX / URL SEARCH PILL */}
         <div className="px-3 pt-2 pb-2.5 no-drag relative">
           <form onSubmit={handleOmniboxSubmit}>
             <div className={`relative flex items-center h-8.5 px-2.5 rounded-xl transition-all duration-200 border ${
@@ -510,7 +569,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 autoComplete="off"
               />
 
-              {/* Security Shield & Extensions Badges */}
               <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
                 {privacyShield ? (
                   <span title="Privacy Shield Active" className="text-emerald-400/90">
@@ -567,32 +625,125 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 3. PINNED FAVORITES GRID (YouTube, GitHub, etc. Arc style tiles) */}
-        <div className="px-3 pb-3 grid grid-cols-2 gap-2 no-drag">
-          {DEFAULT_FAVORITES.map((fav) => (
-            <button
-              key={fav.id}
-              onClick={() => {
-                if (onNavigate) onNavigate(fav.url);
-                else onNewTab(fav.url);
-              }}
-              className="flex items-center justify-center h-10 rounded-xl bg-white/6 hover:bg-white/10 border border-white/[0.08] hover:border-white/15 transition-all duration-150 group shadow-sm"
-              title={fav.name}
-            >
-              <div className="w-6 h-6 rounded-md flex items-center justify-center transition-transform duration-150 group-hover:scale-110">
-                {fav.iconSvg}
-              </div>
-            </button>
-          ))}
+        {/* 3. CUSTOMIZABLE TOP FAVORITES GRID */}
+        <div className="px-3 pb-3 no-drag">
+          <div className="grid grid-cols-2 gap-2">
+            {favorites.map((fav) => {
+              const favDomain = fav.domain || (fav.url.replace(/https?:\/\//, '').split('/')[0]);
+              const faviconUrl = `https://www.google.com/s2/favicons?domain=${favDomain}&sz=64`;
+
+              return (
+                <div key={fav.id} className="relative group/fav">
+                  <button
+                    onClick={() => {
+                      if (onNavigate) onNavigate(fav.url);
+                      else onNewTab(fav.url);
+                    }}
+                    className="w-full flex items-center justify-center h-10 rounded-xl bg-white/6 hover:bg-white/10 border border-white/[0.08] hover:border-white/15 transition-all duration-150 shadow-sm overflow-hidden"
+                    title={`${fav.name} (${fav.url})`}
+                  >
+                    <div className="w-5 h-5 flex items-center justify-center transition-transform duration-150 group-hover/fav:scale-110">
+                      <img 
+                        src={faviconUrl} 
+                        alt={fav.name} 
+                        className="w-4 h-4 rounded-xs object-contain"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }} 
+                      />
+                    </div>
+                  </button>
+
+                  {/* Remove Favorite Button */}
+                  <button
+                    onClick={(e) => handleRemoveFavorite(fav.id, e)}
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-800 text-slate-400 hover:text-red-400 hover:bg-slate-700 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-all duration-150 shadow-md z-10"
+                    title="Remove Favorite"
+                  >
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </div>
+              );
+            })}
+
+            {/* Add Favorite Button */}
+            {favorites.length < 6 && (
+              <button
+                onClick={() => setIsAddFavoriteOpen(true)}
+                className="flex items-center justify-center h-10 rounded-xl bg-white/4 hover:bg-white/8 border border-dashed border-white/15 hover:border-white/25 text-slate-400 hover:text-white transition-all duration-150"
+                title="Add Favorite Shortcut"
+              >
+                <Plus className="w-4 h-4 opacity-70" />
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* 4. ACTIVE SPACE / PROFILE HEADER (e.g. 🪐 siraç göktuğ) */}
+        {/* Add Favorite Modal Popover */}
+        <AnimatePresence>
+          {isAddFavoriteOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="px-3 pb-3 no-drag"
+            >
+              <form onSubmit={handleAddFavorite} className="p-2.5 rounded-xl bg-[#1e1930]/95 border border-white/15 shadow-xl flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-300">Add Favorite</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAddFavoriteOpen(false)}
+                    className="text-slate-400 hover:text-white p-0.5"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Name (e.g. Reddit)"
+                  value={newFavName}
+                  onChange={(e) => setNewFavName(e.target.value)}
+                  className="w-full h-7 px-2 bg-white/8 border border-white/10 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+                  autoFocus
+                />
+
+                <input
+                  type="text"
+                  placeholder="URL (e.g. reddit.com)"
+                  value={newFavUrl}
+                  onChange={(e) => setNewFavUrl(e.target.value)}
+                  className="w-full h-7 px-2 bg-white/8 border border-white/10 rounded-lg text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+                />
+
+                <div className="flex items-center justify-end gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddFavoriteOpen(false)}
+                    className="px-2.5 py-1 rounded-md text-[11px] text-slate-400 hover:bg-white/10"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-2.5 py-1 rounded-md text-[11px] font-medium bg-cyan-600 hover:bg-cyan-500 text-white shadow-sm"
+                  >
+                    Save
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. ACTIVE SPACE / PROFILE HEADER (Zero Emojis, Pure Lucide Orbit) */}
         <div className="px-3 pb-2 no-drag relative" ref={dropdownRef}>
           <button
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/6 transition-colors text-left group"
           >
-            <span className="text-sm shrink-0">🪐</span>
+            <Orbit className="w-3.5 h-3.5 text-purple-400 shrink-0" />
             <span className="text-[13px] font-semibold text-slate-200 truncate flex-1 tracking-tight">
               {activeWorkspace?.name || 'siraç göktuğ'}
             </span>
@@ -649,7 +800,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 5. NEW TAB BUTTON */}
+        {/* 5. NEW TAB BUTTON (Opens Spotlight Omni Search directly!) */}
         <div className="px-3 pb-2 no-drag">
           <button
             onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
@@ -734,13 +885,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 7. BOTTOM DOCK FOOTER: Library / Drawer Box & Action Plus Button */}
+        {/* 7. BOTTOM DOCK FOOTER */}
         <div className="p-3 pt-2 border-t border-white/[0.07] flex items-center justify-between no-drag mt-auto relative" ref={libraryRef}>
-          {/* Library Drawer Icon */}
           <button
             onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
             className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
-            title="Library (Downloads, History, Settings)"
+            title="Library"
           >
             <Package className="w-4 h-4" />
           </button>
@@ -786,7 +936,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
           </AnimatePresence>
 
-          {/* Action Plus Button */}
           <div className="flex items-center gap-1">
             {onCreateFolder && (
               <button
@@ -798,7 +947,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               </button>
             )}
             <button
-              onClick={() => onNewTab()}
+              onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
               className="p-2 rounded-xl hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
               title="New Tab"
             >
