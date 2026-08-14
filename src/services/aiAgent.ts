@@ -79,9 +79,8 @@ class AIAgent {
     }
   }
   
-  // We MUST use a Hermes model because WebLLM only supports function calling on Hermes fine-tunes in this version.
-  // Kept context window at 2048 to prevent the lag we experienced earlier.
-  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
+  // Using ultra-optimized Llama-3.2-3B which is 4x faster and lightweight on WebGPU to prevent browser freezing
+  private modelId = "Llama-3.2-3B-Instruct-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
