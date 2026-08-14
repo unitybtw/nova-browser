@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Copy, Check, Clock, BookOpen } from 'lucide-react';
+import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Clock, BookOpen, Volume2, Globe } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
+import { detectLanguage, getBestVoice } from '../services/tts';
 
 interface HighlightData {
   id: string;
@@ -53,12 +54,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [columnWidth, setColumnWidth] = useState<'narrow' | 'normal' | 'wide'>('normal');
   const [showControls, setShowControls] = useState(false);
 
-  // TTS State
+  // Natural TTS & Language State
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speechRate, setSpeechRate] = useState(1);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [sentences, setSentences] = useState<string[]>([]);
+  const [detectedLang, setDetectedLang] = useState('tr-TR');
+  const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
   
   const contentRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
@@ -85,9 +90,22 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     top: number;
     left: number;
   }>({ visible: false, note: '', top: 0, left: 0 });
-  const [copiedNote, setCopiedNote] = useState(false);
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+
+  // Load available system voices
+  useEffect(() => {
+    const updateVoices = () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        const voices = window.speechSynthesis.getVoices();
+        setAvailableVoices(voices);
+      }
+    };
+    updateVoices();
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoices;
+    }
+  }, []);
 
   // Escape key support to close modals or reader mode
   useEffect(() => {
@@ -136,7 +154,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             setTimeout(() => {
               if (!contentRef.current) return;
               const walkDOM = (node: Node, textToFind: string): Range | null => {
-                if (node.nodeType === 3) { // Text node
+                if (node.nodeType === 3) {
                   const idx = node.nodeValue?.indexOf(textToFind);
                   if (idx !== undefined && idx !== -1) {
                     const range = document.createRange();
@@ -299,6 +317,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const parsed = matches.map(s => s.trim()).filter(s => s.length > 0);
       setSentences(parsed);
       setCurrentSentenceIndex(0);
+
+      // Detect language
+      const lang = detectLanguage(text);
+      setDetectedLang(lang);
     }
   }, [content, title]);
 
@@ -315,6 +337,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     };
   }, [isActive]);
 
+  const effectiveLanguage = selectedLanguage === 'auto' ? detectedLang : selectedLanguage;
+
   const speakSentence = (index: number, rate: number = speechRate, targetSentences: string[] = sentences) => {
     if (!isPlayingRef.current || index >= targetSentences.length) {
       isPlayingRef.current = false;
@@ -325,25 +349,23 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(targetSentences[index]);
+    utterance.lang = effectiveLanguage;
     utterance.rate = rate;
-    utterance.pitch = 1.05;
+    utterance.pitch = 1.0; // Natural human pitch
     
     const voices = window.speechSynthesis.getVoices();
-    let betterVoice = voices.find(v => 
-      (v.name.includes('Google') && !v.name.includes('Translate')) || 
-      v.name.includes('Siri') || 
-      v.name.includes('Premium') ||
-      v.name.includes('Natural') ||
-      v.name === 'Samantha' ||
-      v.name === 'Yelda'
-    );
-    
-    if (!betterVoice) {
-      betterVoice = voices.find(v => !v.name.includes('Alex') && !v.name.includes('Fred') && !v.name.includes('Zarvox') && !v.name.includes('Trinoids')) || voices[0];
+    let chosenVoice: SpeechSynthesisVoice | null = null;
+
+    if (selectedVoiceURI) {
+      chosenVoice = voices.find(v => v.voiceURI === selectedVoiceURI) || null;
+    }
+
+    if (!chosenVoice) {
+      chosenVoice = getBestVoice(voices, effectiveLanguage);
     }
     
-    if (betterVoice) {
-      utterance.voice = betterVoice;
+    if (chosenVoice) {
+      utterance.voice = chosenVoice;
     }
     
     utterance.onend = () => {
@@ -351,7 +373,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const next = index + 1;
       if (next < targetSentences.length) {
         setCurrentSentenceIndex(next);
-        setTimeout(() => speakSentence(next, rate, targetSentences), 20);
+        setTimeout(() => speakSentence(next, rate, targetSentences), 30);
       } else {
         isPlayingRef.current = false;
         setIsPlaying(false);
@@ -519,6 +541,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     { name: 'Pink', hex: '#fbcfe8' }
   ];
 
+  // Voices matching the effective language
+  const languageFilteredVoices = availableVoices.filter(v => 
+    v.lang.toLowerCase().startsWith(effectiveLanguage.toLowerCase().split('-')[0])
+  );
+
   return (
     <AnimatePresence>
       {isActive && (
@@ -574,13 +601,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               <button 
                 onClick={() => setShowControls(!showControls)}
                 className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
-                title="Appearance Settings"
+                title="Appearance & Voice Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
               
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[280px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[300px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
@@ -620,6 +647,60 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       <button onClick={() => setColumnWidth('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
                     </div>
                   </div>
+
+                  {/* Voice / Language Options */}
+                  <div className="border-t pt-4 border-slate-200 dark:border-slate-700">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
+                      <Volume2 className="w-3.5 h-3.5" /> Reading Voice & Language
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {/* Language Selection */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                          <Globe className="w-3 h-3" /> Language
+                        </span>
+                        <select
+                          value={selectedLanguage}
+                          onChange={(e) => {
+                            setSelectedLanguage(e.target.value as any);
+                            setSelectedVoiceURI('');
+                          }}
+                          className={`text-xs px-2 py-1 rounded-lg border outline-none cursor-pointer ${
+                            theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                          }`}
+                        >
+                          <option value="auto">Auto ({detectedLang.startsWith('tr') ? 'Türkçe' : detectedLang.startsWith('de') ? 'Deutsch' : detectedLang.startsWith('fr') ? 'Français' : detectedLang.startsWith('es') ? 'Español' : 'English'})</option>
+                          <option value="tr-TR">Türkçe (TR)</option>
+                          <option value="en-US">English (US/UK)</option>
+                          <option value="de-DE">Deutsch (DE)</option>
+                          <option value="fr-FR">Français (FR)</option>
+                          <option value="es-ES">Español (ES)</option>
+                        </select>
+                      </div>
+
+                      {/* Specific Voice Picker */}
+                      {languageFilteredVoices.length > 0 && (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Voice</span>
+                          <select
+                            value={selectedVoiceURI}
+                            onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                            className={`text-xs px-2 py-1 rounded-lg border outline-none cursor-pointer max-w-[170px] truncate ${
+                              theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                            }`}
+                          >
+                            <option value="">✨ Best Natural Voice</option>
+                            {languageFilteredVoices.map((v) => (
+                              <option key={v.voiceURI} value={v.voiceURI}>
+                                {v.name.replace(/Google|Microsoft|Apple|Online \(Natural\)/gi, '').trim() || v.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -654,6 +735,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <span className="flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5" />
                     {wordCount.toLocaleString()} words
+                  </span>
+                  <span className="flex items-center gap-1 text-blue-500 font-medium">
+                    <Volume2 className="w-3.5 h-3.5" />
+                    {effectiveLanguage.startsWith('tr') ? 'Türkçe Ses' : 'English / Natural Voice'}
                   </span>
                 </div>
 
