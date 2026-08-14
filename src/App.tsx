@@ -286,8 +286,12 @@ function App() {
     if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true') {
       return false;
     }
-    return !localStorage.getItem('nova_onboarding_complete');
+    return true;
   });
+
+  useEffect(() => {
+    (window as any).openOnboarding = () => setShowOnboarding(true);
+  }, []);
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {
