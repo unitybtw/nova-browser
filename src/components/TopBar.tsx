@@ -148,10 +148,10 @@ const MemoizedTabItem = React.memo(({
       }}
       onClick={() => onSelectTab(tab.id)}
       data-tab-id={tab.id}
-      className={`group flex items-center justify-between ${splitTab ? 'px-1.5 py-1.5' : 'px-3 py-1.5'} flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
-        tabStyle === 'floating' ? 'rounded-lg mx-0.5 my-1 border' : 
-        tabStyle === 'square' ? 'rounded-none border-t border-x' : 
-        'rounded-t-xl border-t border-x'
+      className={`group flex items-center justify-between ${splitTab ? 'px-1.5' : 'px-3'} flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
+        tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
+        tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
+        'h-[34px] rounded-t-xl border-t border-x'
       } ${
         isActive
           ? isIncognito
@@ -701,7 +701,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             }}
             ref={tabsContainerRef}
             onWheel={handleWheel}
-            className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region"
+            className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px]"
           >
             <AnimatePresence initial={false}>
             {tabs.map((tab) => {
