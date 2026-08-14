@@ -26,7 +26,7 @@ try {
   }
 } catch (e) {}
 
-// Aggressive GPU Acceleration flags for buttery smooth scrolling
+// Advanced GPU Acceleration, Fast Network & Smooth Compositing flags
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
@@ -34,7 +34,21 @@ app.commandLine.appendSwitch('enable-webgl');
 app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
 app.commandLine.appendSwitch('enable-accelerated-video-decode');
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,CanvasOopRasterization,SmoothScrolling,ParallelDownloading');
+app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
+app.commandLine.appendSwitch('enable-quic');
+app.commandLine.appendSwitch('enable-tcp-fast-open');
+app.commandLine.appendSwitch('enable-fast-unload');
+app.commandLine.appendSwitch('enable-features', [
+  'VaapiVideoDecoder',
+  'CanvasOopRasterization',
+  'SmoothScrolling',
+  'ParallelDownloading',
+  'BackForwardCache',
+  'CSSSubgrid',
+  'WebAssemblySimd',
+  'OverlayScrollbar',
+  'BlinkSchedulerYield'
+].join(','));
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
@@ -1282,16 +1296,30 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   return { error: 'Too many redirects' };
 });
 
-// IPC Handler for Autocomplete Suggestions (Bypasses CORS)
+// IPC Handler for Autocomplete Suggestions with In-Memory LRU Cache
+const suggestionsCache = new Map<string, string[]>();
 ipcMain.handle('get-suggestions', async (event, query: string) => {
   if (!isTrustedSender(event)) return [];
   if (!query || typeof query !== 'string') return [];
+  const cleanQ = query.trim().toLowerCase();
+  if (!cleanQ) return [];
+
+  if (suggestionsCache.has(cleanQ)) {
+    return suggestionsCache.get(cleanQ)!;
+  }
+
   try {
-    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(query)}&type=list`);
+    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list`);
     if (res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 1) {
-        return data[1];
+        const list = data[1].slice(0, 8);
+        if (suggestionsCache.size > 200) {
+          const firstKey = suggestionsCache.keys().next().value;
+          if (firstKey) suggestionsCache.delete(firstKey);
+        }
+        suggestionsCache.set(cleanQ, list);
+        return list;
       }
     }
   } catch (err) {
