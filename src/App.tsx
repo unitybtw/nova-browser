@@ -34,7 +34,6 @@ export interface UserSettings {
   showTasksWidget?: boolean;
   newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
   backgroundCustomUrl?: string;
-  unsplashCategory?: string;
   startupBehavior: 'newTab' | 'continue' | 'specificPages';
   tabStyle: 'rounded' | 'square' | 'floating';
   doNotTrack: boolean;
@@ -318,7 +317,6 @@ function App() {
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',
-      unsplashCategory: 'nature,architecture',
       startupBehavior: 'newTab',
       tabStyle: 'floating',
       doNotTrack: true,
@@ -1581,19 +1579,33 @@ function App() {
   const handleClearHistory = useCallback((timeframe: string = 'all') => {
     if (timeframe === 'all') {
       setHistory([]);
+      try { localStorage.setItem('browsing_history', '[]'); } catch (e) {}
       return;
     }
     
     const now = Date.now();
-    let cutoff = 0;
+    let cutoff = now;
     if (timeframe === 'hour') cutoff = now - 60 * 60 * 1000;
     else if (timeframe === 'day') cutoff = now - 24 * 60 * 60 * 1000;
     else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
     else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
 
-    setHistory(prev => prev.filter(item => item.timestamp < cutoff));
+    setHistory(prev => {
+      const remaining = prev.filter(item => {
+        const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
+        return !isNaN(itemTime) && itemTime < cutoff;
+      });
+      try { localStorage.setItem('browsing_history', JSON.stringify(remaining)); } catch (e) {}
+      return remaining;
+    });
   }, []);
-  const handleRemoveHistoryItem = useCallback((id: string) => setHistory(prev => prev.filter(item => item.id !== id)), []);
+  const handleRemoveHistoryItem = useCallback((id: string) => {
+    setHistory(prev => {
+      const remaining = prev.filter(item => item.id !== id);
+      try { localStorage.setItem('browsing_history', JSON.stringify(remaining)); } catch (e) {}
+      return remaining;
+    });
+  }, []);
 
   const handleClearDownloads = useCallback(() => setDownloads([]), []);
 

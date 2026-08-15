@@ -957,13 +957,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     >
                     {searchValue.includes('.') || searchValue.includes('://') ? (
                       <>
-                        <Globe className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-blue-500'}`} />
-                        <span className="truncate font-medium text-blue-600">Siteye Git: <span className="underline">{searchValue}</span></span>
+                        <Globe className="w-4 h-4 shrink-0 text-blue-500" />
+                        <span className="truncate font-medium text-blue-600 dark:text-blue-400">Go to: <span className="underline">{searchValue}</span></span>
                       </>
                     ) : (
                       <>
                         <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`} />
-                        <span className="truncate">{getSearchEngineName(searchEngine)} ile Ara: <strong className="text-slate-900">{searchValue}</strong></span>
+                        <span className="truncate text-slate-700 dark:text-slate-200">Search with {getSearchEngineName(searchEngine)}: <strong className="text-slate-900 dark:text-white">{searchValue}</strong></span>
                       </>
                     )}
                   </button>

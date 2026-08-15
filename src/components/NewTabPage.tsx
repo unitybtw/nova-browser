@@ -17,7 +17,6 @@ interface NewTabPageProps {
   privacyShield?: boolean;
   newTabBackground?: string;
   backgroundCustomUrl?: string;
-  unsplashCategory?: string;
   showTasksWidget?: boolean;
   isIncognito?: boolean;
   theme?: UserSettings['theme'];
@@ -37,7 +36,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   privacyShield = true,
   newTabBackground = 'default',
   backgroundCustomUrl = '',
-  unsplashCategory = 'nature,architecture',
   showTasksWidget = true,
   isIncognito = false,
   theme = 'dark',
