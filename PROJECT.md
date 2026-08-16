@@ -1,6 +1,7 @@
 # Project: Nova Browser Scan, Bug Fixing, Audit & Release
 
-## Architecture
+## Architecture & AI Context
+- **AI Agent Summary**: See [`AI_SUMMARY.md`](AI_SUMMARY.md) for comprehensive architecture, state flow, and rules.
 - **Framework**: Electron + React 18 + TypeScript + Vite + Tailwind CSS.
 - **Backend / Main Process**: `electron/main.ts`, `electron/preload.ts`, `electron/webstore-preload.ts`, `electron/mcpServer.ts`.
 - **Frontend / Renderer Process**: `src/main.tsx`, `src/App.tsx`, `src/components/`, `src/services/`.
