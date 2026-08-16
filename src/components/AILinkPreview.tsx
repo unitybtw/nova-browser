@@ -85,7 +85,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           setLoadingText("Downloading AI Model (4GB)...");
           await aiAgent.init((progress, text) => {
             if (progress < 100) {
-              setLoadingText(`Downloading AI: %${Math.round(progress)}`);
+              setLoadingText(`Downloading AI: ${Math.round(progress)}%`);
             } else {
               setLoadingText("AI model ready! Extracting summary...");
             }

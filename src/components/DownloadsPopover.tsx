@@ -32,23 +32,22 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, onClose, buttonRef]);
 
-  if (!isOpen) return null;
-
   const rect = buttonRef.current?.getBoundingClientRect();
   const top = rect ? rect.bottom + 10 : 50;
   const right = rect ? window.innerWidth - rect.right - 10 : 20;
 
   return (
     <AnimatePresence>
-      <motion.div
-        id="downloads-popover"
-        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-        transition={{ duration: 0.2 }}
-        className="fixed z-50 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden flex flex-col"
-        style={{ top, right }}
-      >
+      {isOpen && (
+        <motion.div
+          id="downloads-popover"
+          initial={{ opacity: 0, y: -10, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -10, scale: 0.95 }}
+          transition={{ duration: 0.2 }}
+          className="fixed z-50 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden flex flex-col"
+          style={{ top, right }}
+        >
         <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-700/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/80">
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-blue-500" />
@@ -117,11 +116,13 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       </div>
                     )}
                   </div>
-                  
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     {isCompleted && item.savePath && (
                       <button
-                        onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!);
+                        }}
                         className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
                         title="Show in Folder"
                       >
@@ -131,7 +132,10 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                     
                     {isProgressing && (
                       <button
-                        onClick={() => (window as any).electronAPI?.cancelDownload?.(item.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          (window as any).electronAPI?.cancelDownload?.(item.id);
+                        }}
                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors"
                         title="Cancel"
                       >
@@ -143,8 +147,9 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
               );
             })
           )}
-        </div>
-      </motion.div>
+          </div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };

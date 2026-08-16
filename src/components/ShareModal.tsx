@@ -20,8 +20,6 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
 
-  if (!isOpen) return null;
-
   const handleCopy = () => {
     navigator.clipboard.writeText(url);
     setCopied(true);

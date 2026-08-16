@@ -1,7 +1,8 @@
-import React from 'react';
-import { motion } from 'framer-motion';
+import React, { useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Puzzle, Power, Trash2, Settings } from 'lucide-react';
 import { Extension } from '../types/browser';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 interface ExtensionsModalProps {
   isOpen: boolean;
@@ -20,17 +21,23 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onRemoveExtension,
   onManageExtensions
 }) => {
-  if (!isOpen) return null;
+  const containerRef = useRef<HTMLDivElement>(null);
+  useModalFocusTrap(isOpen, onClose, containerRef);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, y: 15 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95, y: 10 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-        className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col"
-      >
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs" onClick={onClose}>
+          <motion.div
+            ref={containerRef}
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className="w-full max-w-md bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col outline-none"
+          >
         <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
           <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
             <Puzzle className="w-5 h-5 text-accent" />
@@ -102,5 +109,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
         </div>
       </motion.div>
     </div>
+      )}
+    </AnimatePresence>
   );
 };

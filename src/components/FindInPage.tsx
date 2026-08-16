@@ -63,8 +63,10 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      e.preventDefault();
       triggerSearch(searchText, !e.shiftKey);
     } else if (e.key === 'Escape') {
+      e.preventDefault();
       handleClose();
     }
   };

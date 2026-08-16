@@ -34,6 +34,10 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
   const containerRef = React.useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
 
+  const rect = anchorRef?.current?.getBoundingClientRect();
+  const top = rect ? rect.bottom + 10 : 50;
+  const right = rect ? Math.max(10, window.innerWidth - rect.right - 10) : 80;
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -45,7 +49,8 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 400 }}
             ref={containerRef}
-            className="absolute top-12 right-24 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
+            style={{ top, right }}
+            className="fixed w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
           >
             {/* Header / Status */}
             <div className={`p-6 text-center transition-colors ${isEnabled ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200'}`}>

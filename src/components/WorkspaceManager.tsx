@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Trash2, Edit2, Check, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, Folder, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
 import { Workspace } from '../types/browser';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 interface WorkspaceManagerProps {
   isOpen: boolean;
@@ -47,6 +49,9 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('slate');
   const [editIcon, setEditIcon] = useState('LayoutGrid');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useModalFocusTrap(isOpen, onClose, containerRef);
 
   // Prevent background scrolling
   useEffect(() => {
@@ -57,8 +62,6 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
     }
     return () => { document.body.style.overflow = 'unset'; };
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const handleAddWorkspace = () => {
     const newWorkspace: Workspace = {
@@ -93,12 +96,22 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      
-      <div className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] ${
-        isIncognito ? 'bg-slate-900 border border-slate-700 text-slate-100' : 'bg-white dark:bg-slate-900 dark:border dark:border-slate-800 text-slate-900 dark:text-slate-100'
-      }`}>
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-xs" onClick={onClose} />
+          
+          <motion.div 
+            ref={containerRef}
+            tabIndex={-1}
+            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            className={`relative w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] outline-none ${
+              isIncognito ? 'bg-slate-900 border border-slate-700 text-slate-100' : 'bg-white dark:bg-slate-900 dark:border dark:border-slate-800 text-slate-900 dark:text-slate-100'
+            }`}
+          >
         <div className={`flex items-center justify-between p-4 border-b ${isIncognito ? 'border-slate-800' : 'border-slate-100 dark:border-slate-800'}`}>
           <h2 className="text-lg font-semibold">Manage Workspaces</h2>
           <button onClick={onClose} className="p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
@@ -230,7 +243,9 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
             Create New Workspace
           </button>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 };

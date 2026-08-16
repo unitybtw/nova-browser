@@ -33,8 +33,6 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
 
   useModalFocusTrap(isOpen, onClose, containerRef);
 
-  if (!isOpen || (!initialImageDataUrl && !isCapturingFull)) return null;
-
   const handleDownload = () => {
     if (!currentImage) return;
     const a = document.createElement('a');

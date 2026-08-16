@@ -58,7 +58,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [speechRate, setSpeechRate] = useState(1);
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [sentences, setSentences] = useState<string[]>([]);
-  const [detectedLang, setDetectedLang] = useState('tr-TR');
+  const [detectedLang, setDetectedLang] = useState(() => (typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US'));
   const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
   
   // Voices (Native OS + Web Speech)
