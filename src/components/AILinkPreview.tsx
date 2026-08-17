@@ -132,8 +132,8 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           transition={{ type: "spring", stiffness: 400, damping: 25 }}
           style={{
             position: 'fixed',
-            left: Math.min(x + 20, window.innerWidth - 320),
-            top: Math.min(y, window.innerHeight - 150),
+            left: Math.max(12, Math.min(x + 20, window.innerWidth - 320)),
+            top: Math.max(12, Math.min(y, window.innerHeight - 180)),
             zIndex: 999999,
           }}
           className="w-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/50 dark:border-slate-800/50 shadow-2xl rounded-2xl p-4 overflow-hidden pointer-events-none"

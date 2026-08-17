@@ -120,9 +120,15 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]">
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
+        >
           <div 
-            className="absolute inset-0 bg-black/20 backdrop-blur-xs transition-opacity" 
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs" 
             onClick={onClose}
           />
           
@@ -224,7 +230,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
             </div>
 
           </motion.div>
-        </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

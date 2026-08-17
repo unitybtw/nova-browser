@@ -201,7 +201,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           })();
           
           (function() {
-            if (!${settings.aiLinkPreviewEnabled}) return;
+            if (!${Boolean(settings.aiLinkPreviewEnabled ?? true)}) return;
             if (window.__nova_hover_injected) return;
             window.__nova_hover_injected = true;
             let hoverTimer = null;

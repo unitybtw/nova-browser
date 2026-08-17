@@ -586,7 +586,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions]);
+  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);

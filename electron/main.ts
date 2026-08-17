@@ -1471,8 +1471,13 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
     if (!popupWin.isDestroyed()) popupWin.close();
   });
 
-  await popupWin.loadURL(url);
-  return { success: true };
+  try {
+    await popupWin.loadURL(url);
+    return { success: true };
+  } catch (err: any) {
+    if (!popupWin.isDestroyed()) popupWin.close();
+    return { error: 'Failed to load extension popup: ' + err.message };
+  }
 });
 
 // Read Chrome Bookmarks

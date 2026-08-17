@@ -71,7 +71,6 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
     }
   };
 
-  if (!isOpen) return null;
   const noMatches = searchText.length > 0 && matchCount === 0;
 
   return (
