@@ -82,12 +82,12 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
 
         // 4. Summarize with WebLLM
         if (!aiAgent.isReady()) {
-          setLoadingText("Downloading AI Model (4GB)...");
-          await aiAgent.init((progress, text) => {
+          setLoadingText("Initializing AI model...");
+          await aiAgent.init((progress, _text) => {
             if (progress < 100) {
-              setLoadingText(`Downloading AI: ${Math.round(progress)}%`);
+              setLoadingText(`Loading AI: ${Math.round(progress)}%`);
             } else {
-              setLoadingText("AI model ready! Extracting summary...");
+              setLoadingText("AI model ready! Generating summary...");
             }
           });
         }
@@ -136,27 +136,25 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
             top: Math.max(12, Math.min(y, window.innerHeight - 180)),
             zIndex: 999999,
           }}
-          className="w-72 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/50 dark:border-slate-800/50 shadow-2xl rounded-2xl p-4 overflow-hidden pointer-events-none"
+          className="w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-2xl rounded-2xl p-4 overflow-hidden pointer-events-none"
         >
-          <div className="absolute inset-0 bg-gradient-to-tr from-white/0 via-white/40 to-white/0 dark:from-white/0 dark:via-white/5 dark:to-white/0 pointer-events-none" />
-          
-          <div className="relative z-10 flex items-center gap-2 mb-3 border-b border-slate-200/50 dark:border-slate-700/50 pb-2">
-            <div className="p-1.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 rounded-lg">
-              <Sparkles className="w-4 h-4" />
+          <div className="relative z-10 flex items-center gap-2 mb-3 border-b border-slate-100 dark:border-white/10 pb-2">
+            <div className="p-1.5 bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 rounded-lg border border-cyan-500/20">
+              <Sparkles className="w-3.5 h-3.5" />
             </div>
-            <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
               AI Link Preview
             </span>
           </div>
           
-          <div className="relative z-10 text-sm text-slate-700 dark:text-slate-300 min-h-[40px] leading-relaxed">
+          <div className="relative z-10 text-xs text-slate-700 dark:text-slate-300 min-h-[40px] leading-relaxed">
             {isSummarizing && !error ? (
               <div className="flex flex-col items-center justify-center h-[50px] text-slate-500 dark:text-slate-400 gap-2">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                <span className="text-xs font-medium text-center">{loadingText}</span>
+                <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
+                <span className="text-[11px] font-medium text-center">{loadingText}</span>
               </div>
             ) : error ? (
-              <div className="text-rose-500 text-xs text-center py-2 font-medium">{error}</div>
+              <div className="text-red-500 text-xs text-center py-2 font-medium">{error}</div>
             ) : (
               <p>
                 {displayedSummary}
@@ -164,7 +162,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
                   <motion.span
                     animate={{ opacity: [1, 0] }}
                     transition={{ repeat: Infinity, duration: 0.8, ease: "linear" }}
-                    className="inline-block w-[3px] h-[14px] bg-indigo-500 ml-[2px] align-middle rounded-full"
+                    className="inline-block w-[2px] h-[12px] bg-cyan-500 ml-[2px] align-middle rounded-full"
                   />
                 )}
               </p>

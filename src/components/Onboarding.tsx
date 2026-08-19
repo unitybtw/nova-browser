@@ -161,7 +161,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
         className="mb-8 mt-10"
       >
-        <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-2xl shadow-blue-500/40 flex items-center justify-center mb-6 mx-auto">
+        <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-2xl shadow-cyan-500/40 flex items-center justify-center mb-6 mx-auto">
           <img src="/nova-icon-pure.png" alt="Nova" className="w-20 h-20 object-contain scale-110" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
         </div>
       </motion.div>
@@ -172,13 +172,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="text-5xl font-bold text-white mb-4 tracking-tight"
       >
         Welcome to<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-violet-400">Nova Browser</span>
+        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400">Nova Browser</span>
       </motion.h1>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-200 text-xl max-w-md leading-relaxed mb-12"
+        className="text-slate-300 text-lg max-w-md leading-relaxed mb-10 font-normal"
       >
         A faster, more private, and smarter web experience awaits you. Let's set it up together.
       </motion.p>
@@ -187,9 +187,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
         onClick={goNext}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
+        whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
         whileTap={{ scale: 0.95 }}
-        className="bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-10 py-4 rounded-2xl font-bold text-lg transition-all"
+        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-lg shadow-cyan-500/25"
       >
         Let's Get Started →
       </motion.button>
@@ -198,13 +198,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     // Step 1 — Import Data
     <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-full bg-slate-800 flex items-center justify-center mb-6 shadow-2xl mt-10">
-        <svg className="w-10 h-10 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 shadow-2xl mt-10 text-cyan-400">
+        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
       </div>
       <h2 className="text-4xl font-bold text-white mb-3">Import from Your Old Browser</h2>
-      <p className="text-slate-200 text-lg max-w-md mb-8">
+      <p className="text-slate-300 text-base max-w-md mb-8">
         You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to Nova with a single click.
       </p>
       
@@ -212,10 +212,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         <button
           onClick={handleImport}
           disabled={isImporting}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-xl font-medium transition-colors mb-4 flex items-center gap-2"
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-8 py-3 rounded-xl font-bold text-sm transition-colors mb-4 flex items-center gap-2 shadow-lg shadow-cyan-500/20"
         >
           {isImporting ? (
-            <div className="w-5 h-5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            <div className="w-5 h-5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
           ) : (
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
           )}
@@ -224,7 +224,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       )}
 
       {importStatus === 'success' && (
-        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30">
+        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30 text-sm">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           Bookmarks imported successfully!
         </div>
@@ -237,7 +237,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         </div>
       )}
 
-      <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4">
+      <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4 text-xs">
         {importStatus === 'success' ? 'Continue' : 'Skip for now'}
       </button>
     </motion.div>,
@@ -246,15 +246,15 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <h2 className="text-4xl font-bold text-white mb-3 mt-10">Choose a Theme</h2>
-      <p className="text-slate-200 text-lg mb-10">Personalize the look of Nova Browser.</p>
+      <p className="text-slate-300 text-base mb-10">Personalize the look of Nova Browser.</p>
       <div className="flex gap-5 mb-12 flex-wrap justify-center">
         {THEMES.map(t => (
           <button
             key={t.id}
             onClick={() => setTheme(t.id)}
-            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border-2 transition-all w-40 backdrop-blur-xl ${
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all w-40 backdrop-blur-xl ${
               theme === t.id
-                ? 'border-blue-400 bg-blue-500/20 scale-105 shadow-xl shadow-blue-500/20'
+                ? 'border-cyan-500 bg-cyan-500/15 scale-105 shadow-xl shadow-cyan-500/20'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
             }`}
           >
@@ -266,9 +266,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
                 <div className={`w-2 h-2 rounded-full ${t.dot} opacity-20`}></div>
               </div>
             </div>
-            <span className="text-white font-semibold text-sm">{t.icon} {t.name}</span>
+            <span className="text-white font-semibold text-xs">{t.icon} {t.name}</span>
             {theme === t.id && (
-              <span className="text-blue-400 text-xs font-medium">✓ Selected</span>
+              <span className="text-cyan-400 text-[11px] font-bold">✓ Selected</span>
             )}
           </button>
         ))}
@@ -279,28 +279,28 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <h2 className="text-4xl font-bold text-white mb-3 mt-10">Your Search Engine</h2>
-      <p className="text-slate-200 text-lg mb-8">Select your default search engine. You can change this later in settings.</p>
-      <div className="flex flex-col gap-3 w-full mb-8">
+      <p className="text-slate-300 text-base mb-8">Select your default search engine. You can change this later in settings.</p>
+      <div className="flex flex-col gap-2.5 w-full mb-8">
         {SEARCH_ENGINES.map(engine => (
           <button
             key={engine.id}
             onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-4 rounded-2xl border-2 text-left transition-all backdrop-blur-xl ${
+            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl ${
               searchEngine === engine.id
-                ? 'border-blue-400 bg-blue-500/20 shadow-lg shadow-blue-500/20 scale-105'
-                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-lg'
+                ? 'border-cyan-500 bg-cyan-500/15 shadow-lg shadow-cyan-500/20 scale-[1.02]'
+                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-md'
             }`}
           >
-            <div className="w-10 h-10 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 flex items-center justify-center shrink-0">
               {engine.icon}
             </div>
             <div className="flex-1 text-left">
-              <div className="text-white font-semibold">{engine.name}</div>
-              <div className="text-slate-400 text-sm">{engine.desc}</div>
+              <div className="text-white font-semibold text-sm">{engine.name}</div>
+              <div className="text-slate-400 text-xs">{engine.desc}</div>
             </div>
             {searchEngine === engine.id && (
-              <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center shrink-0">
-                <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+              <div className="w-5 h-5 rounded-full bg-cyan-500 flex items-center justify-center shrink-0">
+                <svg className="w-3 h-3 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -313,38 +313,38 @@ export function Onboarding({ onComplete }: OnboardingProps) {
     // Step 4 — Privacy Shield
     <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
       <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/30 mt-10">
-        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/20 mt-10 text-emerald-400">
+        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
       </div>
       <h2 className="text-4xl font-bold text-white mb-3">Privacy Shield</h2>
-      <p className="text-slate-200 text-lg max-w-md mb-10 leading-relaxed">
+      <p className="text-slate-300 text-base max-w-md mb-8 leading-relaxed">
         Nova Browser's built-in privacy shield automatically blocks ads, trackers, and malicious content.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 max-w-lg w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 max-w-lg w-full">
         {[
-          { icon: <Ban className="w-8 h-8 text-slate-400" />, label: 'Ads' },
-          { icon: <EyeOff className="w-8 h-8 text-slate-400" />, label: 'Trackers' },
-          { icon: <Bug className="w-8 h-8 text-slate-400" />, label: 'Malware' },
+          { icon: <Ban className="w-7 h-7 text-slate-400" />, label: 'Ads' },
+          { icon: <EyeOff className="w-7 h-7 text-slate-400" />, label: 'Trackers' },
+          { icon: <Bug className="w-7 h-7 text-slate-400" />, label: 'Malware' },
         ].map(item => (
-          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-5 flex flex-col items-center gap-3 transition-colors hover:bg-white/10">
+          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-colors hover:bg-white/10">
             {item.icon}
-            <span className="text-slate-300 text-sm font-medium">{item.label}</span>
-            <span className={`text-xs font-bold px-3 py-1 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10' : 'text-red-400 bg-red-400/10'}`}>
+            <span className="text-slate-300 text-xs font-semibold">{item.label}</span>
+            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' : 'text-red-400 bg-red-400/10 border border-red-400/20'}`}>
               {privacyShield ? 'Blocked' : 'Allowed'}
             </span>
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <button
           onClick={() => setPrivacyShield(!privacyShield)}
-          className={`relative inline-flex h-8 w-16 items-center rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-600'}`}
+          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}
         >
-          <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-9' : 'translate-x-1'}`} />
+          <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-8' : 'translate-x-1'}`} />
         </button>
-        <span className="text-white font-medium text-lg">
+        <span className="text-white font-medium text-base">
           {privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Off'}
         </span>
       </div>
@@ -357,9 +357,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="w-28 h-28 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center mb-8 shadow-2xl shadow-blue-500/40"
+        className="w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-6 shadow-2xl shadow-cyan-500/40 text-slate-950"
       >
-        <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </motion.div>
@@ -367,7 +367,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-5xl font-bold text-white mb-4"
+        className="text-4xl font-bold text-white mb-3"
       >
         You're all set!
       </motion.h2>
@@ -375,7 +375,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-200 text-xl max-w-md leading-relaxed mb-4"
+        className="text-slate-300 text-base max-w-md leading-relaxed mb-4"
       >
         Nova Browser is ready. All your settings are saved and can be changed anytime.
       </motion.p>
@@ -383,7 +383,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.55 }}
-        className="flex gap-6 mb-12 text-sm text-slate-400"
+        className="flex gap-6 mb-10 text-xs text-slate-400"
       >
         <span>Theme: <strong className="text-white capitalize">{theme}</strong></span>
         <span>·</span>
@@ -396,9 +396,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.7 }}
         onClick={handleFinish}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 20px rgba(59, 130, 246, 0.5)" }}
+        whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
         whileTap={{ scale: 0.95 }}
-        className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/20 text-white px-12 py-4 rounded-2xl font-bold text-xl transition-all"
+        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all shadow-lg shadow-cyan-500/25"
       >
         <span>Start Browsing</span>
         <ArrowRight className="w-5 h-5" />
@@ -407,7 +407,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-slate-950 flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-[9999] bg-[#090d16] flex flex-col overflow-hidden">
       {/* Dynamic blob background */}
       <motion.div 
         animate={{ 
@@ -416,7 +416,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           scale: [1, 1.1, 0.9, 1]
         }}
         transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className="absolute -top-20 -left-20 w-[30rem] h-[30rem] bg-blue-600/30 rounded-full blur-[100px] pointer-events-none" 
+        className="absolute -top-20 -left-20 w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" 
       />
       <motion.div 
         animate={{ 
@@ -425,14 +425,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           scale: [1, 1.2, 0.8, 1]
         }}
         transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        className="absolute top-1/2 right-0 w-[25rem] h-[25rem] bg-violet-600/30 rounded-full blur-[100px] pointer-events-none" 
+        className="absolute top-1/2 right-0 w-[25rem] h-[25rem] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" 
       />
 
       {/* Progress Bar */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
         <div className="w-full h-1 bg-white/10">
           <motion.div
-            className="h-full bg-gradient-to-r from-blue-500 to-violet-500"
+            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
             initial={{ width: 0 }}
             animate={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }}
             transition={{ duration: 0.4, ease: 'easeInOut' }}
@@ -447,7 +447,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             <div
               key={i}
               className={`rounded-full transition-all duration-300 ${
-                i + 1 === step ? 'w-6 h-2 bg-blue-500' : i + 1 < step ? 'w-2 h-2 bg-blue-500/60' : 'w-2 h-2 bg-white/20'
+                i + 1 === step ? 'w-6 h-1.5 bg-cyan-500' : i + 1 < step ? 'w-1.5 h-1.5 bg-cyan-500/60' : 'w-1.5 h-1.5 bg-white/20'
               }`}
             />
           ))}
@@ -477,13 +477,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         <div className="flex justify-between items-center px-12 pb-10 pt-4">
           <button
             onClick={goBack}
-            className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2"
+            className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2 text-xs"
           >
             ← Back
           </button>
           <button
             onClick={goNext}
-            className="bg-gradient-to-r from-blue-500 to-violet-600 hover:from-blue-400 hover:to-violet-500 text-white px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 active:scale-95 shadow-lg shadow-blue-500/20"
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-500/20"
           >
             {step === TOTAL_STEPS - 2 ? 'Complete ✓' : 'Next →'}
           </button>
