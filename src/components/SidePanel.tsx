@@ -234,13 +234,13 @@ export const SidePanel = React.memo(({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="absolute top-0 right-0 bottom-0 w-80 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/95 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
+          className="absolute top-0 right-0 bottom-0 w-80 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900">
+          <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
             <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
-              <div className="p-1.5 rounded-lg bg-accent/10 dark:bg-accent-dark/30 text-accent-hover dark:text-accent">
-                <Sparkles className="w-5 h-5" />
+              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                <Sparkles className="w-4 h-4" />
               </div>
               <h2 className="font-semibold text-sm">Browser AI</h2>
             </div>
@@ -515,6 +515,30 @@ export const SidePanel = React.memo(({
                   </motion.div>
                 ) : null}
 
+                {/* Quick Action Starter Prompts */}
+                {isReady && messages.length <= 1 && !isLoading && (
+                  <div className="flex flex-col gap-2 p-3 mt-2 rounded-2xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/8">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Quick Actions</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        '✨ Summarize this page',
+                        '💡 Key takeaways',
+                        '❓ Explain simply',
+                        '🌐 Translate to Turkish',
+                        '📝 Extract action items'
+                      ].map((promptText, i) => (
+                        <button
+                          key={i}
+                          onClick={() => handleAIAction(promptText)}
+                          className="px-2.5 py-1 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 hover:border-cyan-500 dark:hover:border-cyan-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-all shadow-2xs active:scale-95 text-left cursor-pointer"
+                        >
+                          {promptText}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div ref={messagesEndRef} />
               </>
             )}
@@ -522,7 +546,7 @@ export const SidePanel = React.memo(({
 
           {/* Footer (Input) - Always visible when ready */}
           {isReady && (
-            <div className="p-4 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+            <div className="p-3.5 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
               <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
                 {SpeechRecognition && (
                   <button
@@ -530,10 +554,10 @@ export const SidePanel = React.memo(({
                     onMouseDown={handleMouseDownMic}
                     onMouseUp={handleMouseUpMic}
                     onMouseLeave={handleMouseUpMic}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 ${
+                    className={`p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 cursor-pointer ${
                       isListening 
                         ? 'bg-red-500 text-white animate-pulse shadow-red-500/30' 
-                        : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-white/10'
                     }`}
                     title="Push to Talk"
                   >
@@ -546,13 +570,13 @@ export const SidePanel = React.memo(({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={isListening ? "Listening..." : "Ask something, navigate, analyze..."}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 focus:border-accent rounded-xl py-2.5 pl-4 pr-10 text-xs outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 transition-colors"
+                    className="w-full bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-400 rounded-xl py-2.5 pl-4 pr-10 text-xs outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-colors"
                     disabled={isLoading}
                   />
                   <button
                     type="submit"
                     disabled={isLoading || !input.trim()}
-                    className="absolute right-2 p-1.5 rounded-lg text-accent hover:bg-accent/10 dark:hover:bg-accent-dark/30 transition-colors disabled:opacity-40"
+                    className="absolute right-2 p-1.5 rounded-lg text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-40 cursor-pointer"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
