@@ -572,7 +572,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       >
         {/* Clock & Greeting */}
         <motion.div variants={itemVariants} className="text-center mb-4">
-          <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-serif transition-colors">{timeStr}</h1>
+          <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-sans tabular-nums transition-colors">{timeStr}</h1>
           <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 font-medium transition-colors">{greeting}</p>
         </motion.div>
 

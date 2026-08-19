@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Plus, X } from 'lucide-react';
 import { Tab } from '../types/browser';
@@ -31,7 +31,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [isAIMode, setIsAIMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -42,6 +42,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     if (isOpen) {
       setInputValue('');
       setSuggestions([]);
+      setSelectedIndex(0);
       setIsAIMode(false);
       setTimeout(() => {
         inputRef.current?.focus();
@@ -51,7 +52,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   }, [isOpen]);
 
   useEffect(() => {
-    if (isAIMode || !inputValue || inputValue.includes('://') || inputValue.includes('.')) {
+    if (isAIMode || !inputValue.trim() || inputValue.includes('://')) {
       setSuggestions([]);
       return;
     }
@@ -59,17 +60,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     const fetchSuggestions = async () => {
       try {
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(inputValue);
+          const results = await (window as any).electronAPI.getSuggestions(inputValue.trim());
           if (Array.isArray(results)) {
-            setSuggestions(results.slice(0, 6));
+            setSuggestions(results.slice(0, 5));
             return;
           }
         }
-        const response = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(inputValue)}&type=list`);
+        const response = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(inputValue.trim())}&type=list`);
         if (response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data) && data.length > 1) {
-            setSuggestions(data[1].slice(0, 6));
+            setSuggestions(data[1].slice(0, 5));
           }
         }
       } catch (err) {
@@ -78,43 +79,78 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     };
 
     const timer = setTimeout(fetchSuggestions, 150);
-    setSelectedIndex(-1);
     return () => clearTimeout(timer);
   }, [inputValue, isAIMode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputValue.trim() && suggestions.length === 0 && selectedIndex > -1 && selectedIndex < tabs.length) {
-      onSelectTab(tabs[selectedIndex].id);
-      onClose();
-      return;
-    }
+  // Compute matching items for list navigation
+  type ActionItem = 
+    | { type: 'tab'; tab: Tab }
+    | { type: 'suggestion'; text: string };
 
-    if (!inputValue.trim()) {
-      onClose();
-      return;
-    }
+  const items: ActionItem[] = useMemo(() => {
+    const list: ActionItem[] = [];
+    const query = inputValue.trim().toLowerCase();
 
-    let targetValue = inputValue;
-    if (suggestions.length > 0 && selectedIndex > -1 && selectedIndex < suggestions.length) {
-      targetValue = suggestions[selectedIndex];
-    }
+    if (query) {
+      // Matching tabs
+      const matched = tabs.filter(t => 
+        (t.title && t.title.toLowerCase().includes(query)) ||
+        (t.url && t.url.toLowerCase().includes(query))
+      );
+      matched.forEach(t => list.push({ type: 'tab', tab: t }));
 
-    if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
-      let prompt = targetValue;
+      // Suggestions
+      suggestions.forEach(s => list.push({ type: 'suggestion', text: s }));
+    } else {
+      // All open tabs
+      tabs.forEach(t => list.push({ type: 'tab', tab: t }));
+    }
+    return list;
+  }, [inputValue, tabs, suggestions]);
+
+  // Keep selected index within range
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [items.length]);
+
+  const executeItem = (item?: ActionItem) => {
+    if (isAIMode || inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
+      let prompt = inputValue;
       if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
       if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
-      
       window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
-      setInputValue('');
-      setIsAIMode(false);
       onClose();
       return;
     }
 
-    const url = formatSearchUrl(targetValue, searchEngine);
-    onNewTab(url);
+    if (item && item.type === 'tab') {
+      onSelectTab(item.tab.id);
+      onClose();
+      return;
+    }
+
+    const target = item?.type === 'suggestion' ? item.text : inputValue.trim();
+    if (!target) {
+      onClose();
+      return;
+    }
+
+    const url = formatSearchUrl(target, searchEngine);
+    if (onNavigate) {
+      onNavigate(url);
+    } else {
+      onNewTab(url);
+    }
     onClose();
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (items.length > 0 && selectedIndex >= 0 && selectedIndex < items.length) {
+      executeItem(items[selectedIndex]);
+    } else {
+      executeItem();
+    }
   };
 
   return (
@@ -128,7 +164,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
           className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
         >
           <div 
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs" 
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs" 
             onClick={onClose}
           />
           
@@ -138,12 +174,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -10 }}
             transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-            className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden outline-none transition-colors duration-300 ${isAIMode ? 'bg-purple-50/95 dark:bg-purple-900/40 border-purple-400/50 dark:border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.4)]' : 'bg-white/95 dark:bg-slate-900/95 border-[var(--glass-border)] dark:border-slate-700/50'}`}
+            className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden outline-none transition-colors duration-300 ${
+              isAIMode 
+                ? 'bg-purple-50/95 dark:bg-[#1a0f2e]/95 border-purple-400/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]' 
+                : 'bg-white/95 dark:bg-[#120e24]/95 border-slate-200 dark:border-white/10'
+            }`}
             tabIndex={-1}
           >
-            
-            <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${isAIMode ? 'border-purple-200 dark:border-purple-800/50' : 'border-gray-100 dark:border-slate-800/80'}`}>
-              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-500' : 'text-gray-400 dark:text-slate-500'}`} />
+            <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${
+              isAIMode ? 'border-purple-200 dark:border-purple-800/50' : 'border-slate-100 dark:border-white/8'
+            }`}>
+              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-500' : 'text-slate-400 dark:text-slate-500'}`} />
               <input
                 ref={inputRef}
                 type="text"
@@ -156,77 +197,90 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     setInputValue('');
                   } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
-                    const listLength = suggestions.length > 0 ? suggestions.length : tabs.length;
-                    setSelectedIndex(prev => (prev < listLength - 1 ? prev + 1 : prev));
+                    setSelectedIndex(prev => (prev < items.length - 1 ? prev + 1 : 0));
                   } else if (e.key === 'ArrowUp') {
                     e.preventDefault();
-                    setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
+                    setSelectedIndex(prev => (prev > 0 ? prev - 1 : items.length - 1));
                   }
                 }}
-                placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find a blue t-shirt on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, type URL or @ai for AI Agent...`}
-                className={`flex-1 bg-transparent border-none outline-none text-lg font-sans transition-all duration-300 ${isAIMode ? 'text-purple-900 dark:text-purple-100 placeholder-purple-400 dark:placeholder-purple-300' : 'text-gray-800 dark:text-slate-100 placeholder-gray-400 dark:placeholder-slate-500'}`}
+                placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find product comparisons on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, enter URL, or switch tabs...`}
+                className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-all duration-300 ${
+                  isAIMode 
+                    ? 'text-purple-950 dark:text-purple-100 placeholder-purple-400' 
+                    : 'text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500'
+                }`}
                 autoFocus
               />
-              <div className="flex gap-2">
-                <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
+              <div className="flex gap-1.5 items-center">
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
                   ESC
                 </kbd>
-                <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-gray-400 dark:text-slate-500 bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700">
-                  Enter
+                <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
+                  ↵ Enter
                 </kbd>
               </div>
             </form>
 
-            <div className="max-h-[50vh] overflow-y-auto p-2">
-              <div className="px-3 py-2 text-xs font-serif italic text-gray-400 dark:text-slate-500 flex items-center justify-between">
-                <span>{suggestions.length > 0 ? 'Search Suggestions' : 'Open Tabs'}</span>
-              </div>
+            <div className="max-h-[50vh] overflow-y-auto p-2 no-scrollbar">
+              {items.length === 0 ? (
+                <div className="p-4 text-center text-xs text-slate-400 dark:text-slate-500">
+                  Press Enter to search with {getSearchEngineName(searchEngine)}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {items.map((item, idx) => {
+                    const isSelected = selectedIndex === idx;
 
-              <div className="space-y-1">
-                {suggestions.length > 0 ? (
-                  suggestions.map((suggestion, idx) => (
-                    <div
-                      key={`sug-${idx}`}
-                      onMouseEnter={() => setSelectedIndex(idx)}
-                      onClick={() => {
-                        setInputValue(suggestion);
-                        onNewTab(formatSearchUrl(suggestion, searchEngine));
-                        onClose();
-                      }}
-                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
-                        selectedIndex === idx
-                          ? 'bg-blue-50 dark:bg-slate-800/80 text-blue-600 dark:text-blue-400'
-                          : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      <Search className={`w-4 h-4 ${selectedIndex === idx ? 'text-blue-500' : 'text-gray-400 dark:text-slate-500'}`} />
-                      <span className="truncate text-sm font-medium">{suggestion}</span>
-                    </div>
-                  ))
-                ) : (
-                  tabs.map((tab, idx) => (
-                    <div 
-                      key={tab.id}
-                      onMouseEnter={() => setSelectedIndex(idx)}
-                      onClick={() => { onSelectTab(tab.id); onClose(); }}
-                      className={`flex items-center justify-between p-3 rounded-xl cursor-pointer transition-colors ${
-                        selectedIndex === idx || (selectedIndex === -1 && tab.id === activeTabId)
-                          ? 'bg-blue-50 dark:bg-slate-800/80 text-blue-600 dark:text-blue-400' 
-                          : 'text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800/50 hover:text-gray-800 dark:hover:text-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        {tab.favicon ? (
-                          <img src={tab.favicon} className="w-4 h-4 rounded-sm" alt="" />
-                        ) : (
-                          <Globe className={`w-4 h-4 ${selectedIndex === idx || (selectedIndex === -1 && tab.id === activeTabId) ? 'text-blue-500' : 'text-gray-400 dark:text-slate-500'}`} />
-                        )}
-                        <span className="truncate text-sm font-medium">{tab.title || tab.url || 'New Tab'}</span>
+                    if (item.type === 'tab') {
+                      return (
+                        <div
+                          key={`tab-${item.tab.id}`}
+                          onMouseEnter={() => setSelectedIndex(idx)}
+                          onClick={() => executeItem(item)}
+                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                            isSelected
+                              ? 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200 border border-cyan-500/30'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/6'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                            {item.tab.favicon ? (
+                              <img src={item.tab.favicon} className="w-4 h-4 rounded-xs object-contain shrink-0" alt="" />
+                            ) : (
+                              <Globe className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
+                            )}
+                            <span className="truncate text-sm font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
+                          </div>
+                          <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shrink-0 ml-2">
+                            Switch
+                          </span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={`sug-${idx}`}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        onClick={() => executeItem(item)}
+                        className={`flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                          isSelected
+                            ? 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200 border border-cyan-500/30'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/6'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 overflow-hidden min-w-0">
+                          <Search className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
+                          <span className="truncate text-sm font-medium">{item.text}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 shrink-0 ml-2">
+                          Search
+                        </span>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
           </motion.div>
