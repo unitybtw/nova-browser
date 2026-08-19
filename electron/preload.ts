@@ -129,6 +129,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Native OS TTS (macOS high quality voices)
   nativeTtsGetVoices: () => ipcRenderer.invoke('native-tts-get-voices'),
-  nativeTtsSpeak: (text: string, voiceName?: string, rate?: number) => ipcRenderer.invoke('native-tts-speak', text, voiceName, rate),
+  nativeTtsSpeak: (text: string, voiceName?: string, rate?: number, lang?: string) => ipcRenderer.invoke('native-tts-speak', text, voiceName, rate, lang),
   nativeTtsStop: () => ipcRenderer.invoke('native-tts-stop'),
 });

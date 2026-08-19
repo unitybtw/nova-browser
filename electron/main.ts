@@ -1824,7 +1824,7 @@ ipcMain.handle('native-tts-get-voices', async (event) => {
   return [];
 });
 
-ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: string, rate?: number) => {
+ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: string, rate?: number, lang?: string) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
   if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
 
@@ -1843,7 +1843,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
   if (process.platform === 'darwin') {
     return new Promise((resolve) => {
       // 🔒 Security: Sanitize voice name strictly against command flag injection
-      let cleanVoice = 'Yelda';
+      let cleanVoice: string | null = null;
       if (voiceName && typeof voiceName === 'string') {
         const rawName = voiceName.split('(')[0].trim();
         if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
@@ -1851,7 +1851,23 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
         }
       }
 
-      const args: string[] = ['-v', cleanVoice];
+      // If no voice specified, determine best default by language
+      if (!cleanVoice && lang && typeof lang === 'string') {
+        const prefix = lang.toLowerCase().split('-')[0];
+        if (prefix === 'tr') cleanVoice = 'Yelda';
+        else if (prefix === 'de') cleanVoice = 'Anna';
+        else if (prefix === 'fr') cleanVoice = 'Thomas';
+        else if (prefix === 'es') cleanVoice = 'Mónica';
+        else if (prefix === 'it') cleanVoice = 'Alice';
+        else if (prefix === 'ja') cleanVoice = 'Kyoko';
+        else if (prefix === 'ru') cleanVoice = 'Milena';
+        else cleanVoice = 'Samantha';
+      }
+
+      const args: string[] = [];
+      if (cleanVoice) {
+        args.push('-v', cleanVoice);
+      }
       
       if (rate && typeof rate === 'number' && Number.isFinite(rate)) {
         const clampedRate = Math.max(0.5, Math.min(2.5, rate));
@@ -1859,29 +1875,40 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
         args.push('-r', String(wpm));
       }
 
-      try {
-        // 🔒 Security: Pipe text via stdin instead of CLI arguments to prevent argument length limits (E2BIG)
-        const proc = child_process.spawn('/usr/bin/say', args, {
-          stdio: ['pipe', 'ignore', 'pipe']
-        });
-        activeTtsProcess = proc;
+      const runSay = (commandArgs: string[]) => {
+        try {
+          const proc = child_process.spawn('/usr/bin/say', commandArgs, {
+            stdio: ['pipe', 'ignore', 'pipe']
+          });
+          activeTtsProcess = proc;
 
-        proc.stdin.write(text, 'utf8');
-        proc.stdin.end();
+          proc.stdin.write(text, 'utf8');
+          proc.stdin.end();
 
-        proc.on('close', (code) => {
-          if (activeTtsProcess === proc) activeTtsProcess = null;
-          resolve({ success: code === 0 });
-        });
+          proc.on('close', (code) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            if (code === 0) {
+              resolve({ success: true });
+            } else if (commandArgs.includes('-v')) {
+              // If failed with custom voice, try fallback to default system voice
+              const fallbackArgs = commandArgs.filter((a, i) => a !== '-v' && commandArgs[i - 1] !== '-v');
+              runSay(fallbackArgs);
+            } else {
+              resolve({ success: false, error: `Process exited with code ${code}` });
+            }
+          });
 
-        proc.on('error', (err) => {
-          if (activeTtsProcess === proc) activeTtsProcess = null;
+          proc.on('error', (err) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            resolve({ success: false, error: err.message });
+          });
+        } catch (err: any) {
+          activeTtsProcess = null;
           resolve({ success: false, error: err.message });
-        });
-      } catch (err: any) {
-        activeTtsProcess = null;
-        resolve({ success: false, error: err.message });
-      }
+        }
+      };
+
+      runSay(args);
     });
   }
 

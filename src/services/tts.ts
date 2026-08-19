@@ -26,6 +26,36 @@ export function detectLanguage(text: string): string {
   return 'en-US';
 }
 
+/**
+ * Intelligently splits article text into readable sentences without breaking on abbreviations or numbers.
+ */
+export function splitIntoSentences(text: string): string[] {
+  if (!text) return [];
+  
+  if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
+    try {
+      const segmenter = new (Intl as any).Segmenter(undefined, { granularity: 'sentence' });
+      const segments: string[] = [];
+      for (const seg of segmenter.segment(text)) {
+        const trimmed = seg.segment.trim();
+        if (trimmed.length > 0) {
+          segments.push(trimmed);
+        }
+      }
+      if (segments.length > 0) return segments;
+    } catch (_) {}
+  }
+
+  const protectedText = text
+    .replace(/([0-9]+)\.([0-9]+)/g, '$1\u2024$2')
+    .replace(/\b(Dr|Prof|Doç|Av|Uzm|Cad|Sok|No|vs|vb|v\.b|v\.s|e\.g|i\.e|etc|al|fig|vol)\./gi, '$1\u2024');
+
+  const matches = protectedText.match(/[^.!?\n]+[.!?\n]+|[^.!?\n]+$/g) || [text];
+  return matches
+    .map(s => s.replace(/\u2024/g, '.').trim())
+    .filter(s => s.length > 0);
+}
+
 export interface NativeVoiceInfo {
   name: string;
   lang: string;

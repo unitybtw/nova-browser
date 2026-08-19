@@ -1,9 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, Trash2, Clock, BookOpen, Volume2, Globe, Sparkles } from 'lucide-react';
+import { 
+  Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, 
+  Trash2, Clock, BookOpen, Volume2, Globe, Sparkles, SkipBack, SkipForward,
+  Check, ChevronDown
+} from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
-import { detectLanguage, getBestVoice, getMacDefaultVoice, NativeVoiceInfo } from '../services/tts';
+import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo } from '../services/tts';
 
 interface HighlightData {
   id: string;
@@ -46,19 +50,60 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>('light');
-  const [font, setFont] = useState<'sans' | 'serif' | 'mono'>('sans');
-  const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>('md');
-  const [columnWidth, setColumnWidth] = useState<'narrow' | 'normal' | 'wide'>('normal');
+  // Theme & Appearance with persistence
+  const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nova_reader_theme');
+      if (saved === 'light' || saved === 'dark' || saved === 'sepia') return saved;
+      if (document.documentElement.classList.contains('dark') || window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+      }
+    }
+    return 'dark';
+  });
+  
+  const [font, setFont] = useState<'sans' | 'serif' | 'mono'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nova_reader_font');
+      if (saved === 'sans' || saved === 'serif' || saved === 'mono') return saved;
+    }
+    return 'sans';
+  });
+
+  const [fontSize, setFontSize] = useState<'sm' | 'md' | 'lg'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nova_reader_font_size');
+      if (saved === 'sm' || saved === 'md' || saved === 'lg') return saved;
+    }
+    return 'md';
+  });
+
+  const [columnWidth, setColumnWidth] = useState<'narrow' | 'normal' | 'wide'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nova_reader_column_width');
+      if (saved === 'narrow' || saved === 'normal' || saved === 'wide') return saved;
+    }
+    return 'normal';
+  });
+
   const [showControls, setShowControls] = useState(false);
 
   // Native macOS & TTS State
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [speechRate, setSpeechRate] = useState(1);
+  const [speechRate, setSpeechRate] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('nova_reader_speech_rate');
+      if (saved) {
+        const parsed = parseFloat(saved);
+        if (!isNaN(parsed) && parsed >= 0.5 && parsed <= 2.5) return parsed;
+      }
+    }
+    return 1;
+  });
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [sentences, setSentences] = useState<string[]>([]);
-  const [detectedLang, setDetectedLang] = useState(() => (typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US'));
+  const [detectedLang, setDetectedLang] = useState(() => (typeof navigator !== 'undefined' ? navigator.language || 'tr-TR' : 'tr-TR'));
   const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
   
   // Voices (Native OS + Web Speech)
@@ -69,6 +114,27 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const contentRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
+
+  // Persist appearance settings
+  const handleThemeChange = (newTheme: 'light' | 'dark' | 'sepia') => {
+    setTheme(newTheme);
+    localStorage.setItem('nova_reader_theme', newTheme);
+  };
+
+  const handleFontChange = (newFont: 'sans' | 'serif' | 'mono') => {
+    setFont(newFont);
+    localStorage.setItem('nova_reader_font', newFont);
+  };
+
+  const handleFontSizeChange = (newSize: 'sm' | 'md' | 'lg') => {
+    setFontSize(newSize);
+    localStorage.setItem('nova_reader_font_size', newSize);
+  };
+
+  const handleColumnWidthChange = (newWidth: 'narrow' | 'normal' | 'wide') => {
+    setColumnWidth(newWidth);
+    localStorage.setItem('nova_reader_column_width', newWidth);
+  };
 
   // Highlights State
   const [highlights, setHighlights] = useState<HighlightData[]>([]);
@@ -315,13 +381,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
   };
 
-  // Extract sentences when content changes
+  // Extract sentences when content changes using smart Intl / regex sentence splitting
   useEffect(() => {
     if (contentRef.current) {
       const text = contentRef.current.innerText || title;
-      const splitRegex = /[^.!?\n]+[.!?\n]+/g;
-      const matches = text.match(splitRegex) || [text];
-      const parsed = matches.map(s => s.trim()).filter(s => s.length > 0);
+      const parsed = splitIntoSentences(text);
       setSentences(parsed);
       setCurrentSentenceIndex(0);
 
@@ -352,18 +416,19 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     }
 
     const currentSentence = targetSentences[index];
+    setCurrentSentenceIndex(index);
 
     // Check if macOS native TTS is available
     if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsSpeak) {
       const voice = selectedVoiceName || getMacDefaultVoice(effectiveLanguage);
       try {
-        const res = await (window as any).electronAPI.nativeTtsSpeak(currentSentence, voice, rate);
+        const res = await (window as any).electronAPI.nativeTtsSpeak(currentSentence, voice, rate, effectiveLanguage);
         if (!isPlayingRef.current) return;
         if (res && res.success) {
           const next = index + 1;
           if (next < targetSentences.length) {
             setCurrentSentenceIndex(next);
-            setTimeout(() => speakSentence(next, rate, targetSentences), 40);
+            setTimeout(() => speakSentence(next, rate, targetSentences), 30);
           } else {
             isPlayingRef.current = false;
             setIsPlaying(false);
@@ -400,7 +465,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         const next = index + 1;
         if (next < targetSentences.length) {
           setCurrentSentenceIndex(next);
-          setTimeout(() => speakSentence(next, rate, targetSentences), 30);
+          setTimeout(() => speakSentence(next, rate, targetSentences), 20);
         } else {
           isPlayingRef.current = false;
           setIsPlaying(false);
@@ -430,9 +495,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       let currentSentences = sentences;
       if (currentSentences.length === 0 && contentRef.current) {
         const text = contentRef.current.innerText || title || '';
-        const splitRegex = /[^.!?\n]+[.!?\n]+/g;
-        const matches = text.match(splitRegex) || [text];
-        currentSentences = matches.map(s => s.trim()).filter(s => s.length > 0);
+        currentSentences = splitIntoSentences(text);
         setSentences(currentSentences);
       }
 
@@ -441,6 +504,30 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         setIsPlaying(true);
         setIsPaused(false);
         speakSentence(currentSentenceIndex, speechRate, currentSentences);
+      }
+    }
+  };
+
+  const nextSentence = () => {
+    if (currentSentenceIndex < sentences.length - 1) {
+      const next = currentSentenceIndex + 1;
+      setCurrentSentenceIndex(next);
+      if (isPlaying) {
+        if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        speakSentence(next, speechRate);
+      }
+    }
+  };
+
+  const prevSentence = () => {
+    if (currentSentenceIndex > 0) {
+      const prev = currentSentenceIndex - 1;
+      setCurrentSentenceIndex(prev);
+      if (isPlaying) {
+        if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
+        if (window.speechSynthesis) window.speechSynthesis.cancel();
+        speakSentence(prev, speechRate);
       }
     }
   };
@@ -461,6 +548,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const changeSpeechRate = () => {
     const nextRate = speechRate === 1 ? 1.25 : speechRate === 1.25 ? 1.5 : speechRate === 1.5 ? 2 : 1;
     setSpeechRate(nextRate);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('nova_reader_speech_rate', String(nextRate));
+    }
     if (isPlaying) {
       isPlayingRef.current = true;
       if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
@@ -534,9 +624,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           setWordCount(words);
           setReadingTime(Math.max(1, Math.ceil(words / 200)));
 
+          // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode
           const cleanHtml = DOMPurify.sanitize(article.content, { 
             ADD_ATTR: ['target', 'src', 'srcset', 'alt', 'title'],
-            ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark']
+            ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
+            FORBID_ATTR: ['style', 'color', 'bgcolor', 'background']
           });
           setContent(cleanHtml);
         } else {
@@ -553,9 +645,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   }, [isActive, tabId, url]);
 
   const bgColors = {
-    light: 'bg-white text-slate-800',
-    dark: 'bg-slate-900 text-slate-300',
-    sepia: 'bg-[#f4ecd8] text-[#5b4636]'
+    light: 'bg-[#fafafa] text-slate-900',
+    dark: 'bg-slate-950 text-slate-100',
+    sepia: 'bg-[#f6f0e2] text-[#4a3928]'
   };
 
   const fonts = {
@@ -597,8 +689,39 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           transition={{ duration: 0.18 }}
           className={`fixed inset-0 z-50 overflow-y-auto ${bgColors[theme]} ${fonts[font]}`}
         >
+          {/* Custom style overrides to guarantee dark mode clean contrast without white background bleeding */}
+          <style>{`
+            .reader-content * {
+              color: inherit !important;
+              background-color: transparent !important;
+              border-color: ${theme === 'dark' ? 'rgba(255,255,255,0.1)' : theme === 'sepia' ? 'rgba(91,70,54,0.15)' : 'rgba(0,0,0,0.1)'} !important;
+            }
+            .reader-content a {
+              color: #06b6d4 !important;
+              text-decoration: underline !important;
+            }
+            .reader-content pre, .reader-content code {
+              background-color: ${theme === 'dark' ? 'rgba(255,255,255,0.08)' : theme === 'sepia' ? 'rgba(91,70,54,0.1)' : 'rgba(0,0,0,0.06)'} !important;
+              border-radius: 0.375rem;
+              padding: 0.125rem 0.25rem;
+            }
+            .reader-content img {
+              max-width: 100%;
+              height: auto;
+              border-radius: 0.75rem;
+              margin: 1.5rem auto;
+              display: block;
+            }
+            .reader-content blockquote {
+              border-left: 3px solid #06b6d4 !important;
+              padding-left: 1rem;
+              font-style: italic;
+              opacity: 0.9;
+            }
+          `}</style>
+
           {/* Header Bar */}
-          <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-900/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f4ecd8]/90' : 'border-black/5 bg-white/90'}`}>
+          <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-950/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f6f0e2]/90' : 'border-black/5 bg-white/90'}`}>
             <div className="flex items-center gap-2 no-drag">
               {isMac && <div className="w-[68px] shrink-0" />}
               <button 
@@ -609,29 +732,29 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               </button>
             </div>
             
-            <div className="relative flex items-center gap-1 no-drag" ref={controlsRef}>
-              {/* Audio Read Aloud Player */}
-              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-2 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
+            <div className="relative flex items-center gap-1.5 no-drag" ref={controlsRef}>
+              {/* Audio Read Aloud Quick Button */}
+              <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-1 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
                 <button 
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title={isPlaying ? "Pause" : "Read Aloud with Natural Voice"}
                 >
-                  {isPlaying ? <Pause className="w-4 h-4 text-blue-500" /> : <Play className="w-4 h-4 ml-0.5 text-blue-500" />}
+                  {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ml-0.5 text-cyan-400" />}
                 </button>
                 {(isPlaying || isPaused) && (
                   <button 
                     onClick={stopSpeech}
-                    className={`p-1.5 rounded-full transition-colors text-red-500 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                    className={`p-1.5 rounded-full transition-colors text-red-400 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                     title="Stop"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
                   </button>
                 )}
-                <div className={`h-4 w-px mx-1 ${theme === 'dark' ? 'bg-slate-600' : 'bg-slate-300'}`}></div>
+                <div className={`h-4 w-px mx-1 ${theme === 'dark' ? 'bg-slate-700' : 'bg-slate-300'}`}></div>
                 <button
                   onClick={changeSpeechRate}
-                  className={`flex items-center gap-1 p-1 rounded-full transition-colors text-xs font-bold w-10 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
+                  className={`flex items-center gap-1 p-1 rounded-full transition-colors text-xs font-bold w-10 justify-center no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20 text-cyan-400' : 'hover:bg-black/10 text-cyan-600'}`}
                   title="Reading Speed"
                 >
                   {speechRate}x
@@ -640,21 +763,21 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
               
               <button 
                 onClick={() => setShowControls(!showControls)}
-                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-blue-500 text-white' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
-                title="Appearance & macOS Natural Voice Settings"
+                className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-cyan-500 text-slate-950' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
+                title="Appearance & Voice Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
               
               {showControls && (
-                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-800 border-slate-700 shadow-black/50 text-slate-100' : 'bg-white border-slate-200 text-slate-800'}`}>
+                <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Theme</div>
                     <div className="flex gap-2">
-                      <button onClick={() => setTheme('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
-                      <button onClick={() => setTheme('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
-                      <button onClick={() => setTheme('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm' : 'border-slate-600'} bg-slate-900 text-white hover:scale-105`} title="Dark Theme"><Moon className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('light')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='light' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-200'} bg-white text-slate-900 hover:scale-105`} title="Light Theme"><Sun className="w-5 h-5"/></button>
+                      <button onClick={() => handleThemeChange('sepia')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='sepia' ? 'border-amber-600 ring-2 ring-amber-600/20 shadow-sm' : 'border-amber-200'} bg-[#f4ecd8] text-amber-900 font-serif font-bold text-lg hover:scale-105`} title="Sepia Theme">A</button>
+                      <button onClick={() => handleThemeChange('dark')} className={`flex-1 p-2.5 rounded-xl border transition-all no-drag cursor-pointer flex items-center justify-center ${theme==='dark' ? 'border-cyan-500 ring-2 ring-cyan-500/20 shadow-sm' : 'border-slate-700'} bg-slate-950 text-white hover:scale-105`} title="Dark OLED Theme"><Moon className="w-5 h-5"/></button>
                     </div>
                   </div>
 
@@ -662,9 +785,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Typeface</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => setFont('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
-                      <button onClick={() => setFont('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
-                      <button onClick={() => setFont('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
+                      <button onClick={() => handleFontChange('sans')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-sans font-medium transition-all no-drag cursor-pointer ${font==='sans' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Modern</button>
+                      <button onClick={() => handleFontChange('serif')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-serif transition-all no-drag cursor-pointer ${font==='serif' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Classic</button>
+                      <button onClick={() => handleFontChange('mono')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs font-mono transition-all no-drag cursor-pointer ${font==='mono' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Mono</button>
                     </div>
                   </div>
 
@@ -672,9 +795,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Text Size</div>
                     <div className="flex gap-2 items-center">
-                      <button onClick={() => setFontSize('sm')} className={`flex-1 py-1.5 rounded-lg border text-xs transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
-                      <button onClick={() => setFontSize('md')} className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
-                      <button onClick={() => setFontSize('lg')} className={`flex-1 py-1.5 rounded-lg border text-base font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
+                      <button onClick={() => handleFontSizeChange('sm')} className={`flex-1 py-1.5 rounded-lg border text-xs transition-all no-drag cursor-pointer ${fontSize==='sm' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A-</button>
+                      <button onClick={() => handleFontSizeChange('md')} className={`flex-1 py-1.5 rounded-lg border text-sm font-medium transition-all no-drag cursor-pointer ${fontSize==='md' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A</button>
+                      <button onClick={() => handleFontSizeChange('lg')} className={`flex-1 py-1.5 rounded-lg border text-base font-bold transition-all no-drag cursor-pointer ${fontSize==='lg' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>A+</button>
                     </div>
                   </div>
 
@@ -682,16 +805,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Column Width</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => setColumnWidth('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Narrow</button>
-                      <button onClick={() => setColumnWidth('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Standard</button>
-                      <button onClick={() => setColumnWidth('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-700/50' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
+                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Dar</button>
+                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Standart</button>
+                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Geniş</button>
                     </div>
                   </div>
 
-                  {/* Apple / macOS High Quality Voice Options */}
-                  <div className="border-t pt-4 border-slate-200 dark:border-slate-700">
+                  {/* Natural Voice & Language Settings */}
+                  <div className="border-t pt-4 border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
-                      <Volume2 className="w-3.5 h-3.5" /> macOS Doğal Ses & Dil
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Doğal Ses & Dil Ayarları
                     </div>
                     
                     <div className="space-y-2.5">
@@ -707,28 +830,28 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                             setSelectedVoiceName('');
                           }}
                           className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer ${
-                            theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                            theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                           }`}
                         >
                           <option value="auto">Otomatik ({detectedLang.startsWith('tr') ? 'Türkçe' : detectedLang.startsWith('de') ? 'Almanca' : detectedLang.startsWith('fr') ? 'Fransızca' : detectedLang.startsWith('es') ? 'İspanyolca' : 'İngilizce'})</option>
-                          <option value="tr-TR">Türkçe (Yelda)</option>
-                          <option value="en-US">İngilizce (Samantha)</option>
+                          <option value="tr-TR">Türkçe (Yelda / Doğal)</option>
+                          <option value="en-US">İngilizce (Samantha / Natural)</option>
                           <option value="de-DE">Almanca (Anna)</option>
                           <option value="fr-FR">Fransızca (Thomas)</option>
                           <option value="es-ES">İspanyolca (Mónica)</option>
                         </select>
                       </div>
 
-                      {/* macOS Native Voice Picker */}
+                      {/* Native / System Voice Picker */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-amber-500" /> Ses
+                          <Sparkles className="w-3 h-3 text-cyan-400" /> Ses
                         </span>
                         <select
                           value={selectedVoiceName}
                           onChange={(e) => setSelectedVoiceName(e.target.value)}
                           className={`text-xs px-2.5 py-1.5 rounded-lg border outline-none cursor-pointer max-w-[190px] truncate ${
-                            theme === 'dark' ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
+                            theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                           }`}
                         >
                           <option value="">
@@ -763,16 +886,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             </div>
           </div>
 
-          <div className={`${columnWidths[columnWidth]} mx-auto px-6 py-12 pb-32 transition-all duration-300`}>
+          <div className={`${columnWidths[columnWidth]} mx-auto px-6 py-12 pb-36 transition-all duration-300`}>
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                <div className="w-8 h-8 border-4 border-slate-200 border-t-blue-500 rounded-full animate-spin mb-4" />
-                <p className="text-sm font-medium">Extracting article content...</p>
+                <div className="w-8 h-8 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin mb-4" />
+                <p className="text-sm font-medium">Makale içeriği çıkarılıyor...</p>
               </div>
             )}
             
             {error && (
-              <div className="text-center py-20 text-red-500">
+              <div className="text-center py-20 text-red-400">
                 <ShieldAlert className="w-12 h-12 mx-auto mb-4 opacity-50" />
                 <p className="text-base font-medium">{error}</p>
               </div>
@@ -793,20 +916,112 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                     <BookOpen className="w-3.5 h-3.5" />
                     {wordCount.toLocaleString()} kelime
                   </span>
-                  <span className="flex items-center gap-1 text-blue-500 font-medium">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Sesi' : 'macOS Samantha Sesi') : 'Doğal İnsan Sesi'}
+                  <span className="flex items-center gap-1 text-cyan-400 font-medium">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Doğal Sesi' : 'macOS Samantha Doğal Sesi') : 'Doğal İnsan Sesi'}
                   </span>
                 </div>
 
                 <div 
                   ref={contentRef}
-                  className={`reader-content prose prose-lg max-w-none prose-a:text-blue-500 hover:prose-a:text-blue-600 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
+                  className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} 
                 />
               </motion.div>
             )}
           </div>
+
+          {/* Floating Bottom Audio Player */}
+          <AnimatePresence>
+            {(isPlaying || isPaused) && sentences.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 40, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 40, scale: 0.96 }}
+                className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-xl w-[92%] backdrop-blur-2xl rounded-2xl shadow-2xl border p-3.5 flex flex-col gap-2.5 no-drag"
+                style={{
+                  backgroundColor: theme === 'dark' ? 'rgba(15, 23, 42, 0.94)' : theme === 'sepia' ? 'rgba(246, 240, 226, 0.96)' : 'rgba(255, 255, 255, 0.96)',
+                  borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.12)' : theme === 'sepia' ? 'rgba(91, 70, 54, 0.15)' : 'rgba(0, 0, 0, 0.1)',
+                  color: theme === 'dark' ? '#f8fafc' : theme === 'sepia' ? '#4a3928' : '#0f172a'
+                }}
+              >
+                {/* Header: Status and Progress */}
+                <div className="flex items-center justify-between text-xs font-semibold px-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-cyan-400 animate-ping' : 'bg-amber-400'}`} />
+                    <span className="text-cyan-400 font-bold">
+                      {isPlaying ? 'Sesli Okunuyor' : 'Duraklatıldı'}
+                    </span>
+                    <span className="opacity-60 text-[11px]">
+                      ({currentSentenceIndex + 1} / {sentences.length} cümle)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
+                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : 'Doğal Ses')}
+                    </span>
+                    <button
+                      onClick={changeSpeechRate}
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-500/25 transition-colors cursor-pointer"
+                    >
+                      {speechRate}x
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Sentence Caption Preview */}
+                <div className="text-xs px-3 py-2 rounded-xl bg-black/5 dark:bg-white/5 line-clamp-2 italic leading-relaxed opacity-90 border border-black/5 dark:border-white/5">
+                  "{sentences[currentSentenceIndex] || '...'}"
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                  <div 
+                    className="bg-cyan-500 h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${((currentSentenceIndex + 1) / Math.max(1, sentences.length)) * 100}%` }}
+                  />
+                </div>
+
+                {/* Audio Controls */}
+                <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={prevSentence}
+                      disabled={currentSentenceIndex <= 0}
+                      className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
+                      title="Önceki Cümle"
+                    >
+                      <SkipBack className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={toggleSpeech}
+                      className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
+                      title={isPlaying ? "Duraklat" : "Devam Et"}
+                    >
+                      {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
+                    </button>
+                    <button
+                      onClick={nextSentence}
+                      disabled={currentSentenceIndex >= sentences.length - 1}
+                      className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
+                      title="Sonraki Cümle"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={stopSpeech}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                    title="Okumayı Durdur"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Durdur</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Highlight Creation Popover */}
           <AnimatePresence>
@@ -820,7 +1035,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   top: Math.max(10, popoverState.top - 10), 
                   left: popoverState.left, 
                   transform: 'translate(-50%, -100%)',
-                  backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                  backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
                   borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
                   color: theme === 'dark' ? '#f8fafc' : '#0f172a'
                 }}
@@ -833,7 +1048,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       <button 
                         key={c.name}
                         onClick={() => setHighlightColor(c.hex)}
-                        className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-blue-500 scale-110 shadow-xs' : 'border-transparent'}`}
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-cyan-500 scale-110 shadow-xs' : 'border-transparent'}`}
                         style={{ backgroundColor: c.hex }}
                         title={c.name}
                       />
@@ -846,7 +1061,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   placeholder="Add note (optional)..."
                   className="w-full h-20 p-2.5 rounded-xl mb-2.5 resize-none outline-none border text-xs transition-colors"
                   style={{
-                    backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
+                    backgroundColor: theme === 'dark' ? '#020617' : '#f8fafc',
                     borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
                     color: theme === 'dark' ? '#f8fafc' : '#0f172a'
                   }}
@@ -863,7 +1078,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   </button>
                   <button 
                     onClick={saveHighlight} 
-                    className="px-3.5 py-1.5 rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors text-xs font-medium shadow-xs"
+                    className="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors text-xs font-bold shadow-xs"
                   >
                     Highlight
                   </button>
@@ -884,7 +1099,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   top: viewingNote.top + 10, 
                   left: viewingNote.left, 
                   transform: 'translateX(-50%)',
-                  backgroundColor: theme === 'dark' ? '#1e293b' : '#ffffff',
+                  backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
                   borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
                   color: theme === 'dark' ? '#f8fafc' : '#0f172a'
                 }}
@@ -894,14 +1109,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={() => deleteHighlight(viewingNote.id)}
-                      className="p-1 rounded-md text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                      className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
                       title="Delete Highlight"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                     <button 
                       onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} 
-                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors text-sm"
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-200 transition-colors text-sm"
                     >
                       &times;
                     </button>
