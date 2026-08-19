@@ -33,8 +33,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isAIMode, setIsAIMode] = useState(false);
+  const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useModalFocusTrap(isOpen, onClose, containerRef);
 
@@ -108,10 +110,16 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     return list;
   }, [inputValue, tabs, suggestions]);
 
-  // Keep selected index within range
+  // Keep selected index within range and scroll into view
   useEffect(() => {
     setSelectedIndex(0);
   }, [items.length]);
+
+  useEffect(() => {
+    if (itemRefs.current[selectedIndex]) {
+      itemRefs.current[selectedIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedIndex]);
 
   const executeItem = (item?: ActionItem) => {
     if (isAIMode || inputValue.startsWith('@ai ') || inputValue.startsWith('ai:')) {
@@ -164,7 +172,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
           className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
         >
           <div 
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs" 
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" 
             onClick={onClose}
           />
           
@@ -176,15 +184,15 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
             transition={{ type: 'spring', stiffness: 500, damping: 32 }}
             className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden outline-none transition-colors duration-300 ${
               isAIMode 
-                ? 'bg-purple-50/95 dark:bg-[#1a0f2e]/95 border-purple-400/50 shadow-[0_0_40px_rgba(168,85,247,0.3)]' 
-                : 'bg-white/95 dark:bg-[#120e24]/95 border-slate-200 dark:border-white/10'
+                ? 'bg-purple-950/95 border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.25)]' 
+                : 'bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-white/10'
             }`}
             tabIndex={-1}
           >
             <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${
-              isAIMode ? 'border-purple-200 dark:border-purple-800/50' : 'border-slate-100 dark:border-white/8'
+              isAIMode ? 'border-purple-800/40 bg-purple-900/20' : 'border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30'
             }`}>
-              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-500' : 'text-slate-400 dark:text-slate-500'}`} />
+              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
               <input
                 ref={inputRef}
                 type="text"
@@ -206,11 +214,23 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                 placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find product comparisons on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, enter URL, or switch tabs...`}
                 className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-all duration-300 ${
                   isAIMode 
-                    ? 'text-purple-950 dark:text-purple-100 placeholder-purple-400' 
+                    ? 'text-purple-100 placeholder-purple-400/80' 
                     : 'text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500'
                 }`}
                 autoFocus
               />
+              {inputValue.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInputValue('');
+                    inputRef.current?.focus();
+                  }}
+                  className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
               <div className="flex gap-1.5 items-center">
                 <kbd className="hidden sm:inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/10">
                   ESC
@@ -235,25 +255,46 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                       return (
                         <div
                           key={`tab-${item.tab.id}`}
+                          ref={el => { itemRefs.current[idx] = el; }}
                           onMouseEnter={() => setSelectedIndex(idx)}
                           onClick={() => executeItem(item)}
-                          className={`flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
+                          className={`group flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
                             isSelected
                               ? 'bg-cyan-500/15 text-cyan-900 dark:text-cyan-200 border border-cyan-500/30'
                               : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/6'
                           }`}
                         >
                           <div className="flex items-center gap-3 overflow-hidden min-w-0">
-                            {item.tab.favicon ? (
-                              <img src={item.tab.favicon} className="w-4 h-4 rounded-xs object-contain shrink-0" alt="" />
+                            {item.tab.favicon && !failedFavicons.has(item.tab.id) ? (
+                              <img 
+                                src={item.tab.favicon} 
+                                className="w-4 h-4 rounded-xs object-contain shrink-0" 
+                                alt="" 
+                                onError={() => setFailedFavicons(prev => new Set(prev).add(item.tab.id))}
+                              />
                             ) : (
                               <Globe className={`w-4 h-4 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
                             )}
                             <span className="truncate text-sm font-medium">{item.tab.title || item.tab.url || 'Tab'}</span>
                           </div>
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 shrink-0 ml-2">
-                            Switch
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                              Switch
+                            </span>
+                            {tabs.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onCloseTab(item.tab.id);
+                                }}
+                                className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                title="Close Tab"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     }
@@ -261,6 +302,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     return (
                       <div
                         key={`sug-${idx}`}
+                        ref={el => { itemRefs.current[idx] = el; }}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         onClick={() => executeItem(item)}
                         className={`flex items-center justify-between p-2.5 px-3 rounded-xl cursor-pointer transition-all duration-150 ${
