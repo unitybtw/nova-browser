@@ -425,7 +425,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
 
   return (
-    <div className="flex-1 flex max-w-2xl mx-auto px-2 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.01)' : 'scale(1)' }}>
+    <div className="flex-1 flex w-full mx-1 transition-all duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
       <div className="w-full relative">
         <form onSubmit={handleSearchSubmit} className="relative group w-full">
           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
