@@ -428,25 +428,26 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     <div className="flex-1 flex w-full mx-1 transition-all duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
       <div className="w-full relative">
         <form onSubmit={handleSearchSubmit} className="relative group w-full">
-          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
-            {(() => {
-              const sec = getUrlSecurityInfo(activeTab?.url || '');
-              return (
-                <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
-                  {isIncognito && (
-                    <div className="flex items-center gap-1 mr-1 text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md">
-                      <VenetianMask className="w-3.5 h-3.5" />
-                      <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
-                    </div>
-                  )}
-                  {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
-                  {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
-                  {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
-                  {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
-                  {sec.level === 'unknown' && <HelpCircle className="w-3.5 h-3.5" />}
-                </div>
-              );
-            })()}
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none z-10">
+            {isIncognito ? (
+              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs" title="Private & Incognito Mode">
+                <VenetianMask className="w-3.5 h-3.5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
+              </div>
+            ) : (
+              (() => {
+                const sec = getUrlSecurityInfo(activeTab?.url || '');
+                return (
+                  <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                    {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
+                    {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
+                    {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
+                    {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
+                    {sec.level === 'unknown' && <HelpCircle className="w-3.5 h-3.5" />}
+                  </div>
+                );
+              })()
+            )}
           </div>
           <input
             type="text"
@@ -479,7 +480,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
             className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
               isIncognito 
-                ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
+                ? 'pl-28 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                 : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
             } ${isAIMode ? 'border-cyan-400/50 ring-4 ring-cyan-500/20 bg-cyan-950/30 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
@@ -488,7 +489,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           {/* Title & URL Overlay for Vertical Tabs Mode */}
           {useVerticalTabs && !isFocused && !isAIMode && (
-            <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-[7.5rem]' : 'pl-11'}`}>
+            <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-28' : 'pl-11'}`}>
               <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
                 {activeTab?.title || 'New Tab'}
               </span>
