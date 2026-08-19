@@ -1940,6 +1940,7 @@ function App() {
               onOpenExtensions={handleOpenExtensions}
               bookmarks={bookmarks}
               isCollapsed={false}
+              onReorderTabs={handleReorderTabs}
               onToggleCollapse={() => {
                 setIsSidebarCollapsed(true);
                 setIsHoverRevealing(false);
@@ -1948,6 +1949,11 @@ function App() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Top Window Drag Strip for moving frameless window in Vertical Tabs mode */}
+      {settings.useVerticalTabs && (
+        <div className="fixed top-0 left-0 right-0 h-8 drag-region pointer-events-none z-30" />
+      )}
 
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
@@ -2023,6 +2029,7 @@ function App() {
                   onOpenExtensions={handleOpenExtensions}
                   bookmarks={bookmarks}
                   isCollapsed={true}
+                  onReorderTabs={handleReorderTabs}
                   onToggleCollapse={() => {
                     setIsSidebarCollapsed(false);
                     setIsHoverRevealing(false);

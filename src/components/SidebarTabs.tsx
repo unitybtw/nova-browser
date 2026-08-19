@@ -129,6 +129,7 @@ export interface SidebarTabsProps {
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
+  onReorderTabs?: (draggedId: string, targetId: string) => void;
 }
 
 // Tab Peek Popover rendered via Portal
@@ -213,7 +214,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenExtensions,
   bookmarks = [],
   onToggleCollapse,
-  isCollapsed = false
+  isCollapsed = false,
+  onReorderTabs
 }) => {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
@@ -221,6 +223,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
@@ -398,6 +401,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const renderTab = (tab: Tab, isNested: boolean = false) => {
     const isActive = tab.id === activeTabId;
     const isSplitChild = tab.id === splitTabId;
+    const isDragOver = dragOverTabId === tab.id;
 
     if (isSplitChild && splitTabId && activeTabId) {
       return null;
@@ -410,7 +414,30 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           e.dataTransfer.setData('text/plain', tab.id);
           onTabDragStart?.();
         }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = 'move';
+          if (dragOverTabId !== tab.id) {
+            setDragOverTabId(tab.id);
+          }
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            if (dragOverTabId === tab.id) setDragOverTabId(null);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragOverTabId(null);
+          const draggedId = e.dataTransfer.getData('text/plain');
+          if (draggedId && draggedId !== tab.id && onReorderTabs) {
+            onReorderTabs(draggedId, tab.id);
+          }
+        }}
         onDragEnd={() => {
+          setDragOverTabId(null);
           setHoverPos({ top: 0, left: 0 });
           onTabDragEnd?.();
         }}
@@ -425,9 +452,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-all duration-150 group/tab select-none ${
           isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
         } ${
-          isActive
-            ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
-            : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
+          isDragOver
+            ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
+            : isActive
+              ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
+              : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
         }`}
       >
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
