@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
@@ -73,6 +73,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   isActive = true,
 }) => {
   const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isFocused, setIsFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const [speedDials, setSpeedDials] = useState(() => {
     try {
       const saved = localStorage.getItem('nova_speed_dials');
@@ -102,6 +109,62 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   // Resolved Daily 4K Ultra HD Wallpaper
   const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto();
 
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+        setSelectedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Fetch search suggestions
+  useEffect(() => {
+    if (!isFocused || !query.trim() || query.includes('://')) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const timer = setTimeout(async () => {
+      try {
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
+          const results = await (window as any).electronAPI.getSuggestions(query.trim());
+          if (!abortController.signal.aborted && Array.isArray(results)) {
+            setSuggestions(results.slice(0, 6));
+            setShowSuggestions(results.length > 0);
+            return;
+          }
+        }
+        const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(query.trim())}&type=list`, {
+          signal: abortController.signal
+        });
+        if (!abortController.signal.aborted && res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data) && Array.isArray(data[1])) {
+            const list = data[1].slice(0, 6);
+            setSuggestions(list);
+            setShowSuggestions(list.length > 0);
+          }
+        }
+      } catch (err) {
+        // ignore aborted or network errors
+      }
+    }, 120);
+
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [query, isFocused]);
+
   useEffect(() => {
     localStorage.setItem('nova_todos', JSON.stringify(todos));
   }, [todos]);
@@ -129,11 +192,34 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
   }, [speedDials]);
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        setShowSuggestions(true);
+        setSelectedIndex(prev => (prev < suggestions.length - 1 ? prev + 1 : 0));
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (suggestions.length > 0) {
+        setShowSuggestions(true);
+        setSelectedIndex(prev => (prev > 0 ? prev - 1 : suggestions.length - 1));
+      }
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+    }
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query.trim()) return;
-    const targetUrl = formatSearchUrl(query, searchEngine);
-    onNavigate(targetUrl);
+    let target = query.trim();
+    if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      target = suggestions[selectedIndex];
+    }
+    if (!target) return;
+    setShowSuggestions(false);
+    onNavigate(formatSearchUrl(target, searchEngine));
   };
 
   const handleAddSpeedDial = () => {
@@ -588,25 +674,84 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <Clock variants={itemVariants} />
 
         {/* Omnibox / Search Form */}
-        <motion.div variants={itemVariants} className="w-full">
+        <motion.div variants={itemVariants} className="w-full relative z-30" ref={searchContainerRef}>
           <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-accent transition-colors">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => {
+                setIsFocused(true);
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
+              onKeyDown={handleKeyDown}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-14 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-800/60 backdrop-blur-md border-slate-200 dark:border-slate-700/60 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-800/90 focus:border-accent dark:focus:border-accent/80 focus:ring-4 focus:ring-accent/15 dark:focus:ring-accent/20"
+              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-cyan-500 dark:focus:border-cyan-500/80 focus:ring-4 focus:ring-cyan-500/15"
             />
-            <button
-              type="submit"
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-accent-hover hover:bg-accent text-white transition-all shadow-md shadow-indigo-600/30 opacity-90 hover:opacity-100 active:scale-95"
-            >
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    setSuggestions([]);
+                    setShowSuggestions(false);
+                    setSelectedIndex(-1);
+                  }}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="submit"
+                className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all shadow-md shadow-cyan-500/25 active:scale-95 font-bold"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </form>
+
+          {/* Search Suggestions Dropdown */}
+          <AnimatePresence>
+            {showSuggestions && suggestions.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                transition={{ duration: 0.15 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
+              >
+                {suggestions.map((s, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      setShowSuggestions(false);
+                      onNavigate(formatSearchUrl(s, searchEngine));
+                    }}
+                    onMouseEnter={() => setSelectedIndex(idx)}
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left text-sm transition-all ${
+                      idx === selectedIndex 
+                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-l-2 border-cyan-500' 
+                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Search className={`w-4 h-4 shrink-0 ${idx === selectedIndex ? 'text-cyan-500' : 'text-slate-400'}`} />
+                      <span className="truncate">{s}</span>
+                    </div>
+                    <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Privacy Indicator */}
           <div className="flex items-center justify-between px-2 mt-2 text-xs opacity-60 font-medium">

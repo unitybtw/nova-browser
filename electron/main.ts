@@ -1404,30 +1404,58 @@ const suggestionsCache = new Map<string, string[]>();
 ipcMain.handle('get-suggestions', async (event, query: string) => {
   if (!isTrustedSender(event)) return [];
   if (!query || typeof query !== 'string') return [];
-  const cleanQ = query.trim().toLowerCase();
+  const cleanQ = query.trim();
   if (!cleanQ) return [];
 
-  if (suggestionsCache.has(cleanQ)) {
-    return suggestionsCache.get(cleanQ)!;
+  const cacheKey = cleanQ.toLowerCase();
+  if (suggestionsCache.has(cacheKey)) {
+    return suggestionsCache.get(cacheKey)!;
   }
 
+  // 1. Try DuckDuckGo Autocomplete
   try {
-    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
-      if (Array.isArray(data) && data.length > 1) {
-        const list = data[1].slice(0, 8);
-        if (suggestionsCache.size > 200) {
+      if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1]) && data[1].length > 0) {
+        const list: string[] = data[1].slice(0, 8);
+        if (suggestionsCache.size > 300) {
           const firstKey = suggestionsCache.keys().next().value;
           if (firstKey) suggestionsCache.delete(firstKey);
         }
-        suggestionsCache.set(cleanQ, list);
+        suggestionsCache.set(cacheKey, list);
         return list;
       }
     }
-  } catch (err) {
-    // ignore
-  }
+  } catch (err) {}
+
+  // 2. Fallback to Google Autocomplete
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1]) && data[1].length > 0) {
+        const list: string[] = data[1].slice(0, 8);
+        if (suggestionsCache.size > 300) {
+          const firstKey = suggestionsCache.keys().next().value;
+          if (firstKey) suggestionsCache.delete(firstKey);
+        }
+        suggestionsCache.set(cacheKey, list);
+        return list;
+      }
+    }
+  } catch (err) {}
+
   return [];
 });
 
