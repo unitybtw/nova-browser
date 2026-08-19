@@ -425,7 +425,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
 
   return (
-    <div className="flex-1 flex px-2 lg:px-6 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
+    <div className="flex-1 flex max-w-2xl mx-auto px-2 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.01)' : 'scale(1)' }}>
       <div className="w-full relative">
         <form onSubmit={handleSearchSubmit} className="relative group w-full">
           <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
@@ -434,7 +434,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               return (
                 <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
                   {isIncognito && (
-                    <div className="flex items-center gap-1 mr-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">
+                    <div className="flex items-center gap-1 mr-1 text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md">
                       <VenetianMask className="w-3.5 h-3.5" />
                       <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
                     </div>
@@ -477,11 +477,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               setTimeout(() => setShowSuggestions(false), 200);
             }}
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
-            className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
+            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
               isIncognito 
                 ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
-                : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-            } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} ${
+                : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
+            } ${isAIMode ? 'border-cyan-400/50 ring-4 ring-cyan-500/20 bg-cyan-950/30 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
             }`}
           />
@@ -513,7 +513,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               <button 
                 type="button" 
                 onClick={onToggleReaderMode}
-                className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+                className={`p-1 rounded-lg transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
                 title="Toggle Reader Mode"
               >
                 <BookOpen className="w-3.5 h-3.5" />
@@ -523,10 +523,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             <button 
               type="button" 
               onClick={onToggleBookmark}
-              className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+              className={`p-1 rounded-lg transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
               title="Bookmark Page"
             >
-              <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : ''}`} />
+              <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-cyan-500 text-cyan-500' : ''}`} />
             </button>
           </div>
         </form>
@@ -544,7 +544,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
                 transition={{ duration: 0.18, ease: 'easeOut' }}
-                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
+                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white/95 backdrop-blur-xl border border-slate-200/80 divide-slate-100 dark:bg-slate-900/95 dark:border-white/10 dark:divide-white/5'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >
               
@@ -559,20 +559,20 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
                     selectedIndex === -1 
-                      ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold' 
                       : isIncognito 
                         ? 'hover:bg-slate-700 text-slate-200' 
-                        : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                        : 'hover:bg-slate-100 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
                 {searchValue.includes('.') || searchValue.includes('://') ? (
                   <>
-                    <Globe className="w-4 h-4 shrink-0 text-blue-500" />
-                    <span className="truncate font-medium text-blue-600 dark:text-blue-400">Go to: <span className="underline">{searchValue}</span></span>
+                    <Globe className="w-4 h-4 shrink-0 text-cyan-500" />
+                    <span className="truncate font-medium text-cyan-600 dark:text-cyan-400">Go to: <span className="underline">{searchValue}</span></span>
                   </>
                 ) : (
                   <>
-                    <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`} />
+                    <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-cyan-500' : 'text-slate-400 group-hover:text-cyan-500'}`} />
                     <span className="truncate text-slate-700 dark:text-slate-200">Search with {getSearchEngineName(searchEngine)}: <strong className="text-slate-900 dark:text-white">{searchValue}</strong></span>
                   </>
                 )}
@@ -598,11 +598,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
                           selectedIndex === idx 
-                            ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
-                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium' 
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
                         }`}
                       >
-                        <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-cyan-500' : 'text-slate-400'}`} />
                         <span className="truncate">{suggestion}</span>
                       </button>
                     ))}
@@ -631,12 +631,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                           }}
                           className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
                             selectedIndex === bookmarkIdx
-                              ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
                           }`}
                         >
                           <div className="flex items-center gap-3 overflow-hidden">
-                            <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-blue-500 fill-blue-500' : 'text-amber-400 fill-amber-400'}`} />
+                            <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-cyan-500 fill-cyan-500' : 'text-amber-400 fill-amber-400'}`} />
                             <span className="truncate font-medium">{bookmark.title}</span>
                           </div>
                           <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
@@ -1090,36 +1090,31 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           isBookmarked={isBookmarked}
         />
 
-        {/* Extensions / Split View / Menu */}
-        <div className="flex items-center gap-1 ml-auto relative">
-          <button 
+        {/* Extensions / Action Controls / More Menu */}
+        <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
+          {/* AI Copilot Pill */}
+          <motion.button 
+            whileHover={{ scale: 1.04 }} 
+            whileTap={{ scale: 0.96 }}
             onClick={onToggleAIAssistant}
-            className={`p-1.5 rounded transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all font-semibold text-xs shrink-0 ${
               isIncognito 
-                ? 'hover:bg-accent-dark/40 text-accent' 
-                : 'hover:bg-accent/10 text-accent dark:hover:bg-accent-dark/30 dark:text-accent'
+                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20' 
+                : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 shadow-xs'
             }`}
-            title="AI Browser Assistant"
+            title="Nova AI Copilot (Side Panel)"
           >
-            <Sparkles className="w-4 h-4" />
-          </button>
-          <div className="w-px h-4 bg-slate-200 dark:bg-slate-700 mx-1" />
-          <button 
-            onClick={onToggleVpn}
-            className={`p-1.5 rounded transition-colors ${
-              isVpnEnabled 
-                ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                : isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
-            }`}
-            title="VPN (Proxy)"
-          >
-            <Network className="w-4 h-4" />
-          </button>
-          {/* Active Extensions */}
-          {extensions.map(ext => (
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span>AI</span>
+          </motion.button>
+
+          <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />
+
+          {/* Active Pinned Extensions */}
+          {extensions.filter(ext => ext.iconData).slice(0, 2).map(ext => (
             <button
               key={ext.id}
-              className={`p-1 rounded transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${!ext.iconData ? (isIncognito ? 'bg-accent-dark/30 text-accent hover:bg-slate-700' : 'bg-accent/10 text-accent-hover hover:bg-accent/20 dark:bg-accent-dark/30 dark:text-accent dark:hover:bg-indigo-800/50') : (isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700')}`}
+              className={`p-1 rounded-lg transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
               title={ext.name}
               onClick={(e) => {
                 if (ext.popupUrl) {
@@ -1128,18 +1123,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   if ((window as any).electronAPI?.openExtensionPopup) {
                     (window as any).electronAPI.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
                   } else {
-                    onNewTab(url); // fallback
+                    onNewTab(url);
                   }
-                } else {
-                  console.log(ext.name + ' extension has no popup screen or uses a background action.');
                 }
               }}
             >
-              {ext.iconData ? (
-                <img src={ext.iconData} alt={ext.name} className="w-5 h-5 rounded-sm object-contain" />
-              ) : (
-                ext.name.charAt(0).toUpperCase()
-              )}
+              <img src={ext.iconData} alt={ext.name} className="w-4 h-4 rounded-sm object-contain" />
             </button>
           ))}
 
@@ -1147,12 +1136,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <div className="relative">
             <button 
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
-              className={`p-1.5 rounded transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`}
-              title="Ad Blocker"
+              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
+              title="Privacy & Ad Shield"
             >
-              {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4" />}
+              {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4 text-cyan-400" />}
               {(!isWhitelisted && (activeTab?.blockedAdsCount || 0) > 0) && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeTab!.blockedAdsCount}
                 </span>
               )}
@@ -1173,12 +1162,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <button
               ref={downloadsBtnRef}
               onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
-              className={`p-1.5 rounded transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
               title="Downloads"
             >
               <Download className="w-4 h-4" />
               {(activeDownloadsCount || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeDownloadsCount}
                 </span>
               )}
@@ -1193,46 +1182,23 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             />
           </div>
 
+          {/* Extensions Manager Button */}
           <button 
             onClick={onOpenExtensions}
-            className={`p-1.5 rounded transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'}`}
+            className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
             title="Extensions"
           >
             <Puzzle className="w-4 h-4" />
           </button>
-          {/* MCP Status Badge */}
-          <button
-            onClick={() => onNavigate('nova://settings#mcp')}
-            title={mcpRunning ? `MCP Server Running${mcpClientCount > 0 ? ` · ${mcpClientCount} connected` : ''}` : 'MCP Server Stopped'}
-            className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium transition-all ${
-              mcpRunning && mcpClientCount > 0
-                ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
-                : mcpRunning
-                ? 'bg-slate-100 text-slate-500 dark:bg-slate-700/50 dark:text-slate-400'
-                : 'bg-slate-50 text-slate-400 dark:bg-slate-800/50 dark:text-slate-500'
-            }`}
-          >
-            <Cpu className="w-3 h-3" />
-            <span>MCP</span>
-            {mcpClientCount > 0 && (
-              <span className={`w-1.5 h-1.5 rounded-full ${mcpClientCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
-            )}
-          </button>
-          <button 
-            onClick={onToggleSplitView}
-            className={`p-1.5 rounded transition-colors ${
-              isSplitView ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-700 dark:text-slate-300'
-            }`}
-            title="Toggle Split View (Side-by-Side)"
-          >
-            <Columns className="w-4 h-4" />
-          </button>
           
+          {/* More Menu */}
           <div className="relative">
             <button 
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-              className={`p-1.5 rounded transition-colors ${
-                isMoreMenuOpen ? 'bg-slate-200 dark:bg-slate-700 text-blue-500' : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300'
+              className={`p-1.5 rounded-lg transition-colors ${
+                isMoreMenuOpen 
+                  ? 'bg-slate-200 dark:bg-slate-700 text-cyan-500' 
+                  : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
               }`}
               title="More Options"
             >
@@ -1248,39 +1214,93 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-1.5 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 z-50 flex flex-col py-2"
+                    className="absolute right-0 top-full mt-1.5 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
                   >
-                    <div className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700">
-                      <span className="text-sm text-slate-700 dark:text-slate-300">Zoom</span>
-                      <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 rounded-lg p-0.5">
-                        <button onClick={onZoomOut} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
-                        <button onClick={onZoomIn} className="p-1 rounded hover:bg-white dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
-                      </div>
+                    {/* View & Layout Section */}
+                    <div className="py-1">
+                      <button 
+                        onClick={() => { onToggleSplitView(); setIsMoreMenuOpen(false); }} 
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Columns className="w-4 h-4 text-cyan-400" />
+                          <span>Split View (Side-by-Side)</span>
+                        </div>
+                        {isSplitView && <span className="text-[10px] font-bold bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">ON</span>}
+                      </button>
+
+                      {onToggleVpn && (
+                        <button 
+                          onClick={() => { onToggleVpn(); setIsMoreMenuOpen(false); }} 
+                          className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Network className="w-4 h-4 text-cyan-400" />
+                            <span>VPN (Secure Proxy)</span>
+                          </div>
+                          {isVpnEnabled ? (
+                            <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded">ACTIVE</span>
+                          ) : (
+                            <span className="text-[10px] text-slate-400">OFF</span>
+                          )}
+                        </button>
+                      )}
+
+                      <button 
+                        onClick={() => { onNavigate('nova://settings#mcp'); setIsMoreMenuOpen(false); }} 
+                        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Cpu className="w-4 h-4 text-cyan-400" />
+                          <span>MCP AI Tools Server</span>
+                        </div>
+                        {mcpRunning ? (
+                          <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            ONLINE
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400">OFFLINE</span>
+                        )}
+                      </button>
                     </div>
-                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                    <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <Camera className="w-4 h-4 text-slate-400" /> Screenshot
-                    </button>
-                    <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <Share2 className="w-4 h-4 text-slate-400" /> Share Link
-                    </button>
-                    <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <Search className="w-4 h-4 text-slate-400" /> Find in Page
-                    </button>
-                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                    <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <div className="flex items-center gap-3">
-                        <Download className="w-4 h-4 text-slate-400" /> Downloads
+
+                    {/* Tools Section */}
+                    <div className="py-1">
+                      <div className="flex items-center justify-between px-3 py-1.5">
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Zoom</span>
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-lg p-0.5 border border-slate-200/50 dark:border-white/5">
+                          <button onClick={onZoomOut} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="Zoom Out"><ZoomOut className="w-3.5 h-3.5" /></button>
+                          <span className="text-[11px] font-bold px-1.5 text-slate-700 dark:text-slate-200">{Math.round((activeTab?.zoomFactor || 1) * 100)}%</span>
+                          <button onClick={onZoomIn} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
+                        </div>
                       </div>
-                      {(activeDownloadsCount || 0) > 0 && <span className="bg-blue-500 text-white text-[10px] px-2 py-0.5 rounded-full font-medium">{activeDownloadsCount}</span>}
-                    </button>
-                    <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <Clock className="w-4 h-4 text-slate-400" /> History
-                    </button>
-                    <div className="h-px bg-slate-100 dark:bg-slate-700 my-1" />
-                    <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm text-left">
-                      <Settings className="w-4 h-4 text-slate-400" /> Settings
-                    </button>
+                      <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <Camera className="w-4 h-4 text-slate-400" /> Screenshot
+                      </button>
+                      <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <Share2 className="w-4 h-4 text-slate-400" /> Share Link
+                      </button>
+                      <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <Search className="w-4 h-4 text-slate-400" /> Find in Page
+                      </button>
+                    </div>
+
+                    {/* Navigation / Library */}
+                    <div className="py-1">
+                      <button onClick={() => { onOpenDownloads(); setIsMoreMenuOpen(false); }} className="w-full flex items-center justify-between px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <div className="flex items-center gap-2.5">
+                          <Download className="w-4 h-4 text-slate-400" /> Downloads
+                        </div>
+                        {(activeDownloadsCount || 0) > 0 && <span className="bg-cyan-500 text-slate-950 text-[10px] px-1.5 py-0.5 rounded-full font-bold">{activeDownloadsCount}</span>}
+                      </button>
+                      <button onClick={() => { onOpenHistory(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <Clock className="w-4 h-4 text-slate-400" /> History
+                      </button>
+                      <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                        <Settings className="w-4 h-4 text-slate-400" /> Settings
+                      </button>
+                    </div>
                   </motion.div>
                 </>
               )}
