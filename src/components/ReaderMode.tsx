@@ -484,10 +484,23 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       }
 
       try {
+        let html = '';
         const webview = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
-        if (!webview) throw new Error('Web browser component failed to load.');
-
-        const html = await webview.executeJavaScript(`document.documentElement.outerHTML`);
+        if (webview && typeof webview.executeJavaScript === 'function') {
+          try {
+            html = await webview.executeJavaScript(`document.documentElement.outerHTML`);
+          } catch (e) {
+            console.warn('ReaderMode webview.executeJavaScript failed, trying fallback', e);
+          }
+        }
+        if (!html && (window as any).electronAPI?.fetchPageHtml) {
+          try {
+            html = await (window as any).electronAPI.fetchPageHtml(url);
+          } catch (e) {
+            console.warn('ReaderMode fetchPageHtml fallback failed', e);
+          }
+        }
+        if (!html) throw new Error('Unable to extract article content from this page.');
         
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');

@@ -369,13 +369,24 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
 
   // Listen for console messages from the renderer process and log them safely to the terminal
-  mainWindow?.webContents.on('console-message', (event, level, message, line, sourceId) => {
+  mainWindow?.webContents.on('console-message', (event: any, ...rest: any[]) => {
+    const level = typeof event?.level === 'number' ? event.level : (typeof rest[0] === 'number' ? rest[0] : 0);
+    let message = typeof event?.message === 'string' ? event.message : (typeof rest[1] === 'string' ? rest[1] : (typeof event === 'string' ? event : ''));
+    const line = typeof event?.lineNumber === 'number' ? event.lineNumber : (typeof rest[2] === 'number' ? rest[2] : 0);
+    const sourceId = typeof event?.sourceId === 'string' ? event.sourceId : (typeof rest[3] === 'string' ? rest[3] : '');
+
+    if (!message && typeof event === 'object' && event !== null && 'message' in event) {
+      message = String(event.message);
+    }
+
     // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
-    if (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message)) {
+    if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
       console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
       return;
     }
-    console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+    if (message) {
+      console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+    }
   });
 }
 
