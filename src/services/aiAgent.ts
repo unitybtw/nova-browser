@@ -79,8 +79,8 @@ class AIAgent {
     }
   }
   
-  // Function calling in WebLLM requires Hermes-family models
-  private modelId = "Hermes-3-Llama-3.1-8B-q4f16_1-MLC"; 
+  // Fast, lightweight, multilingual default model (<800MB download vs 4.5GB 8B)
+  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -408,6 +408,10 @@ class AIAgent {
   private async _doInit(onProgress?: InitProgressHandler) {
     this.isInitializing = true;
     try {
+      if (typeof navigator !== 'undefined' && !(navigator as any).gpu) {
+        throw new Error("WebGPU is not supported or hardware acceleration is disabled. Please enable Hardware Acceleration in your system/browser settings.");
+      }
+
       const initProgressCallback: InitProgressCallback = (initProgress) => {
         if (onProgress) {
           onProgress(initProgress.progress * 100, initProgress.text);
@@ -416,6 +420,12 @@ class AIAgent {
 
       const { CreateWebWorkerMLCEngine } = await import("@mlc-ai/web-llm");
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
+
+      try {
+        const storedModel = localStorage.getItem('nova_ai_model');
+        if (storedModel) this.modelId = storedModel;
+      } catch {}
+
       this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
         initProgressCallback,
         context_window_size: 2048
@@ -972,36 +982,28 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     this.isInterrupted = false;
 
     const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
-You are an advanced Browser AI Assistant.
-Your tasks:
-1. Help the user navigate the web and find information in English.
-2. Use the provided TOOLS to read pages, click buttons, and fill forms.
-
-CRITICAL RULES FOR TOOL USAGE:
-- If asked to open a new tab, use 'manage_tabs' (action="create") INSTEAD OF 'navigate_to_url'!
-- When you use 'navigate_to_url', the CURRENT PAGE CONTENT AND ELEMENTS (buttons, etc.) will AUTOMATICALLY be returned to you. DO NOT unnecessarily call 'read_page_content' right after navigating!
-- NEVER call 'navigate_to_url' twice in a row. If you navigate to a page, interact with it (fill_input, click_element) or reply to the user.
-- Do not leave the user's request half-done. If it's a multi-step task (e.g. search and summarize), first search, then read the page, then summarize.
-- Always be concise. Never prolong unnecessarily.
-
-MEMORY SYSTEM (CRITICAL): If the user gives you persistent info or a preference (e.g. "my name is Ali", "always speak English"), you MUST use the 'save_to_memory' tool to remember this for the future.\n`;
+You are Nova Browser's intelligent AI Assistant.
+Tasks & Guidelines:
+1. Help the user navigate the web, analyze pages, and find information.
+2. MULTILINGUAL: Respond in the language used by the user (Turkish if the user speaks Turkish, English if English).
+3. Use the provided TOOLS to read pages, click buttons, and fill forms.
+4. If asked to open a new tab, use 'manage_tabs' (action="create") instead of 'navigate_to_url'.
+5. When you navigate or perform actions, be concise and direct.
+6. MEMORY: If the user provides a personal fact or preference, save it using 'save_to_memory'.\n`;
 
     // Inject memory prompt if present
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
     
-    // WebLLM Hermes blocks custom 'system' roles when tools are enabled, 
-    // so we append our instructions to the last user message instead.
-    const requestMessages = [...messages];
-    
-    if (requestMessages.length > 0) {
-      const firstMsg = requestMessages[0];
-      if (firstMsg.role === 'user' && typeof firstMsg.content === 'string') {
-        requestMessages[0] = {
-          ...firstMsg,
-          content: systemInstruction + (memoryPrompt || '') + '\n\n[USER REQUEST]\n' + firstMsg.content
+    // Prepare clean request messages with system instruction attached to the first user message
+    const requestMessages = messages.map((m, idx) => {
+      if (idx === 0 && m.role === 'user' && typeof m.content === 'string') {
+        return {
+          ...m,
+          content: systemInstruction + (memoryPrompt || '') + '\n\n[USER REQUEST]\n' + m.content
         };
       }
-    }
+      return { ...m };
+    });
 
     let isDone = false;
     let currentMessages = [...requestMessages];
