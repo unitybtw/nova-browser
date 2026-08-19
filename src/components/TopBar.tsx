@@ -1188,6 +1188,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               isOpen={isDownloadsOpen}
               onClose={() => setIsDownloadsOpen(false)}
               onClearDownloads={onClearDownloads || (() => {})}
+              onOpenDownloadsPage={() => onNavigate('nova://downloads')}
               buttonRef={downloadsBtnRef}
             />
           </div>

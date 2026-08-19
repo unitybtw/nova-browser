@@ -301,6 +301,30 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [aiCacheStatus, setAiCacheStatus] = useState<string>('');
+  const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
+
+  const handleClearAiCache = async () => {
+    if (!window.confirm('Clear all downloaded local AI model files and temporary cache?')) return;
+    setIsClearingCache(true);
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const keys = await window.caches.keys();
+        for (const k of keys) {
+          await window.caches.delete(k);
+        }
+      }
+      if ((window as any).electronAPI?.clearAiModelsCache) {
+        await (window as any).electronAPI.clearAiModelsCache();
+      }
+      setAiCacheStatus('AI model cache cleared successfully!');
+      setTimeout(() => setAiCacheStatus(''), 4000);
+    } catch (e: any) {
+      setAiCacheStatus('Failed to clear cache: ' + (e?.message || String(e)));
+    } finally {
+      setIsClearingCache(false);
+    }
+  };
 
   const [extensions, setExtensions] = useState<any[]>([]);
 
@@ -828,6 +852,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.clearOnExit ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Storage & Model Cache</h2>
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Purge AI Model Cache</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Delete downloaded local WebLLM neural network weights to free up disk space</div>
+                    {aiCacheStatus && (
+                      <div className={`text-xs mt-2 font-medium ${aiCacheStatus.includes('successfully') ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                        {aiCacheStatus}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleClearAiCache}
+                    disabled={isClearingCache}
+                    className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 rounded-xl text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {isClearingCache ? 'Clearing...' : 'Clear AI Cache'}
+                  </button>
                 </div>
               </section>
             </div>
