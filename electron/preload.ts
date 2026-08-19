@@ -70,6 +70,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
   setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
   clearIncognitoSession: () => ipcRenderer.invoke('clear-incognito-session'),
+  clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
   secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
   storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),

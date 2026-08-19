@@ -98,6 +98,7 @@ async function verifyMainProcessRuntime() {
     'set-mcp-tool-enabled',
     'get-mcp-status',
     'clear-incognito-session',
+    'clear-ai-models-cache',
     'secure-store-set',
     'secure-store-get',
     'store-set',

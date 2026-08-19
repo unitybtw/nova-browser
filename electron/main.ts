@@ -1077,6 +1077,22 @@ ipcMain.handle('clear-incognito-session', async (event) => {
   }
 });
 
+// Clear AI model cache & Service Worker WebLLM cache
+ipcMain.handle('clear-ai-models-cache', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    const defaultSess = session.defaultSession;
+    await defaultSess.clearStorageData({
+      storages: ['serviceworkers', 'cachestorage']
+    });
+    await defaultSess.clearCache();
+    return true;
+  } catch (err) {
+    console.error('Error clearing AI models cache:', err);
+    return false;
+  }
+});
+
 // Generic Secure Storage API (for future password manager, etc.)
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;

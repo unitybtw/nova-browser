@@ -146,6 +146,25 @@ export const SidePanel = React.memo(({
     }
   }, [isReady, isInitializing]);
 
+  const handleClearAICache = async () => {
+    if (!window.confirm('Clear downloaded AI models and temporary cache to free up disk space?')) return;
+    try {
+      if (typeof window !== 'undefined' && 'caches' in window) {
+        const keys = await window.caches.keys();
+        for (const k of keys) {
+          await window.caches.delete(k);
+        }
+      }
+      if ((window as any).electronAPI?.clearAiModelsCache) {
+        await (window as any).electronAPI.clearAiModelsCache();
+      }
+      setMessages([{ role: 'assistant', content: 'AI model cache and temporary files were successfully deleted from your computer.' }]);
+      setIsReady(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const handleAIAction = async (text: string) => {
     if (!text.trim() || isLoading) return;
 
@@ -255,10 +274,19 @@ export const SidePanel = React.memo(({
               {isReady && messages.length > 0 && !isLoading && (
                 <button
                   onClick={() => setMessages([{ role: 'assistant', content: 'Chat reset. How can I help you?' }])}
-                  className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-500 transition-colors"
+                  className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                   title="Reset Chat"
                 >
                   <RefreshCw className="w-4 h-4" />
+                </button>
+              )}
+              {!isLoading && (
+                <button
+                  onClick={handleClearAICache}
+                  className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors"
+                  title="Purge Downloaded AI Cache & Free Disk Space"
+                >
+                  <Trash2 className="w-4 h-4" />
                 </button>
               )}
               {isLoading && (
