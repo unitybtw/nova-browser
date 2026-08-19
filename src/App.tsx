@@ -1939,6 +1939,7 @@ function App() {
               onOpenSettings={handleOpenSettings}
               onOpenExtensions={handleOpenExtensions}
               bookmarks={bookmarks}
+              isCollapsed={false}
               onToggleCollapse={() => {
                 setIsSidebarCollapsed(true);
                 setIsHoverRevealing(false);
@@ -1951,11 +1952,27 @@ function App() {
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
         <>
-          {/* Invisible Left Edge Mouse Sensor */}
+          {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
           <div 
-            className="fixed top-0 left-0 bottom-0 w-6 z-40"
+            className="fixed top-0 left-0 bottom-0 w-8 z-40"
             onMouseEnter={handleHoverSidebarOpen}
           />
+
+          {/* Floating Expand Sidebar Button when Collapsed */}
+          <div className="fixed top-2.5 left-2.5 z-45 flex items-center">
+            <button
+              onClick={() => {
+                setIsSidebarCollapsed(false);
+                setIsHoverRevealing(false);
+              }}
+              onMouseEnter={handleHoverSidebarOpen}
+              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              title="Expand Sidebar (⌘S)"
+            >
+              <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘S</span>
+            </button>
+          </div>
 
           {/* Smooth Sliding Overlay Sidebar on Hover */}
           <AnimatePresence>
@@ -2005,6 +2022,7 @@ function App() {
                   onOpenSettings={handleOpenSettings}
                   onOpenExtensions={handleOpenExtensions}
                   bookmarks={bookmarks}
+                  isCollapsed={true}
                   onToggleCollapse={() => {
                     setIsSidebarCollapsed(false);
                     setIsHoverRevealing(false);

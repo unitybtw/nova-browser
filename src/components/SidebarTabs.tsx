@@ -29,7 +29,8 @@ import {
   Layers,
   LayoutGrid,
   Trash2,
-  PanelLeft
+  PanelLeft,
+  Pin
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
@@ -127,6 +128,7 @@ export interface SidebarTabsProps {
   onOpenExtensions?: () => void;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
+  isCollapsed?: boolean;
 }
 
 // Tab Peek Popover rendered via Portal
@@ -210,7 +212,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenSettings,
   onOpenExtensions,
   bookmarks = [],
-  onToggleCollapse
+  onToggleCollapse,
+  isCollapsed = false
 }) => {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
@@ -492,9 +495,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <button
                 onClick={onToggleCollapse}
                 className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag flex items-center justify-center"
-                title="Hide Sidebar (⌘S)"
+                title={isCollapsed ? "Pin Sidebar (⌘S)" : "Hide Sidebar (⌘S)"}
               >
-                <PanelLeft className="w-3.5 h-3.5" />
+                {isCollapsed ? (
+                  <Pin className="w-3.5 h-3.5 rotate-45 text-cyan-500 dark:text-cyan-400" />
+                ) : (
+                  <PanelLeft className="w-3.5 h-3.5" />
+                )}
               </button>
             )}
           </div>
