@@ -2378,6 +2378,7 @@ function App() {
             onToggleExtension={handleToggleExtension}
             onRemoveExtension={handleRemoveExtension}
             onManageExtensions={handleManageExtensions}
+            onOpenUrl={handleNewTab}
           />
         )}
       </React.Suspense>
