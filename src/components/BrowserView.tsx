@@ -81,11 +81,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     hostname: string;
     username: string;
     password: string;
+    isUpdate?: boolean;
   }>({
     isOpen: false,
     hostname: '',
     username: '',
-    password: ''
+    password: '',
+    isUpdate: false
   });
   
   const [aiPreview, setAiPreview] = useState<{ isOpen: boolean; x: number; y: number; url: string }>({
@@ -167,20 +169,63 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             const savedCredentials = ${JSON.stringify(savedPasswords)};
             if (savedCredentials.length > 0) {
               const cred = savedCredentials[0];
-              const pwdInputs = document.querySelectorAll('input[type="password"]');
+              const pwdInputs = Array.from(document.querySelectorAll('input[type="password"]'));
               if (pwdInputs.length > 0) {
-                const form = pwdInputs[0].closest('form');
-                if (form) {
-                  const textInputs = form.querySelectorAll('input[type="text"], input[type="email"]');
-                  if (textInputs.length > 0) {
-                    textInputs[0].value = cred.username;
-                    textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                  }
-                  pwdInputs[0].value = cred.password;
-                  pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                const root = pwdInputs[0].closest('form') || pwdInputs[0].closest('div') || document;
+                const textInputs = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
+                if (textInputs.length > 0) {
+                  textInputs[0].value = cred.username;
+                  textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                  textInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
                 }
+                pwdInputs[0].value = cred.password;
+                pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                pwdInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
               }
             }
+
+            // In-page fallback password capture listener
+            let lastUser = '';
+            document.addEventListener('input', (e) => {
+              const t = e.target;
+              if (t && t.tagName === 'INPUT') {
+                const type = (t.type || '').toLowerCase();
+                const name = (t.name || '').toLowerCase();
+                if (type === 'text' || type === 'email' || type === 'tel' || name.includes('user') || name.includes('email') || name.includes('login')) {
+                  if (t.value && t.value.trim()) lastUser = t.value.trim();
+                }
+              }
+            }, true);
+
+            const checkAndEmit = () => {
+              const pwds = Array.from(document.querySelectorAll('input[type="password"]'));
+              const activePwd = pwds.find(p => p.value && p.value.length > 0);
+              if (!activePwd || !activePwd.value) return;
+
+              const root = activePwd.closest('form') || activePwd.closest('div') || document;
+              let userInp = root.querySelector('input[autocomplete="username"], input[autocomplete="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[type="email"], input[type="text"]');
+              const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
+              
+              if (foundUser && activePwd.value) {
+                console.log('NOVA_SAVE_PW::' + JSON.stringify({
+                  hostname: window.location.hostname,
+                  username: foundUser,
+                  password: activePwd.value
+                }));
+              }
+            };
+
+            document.addEventListener('submit', checkAndEmit, true);
+            document.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAndEmit(); }, true);
+            document.addEventListener('click', (e) => {
+              const btn = e.target && e.target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
+              if (btn) {
+                const txt = (btn.textContent || btn.value || '').toLowerCase();
+                if (btn.type === 'submit' || /log|sign|giriş|kayıt|devam|next|continue|submit|ileri/i.test(txt)) {
+                  setTimeout(checkAndEmit, 50);
+                }
+              }
+            }, true);
           })();
           
           (function() {
@@ -338,26 +383,57 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: false });
     };
 
+    const handlePasswordDetected = async (hostname: string, username: string, password: string) => {
+      let actualHostname = '';
+      try {
+        actualHostname = new URL(tab?.url || '').hostname;
+      } catch (_) {}
+
+      if (actualHostname && actualHostname === hostname && username && password) {
+        const cleanUser = String(username).substring(0, 100);
+        const cleanPass = String(password).substring(0, 500);
+
+        let isUpdate = false;
+        try {
+          const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+          if (raw) {
+            const all = JSON.parse(raw);
+            const existing = all.find((p: any) => p.hostname === actualHostname && p.username === cleanUser);
+            if (existing) {
+              if (existing.password === cleanPass) {
+                return;
+              }
+              isUpdate = true;
+            }
+          }
+        } catch (_) {}
+
+        setPasswordPrompt({
+          isOpen: true,
+          hostname: actualHostname,
+          username: cleanUser,
+          password: cleanPass,
+          isUpdate
+        });
+      }
+    };
+
     const handleIpcMessage = (e: any) => {
       if (e.channel === 'password-form-submitted' && e.args?.[0]) {
         const { hostname, username, password } = e.args[0];
-        let actualHostname = '';
-        try {
-          actualHostname = new URL(tab?.url || '').hostname;
-        } catch (_) {}
-
-        if (actualHostname && actualHostname === hostname && username && password) {
-          setPasswordPrompt({
-            isOpen: true,
-            hostname: actualHostname,
-            username: String(username).substring(0, 100),
-            password: String(password).substring(0, 500)
-          });
-        }
+        handlePasswordDetected(hostname, username, password);
       }
     };
 
     const handleConsoleMessage = (e: any) => {
+      if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
+        try {
+          const data = JSON.parse(e.message.substring(14));
+          if (data && data.hostname && data.username && data.password) {
+            handlePasswordDetected(data.hostname, data.username, data.password);
+          }
+        } catch (_) {}
+      }
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
         try {
           const data = JSON.parse(e.message.substring(17));
@@ -837,19 +913,23 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         isOpen={passwordPrompt.isOpen}
         hostname={passwordPrompt.hostname}
         username={passwordPrompt.username}
+        password={passwordPrompt.password}
+        isUpdate={passwordPrompt.isUpdate}
         onClose={() => setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))}
-        onSave={async () => {
+        onSave={async (customUsername?: string, customPassword?: string) => {
+          const finalUsername = customUsername || passwordPrompt.username;
+          const finalPassword = customPassword || passwordPrompt.password;
           try {
             const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
             let passwords = raw ? JSON.parse(raw) : [];
             
-            // Remove existing password for this host if any
-            passwords = passwords.filter((p: any) => p.hostname !== passwordPrompt.hostname);
+            // Remove existing password for this host & username if any
+            passwords = passwords.filter((p: any) => !(p.hostname === passwordPrompt.hostname && p.username === finalUsername));
             
             passwords.push({
               hostname: passwordPrompt.hostname,
-              username: passwordPrompt.username,
-              password: passwordPrompt.password,
+              username: finalUsername,
+              password: finalPassword,
               timestamp: Date.now()
             });
             
