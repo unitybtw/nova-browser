@@ -78,8 +78,8 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
     return {
       level: 'internal',
       label: 'Nova',
-      color: 'text-purple-500',
-      bgColor: 'bg-purple-50 dark:bg-purple-500/10',
+      color: 'text-cyan-500',
+      bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
       icon: 'Home',
       tooltip: 'Nova internal page'
     };
@@ -94,8 +94,8 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
       return {
         level: 'internal',
         label: 'Nova',
-        color: 'text-purple-500',
-        bgColor: 'bg-purple-50 dark:bg-purple-500/10',
+        color: 'text-cyan-500',
+        bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
         icon: 'Home',
         tooltip: 'Nova internal page'
       };
