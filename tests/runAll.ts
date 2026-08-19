@@ -6,4 +6,11 @@ import './e2e/tier4_real_world.test';
 import './e2e/tier5_adversarial_stress.test';
 import './challenger2_empirical_verification';
 import './challenger_iter2_stress';
+import './challenger_m1_security_empirical';
+import './m1_adversarial_security.test';
+import './m2_adversarial_empirical.test';
+import './m3_performance_memoization.test';
+import './challenger_m3_performance_empirical';
 import './main_process_runtime_verification';
+import './challenger_m4_bundle_empirical';
+

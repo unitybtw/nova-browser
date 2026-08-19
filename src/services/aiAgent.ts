@@ -1,4 +1,4 @@
-import { MLCEngine, InitProgressCallback, ChatCompletionMessageParam } from "@mlc-ai/web-llm";
+import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam } from "@mlc-ai/web-llm";
 import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";

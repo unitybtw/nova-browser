@@ -73,10 +73,32 @@ const PHISHING_KEYWORDS = [
   'refund-2024', 'gift-card-free', 'survey-winner'
 ];
 
-// 🔒 Security: Validate that IPC messages originate strictly from our trusted main UI window
+// 🔒 Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
 function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
-  return event.sender.id === mainWindow.webContents.id;
+  if (event.sender.id !== mainWindow.webContents.id) return false;
+  if (event.senderFrame && mainWindow.webContents.mainFrame && event.senderFrame !== mainWindow.webContents.mainFrame) {
+    return false;
+  }
+  return true;
+}
+
+// 🔒 Security: Validate dev server and app internal page origins strictly
+function isTrustedAppOrigin(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol === 'nova:' || parsed.protocol === 'devtools:') return true;
+    if (parsed.origin === 'http://localhost:5173') return true;
+    if (parsed.protocol === 'file:') {
+      const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
+      const navPath = decodeURIComponent(parsed.pathname);
+      return path.resolve(navPath) === allowedPath;
+    }
+    return false;
+  } catch {
+    return false;
+  }
 }
 
 function isPhishing(urlStr: string) {
@@ -179,23 +201,12 @@ function createWindow() {
 
   // 🔒 Security: Prevent Drag and Drop navigation on the main UI window
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    // Only allow navigation to localhost dev server or the specific dist/index.html in prod
-    if (url.startsWith('http://localhost:5173')) {
-      return;
-    }
-    if (url.startsWith('file://')) {
-      const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
-      try {
-        const navPath = decodeURIComponent(new URL(url).pathname);
-        if (path.resolve(navPath) === allowedPath) {
-          return;
-        }
-      } catch {}
-      event.preventDefault();
-      console.warn('Blocked file:// navigation to non-app path:', url);
+    // Only allow navigation to localhost dev server origin or the specific dist/index.html in prod
+    if (isTrustedAppOrigin(url)) {
       return;
     }
     event.preventDefault();
+    console.warn('Blocked main window navigation to non-app path:', url);
   });
 
   // Inject webstore API into all webviews
@@ -307,14 +318,26 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       }
     }
 
-    if (details.url.includes('localhost:5173')) {
+    let isDevLocalhost = false;
+    let isAppFile = false;
+    try {
+      const parsed = new URL(details.url);
+      if (parsed.origin === 'http://localhost:5173') {
+        isDevLocalhost = true;
+      }
+      if (parsed.protocol === 'file:') {
+        isAppFile = true;
+      }
+    } catch {}
+
+    if (isDevLocalhost) {
       responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
       responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
     }
 
     // VULN-16: Add Content Security Policy for the app's own pages
-    if (details.url.startsWith('file://') || details.url.includes('localhost:5173')) {
-      const isDev = details.url.includes('localhost:5173') || !app.isPackaged;
+    if (isAppFile || isDevLocalhost) {
+      const isDev = isDevLocalhost || !app.isPackaged;
       responseHeaders['Content-Security-Policy'] = [
         isDev
           ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:;"
@@ -345,8 +368,13 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
 
 
-  // Listen for console messages from the renderer process and log them to the terminal
+  // Listen for console messages from the renderer process and log them safely to the terminal
   mainWindow?.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
+    if (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message)) {
+      console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
+      return;
+    }
     console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
   });
 }
@@ -377,7 +405,7 @@ app.whenReady().then(async () => {
       const url = details.requestingUrl || webContents.getURL() || '';
       
       // Auto-allow internal app pages
-      if (url.startsWith('nova://') || url.startsWith('http://localhost:5173') || url.startsWith('devtools://')) {
+      if (isTrustedAppOrigin(url)) {
         return callback(true);
       }
       
@@ -417,7 +445,7 @@ app.whenReady().then(async () => {
 
     targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
       // If it's a silent check from the browser itself, allow it
-      if (requestingOrigin.startsWith('nova://') || requestingOrigin.startsWith('http://localhost:5173')) {
+      if (isTrustedAppOrigin(requestingOrigin)) {
         return true; 
       }
       
@@ -571,6 +599,20 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.webSecurity = true;
     webPreferences.allowRunningInsecureContent = false;
     webPreferences.experimentalFeatures = false;
+    webPreferences.sandbox = true;
+    webPreferences.backgroundThrottling = true;
+
+    // Preload restriction: only allow authorized webstore preload script
+    const authorizedPreloads = [
+      path.resolve(path.join(__dirname, 'webstore-preload.cjs')),
+      path.resolve(path.join(__dirname, 'webstore-preload.js'))
+    ];
+    if (webPreferences.preload) {
+      const resolvedPreload = path.resolve(webPreferences.preload);
+      if (!authorizedPreloads.includes(resolvedPreload)) {
+        delete webPreferences.preload;
+      }
+    }
   });
 
   // 🔒 Security: Block arbitrary window popups and route valid HTTP/HTTPS URLs to our secure tab system
@@ -585,6 +627,19 @@ app.on('web-contents-created', (_event, contents) => {
   });
 
   if (contents.getType() === 'webview') {
+    // Native Audio State Hook
+    const audioListener = (_audioEvt: any, audible: boolean) => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('tab-audio-changed', {
+          webContentsId: contents.id,
+          isPlayingAudio: audible
+        });
+      }
+    };
+    (contents as any).on('audio-state-changed', audioListener);
+    contents.once('destroyed', () => {
+      (contents as any).removeListener('audio-state-changed', audioListener);
+    });
     contents.on('will-navigate', (e, navigationUrl) => {
       // 0. Prevent dangerous protocols & local file access on webviews
       const dangerousProtocols = ['file:', 'javascript:', 'data:', 'vbscript:', 'chrome:', 'edge:', 'about:config'];
@@ -764,12 +819,15 @@ ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
 // Set theme source for dark mode rendering on pages
 ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;
-  nativeTheme.themeSource = theme;
+  if (theme === 'light' || theme === 'dark' || theme === 'system') {
+    nativeTheme.themeSource = theme;
+  }
 });
 
 // Capture thumbnail from a webview via its webContentsId
 ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => {
   if (!isTrustedSender(event)) return null;
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return null;
   try {
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return null;
@@ -788,6 +846,7 @@ ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => 
 // Capture full page screenshot using CDP
 ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   if (!isTrustedSender(event)) return null;
+  if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return null;
   try {
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return null;
@@ -950,6 +1009,7 @@ app.on('web-contents-created', (_event, wc) => {
 // Download Controls
 ipcMain.handle('pause-download', (event, id: string) => {
   if (!isTrustedSender(event)) return false;
+  if (!id || typeof id !== 'string') return false;
   const item = activeDownloads.get(id);
   if (item && !item.isPaused()) {
     item.pause();
@@ -960,6 +1020,7 @@ ipcMain.handle('pause-download', (event, id: string) => {
 
 ipcMain.handle('resume-download', (event, id: string) => {
   if (!isTrustedSender(event)) return false;
+  if (!id || typeof id !== 'string') return false;
   const item = activeDownloads.get(id);
   if (item && item.canResume()) {
     item.resume();
@@ -970,6 +1031,7 @@ ipcMain.handle('resume-download', (event, id: string) => {
 
 ipcMain.handle('cancel-download', (event, id: string) => {
   if (!isTrustedSender(event)) return false;
+  if (!id || typeof id !== 'string') return false;
   const item = activeDownloads.get(id);
   if (item) {
     item.cancel();
@@ -981,6 +1043,7 @@ ipcMain.handle('cancel-download', (event, id: string) => {
 
 ipcMain.handle('open-download', (event, pathStr: string) => {
   if (!isTrustedSender(event)) return false;
+  if (!pathStr || typeof pathStr !== 'string') return false;
   const downloadsPath = app.getPath('downloads');
   try {
     const resolvedPath = path.resolve(pathStr);
@@ -998,6 +1061,7 @@ ipcMain.handle('open-download', (event, pathStr: string) => {
 
 ipcMain.handle('show-download-in-folder', (event, pathStr: string) => {
   if (!isTrustedSender(event)) return false;
+  if (!pathStr || typeof pathStr !== 'string') return false;
   const downloadsPath = app.getPath('downloads');
   try {
     const resolvedPath = path.resolve(pathStr);
@@ -1048,7 +1112,8 @@ ipcMain.handle('get-mcp-tool-settings', (event) => {
 });
 ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolean) => {
   if (!isTrustedSender(event)) return false;
-  mcpServer?.setToolEnabled(toolName, enabled);
+  if (!toolName || typeof toolName !== 'string') return false;
+  mcpServer?.setToolEnabled(toolName, Boolean(enabled));
   return true;
 });
 
@@ -1097,7 +1162,8 @@ ipcMain.handle('clear-ai-models-cache', async (event) => {
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
   try {
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (typeof value !== 'string') throw new Error('Invalid value format');
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     // VULN-06: Warn and mark when encryption is unavailable
     if (safeStorage.isEncryptionAvailable()) {
@@ -1118,7 +1184,7 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
 ipcMain.handle('secure-store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
   try {
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     if (fs.existsSync(keyPath)) {
       const raw = fs.readFileSync(keyPath);
@@ -1144,10 +1210,15 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
 ipcMain.handle('store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
   try {
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
+      return { error: 'Invalid key format' };
+    }
+    if (typeof value !== 'string') {
+      return { error: 'Invalid value format: must be string' };
+    }
     // VULN-23: Enforce max value size of 10MB
     const MAX_STORE_VALUE_SIZE = 10 * 1024 * 1024; // 10MB
-    if (typeof value === 'string' && Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
+    if (Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
       console.error('Store set error: Value exceeds maximum size of 10MB');
       return { error: 'Value exceeds maximum allowed size of 10MB' };
     }
@@ -1171,7 +1242,7 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
 ipcMain.handle('store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
   try {
-    if (!/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     if (fs.existsSync(keyPath)) {
       return fs.readFileSync(keyPath, 'utf-8');
@@ -1185,9 +1256,14 @@ ipcMain.handle('store-get', async (event, key: string) => {
 // IPC Handler for VPN
 ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: string }) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
-  const proxyRules = (config.enabled && config.proxyUrl) ? config.proxyUrl.trim() : 'direct://';
+  if (!config || typeof config !== 'object') {
+    return { error: 'Invalid VPN config object' };
+  }
+  const isEnabled = Boolean(config.enabled);
+  const rawProxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : '';
+  const proxyRules = (isEnabled && rawProxyUrl) ? rawProxyUrl : 'direct://';
   
-  if (config.enabled && config.proxyUrl) {
+  if (isEnabled && rawProxyUrl) {
     // 🔒 Security: Validate proxy URL protocol
     const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
     if (!allowedProxyProtocols.some(proto => proxyRules.startsWith(proto))) {
@@ -1569,6 +1645,9 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
 // Remove Extension
 ipcMain.handle('remove-extension', async (event, extensionId: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
   const win = BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No window available' };
   try {
@@ -1576,8 +1655,9 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
     loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
     
     // Also delete it from disk so it doesn't load on next startup
-    const extDir = path.join(app.getPath('userData'), 'extensions', extensionId);
-    if (fs.existsSync(extDir)) {
+    const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+    const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
+    if (extDir.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(extDir)) {
       fs.rmSync(extDir, { recursive: true, force: true });
     }
     

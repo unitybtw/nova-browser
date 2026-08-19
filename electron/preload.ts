@@ -117,6 +117,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('tab-thumbnail-update', handler);
     return () => ipcRenderer.removeListener('tab-thumbnail-update', handler);
   },
+  onTabAudioChanged: (callback: (event: any, data: { webContentsId: number; isPlayingAudio: boolean }) => void) => {
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('tab-audio-changed', handler);
+    return () => ipcRenderer.removeListener('tab-audio-changed', handler);
+  },
   onAdBlockedBatch: (callback: (event: any, batch: Record<number, number>) => void) => {
     const handler = (_event: any, batch: any) => callback(null, batch);
     ipcRenderer.on('ad-blocked-batch', handler);

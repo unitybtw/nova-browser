@@ -66,6 +66,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const webviewInitialSrc = useRef<string>(getSafeUrl(tab?.url));
   const isWebviewReady = useRef<boolean>(false);
 
+  useEffect(() => {
+    if (tab?.url) {
+      webviewInitialSrc.current = getSafeUrl(tab.url);
+    }
+  }, [tab?.url]);
+
   const isNewTab = React.useMemo(() => (
     !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab?.url]);
@@ -175,29 +181,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 }
               }
             }
-
-            // Capture new submissions
-            document.addEventListener('submit', (e) => {
-              const form = e.target;
-              if (form && form.tagName === 'FORM') {
-                const pwdInput = form.querySelector('input[type="password"]');
-                if (pwdInput && pwdInput.value) {
-                  let username = '';
-                  const textInputs = form.querySelectorAll('input[type="text"], input[type="email"]');
-                  if (textInputs.length > 0) {
-                    username = textInputs[0].value;
-                  }
-                  
-                  // IPC to parent window (App.tsx / BrowserView.tsx)
-                  // But wait, window.ipcRenderer doesn't exist unless nodeIntegration/preload.
-                  // Instead, we can send a custom event and listen for it via another executeJavaScript polling, 
-                  // or set title? No, webview supports ipc-message if we use sendToHost in a preload.
-                  // Since we have no preload, we can't easily send an IPC message from standard injected script.
-                  // However, we can use console.log and capture it!
-                  console.log('NOVA_SAVE_PW::' + JSON.stringify({ hostname: window.location.hostname, username, password: pwdInput.value }));
-                }
-              }
-            });
           })();
           
           (function() {
@@ -356,32 +339,25 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleIpcMessage = (e: any) => {
-      if (e.channel === 'password-form-submitted') {
+      if (e.channel === 'password-form-submitted' && e.args?.[0]) {
         const { hostname, username, password } = e.args[0];
-        setPasswordPrompt({ isOpen: true, hostname, username, password });
+        let actualHostname = '';
+        try {
+          actualHostname = new URL(tab?.url || '').hostname;
+        } catch (_) {}
+
+        if (actualHostname && actualHostname === hostname && username && password) {
+          setPasswordPrompt({
+            isOpen: true,
+            hostname: actualHostname,
+            username: String(username).substring(0, 100),
+            password: String(password).substring(0, 500)
+          });
+        }
       }
     };
 
     const handleConsoleMessage = (e: any) => {
-      if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
-        try {
-          const data = JSON.parse(e.message.substring(14));
-          // Security: Bind saved password hostname strictly to the actual tab's current domain
-          let actualHostname = '';
-          try {
-            actualHostname = new URL(tab?.url || '').hostname;
-          } catch (_) {}
-          
-          if (actualHostname && actualHostname === data.hostname && data.username && data.password) {
-            setPasswordPrompt({
-              isOpen: true,
-              hostname: actualHostname,
-              username: String(data.username).substring(0, 100),
-              password: String(data.password).substring(0, 500)
-            });
-          }
-        } catch (err) {}
-      }
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
         try {
           const data = JSON.parse(e.message.substring(17));
@@ -420,7 +396,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('console-message', handleConsoleMessage);
 
     // Initial check: if webview is already not loading, ensure isLoading is false
-    setTimeout(() => {
+    const readyCheckTimer = setTimeout(() => {
       try {
         if (webview && typeof webview.isLoading === 'function' && !webview.isLoading() && tab?.id) {
           onUpdateTab(tab.id, { isLoading: false });
@@ -429,6 +405,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }, 500);
 
     return () => {
+      clearTimeout(readyCheckTimer);
+      isWebviewReady.current = false;
+      domReadyRef.current = false;
       webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
       webview.removeEventListener('did-stop-loading', handleStopLoading);
@@ -516,7 +495,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return () => {
       wv.removeEventListener('dom-ready', onReady);
     };
-  }, []);
+  }, [tab?.isSuspended]);
 
   useEffect(() => {
     if (!tab?.url || tab.url === lastLoadedUrl.current) return;
@@ -533,6 +512,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           wv.removeEventListener('dom-ready', pendingLoad);
         };
         wv.addEventListener('dom-ready', pendingLoad);
+        return () => {
+          wv.removeEventListener('dom-ready', pendingLoad);
+        };
       }
     }
   }, [tab?.url]);
@@ -578,6 +560,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (isNewTab) {
     return (
       <NewTabPage 
+        isActive={isActive}
         onNavigate={(url) => {
           // Update the tab URL so BrowserView's useEffect fires loadURL
           onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
@@ -671,7 +654,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
-            src={webviewInitialSrc.current || 'about:blank'}
+            partition={isIncognito ? 'incognito' : undefined}
+            src={getSafeUrl(tab?.url)}
             className="w-full h-full border-none bg-white"
             allowpopups={"true" as any}
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
@@ -834,7 +818,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               <iframe
                 ref={webviewRef as any}
                 data-tab-id={tab.id}
-                src={webviewInitialSrc.current || 'about:blank'}
+                src={getSafeUrl(tab?.url)}
                 className="w-full h-full border-none bg-white"
                 title={tab.title}
                 sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
@@ -889,20 +873,43 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   );
 }, (prevProps, nextProps) => {
   if (prevProps.isActive !== nextProps.isActive) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.newTabBackground !== nextProps.newTabBackground) return false;
+
+  // Tab properties comparison
+  if (prevProps.tab?.id !== nextProps.tab?.id) return false;
   if (prevProps.tab?.url !== nextProps.tab?.url) return false;
-  if (prevProps.tab?.isLoading !== nextProps.tab?.isLoading) return false;
   if (prevProps.tab?.title !== nextProps.tab?.title) return false;
   if (prevProps.tab?.favicon !== nextProps.tab?.favicon) return false;
-  if (prevProps.tab?.isSuspended !== nextProps.tab?.isSuspended) return false;
-  if (prevProps.tab?.thumbnail !== nextProps.tab?.thumbnail) return false;
+  if (prevProps.tab?.isLoading !== nextProps.tab?.isLoading) return false;
+  if (prevProps.tab?.canGoBack !== nextProps.tab?.canGoBack) return false;
+  if (prevProps.tab?.canGoForward !== nextProps.tab?.canGoForward) return false;
   if (prevProps.tab?.isMuted !== nextProps.tab?.isMuted) return false;
-  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  
-  // Deep comparison for settings object changes that affect rendering
+  if (prevProps.tab?.isPinned !== nextProps.tab?.isPinned) return false;
+  if (prevProps.tab?.isIncognito !== nextProps.tab?.isIncognito) return false;
+  if (prevProps.tab?.thumbnail !== nextProps.tab?.thumbnail) return false;
+  if (prevProps.tab?.zoomFactor !== nextProps.tab?.zoomFactor) return false;
+  if (prevProps.tab?.isPlayingAudio !== nextProps.tab?.isPlayingAudio) return false;
+  if (prevProps.tab?.blockedAdsCount !== nextProps.tab?.blockedAdsCount) return false;
+  if (prevProps.tab?.webContentsId !== nextProps.tab?.webContentsId) return false;
+  if (prevProps.tab?.isSuspended !== nextProps.tab?.isSuspended) return false;
+
+  // Settings comparison
+  if (prevProps.settings?.searchEngine !== nextProps.settings?.searchEngine) return false;
+  if (prevProps.settings?.newTabBackground !== nextProps.settings?.newTabBackground) return false;
+  if (prevProps.settings?.backgroundCustomUrl !== nextProps.settings?.backgroundCustomUrl) return false;
+  if (prevProps.settings?.aiLinkPreviewEnabled !== nextProps.settings?.aiLinkPreviewEnabled) return false;
+  if (prevProps.settings?.privacyShield !== nextProps.settings?.privacyShield) return false;
+  if (prevProps.settings?.theme !== nextProps.settings?.theme) return false;
+  if (prevProps.settings?.showTasksWidget !== nextProps.settings?.showTasksWidget) return false;
+
+  // Deep comparison for settings object changes that affect internal pages
   if ((prevProps.tab?.url?.startsWith('nova://settings') || prevProps.tab?.url?.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;
   if ((prevProps.tab?.url?.startsWith('nova://history') || prevProps.tab?.url?.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
   if ((prevProps.tab?.url?.startsWith('nova://downloads') || prevProps.tab?.url?.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
-  
+
   return true;
 });
 

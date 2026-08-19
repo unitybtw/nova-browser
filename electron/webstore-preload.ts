@@ -1,8 +1,11 @@
 import { ipcRenderer, webFrame } from 'electron';
 
+const currentHost = window.location.hostname.toLowerCase();
+const isChromeWebStore = currentHost === 'chromewebstore.google.com' || currentHost === 'chrome.google.com';
+
 if ((window as any).__novaPreloadInjected) {
   // Already injected
-} else if (window.location.hostname.includes('chrome.google.com') || window.location.hostname.includes('chromewebstore.google.com')) {
+} else if (isChromeWebStore) {
   (window as any).__novaPreloadInjected = true;
 
   // Create Trusted Types policy to bypass CSP for innerHTML
@@ -69,8 +72,8 @@ if ((window as any).__novaPreloadInjected) {
   };
 
   window.addEventListener('message', (event) => {
-    const currentHost = window.location.hostname;
-    if (!currentHost.includes('chromewebstore.google.com') && !currentHost.includes('chrome.google.com')) return;
+    const host = window.location.hostname.toLowerCase();
+    if (host !== 'chromewebstore.google.com' && host !== 'chrome.google.com') return;
     if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
     
     const extensionId = event.data.extensionId;

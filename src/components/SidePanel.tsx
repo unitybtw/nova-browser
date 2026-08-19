@@ -9,16 +9,6 @@ import { tts } from '../services/tts';
 import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
 import { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 
-// Setup Speech Recognition
-const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-let recognition: any = null;
-if (SpeechRecognition) {
-  recognition = new SpeechRecognition();
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.lang = 'en-US';
-}
-
 interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
@@ -46,6 +36,8 @@ export const SidePanel = React.memo(({
   const [isListening, setIsListening] = useState(false);
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const hasSpeechRecognition = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe(actions => {
@@ -61,50 +53,64 @@ export const SidePanel = React.memo(({
     return () => { unsubscribe(); };
   }, []);
 
+  // Initialize SpeechRecognition with proper lifecycle cleanup
+  useEffect(() => {
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognitionClass) {
+      try {
+        const rec = new SpeechRecognitionClass();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.lang = 'en-US';
+
+        rec.onresult = (event: any) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript) {
+            setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
+          }
+        };
+        rec.onerror = () => setIsListening(false);
+        rec.onend = () => setIsListening(false);
+
+        recognitionRef.current = rec;
+      } catch (err) {
+        console.error('Failed to initialize SpeechRecognition:', err);
+      }
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {}
+        recognitionRef.current.onresult = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onend = null;
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
+
   // Push-to-Talk Handlers
   const handleMouseDownMic = useCallback(() => {
-    if (!recognition) return;
+    if (!recognitionRef.current) return;
     try {
-      recognition.start();
+      recognitionRef.current.start();
       setIsListening(true);
     } catch (e) { console.error(e); }
   }, []);
 
   const handleMouseUpMic = useCallback(() => {
-    if (!recognition) return;
+    if (!recognitionRef.current) return;
     try {
-      recognition.stop();
+      recognitionRef.current.stop();
       setIsListening(false);
     } catch (e) { console.error(e); }
-  }, []);
-
-  useEffect(() => {
-    if (!recognition) return;
-    const handleResult = (event: any) => {
-      let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript;
-        }
-      }
-      if (finalTranscript) {
-        setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
-      }
-    };
-    const handleError = () => setIsListening(false);
-    const handleEnd = () => setIsListening(false);
-
-    recognition.onresult = handleResult;
-    recognition.onerror = handleError;
-    recognition.onend = handleEnd;
-
-    return () => {
-      if (recognition) {
-        recognition.onresult = null;
-        recognition.onerror = null;
-        recognition.onend = null;
-      }
-    };
   }, []);
 
   // Subscribe to TTS state changes
@@ -227,23 +233,29 @@ export const SidePanel = React.memo(({
     await handleAIAction(currentInput);
   };
 
+  const handleAIActionRef = useRef(handleAIAction);
+  handleAIActionRef.current = handleAIAction;
+
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
+
   useEffect(() => {
     const handleQuickAction = (e: Event) => {
       const customEvent = e as CustomEvent;
       const actionText = customEvent.detail;
       if (actionText) {
-        if (!isOpen) {
+        if (!isOpenRef.current) {
           // Tell App.tsx to open SidePanel via a new event, or we need App.tsx to listen and open it!
           window.dispatchEvent(new CustomEvent('open-ai-sidepanel'));
         }
         setTimeout(() => {
-          handleAIAction(actionText);
+          handleAIActionRef.current(actionText);
         }, 300);
       }
     };
     window.addEventListener('ai-quick-action', handleQuickAction);
     return () => window.removeEventListener('ai-quick-action', handleQuickAction);
-  }, [messages, isLoading, isReady, isInitializing, isOpen]);
+  }, []);
 
   return (
     <AnimatePresence>
@@ -576,7 +588,7 @@ export const SidePanel = React.memo(({
           {isReady && (
             <div className="p-3.5 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
               <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
-                {SpeechRecognition && (
+                {hasSpeechRecognition && (
                   <button
                     type="button"
                     onMouseDown={handleMouseDownMic}

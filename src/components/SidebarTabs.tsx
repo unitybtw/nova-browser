@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -392,11 +392,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   }, []);
 
   // Filter out blank new tabs so they do not duplicate the "+ New Tab" action button!
-  const visitedTabs = tabs.filter(t => {
+  const visitedTabs = useMemo(() => tabs.filter(t => {
     const isBlank = !t.url || t.url === 'nova://newtab' || t.url === 'about:blank' || t.url === 'https://newtab';
     // If it's a blank new tab, don't show as a second "+ New Tab" item in the tab list
     return !isBlank;
-  });
+  }), [tabs]);
 
   const renderTab = (tab: Tab, isNested: boolean = false) => {
     const isActive = tab.id === activeTabId;
@@ -481,7 +481,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         <div className={`flex items-center gap-1 transition-all duration-150 shrink-0 ${
-          isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+          isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
         }`}>
           {tab.isMuted ? (
             <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">

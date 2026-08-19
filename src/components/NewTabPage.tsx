@@ -20,7 +20,38 @@ interface NewTabPageProps {
   showTasksWidget?: boolean;
   isIncognito?: boolean;
   theme?: UserSettings['theme'];
+  isActive?: boolean;
 }
+
+interface ClockProps {
+  variants?: any;
+}
+
+export const Clock: React.FC<ClockProps> = React.memo(({ variants }) => {
+  const [timeStr, setTimeStr] = useState('');
+  const [greeting, setGreeting] = useState('');
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      const hour = now.getHours();
+      if (hour < 12) setGreeting('Good Morning');
+      else if (hour < 18) setGreeting('Good Afternoon');
+      else setGreeting('Good Evening');
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <motion.div variants={variants} className="text-center mb-4">
+      <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-sans tabular-nums transition-colors">{timeStr}</h1>
+      <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 font-medium transition-colors">{greeting}</p>
+    </motion.div>
+  );
+});
 
 const DEFAULT_SPEED_DIALS = [
   { name: 'Google', url: 'https://www.google.com', domain: 'google.com' },
@@ -39,6 +70,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   showTasksWidget = true,
   isIncognito = false,
   theme = 'dark',
+  isActive = true,
 }) => {
   const [query, setQuery] = useState('');
   const [speedDials, setSpeedDials] = useState(() => {
@@ -67,26 +99,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   });
   const [newTodo, setNewTodo] = useState('');
 
-  // Clock & Greeting
-  const [timeStr, setTimeStr] = useState('');
-  const [greeting, setGreeting] = useState('');
-
   // Resolved Daily 4K Ultra HD Wallpaper
   const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto();
-
-  useEffect(() => {
-    const updateTime = () => {
-      const now = new Date();
-      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-      const hour = now.getHours();
-      if (hour < 12) setGreeting('Good Morning');
-      else if (hour < 18) setGreeting('Good Afternoon');
-      else setGreeting('Good Evening');
-    };
-    updateTime();
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     localStorage.setItem('nova_todos', JSON.stringify(todos));
@@ -401,9 +415,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {newTabBackground === 'aurora_waves' && (
         <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#080b12]' : 'bg-slate-50'}`}>
           <motion.div 
-            animate={{ 
+            animate={isActive ? { 
               x: ['0%', '-50%', '0%'],
-            }}
+            } : false}
             transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
             className={`absolute top-[-50%] bottom-[-50%] left-0 w-[400%] blur-[90px] ${isDarkTheme ? 'opacity-65' : 'opacity-35'}`}
             style={{
@@ -431,9 +445,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             }}
           >
             <motion.div 
-              animate={{ 
+              animate={isActive ? { 
                 backgroundPositionY: ['0px', '48px'],
-              }}
+              } : false}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
               className="absolute bottom-0 left-[-50%] right-[-50%] h-[75vh]"
               style={{
@@ -465,10 +479,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 boxShadow: '0 0 8px 1.5px rgba(255,255,255,0.7)',
                 willChange: 'transform, opacity'
               }}
-              animate={{
+              animate={isActive ? {
                 scale: [0.6, 1.6, 0.6],
                 opacity: [0.2, 1, 0.2],
-              }}
+              } : false}
               transition={{
                 duration: star.duration,
                 repeat: Infinity,
@@ -496,12 +510,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 boxShadow: '0 0 14px 3px rgba(251, 191, 36, 0.5)',
                 willChange: 'transform, opacity'
               }}
-              animate={{
+              animate={isActive ? {
                 y: [0, fly.driftY, 0],
                 x: [0, fly.driftX, 0],
                 opacity: [0.1, 0.9, 0.3, 0.9, 0.1],
                 scale: [0.8, 1.3, 0.8]
-              }}
+              } : false}
               transition={{
                 duration: fly.duration,
                 repeat: Infinity,
@@ -518,10 +532,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#07070b]' : 'bg-slate-950'}`}>
           <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.3)_0%,rgba(7,7,11,1)_70%)]" />
           <motion.div
-            animate={{
+            animate={isActive ? {
               rotate: [0, 360],
               scale: [1, 1.15, 1]
-            }}
+            } : false}
             transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
             className="absolute -inset-[80%] blur-[110px] opacity-55"
             style={{
@@ -549,9 +563,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 boxShadow: '0 0 10px 2px rgba(16, 185, 129, 0.5)',
                 willChange: 'transform'
               }}
-              animate={{
+              animate={isActive ? {
                 y: ['0vh', '140vh'],
-              }}
+              } : false}
               transition={{
                 duration: col.speed,
                 repeat: Infinity,
@@ -571,10 +585,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
         className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
-        <motion.div variants={itemVariants} className="text-center mb-4">
-          <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-sans tabular-nums transition-colors">{timeStr}</h1>
-          <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 font-medium transition-colors">{greeting}</p>
-        </motion.div>
+        <Clock variants={itemVariants} />
 
         {/* Omnibox / Search Form */}
         <motion.div variants={itemVariants} className="w-full">

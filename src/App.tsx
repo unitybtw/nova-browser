@@ -426,6 +426,27 @@ function App() {
     }
   }, []);
 
+  // Listen for native Chromium webview audio state updates from Electron main process
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.onTabAudioChanged) {
+      const removeListener = (window as any).electronAPI.onTabAudioChanged((_event: any, { webContentsId, isPlayingAudio }: { webContentsId: number; isPlayingAudio: boolean }) => {
+        setTabs(prevTabs =>
+          prevTabs.map(tab => {
+            if (tab.webContentsId === webContentsId) {
+              return { ...tab, isPlayingAudio };
+            }
+            return tab;
+          })
+        );
+      });
+      return () => {
+        try {
+          removeListener?.();
+        } catch (_) {}
+      };
+    }
+  }, []);
+
   // Downloads state
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
 
@@ -1649,6 +1670,69 @@ function App() {
 
   const handleCloseShare = useCallback(() => setIsShareOpen(false), []);
   const handleCloseSpotlight = useCallback(() => setIsSpotlightOpen(false), []);
+  const handleCloseReaderMode = useCallback(() => setIsReaderModeOpen(false), []);
+  const handleCloseWorkspaceManager = useCallback(() => setIsWorkspaceManagerOpen(false), []);
+  const handleCloseExtensions = useCallback(() => setIsExtensionsOpen(false), []);
+  const handleCloseScreenshot = useCallback(() => setIsScreenshotOpen(false), []);
+  const handleCloseVpnPopover = useCallback(() => setIsVpnPopoverOpen(false), []);
+
+  const handleCollapseSidebar = useCallback(() => {
+    setIsSidebarCollapsed(true);
+    setIsHoverRevealing(false);
+  }, []);
+
+  const handleExpandSidebar = useCallback(() => {
+    setIsSidebarCollapsed(false);
+    setIsHoverRevealing(false);
+  }, []);
+
+  const vpnAnchorRef = useRef<HTMLButtonElement | null>(null);
+
+  const handleToggleExtension = useCallback((id: string) => {
+    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
+  }, []);
+
+  const handleRemoveExtension = useCallback(async (id: string) => {
+    if (window.confirm('Are you sure you want to remove this extension?')) {
+      try {
+        await (window as any).electronAPI?.removeExtension?.(id);
+        setExtensions(prev => prev.filter(e => e.id !== id));
+      } catch (e) {
+        console.error('Failed to remove extension:', e);
+      }
+    }
+  }, []);
+
+  const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
+
+  const handleSpotlightSelectTab = useCallback((tabId: string) => {
+    setTabs(currentTabs => {
+      const t = currentTabs.find(tab => tab.id === tabId);
+      if (t && t.workspaceId) {
+        setActiveWorkspaceId(t.workspaceId);
+      } else if (t && !t.workspaceId) {
+        setActiveWorkspaceId('default');
+      }
+      return currentTabs;
+    });
+    setActiveTabId(tabId);
+  }, []);
+
+  const handleOnboardingComplete = useCallback((prefs: any) => {
+    setShowOnboarding(false);
+    setSettings(s => ({
+      ...s,
+      theme: prefs.theme,
+      searchEngine: prefs.searchEngine,
+      privacyShield: prefs.privacyShield
+    }));
+    if (prefs.importedBookmarks && prefs.importedBookmarks.length > 0) {
+      setBookmarks(prev => {
+        const newBookmarks = [...prev, ...prefs.importedBookmarks!];
+        return newBookmarks;
+      });
+    }
+  }, []);
 
   const handleFoundInPage = useCallback((idx: number, count: number) => setFindMatches({ index: idx, count }), []);
   const handleCloseFindInPage = useCallback(() => setIsFindInPageOpen(false), []);
@@ -1864,24 +1948,12 @@ function App() {
 
   const workspaceTabs = useMemo(() => tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default')), [tabs, activeWorkspaceId]);
 
+  const sortedTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id)), [tabs]);
+
   if (showOnboarding) {
     return (
       <Onboarding
-        onComplete={(prefs) => {
-          setShowOnboarding(false);
-          setSettings(s => ({
-            ...s,
-            theme: prefs.theme,
-            searchEngine: prefs.searchEngine,
-            privacyShield: prefs.privacyShield
-          }));
-          if (prefs.importedBookmarks && prefs.importedBookmarks.length > 0) {
-            setBookmarks(prev => {
-              const newBookmarks = [...prev, ...prefs.importedBookmarks!];
-              return newBookmarks;
-            });
-          }
-        }}
+        onComplete={handleOnboardingComplete}
       />
     );
   }
@@ -1941,10 +2013,7 @@ function App() {
               bookmarks={bookmarks}
               isCollapsed={false}
               onReorderTabs={handleReorderTabs}
-              onToggleCollapse={() => {
-                setIsSidebarCollapsed(true);
-                setIsHoverRevealing(false);
-              }}
+              onToggleCollapse={handleCollapseSidebar}
             />
           </motion.div>
         )}
@@ -1967,10 +2036,7 @@ function App() {
           {/* Floating Expand Sidebar Button when Collapsed */}
           <div className="fixed top-2.5 left-2.5 z-45 flex items-center">
             <button
-              onClick={() => {
-                setIsSidebarCollapsed(false);
-                setIsHoverRevealing(false);
-              }}
+              onClick={handleExpandSidebar}
               onMouseEnter={handleHoverSidebarOpen}
               className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer"
               title="Expand Sidebar (⌘S)"
@@ -2030,10 +2096,7 @@ function App() {
                   bookmarks={bookmarks}
                   isCollapsed={true}
                   onReorderTabs={handleReorderTabs}
-                  onToggleCollapse={() => {
-                    setIsSidebarCollapsed(false);
-                    setIsHoverRevealing(false);
-                  }}
+                  onToggleCollapse={handleExpandSidebar}
                 />
               </motion.div>
             )}
@@ -2168,7 +2231,7 @@ function App() {
 
         {/* Primary View */}
         <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : '100%' }} className="h-full relative transition-none">
-          {[...tabs].sort((a, b) => a.id.localeCompare(b.id)).map((tab) => {
+          {sortedTabs.map((tab) => {
             if (secondaryTab && tab.id === secondaryTab.id) {
               return null;
             }
@@ -2299,15 +2362,7 @@ function App() {
         tabs={tabs}
         activeTabId={activeTabId}
         searchEngine={settings.searchEngine}
-        onSelectTab={(tabId) => {
-          const t = tabs.find(t => t.id === tabId);
-          if (t && t.workspaceId && t.workspaceId !== activeWorkspaceId) {
-             setActiveWorkspaceId(t.workspaceId);
-          } else if (t && !t.workspaceId && activeWorkspaceId !== 'default') {
-             setActiveWorkspaceId('default');
-          }
-          setActiveTabId(tabId);
-        }}
+        onSelectTab={handleSpotlightSelectTab}
         onNewTab={handleNewTab}
         onCloseTab={handleCloseTab}
         onNavigate={handleNavigate}
@@ -2318,22 +2373,11 @@ function App() {
         {isExtensionsOpen && (
           <ExtensionsModal
             isOpen={isExtensionsOpen}
-            onClose={() => setIsExtensionsOpen(false)}
+            onClose={handleCloseExtensions}
             extensions={extensions}
-            onToggleExtension={(id) => {
-              setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
-            }}
-            onRemoveExtension={async (id) => {
-              if (window.confirm('Are you sure you want to remove this extension?')) {
-                try {
-                  await (window as any).electronAPI?.removeExtension?.(id);
-                  setExtensions(prev => prev.filter(e => e.id !== id));
-                } catch (e) {
-                  console.error('Failed to remove extension:', e);
-                }
-              }
-            }}
-            onManageExtensions={() => handleNewTab('nova://settings#extensions')}
+            onToggleExtension={handleToggleExtension}
+            onRemoveExtension={handleRemoveExtension}
+            onManageExtensions={handleManageExtensions}
           />
         )}
       </React.Suspense>
@@ -2355,7 +2399,7 @@ function App() {
         {isScreenshotOpen && (
           <ScreenshotModal
             isOpen={isScreenshotOpen}
-            onClose={() => setIsScreenshotOpen(false)}
+            onClose={handleCloseScreenshot}
             imageDataUrl={screenshotDataUrl}
             pageTitle={activeTab?.title || ''}
             onCaptureFullPage={handleCaptureFullPage}
@@ -2366,13 +2410,13 @@ function App() {
       {/* VPN POPOVER */}
       <VpnPopover
         isOpen={isVpnPopoverOpen}
-        onClose={() => setIsVpnPopoverOpen(false)}
+        onClose={handleCloseVpnPopover}
         isEnabled={vpnEnabled}
         onToggle={setVpnEnabled}
         selectedLocation={vpnLocation}
         locations={vpnLocations}
         onSelectLocation={setVpnLocation}
-        anchorRef={{ current: null } as any}
+        anchorRef={vpnAnchorRef}
       />
 
       </div>
@@ -2383,7 +2427,7 @@ function App() {
             url={activeTab?.url || ''} 
             tabId={activeTabId} 
             isActive={isReaderModeOpen} 
-            onClose={() => setIsReaderModeOpen(false)} 
+            onClose={handleCloseReaderMode} 
           />
         )}
       </React.Suspense>
@@ -2392,7 +2436,7 @@ function App() {
         {isWorkspaceManagerOpen && (
           <WorkspaceManager 
             isOpen={isWorkspaceManagerOpen} 
-            onClose={() => setIsWorkspaceManagerOpen(false)} 
+            onClose={handleCloseWorkspaceManager} 
             workspaces={workspaces} 
             onUpdateWorkspaces={setWorkspaces} 
             activeWorkspaceId={activeWorkspaceId} 

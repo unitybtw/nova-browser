@@ -301,6 +301,359 @@ const MemoizedTabItem = React.memo(({
   );
 });
 
+interface OmniboxBarProps {
+  activeTab?: Tab;
+  isIncognito?: boolean;
+  searchEngine: UserSettings['searchEngine'];
+  bookmarks: Bookmark[];
+  useVerticalTabs?: boolean;
+  onNavigate: (url: string) => void;
+  onToggleReaderMode?: () => void;
+  onToggleBookmark?: () => void;
+  isBookmarked: boolean;
+}
+
+export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
+  activeTab,
+  isIncognito,
+  searchEngine,
+  bookmarks,
+  useVerticalTabs,
+  onNavigate,
+  onToggleReaderMode,
+  onToggleBookmark,
+  isBookmarked,
+}) => {
+  const [searchValue, setSearchValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
+  const [isAIMode, setIsAIMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setSearchValue(activeTab?.url || '');
+    }
+  }, [activeTab?.url, isFocused]);
+
+  useEffect(() => {
+    if (isAIMode || !searchValue || searchValue.includes('://') || searchValue.includes('.')) {
+      setSuggestions([]);
+      return;
+    }
+
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const fetchSuggestions = async () => {
+      try {
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
+          const results = await (window as any).electronAPI.getSuggestions(searchValue);
+          if (!abortController.signal.aborted && Array.isArray(results)) {
+            setSuggestions(results.slice(0, 6));
+            return;
+          }
+        }
+        const response = await fetch(
+          `https://duckduckgo.com/ac/?q=${encodeURIComponent(searchValue)}&type=list`,
+          { signal: abortController.signal }
+        );
+        if (!abortController.signal.aborted && response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data) && data.length > 1) {
+            setSuggestions(data[1].slice(0, 6));
+          }
+        }
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          // ignore network errors
+        }
+      }
+    };
+
+    const timer = setTimeout(fetchSuggestions, 150);
+    setSelectedIndex(-1);
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
+  }, [searchValue, isAIMode]);
+
+  const handleSearchSubmit = useCallback((e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchValue.trim()) return;
+
+    let targetValue = searchValue;
+    const matchedBookmarks = bookmarks
+      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
+      .slice(0, 3);
+
+    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
+      targetValue = suggestions[selectedIndex];
+    } else if (selectedIndex >= suggestions.length && selectedIndex < suggestions.length + matchedBookmarks.length) {
+      targetValue = matchedBookmarks[selectedIndex - suggestions.length].url;
+    }
+
+    if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
+      let prompt = targetValue;
+      if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
+      if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
+      
+      window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
+      setSearchValue('');
+      setIsAIMode(false);
+      setShowSuggestions(false);
+      setSelectedIndex(-1);
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      return;
+    }
+
+    const url = formatSearchUrl(targetValue, searchEngine);
+    onNavigate(url);
+    setShowSuggestions(false);
+    setSelectedIndex(-1);
+    
+    // Blur the active element to drop focus
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
+
+  return (
+    <div className="flex-1 flex px-2 lg:px-6 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
+      <div className="w-full relative">
+        <form onSubmit={handleSearchSubmit} className="relative group w-full">
+          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
+            {(() => {
+              const sec = getUrlSecurityInfo(activeTab?.url || '');
+              return (
+                <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                  {isIncognito && (
+                    <div className="flex items-center gap-1 mr-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">
+                      <VenetianMask className="w-3.5 h-3.5" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
+                    </div>
+                  )}
+                  {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
+                  {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
+                  {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
+                  {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
+                  {sec.level === 'unknown' && <HelpCircle className="w-3.5 h-3.5" />}
+                </div>
+              );
+            })()}
+          </div>
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Tab' && searchValue.trim().toLowerCase() === '@ai') {
+                e.preventDefault();
+                setIsAIMode(true);
+                setSearchValue('');
+              } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const matchedBookmarksCount = bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).slice(0, 3).length;
+                const maxIndex = suggestions.length + matchedBookmarksCount - 1;
+                setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
+              }
+            }}
+            onFocus={(e) => {
+              setIsFocused(true);
+              setShowSuggestions(true);
+              e.target.select();
+            }}
+            onBlur={() => {
+              setIsFocused(false);
+              setTimeout(() => setShowSuggestions(false), 200);
+            }}
+            placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
+            className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
+              isIncognito 
+                ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
+                : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
+            } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} ${
+              (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
+            }`}
+          />
+
+          {/* Title & URL Overlay for Vertical Tabs Mode */}
+          {useVerticalTabs && !isFocused && !isAIMode && (
+            <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-[7.5rem]' : 'pl-11'}`}>
+              <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
+                {activeTab?.title || 'New Tab'}
+              </span>
+              {activeTab?.url && activeTab.url !== 'nova://newtab' && (
+                <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
+                  {formatSearchUrl(activeTab.url)}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+            {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
+              <div 
+                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all ${isIncognito ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}
+                title="Zoom Level"
+              >
+                {Math.round(activeTab.zoomFactor * 100)}%
+              </div>
+            )}
+
+            {onToggleReaderMode && (
+              <button 
+                type="button" 
+                onClick={onToggleReaderMode}
+                className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+                title="Toggle Reader Mode"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <button 
+              type="button" 
+              onClick={onToggleBookmark}
+              className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+              title="Bookmark Page"
+            >
+              <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : ''}`} />
+            </button>
+          </div>
+        </form>
+
+        {/* Search Suggestions Dropdown */}
+        <AnimatePresence>
+          {showSuggestions && searchValue.trim().length > 0 && (() => {
+            const matchedBookmarks = bookmarks
+              .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
+              .slice(0, 3);
+            
+            return (
+              <motion.div 
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
+                onMouseDown={(e) => e.preventDefault()}
+              >
+              
+              {/* Primary Direct Action (Index -1) */}
+                <button
+                  type="button"
+                  onMouseEnter={() => setSelectedIndex(-1)}
+                  onClick={() => {
+                    setShowSuggestions(false);
+                    onNavigate(formatSearchUrl(searchValue, searchEngine));
+                    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
+                    selectedIndex === -1 
+                      ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                      : isIncognito 
+                        ? 'hover:bg-slate-700 text-slate-200' 
+                        : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                {searchValue.includes('.') || searchValue.includes('://') ? (
+                  <>
+                    <Globe className="w-4 h-4 shrink-0 text-blue-500" />
+                    <span className="truncate font-medium text-blue-600 dark:text-blue-400">Go to: <span className="underline">{searchValue}</span></span>
+                  </>
+                ) : (
+                  <>
+                    <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`} />
+                    <span className="truncate text-slate-700 dark:text-slate-200">Search with {getSearchEngineName(searchEngine)}: <strong className="text-slate-900 dark:text-white">{searchValue}</strong></span>
+                  </>
+                )}
+              </button>
+
+              {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
+              {suggestions.length > 0 && (
+                <div className="py-1">
+                  <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Search Suggestions
+                  </div>
+
+                  {suggestions.map((suggestion, idx) => (
+                      <button
+                        key={`sug-${idx}`}
+                        type="button"
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                        onClick={() => {
+                          setSearchValue(suggestion);
+                          setShowSuggestions(false);
+                          onNavigate(formatSearchUrl(suggestion, searchEngine));
+                          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
+                          selectedIndex === idx 
+                            ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
+                        <span className="truncate">{suggestion}</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+
+              {/* Matching Bookmarks (Index suggestions.length to ...) */}
+              {matchedBookmarks.length > 0 && (
+                <div className="py-1">
+                  <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Bookmarks
+                  </div>
+                  {matchedBookmarks
+                    .map((bookmark, idx) => {
+                      const bookmarkIdx = suggestions.length + idx;
+                      return (
+                        <button
+                          key={`bm-${bookmark.id}`}
+                          type="button"
+                          onMouseEnter={() => setSelectedIndex(bookmarkIdx)}
+                          onClick={() => {
+                            setSearchValue(bookmark.url);
+                            setShowSuggestions(false);
+                            onNavigate(bookmark.url);
+                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                          }}
+                          className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
+                            selectedIndex === bookmarkIdx
+                              ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-blue-500 fill-blue-500' : 'text-amber-400 fill-amber-400'}`} />
+                            <span className="truncate font-medium">{bookmark.title}</span>
+                          </div>
+                          <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
+                        </button>
+                      );
+                    })}
+                </div>
+                )}
+              </motion.div>
+            );
+          })()}
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+});
+
 export const TopBar: React.FC<TopBarProps> = React.memo(({
   tabs,
   workspaces,
@@ -354,15 +707,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   splitTabId,
   onCloseSplit
 }) => {
-  const [searchValue, setSearchValue] = useState('');
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ left: 0, width: 0 });
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [mcpClientCount, setMcpClientCount] = useState(0);
   const [mcpRunning, setMcpRunning] = useState(false);
@@ -371,7 +720,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
-  const [isAIMode, setIsAIMode] = useState(false);
   const [ghostTab, setGhostTab] = useState<{ id: string; x: number; y: number } | null>(null);
 
   const tabsContainerRef = useRef<any>(null);
@@ -422,11 +770,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     }
   };
 
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   useEffect(() => {
     let cleanup: (() => void) | void;
     if ((window as any).electronAPI?.onAdBlocked) {
       cleanup = (window as any).electronAPI.onAdBlocked((_: any, data: { tabId: string }) => {
-        const tab = tabs.find(t => t.id === data.tabId);
+        const tab = tabsRef.current.find(t => t.id === data.tabId);
         if (tab) {
           tab.blockedAdsCount = (tab.blockedAdsCount || 0) + 1;
           setForceUpdate(v => v + 1);
@@ -436,7 +787,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     return () => {
       if (typeof cleanup === 'function') cleanup();
     };
-  }, [tabs]);
+  }, []);
 
   useEffect(() => {
     const fetchWhitelist = async () => {
@@ -505,88 +856,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       if (cleanup) cleanup();
     };
   }, []);
-
-  const [isFocused, setIsFocused] = useState(false);
-
-  useEffect(() => {
-    if (!isFocused) {
-      setSearchValue(activeTab?.url || '');
-    }
-  }, [activeTab?.url, isFocused]);
-
-  useEffect(() => {
-    if (isAIMode || !searchValue || searchValue.includes('://') || searchValue.includes('.')) {
-      setSuggestions([]);
-      return;
-    }
-
-    const fetchSuggestions = async () => {
-      try {
-        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(searchValue);
-          if (Array.isArray(results)) {
-            setSuggestions(results.slice(0, 6));
-            return;
-          }
-        }
-        const response = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(searchValue)}&type=list`);
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data) && data.length > 1) {
-            setSuggestions(data[1].slice(0, 6));
-          }
-        }
-      } catch (err) {
-        // ignore errors
-      }
-    };
-
-    const timer = setTimeout(fetchSuggestions, 150);
-    setSelectedIndex(-1);
-    return () => clearTimeout(timer);
-  }, [searchValue, isAIMode]);
-
-  const handleSearchSubmit = React.useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    if (!searchValue.trim()) return;
-
-    let targetValue = searchValue;
-    const matchedBookmarks = bookmarks
-      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-      .slice(0, 3);
-
-    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
-      targetValue = suggestions[selectedIndex];
-    } else if (selectedIndex >= suggestions.length && selectedIndex < suggestions.length + matchedBookmarks.length) {
-      targetValue = matchedBookmarks[selectedIndex - suggestions.length].url;
-    }
-
-    if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
-      let prompt = targetValue;
-      if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
-      if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
-      
-      window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
-      setSearchValue('');
-      setIsAIMode(false);
-      setShowSuggestions(false);
-      setSelectedIndex(-1);
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur();
-      }
-      return;
-    }
-
-    const url = formatSearchUrl(targetValue, searchEngine);
-    onNavigate(url);
-    setShowSuggestions(false);
-    setSelectedIndex(-1);
-    
-    // Blur the active element to drop focus
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -809,238 +1078,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         </div>
 
         {/* Omnibox / Address Bar */}
-        <div className="flex-1 flex px-2 lg:px-6 transition-all duration-300 ease-out" style={{ transform: isFocused ? 'scale(1.02)' : 'scale(1)' }}>
-          <div className="w-full relative">
-            <form onSubmit={handleSearchSubmit} className="relative group w-full">
-              <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-2 pointer-events-none z-10">
-                {(() => {
-                  const sec = getUrlSecurityInfo(activeTab?.url || '');
-                  return (
-                    <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
-                      {isIncognito && (
-                        <div className="flex items-center gap-1 mr-1 text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded-md">
-                          <VenetianMask className="w-3.5 h-3.5" />
-                          <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
-                        </div>
-                      )}
-                      {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
-                      {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
-                      {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
-                      {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
-                      {sec.level === 'unknown' && <HelpCircle className="w-3.5 h-3.5" />}
-                    </div>
-                  );
-                })()}
-              </div>
-              <input
-                type="text"
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Tab' && searchValue.trim().toLowerCase() === '@ai') {
-                    e.preventDefault();
-                    setIsAIMode(true);
-                    setSearchValue('');
-                  } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    const matchedBookmarksCount = bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).slice(0, 3).length;
-                    const maxIndex = suggestions.length + matchedBookmarksCount - 1;
-                    setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
-                  } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
-                  }
-                }}
-                onFocus={(e) => {
-                  setIsFocused(true);
-                  setShowSuggestions(true);
-                  e.target.select();
-                }}
-                onBlur={() => {
-                  setIsFocused(false);
-                  setTimeout(() => setShowSuggestions(false), 200);
-                }}
-                placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
-                className={`w-full border border-transparent focus:border-blue-500 focus:ring-2 focus:ring-blue-100/50 rounded-full py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
-                  isIncognito 
-                    ? 'pl-[7.5rem] bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
-                    : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/80 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-                } ${isAIMode ? 'border-purple-400/50 ring-4 ring-purple-500/20 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 text-purple-900 dark:text-purple-100 shadow-[0_0_20px_rgba(168,85,247,0.3)]' : ''} ${
-                  (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
-                }`}
-              />
-
-              {/* Title & URL Overlay for Vertical Tabs Mode */}
-              {useVerticalTabs && !isFocused && !isAIMode && (
-                <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-[7.5rem]' : 'pl-11'}`}>
-                  <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
-                    {activeTab?.title || 'New Tab'}
-                  </span>
-                  {activeTab?.url && activeTab.url !== 'nova://newtab' && (
-                    <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
-                      {formatSearchUrl(activeTab.url)}
-                    </span>
-                  )}
-                </div>
-              )}
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
-                {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
-                  <div 
-                    className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all ${isIncognito ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}
-                    title="Zoom Level"
-                  >
-                    {Math.round(activeTab.zoomFactor * 100)}%
-                  </div>
-                )}
-
-                {onToggleReaderMode && (
-                  <button 
-                    type="button" 
-                    onClick={onToggleReaderMode}
-                    className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
-                    title="Toggle Reader Mode"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                  </button>
-                )}
-                
-
-
-                <button 
-                  type="button" 
-                  onClick={onToggleBookmark}
-                  className={`p-1 rounded-full transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
-                  title="Bookmark Page"
-                >
-                  <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-blue-500 text-blue-500' : ''}`} />
-                </button>
-                
-
-              </div>
-          </form>
-
-            {/* Search Suggestions Dropdown */}
-            <AnimatePresence>
-              {showSuggestions && searchValue.trim().length > 0 && (() => {
-                const matchedBookmarks = bookmarks
-                  .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-                  .slice(0, 3);
-                
-                const totalItems = 1 + suggestions.length + matchedBookmarks.length;
-
-                return (
-                  <motion.div 
-                    initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                    transition={{ duration: 0.18, ease: 'easeOut' }}
-                    className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:divide-slate-700'}`}
-                    onMouseDown={(e) => e.preventDefault()}
-                  >
-                  
-                  {/* Primary Direct Action (Index -1) */}
-                    <button
-                      type="button"
-                      onMouseEnter={() => setSelectedIndex(-1)}
-                      onClick={() => {
-                        setShowSuggestions(false);
-                        onNavigate(formatSearchUrl(searchValue, searchEngine));
-                        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
-                        selectedIndex === -1 
-                          ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
-                          : isIncognito 
-                            ? 'hover:bg-slate-700 text-slate-200' 
-                            : 'hover:bg-blue-50/70 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-700'
-                      }`}
-                    >
-                    {searchValue.includes('.') || searchValue.includes('://') ? (
-                      <>
-                        <Globe className="w-4 h-4 shrink-0 text-blue-500" />
-                        <span className="truncate font-medium text-blue-600 dark:text-blue-400">Go to: <span className="underline">{searchValue}</span></span>
-                      </>
-                    ) : (
-                      <>
-                        <Search className={`w-4 h-4 shrink-0 ${selectedIndex === -1 ? 'text-blue-500' : 'text-slate-400 group-hover:text-blue-500'}`} />
-                        <span className="truncate text-slate-700 dark:text-slate-200">Search with {getSearchEngineName(searchEngine)}: <strong className="text-slate-900 dark:text-white">{searchValue}</strong></span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
-                  {suggestions.length > 0 && (
-                    <div className="py-1">
-                      <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Search Suggestions
-                      </div>
-
-                      {suggestions.map((suggestion, idx) => (
-                          <button
-                            key={`sug-${idx}`}
-                            type="button"
-                            onMouseEnter={() => setSelectedIndex(idx)}
-                            onClick={() => {
-                              setSearchValue(suggestion);
-                              setShowSuggestions(false);
-                              onNavigate(formatSearchUrl(suggestion, searchEngine));
-                              if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                              selectedIndex === idx 
-                                ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400' 
-                                : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
-                            }`}
-                          >
-                            <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-blue-500' : 'text-slate-400'}`} />
-                            <span className="truncate">{suggestion}</span>
-                          </button>
-                        ))}
-                    </div>
-                  )}
-
-                  {/* Matching Bookmarks (Index suggestions.length to ...) */}
-                  {matchedBookmarks.length > 0 && (
-                    <div className="py-1">
-                      <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                        Bookmarks
-                      </div>
-                      {matchedBookmarks
-                        .map((bookmark, idx) => {
-                          const bookmarkIdx = suggestions.length + idx;
-                          return (
-                            <button
-                              key={`bm-${bookmark.id}`}
-                              type="button"
-                              onMouseEnter={() => setSelectedIndex(bookmarkIdx)}
-                              onClick={() => {
-                                setSearchValue(bookmark.url);
-                                setShowSuggestions(false);
-                                onNavigate(bookmark.url);
-                                if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                              }}
-                              className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
-                                selectedIndex === bookmarkIdx
-                                  ? 'bg-slate-100 dark:bg-slate-700/80 text-blue-600 dark:text-blue-400'
-                                  : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 overflow-hidden">
-                                <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-blue-500 fill-blue-500' : 'text-amber-400 fill-amber-400'}`} />
-                                <span className="truncate font-medium">{bookmark.title}</span>
-                              </div>
-                              <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
-                            </button>
-                          );
-                        })}
-                    </div>
-                    )}
-                  </motion.div>
-                );
-              })()}
-            </AnimatePresence>
-          </div>
-        </div>
+        <OmniboxBar
+          activeTab={activeTab}
+          isIncognito={isIncognito}
+          searchEngine={searchEngine}
+          bookmarks={bookmarks}
+          useVerticalTabs={useVerticalTabs}
+          onNavigate={onNavigate}
+          onToggleReaderMode={onToggleReaderMode}
+          onToggleBookmark={onToggleBookmark}
+          isBookmarked={isBookmarked}
+        />
 
         {/* Extensions / Split View / Menu */}
         <div className="flex items-center gap-1 ml-auto relative">
