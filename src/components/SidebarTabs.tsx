@@ -145,26 +145,22 @@ const TabPeekPortal: React.FC<{
           animate={{ opacity: 1, x: 0, scale: 1 }}
           exit={{ opacity: 0, x: -8, scale: 0.95 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none bg-slate-900 text-white"
+          className="pointer-events-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden"
           style={{
             position: 'fixed',
             top: Math.min(pos.top, window.innerHeight - 220),
             left: pos.left,
             zIndex: 99999,
             width: 272,
-            borderRadius: 12,
-            overflow: 'hidden',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.2)',
-            border: '1px solid rgba(255,255,255,0.1)',
           }}
         >
-          <div className="px-3 py-2 border-b border-white/10 bg-white/5">
-            <div className="text-xs font-semibold text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
+          <div className="px-3 py-2 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
+            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
               {tab.favicon && <img src={tab.favicon} alt="" style={{ width: 12, height: 12, marginRight: 6, display: 'inline', verticalAlign: 'middle', borderRadius: 2 }} />}
               {tab.title || tab.url || 'New Tab'}
             </div>
           </div>
-          <div className="bg-slate-950 overflow-hidden" style={{ aspectRatio: '16/9' }}>
+          <div className="bg-slate-100 dark:bg-slate-950 overflow-hidden" style={{ aspectRatio: '16/9' }}>
             <img
               src={tab.thumbnail}
               alt="Tab preview"
@@ -427,14 +423,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
         } ${
           isActive
-            ? 'bg-white/12 text-white shadow-sm font-medium border border-white/10'
-            : 'text-slate-300/80 hover:bg-white/6 hover:text-white'
+            ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
+            : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
         }`}
       >
         <div className="flex items-center gap-2.5 flex-1 min-w-0">
           <div className="w-4 h-4 flex items-center justify-center shrink-0">
             {tab.isLoading ? (
-              <div className="w-3.5 h-3.5 border-2 border-slate-300/40 border-t-white rounded-full animate-spin" />
+              <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
             ) : tab.favicon ? (
               <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
             ) : tab.url === 'nova://settings' ? (
@@ -456,23 +452,23 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           isActive ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
         }`}>
           {tab.isMuted ? (
-            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-white/10 text-red-400">
+            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
               <VolumeX className="w-3 h-3" />
             </button>
           ) : tab.isPlayingAudio ? (
-            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-white/10 text-cyan-400">
+            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
               <Volume2 className="w-3 h-3 animate-pulse" />
             </button>
           ) : null}
           {tab.isSuspended && (
-            <span className="p-0.5 text-indigo-300/70 shrink-0" title="Sleeping Tab">
+            <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
               <Moon className="w-3 h-3" />
             </span>
           )}
           {tabs.length > 1 && (
             <button 
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
-              className="p-1 rounded-md hover:bg-white/15 text-slate-400 hover:text-white transition-colors"
+              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
             >
               <X className="w-3 h-3" />
             </button>
@@ -486,7 +482,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-200 z-50 bg-[#151122]/95 backdrop-blur-3xl border-r border-white/[0.06] font-sans">
+      <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100/90 dark:bg-[#151122]/95 backdrop-blur-3xl border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0">
@@ -495,7 +491,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors no-drag flex items-center justify-center"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag flex items-center justify-center"
                 title="Hide Sidebar (⌘S)"
               >
                 <PanelLeft className="w-3.5 h-3.5" />
@@ -509,7 +505,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               onClick={onGoBack}
               disabled={!canGoBack}
               className={`p-1.5 rounded-lg transition-colors ${
-                canGoBack ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
+                canGoBack ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
               }`}
               title="Back"
             >
@@ -519,7 +515,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               onClick={onGoForward}
               disabled={!canGoForward}
               className={`p-1.5 rounded-lg transition-colors ${
-                canGoForward ? 'hover:bg-white/10 text-slate-300 hover:text-white' : 'text-slate-600 cursor-default'
+                canGoForward ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
               }`}
               title="Forward"
             >
@@ -527,7 +523,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             </button>
             <button
               onClick={onReload}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
               title="Reload"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -540,8 +536,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           <form onSubmit={handleOmniboxSubmit}>
             <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-all duration-200 border ${
               isOmniboxFocused 
-                ? 'bg-white/12 border-white/20 shadow-lg ring-1 ring-white/10' 
-                : 'bg-white/6 hover:bg-white/8 border-white/[0.08]'
+                ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10' 
+                : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
             }`}>
               <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
               
@@ -580,7 +576,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   }
                 }}
                 placeholder="Search or Enter URL..."
-                className="w-full bg-transparent text-[12px] text-white placeholder-slate-400/60 focus:outline-none tracking-tight"
+                className="w-full bg-transparent text-[12px] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-400/60 focus:outline-none tracking-tight"
                 spellCheck={false}
                 autoCapitalize="off"
                 autoComplete="off"
@@ -588,11 +584,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
               <div className="flex items-center gap-1.5 shrink-0 ml-1">
                 {privacyShield ? (
-                  <span title="Privacy Shield Active" className="text-emerald-400/90">
+                  <span title="Privacy Shield Active" className="text-emerald-500 dark:text-emerald-400/90">
                     <ShieldCheck className="w-3.5 h-3.5" />
                   </span>
                 ) : (
-                  <span title="Privacy Shield Disabled" className="text-slate-500">
+                  <span title="Privacy Shield Disabled" className="text-slate-400 dark:text-slate-500">
                     <Shield className="w-3.5 h-3.5" />
                   </span>
                 )}
@@ -600,7 +596,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenExtensions(); }}
-                    className="text-slate-400 hover:text-white transition-colors"
+                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
                     title="Extensions"
                   >
                     <Puzzle className="w-3.5 h-3.5 opacity-70" />
@@ -618,7 +614,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-11 left-3 right-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-11 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -630,7 +626,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       setShowSuggestions(false);
                     }}
                     className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs transition-colors ${
-                      idx === selectedIndex ? 'bg-white/15 text-white font-medium' : 'text-slate-300 hover:bg-white/8'
+                      idx === selectedIndex ? 'bg-slate-100 text-slate-900 font-medium dark:bg-white/15 dark:text-white' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-white/8'
                     }`}
                   >
                     <Search className="w-3 h-3 text-slate-400 shrink-0" />
@@ -652,7 +648,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     if (onNavigate) onNavigate(fav.url);
                     else onNewTab(fav.url);
                   }}
-                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/6 hover:bg-white/10 border border-white/[0.08] hover:border-white/15 transition-all duration-150 shadow-sm"
+                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-all duration-150 shadow-xs"
                   title={`${fav.name} (${fav.url})`}
                 >
                   <div className="w-4 h-4 flex items-center justify-center transition-transform duration-150 group-hover/fav:scale-110">
@@ -663,7 +659,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {/* Delete Shortcut */}
                 <button
                   onClick={(e) => handleRemoveFavorite(fav.id, e)}
-                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-800 text-slate-400 hover:text-red-400 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10"
+                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10"
                 >
                   <X className="w-2 h-2" />
                 </button>
@@ -674,7 +670,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {favorites.length < 4 && (
               <button
                 onClick={() => setIsAddFavOpen(true)}
-                className="flex items-center justify-center h-9 rounded-xl bg-white/3 hover:bg-white/8 border border-dashed border-white/15 text-slate-400 hover:text-white transition-all"
+                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
                 title="Add Favorite"
               >
                 <Plus className="w-3.5 h-3.5 opacity-60" />
@@ -692,13 +688,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               exit={{ opacity: 0, scale: 0.95 }}
               className="px-3 pb-2.5 no-drag"
             >
-              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-[#1e1930] border border-white/15 shadow-xl flex flex-col gap-1.5">
+              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#1e1930] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
                 <input
                   type="text"
                   placeholder="Name (e.g. Reddit)"
                   value={newFavName}
                   onChange={(e) => setNewFavName(e.target.value)}
-                  className="w-full h-6 px-2 bg-white/8 border border-white/10 rounded-md text-xs text-white placeholder-slate-400 focus:outline-none"
+                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
                   autoFocus
                 />
                 <input
@@ -706,19 +702,19 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   placeholder="URL (e.g. reddit.com)"
                   value={newFavUrl}
                   onChange={(e) => setNewFavUrl(e.target.value)}
-                  className="w-full h-6 px-2 bg-white/8 border border-white/10 rounded-md text-xs text-white placeholder-slate-400 focus:outline-none"
+                  className="w-full h-6 px-2 bg-slate-100 dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
                 />
                 <div className="flex items-center justify-end gap-1 pt-0.5">
                   <button
                     type="button"
                     onClick={() => setIsAddFavOpen(false)}
-                    className="px-2 py-0.5 text-[10px] text-slate-400"
+                    className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium"
+                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium hover:bg-cyan-500"
                   >
                     Save
                   </button>
@@ -732,10 +728,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         <div className="px-3 pb-2 no-drag relative" ref={dropdownRef}>
           <button
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-white/6 transition-colors text-left group"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group"
           >
-            <Orbit className="w-3.5 h-3.5 text-purple-400 shrink-0" />
-            <span className="text-[13px] font-semibold text-slate-200 truncate flex-1 tracking-tight">
+            <Orbit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+            <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
               {activeWorkspace?.name || 'Personal'}
             </span>
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
@@ -751,7 +747,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-9 left-3 right-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
                   {workspaces.map(w => (
@@ -761,26 +757,26 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         onSelectWorkspace(w.id);
                         setIsWorkspaceDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
                     >
                       <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
                            style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
                         {w.name.charAt(0)}
                       </div>
-                      <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-white' : 'text-slate-300'}`}>
+                      <span className={`text-xs flex-1 truncate ${w.id === activeWorkspaceId ? 'font-semibold text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>
                         {w.name}
                       </span>
-                      {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-400" />}
+                      {w.id === activeWorkspaceId && <Check className="w-3 h-3 text-cyan-500 dark:text-cyan-400" />}
                     </button>
                   ))}
                 </div>
-                <div className="border-t border-white/10 mt-1 pt-1">
+                <div className="border-t border-slate-100 dark:border-white/10 mt-1 pt-1">
                   <button
                     onClick={() => {
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-300 hover:bg-white/10 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                   >
                     <Settings className="w-3.5 h-3.5" />
                     Manage Spaces
@@ -797,13 +793,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
             className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-all text-left group ${
               isCurrentNewTab
-                ? 'bg-white/12 text-white font-medium border border-white/10 shadow-sm'
-                : 'hover:bg-white/6 text-slate-300/80 hover:text-white'
+                ? 'bg-white text-slate-900 font-semibold border border-slate-200/80 shadow-xs dark:bg-white/12 dark:text-white dark:font-medium dark:border-white/10 dark:shadow-sm'
+                : 'hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white'
             }`}
           >
-            <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+            <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
             <span className="text-[13px] tracking-tight flex-1">New Tab</span>
-            <span className="text-[10px] text-slate-500 font-mono">⌘T</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘T</span>
           </button>
         </div>
 
@@ -834,15 +830,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 >
                   <div
                     onClick={() => onToggleFolder?.(folder.id)}
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-white/10'); }}
-                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-white/10')}
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-slate-200/60', 'dark:bg-white/10'); }}
+                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10')}
                     onDrop={(e) => {
                       e.preventDefault();
-                      e.currentTarget.classList.remove('bg-white/10');
+                      e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10');
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-300 hover:bg-white/6 transition-all group/folder"
+                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-all group/folder"
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -851,7 +847,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
-                      className="p-1 rounded-md hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-400"
+                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -881,10 +877,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 7. BOTTOM DOCK FOOTER */}
-        <div className="h-11 px-3.5 pb-2 border-t border-white/[0.06] flex items-center justify-between no-drag mt-auto relative" ref={libraryRef}>
+        <div className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative" ref={libraryRef}>
           <button
             onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
             title="Library"
           >
             <Package className="w-4 h-4" />
@@ -898,32 +894,32 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-12 left-3 bg-[#1e1930]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+                className="absolute bottom-12 left-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
                 {onOpenDownloads && (
                   <button
                     onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
                   >
-                    <Download className="w-3.5 h-3.5 text-blue-400" />
+                    <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                     Downloads
                   </button>
                 )}
                 {onOpenHistory && (
                   <button
                     onClick={() => { onOpenHistory(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
                   >
-                    <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                    <Clock className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                     History
                   </button>
                 )}
                 {onOpenSettings && (
                   <button
                     onClick={() => { onOpenSettings(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-200 hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
                   >
-                    <Settings className="w-3.5 h-3.5 text-purple-400" />
+                    <Settings className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                     Settings
                   </button>
                 )}
@@ -935,7 +931,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {onCreateFolder && (
               <button
                 onClick={onCreateFolder}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
                 title="New Folder"
               >
                 <FolderPlus className="w-4 h-4" />
@@ -943,7 +939,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
             <button
               onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
               title="New Tab"
             >
               <Plus className="w-4 h-4" />

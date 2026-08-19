@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, Settings, VenetianMask, Camera, Shuffle } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../App';
@@ -276,17 +276,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
   return (
     <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}>
-      
-      {/* Settings Button */}
-      <div className="absolute top-6 right-6 z-50">
-        <button
-          onClick={() => onNavigate('nova://settings')}
-          className="p-2.5 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/10 text-slate-800 dark:text-white transition-all shadow-lg shadow-black/5 hover:scale-110 active:scale-95"
-          title="Customize (Settings)"
-        >
-          <Settings className="w-5 h-5 opacity-70" />
-        </button>
-      </div>
       
       {/* Unsplash Background */}
       {newTabBackground === 'unsplash' && (

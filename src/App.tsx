@@ -1884,11 +1884,13 @@ function App() {
         }}
       />
     );
-  }  return (
+  }
+
+  return (
     <div className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
-      settings.useVerticalTabs 
-        ? activeTab?.isIncognito ? 'bg-[#0a0812]' : 'bg-[#151122]'
-        : 'bg-slate-50 dark:bg-slate-900'
+      activeTab?.isIncognito
+        ? 'bg-slate-950 dark:bg-[#0a0812]'
+        : 'bg-slate-100 dark:bg-[#151122]'
     } transition-colors duration-300`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
@@ -1965,7 +1967,7 @@ function App() {
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-[#151122]/98 backdrop-blur-3xl border-r border-white/10"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 backdrop-blur-3xl border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -2018,8 +2020,8 @@ function App() {
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
-            ? 'bg-[#0e0c15] m-0 rounded-none border-0'
-            : 'rounded-xl shadow-2xl border border-white/10 bg-[#0e0c15] m-2 ml-0' 
+            ? 'bg-white dark:bg-[#0e0c15] m-0 rounded-none border-0'
+            : 'rounded-xl shadow-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#0e0c15] m-2 ml-0' 
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
