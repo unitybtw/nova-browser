@@ -2020,8 +2020,8 @@ function App() {
       <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
-            ? 'bg-white dark:bg-[#0e0c15] m-0 rounded-none border-0'
-            : 'rounded-xl shadow-2xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#0e0c15] m-2 ml-0' 
+            ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
+            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5' 
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
