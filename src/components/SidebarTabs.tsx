@@ -619,7 +619,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   }, 200);
                 }}
                 onKeyDown={(e) => {
-                  if (e.key === 'ArrowDown') {
+                  if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+                    e.preventDefault();
+                    setSearchValue(suggestions[selectedIndex]);
+                    setSelectedIndex(-1);
+                  } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     setSelectedIndex(prev => Math.min(prev + 1, suggestions.length - 1));
                   } else if (e.key === 'ArrowUp') {
@@ -627,6 +631,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     setSelectedIndex(prev => Math.max(prev - 1, -1));
                   } else if (e.key === 'Escape') {
                     setShowSuggestions(false);
+                    setSelectedIndex(-1);
+                    if (activeTab?.url && activeTab.url !== 'nova://newtab') {
+                      setSearchValue(activeTab.url);
+                    }
                     omniboxInputRef.current?.blur();
                   }
                 }}

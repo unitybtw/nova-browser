@@ -45,7 +45,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
-import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { UserSettings } from '../App';
@@ -339,7 +339,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   }, [activeTab?.url, isFocused]);
 
   useEffect(() => {
-    if (isAIMode || !searchValue || searchValue.includes('://') || searchValue.includes('.')) {
+    const trimmed = searchValue.trim();
+    if (isAIMode || !trimmed || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('nova://') || trimmed.startsWith('about:')) {
       setSuggestions([]);
       return;
     }
@@ -352,7 +353,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(searchValue, searchEngine, clientLocale);
+          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
             setSuggestions(results.slice(0, 6));
             return;
@@ -361,7 +362,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
         const response = await fetch(
-          `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`,
+          `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`,
           { signal: abortController.signal }
         );
         if (!abortController.signal.aborted && response.ok) {
@@ -383,7 +384,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       clearTimeout(timer);
       abortController.abort();
     };
-  }, [searchValue, isAIMode]);
+  }, [searchValue, isAIMode, searchEngine]);
 
   const handleSearchSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -461,6 +462,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 e.preventDefault();
                 setIsAIMode(true);
                 setSearchValue('');
+              } else if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+                e.preventDefault();
+                setSearchValue(suggestions[selectedIndex]);
+                setSelectedIndex(-1);
               } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 const matchedBookmarksCount = bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).slice(0, 3).length;
@@ -469,6 +474,15 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 setSelectedIndex(prev => (prev > -1 ? prev - 1 : -1));
+              } else if (e.key === 'Escape') {
+                setShowSuggestions(false);
+                setSelectedIndex(-1);
+                if (activeTab?.url) {
+                  setSearchValue(activeTab.url);
+                }
+                if (document.activeElement instanceof HTMLElement) {
+                  document.activeElement.blur();
+                }
               }
             }}
             onFocus={(e) => {
@@ -569,7 +583,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         : 'hover:bg-slate-100 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
-                {searchValue.includes('.') || searchValue.includes('://') ? (
+                {isValidUrlOrDomain(searchValue) ? (
                   <>
                     <Globe className="w-4 h-4 shrink-0 text-cyan-500" />
                     <span className="truncate font-medium text-cyan-600 dark:text-cyan-400">Go to: <span className="underline">{searchValue}</span></span>

@@ -206,6 +206,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     e.preventDefault();
                     setIsAIMode(true);
                     setInputValue('');
+                  } else if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < items.length && items[selectedIndex].type === 'suggestion') {
+                    e.preventDefault();
+                    setInputValue((items[selectedIndex] as { type: 'suggestion'; text: string }).text);
+                    setSelectedIndex(-1);
                   } else if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     setSelectedIndex(prev => (prev < items.length - 1 ? prev + 1 : 0));

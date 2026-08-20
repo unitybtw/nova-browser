@@ -196,7 +196,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   }, [speedDials]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
+    if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+      e.preventDefault();
+      setQuery(suggestions[selectedIndex]);
+      setSelectedIndex(-1);
+    } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (suggestions.length > 0) {
         setShowSuggestions(true);
