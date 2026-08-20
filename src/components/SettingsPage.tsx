@@ -408,32 +408,19 @@ const BackgroundPreviewCard: React.FC<{
       {renderBackgroundAnimation(bg.id, isHovered, isSelected)}
 
       {/* Overlay & Content */}
-      <div className="absolute inset-0 flex flex-col justify-between p-3.5 z-20 pointer-events-none">
-        {/* Top Badges */}
-        <div className="flex items-center justify-between w-full">
-          {bg.badge ? (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-cyan-300 border border-cyan-500/30 flex items-center gap-1 shadow-xs">
-              <Sparkles size={10} className="text-cyan-400" />
-              {bg.badge}
-            </span>
-          ) : <span />}
-
-          {/* Selection Checkmark / Hover Live Indicator */}
-          {isSelected ? (
+      <div className="absolute inset-0 flex flex-col justify-between p-3 z-20 pointer-events-none">
+        {/* Selection Checkmark */}
+        <div className="flex justify-end w-full">
+          {isSelected && (
             <div className="w-5 h-5 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center shadow-md font-bold">
               <Check size={12} strokeWidth={3} />
             </div>
-          ) : isHovered ? (
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-white/90 border border-white/20 flex items-center gap-1.5 animate-in fade-in duration-200">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Live Preview
-            </span>
-          ) : null}
+          )}
         </div>
 
         {/* Bottom Title */}
-        <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent -mx-3.5 -mb-3.5 p-3 pt-6 rounded-b-2xl">
-          <p className="text-white font-semibold text-sm drop-shadow-sm flex items-center gap-1.5">
+        <div className="bg-gradient-to-t from-black/90 via-black/50 to-transparent -mx-3 -mb-3 p-3 pt-5 rounded-b-2xl">
+          <p className="text-white font-medium text-sm drop-shadow-sm truncate">
             {bg.name}
           </p>
         </div>
@@ -1010,16 +997,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </section>
 
               <section>
-                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">New Tab Background</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Hover over any theme for a live animated preview.</p>
-                  </div>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-500 font-medium border border-cyan-500/20 flex items-center gap-1">
-                    <Sparkles size={12} className="text-cyan-400" />
-                    Live 3D & Particle Engine
-                  </span>
-                </div>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">New Tab Background</h2>
 
                 <div className="grid grid-cols-2 gap-4">
                   {BACKGROUND_OPTIONS.map(bg => (
