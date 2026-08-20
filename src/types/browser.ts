@@ -51,6 +51,8 @@ export interface Extension {
   enabled?: boolean;
   iconData?: string;
   popupUrl?: string;
+  optionsUrl?: string;
+  homepageUrl?: string;
 }
 
 export interface Bookmark {

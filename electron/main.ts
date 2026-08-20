@@ -1473,6 +1473,8 @@ ipcMain.handle('select-extension-folder', async (event) => {
 
 // Extension management (in‑memory list)
 let loadedExtensions: any[] = [];
+let activeExtensionPopupWin: BrowserWindow | null = null;
+let activeExtensionPopupUrl: string | null = null;
 
 // Load an unpacked extension from a folder path
 ipcMain.handle('install-extension', async (event, folderPath: string) => {
@@ -1504,16 +1506,27 @@ ipcMain.handle('list-extensions', async (event) => {
   return Promise.all(loadedExtensions.map(async (e) => {
     let iconData = undefined;
     let popupUrl = undefined;
+    let optionsUrl = undefined;
+    let homepageUrl = undefined;
     try {
       const manifestPath = path.join(e.path, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         
-        // Find popup URL
-        if (manifest.action?.default_popup) {
-          popupUrl = manifest.action.default_popup;
-        } else if (manifest.browser_action?.default_popup) {
-          popupUrl = manifest.browser_action.default_popup;
+        // Find popup URL (normalize leading slashes)
+        const rawPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup || manifest.page_action?.default_popup;
+        if (rawPopup) {
+          popupUrl = String(rawPopup).replace(/^\.?\//, '');
+        }
+
+        // Find options page URL
+        const rawOptions = manifest.options_ui?.page || manifest.options_page;
+        if (rawOptions) {
+          optionsUrl = String(rawOptions).replace(/^\.?\//, '');
+        }
+
+        if (manifest.homepage_url) {
+          homepageUrl = manifest.homepage_url;
         }
 
         if (manifest.icons) {
@@ -1541,7 +1554,9 @@ ipcMain.handle('list-extensions', async (event) => {
       version: e.version,
       description: e.description,
       iconData,
-      popupUrl
+      popupUrl,
+      optionsUrl,
+      homepageUrl
     };
   }));
 });
@@ -1568,23 +1583,64 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
     return { error: 'Blocked: only chrome-extension:// and local extension file:// URLs are allowed.' };
   }
 
+  // Toggle behavior: if clicking the same extension popup while open, close it
+  if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
+    const isSameUrl = activeExtensionPopupUrl === url;
+    try {
+      activeExtensionPopupWin.close();
+    } catch (_) {}
+    activeExtensionPopupWin = null;
+    activeExtensionPopupUrl = null;
+    if (isSameUrl) {
+      return { success: true, toggled: true };
+    }
+  }
+
+  const win = mainWindow || BrowserWindow.getAllWindows().find(w => w !== activeExtensionPopupWin) || BrowserWindow.getAllWindows()[0];
+  if (!win) return { error: 'No main window available' };
+
+  const popupWidth = 380;
+  const popupHeight = 520;
+  let posX: number | undefined;
+  let posY: number | undefined;
+
+  if (bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number') {
+    const [winX, winY] = win.getPosition();
+    const [winW, winH] = win.getSize();
+    
+    // Calculate screen coordinate anchored directly under the button
+    const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);
+    const calculatedX = btnCenterX - Math.round(popupWidth / 2);
+    
+    posX = Math.max(winX + 12, Math.min(calculatedX, winX + winW - popupWidth - 12));
+    posY = winY + Math.round(bounds.y) + Math.round(bounds.height || 28) + 6;
+  }
+
   const popupWin = new BrowserWindow({
-    width: 380,
-    height: 500,
-    x: bounds?.x ? Math.round(bounds.x) - 340 : undefined,
-    y: bounds?.y ? Math.round(bounds.y) + 40 : undefined,
+    width: popupWidth,
+    height: popupHeight,
+    x: posX,
+    y: posY,
+    parent: win,
+    modal: false,
     frame: false,
-    transparent: true,
+    transparent: false,
+    backgroundColor: '#151122',
+    hasShadow: true,
     alwaysOnTop: true,
     resizable: false,
     skipTaskbar: true,
+    show: false,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: true,
+      sandbox: false,
       session: session.defaultSession
     }
   });
+
+  activeExtensionPopupWin = popupWin;
+  activeExtensionPopupUrl = url;
 
   // 🔒 Security: Block arbitrary window popups from extension popup content
   popupWin.webContents.setWindowOpenHandler(({ url }) => {
@@ -1597,9 +1653,35 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
     return { action: 'deny' };
   });
 
+  // Show only when ready to prevent blank/white flash
+  popupWin.once('ready-to-show', () => {
+    if (!popupWin.isDestroyed()) {
+      popupWin.show();
+      popupWin.focus();
+    }
+  });
+
   // Close popup when it loses focus
   popupWin.on('blur', () => {
     if (!popupWin.isDestroyed()) popupWin.close();
+  });
+
+  popupWin.on('closed', () => {
+    if (activeExtensionPopupWin === popupWin) {
+      activeExtensionPopupWin = null;
+      activeExtensionPopupUrl = null;
+    }
+  });
+
+  // Close popup when parent window moves or minimizes
+  const handleParentChange = () => {
+    if (!popupWin.isDestroyed()) popupWin.close();
+  };
+  win.once('move', handleParentChange);
+  win.once('minimize', handleParentChange);
+  popupWin.once('closed', () => {
+    win.removeListener('move', handleParentChange);
+    win.removeListener('minimize', handleParentChange);
   });
 
   try {

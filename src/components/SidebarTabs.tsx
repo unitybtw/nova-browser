@@ -648,7 +648,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); onOpenExtensions(); }}
-                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+                    className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                     title="Extensions"
                   >
                     <Puzzle className="w-3.5 h-3.5 opacity-70" />

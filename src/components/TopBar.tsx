@@ -1112,24 +1112,36 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />
 
           {/* Active Pinned Extensions */}
-          {extensions.filter(ext => ext.iconData).slice(0, 2).map(ext => (
+          {extensions.filter(ext => ext.enabled !== false).slice(0, 4).map(ext => (
             <button
               key={ext.id}
               className={`p-1 rounded-lg transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
               title={ext.name}
               onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
                 if (ext.popupUrl) {
-                  const url = `chrome-extension://${ext.id}/${ext.popupUrl}`;
-                  const rect = e.currentTarget.getBoundingClientRect();
+                  const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
+                  const url = `chrome-extension://${ext.id}/${cleanPopup}`;
                   if ((window as any).electronAPI?.openExtensionPopup) {
                     (window as any).electronAPI.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
                   } else {
                     onNewTab(url);
                   }
+                } else if (ext.optionsUrl) {
+                  const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
+                  onNewTab(`chrome-extension://${ext.id}/${cleanOptions}`);
+                } else {
+                  onOpenExtensions();
                 }
               }}
             >
-              <img src={ext.iconData} alt={ext.name} className="w-4 h-4 rounded-sm object-contain" />
+              {ext.iconData ? (
+                <img src={ext.iconData} alt={ext.name} className="w-4 h-4 rounded-xs object-contain" />
+              ) : (
+                <div className="w-4 h-4 rounded-xs bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] uppercase font-bold">
+                  {ext.name ? ext.name.charAt(0) : <Puzzle className="w-3.5 h-3.5" />}
+                </div>
+              )}
             </button>
           ))}
 
