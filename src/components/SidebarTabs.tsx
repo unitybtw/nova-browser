@@ -517,13 +517,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100/90 dark:bg-[#151122]/95 backdrop-blur-3xl border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
-        <div className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0">
+        <div 
+          className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0 select-none"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
           <div className="flex items-center gap-1">
-            <div className="w-[72px] h-full shrink-0" />
+            <div 
+              className="w-[72px] h-full shrink-0 drag-region" 
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            />
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag flex items-center justify-center"
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag cursor-pointer flex items-center justify-center"
                 title={isCollapsed ? "Pin Sidebar (⌘S)" : "Hide Sidebar (⌘S)"}
               >
                 {isCollapsed ? (
@@ -536,11 +543,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </div>
 
           {/* Navigation Controls in Arc style */}
-          <div className="flex items-center gap-0.5 no-drag">
+          <div 
+            className="flex items-center gap-0.5 no-drag"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
             <button
               onClick={onGoBack}
               disabled={!canGoBack}
-              className={`p-1.5 rounded-lg transition-colors ${
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
                 canGoBack ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
               }`}
               title="Back"
@@ -550,7 +561,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <button
               onClick={onGoForward}
               disabled={!canGoForward}
-              className={`p-1.5 rounded-lg transition-colors ${
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className={`p-1.5 rounded-lg transition-colors no-drag cursor-pointer ${
                 canGoForward ? 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white' : 'text-slate-400 dark:text-slate-600 cursor-default'
               }`}
               title="Forward"
@@ -559,7 +571,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             </button>
             <button
               onClick={onReload}
-              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors no-drag cursor-pointer"
               title="Reload"
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
@@ -568,7 +581,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 2. INTEGRATED OMNIBOX / URL SEARCH PILL */}
-        <div className="px-3 pt-1 pb-2.5 no-drag relative">
+        <div 
+          className="px-3 pt-1 pb-2.5 no-drag relative"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <form onSubmit={handleOmniboxSubmit}>
             <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-all duration-200 border ${
               isOmniboxFocused 
@@ -675,7 +691,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 3. CUSTOMIZABLE TOP FAVORITES GRID (Arc 2-column or 4-column glass tiles) */}
-        <div className="px-3 pb-2.5 no-drag">
+        <div 
+          className="px-3 pb-2.5 no-drag"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <div className="grid grid-cols-2 gap-1.5">
             {favorites.slice(0, 4).map((fav) => (
               <div key={fav.id} className="relative group/fav">
@@ -684,7 +703,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     if (onNavigate) onNavigate(fav.url);
                     else onNewTab(fav.url);
                   }}
-                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-all duration-150 shadow-xs"
+                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-all duration-150 shadow-xs cursor-pointer"
                   title={`${fav.name} (${fav.url})`}
                 >
                   <div className="w-4 h-4 flex items-center justify-center transition-transform duration-150 group-hover/fav:scale-110">
@@ -695,7 +714,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {/* Delete Shortcut */}
                 <button
                   onClick={(e) => handleRemoveFavorite(fav.id, e)}
-                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10"
+                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
                 >
                   <X className="w-2 h-2" />
                 </button>
@@ -706,7 +725,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {favorites.length < 4 && (
               <button
                 onClick={() => setIsAddFavOpen(true)}
-                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all"
+                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
                 title="Add Favorite"
               >
                 <Plus className="w-3.5 h-3.5 opacity-60" />
@@ -723,6 +742,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
               className="px-3 pb-2.5 no-drag"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
               <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#1e1930] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
                 <input
@@ -744,13 +764,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   <button
                     type="button"
                     onClick={() => setIsAddFavOpen(false)}
-                    className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400"
+                    className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium hover:bg-cyan-500"
+                    className="px-2 py-0.5 text-[10px] bg-cyan-600 rounded-md text-white font-medium hover:bg-cyan-500 cursor-pointer"
                   >
                     Save
                   </button>
@@ -761,10 +781,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </AnimatePresence>
 
         {/* 4. ACTIVE SPACE / PROFILE HEADER (Zero Emoji, Clean Lucide Orbit) */}
-        <div className="px-3 pb-2 no-drag relative" ref={dropdownRef}>
+        <div 
+          className="px-3 pb-2 no-drag relative" 
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          ref={dropdownRef}
+        >
           <button
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
           >
             <Orbit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
             <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
@@ -793,7 +817,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         onSelectWorkspace(w.id);
                         setIsWorkspaceDropdownOpen(false);
                       }}
-                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left"
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                     >
                       <div className="w-4 h-4 rounded-md flex items-center justify-center text-[10px] text-white font-bold"
                            style={{ backgroundColor: WORKSPACE_COLORS[w.color] || '#64748b' }}>
@@ -812,7 +836,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       setIsWorkspaceDropdownOpen(false);
                       window.dispatchEvent(new CustomEvent('open-workspace-manager'));
                     }}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5" />
                     Manage Spaces
@@ -824,10 +848,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 5. NEW TAB ACTION BUTTON (Arc Style: Highlights when on New Tab, opens Spotlight on click) */}
-        <div className="px-3 pb-1.5 no-drag">
+        <div 
+          className="px-3 pb-1.5 no-drag"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+        >
           <button
             onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-            className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-all text-left group ${
+            className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-all text-left group cursor-pointer ${
               isCurrentNewTab
                 ? 'bg-white text-slate-900 font-semibold border border-slate-200/80 shadow-xs dark:bg-white/12 dark:text-white dark:font-medium dark:border-white/10 dark:shadow-sm'
                 : 'hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white'
@@ -913,10 +940,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 7. BOTTOM DOCK FOOTER */}
-        <div className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative" ref={libraryRef}>
+        <div 
+          className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative" 
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          ref={libraryRef}
+        >
           <button
             onClick={() => setIsLibraryDropdownOpen(!isLibraryDropdownOpen)}
-            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
             title="Library"
           >
             <Package className="w-4 h-4" />
@@ -935,7 +966,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenDownloads && (
                   <button
                     onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
                     Downloads
@@ -944,7 +975,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenHistory && (
                   <button
                     onClick={() => { onOpenHistory(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Clock className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                     History
@@ -953,7 +984,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {onOpenSettings && (
                   <button
                     onClick={() => { onOpenSettings(); setIsLibraryDropdownOpen(false); }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left"
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400" />
                     Settings
@@ -967,7 +998,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {onCreateFolder && (
               <button
                 onClick={onCreateFolder}
-                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+                className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 title="New Folder"
               >
                 <FolderPlus className="w-4 h-4" />
@@ -975,7 +1006,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
             <button
               onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
               title="New Tab"
             >
               <Plus className="w-4 h-4" />

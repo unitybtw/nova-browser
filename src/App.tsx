@@ -1973,7 +1973,7 @@ function App() {
             animate={{ width: 240, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="h-full flex flex-col shrink-0 drag-region relative z-50 overflow-hidden"
+            className="h-full flex flex-col shrink-0 relative z-50 overflow-hidden"
           >
             <SidebarTabs
               tabs={workspaceTabs}
@@ -2019,26 +2019,26 @@ function App() {
         )}
       </AnimatePresence>
 
-      {/* Top Window Drag Strip for moving frameless window in Vertical Tabs mode */}
-      {settings.useVerticalTabs && (
-        <div className="fixed top-0 left-0 right-0 h-8 drag-region pointer-events-none z-30" />
-      )}
-
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {settings.useVerticalTabs && isSidebarCollapsed && (
         <>
           {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
           <div 
-            className="fixed top-0 left-0 bottom-0 w-8 z-40"
+            className="fixed top-0 left-0 bottom-0 w-8 z-40 no-drag"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onMouseEnter={handleHoverSidebarOpen}
           />
 
           {/* Floating Expand Sidebar Button when Collapsed */}
-          <div className="fixed top-2.5 left-2.5 z-45 flex items-center">
+          <div 
+            className="fixed top-2.5 left-2.5 z-45 flex items-center no-drag"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
             <button
               onClick={handleExpandSidebar}
               onMouseEnter={handleHoverSidebarOpen}
-              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
               title="Expand Sidebar (⌘S)"
             >
               <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
