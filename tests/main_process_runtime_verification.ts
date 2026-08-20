@@ -108,6 +108,7 @@ async function verifyMainProcessRuntime() {
     'get-suggestions',
     'select-extension-folder',
     'install-extension',
+    'toggle-extension',
     'list-extensions',
     'open-extension-popup',
     'import-chrome-bookmarks',

@@ -1,13 +1,14 @@
 import React, { useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play } from 'lucide-react';
-import { Extension } from '../types/browser';
+import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 
 interface ExtensionsModalProps {
   isOpen: boolean;
   onClose: () => void;
   extensions: Extension[];
+  activeTab?: Tab | null;
   onToggleExtension?: (id: string) => void;
   onRemoveExtension?: (id: string) => void;
   onManageExtensions?: () => void;
@@ -18,6 +19,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   isOpen,
   onClose,
   extensions,
+  activeTab,
   onToggleExtension,
   onRemoveExtension,
   onManageExtensions,
@@ -36,7 +38,17 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
           const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
           bounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
         }
-        (window as any).electronAPI.openExtensionPopup(url, bounds);
+        (window as any).electronAPI.openExtensionPopup(
+          url, 
+          bounds,
+          activeTab ? {
+            id: activeTab.id,
+            url: activeTab.url,
+            title: activeTab.title,
+            favIconUrl: activeTab.favicon,
+            webContentsId: activeTab.webContentsId
+          } : undefined
+        );
         onClose();
       } else if (onOpenUrl) {
         onOpenUrl(url);

@@ -551,6 +551,7 @@ app.whenReady().then(async () => {
 
   // Load persistent extensions from disk
   const extensionsPath = path.join(app.getPath('userData'), 'extensions');
+  const disabledIds = getDisabledExtensionIds();
   if (fs.existsSync(extensionsPath)) {
     try {
       const extensionDirs = fs.readdirSync(extensionsPath);
@@ -564,12 +565,26 @@ app.whenReady().then(async () => {
           }
           
           if (fs.existsSync(path.join(extPath, 'manifest.json'))) {
-            session.defaultSession.loadExtension(extPath).then(extInfo => {
-              loadedExtensions.push(extInfo);
-              console.log(`Loaded extension: ${extInfo.name}`);
-            }).catch(err => {
-              console.error(`Failed to load extension at ${extPath}:`, err);
-            });
+            if (disabledIds.includes(dir)) {
+              try {
+                const manifest = JSON.parse(fs.readFileSync(path.join(extPath, 'manifest.json'), 'utf8'));
+                loadedExtensions.push({
+                  id: dir,
+                  name: manifest.name || dir,
+                  path: extPath,
+                  version: manifest.version || '1.0',
+                  description: manifest.description || '',
+                  enabled: false
+                });
+              } catch (_) {}
+            } else {
+              session.defaultSession.loadExtension(extPath).then(extInfo => {
+                loadedExtensions.push(extInfo);
+                console.log(`Loaded extension: ${extInfo.name}`);
+              }).catch(err => {
+                console.error(`Failed to load extension at ${extPath}:`, err);
+              });
+            }
           }
         }
       }
@@ -1471,10 +1486,62 @@ ipcMain.handle('select-extension-folder', async (event) => {
   return { canceled, folderPath: filePaths[0] };
 });
 
-// Extension management (in‑memory list)
+// Extension management (in‑memory list & persistence)
 let loadedExtensions: any[] = [];
 let activeExtensionPopupWin: BrowserWindow | null = null;
 let activeExtensionPopupUrl: string | null = null;
+
+const disabledExtensionsFile = path.join(app.getPath('userData'), 'disabled_extensions.json');
+
+function getDisabledExtensionIds(): string[] {
+  try {
+    if (fs.existsSync(disabledExtensionsFile)) {
+      return JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
+    }
+  } catch (_) {}
+  return [];
+}
+
+function setDisabledExtensionIds(ids: string[]): void {
+  try {
+    fs.writeFileSync(disabledExtensionsFile, JSON.stringify(ids), 'utf8');
+  } catch (_) {}
+}
+
+function getLocalizedManifestString(extPath: string, text: string, fallback: string = ''): string {
+  if (!text || typeof text !== 'string') return fallback;
+  if (!text.startsWith('__MSG_') || !text.endsWith('__')) return text;
+  const key = text.slice(6, -2);
+  
+  const localesDir = path.join(extPath, '_locales');
+  if (!fs.existsSync(localesDir)) return fallback || text;
+  
+  const candidateLocales = ['en', 'en_US', 'en_GB', 'tr'];
+  try {
+    const allLocales = fs.readdirSync(localesDir);
+    const searchOrder = [...candidateLocales.filter(l => allLocales.includes(l)), ...allLocales];
+    
+    for (const loc of searchOrder) {
+      const msgFile = path.join(localesDir, loc, 'messages.json');
+      if (fs.existsSync(msgFile)) {
+        try {
+          const content = JSON.parse(fs.readFileSync(msgFile, 'utf8'));
+          if (content[key]?.message) {
+            return content[key].message;
+          }
+          const lowerKey = key.toLowerCase();
+          for (const k of Object.keys(content)) {
+            if (k.toLowerCase() === lowerKey && content[k]?.message) {
+              return content[k].message;
+            }
+          }
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+  
+  return fallback || text;
+}
 
 // Load an unpacked extension from a folder path
 ipcMain.handle('install-extension', async (event, folderPath: string) => {
@@ -1500,19 +1567,69 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   }
 });
 
+// Toggle Extension enabled/disabled state
+ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: boolean) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
+
+  const disabledIds = getDisabledExtensionIds();
+  const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  const extPath = path.resolve(path.join(extensionsBaseDir, extensionId));
+
+  try {
+    if (enabled) {
+      const newDisabled = disabledIds.filter(id => id !== extensionId);
+      setDisabledExtensionIds(newDisabled);
+      
+      if (fs.existsSync(extPath)) {
+        const isLoaded = loadedExtensions.some(e => e.id === extensionId);
+        if (!isLoaded) {
+          const extInfo = await session.defaultSession.loadExtension(extPath);
+          loadedExtensions.push(extInfo);
+        }
+      }
+    } else {
+      if (!disabledIds.includes(extensionId)) {
+        disabledIds.push(extensionId);
+        setDisabledExtensionIds(disabledIds);
+      }
+      try {
+        await session.defaultSession.removeExtension(extensionId);
+      } catch (_) {}
+      loadedExtensions = loadedExtensions.filter(e => e.id !== extensionId);
+    }
+
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) win.webContents.send('extension-changed');
+    return { success: true };
+  } catch (err: any) {
+    console.error('Failed to toggle extension:', err);
+    return { error: err.message || 'Failed to toggle extension' };
+  }
+});
+
 // Return list of loaded extensions
 ipcMain.handle('list-extensions', async (event) => {
   if (!isTrustedSender(event)) return [];
+  const disabledIds = getDisabledExtensionIds();
+  
   return Promise.all(loadedExtensions.map(async (e) => {
     let iconData = undefined;
     let popupUrl = undefined;
     let optionsUrl = undefined;
     let homepageUrl = undefined;
+    let localizedName = e.name;
+    let localizedDesc = e.description;
     try {
       const manifestPath = path.join(e.path, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
         
+        localizedName = getLocalizedManifestString(e.path, manifest.name, e.name);
+        localizedDesc = getLocalizedManifestString(e.path, manifest.description, e.description);
+
         // Find popup URL (normalize leading slashes)
         const rawPopup = manifest.action?.default_popup || manifest.browser_action?.default_popup || manifest.page_action?.default_popup;
         if (rawPopup) {
@@ -1547,12 +1664,12 @@ ipcMain.handle('list-extensions', async (event) => {
     }
     
     return {
-      name: e.name,
+      name: localizedName || e.name || e.id,
       id: e.id,
-      enabled: true,
+      enabled: !disabledIds.includes(e.id),
       path: e.path,
       version: e.version,
-      description: e.description,
+      description: localizedDesc || e.description || '',
       iconData,
       popupUrl,
       optionsUrl,
@@ -1562,7 +1679,7 @@ ipcMain.handle('list-extensions', async (event) => {
 });
 
 // Open Extension Popup Window
-ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
+ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   // VULN-14: Validate URL protocol for extension popups
   const blockedProtocols = ['javascript:', 'data:', 'vbscript:'];
@@ -1599,8 +1716,8 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
   const win = mainWindow || BrowserWindow.getAllWindows().find(w => w !== activeExtensionPopupWin) || BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No main window available' };
 
-  const popupWidth = 380;
-  const popupHeight = 520;
+  let popupWidth = 380;
+  let popupHeight = 520;
   let posX: number | undefined;
   let posY: number | undefined;
 
@@ -1646,11 +1763,108 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds) => {
   popupWin.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'chrome-extension:') {
         mainWindow?.webContents.send('new-tab', url);
       }
     } catch {}
     return { action: 'deny' };
+  });
+
+  // Inject active tab bridge into the extension popup
+  const injectActiveTabBridge = () => {
+    if (!activeTabInfo || !popupWin || popupWin.isDestroyed()) return;
+    const tabData = {
+      id: activeTabInfo.webContentsId || 1,
+      index: 0,
+      windowId: win.id,
+      highlighted: true,
+      active: true,
+      selected: true,
+      pinned: false,
+      url: activeTabInfo.url || 'about:blank',
+      title: activeTabInfo.title || 'New Tab',
+      favIconUrl: activeTabInfo.favIconUrl || '',
+      status: 'complete',
+      incognito: false,
+      width: win.getContentBounds().width,
+      height: win.getContentBounds().height
+    };
+
+    const bridgeCode = `
+      (function() {
+        try {
+          if (window.chrome && window.chrome.tabs) {
+            const realTab = ${JSON.stringify(tabData)};
+            const origQuery = window.chrome.tabs.query;
+            window.chrome.tabs.query = function(q, cb) {
+              if (typeof cb === 'function') {
+                if (!q || q.active || q.currentWindow || q.lastFocusedWindow) {
+                  cb([realTab]);
+                } else if (origQuery) {
+                  origQuery.call(window.chrome.tabs, q, function(res) {
+                    cb(res && res.length > 0 ? res : [realTab]);
+                  });
+                } else {
+                  cb([realTab]);
+                }
+              } else {
+                return Promise.resolve([realTab]);
+              }
+            };
+            window.chrome.tabs.get = function(id, cb) {
+              if (typeof cb === 'function') cb(realTab);
+              else return Promise.resolve(realTab);
+            };
+            window.chrome.tabs.getCurrent = function(cb) {
+              if (typeof cb === 'function') cb(realTab);
+              else return Promise.resolve(realTab);
+            };
+          }
+        } catch(e) {}
+      })();
+    `;
+
+    popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
+  };
+
+  popupWin.webContents.on('dom-ready', async () => {
+    injectActiveTabBridge();
+    
+    // Auto-fit popup dimensions to content
+    try {
+      const dimensions = await popupWin.webContents.executeJavaScript(`
+        ({
+          width: Math.max(document.body?.scrollWidth || 0, document.documentElement?.scrollWidth || 0, 320),
+          height: Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, 200)
+        })
+      `);
+      if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
+        const fitWidth = Math.min(Math.max(dimensions.width, 320), 600);
+        const fitHeight = Math.min(Math.max(dimensions.height, 200), 650);
+        
+        if (!popupWin.isDestroyed()) {
+          let newX = posX;
+          if (bounds && typeof bounds.x === 'number' && win) {
+            const [winX] = win.getPosition();
+            const [winW] = win.getSize();
+            const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);
+            const calculatedX = btnCenterX - Math.round(fitWidth / 2);
+            newX = Math.max(winX + 12, Math.min(calculatedX, winX + winW - fitWidth - 12));
+          }
+          popupWin.setBounds({
+            x: newX,
+            y: posY,
+            width: fitWidth,
+            height: fitHeight
+          });
+        }
+      }
+    } catch (_) {}
+
+    if (!popupWin.isDestroyed() && !popupWin.isVisible()) {
+      popupWin.show();
+      popupWin.focus();
+    }
   });
 
   // Show only when ready to prevent blank/white flash

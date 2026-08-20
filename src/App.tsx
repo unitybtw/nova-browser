@@ -1688,9 +1688,18 @@ function App() {
 
   const vpnAnchorRef = useRef<HTMLButtonElement | null>(null);
 
-  const handleToggleExtension = useCallback((id: string) => {
-    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: e.enabled === false ? true : false } : e));
-  }, []);
+  const handleToggleExtension = useCallback(async (id: string) => {
+    const ext = extensions.find(e => e.id === id);
+    const nextEnabled = ext?.enabled === false ? true : false;
+    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
+    try {
+      if ((window as any).electronAPI?.toggleExtension) {
+        await (window as any).electronAPI.toggleExtension(id, nextEnabled);
+      }
+    } catch (e) {
+      console.error('Failed to toggle extension:', e);
+    }
+  }, [extensions]);
 
   const handleRemoveExtension = useCallback(async (id: string) => {
     if (window.confirm('Are you sure you want to remove this extension?')) {
@@ -2375,6 +2384,7 @@ function App() {
             isOpen={isExtensionsOpen}
             onClose={handleCloseExtensions}
             extensions={extensions}
+            activeTab={activeTab}
             onToggleExtension={handleToggleExtension}
             onRemoveExtension={handleRemoveExtension}
             onManageExtensions={handleManageExtensions}

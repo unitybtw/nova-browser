@@ -95,9 +95,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Extension management
   installExtension: (folderPath: string) => ipcRenderer.invoke('install-extension', folderPath),
+  toggleExtension: (extensionId: string, enabled: boolean) => ipcRenderer.invoke('toggle-extension', extensionId, enabled),
   listExtensions: () => ipcRenderer.invoke('list-extensions'),
   removeExtension: (extensionId: string) => ipcRenderer.invoke('remove-extension', extensionId),
-  openExtensionPopup: (url: string, bounds: any) => ipcRenderer.invoke('open-extension-popup', url, bounds),
+  openExtensionPopup: (url: string, bounds: any, activeTabInfo?: any) => ipcRenderer.invoke('open-extension-popup', url, bounds, activeTabInfo),
   selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
   installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
   onExtensionInstalledSilently: (callback: (event: any, data: any) => void) => {

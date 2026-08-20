@@ -1123,7 +1123,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
                   const url = `chrome-extension://${ext.id}/${cleanPopup}`;
                   if ((window as any).electronAPI?.openExtensionPopup) {
-                    (window as any).electronAPI.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
+                    (window as any).electronAPI.openExtensionPopup(
+                      url,
+                      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                      {
+                        id: activeTab?.id,
+                        url: activeTab?.url,
+                        title: activeTab?.title,
+                        favIconUrl: activeTab?.favicon,
+                        webContentsId: activeTab?.webContentsId
+                      }
+                    );
                   } else {
                     onNewTab(url);
                   }
