@@ -350,20 +350,23 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
     const fetchSuggestions = async () => {
       try {
+        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(searchValue);
+          const results = await (window as any).electronAPI.getSuggestions(searchValue, searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
             setSuggestions(results.slice(0, 6));
             return;
           }
         }
+        const lang = clientLocale.split('-')[0] || 'tr';
+        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
         const response = await fetch(
-          `https://duckduckgo.com/ac/?q=${encodeURIComponent(searchValue)}&type=list`,
+          `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`,
           { signal: abortController.signal }
         );
         if (!abortController.signal.aborted && response.ok) {
           const data = await response.json();
-          if (data && Array.isArray(data) && data.length > 1) {
+          if (data && Array.isArray(data) && Array.isArray(data[1])) {
             setSuggestions(data[1].slice(0, 6));
           }
         }

@@ -135,15 +135,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
     const timer = setTimeout(async () => {
       try {
+        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(query.trim());
+          const results = await (window as any).electronAPI.getSuggestions(query.trim(), searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
             setSuggestions(results.slice(0, 6));
             setShowSuggestions(results.length > 0);
             return;
           }
         }
-        const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(query.trim())}&type=list`, {
+        const lang = clientLocale.split('-')[0] || 'tr';
+        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query.trim())}&hl=${lang}&gl=${country}`, {
           signal: abortController.signal
         });
         if (!abortController.signal.aborted && res.ok) {

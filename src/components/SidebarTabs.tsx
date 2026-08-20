@@ -317,17 +317,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
     const timer = setTimeout(async () => {
       try {
+        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(searchValue);
+          const results = await (window as any).electronAPI.getSuggestions(searchValue, searchEngine, clientLocale);
           if (Array.isArray(results)) {
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
-        const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(searchValue)}&type=list`);
+        const lang = clientLocale.split('-')[0] || 'tr';
+        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`);
         if (res.ok) {
           const data = await res.json();
-          if (data && Array.isArray(data) && data[1]) {
+          if (data && Array.isArray(data) && Array.isArray(data[1])) {
             setSuggestions(data[1].slice(0, 5));
           }
         }
@@ -335,7 +338,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     }, 150);
 
     return () => clearTimeout(timer);
-  }, [searchValue, isOmniboxFocused]);
+  }, [searchValue, isOmniboxFocused, searchEngine]);
 
   // Handle Omnibox Submit
   const handleOmniboxSubmit = (e: React.FormEvent) => {

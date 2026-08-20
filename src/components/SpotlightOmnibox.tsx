@@ -61,17 +61,20 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
     const fetchSuggestions = async () => {
       try {
+        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(inputValue.trim());
+          const results = await (window as any).electronAPI.getSuggestions(inputValue.trim(), searchEngine, clientLocale);
           if (Array.isArray(results)) {
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
-        const response = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(inputValue.trim())}&type=list`);
+        const lang = clientLocale.split('-')[0] || 'tr';
+        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(inputValue.trim())}&hl=${lang}&gl=${country}`);
         if (response.ok) {
           const data = await response.json();
-          if (data && Array.isArray(data) && data.length > 1) {
+          if (data && Array.isArray(data) && Array.isArray(data[1])) {
             setSuggestions(data[1].slice(0, 5));
           }
         }
@@ -82,7 +85,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
     const timer = setTimeout(fetchSuggestions, 150);
     return () => clearTimeout(timer);
-  }, [inputValue, isAIMode]);
+  }, [inputValue, isAIMode, searchEngine]);
 
   // Compute matching items for list navigation
   type ActionItem = 

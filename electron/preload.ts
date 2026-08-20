@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setPrivacyShield: (enabled: boolean) => ipcRenderer.invoke('set-privacy-shield', enabled),
   setDoNotTrack: (enabled: boolean) => ipcRenderer.invoke('set-do-not-track', enabled),
   setWindowButtonVisibility: (visible: boolean) => ipcRenderer.invoke('set-window-button-visibility', visible),
-  getSuggestions: (query: string) => ipcRenderer.invoke('get-suggestions', query),
+  getSuggestions: (query: string, engine?: string, locale?: string) => ipcRenderer.invoke('get-suggestions', query, engine, locale),
   fetchWallpaperPhotos: (query: string) => ipcRenderer.invoke('fetch-wallpaper-photos', query),
   fetchUnsplashPhotos: (query: string) => ipcRenderer.invoke('fetch-unsplash-photos', query),
   fetchPageHtml: (url: string) => ipcRenderer.invoke('fetch-page-html', url),

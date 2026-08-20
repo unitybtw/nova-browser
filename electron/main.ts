@@ -1414,62 +1414,158 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   return { error: 'Too many redirects' };
 });
 
-// IPC Handler for Autocomplete Suggestions with In-Memory LRU Cache
+// IPC Handler for Autocomplete Suggestions with Regional Intelligence & In-Memory LRU Cache
 const suggestionsCache = new Map<string, string[]>();
-ipcMain.handle('get-suggestions', async (event, query: string) => {
+
+function resolveLocaleDetails(clientLocale?: string) {
+  const rawLocale = (typeof clientLocale === 'string' && clientLocale.trim()) 
+    ? clientLocale.trim() 
+    : (app.getLocale() || 'tr-TR');
+  const parts = rawLocale.replace('_', '-').split('-');
+  const lang = (parts[0] || 'tr').toLowerCase();
+  const country = (parts[1] || (lang === 'tr' ? 'tr' : 'us')).toLowerCase();
+  const ddgRegion = `${country}-${lang}`;
+  const acceptLanguage = `${lang}-${country.toUpperCase()},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
+  return { lang, country, ddgRegion, acceptLanguage };
+}
+
+ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, clientLocale?: string) => {
   if (!isTrustedSender(event)) return [];
   if (!query || typeof query !== 'string') return [];
   const cleanQ = query.trim();
   if (!cleanQ) return [];
 
-  const cacheKey = cleanQ.toLowerCase();
+  const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(clientLocale);
+  const normalizedKey = cleanQ.normalize('NFC').toLowerCase();
+  const cacheKey = `${normalizedKey}_${engine || 'default'}_${lang}_${country}`;
+
   if (suggestionsCache.has(cacheKey)) {
     return suggestionsCache.get(cacheKey)!;
   }
 
-  // 1. Try DuckDuckGo Autocomplete
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch(`https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1]) && data[1].length > 0) {
-        const list: string[] = data[1].slice(0, 8);
-        if (suggestionsCache.size > 300) {
-          const firstKey = suggestionsCache.keys().next().value;
-          if (firstKey) suggestionsCache.delete(firstKey);
-        }
-        suggestionsCache.set(cacheKey, list);
-        return list;
-      }
-    }
-  } catch (err) {}
+  const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
-  // 2. Fallback to Google Autocomplete
-  try {
+  const fetchGoogle = async (): Promise<string[]> => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 1200);
-    const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    if (res.ok) {
-      const data = await res.json();
-      if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1]) && data[1].length > 0) {
-        const list: string[] = data[1].slice(0, 8);
-        if (suggestionsCache.size > 300) {
-          const firstKey = suggestionsCache.keys().next().value;
-          if (firstKey) suggestionsCache.delete(firstKey);
+    try {
+      const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${lang}&gl=${country}`;
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-        suggestionsCache.set(cacheKey, list);
-        return list;
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
+    } catch (_) {} finally {
+      clearTimeout(timeout);
     }
-  } catch (err) {}
+    return [];
+  };
+
+  const fetchDuckDuckGo = async (): Promise<string[]> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    try {
+      const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
+        }
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
+      }
+    } catch (_) {} finally {
+      clearTimeout(timeout);
+    }
+    return [];
+  };
+
+  const fetchBing = async (): Promise<string[]> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    try {
+      const market = `${lang}-${country.toUpperCase()}`;
+      const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${lang}&setmkt=${market}`;
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
+        }
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
+      }
+    } catch (_) {} finally {
+      clearTimeout(timeout);
+    }
+    return [];
+  };
+
+  const fetchBrave = async (): Promise<string[]> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1200);
+    try {
+      const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false`;
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
+        }
+      });
+      clearTimeout(timeout);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
+      }
+    } catch (_) {} finally {
+      clearTimeout(timeout);
+    }
+    return [];
+  };
+
+  let providers = [fetchGoogle, fetchDuckDuckGo, fetchBing];
+  if (engine === 'duckduckgo') {
+    providers = [fetchDuckDuckGo, fetchGoogle, fetchBing];
+  } else if (engine === 'bing') {
+    providers = [fetchBing, fetchGoogle, fetchDuckDuckGo];
+  } else if (engine === 'brave') {
+    providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
+  }
+
+  for (const provider of providers) {
+    const list = await provider();
+    if (list.length > 0) {
+      if (suggestionsCache.size > 400) {
+        const firstKey = suggestionsCache.keys().next().value;
+        if (firstKey) suggestionsCache.delete(firstKey);
+      }
+      suggestionsCache.set(cacheKey, list);
+      return list;
+    }
+  }
 
   return [];
 });
