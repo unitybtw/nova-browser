@@ -482,6 +482,24 @@ function App() {
     return () => clearTimeout(timer);
   }, [tabs]);
 
+  // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
+  useEffect(() => {
+    if (tabs.length === 0) {
+      const fallbackId = Date.now().toString();
+      setTabs([{
+        id: fallbackId,
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false
+      }]);
+      setActiveTabId(fallbackId);
+    } else if (!tabs.some(t => t.id === activeTabId)) {
+      setActiveTabId(tabs[0].id);
+    }
+  }, [tabs, activeTabId]);
+
   useEffect(() => {
     localStorage.setItem('active_tab_session', activeTabId);
   }, [activeTabId]);
@@ -999,17 +1017,35 @@ function App() {
     const isInternalPage = !!newTitle;
 
     setTabs(prev => {
-      const activeTab = prev.find(t => t.id === activeTabId);
+      if (prev.length === 0) {
+        const newTabId = Date.now().toString();
+        setActiveTabId(newTabId);
+        return [{
+          id: newTabId,
+          url,
+          title: newTitle || 'New Tab',
+          isLoading: !isInternalPage,
+          canGoBack: false,
+          canGoForward: false
+        }];
+      }
+
+      const activeTab = prev.find(t => t.id === activeTabId) || prev[0];
+      const targetId = activeTab ? activeTab.id : prev[0].id;
+      if (targetId !== activeTabId) {
+        setActiveTabId(targetId);
+      }
+
       if (activeTab && activeTab.url === url) {
         // URL is exactly the same, force a reload if it's a webview
         if (!isInternalPage) {
-          const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+          const webview = document.querySelector(`webview[data-tab-id="${targetId}"]`) as any;
           if (webview) webview.reload();
         }
-        return prev.map(t => t.id === activeTabId ? { ...t, isLoading: !isInternalPage } : t);
+        return prev.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t);
       }
       
-      return prev.map(t => t.id === activeTabId ? { 
+      return prev.map(t => t.id === targetId ? { 
         ...t, 
         url, 
         isLoading: !isInternalPage,

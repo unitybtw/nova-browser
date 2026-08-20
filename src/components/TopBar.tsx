@@ -334,7 +334,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
   useEffect(() => {
     if (!isFocused) {
-      setSearchValue(activeTab?.url || '');
+      const url = activeTab?.url || '';
+      if (url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') {
+        setSearchValue('');
+      } else {
+        setSearchValue(url);
+      }
     }
   }, [activeTab?.url, isFocused]);
 
