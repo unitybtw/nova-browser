@@ -1202,12 +1202,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <button
               ref={downloadsBtnRef}
               onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
-              className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
+              className={`p-1.5 rounded-lg transition-all relative cursor-pointer ${
+                (activeDownloadsCount || 0) > 0
+                  ? 'text-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20 shadow-xs'
+                  : isIncognito 
+                    ? 'hover:bg-slate-700 text-slate-300' 
+                    : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+              }`}
               title="Downloads"
             >
-              <Download className="w-4 h-4" />
+              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'animate-bounce' : ''}`} />
               {(activeDownloadsCount || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs animate-pulse">
                   {activeDownloadsCount}
                 </span>
               )}

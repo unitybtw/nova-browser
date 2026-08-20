@@ -240,72 +240,103 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 });
 
   // Downloads Manager: Handle file downloads via Electron IPC
-  session.defaultSession.on('will-download', (event, item, webContents) => {
-    const downloadId = Date.now().toString();
-    const filename = item.getFilename();
-    const totalBytes = item.getTotalBytes();
-    activeDownloads.set(downloadId, item);
+  function registerDownloadsManager(targetSession: Electron.Session) {
+    targetSession.on('will-download', (event, item, webContents) => {
+      const downloadId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
+      const filename = item.getFilename();
+      const totalBytes = item.getTotalBytes();
+      activeDownloads.set(downloadId, item);
 
-    // Auto-install CRX extensions from Chrome Web Store
-    if (filename.endsWith('.crx')) {
-      item.cancel();
-    } else if (nextDownloadAsSaveAs) {
-      nextDownloadAsSaveAs = false;
-      // Do not set save path so Electron shows the Save Dialog automatically
-      item.once('done', (_event, state) => {
-        if (state === 'completed') activeDownloads.delete(downloadId);
-      });
-    } else {
-      item.setSavePath(path.join(app.getPath('downloads'), filename));
-      item.once('done', (_event, state) => {
-        if (state === 'completed') {
-          activeDownloads.delete(downloadId);
-        }
-      });
-    }
+      // Auto-install CRX extensions from Chrome Web Store
+      if (filename.endsWith('.crx')) {
+        item.cancel();
+        activeDownloads.delete(downloadId);
+        return;
+      }
 
-    mainWindow?.webContents.send('download-update', {
-      id: downloadId,
-      filename,
-      url: item.getURL(),
-      receivedBytes: 0,
-      totalBytes,
-      state: 'progressing'
-    });
-
-    item.on('updated', (event, state) => {
-      if (state === 'interrupted') {
-        mainWindow?.webContents.send('download-update', {
-          id: downloadId,
-          filename,
-          receivedBytes: item.getReceivedBytes(),
-          totalBytes,
-          state: 'cancelled'
+      if (nextDownloadAsSaveAs) {
+        nextDownloadAsSaveAs = false;
+        // Do not set save path so Electron shows the Save Dialog automatically
+        item.once('done', (_event, state) => {
+          if (state === 'completed') activeDownloads.delete(downloadId);
         });
-      } else if (state === 'progressing') {
-        mainWindow?.webContents.send('download-update', {
-          id: downloadId,
-          filename,
-          receivedBytes: item.getReceivedBytes(),
-          totalBytes,
-          state: 'progressing',
-          isPaused: item.isPaused()
+      } else {
+        const defaultDir = app.getPath('downloads');
+        let targetPath = path.join(defaultDir, filename);
+        // Auto-increment filename if already exists to avoid silent overwrite
+        try {
+          if (fs.existsSync(targetPath)) {
+            const ext = path.extname(filename);
+            const base = path.basename(filename, ext);
+            let counter = 1;
+            while (fs.existsSync(path.join(defaultDir, `${base} (${counter})${ext}`))) {
+              counter++;
+            }
+            targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
+          }
+        } catch {}
+        item.setSavePath(targetPath);
+        item.once('done', (_event, state) => {
+          if (state === 'completed') {
+            activeDownloads.delete(downloadId);
+          }
         });
       }
-    });
 
-    item.once('done', (event, state) => {
-      activeDownloads.delete(downloadId);
       mainWindow?.webContents.send('download-update', {
         id: downloadId,
-        filename,
-        receivedBytes: item.getReceivedBytes(),
+        filename: path.basename(item.getSavePath() || filename),
+        url: item.getURL(),
+        receivedBytes: 0,
         totalBytes,
-        state: state === 'completed' ? 'completed' : 'cancelled',
-        savePath: item.getSavePath()
+        state: 'progressing',
+        startTime: Date.now(),
+        savePath: item.getSavePath() || undefined
+      });
+
+      item.on('updated', (event, state) => {
+        if (state === 'interrupted') {
+          mainWindow?.webContents.send('download-update', {
+            id: downloadId,
+            filename: path.basename(item.getSavePath() || filename),
+            url: item.getURL(),
+            receivedBytes: item.getReceivedBytes(),
+            totalBytes,
+            state: 'cancelled',
+            savePath: item.getSavePath() || undefined
+          });
+        } else if (state === 'progressing') {
+          mainWindow?.webContents.send('download-update', {
+            id: downloadId,
+            filename: path.basename(item.getSavePath() || filename),
+            url: item.getURL(),
+            receivedBytes: item.getReceivedBytes(),
+            totalBytes,
+            state: 'progressing',
+            isPaused: item.isPaused(),
+            savePath: item.getSavePath() || undefined
+          });
+        }
+      });
+
+      item.once('done', (event, state) => {
+        activeDownloads.delete(downloadId);
+        mainWindow?.webContents.send('download-update', {
+          id: downloadId,
+          filename: path.basename(item.getSavePath() || filename),
+          url: item.getURL(),
+          receivedBytes: item.getReceivedBytes(),
+          totalBytes: item.getTotalBytes(),
+          state: state === 'completed' ? 'completed' : 'cancelled',
+          savePath: item.getSavePath() || undefined,
+          isPaused: false
+        });
       });
     });
-  });
+  }
+
+  registerDownloadsManager(session.defaultSession);
+  registerDownloadsManager(session.fromPartition('incognito'));
 
   // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

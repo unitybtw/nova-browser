@@ -760,32 +760,41 @@ function App() {
       let pendingUpdates: Record<string, DownloadItem> = {};
       let throttleTimer: any = null;
 
+      const flushUpdates = () => {
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+          throttleTimer = null;
+        }
+        setDownloads(prev => {
+          const updated = [...prev];
+          let hasChanges = false;
+          
+          Object.values(pendingUpdates).forEach(pendingData => {
+            const existingIdx = updated.findIndex(d => d.id === pendingData.id);
+            if (existingIdx !== -1) {
+              updated[existingIdx] = { ...updated[existingIdx], ...pendingData };
+              hasChanges = true;
+            } else {
+              updated.unshift(pendingData);
+              hasChanges = true;
+            }
+          });
+          
+          pendingUpdates = {};
+          return hasChanges ? updated : prev;
+        });
+      };
+
       cleanupDownloads = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
         pendingUpdates[data.id] = data;
         
-        if (!throttleTimer) {
+        // Immediate update for new downloads or completion/cancellation
+        if (data.receivedBytes === 0 || data.state === 'completed' || data.state === 'cancelled' || data.state === 'interrupted') {
+          flushUpdates();
+        } else if (!throttleTimer) {
           throttleTimer = setTimeout(() => {
-            setDownloads(prev => {
-              const updated = [...prev];
-              let hasChanges = false;
-              
-              Object.values(pendingUpdates).forEach(pendingData => {
-                const existingIdx = updated.findIndex(d => d.id === pendingData.id);
-                if (existingIdx !== -1) {
-                  updated[existingIdx] = { ...updated[existingIdx], ...pendingData };
-                  hasChanges = true;
-                } else {
-                  updated.unshift(pendingData);
-                  hasChanges = true;
-                }
-              });
-              
-              pendingUpdates = {};
-              throttleTimer = null;
-              
-              return hasChanges ? updated : prev;
-            });
-          }, 500); // UI throttled to 500ms
+            flushUpdates();
+          }, 100); // Fast 100ms UI progress update
         }
       });
     }
