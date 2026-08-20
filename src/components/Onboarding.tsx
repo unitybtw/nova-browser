@@ -152,14 +152,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   const steps = [
     // Step 0 — Welcome
     <motion.div key="welcome" className="flex flex-col items-center justify-center h-full text-center px-8">
-      {/* Draggable Top Area */}
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      
       <motion.div
         initial={{ scale: 0.5, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-        className="mb-8 mt-10"
+        className="mb-8"
       >
         <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-2xl shadow-cyan-500/40 flex items-center justify-center mb-6 mx-auto">
           <img src="/nova-icon-pure.png" alt="Nova" className="w-20 h-20 object-contain scale-110" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
@@ -169,7 +166,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-5xl font-bold text-white mb-4 tracking-tight"
+        className="text-5xl font-bold text-white mb-4 tracking-tight select-none"
       >
         Welcome to<br />
         <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400">Nova Browser</span>
@@ -178,7 +175,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-300 text-lg max-w-md leading-relaxed mb-10 font-normal"
+        className="text-slate-300 text-lg max-w-md leading-relaxed mb-10 font-normal select-none"
       >
         A faster, more private, and smarter web experience awaits you. Let's set it up together.
       </motion.p>
@@ -189,7 +186,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         onClick={goNext}
         whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
         whileTap={{ scale: 0.95 }}
-        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-lg shadow-cyan-500/25"
+        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-lg shadow-cyan-500/25 no-drag cursor-pointer"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         Let's Get Started →
       </motion.button>
@@ -197,14 +195,13 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 1 — Import Data
     <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 shadow-2xl mt-10 text-cyan-400">
+      <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 shadow-2xl text-cyan-400">
         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Import from Your Old Browser</h2>
-      <p className="text-slate-300 text-base max-w-md mb-8">
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">Import from Your Old Browser</h2>
+      <p className="text-slate-300 text-base max-w-md mb-8 select-none">
         You can import your bookmarks from Google Chrome (and other Chromium-based browsers) to Nova with a single click.
       </p>
       
@@ -212,7 +209,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         <button
           onClick={handleImport}
           disabled={isImporting}
-          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-8 py-3 rounded-xl font-bold text-sm transition-colors mb-4 flex items-center gap-2 shadow-lg shadow-cyan-500/20"
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-8 py-3 rounded-xl font-bold text-sm transition-colors mb-4 flex items-center gap-2 shadow-lg shadow-cyan-500/20 no-drag cursor-pointer"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {isImporting ? (
             <div className="w-5 h-5 rounded-full border-2 border-slate-950 border-t-transparent animate-spin" />
@@ -224,39 +222,43 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       )}
 
       {importStatus === 'success' && (
-        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30 text-sm">
+        <div className="bg-emerald-500/20 text-emerald-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-emerald-500/30 text-sm no-drag select-none" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
           Bookmarks imported successfully!
         </div>
       )}
 
       {importStatus === 'error' && (
-        <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm">
+        <div className="bg-red-500/20 text-red-400 px-6 py-3 rounded-xl font-medium mb-4 flex items-center gap-2 border border-red-500/30 text-sm no-drag select-none" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
           Chrome data could not be found or read.
         </div>
       )}
 
-      <button onClick={goNext} className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4 text-xs">
+      <button 
+        onClick={goNext} 
+        className="text-slate-400 hover:text-white transition-colors underline decoration-slate-600 underline-offset-4 text-xs no-drag cursor-pointer"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      >
         {importStatus === 'success' ? 'Continue' : 'Skip for now'}
       </button>
     </motion.div>,
 
     // Step 2 — Theme
     <motion.div key="theme" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Choose a Theme</h2>
-      <p className="text-slate-300 text-base mb-10">Personalize the look of Nova Browser.</p>
-      <div className="flex gap-5 mb-12 flex-wrap justify-center">
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">Choose a Theme</h2>
+      <p className="text-slate-300 text-base mb-10 select-none">Personalize the look of Nova Browser.</p>
+      <div className="flex gap-5 mb-12 flex-wrap justify-center no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {THEMES.map(t => (
           <button
             key={t.id}
             onClick={() => setTheme(t.id)}
-            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all w-40 backdrop-blur-xl ${
+            className={`flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all w-40 backdrop-blur-xl no-drag cursor-pointer ${
               theme === t.id
                 ? 'border-cyan-500 bg-cyan-500/15 scale-105 shadow-xl shadow-cyan-500/20'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
             }`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             {/* Mini browser preview */}
             <div className={`w-28 h-20 rounded-xl overflow-hidden ${t.preview} shadow-lg`}>
@@ -277,19 +279,19 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 3 — Search Engine
     <motion.div key="search" className="flex flex-col items-center justify-center h-full text-center px-8 w-full max-w-2xl mx-auto relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <h2 className="text-4xl font-bold text-white mb-3 mt-10">Your Search Engine</h2>
-      <p className="text-slate-300 text-base mb-8">Select your default search engine. You can change this later in settings.</p>
-      <div className="flex flex-col gap-2.5 w-full mb-8">
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">Your Search Engine</h2>
+      <p className="text-slate-300 text-base mb-8 select-none">Select your default search engine. You can change this later in settings.</p>
+      <div className="flex flex-col gap-2.5 w-full mb-8 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {SEARCH_ENGINES.map(engine => (
           <button
             key={engine.id}
             onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl ${
+            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl no-drag cursor-pointer ${
               searchEngine === engine.id
                 ? 'border-cyan-500 bg-cyan-500/15 shadow-lg shadow-cyan-500/20 scale-[1.02]'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-md'
             }`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <div className="w-9 h-9 flex items-center justify-center shrink-0">
               {engine.icon}
@@ -312,23 +314,22 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 4 — Privacy Shield
     <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
-      <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/20 mt-10 text-emerald-400">
+      <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/20 text-emerald-400">
         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
       </div>
-      <h2 className="text-4xl font-bold text-white mb-3">Privacy Shield</h2>
-      <p className="text-slate-300 text-base max-w-md mb-8 leading-relaxed">
+      <h2 className="text-4xl font-bold text-white mb-3 select-none">Privacy Shield</h2>
+      <p className="text-slate-300 text-base max-w-md mb-8 leading-relaxed select-none">
         Nova Browser's built-in privacy shield automatically blocks ads, trackers, and malicious content.
       </p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 max-w-lg w-full">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 max-w-lg w-full no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {[
           { icon: <Ban className="w-7 h-7 text-slate-400" />, label: 'Ads' },
           { icon: <EyeOff className="w-7 h-7 text-slate-400" />, label: 'Trackers' },
           { icon: <Bug className="w-7 h-7 text-slate-400" />, label: 'Malware' },
         ].map(item => (
-          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-colors hover:bg-white/10">
+          <div key={item.label} className="bg-white/5 border border-white/10 backdrop-blur-md rounded-2xl p-4 flex flex-col items-center gap-2.5 transition-colors hover:bg-white/10 select-none">
             {item.icon}
             <span className="text-slate-300 text-xs font-semibold">{item.label}</span>
             <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${privacyShield ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20' : 'text-red-400 bg-red-400/10 border border-red-400/20'}`}>
@@ -337,14 +338,15 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           </div>
         ))}
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <button
           onClick={() => setPrivacyShield(!privacyShield)}
-          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}
+          className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 cursor-pointer ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${privacyShield ? 'translate-x-8' : 'translate-x-1'}`} />
         </button>
-        <span className="text-white font-medium text-base">
+        <span className="text-white font-medium text-base select-none">
           {privacyShield ? 'Privacy Shield Active' : 'Privacy Shield Off'}
         </span>
       </div>
@@ -352,7 +354,6 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 5 — Done
     <motion.div key="done" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="absolute top-0 left-0 right-0 h-10" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
       <motion.div
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
@@ -367,7 +368,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="text-4xl font-bold text-white mb-3"
+        className="text-4xl font-bold text-white mb-3 select-none"
       >
         You're all set!
       </motion.h2>
@@ -375,7 +376,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.45 }}
-        className="text-slate-300 text-base max-w-md leading-relaxed mb-4"
+        className="text-slate-300 text-base max-w-md leading-relaxed mb-4 select-none"
       >
         Nova Browser is ready. All your settings are saved and can be changed anytime.
       </motion.p>
@@ -383,7 +384,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.55 }}
-        className="flex gap-6 mb-10 text-xs text-slate-400"
+        className="flex gap-6 mb-10 text-xs text-slate-400 select-none"
       >
         <span>Theme: <strong className="text-white capitalize">{theme}</strong></span>
         <span>·</span>
@@ -398,7 +399,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         onClick={handleFinish}
         whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
         whileTap={{ scale: 0.95 }}
-        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all shadow-lg shadow-cyan-500/25"
+        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all shadow-lg shadow-cyan-500/25 no-drag cursor-pointer"
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <span>Start Browsing</span>
         <ArrowRight className="w-5 h-5" />
@@ -407,7 +409,31 @@ export function Onboarding({ onComplete }: OnboardingProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-[#090d16] flex flex-col overflow-hidden">
+    <div 
+      className="fixed inset-0 z-[9999] bg-[#090d16] flex flex-col overflow-hidden drag-region select-none"
+      style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+    >
+      {/* Top Window Drag Header with macOS Traffic Light Spacing */}
+      <div 
+        className="w-full h-11 flex items-center justify-between px-4 shrink-0 drag-region z-50 select-none"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
+        <div className="flex items-center gap-2 pl-20 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <span className="text-[11px] font-semibold text-slate-500 tracking-wider uppercase">
+            Nova Browser Setup
+          </span>
+        </div>
+        <div className="flex items-center gap-2 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <button
+            onClick={handleFinish}
+            className="text-xs text-slate-400 hover:text-white transition-colors px-3 py-1 rounded-lg hover:bg-white/5 cursor-pointer no-drag select-none font-medium"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          >
+            Skip Setup
+          </button>
+        </div>
+      </div>
+
       {/* Dynamic blob background */}
       <motion.div 
         animate={{ 
@@ -430,7 +456,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
       {/* Progress Bar */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="w-full h-1 bg-white/10">
+        <div className="w-full h-1 bg-white/10 shrink-0 pointer-events-none">
           <motion.div
             className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
             initial={{ width: 0 }}
@@ -442,7 +468,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
       {/* Step dots */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="flex justify-center gap-2 pt-6">
+        <div className="flex justify-center gap-2 pt-4 shrink-0 drag-region" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}>
           {Array.from({ length: TOTAL_STEPS - 2 }).map((_, i) => (
             <div
               key={i}
@@ -455,7 +481,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       )}
 
       {/* Step Content */}
-      <div className="flex-1 relative overflow-hidden flex items-center justify-center">
+      <div 
+        className="flex-1 relative overflow-hidden flex items-center justify-center drag-region"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+      >
         <AnimatePresence custom={dir} mode="wait">
           <motion.div
             key={step}
@@ -465,7 +494,8 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             animate="center"
             exit="exit"
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="absolute inset-0 flex items-center justify-center"
+            className="absolute inset-0 flex items-center justify-center drag-region"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
             {steps[step]}
           </motion.div>
@@ -474,16 +504,21 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
       {/* Navigation Buttons */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
-        <div className="flex justify-between items-center px-12 pb-10 pt-4">
+        <div 
+          className="flex justify-between items-center px-12 pb-8 pt-2 shrink-0 drag-region"
+          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        >
           <button
             onClick={goBack}
-            className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2 text-xs"
+            className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2 text-xs no-drag cursor-pointer"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             ← Back
           </button>
           <button
             onClick={goNext}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-500/20"
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-500/20 no-drag cursor-pointer"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             {step === TOTAL_STEPS - 2 ? 'Complete ✓' : 'Next →'}
           </button>
