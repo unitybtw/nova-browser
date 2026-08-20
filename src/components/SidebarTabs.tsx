@@ -30,11 +30,13 @@ import {
   LayoutGrid,
   Trash2,
   PanelLeft,
-  Pin
+  Pin,
+  HelpCircle
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
 import { formatSearchUrl } from '../utils/searchEngine';
+import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -99,6 +101,14 @@ export interface SidebarTabsProps {
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: (url?: string) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onDuplicateTab?: (id: string) => void;
+  onTogglePinTab?: (id: string) => void;
+  onCloseOtherTabs?: (id: string) => void;
+  onCloseTabsToRight?: (index: number) => void;
+  onNewTabRight?: (index: number) => void;
+  onReopenClosedTab?: () => void;
+  canReopenClosedTab?: boolean;
+  onToggleBookmark?: () => void;
   workspaces: Workspace[];
   activeWorkspaceId: string;
   onSelectWorkspace: (id: string) => void;
@@ -125,6 +135,7 @@ export interface SidebarTabsProps {
   onOpenDownloads?: () => void;
   onOpenHistory?: () => void;
   onOpenSettings?: () => void;
+  onOpenHelp?: () => void;
   onOpenExtensions?: () => void;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
@@ -185,6 +196,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onCloseTab,
   onNewTab,
   onToggleMuteTab,
+  onDuplicateTab,
+  onTogglePinTab,
+  onCloseOtherTabs,
+  onCloseTabsToRight,
+  onNewTabRight,
+  onReopenClosedTab,
+  canReopenClosedTab = false,
+  onToggleBookmark,
   workspaces,
   activeWorkspaceId,
   onSelectWorkspace,
@@ -211,6 +230,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenDownloads,
   onOpenHistory,
   onOpenSettings,
+  onOpenHelp,
   onOpenExtensions,
   bookmarks = [],
   onToggleCollapse,
@@ -224,6 +244,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+
+  const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    tab: null,
+    tabIndex: -1
+  });
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
@@ -450,6 +478,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         transition={{ duration: 0.12, ease: 'easeOut' }}
         key={tab.id}
         onClick={() => onSelectTab(tab.id)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setTabContextMenu({
+            isOpen: true,
+            x: e.clientX,
+            y: e.clientY,
+            tab,
+            tabIndex: tabs.findIndex(t => t.id === tab.id)
+          });
+        }}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
         className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-all duration-150 group/tab select-none ${
@@ -478,9 +517,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <Globe className="w-3.5 h-3.5 opacity-70" />
             )}
           </div>
-          <span className="truncate text-[13px] tracking-tight">
+          <span className="truncate text-[13px] tracking-tight flex-1">
             {tab.title || tab.url || 'Tab'}
           </span>
+          {tab.isPinned && (
+            <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
+          )}
         </div>
 
         <div className={`flex items-center gap-1 transition-all duration-150 shrink-0 ${
@@ -500,7 +542,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <Moon className="w-3 h-3" />
             </span>
           )}
-          {tabs.length > 1 && (
+          {tabs.length > 1 && !tab.isPinned && (
             <button 
               onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
               className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
@@ -863,9 +905,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           className="px-3 pb-1.5 no-drag"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <button
+          <motion.button
+            whileHover={{ scale: 1.01 }}
+            whileTap={{ scale: 0.98 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
             onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-            className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-all text-left group cursor-pointer ${
+            className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-colors text-left group cursor-pointer ${
               isCurrentNewTab
                 ? 'bg-white text-slate-900 font-semibold border border-slate-200/80 shadow-xs dark:bg-white/12 dark:text-white dark:font-medium dark:border-white/10 dark:shadow-sm'
                 : 'hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white'
@@ -874,7 +919,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
             <span className="text-[13px] tracking-tight flex-1">New Tab</span>
             <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘T</span>
-          </button>
+          </motion.button>
         </div>
 
         {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}
@@ -1001,27 +1046,40 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     Settings
                   </button>
                 )}
+                {onOpenHelp && (
+                  <button
+                    onClick={() => { onOpenHelp(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    Help & Support
+                  </button>
+                )}
               </motion.div>
             )}
           </AnimatePresence>
 
           <div className="flex items-center gap-1">
             {onCreateFolder && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
                 onClick={onCreateFolder}
                 className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 title="New Folder"
               >
                 <FolderPlus className="w-4 h-4" />
-              </button>
+              </motion.button>
             )}
-            <button
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
               onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
               className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
               title="New Tab"
             >
               <Plus className="w-4 h-4" />
-            </button>
+            </motion.button>
           </div>
         </div>
 
@@ -1029,6 +1087,44 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
       {/* Tab Peek Portal */}
       <TabPeekPortal tab={hoveredTab} pos={hoverPos} />
+
+      {/* Chrome-Style Tab Context Menu */}
+      <TabContextMenu
+        menuState={tabContextMenu}
+        onClose={() => setTabContextMenu(prev => ({ ...prev, isOpen: false, tab: null }))}
+        onNewTabRight={(idx) => {
+          if (onNewTabRight) onNewTabRight(idx);
+          else onNewTab();
+        }}
+        onReloadTab={(tabId) => {
+          if (tabId === activeTabId && onReload) onReload();
+        }}
+        onDuplicateTab={(tabId) => {
+          if (onDuplicateTab) onDuplicateTab(tabId);
+        }}
+        onTogglePinTab={(tabId) => {
+          if (onTogglePinTab) onTogglePinTab(tabId);
+        }}
+        onToggleMuteTab={(tabId) => {
+          onToggleMuteTab(tabId, { stopPropagation: () => {} } as any);
+        }}
+        onBookmarkTab={(targetTab) => {
+          if (onToggleBookmark) onToggleBookmark();
+        }}
+        onCloseTab={(tabId) => onCloseTab(tabId)}
+        onCloseOtherTabs={(tabId) => {
+          if (onCloseOtherTabs) onCloseOtherTabs(tabId);
+        }}
+        onCloseTabsToRight={(idx) => {
+          if (onCloseTabsToRight) onCloseTabsToRight(idx);
+        }}
+        onReopenClosedTab={() => {
+          if (onReopenClosedTab) onReopenClosedTab();
+        }}
+        canReopenClosedTab={canReopenClosedTab}
+        isBookmarked={tabContextMenu.tab ? bookmarks.some(b => b.url === tabContextMenu.tab?.url) : false}
+        totalTabs={tabs.length}
+      />
     </>
   );
 });

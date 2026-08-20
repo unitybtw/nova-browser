@@ -1,5 +1,5 @@
 console.log('Main process starting...');
-import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme, safeStorage } from 'electron';
+import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
 import dns from 'dns';
@@ -437,9 +437,346 @@ function addUpgradedUrl(url: string): void {
   upgradedUrls.add(url);
 }
 
+function setupApplicationMenu() {
+  const isMac = process.platform === 'darwin';
+
+  if (isMac) {
+    try {
+      app.setAboutPanelOptions({
+        applicationName: 'Nova Browser',
+        applicationVersion: '1.0.7',
+        version: '1.0.7',
+        copyright: 'Copyright © 2026 Nova Browser. All rights reserved.',
+        credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
+        website: 'https://github.com/unitybtw/nova-browser'
+      });
+    } catch {}
+  }
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App Menu (macOS only)
+    ...(isMac ? [{
+      label: app.name || 'Nova Browser',
+      submenu: [
+        {
+          label: 'About Nova Browser',
+          click: () => {
+            if (isMac) {
+              app.showAboutPanel();
+            } else {
+              mainWindow?.webContents.send('shortcut', 'open-help');
+            }
+          }
+        },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            mainWindow?.webContents.send('shortcut', 'check-updates');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Preferences...',
+          accelerator: 'CmdOrCtrl+,',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'settings');
+          }
+        },
+        { type: 'separator' as const },
+        { role: 'services' as const },
+        { type: 'separator' as const },
+        { role: 'hide' as const },
+        { role: 'hideOthers' as const },
+        { role: 'unhide' as const },
+        { type: 'separator' as const },
+        { role: 'quit' as const }
+      ]
+    }] : []),
+    // File Menu
+    {
+      label: 'File',
+      submenu: [
+        {
+          label: 'New Tab',
+          accelerator: 'CmdOrCtrl+T',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'new-tab');
+          }
+        },
+        {
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'new-tab');
+          }
+        },
+        {
+          label: 'New Incognito Tab',
+          accelerator: 'Shift+CmdOrCtrl+N',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'new-incognito');
+          }
+        },
+        {
+          label: 'Open Location / Search...',
+          accelerator: 'CmdOrCtrl+L',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'focus-url');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Close Tab',
+          accelerator: 'CmdOrCtrl+W',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'close-tab');
+          }
+        },
+        {
+          label: 'Reopen Closed Tab',
+          accelerator: 'Shift+CmdOrCtrl+T',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'reopen-tab');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Print...',
+          accelerator: 'CmdOrCtrl+P',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'print');
+          }
+        },
+        ...(!isMac ? [{ type: 'separator' as const }, { role: 'quit' as const }] : [])
+      ]
+    },
+    // Edit Menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' as const },
+        { role: 'redo' as const },
+        { type: 'separator' as const },
+        { role: 'cut' as const },
+        { role: 'copy' as const },
+        { role: 'paste' as const },
+        { role: 'pasteAndMatchStyle' as const },
+        { role: 'delete' as const },
+        { role: 'selectAll' as const },
+        { type: 'separator' as const },
+        {
+          label: 'Find in Page...',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'find');
+          }
+        }
+      ]
+    },
+    // View Menu
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Reload This Page',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'reload');
+          }
+        },
+        {
+          label: 'Force Reload',
+          accelerator: 'Shift+CmdOrCtrl+R',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'force-reload');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Actual Size (100%)',
+          accelerator: 'CmdOrCtrl+0',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'zoom-reset');
+          }
+        },
+        {
+          label: 'Zoom In',
+          accelerator: 'CmdOrCtrl+Plus',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'zoom-in');
+          }
+        },
+        {
+          label: 'Zoom Out',
+          accelerator: 'CmdOrCtrl+-',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'zoom-out');
+          }
+        },
+        { type: 'separator' as const },
+        { role: 'togglefullscreen' as const },
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'devtools');
+          }
+        }
+      ]
+    },
+    // History Menu
+    {
+      label: 'History',
+      submenu: [
+        {
+          label: 'Back',
+          accelerator: 'CmdOrCtrl+[',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'go-back');
+          }
+        },
+        {
+          label: 'Forward',
+          accelerator: 'CmdOrCtrl+]',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'go-forward');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Show Full History',
+          accelerator: 'CmdOrCtrl+Y',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'history');
+          }
+        },
+        {
+          label: 'Show Downloads',
+          accelerator: 'Shift+CmdOrCtrl+J',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'downloads');
+          }
+        }
+      ]
+    },
+    // Bookmarks Menu
+    {
+      label: 'Bookmarks',
+      submenu: [
+        {
+          label: 'Bookmark This Tab...',
+          accelerator: 'CmdOrCtrl+D',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'bookmark');
+          }
+        },
+        {
+          label: 'Show Bookmarks Bar',
+          accelerator: 'Shift+CmdOrCtrl+B',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'toggle-bookmarks-bar');
+          }
+        }
+      ]
+    },
+    // Window Menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' as const },
+        { role: 'zoom' as const },
+        ...(isMac ? [
+          { type: 'separator' as const },
+          { role: 'front' as const },
+          { type: 'separator' as const },
+          { role: 'window' as const }
+        ] : [
+          { role: 'close' as const }
+        ])
+      ]
+    },
+    // macOS Native Help Menu (with Help search role & items)
+    {
+      role: 'help' as const,
+      label: 'Help',
+      submenu: [
+        {
+          label: 'Nova Browser Help Center',
+          accelerator: 'F1',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'open-help');
+          }
+        },
+        {
+          label: 'Keyboard Shortcuts Guide',
+          accelerator: 'CmdOrCtrl+/',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'shortcuts-help');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Nova AI Copilot Guide',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'ai-help');
+          }
+        },
+        {
+          label: 'Privacy Shield & Security Info',
+          click: () => {
+            mainWindow?.webContents.send('shortcut', 'privacy-help');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Report an Issue / Feedback',
+          click: async () => {
+            await shell.openExternal('https://github.com/unitybtw/nova-browser/issues');
+          }
+        },
+        {
+          label: 'Visit Nova Browser GitHub',
+          click: async () => {
+            await shell.openExternal('https://github.com/unitybtw/nova-browser');
+          }
+        },
+        {
+          label: "What's New in This Version",
+          click: async () => {
+            await shell.openExternal('https://github.com/unitybtw/nova-browser/releases');
+          }
+        },
+        { type: 'separator' as const },
+        {
+          label: 'Check for Updates...',
+          click: () => {
+            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            mainWindow?.webContents.send('shortcut', 'check-updates');
+          }
+        },
+        {
+          label: 'About Nova Browser',
+          click: () => {
+            if (isMac) {
+              app.showAboutPanel();
+            } else {
+              mainWindow?.webContents.send('shortcut', 'about-help');
+            }
+          }
+        }
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
+
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
+  setupApplicationMenu();
 
   // --- STRICT PERMISSION SYSTEM (SECURITY) ---
   const applyStrictSecurityToSession = (targetSession: Electron.Session) => {

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { DownloadsPopover } from './DownloadsPopover';
+import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
+import { SiteInfoPopover } from './SiteInfoPopover';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { 
   ArrowLeft,
@@ -18,6 +20,7 @@ import {
   Download,
   Columns,
   Pin,
+  PinOff,
   Volume2,
   VolumeX,
   Share2,
@@ -75,15 +78,22 @@ interface TopBarProps {
   onOpenHistory: () => void;
   onOpenDownloads: () => void;
   onOpenSettings: () => void;
+  onOpenHelp?: () => void;
   onOpenShare: () => void;
   onTakeScreenshot: () => void;
   onOpenFindInPage: () => void;
   onToggleSplitView: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  onDuplicateTab: (id: string, e: React.MouseEvent) => void;
-  onTogglePinTab: (id: string, e: React.MouseEvent) => void;
-  onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onResetZoom?: () => void;
+  onDuplicateTab: (id: string, e?: React.MouseEvent) => void;
+  onTogglePinTab: (id: string, e?: React.MouseEvent) => void;
+  onToggleMuteTab: (id: string, e?: React.MouseEvent) => void;
+  onCloseOtherTabs?: (id: string) => void;
+  onCloseTabsToRight?: (index: number) => void;
+  onNewTabRight?: (index: number) => void;
+  onReopenClosedTab?: () => void;
+  canReopenClosedTab?: boolean;
   onSuspendTab?: (id: string) => void;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
   onReorderFullList?: (newTabs: Tab[]) => void;
@@ -91,7 +101,7 @@ interface TopBarProps {
   onSelectTab: (id: string) => void;
   onNewTab: (url?: string) => void;
   onNewIncognitoTab: () => void;
-  onCloseTab: (id: string, e: React.MouseEvent) => void;
+  onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNavigate: (url: string) => void;
   onGoBack: () => void;
   onGoForward: () => void;
@@ -114,12 +124,14 @@ interface TopBarProps {
 }
 
 const MemoizedTabItem = React.memo(({ 
-  tab, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
+  tab, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
-  tabsLength, setGhostTab
+  tabsLength, setGhostTab, onOpenContextMenu
 }: any) => {
   if (isSplitChild) return null;
+
+  const isPinned = !!tab.isPinned;
 
   return (
     <Reorder.Item
@@ -147,8 +159,16 @@ const MemoizedTabItem = React.memo(({
         }
       }}
       onClick={() => onSelectTab(tab.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenContextMenu?.(tab, index, e);
+      }}
       data-tab-id={tab.id}
-      className={`group flex items-center justify-between ${splitTab ? 'px-1.5' : 'px-3'} flex-1 min-w-[120px] ${splitTab ? 'max-w-[320px]' : 'max-w-[240px]'} text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag ${
+      title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
+      className={`group flex items-center justify-between ${
+        isPinned ? 'px-2 min-w-[38px] max-w-[38px] justify-center' : splitTab ? 'px-1.5 min-w-[120px] max-w-[320px]' : 'px-3 min-w-[120px] max-w-[240px]'
+      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-all no-drag relative ${
         tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
         tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
         'h-[34px] rounded-t-xl border-t border-x'
@@ -162,7 +182,26 @@ const MemoizedTabItem = React.memo(({
             : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
       }`}
     >
-      {splitTab ? (
+      {isPinned ? (
+        <div className="flex items-center justify-center w-full h-full relative">
+          {tab.isLoading ? (
+            <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+          ) : tab.favicon ? (
+            <img src={tab.favicon} alt="" className="w-4 h-4 rounded-xs shrink-0" />
+          ) : (
+            <Globe className="w-4 h-4 text-slate-400 shrink-0" />
+          )}
+          {tab.isPlayingAudio && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleMuteTab(tab.id, e); }}
+              className="absolute -top-1 -right-1 p-0.5 bg-blue-500 text-white rounded-full shadow-xs"
+              title="Mute Tab"
+            >
+              <Volume2 className="w-2.5 h-2.5 animate-pulse" />
+            </button>
+          )}
+        </div>
+      ) : splitTab ? (
         <div className="flex w-full items-center h-full">
           {/* Primary Tab Half */}
           <div 
@@ -294,6 +333,7 @@ const MemoizedTabItem = React.memo(({
     prevProps.tab.favicon === nextProps.tab.favicon &&
     prevProps.tab.isLoading === nextProps.tab.isLoading &&
     prevProps.tab.isMuted === nextProps.tab.isMuted &&
+    prevProps.tab.isPinned === nextProps.tab.isPinned &&
     prevProps.tab.isPlayingAudio === nextProps.tab.isPlayingAudio &&
     prevProps.tab.isSuspended === nextProps.tab.isSuspended &&
     prevProps.tabsLength === nextProps.tabsLength &&
@@ -310,6 +350,7 @@ interface OmniboxBarProps {
   onNavigate: (url: string) => void;
   onToggleReaderMode?: () => void;
   onToggleBookmark?: () => void;
+  onResetZoom?: () => void;
   isBookmarked: boolean;
 }
 
@@ -322,6 +363,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   onNavigate,
   onToggleReaderMode,
   onToggleBookmark,
+  onResetZoom,
   isBookmarked,
 }) => {
   const [searchValue, setSearchValue] = useState('');
@@ -330,6 +372,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [isSiteInfoOpen, setIsSiteInfoOpen] = useState(false);
+  const siteInfoBtnRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -437,9 +481,17 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     <div className="flex-1 flex w-full mx-1 transition-all duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
       <div className="w-full relative">
         <form onSubmit={handleSearchSubmit} className="relative group w-full">
-          <div className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none z-10">
+          <div 
+            ref={siteInfoBtnRef}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsSiteInfoOpen(prev => !prev);
+            }}
+            className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer"
+          >
             {isIncognito ? (
-              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs" title="Private & Incognito Mode">
+              <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title="Private & Incognito Mode (Click for Site Info)">
                 <VenetianMask className="w-3.5 h-3.5" />
                 <span className="text-[10px] font-bold uppercase tracking-wider">Incognito</span>
               </div>
@@ -447,7 +499,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               (() => {
                 const sec = getUrlSecurityInfo(activeTab?.url || '');
                 return (
-                  <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-colors ${sec.bgColor} ${sec.color}`} title={sec.tooltip}>
+                  <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-all hover:scale-105 active:scale-95 ${sec.bgColor} ${sec.color}`} title={`${sec.tooltip} (Click for site info & permissions)`}>
                     {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
                     {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
                     {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
@@ -458,6 +510,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               })()
             )}
           </div>
+
+          <SiteInfoPopover
+            isOpen={isSiteInfoOpen}
+            onClose={() => setIsSiteInfoOpen(false)}
+            url={activeTab?.url || ''}
+            blockedAdsCount={activeTab?.blockedAdsCount || 0}
+            buttonRef={siteInfoBtnRef}
+          />
           <input
             type="text"
             value={searchValue}
@@ -524,12 +584,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           )}
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
             {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
-              <div 
-                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-default select-none transition-all ${isIncognito ? 'bg-slate-700 text-slate-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'}`}
-                title="Zoom Level"
+              <button 
+                type="button"
+                onClick={onResetZoom}
+                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-all hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
+                title="Zoom Level (Click to reset 100%)"
               >
                 {Math.round(activeTab.zoomFactor * 100)}%
-              </div>
+              </button>
             )}
 
             {onToggleReaderMode && (
@@ -696,15 +758,22 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onOpenHistory,
   onOpenDownloads,
   onOpenSettings,
+  onOpenHelp,
   onOpenShare,
   onTakeScreenshot,
   onOpenFindInPage,
   onToggleSplitView,
   onZoomIn,
   onZoomOut,
+  onResetZoom,
   onDuplicateTab,
   onTogglePinTab,
   onToggleMuteTab,
+  onCloseOtherTabs,
+  onCloseTabsToRight,
+  onNewTabRight,
+  onReopenClosedTab,
+  canReopenClosedTab = false,
   onSuspendTab,
   onReorderTabs,
   onReorderFullList,
@@ -740,6 +809,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [mcpRunning, setMcpRunning] = useState(false);
   const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
   const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
+  const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
+    isOpen: false,
+    x: 0,
+    y: 0,
+    tab: null,
+    tabIndex: -1
+  });
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [, setForceUpdate] = useState(0);
@@ -1016,6 +1092,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 <MemoizedTabItem
                   key={tab.id}
                   tab={tab}
+                  index={tabs.findIndex(t => t.id === tab.id)}
                   isActive={isActive}
                   isSplitChild={isSplitChild}
                   splitTab={splitTab}
@@ -1033,28 +1110,53 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onCloseTab={onCloseTab}
                   tabsLength={tabs.length}
                   setGhostTab={setGhostTab}
+                  onOpenContextMenu={(targetTab: Tab, index: number, e: React.MouseEvent) => {
+                    setTabContextMenu({
+                      isOpen: true,
+                      x: e.clientX,
+                      y: e.clientY,
+                      tab: targetTab,
+                      tabIndex: index
+                    });
+                  }}
                 />
               );
             })}
             </AnimatePresence>
             
             {/* New Tab Button */}
-            <button
+            <motion.button
+              layout="position"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
               onClick={() => onNewTab()}
-              className={`p-1.5 mb-1 ml-1 rounded-lg transition-all shrink-0 no-drag ${isIncognito ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}
-              title="New Tab"
+              className={`p-1.5 mb-1 ml-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
+                isIncognito 
+                  ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' 
+                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+              }`}
+              title="New Tab (⌘T)"
             >
               <Plus className="w-4 h-4" />
-            </button>
+            </motion.button>
 
             {/* New Incognito Tab Button */}
-            <button
+            <motion.button
+              layout="position"
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
               onClick={onNewIncognitoTab}
-              className={`p-1.5 mb-1 rounded-lg transition-all shrink-0 no-drag ${isIncognito ? 'text-slate-300 hover:bg-slate-700 hover:text-white' : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'}`}
-              title="New Private / Incognito Tab"
+              className={`p-1.5 mb-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
+                isIncognito 
+                  ? 'text-slate-300 hover:bg-slate-700 hover:text-white' 
+                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+              }`}
+              title="New Private / Incognito Tab (⇧⌘N)"
             >
               <ShieldOff className="w-4 h-4" />
-            </button>
+            </motion.button>
           </Reorder.Group>
 
           {canScrollRight && (
@@ -1110,6 +1212,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           onNavigate={onNavigate}
           onToggleReaderMode={onToggleReaderMode}
           onToggleBookmark={onToggleBookmark}
+          onResetZoom={onResetZoom}
           isBookmarked={isBookmarked}
         />
 
@@ -1351,6 +1454,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       <button onClick={() => { onOpenSettings(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
                         <Settings className="w-4 h-4 text-slate-400" /> Settings
                       </button>
+                      {onOpenHelp && (
+                        <button onClick={() => { onOpenHelp(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                          <HelpCircle className="w-4 h-4 text-slate-400" /> Help & Support
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 </>
@@ -1457,6 +1565,38 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       </div>,
       document.body
     )}
+
+    {/* Chrome-Style Tab Context Menu */}
+    <TabContextMenu
+      menuState={tabContextMenu}
+      onClose={() => setTabContextMenu(prev => ({ ...prev, isOpen: false, tab: null }))}
+      onNewTabRight={(idx) => {
+        if (onNewTabRight) onNewTabRight(idx);
+        else onNewTab();
+      }}
+      onReloadTab={(tabId) => {
+        if (tabId === activeTabId) onReload();
+      }}
+      onDuplicateTab={(tabId) => onDuplicateTab(tabId)}
+      onTogglePinTab={(tabId) => onTogglePinTab(tabId)}
+      onToggleMuteTab={(tabId) => onToggleMuteTab(tabId)}
+      onBookmarkTab={(targetTab) => {
+        if (onToggleBookmark) onToggleBookmark();
+      }}
+      onCloseTab={(tabId) => onCloseTab(tabId)}
+      onCloseOtherTabs={(tabId) => {
+        if (onCloseOtherTabs) onCloseOtherTabs(tabId);
+      }}
+      onCloseTabsToRight={(idx) => {
+        if (onCloseTabsToRight) onCloseTabsToRight(idx);
+      }}
+      onReopenClosedTab={() => {
+        if (onReopenClosedTab) onReopenClosedTab();
+      }}
+      canReopenClosedTab={canReopenClosedTab}
+      isBookmarked={tabContextMenu.tab ? bookmarks.some(b => b.url === tabContextMenu.tab?.url) : false}
+      totalTabs={tabs.length}
+    />
     </>
   );
 });

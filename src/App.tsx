@@ -60,6 +60,7 @@ const ScreenshotModal = React.lazy(() => import('./components/ScreenshotModal').
 const ReaderMode = React.lazy(() => import('./components/ReaderMode').then(m => ({ default: m.ReaderMode })));
 const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
 const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
+const HelpModal = React.lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
@@ -191,6 +192,8 @@ function App() {
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [isWorkspaceManagerOpen, setIsWorkspaceManagerOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
   
   // Workspaces State
   const [workspaces, setWorkspaces] = useState<import('./types/browser').Workspace[]>(() => {
@@ -286,6 +289,7 @@ function App() {
     setIsSpotlightOpen(false);
     setIsVpnPopoverOpen(false);
     setIsExtensionsOpen(false);
+    setIsHelpOpen(false);
   }, []);
 
   const openModal = useCallback((modalName: 'share' | 'spotlight' | 'extensions') => {
@@ -749,6 +753,127 @@ function App() {
     });
   }, []);
 
+  const handleDuplicateTab = useCallback((tabId: string) => {
+    setTabs(prev => {
+      const idx = prev.findIndex(t => t.id === tabId);
+      if (idx === -1) return prev;
+      const original = prev[idx];
+      const newTab: Tab = {
+        ...original,
+        id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
+        title: original.title,
+        url: original.url,
+        favicon: original.favicon,
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        isPinned: false
+      };
+      const newTabs = [...prev];
+      newTabs.splice(idx + 1, 0, newTab);
+      setActiveTabId(newTab.id);
+      return newTabs;
+    });
+  }, []);
+
+  const handleTogglePinTab = useCallback((tabId: string) => {
+    setTabs(prev => {
+      const target = prev.find(t => t.id === tabId);
+      if (!target) return prev;
+      const willPin = !target.isPinned;
+      const updated = prev.map(t => t.id === tabId ? { ...t, isPinned: willPin } : t);
+      // Re-sort: pinned tabs at the start
+      const pinned = updated.filter(t => t.isPinned);
+      const unpinned = updated.filter(t => !t.isPinned);
+      return [...pinned, ...unpinned];
+    });
+  }, []);
+
+  const handleCloseOtherTabs = useCallback((tabId: string) => {
+    setTabs(prev => {
+      const target = prev.find(t => t.id === tabId);
+      if (!target) return prev;
+      // Preserve pinned tabs and target tab
+      const toKeep = prev.filter(t => t.id === tabId || t.isPinned);
+      const toClose = prev.filter(t => t.id !== tabId && !t.isPinned);
+      setClosedTabsStack(stack => [...stack, ...toClose]);
+      setActiveTabId(tabId);
+      return toKeep;
+    });
+  }, []);
+
+  const handleCloseTabsToRight = useCallback((index: number) => {
+    setTabs(prev => {
+      if (index < 0 || index >= prev.length - 1) return prev;
+      const toKeep = prev.slice(0, index + 1);
+      const toClose = prev.slice(index + 1).filter(t => !t.isPinned);
+      const pinnedToRight = prev.slice(index + 1).filter(t => t.isPinned);
+      setClosedTabsStack(stack => [...stack, ...toClose]);
+      const nextTabs = [...toKeep, ...pinnedToRight];
+      if (!nextTabs.some(t => t.id === activeTabId)) {
+        setActiveTabId(prev[index].id);
+      }
+      return nextTabs;
+    });
+  }, [activeTabId]);
+
+  const handleNewTabRight = useCallback((index: number) => {
+    const newId = Date.now().toString();
+    const newTab: Tab = {
+      id: newId,
+      url: 'nova://newtab',
+      title: 'New Tab',
+      isLoading: false,
+      canGoBack: false,
+      canGoForward: false
+    };
+    setTabs(prev => {
+      const newTabs = [...prev];
+      const targetIndex = index >= 0 && index < prev.length ? index + 1 : prev.length;
+      newTabs.splice(targetIndex, 0, newTab);
+      return newTabs;
+    });
+    setActiveTabId(newId);
+  }, []);
+
+  const handlePrintPage = useCallback(() => {
+    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+    if (webview && webview.print) {
+      try {
+        webview.print();
+      } catch (err) {
+        console.error('Print error:', err);
+      }
+    } else {
+      window.print();
+    }
+  }, [activeTabId]);
+
+  const handleOpenDevTools = useCallback(() => {
+    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+    if (webview && webview.openDevTools) {
+      try {
+        if (webview.isDevToolsOpened?.()) {
+          webview.closeDevTools();
+        } else {
+          webview.openDevTools({ mode: 'right' });
+        }
+      } catch (err) {
+        console.error('DevTools error:', err);
+      }
+    }
+  }, [activeTabId]);
+
+  const handleReopenClosedTab = useCallback(() => {
+    setClosedTabsStack(stack => {
+      if (stack.length === 0) return stack;
+      const lastTab = stack[stack.length - 1];
+      setTabs(prev => [...prev, lastTab]);
+      setActiveTabId(lastTab.id);
+      return stack.slice(0, -1);
+    });
+  }, []);
+
 
 
   // Listen to IPC events from main process (Shortcuts & Downloads) with cleanups
@@ -761,9 +886,68 @@ function App() {
       cleanupShortcut = window.electronAPI.onShortcut((_event: any, command: string) => {
         if (command === 'search' || command === 'toggle-omnibox') {
           setIsSpotlightOpen(prev => !prev);
-        }
-        if (command === 'new-tab') {
+        } else if (command === 'new-tab') {
           handleNewTab();
+        } else if (command === 'new-incognito') {
+          handleNewIncognitoTab();
+        } else if (command === 'close-tab') {
+          if (activeTabId) handleCloseTab(activeTabId);
+        } else if (command === 'reopen-tab') {
+          handleReopenClosedTab();
+        } else if (command === 'open-help') {
+          closeAllModals();
+          setHelpInitialTab('help');
+          setIsHelpOpen(true);
+        } else if (command === 'shortcuts-help') {
+          closeAllModals();
+          setHelpInitialTab('shortcuts');
+          setIsHelpOpen(true);
+        } else if (command === 'ai-help') {
+          closeAllModals();
+          setHelpInitialTab('ai');
+          setIsHelpOpen(true);
+        } else if (command === 'privacy-help') {
+          closeAllModals();
+          setHelpInitialTab('privacy');
+          setIsHelpOpen(true);
+        } else if (command === 'about-help') {
+          closeAllModals();
+          setHelpInitialTab('about');
+          setIsHelpOpen(true);
+        } else if (command === 'settings') {
+          handleOpenSettings();
+        } else if (command === 'focus-url') {
+          const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        } else if (command === 'print') {
+          handlePrintPage();
+        } else if (command === 'devtools') {
+          handleOpenDevTools();
+        } else if (command === 'reload' || command === 'force-reload') {
+          handleReload();
+        } else if (command === 'zoom-in') {
+          handleZoomIn();
+        } else if (command === 'zoom-out') {
+          handleZoomOut();
+        } else if (command === 'zoom-reset') {
+          handleResetZoom();
+        } else if (command === 'history') {
+          handleOpenHistory();
+        } else if (command === 'downloads') {
+          handleOpenDownloads();
+        } else if (command === 'bookmark') {
+          handleToggleBookmarkActive();
+        } else if (command === 'toggle-bookmarks-bar') {
+          setSettings(s => ({ ...s, showBookmarksBar: !s.showBookmarksBar }));
+        } else if (command === 'find') {
+          setIsFindInPageOpen(prev => !prev);
+        } else if (command === 'go-back') {
+          handleGoBack();
+        } else if (command === 'go-forward') {
+          handleGoForward();
         }
       });
     }
@@ -1451,13 +1635,8 @@ function App() {
     }));
   }, []);
 
-  const handleTogglePinTab = useCallback((id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTabs(prev => prev.map(t => t.id === id ? { ...t, isPinned: !t.isPinned } : t));
-  }, []);
-
-  const handleToggleMuteTab = useCallback((id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleToggleMuteTab = useCallback((id: string, e?: React.MouseEvent) => {
+    if (e?.stopPropagation) e.stopPropagation();
     setTabs(prev => prev.map(t => t.id === id ? { ...t, isMuted: !t.isMuted } : t));
   }, []);
 
@@ -1481,21 +1660,6 @@ function App() {
         alert("Picture-in-Picture Error: " + (e.message || e));
       });
     }
-  }, []);
-
-  const handleDuplicateTab = useCallback((id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setTabs(prev => {
-      const tabToDuplicate = prev.find(t => t.id === id);
-      if (!tabToDuplicate) return prev;
-      const duplicatedTab: Tab = {
-        ...tabToDuplicate,
-        id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
-        title: `${tabToDuplicate.title} (Copy)`
-      };
-      setActiveTabId(duplicatedTab.id);
-      return [...prev, duplicatedTab];
-    });
   }, []);
 
   const handleToggleBookmark = useCallback((tab: Tab) => {
@@ -2025,11 +2189,34 @@ function App() {
         handleGoForward();
         return;
       }
+
+      // Print Page (Cmd + P / Ctrl + P)
+      if (meta && key === 'p') {
+        e.preventDefault();
+        handlePrintPage();
+        return;
+      }
+
+      // Open DevTools (F12 or Cmd+Option+I / Ctrl+Shift+I)
+      if (key === 'f12' || (meta && e.altKey && key === 'i') || (e.ctrlKey && e.shiftKey && key === 'i')) {
+        e.preventDefault();
+        handleOpenDevTools();
+        return;
+      }
+
+      // Help Center / Shortcuts Guide (F1 or Cmd+? / Cmd+/)
+      if (key === 'f1' || (meta && (key === '?' || key === '/'))) {
+        e.preventDefault();
+        closeAllModals();
+        setHelpInitialTab(key === '?' || key === '/' ? 'shortcuts' : 'help');
+        setIsHelpOpen(true);
+        return;
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, settings.shortcuts]);
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
 
@@ -2080,6 +2267,14 @@ function App() {
               onCloseTab={handleCloseTab}
               onNewTab={handleNewTab}
               onToggleMuteTab={handleToggleMuteTab}
+              onDuplicateTab={handleDuplicateTab}
+              onTogglePinTab={handleTogglePinTab}
+              onCloseOtherTabs={handleCloseOtherTabs}
+              onCloseTabsToRight={handleCloseTabsToRight}
+              onNewTabRight={handleNewTabRight}
+              onReopenClosedTab={handleReopenClosedTab}
+              canReopenClosedTab={closedTabsStack.length > 0}
+              onToggleBookmark={handleToggleBookmarkActive}
               workspaces={workspaces}
               activeWorkspaceId={activeWorkspaceId}
               onSelectWorkspace={handleSelectWorkspace}
@@ -2106,6 +2301,7 @@ function App() {
               onOpenDownloads={handleOpenDownloads}
               onOpenHistory={handleOpenHistory}
               onOpenSettings={handleOpenSettings}
+              onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
               onOpenExtensions={handleOpenExtensions}
               bookmarks={bookmarks}
               isCollapsed={false}
@@ -2163,6 +2359,14 @@ function App() {
                   onCloseTab={handleCloseTab}
                   onNewTab={handleNewTab}
                   onToggleMuteTab={handleToggleMuteTab}
+                  onDuplicateTab={handleDuplicateTab}
+                  onTogglePinTab={handleTogglePinTab}
+                  onCloseOtherTabs={handleCloseOtherTabs}
+                  onCloseTabsToRight={handleCloseTabsToRight}
+                  onNewTabRight={handleNewTabRight}
+                  onReopenClosedTab={handleReopenClosedTab}
+                  canReopenClosedTab={closedTabsStack.length > 0}
+                  onToggleBookmark={handleToggleBookmarkActive}
                   workspaces={workspaces}
                   activeWorkspaceId={activeWorkspaceId}
                   onSelectWorkspace={handleSelectWorkspace}
@@ -2189,6 +2393,7 @@ function App() {
                   onOpenDownloads={handleOpenDownloads}
                   onOpenHistory={handleOpenHistory}
                   onOpenSettings={handleOpenSettings}
+                  onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
                   onOpenExtensions={handleOpenExtensions}
                   bookmarks={bookmarks}
                   isCollapsed={true}
@@ -2240,6 +2445,7 @@ function App() {
                 onOpenHistory={handleOpenHistory}
                 onOpenDownloads={handleOpenDownloads}
                 onOpenSettings={handleOpenSettings}
+                onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
                 onOpenExtensions={handleOpenExtensions}
                 onOpenShare={handleOpenShare}
                 onTakeScreenshot={handleTakeScreenshot}
@@ -2247,9 +2453,15 @@ function App() {
                 onToggleSplitView={handleToggleSplitView}
                 onZoomIn={handleZoomIn}
                 onZoomOut={handleZoomOut}
+                onResetZoom={handleResetZoom}
                 onDuplicateTab={handleDuplicateTab}
                 onTogglePinTab={handleTogglePinTab}
                 onToggleMuteTab={handleToggleMuteTab}
+                onCloseOtherTabs={handleCloseOtherTabs}
+                onCloseTabsToRight={handleCloseTabsToRight}
+                onNewTabRight={handleNewTabRight}
+                onReopenClosedTab={handleReopenClosedTab}
+                canReopenClosedTab={closedTabsStack.length > 0}
                 onSuspendTab={handleSuspendTab}
                 onReorderTabs={handleReorderTabs}
                 onReorderFullList={handleReorderFullList}
@@ -2541,6 +2753,16 @@ function App() {
             activeWorkspaceId={activeWorkspaceId} 
             onSelectWorkspace={handleSelectWorkspace} 
             isIncognito={activeTab?.isIncognito} 
+          />
+        )}
+      </React.Suspense>
+
+      <React.Suspense fallback={null}>
+        {isHelpOpen && (
+          <HelpModal
+            isOpen={isHelpOpen}
+            onClose={() => setIsHelpOpen(false)}
+            initialTab={helpInitialTab}
           />
         )}
       </React.Suspense>

@@ -27,9 +27,20 @@ interface ClockProps {
   variants?: any;
 }
 
+const getInitialTimeAndGreeting = () => {
+  const now = new Date();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const hour = now.getHours();
+  let greet = 'Good Evening';
+  if (hour < 12) greet = 'Good Morning';
+  else if (hour < 18) greet = 'Good Afternoon';
+  return { time, greet };
+};
+
 export const Clock: React.FC<ClockProps> = React.memo(({ variants }) => {
-  const [timeStr, setTimeStr] = useState('');
-  const [greeting, setGreeting] = useState('');
+  const initial = useMemo(() => getInitialTimeAndGreeting(), []);
+  const [timeStr, setTimeStr] = useState(initial.time);
+  const [greeting, setGreeting] = useState(initial.greet);
 
   useEffect(() => {
     const updateTime = () => {
@@ -40,7 +51,6 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants }) => {
       else if (hour < 18) setGreeting('Good Afternoon');
       else setGreeting('Good Evening');
     };
-    updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -258,17 +268,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1, 
-      transition: { staggerChildren: 0.1, delayChildren: 0.1 }
+      transition: { staggerChildren: 0.04, delayChildren: 0.01 }
     }
   };
 
   const itemVariants: any = {
-    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    hidden: { opacity: 0, y: 10 },
     visible: { 
       opacity: 1, 
       y: 0, 
-      scale: 1,
-      transition: { type: 'spring', stiffness: 300, damping: 24 }
+      transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
     }
   };
 
@@ -366,11 +375,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search or type URL in incognito mode..."
-                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-all shadow-xl backdrop-blur-xl"
+                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
               />
               <button 
                 type="submit"
-                className="absolute inset-y-0 right-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100"
+                className="absolute inset-y-0 right-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
               >
                 <ArrowRight className="h-5 w-5" />
               </button>
@@ -382,7 +391,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
   }
 
   return (
-    <div className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}>
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2, ease: 'easeOut' }}
+      className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
+    >
       
       {/* Unsplash Background */}
       {newTabBackground === 'unsplash' && (
@@ -696,7 +710,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               }}
               onKeyDown={handleKeyDown}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-xl border bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-cyan-500 dark:focus:border-cyan-500/80 focus:ring-4 focus:ring-cyan-500/15"
+              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-colors duration-200 shadow-xl border bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-cyan-500 dark:focus:border-cyan-500/80 focus:ring-4 focus:ring-cyan-500/15"
             />
             
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -709,14 +723,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                     setShowSuggestions(false);
                     setSelectedIndex(-1);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
               <button
                 type="submit"
-                className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all shadow-md shadow-cyan-500/25 active:scale-95 font-bold"
+                className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors shadow-md shadow-cyan-500/25 active:scale-95 font-bold cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -727,15 +741,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           <AnimatePresence>
             {showSuggestions && suggestions.length > 0 && (
               <motion.div
-                initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
                 className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
               >
                 {suggestions.map((s, idx) => (
                   <button
-                    key={idx}
+                    key={`${s}-${idx}`}
                     type="button"
                     onMouseDown={(e) => {
                       e.preventDefault();
@@ -743,7 +757,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                       onNavigate(formatSearchUrl(s, searchEngine));
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left text-sm transition-all ${
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left text-sm transition-colors cursor-pointer ${
                       idx === selectedIndex 
                         ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-l-2 border-cyan-500' 
                         : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
@@ -784,17 +798,17 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
           <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
             {speedDials.map((dial: any, idx: number) => (
               <motion.div 
-                key={idx} 
-                whileHover={{ scale: 1.08, y: -6 }}
-                whileTap={{ scale: 0.95 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+                key={`${dial.name}-${dial.url}-${idx}`} 
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="relative group w-[100px] sm:w-[110px]"
               >
                 <button
                   onClick={() => onNavigate(dial.url)}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-200 border shadow-sm bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-sm shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0">
                     <img 
                       src={`https://www.google.com/s2/favicons?domain=${dial.domain || dial.url}&sz=64`}
                       alt={dial.name}
@@ -810,7 +824,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                       setEditingDial({ name: dial.name, url: dial.url, index: idx });
                       setIsEditModalOpen(true);
                     }}
-                    className="p-1 text-slate-300 hover:text-white rounded"
+                    className="p-1 text-slate-300 hover:text-white rounded cursor-pointer"
                   >
                     <Edit2 className="w-3 h-3" />
                   </button>
@@ -819,7 +833,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                       e.stopPropagation();
                       handleDeleteSpeedDial(idx);
                     }}
-                    className="p-1 text-red-400 hover:text-red-300 rounded"
+                    className="p-1 text-red-400 hover:text-red-300 rounded cursor-pointer"
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -828,18 +842,23 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             ))}
 
             {speedDials.length < 10 && (
-              <div className="relative group w-[100px] sm:w-[110px]">
+              <motion.div 
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="relative group w-[100px] sm:w-[110px]"
+              >
                 <button
                   onClick={() => {
                     setEditingDial({ name: '', url: '', index: null });
                     setIsEditModalOpen(true);
                   }}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border border-dashed opacity-60 hover:opacity-100 hover:scale-105 active:scale-95 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-200 border border-dashed opacity-60 hover:opacity-100 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40 cursor-pointer"
                 >
                   <Plus className="w-6 h-6" />
                   <span className="text-xs font-medium">Add</span>
                 </button>
-              </div>
+              </motion.div>
             )}
           </div>
         </motion.div>
@@ -848,8 +867,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       {/* ToDo / Tasks Widget */}
       {showTasksWidget && (
       <motion.div 
-        variants={itemVariants}
-        className="absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl transition-all duration-300 border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        className="absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
         style={{ maxHeight: '380px' }}
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
@@ -864,7 +885,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             {todos.some(t => t.completed) && (
               <button
                 onClick={clearCompletedTodos}
-                className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors opacity-80 hover:opacity-100 ml-1"
+                className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors opacity-80 hover:opacity-100 ml-1 cursor-pointer"
                 title="Clear completed tasks"
               >
                 Clear
@@ -878,24 +899,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
             {todos.map(todo => (
               <motion.div 
                 key={todo.id}
-                initial={{ opacity: 0, y: -6 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.15, ease: 'easeOut' }}
                 onClick={() => toggleTodo(todo.id)}
-                className={`flex items-center justify-between gap-3 p-2.5 rounded-xl group cursor-pointer transition-all hover:bg-slate-100/80 dark:hover:bg-white/10 ${
-                  todo.completed ? 'opacity-60 bg-slate-500/5' : ''
+                className={`flex items-center justify-between gap-3 p-2.5 rounded-xl group cursor-pointer transition-colors ${
+                  todo.completed ? 'opacity-60 bg-slate-500/5' : 'hover:bg-slate-100/80 dark:hover:bg-white/10'
                 }`}
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-all ${
+                  <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-colors ${
                     todo.completed 
                       ? 'bg-accent text-white shadow-xs shadow-accent/30' 
                       : 'border-2 border-slate-300 dark:border-slate-600 group-hover:border-accent'
                   }`}>
                     {todo.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                   </div>
-                  <span className={`text-sm truncate select-none transition-all text-slate-800 dark:text-slate-100 ${
+                  <span className={`text-sm truncate select-none transition-colors text-slate-800 dark:text-slate-100 ${
                     todo.completed ? 'line-through opacity-70' : ''
                   }`}>
                     {todo.text}
@@ -907,7 +928,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
                     e.stopPropagation();
                     deleteTodo(todo.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-all shrink-0"
+                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors shrink-0 cursor-pointer"
                   title="Delete task"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -930,12 +951,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
               placeholder="Add a new task..."
-              className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-all focus:ring-2 focus:ring-accent/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
+              className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-colors focus:ring-2 focus:ring-accent/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
             />
             {newTodo.trim() && (
               <button 
                 type="submit" 
-                className="absolute right-2 p-1 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-xs"
+                className="absolute right-2 p-1 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -1002,6 +1023,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
       )}
       </AnimatePresence>
 
-    </div>
+    </motion.div>
   );
 };
