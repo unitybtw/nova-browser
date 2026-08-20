@@ -1833,14 +1833,14 @@ function App() {
 
       if (matches('newTab')) {
         e.preventDefault();
-        if (settings.useVerticalTabs) {
-          handleOpenSpotlight();
-        } else {
-          handleNewTab();
-          setTimeout(() => {
-            document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
-          }, 100);
-        }
+        handleNewTab();
+        setTimeout(() => {
+          const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+          if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+          }
+        }, 100);
         return;
       }
       
@@ -1868,7 +1868,7 @@ function App() {
         return;
       }
 
-      if (matches('reload')) {
+      if (matches('reload') || key === 'f5') {
         e.preventDefault();
         handleReload();
         return;
@@ -1880,8 +1880,37 @@ function App() {
         return;
       }
 
+      // Focus Address / Search bar (⌘L / Ctrl+L)
+      if (meta && key === 'l') {
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+        if (searchInput) {
+          searchInput.focus();
+          searchInput.select();
+        }
+        return;
+      }
+
+      // Next / Previous Tab (Ctrl+Tab / Ctrl+Shift+Tab)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+        e.preventDefault();
+        setTabs(currentTabs => {
+          if (currentTabs.length <= 1) return currentTabs;
+          const currentIndex = currentTabs.findIndex(t => t.id === activeTabId);
+          let nextIndex = 0;
+          if (e.shiftKey) {
+            nextIndex = currentIndex <= 0 ? currentTabs.length - 1 : currentIndex - 1;
+          } else {
+            nextIndex = currentIndex >= currentTabs.length - 1 ? 0 : currentIndex + 1;
+          }
+          setActiveTabId(currentTabs[nextIndex].id);
+          return currentTabs;
+        });
+        return;
+      }
+
       // Toggle Sidebar in Vertical Tabs Mode (⌘S / Ctrl+S)
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+      if ((e.metaKey || e.ctrlKey) && key === 's') {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
         return;
@@ -1925,6 +1954,20 @@ function App() {
           }
           return currentTabs;
         });
+        return;
+      }
+
+      // Zoom In (Cmd + + / Cmd + =)
+      if (meta && (key === '+' || key === '=')) {
+        e.preventDefault();
+        handleZoomIn();
+        return;
+      }
+
+      // Zoom Out (Cmd + -)
+      if (meta && key === '-') {
+        e.preventDefault();
+        handleZoomOut();
         return;
       }
 
