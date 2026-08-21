@@ -840,8 +840,21 @@ class NovaSyncService {
       };
 
       if (this.currentUser.syncCode) {
+        if (isSupabaseConfigured()) {
+          try {
+            const supabase = getSupabaseClient();
+            await supabase.from('nova_sync_chains').upsert({
+              sync_code: this.currentUser.syncCode,
+              payload: newBundle,
+              updated_at: new Date().toISOString()
+            });
+          } catch (err) {
+            console.warn('[NovaSync] Supabase sync chain update failed:', err);
+          }
+        }
+
         const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
-        const chains = chainsRaw ? JSON.parse(chainsRaw) : {};
+        const chains: Record<string, { payload: SyncDataBundle; createdAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
         chains[this.currentUser.syncCode] = { payload: newBundle, createdAt: Date.now() };
         localStorage.setItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY, JSON.stringify(chains));
       } else {
