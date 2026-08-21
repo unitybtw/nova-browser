@@ -1421,17 +1421,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                             )}
                             <div className="min-w-0">
                               <span className="text-xs font-bold block truncate">
-                                {syncStatus.isLoggedIn && syncStatus.user ? syncStatus.user.displayName : 'Nova Account & Sync'}
+                                {syncStatus.isLoggedIn ? (syncStatus.syncCode || 'Nova Sync') : 'Nova Sync'}
                               </span>
                               <span className="text-[10px] text-slate-400 truncate block">
-                                {syncStatus.isLoggedIn ? 'Sync is active' : 'Sign in to sync data'}
+                                {syncStatus.isLoggedIn ? 'Sync Chain Active' : 'Pair & sync across devices'}
                               </span>
                             </div>
                           </div>
                           {syncStatus.isLoggedIn ? (
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                           ) : (
-                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Sign In</span>
+                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Pair</span>
                           )}
                         </button>
                       </div>
