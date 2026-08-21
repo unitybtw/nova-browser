@@ -90,9 +90,10 @@
     "build": "tsc && vite build && npm run build:electron",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
-    "preview": "vite preview",
     "pack:win": "npm run build && electron-builder --win",
     "pack:mac": "npm run build && electron-builder --mac",
+    "dev:website": "npm --prefix website run dev",
+    "build:website": "npm --prefix website run build",
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
   "dependencies": {
