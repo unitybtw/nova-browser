@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -188,6 +188,155 @@ const TabPeekPortal: React.FC<{
     document.body
   );
 };
+
+interface SidebarTabItemProps {
+  tab: Tab;
+  isActive: boolean;
+  isDragOver: boolean;
+  isNested: boolean;
+  tabsLength: number;
+  onSelectTab: (id: string) => void;
+  onCloseTab: (id: string, e?: React.MouseEvent) => void;
+  onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onTabDragStart?: () => void;
+  onTabDragEnd?: () => void;
+  onReorderTabs?: (draggedId: string, targetId: string) => void;
+  onOpenContextMenu: (tab: Tab, e: React.MouseEvent) => void;
+  onMouseEnter: (tab: Tab, e: React.MouseEvent) => void;
+  onMouseLeave: () => void;
+  setDragOverTabId: (id: string | null) => void;
+}
+
+const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
+  tab,
+  isActive,
+  isDragOver,
+  isNested,
+  tabsLength,
+  onSelectTab,
+  onCloseTab,
+  onToggleMuteTab,
+  onTabDragStart,
+  onTabDragEnd,
+  onReorderTabs,
+  onOpenContextMenu,
+  onMouseEnter,
+  onMouseLeave,
+  setDragOverTabId
+}) => {
+  const isNewTabUrl = !tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
+
+  return (
+    <motion.div
+      draggable
+      onDragStart={(e: any) => {
+        e.dataTransfer.setData('text/plain', tab.id);
+        onTabDragStart?.();
+      }}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        if (!isDragOver) {
+          setDragOverTabId(tab.id);
+        }
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+          if (isDragOver) setDragOverTabId(null);
+        }
+      }}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragOverTabId(null);
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (draggedId && draggedId !== tab.id && onReorderTabs) {
+          onReorderTabs(draggedId, tab.id);
+        }
+      }}
+      onDragEnd={() => {
+        setDragOverTabId(null);
+        onTabDragEnd?.();
+      }}
+      initial={false}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
+      transition={{ duration: 0.12, ease: 'easeOut' }}
+      key={tab.id}
+      onClick={() => onSelectTab(tab.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        onOpenContextMenu(tab, e);
+      }}
+      onMouseEnter={(e) => onMouseEnter(tab, e)}
+      onMouseLeave={onMouseLeave}
+      className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none ${
+        isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
+      } ${
+        isDragOver
+          ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
+          : isActive
+            ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
+            : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
+      }`}
+    >
+      <div className="flex items-center gap-2.5 flex-1 min-w-0">
+        <div className="w-4 h-4 flex items-center justify-center shrink-0">
+          {tab.isLoading ? (
+            <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
+          ) : tab.favicon ? (
+            <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
+          ) : tab.url === 'nova://settings' ? (
+            <Settings className="w-3.5 h-3.5 opacity-70" />
+          ) : tab.url === 'nova://history' ? (
+            <Clock className="w-3.5 h-3.5 opacity-70" />
+          ) : tab.url === 'nova://downloads' ? (
+            <Download className="w-3.5 h-3.5 opacity-70" />
+          ) : isNewTabUrl ? (
+            <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+          ) : (
+            <Globe className="w-3.5 h-3.5 opacity-70" />
+          )}
+        </div>
+        <span className="truncate text-[13px] tracking-tight flex-1">
+          {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
+        </span>
+        {tab.isPinned && (
+          <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
+        )}
+      </div>
+
+      <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
+        isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+      }`}>
+        {tab.isMuted ? (
+          <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
+            <VolumeX className="w-3 h-3" />
+          </button>
+        ) : tab.isPlayingAudio ? (
+          <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
+            <Volume2 className="w-3 h-3 animate-pulse" />
+          </button>
+        ) : null}
+        {tab.isSuspended && (
+          <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
+            <Moon className="w-3 h-3" />
+          </span>
+        )}
+        {tabsLength > 1 && !tab.isPinned && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
+            className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+});
 
 export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   tabs,
@@ -423,135 +572,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     };
   }, []);
 
-  const renderTab = (tab: Tab, isNested: boolean = false) => {
-    const isActive = tab.id === activeTabId;
-    const isSplitChild = tab.id === splitTabId;
-    const isDragOver = dragOverTabId === tab.id;
-
-    if (isSplitChild && splitTabId && activeTabId) {
-      return null;
-    }
-
-    const isNewTabUrl = !tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
-
-    return (
-      <motion.div
-        draggable
-        onDragStart={(e: any) => {
-          e.dataTransfer.setData('text/plain', tab.id);
-          onTabDragStart?.();
-        }}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          e.dataTransfer.dropEffect = 'move';
-          if (dragOverTabId !== tab.id) {
-            setDragOverTabId(tab.id);
-          }
-        }}
-        onDragLeave={(e) => {
-          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-            if (dragOverTabId === tab.id) setDragOverTabId(null);
-          }
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setDragOverTabId(null);
-          const draggedId = e.dataTransfer.getData('text/plain');
-          if (draggedId && draggedId !== tab.id && onReorderTabs) {
-            onReorderTabs(draggedId, tab.id);
-          }
-        }}
-        onDragEnd={() => {
-          setDragOverTabId(null);
-          setHoverPos({ top: 0, left: 0 });
-          onTabDragEnd?.();
-        }}
-        initial={false}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
-        transition={{ duration: 0.12, ease: 'easeOut' }}
-        key={tab.id}
-        onClick={() => onSelectTab(tab.id)}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setTabContextMenu({
-            isOpen: true,
-            x: e.clientX,
-            y: e.clientY,
-            tab,
-            tabIndex: tabs.findIndex(t => t.id === tab.id)
-          });
-        }}
-        onMouseEnter={(e) => handleMouseEnter(tab, e)}
-        onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none ${
-          isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
-        } ${
-          isDragOver
-            ? 'ring-2 ring-cyan-500 bg-cyan-500/15 text-slate-900 dark:text-white shadow-md'
-            : isActive
-              ? 'bg-white text-slate-900 shadow-xs font-semibold border border-slate-200/80 dark:bg-white/12 dark:text-white dark:shadow-sm dark:font-medium dark:border-white/10'
-              : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
-        }`}
-      >
-        <div className="flex items-center gap-2.5 flex-1 min-w-0">
-          <div className="w-4 h-4 flex items-center justify-center shrink-0">
-            {tab.isLoading ? (
-              <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
-            ) : tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
-            ) : tab.url === 'nova://settings' ? (
-              <Settings className="w-3.5 h-3.5 opacity-70" />
-            ) : tab.url === 'nova://history' ? (
-              <Clock className="w-3.5 h-3.5 opacity-70" />
-            ) : tab.url === 'nova://downloads' ? (
-              <Download className="w-3.5 h-3.5 opacity-70" />
-            ) : isNewTabUrl ? (
-              <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
-            ) : (
-              <Globe className="w-3.5 h-3.5 opacity-70" />
-            )}
-          </div>
-          <span className="truncate text-[13px] tracking-tight flex-1">
-            {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
-          </span>
-          {tab.isPinned && (
-            <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
-          )}
-        </div>
-
-        <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
-          isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
-        }`}>
-          {tab.isMuted ? (
-            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
-              <VolumeX className="w-3 h-3" />
-            </button>
-          ) : tab.isPlayingAudio ? (
-            <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
-              <Volume2 className="w-3 h-3 animate-pulse" />
-            </button>
-          ) : null}
-          {tab.isSuspended && (
-            <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
-              <Moon className="w-3 h-3" />
-            </span>
-          )}
-          {tabs.length > 1 && !tab.isPinned && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
-              className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      </motion.div>
-    );
-  };
+  const handleOpenContextMenu = useCallback((tab: Tab, e: React.MouseEvent) => {
+    setTabContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      tab,
+      tabIndex: tabs.findIndex(t => t.id === tab.id)
+    });
+  }, [tabs]);
 
   const isCurrentNewTab = !activeTab?.url || activeTab.url === 'nova://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
 
@@ -975,7 +1004,29 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         className="relative"
                       >
                         <div className="flex flex-col gap-0.5 pb-1">
-                          {folderTabs.map(tab => renderTab(tab, true))}
+                          {folderTabs.map(tab => {
+                            if (tab.id === splitTabId && splitTabId && activeTabId) return null;
+                            return (
+                              <SidebarTabItem
+                                key={tab.id}
+                                tab={tab}
+                                isActive={tab.id === activeTabId}
+                                isDragOver={dragOverTabId === tab.id}
+                                isNested={true}
+                                tabsLength={tabs.length}
+                                onSelectTab={onSelectTab}
+                                onCloseTab={onCloseTab}
+                                onToggleMuteTab={onToggleMuteTab}
+                                onTabDragStart={onTabDragStart}
+                                onTabDragEnd={onTabDragEnd}
+                                onReorderTabs={onReorderTabs}
+                                onOpenContextMenu={handleOpenContextMenu}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                                setDragOverTabId={setDragOverTabId}
+                              />
+                            );
+                          })}
                         </div>
                       </motion.div>
                     )}
@@ -985,7 +1036,29 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             })}
 
             {/* Root Tabs */}
-            {tabs.filter(t => !t.folderId).map(tab => renderTab(tab, false))}
+            {tabs.filter(t => !t.folderId).map(tab => {
+              if (tab.id === splitTabId && splitTabId && activeTabId) return null;
+              return (
+                <SidebarTabItem
+                  key={tab.id}
+                  tab={tab}
+                  isActive={tab.id === activeTabId}
+                  isDragOver={dragOverTabId === tab.id}
+                  isNested={false}
+                  tabsLength={tabs.length}
+                  onSelectTab={onSelectTab}
+                  onCloseTab={onCloseTab}
+                  onToggleMuteTab={onToggleMuteTab}
+                  onTabDragStart={onTabDragStart}
+                  onTabDragEnd={onTabDragEnd}
+                  onReorderTabs={onReorderTabs}
+                  onOpenContextMenu={handleOpenContextMenu}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                  setDragOverTabId={setDragOverTabId}
+                />
+              );
+            })}
           </AnimatePresence>
         </div>
 

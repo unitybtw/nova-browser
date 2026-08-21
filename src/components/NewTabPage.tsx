@@ -88,7 +88,7 @@ const itemVariants: any = {
   }
 };
 
-export const NewTabPage: React.FC<NewTabPageProps> = ({ 
+export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({ 
   onNavigate,
   searchEngine = 'google',
   privacyShield = true,
@@ -1026,4 +1026,4 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
 
     </motion.div>
   );
-};
+});

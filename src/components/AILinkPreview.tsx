@@ -80,16 +80,13 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
 
         if (isCancelled) return;
 
-        // 4. Summarize with WebLLM
+        // 4. Summarize with WebLLM (only if AI model is already loaded)
         if (!aiAgent.isReady()) {
-          setLoadingText("Initializing AI model...");
-          await aiAgent.init((progress, _text) => {
-            if (progress < 100) {
-              setLoadingText(`Loading AI: ${Math.round(progress)}%`);
-            } else {
-              setLoadingText("AI model ready! Generating summary...");
-            }
-          });
+          // If model is not loaded yet, show the page text snippet instead of triggering a massive model download
+          const snippet = contentToSummarize.substring(0, 200) + '...';
+          setIsSummarizing(false);
+          setSummary(snippet);
+          return;
         }
         
         if (isCancelled) return;

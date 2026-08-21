@@ -43,7 +43,7 @@ const PasswordList = () => {
   return (
     <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
       {passwords.map((p, i) => (
-        <div key={i} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+        <div key={`${p.hostname}-${p.username}-${i}`} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
           <div className="flex items-center gap-4 flex-1">
             <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center flex-shrink-0">
               <img src={`https://www.google.com/s2/favicons?domain=${p.hostname}&sz=32`} className="w-5 h-5" alt="" />

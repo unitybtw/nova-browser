@@ -82,29 +82,29 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
     };
   }, [menuState.isOpen, onClose]);
 
-  if (!menuState.isOpen || !menuState.tab) return null;
-
-  const { tab, tabIndex, x, y } = menuState;
+  const tab = menuState.tab;
+  const tabIndex = menuState.tabIndex;
   const isRightmost = tabIndex >= totalTabs - 1;
   const hasOtherTabs = totalTabs > 1;
 
   // Adjust menu position to avoid overflowing viewport edges
   const menuWidth = 230;
   const menuHeight = 360;
-  const adjustedX = Math.min(x, window.innerWidth - menuWidth - 10);
-  const adjustedY = Math.min(y, window.innerHeight - menuHeight - 10);
+  const adjustedX = Math.min(menuState.x, window.innerWidth - menuWidth - 10);
+  const adjustedY = Math.min(menuState.y, window.innerHeight - menuHeight - 10);
 
   return (
     <AnimatePresence>
-      <motion.div
-        ref={menuRef}
-        initial={{ opacity: 0, scale: 0.95, y: -4 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.95 }}
-        transition={{ duration: 0.12, ease: 'easeOut' }}
-        style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-        className="fixed z-[99999] w-58 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium"
-      >
+      {menuState.isOpen && tab && (
+        <motion.div
+          ref={menuRef}
+          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
+          style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
+          className="fixed z-[99999] w-58 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium"
+        >
         {/* New Tab to Right */}
         <button
           onClick={() => { onNewTabRight(tabIndex); onClose(); }}
@@ -245,7 +245,8 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
             </button>
           </>
         )}
-      </motion.div>
+        </motion.div>
+      )}
     </AnimatePresence>
   );
 };

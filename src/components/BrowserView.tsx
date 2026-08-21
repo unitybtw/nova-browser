@@ -14,6 +14,8 @@ const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ defa
 const HistoryPage = React.lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
 const DownloadsPage = React.lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
 
+const NOOP = () => {};
+
 interface BrowserViewProps {
   tab?: Tab | null;
   isActive: boolean;
@@ -660,7 +662,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         <SettingsPage
           url={tab.url}
           settings={settings}
-          onUpdateSettings={onUpdateSettings || (() => {})}
+          onUpdateSettings={onUpdateSettings || NOOP}
           onExportData={onExportData}
           onImportData={onImportData}
         />
@@ -677,8 +679,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             onUpdateTab(tab.id, { url, isLoading: true });
             if (onNavigate) onNavigate(url);
           }}
-          onClearHistory={onClearHistory || (() => {})}
-          onRemoveHistoryItem={onRemoveHistoryItem || (() => {})}
+          onClearHistory={onClearHistory || NOOP}
+          onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
         />
       </React.Suspense>
     );
@@ -689,7 +691,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading Downloads...</div>}>
         <DownloadsPage
           downloads={downloads}
-          onClearDownloads={onClearDownloads || (() => {})}
+          onClearDownloads={onClearDownloads || NOOP}
         />
       </React.Suspense>
     );
