@@ -3,6 +3,8 @@ import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Stats } from './components/Stats';
 import { Features } from './components/Features';
+import { ThemeStudio } from './components/ThemeStudio';
+import { SyncShowcase } from './components/SyncShowcase';
 
 const FeatureShowcase = lazy(() => import('./components/FeatureShowcase').then(m => ({ default: m.FeatureShowcase })));
 const Comparison = lazy(() => import('./components/Comparison').then(m => ({ default: m.Comparison })));
@@ -22,16 +24,22 @@ function App() {
       <Navbar />
 
       <main>
-        {/* 1. Hero — first impression */}
+        {/* 1. Hero — First impression with multi-view screenshot switcher & sandbox */}
         <Hero />
 
-        {/* 2. Stats — social proof numbers */}
+        {/* 2. Stats — Community & Open Source proof numbers */}
         <Stats />
 
-        {/* 3. Feature grid — quick overview */}
+        {/* 3. Features — Bento Grid Architecture */}
         <Features />
 
-        {/* 4+ Below-the-fold sections, lazy-loaded */}
+        {/* 4. Theme & Customization Studio — Interactive theme & accent customizer */}
+        <ThemeStudio />
+
+        {/* 5. Zero-Knowledge Cloud Sync — Interactive pairing chain showcase */}
+        <SyncShowcase />
+
+        {/* 6+ Deep Dive Feature Showcase & Comparison, lazy-loaded */}
         <Suspense fallback={null}>
           <FeatureShowcase />
           <Comparison />
