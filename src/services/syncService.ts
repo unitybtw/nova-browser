@@ -152,22 +152,41 @@ class NovaSyncService {
       const supabase = getSupabaseClient();
       this.unsubscribeFromRealtime();
 
-      this.realtimeChannel = supabase
-        .channel(`sync-vault:${this.currentUser.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'nova_sync_vaults',
-            filter: `user_id=eq.${this.currentUser.id}`
-          },
-          () => {
-            console.log('[NovaSync] Remote sync change received via Realtime WebSocket');
-            this.remoteSyncListeners.forEach(fn => fn());
-          }
-        )
-        .subscribe();
+      if (this.currentUser.syncCode) {
+        this.realtimeChannel = supabase
+          .channel(`sync-chain:${this.currentUser.syncCode}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'nova_sync_chains',
+              filter: `sync_code=eq.${this.currentUser.syncCode}`
+            },
+            () => {
+              console.log('[NovaSync] Remote sync chain change received via Realtime');
+              this.remoteSyncListeners.forEach(fn => fn());
+            }
+          )
+          .subscribe();
+      } else {
+        this.realtimeChannel = supabase
+          .channel(`sync-vault:${this.currentUser.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'nova_sync_vaults',
+              filter: `user_id=eq.${this.currentUser.id}`
+            },
+            () => {
+              console.log('[NovaSync] Remote sync change received via Realtime WebSocket');
+              this.remoteSyncListeners.forEach(fn => fn());
+            }
+          )
+          .subscribe();
+      }
     } catch (e) {
       console.warn('[NovaSync] Realtime subscribe failed:', e);
     }
@@ -290,13 +309,27 @@ class NovaSyncService {
       workspaces: localData.workspaces
     };
 
-    // Save to sync chains registry
+    // 1. Push to Supabase Cloud if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.from('nova_sync_chains').upsert({
+          sync_code: syncCode,
+          payload,
+          updated_at: new Date().toISOString()
+        });
+      } catch (err) {
+        console.warn('[NovaSync] Supabase sync chain upsert failed:', err);
+      }
+    }
+
+    // 2. Save to local sync chains registry
     const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
     const chains: Record<string, { payload: SyncDataBundle; createdAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
     chains[syncCode] = { payload, createdAt: Date.now() };
     localStorage.setItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY, JSON.stringify(chains));
 
-    // Also link to current user
+    // Also link to current user session
     if (!this.currentUser) {
       const pairedUser: NovaUser = {
         id: syncCode,
@@ -311,8 +344,10 @@ class NovaSyncService {
       this.token = 'nvt_chain_' + syncCode;
       this.masterKey = syncSecret;
       sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, syncSecret);
+      localStorage.setItem(STORAGE_KEYS.MASTER_KEY, syncSecret);
       localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(pairedUser));
       localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+      this.subscribeToRealtime();
       this.notify();
     }
 
@@ -328,16 +363,45 @@ class NovaSyncService {
       throw new Error('Invalid Nova Sync Code format (should look like nova-xxxx-xxxx-xxxx-xxxx)');
     }
 
-    const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
-    const chains: Record<string, { payload: SyncDataBundle; createdAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+    let remotePayload: SyncDataBundle | null = null;
+    let recordCreatedAt = Date.now();
 
-    const record = chains[cleanCode];
-    if (!record || !record.payload) {
+    // 1. Check Supabase Cloud first
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseClient();
+        const { data, error } = await supabase
+          .from('nova_sync_chains')
+          .select('*')
+          .eq('sync_code', cleanCode)
+          .maybeSingle();
+
+        if (!error && data && data.payload) {
+          remotePayload = data.payload;
+          if (data.created_at) recordCreatedAt = new Date(data.created_at).getTime();
+        }
+      } catch (err) {
+        console.warn('[NovaSync] Supabase sync chain fetch failed:', err);
+      }
+    }
+
+    // 2. Fallback to local registry
+    if (!remotePayload) {
+      const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
+      const chains: Record<string, { payload: SyncDataBundle; createdAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+      const record = chains[cleanCode];
+      if (record && record.payload) {
+        remotePayload = record.payload;
+        recordCreatedAt = record.createdAt;
+      }
+    }
+
+    if (!remotePayload) {
       throw new Error('Sync code not found or expired. Please generate a fresh code on your other device.');
     }
 
     const syncSecret = cleanCode.replace(/-/g, '');
-    const remoteBundle = record.payload;
+    const remoteBundle = remotePayload;
 
     // Decrypt passwords if present
     let decryptedPasswords: any[] = [];
@@ -358,7 +422,7 @@ class NovaSyncService {
       id: cleanCode,
       email: `${cleanCode}@sync.nova`,
       displayName: 'Synced Device',
-      createdAt: record.createdAt,
+      createdAt: recordCreatedAt,
       lastLoginAt: Date.now(),
       syncPreferences: { ...DEFAULT_PREFERENCES },
       syncCode: cleanCode
@@ -368,11 +432,13 @@ class NovaSyncService {
     this.token = 'nvt_chain_' + cleanCode;
     this.masterKey = syncSecret;
     sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, syncSecret);
+    localStorage.setItem(STORAGE_KEYS.MASTER_KEY, syncSecret);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(joinedUser));
     localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
     this.lastSyncedAt = Date.now();
     localStorage.setItem(STORAGE_KEYS.SYNC_STATUS, JSON.stringify({ lastSyncedAt: this.lastSyncedAt }));
 
+    this.subscribeToRealtime();
     this.notify();
     return {
       ...remoteBundle,
