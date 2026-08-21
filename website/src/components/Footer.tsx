@@ -18,15 +18,15 @@ export const Footer: React.FC = () => {
             </div>
             <div>
               <span className="text-sm font-bold text-white font-mono">NOVA BROWSER</span>
-              <p className="text-xs text-slate-500">Açık Kaynak & Yapay Zeka Yerel Masaüstü Tarayıcısı</p>
+              <p className="text-xs text-slate-500">Open-Source & AI-Native Desktop Web Browser</p>
             </div>
           </div>
           
           <div className="flex items-center gap-6 text-xs font-medium text-slate-400">
-            <a href="#ai-agent" className="hover:text-white transition-colors">Otonom AI</a>
-            <a href="#performance" className="hover:text-white transition-colors">Performans</a>
-            <a href="#security" className="hover:text-white transition-colors">Gizlilik</a>
-            <a href="#features" className="hover:text-white transition-colors">Özellikler</a>
+            <a href="#ai-agent" className="hover:text-white transition-colors">AI Agent</a>
+            <a href="#performance" className="hover:text-white transition-colors">Performance</a>
+            <a href="#security" className="hover:text-white transition-colors">Privacy</a>
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a
               href="https://github.com/unitybtw/nova-browser"
               target="_blank"

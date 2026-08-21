@@ -29,15 +29,15 @@ export const CTA: React.FC = () => {
           <div className="relative z-10 max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-cyan-400 mb-6">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>ÜCRETSİZ & AÇIK KAYNAK</span>
+              <span>FREE & OPEN SOURCE</span>
             </div>
 
             <h2 className="text-3xl sm:text-5xl font-extrabold text-white mb-4 leading-tight">
-              Geleceğin Tarayıcısını Şimdi Deneyimleyin.
+              Experience the Future of Web Browsing.
             </h2>
 
             <p className="text-base sm:text-lg text-slate-400 mb-10 max-w-xl mx-auto leading-relaxed">
-              Hesap veya kredi kartı gerekmez. macOS ve Windows için hemen indirin ve otonom yapay zeka hızına geçin.
+              No accounts or credit cards required. Download for macOS or Windows and experience autonomous AI-native browsing today.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3.5 w-full">
@@ -47,7 +47,7 @@ export const CTA: React.FC = () => {
                   className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Monitor className="w-4 h-4" />
-                  <span>Windows İçin İndir (.exe)</span>
+                  <span>Download for Windows (.exe)</span>
                 </a>
               ) : (
                 <a
@@ -55,7 +55,7 @@ export const CTA: React.FC = () => {
                   className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Apple className="w-4 h-4" />
-                  <span>macOS İçin İndir (.dmg)</span>
+                  <span>Download for macOS (.dmg)</span>
                 </a>
               )}
 
@@ -66,7 +66,7 @@ export const CTA: React.FC = () => {
                 className="w-full sm:w-auto card-glass hover:bg-white/10 text-white px-8 py-3.5 rounded-xl font-semibold text-sm transition-all border border-white/10 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <GithubIcon className="w-4 h-4" />
-                <span>GitHub'da İncele</span>
+                <span>Star on GitHub</span>
               </a>
             </div>
           </div>

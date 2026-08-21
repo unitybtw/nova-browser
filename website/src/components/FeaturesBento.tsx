@@ -7,33 +7,33 @@ export const FeaturesBento: React.FC = () => {
     {
       span: 'lg:col-span-8',
       icon: <Puzzle className="w-6 h-6 text-purple-400" />,
-      tag: 'Eklenti Ekosistemi',
-      title: 'Chrome Web Store Doğrudan Yükleme',
-      desc: 'chromewebstore.google.com sayfalarını gezerken tek tıkla doğrudan CRX3 eklentilerini tarayıcınıza yükleyin.',
+      tag: 'Ecosystem Parity',
+      title: 'Direct Chrome Web Store Installation',
+      desc: 'Browse chromewebstore.google.com and install CRX3 extensions directly with full manifest compatibility.',
       badge: 'CRX3 Direct',
     },
     {
       span: 'lg:col-span-4',
       icon: <SplitSquareVertical className="w-6 h-6 text-amber-400" />,
-      tag: 'Çoklu Görev',
-      title: 'İkili Bölünmüş Ekran (Split View)',
-      desc: 'İki web sayfasını yan yana çalıştırın; bağımsız zoom ve kaydırma ile üretkenliği ikiye katlayın.',
+      tag: 'Multi-Tasking',
+      title: 'Dual-View Split Screen',
+      desc: 'Run two interactive browser windows side-by-side with independent scroll locks and zoom controls.',
       badge: 'Dual Pane',
     },
     {
       span: 'lg:col-span-4',
       icon: <FolderTree className="w-6 h-6 text-cyan-400" />,
-      tag: 'Sekme Yönetimi',
-      title: 'Sınırsız Çalışma Alanları (Workspaces)',
-      desc: 'Kişisel, iş ve araştırma sekmelerinizi izole çalışma alanlarına ve renkli klasörlere ayırın.',
+      tag: 'Spatial Tabs',
+      title: 'Isolated Workspaces & Nested Folders',
+      desc: 'Separate personal, engineering, and research tabs into dedicated workspaces with color-coded folders.',
       badge: 'Workspaces',
     },
     {
       span: 'lg:col-span-8',
       icon: <Volume2 className="w-6 h-6 text-emerald-400" />,
-      tag: 'Okuma Stüdyosu',
-      title: 'Dikkatsiz Okuyucu Modu & İşletim Sistemi Ses Sentezi',
-      desc: 'Mozilla Readability ile temizlenmiş metinleri yerel işletim sistemi yapay zeka sesiyle dinleyin.',
+      tag: 'Reader Studio',
+      title: 'Distraction-Free Reader & Native Audio Synthesis',
+      desc: 'Mozilla Readability text extraction paired with high-fidelity native OS text-to-speech audio narration.',
       badge: 'Native TTS',
     },
   ];
@@ -51,7 +51,7 @@ export const FeaturesBento: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full card-glass text-xs font-mono text-cyan-400 mb-4 border border-cyan-500/20"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>GELİŞMİŞ ÖZELLİKLER</span>
+            <span>CORE CAPABILITIES</span>
           </motion.div>
 
           <motion.h2
@@ -61,9 +61,9 @@ export const FeaturesBento: React.FC = () => {
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4"
           >
-            Üretkenliğinizi <br />
+            Maximize Your <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-purple-400">
-              Maksimuma Çıkarın
+              Daily Browsing Productivity
             </span>
           </motion.h2>
 
@@ -74,7 +74,7 @@ export const FeaturesBento: React.FC = () => {
             transition={{ delay: 0.2 }}
             className="text-base sm:text-lg text-slate-400 leading-relaxed"
           >
-            Günlük web deneyiminizi hızlandıran ve kolaylaştıran modern araçlar.
+            Next-generation productivity features built directly into the browser core.
           </motion.p>
         </div>
 

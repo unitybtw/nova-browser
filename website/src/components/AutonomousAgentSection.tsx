@@ -6,26 +6,26 @@ export const AutonomousAgentSection: React.FC = () => {
   const steps = [
     {
       num: '01',
-      title: 'Doğal Dil Komutu',
-      desc: '"GitHub depomdaki son PR\'ları incele ve özet çıkar" gibi herhangi bir komut verin.',
+      title: 'Natural Language Prompt',
+      desc: 'Give any web instruction: "Scan recent pull requests in my repository and compile a summary."',
       icon: <Sparkles className="w-5 h-5 text-cyan-400" />
     },
     {
       num: '02',
-      title: 'Canlı DOM & Sayfa Analizi',
-      desc: 'Nova, web sayfasının erişilebilirlik ağacını ve interaktif butonlarını anında haritalandırır.',
+      title: 'Realtime DOM & Tree Mapping',
+      desc: 'Nova maps interactive DOM nodes, buttons, forms, and accessibility trees instantly.',
       icon: <Code2 className="w-5 h-5 text-purple-400" />
     },
     {
       num: '03',
-      title: 'Görsel İmleç & Otonom Tıklama',
-      desc: 'Ekranda parlayan yapay zeka imleci butonlara tıklar, formları doldurur ve sayfaları gezer.',
+      title: 'Visual Cursor Navigation',
+      desc: 'The glowing virtual agent cursor clicks buttons, fills out forms, and scrolls pages autonomously.',
       icon: <MousePointer className="w-5 h-5 text-emerald-400" />
     },
     {
       num: '04',
-      title: 'Sıfır Bulut Bağımlılığı',
-      desc: 'WebGPU ile tamamen cihazınızda yerel Web-LLM çalışır ya da Claude/OpenAI bağlanabilir.',
+      title: 'Zero Cloud Dependency',
+      desc: 'Runs locally on WebGPU via Web-LLM or connects directly to Claude / OpenAI with your own key.',
       icon: <Cpu className="w-5 h-5 text-amber-400" />
     },
   ];
@@ -53,9 +53,9 @@ export const AutonomousAgentSection: React.FC = () => {
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4"
           >
-            Web'de Sizin İçin Gezinen <br />
+            An Autonomous Agent <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-primary to-purple-400">
-              Otonom AI Ajanı
+              That Actually Navigates the Web
             </span>
           </motion.h2>
 
@@ -66,7 +66,7 @@ export const AutonomousAgentSection: React.FC = () => {
             transition={{ delay: 0.2 }}
             className="text-base sm:text-lg text-slate-400 leading-relaxed"
           >
-            Nova sadece metin özetlemez; ekrandaki butonları tıklayan, araştırmaları derleyen ve karmaşık çok adımlı görevleri tamamlayan yerleşik bir yapay zeka ajanına sahiptir.
+            Nova doesn't just summarize text — it physically interacts with web pages, clicks buttons, extracts data, and completes multi-step workflows autonomously.
           </motion.p>
         </div>
 
@@ -118,20 +118,20 @@ export const AutonomousAgentSection: React.FC = () => {
           <div className="space-y-3 text-slate-300">
             <div className="flex items-start gap-2">
               <span className="text-cyan-400 shrink-0">$</span>
-              <span className="text-white font-semibold">nova agent --goal "Research latest AI models and compile findings"</span>
+              <span className="text-white font-semibold">nova agent --goal "Research latest AI benchmark papers on arXiv and summarize findings"</span>
             </div>
             <div className="text-slate-400 pl-4 border-l-2 border-white/10 space-y-1.5 text-[11px]">
               <p className="text-purple-300 flex items-center gap-1.5">
-                <Terminal className="w-3 h-3" /> [MCP:browser_navigate] Opening target documentation page
+                <Terminal className="w-3 h-3" /> [MCP:browser_navigate] Navigating to https://arxiv.org/list/cs.AI/recent
               </p>
               <p className="text-cyan-300 flex items-center gap-1.5">
-                <Code2 className="w-3 h-3" /> [MCP:dom_query] Scanning interactive elements & text hierarchy
+                <Code2 className="w-3 h-3" /> [MCP:dom_query] Scanning interactive elements & paper nodes
               </p>
               <p className="text-emerald-300 flex items-center gap-1.5">
-                <MousePointer className="w-3 h-3" /> [MCP:cursor_click] Filtered benchmarks and summarized table
+                <MousePointer className="w-3 h-3" /> [MCP:cursor_click] Filtered top benchmarks and compiled results
               </p>
               <p className="text-amber-300 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> [SUCCESS] Analysis completed in 2.8s
+                <CheckCircle2 className="w-3 h-3 text-emerald-400" /> [SUCCESS] Task completed in 2.8s
               </p>
             </div>
           </div>

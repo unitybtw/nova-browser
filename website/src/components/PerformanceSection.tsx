@@ -5,7 +5,7 @@ import { Cpu, Zap, BatteryCharging, Gauge } from 'lucide-react';
 export const PerformanceSection: React.FC = () => {
   const benchmarks = [
     {
-      metric: 'Bellek Kullanımı (20 Sekme)',
+      metric: 'Memory Footprint (20 Open Tabs)',
       nova: '310 MB',
       novaPercent: 25,
       chrome: '1,180 MB',
@@ -14,19 +14,19 @@ export const PerformanceSection: React.FC = () => {
       arcPercent: 100,
       brave: '620 MB',
       bravePercent: 50,
-      note: 'Rust tab suspension ve hafif WebGPU motoru sayesinde %70 daha az RAM.',
+      note: '70% less RAM through aggressive background tab suspension and lightweight WebGPU engine.',
     },
     {
-      metric: 'İlk Sayfa Yükleme Hızı',
-      nova: '0.42 sn',
+      metric: 'First Contentful Paint (Cold Load)',
+      nova: '0.42s',
       novaPercent: 20,
-      chrome: '0.88 sn',
+      chrome: '0.88s',
       chromePercent: 70,
-      arc: '1.15 sn',
+      arc: '1.15s',
       arcPercent: 95,
-      brave: '0.65 sn',
+      brave: '0.65s',
       bravePercent: 55,
-      note: 'Dahili native Cliqz/AdBlocker filtre motoru ile gecikmesiz ağ istekleri.',
+      note: 'Native Cliqz/AdBlocker engine strips tracking overhead before network dispatch.',
     },
   ];
 
@@ -43,7 +43,7 @@ export const PerformanceSection: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full card-glass text-xs font-mono text-purple-400 mb-4 border border-purple-500/20"
           >
             <Gauge className="w-3.5 h-3.5" />
-            <span>BENCHMARK VE VERİMLİLİK</span>
+            <span>BENCHMARKS & EFFICIENCY</span>
           </motion.div>
 
           <motion.h2
@@ -53,20 +53,19 @@ export const PerformanceSection: React.FC = () => {
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4"
           >
-            Hafif, Sessiz ve <br />
+            Lightweight, Quiet, and <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-white to-cyan-400">
-              Yıldırım Hızında
+              Lightning Fast
             </span>
           </motion.h2>
 
           <motion.p
             initial={{ opacity: 0, y: 15 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
             transition={{ delay: 0.2 }}
             className="text-base sm:text-lg text-slate-400 leading-relaxed"
           >
-            Gereksiz arka plan servisleri ve izleyiciler olmadan çalışan Nova, bilgisayarınızın kaynaklarını tüketmez.
+            Built without bloated telemetry services, Nova runs with near-zero CPU and memory overhead.
           </motion.p>
         </div>
 
@@ -77,8 +76,8 @@ export const PerformanceSection: React.FC = () => {
               <Cpu className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">-%70</span>
-              <p className="text-xs text-slate-400">Daha Az RAM Tüketimi</p>
+              <span className="text-2xl font-bold text-white font-mono">-70%</span>
+              <p className="text-xs text-slate-400">Lower RAM Consumption</p>
             </div>
           </div>
 
@@ -88,7 +87,7 @@ export const PerformanceSection: React.FC = () => {
             </div>
             <div>
               <span className="text-2xl font-bold text-white font-mono">2.4x</span>
-              <p className="text-xs text-slate-400">Daha Hızlı DOM Yüklemesi</p>
+              <p className="text-xs text-slate-400">Faster Page Rendering</p>
             </div>
           </div>
 
@@ -97,15 +96,15 @@ export const PerformanceSection: React.FC = () => {
               <BatteryCharging className="w-6 h-6" />
             </div>
             <div>
-              <span className="text-2xl font-bold text-white font-mono">+3.5 Saat</span>
-              <p className="text-xs text-slate-400">Daha Fazla Pil Ömrü</p>
+              <span className="text-2xl font-bold text-white font-mono">+3.5 hrs</span>
+              <p className="text-xs text-slate-400">Extended Battery Life</p>
             </div>
           </div>
         </div>
 
         {/* Visual Benchmark Comparison Bars */}
         <div className="max-w-4xl mx-auto card-glass rounded-3xl p-6 sm:p-8 border border-white/10">
-          <h3 className="text-base font-bold text-white mb-6">Tarayıcı Karşılaştırma Grafikleri</h3>
+          <h3 className="text-base font-bold text-white mb-6">Real-World Browser Benchmarks</h3>
 
           <div className="space-y-8">
             {benchmarks.map((b, idx) => (

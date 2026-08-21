@@ -52,23 +52,23 @@ export const Navbar: React.FC = () => {
             </div>
           </a>
 
-          {/* Nav Links */}
+          {/* Nav Links in English */}
           <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-300">
             <a href="#ai-agent" className="hover:text-white transition-colors flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Otonom AI</span>
+              <span>AI Agent</span>
             </a>
             <a href="#performance" className="hover:text-white transition-colors flex items-center gap-1.5">
               <Cpu className="w-3.5 h-3.5 text-purple-400" />
-              <span>Performans</span>
+              <span>Performance</span>
             </a>
             <a href="#security" className="hover:text-white transition-colors flex items-center gap-1.5">
               <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Gizlilik</span>
+              <span>Privacy</span>
             </a>
             <a href="#features" className="hover:text-white transition-colors flex items-center gap-1.5">
               <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>Özellikler</span>
+              <span>Features</span>
             </a>
             <a
               href="https://github.com/unitybtw/nova-browser"
@@ -89,7 +89,7 @@ export const Navbar: React.FC = () => {
                 className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] flex items-center gap-1.5 cursor-pointer"
               >
                 <Monitor className="w-3.5 h-3.5" />
-                <span>Windows İndir (.exe)</span>
+                <span>Download for Windows (.exe)</span>
               </a>
             ) : (
               <a
@@ -97,7 +97,7 @@ export const Navbar: React.FC = () => {
                 className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] flex items-center gap-1.5 cursor-pointer"
               >
                 <Apple className="w-3.5 h-3.5" />
-                <span>macOS İndir (.dmg)</span>
+                <span>Download for macOS (.dmg)</span>
               </a>
             )}
           </div>
@@ -124,19 +124,19 @@ export const Navbar: React.FC = () => {
             className="md:hidden mx-4 mt-2 p-4 rounded-2xl bg-[#090b10] border border-white/10 shadow-2xl flex flex-col gap-3"
           >
             <a href="#ai-agent" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              🤖 Otonom AI Ajanı
+              🤖 Autonomous AI Agent
             </a>
             <a href="#performance" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              ⚡ Performans Karşılaştırması
+              ⚡ Performance Benchmarks
             </a>
             <a href="#security" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              🔒 Gizlilik & E2EE Eşleme
+              🔒 Privacy & E2EE Sync
             </a>
             <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              ✨ Tüm Özellikler
+              ✨ All Features
             </a>
             <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="text-sm font-semibold text-slate-300 py-1.5">
-              GitHub Repo
+              GitHub Repository
             </a>
             <div className="border-t border-white/10 pt-3 mt-1">
               <a
@@ -144,7 +144,7 @@ export const Navbar: React.FC = () => {
                 className="w-full bg-white text-black py-2.5 rounded-xl text-center font-bold text-xs flex items-center justify-center gap-2"
               >
                 <Apple className="w-4 h-4" />
-                <span>Nova Browser İndir</span>
+                <span>Download Nova Browser</span>
               </a>
             </div>
           </motion.div>

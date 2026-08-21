@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Apple, Monitor, ChevronRight } from 'lucide-react';
-import { InteractiveBrowserFrame } from './InteractiveBrowserFrame';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Apple, Monitor, ChevronRight, Bot, LayoutDashboard, Lock } from 'lucide-react';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -12,6 +11,7 @@ const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 export const Hero: React.FC = () => {
   const [os, setOs] = useState<'mac' | 'win'>('mac');
+  const [activeTab, setActiveTab] = useState<'ai' | 'newtab' | 'sync'>('ai');
 
   useEffect(() => {
     const ua = window.navigator.userAgent.toLowerCase();
@@ -35,7 +35,7 @@ export const Hero: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span className="font-bold">NOVA BROWSER 1.0</span>
             <span className="text-white/20">|</span>
-            <span className="text-slate-300">Açık Kaynak & Otonom AI Tarayıcısı</span>
+            <span className="text-slate-300">Open-Source & AI-Native Browser</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           </motion.div>
 
@@ -46,9 +46,9 @@ export const Hero: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.08 }}
             className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-[1.1]"
           >
-            Hız için inşa edildi. <br />
+            Built for speed. <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-slate-400">
-              Yapay zeka ile güçlendirildi.
+              Powered by intelligence.
             </span>
           </motion.h1>
 
@@ -58,7 +58,7 @@ export const Hero: React.FC = () => {
             transition={{ duration: 0.4, delay: 0.16 }}
             className="text-base sm:text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed"
           >
-            Otonom MCP AI ajanları, sıfır-bilgi E2EE cihaz eşleme ve sıfır telemetri kalkanına sahip yeni nesil masaüstü web tarayıcısı.
+            An AI-native desktop browser with autonomous Model Context Protocol (MCP) agents, zero-knowledge encrypted device pairing, and zero telemetry.
           </motion.p>
 
           {/* Download CTAs */}
@@ -66,7 +66,7 @@ export const Hero: React.FC = () => {
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.24 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md sm:max-w-none mx-auto mb-16"
+            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md sm:max-w-none mx-auto mb-14"
           >
             {os === 'win' ? (
               <a
@@ -74,7 +74,7 @@ export const Hero: React.FC = () => {
                 className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Monitor className="w-4 h-4" />
-                <span>Windows İçin İndir (64-bit .exe)</span>
+                <span>Download for Windows (.exe)</span>
               </a>
             ) : (
               <a
@@ -82,7 +82,7 @@ export const Hero: React.FC = () => {
                 className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Apple className="w-4 h-4" />
-                <span>macOS İçin İndir (Apple Silicon .dmg)</span>
+                <span>Download for macOS (.dmg)</span>
               </a>
             )}
 
@@ -93,18 +93,101 @@ export const Hero: React.FC = () => {
               className="w-full sm:w-auto card-glass text-slate-200 hover:text-white px-7 py-3.5 rounded-xl font-semibold text-sm transition-all border border-white/10 hover:border-white/20 flex items-center justify-center gap-2 cursor-pointer"
             >
               <GithubIcon className="w-4 h-4" />
-              <span>GitHub'da İncele</span>
+              <span>Star on GitHub</span>
             </a>
           </motion.div>
         </div>
 
-        {/* Authentic Live Interactive Browser Frame */}
+        {/* Real High-Resolution Browser Screenshot Showcase */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
+          className="max-w-6xl mx-auto"
         >
-          <InteractiveBrowserFrame />
+          {/* Switcher Navigation Tabs */}
+          <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
+            <button
+              onClick={() => setActiveTab('ai')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'ai'
+                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
+                  : 'card-glass text-slate-400 hover:text-white'
+              }`}
+            >
+              <Bot className="w-4 h-4 text-cyan-500" />
+              <span>Autonomous AI & MCP Sidepanel</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('newtab')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'newtab'
+                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
+                  : 'card-glass text-slate-400 hover:text-white'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 text-purple-400" />
+              <span>Start Page & Speed Dials</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('sync')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                activeTab === 'sync'
+                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
+                  : 'card-glass text-slate-400 hover:text-white'
+              }`}
+            >
+              <Lock className="w-4 h-4 text-emerald-400" />
+              <span>Zero-Knowledge 1-Click Sync</span>
+            </button>
+          </div>
+
+          {/* Genuine Screenshot Container */}
+          <div className="rounded-2xl p-1.5 sm:p-2 bg-gradient-to-b from-white/15 via-white/5 to-transparent border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.8)] overflow-hidden">
+            <div className="relative w-full rounded-xl overflow-hidden bg-black aspect-[16/10] flex items-center justify-center">
+              <AnimatePresence mode="wait">
+                {activeTab === 'ai' && (
+                  <motion.img
+                    key="ai-preview"
+                    src="/assets/preview.png"
+                    alt="Nova Browser Autonomous AI Agent and MCP Sidepanel"
+                    initial={{ opacity: 0, scale: 0.99 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+                {activeTab === 'newtab' && (
+                  <motion.img
+                    key="newtab-preview"
+                    src="/assets/newtab.png"
+                    alt="Nova Browser Clean Start Page and Speed Dials"
+                    initial={{ opacity: 0, scale: 0.99 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+                {activeTab === 'sync' && (
+                  <motion.img
+                    key="sync-preview"
+                    src="/assets/sync.png"
+                    alt="Nova Browser Zero-Knowledge Device Pairing Code"
+                    initial={{ opacity: 0, scale: 0.99 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="w-full h-full object-contain"
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
         </motion.div>
 
       </div>

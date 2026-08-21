@@ -6,27 +6,27 @@ export const SecuritySection: React.FC = () => {
   const securityPillars = [
     {
       icon: <Lock className="w-6 h-6 text-emerald-400" />,
-      title: 'Sıfır-Bilgi Cihaz Eşleme',
-      desc: 'Parola ve e-posta olmadan çalışan 1-Tık Eşleme kodunuz, cihazınızda AES-256-GCM ile şifrelenen anahtarın kendisidir.',
+      title: 'Zero-Knowledge Device Pairing',
+      desc: 'Your 1-Click pairing code is the AES-256-GCM encryption key. No email, password, or third-party login required.',
       badge: 'E2EE AES-256',
     },
     {
       icon: <EyeOff className="w-6 h-6 text-cyan-400" />,
-      title: '0 Telemetri & Sıfır İzleme',
-      desc: 'Gezindiğiniz sayfalar, aramalarınız veya sekme başlıklarınız asla hiçbir sunucuya gönderilmez ve kaydedilmez.',
-      badge: '0 Veri Toplama',
+      title: '0 Telemetry & No Tracking',
+      desc: 'Your visited URLs, search queries, and tab titles are never logged, tracked, or sent to central servers.',
+      badge: '0 Data Collected',
     },
     {
       icon: <ShieldCheck className="w-6 h-6 text-rose-400" />,
-      title: 'Donanım Destekli Reklam Kalkanı',
-      desc: 'Zararlı scriptleri, parmak izi (fingerprinting) izleyicilerini ve crypto madencilerini ağ seviyesinde engeller.',
+      title: 'Hardware-Accelerated Shield',
+      desc: 'Blocks intrusive ads, cross-site tracking beacons, and cryptocurrency miners at the native network layer.',
       badge: 'AdBlock Shield',
     },
     {
       icon: <ServerOff className="w-6 h-6 text-purple-400" />,
-      title: 'Tamamen Açık Kaynak',
-      desc: 'Tüm Electron ve React kod tabanı GitHub üzerinde kamuya açıktır. Güvenlik açıkları şeffaf şekilde denetlenir.',
-      badge: 'MIT Lisansı',
+      title: '100% Open-Source Codebase',
+      desc: 'The entire Electron main process, preload scripts, and React frontend are publicly auditable on GitHub.',
+      badge: 'MIT License',
     },
   ];
 
@@ -43,7 +43,7 @@ export const SecuritySection: React.FC = () => {
             className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full card-glass text-xs font-mono text-emerald-400 mb-4 border border-emerald-500/20"
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>GİZLİLİK VE ŞİFRELEME MİMARİSİ</span>
+            <span>CRYPTOGRAPHIC PRIVACY ARCHITECTURE</span>
           </motion.div>
 
           <motion.h2
@@ -53,9 +53,9 @@ export const SecuritySection: React.FC = () => {
             transition={{ delay: 0.1 }}
             className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4"
           >
-            Verileriniz Sadece <br />
+            Your Browsing Data <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-white to-cyan-400">
-              Cihazınızda Kalır
+              Belongs Exclusively to You
             </span>
           </motion.h2>
 
@@ -66,7 +66,7 @@ export const SecuritySection: React.FC = () => {
             transition={{ delay: 0.2 }}
             className="text-base sm:text-lg text-slate-400 leading-relaxed"
           >
-            Gizliliğin bir seçenek değil, tarayıcının temel hakkı olduğuna inanıyoruz.
+            We believe digital privacy should be an absolute default, not an optional setting.
           </motion.p>
         </div>
 
