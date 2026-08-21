@@ -36,7 +36,9 @@ export default defineConfig({
         manualChunks: {
           'web-llm': ['@mlc-ai/web-llm'],
           'vendor-react': ['react', 'react-dom'],
-          'vendor-ui': ['framer-motion', 'lucide-react']
+          'vendor-ui': ['framer-motion', 'lucide-react'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm', 'dompurify'],
+          'vendor-supabase': ['@supabase/supabase-js']
         }
       }
     }

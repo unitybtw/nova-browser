@@ -62,7 +62,7 @@ const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({
 const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
 const HelpModal = React.lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 const AccountModal = React.lazy(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
-import { Onboarding } from './components/Onboarding';
+const Onboarding = React.lazy(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
@@ -2394,9 +2394,11 @@ function App() {
 
   if (showOnboarding) {
     return (
-      <Onboarding
-        onComplete={handleOnboardingComplete}
-      />
+      <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
+        <Onboarding
+          onComplete={handleOnboardingComplete}
+        />
+      </React.Suspense>
     );
   }
 
