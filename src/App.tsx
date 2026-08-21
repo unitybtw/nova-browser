@@ -107,38 +107,7 @@ function App() {
     }
   }, [demoParams.isDemo]);
 
-  // Autonomous Animated AI Cursor for Demo Mode
-  useEffect(() => {
-    if (!demoParams.isDemo) return;
 
-    let step = 0;
-    const interval = setInterval(() => {
-      if (step === 0) {
-        window.dispatchEvent(new CustomEvent('ai-cursor', {
-          detail: { x: Math.round(window.innerWidth * 0.38), y: 75, action: 'move' }
-        }));
-      } else if (step === 1) {
-        window.dispatchEvent(new CustomEvent('ai-cursor', {
-          detail: { x: Math.round(window.innerWidth * 0.45), y: 160, action: 'move' }
-        }));
-      } else if (step === 2) {
-        window.dispatchEvent(new CustomEvent('ai-cursor', {
-          detail: { x: Math.round(window.innerWidth * 0.45), y: 160, action: 'click' }
-        }));
-      } else if (step === 3) {
-        window.dispatchEvent(new CustomEvent('ai-cursor', {
-          detail: { x: Math.round(window.innerWidth * 0.65), y: 260, action: 'move' }
-        }));
-      } else if (step === 4) {
-        window.dispatchEvent(new CustomEvent('ai-cursor', {
-          detail: { x: Math.round(window.innerWidth * 0.65), y: 260, action: 'click' }
-        }));
-      }
-      step = (step + 1) % 5;
-    }, 1800);
-
-    return () => clearInterval(interval);
-  }, [demoParams.isDemo]);
 
   const [tabs, setTabs] = useState<Tab[]>(() => {
     if (demoParams.isDemo) {
@@ -298,6 +267,70 @@ function App() {
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
   const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(DEFAULT_VPN_LOCATIONS);
+
+  // Automated Real Browser Demo Showcase for Website
+  useEffect(() => {
+    if (!demoParams.isDemo) return;
+
+    let cycle = 0;
+    const runCycle = () => {
+      if (cycle === 0) {
+        // Scene 1: arXiv AI Research + AI Sidepanel + Glowing Cursor
+        setTabs([
+          { id: '1', url: 'https://arxiv.org/list/cs.AI/recent', title: 'arXiv / cs.AI Research', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
+        ]);
+        setActiveTabId('1');
+        setSplitTabId(null);
+        setIsSidePanelOpen(true);
+
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('ai-cursor', {
+            detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'move' }
+          }));
+        }, 800);
+
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('ai-cursor', {
+            detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'click' }
+          }));
+        }, 2200);
+      } else if (cycle === 1) {
+        // Scene 2: New Tab Page with Clock, Tasks, Speed Dials
+        setIsSidePanelOpen(false);
+        setActiveTabId('2');
+        setSplitTabId(null);
+
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('ai-cursor', {
+            detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'move' }
+          }));
+        }, 800);
+
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('ai-cursor', {
+            detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'click' }
+          }));
+        }, 2000);
+      } else if (cycle === 2) {
+        // Scene 3: Dual Split Screen Multitasking (React 19 & Tailwind CSS)
+        setIsSidePanelOpen(false);
+        setTabs([
+          { id: '1', url: 'https://react.dev/reference/react', title: 'React 19 Docs', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, canGoBack: false, canGoForward: false }
+        ]);
+        setActiveTabId('1');
+        setSplitTabId('2');
+      }
+
+      cycle = (cycle + 1) % 3;
+    };
+
+    runCycle();
+    const interval = setInterval(runCycle, 6500);
+
+    return () => clearInterval(interval);
+  }, [demoParams.isDemo]);
 
   // Load extensions on mount
   useEffect(() => {
