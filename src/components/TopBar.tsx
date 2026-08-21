@@ -45,7 +45,9 @@ import {
   VenetianMask,
   Moon,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  User,
+  Cloud
 } from 'lucide-react';
 import { Tab, Bookmark } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
@@ -53,6 +55,7 @@ import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { UserSettings } from '../App';
 import { tabThumbnailCache } from '../services/thumbnailCache';
+import { syncService, SyncStatus } from '../services/syncService';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -116,6 +119,7 @@ interface TopBarProps {
   showBookmarksBar?: boolean;
   onToggleReaderMode?: () => void;
   onOpenExtensions: () => void;
+  onOpenAccount?: () => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
   onTabDrag?: (y: number) => void;
@@ -801,6 +805,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   showBookmarksBar = false,
   onToggleReaderMode,
   onOpenExtensions,
+  onOpenAccount,
   onTabDragStart,
   onTabDragEnd,
   onTabDrag,
@@ -808,6 +813,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   splitTabId,
   onCloseSplit
 }) => {
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
+
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(status => {
+      setSyncStatus(status);
+    });
+    return () => { unsubscribe(); };
+  }, []);
+
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverPos, setHoverPos] = useState({ left: 0, width: 0 });
@@ -1336,6 +1350,32 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           >
             <Puzzle className="w-4 h-4" />
           </button>
+
+          {/* Nova Account & Sync Button */}
+          {onOpenAccount && (
+            <button
+              onClick={onOpenAccount}
+              className={`p-1.5 rounded-lg transition-colors relative flex items-center justify-center ${
+                isIncognito 
+                  ? 'hover:bg-slate-700 text-slate-300' 
+                  : syncStatus.isLoggedIn
+                    ? 'hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
+                    : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
+              }`}
+              title={syncStatus.isLoggedIn ? `Nova Account (${syncStatus.user?.displayName || syncStatus.user?.email})` : 'Sign In to Nova Sync'}
+            >
+              {syncStatus.isLoggedIn && syncStatus.user ? (
+                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-[10px] flex items-center justify-center shadow-xs uppercase">
+                  {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
+                </div>
+              ) : (
+                <User className="w-4 h-4" />
+              )}
+              {syncStatus.isLoggedIn && (
+                <span className="w-2 h-2 rounded-full bg-emerald-500 absolute top-0.5 right-0.5 border border-white dark:border-slate-900" />
+              )}
+            </button>
+          )}
           
           {/* More Menu */}
           <div className="relative">
@@ -1362,6 +1402,41 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     transition={{ duration: 0.15 }}
                     className="absolute right-0 top-full mt-1.5 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
                   >
+                    {/* Nova Account Header inside menu */}
+                    {onOpenAccount && (
+                      <div className="p-1">
+                        <button
+                          onClick={() => { onOpenAccount(); setIsMoreMenuOpen(false); }}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/15 hover:to-blue-500/15 text-slate-800 dark:text-slate-100 rounded-xl transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {syncStatus.isLoggedIn && syncStatus.user ? (
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                                {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
+                              </div>
+                            ) : (
+                              <div className="p-1 rounded-lg bg-cyan-500/20 text-cyan-600 dark:text-cyan-400">
+                                <Cloud className="w-4 h-4" />
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <span className="text-xs font-bold block truncate">
+                                {syncStatus.isLoggedIn && syncStatus.user ? syncStatus.user.displayName : 'Nova Account & Sync'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 truncate block">
+                                {syncStatus.isLoggedIn ? 'Sync is active' : 'Sign in to sync data'}
+                              </span>
+                            </div>
+                          </div>
+                          {syncStatus.isLoggedIn ? (
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                          ) : (
+                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Sign In</span>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
                     {/* View & Layout Section */}
                     <div className="py-1">
                       <button 

@@ -61,11 +61,13 @@ const ReaderMode = React.lazy(() => import('./components/ReaderMode').then(m => 
 const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
 const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
 const HelpModal = React.lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
+const AccountModal = React.lazy(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
 import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
+import { syncService } from './services/syncService';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -196,6 +198,7 @@ function App() {
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [isWorkspaceManagerOpen, setIsWorkspaceManagerOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
   
   // Workspaces State
@@ -295,6 +298,7 @@ function App() {
     setIsVpnPopoverOpen(false);
     setIsExtensionsOpen(false);
     setIsHelpOpen(false);
+    setIsAccountModalOpen(false);
   }, []);
 
   const openModal = useCallback((modalName: 'share' | 'spotlight' | 'extensions') => {
@@ -648,6 +652,54 @@ function App() {
   useEffect(() => {
     localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
   }, [bookmarks]);
+
+  // Cloud Sync Handler
+  const handlePerformSync = useCallback(async () => {
+    try {
+      let localPasswords: any[] = [];
+      try {
+        const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        if (rawP) localPasswords = JSON.parse(rawP);
+      } catch (e) {}
+
+      const syncResult = await syncService.syncData({
+        bookmarks,
+        folders,
+        history,
+        passwords: localPasswords,
+        settings,
+        workspaces
+      });
+
+      if (syncResult && syncResult.mergedData) {
+        const { mergedData } = syncResult;
+        setBookmarks(mergedData.bookmarks);
+        setFolders(mergedData.folders);
+        setHistory(mergedData.history);
+        setSettings(mergedData.settings);
+        setWorkspaces(mergedData.workspaces);
+
+        if (mergedData.passwords && (window as any).electronAPI?.secureStoreSet) {
+          await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(mergedData.passwords));
+        }
+      }
+    } catch (err) {
+      console.error('[NovaSync] Sync execution failed:', err);
+      throw err;
+    }
+  }, [bookmarks, folders, history, settings, workspaces]);
+
+  // Background auto-sync on initial app load if already authenticated
+  useEffect(() => {
+    const status = syncService.getStatus();
+    if (status.isLoggedIn) {
+      const timer = setTimeout(() => {
+        handlePerformSync().catch(() => {});
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [handlePerformSync]);
+
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
 
   // Select/focus tab & reset hibernation timer
@@ -2328,6 +2380,7 @@ function App() {
               onOpenDownloads={handleOpenDownloads}
               onOpenHistory={handleOpenHistory}
               onOpenSettings={handleOpenSettings}
+              onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
               onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
               onOpenExtensions={handleOpenExtensions}
               bookmarks={bookmarks}
@@ -2420,6 +2473,7 @@ function App() {
                   onOpenDownloads={handleOpenDownloads}
                   onOpenHistory={handleOpenHistory}
                   onOpenSettings={handleOpenSettings}
+                  onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
                   onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
                   onOpenExtensions={handleOpenExtensions}
                   bookmarks={bookmarks}
@@ -2472,6 +2526,7 @@ function App() {
                 onOpenHistory={handleOpenHistory}
                 onOpenDownloads={handleOpenDownloads}
                 onOpenSettings={handleOpenSettings}
+                onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
                 onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
                 onOpenExtensions={handleOpenExtensions}
                 onOpenShare={handleOpenShare}
@@ -2790,6 +2845,17 @@ function App() {
             isOpen={isHelpOpen}
             onClose={() => setIsHelpOpen(false)}
             initialTab={helpInitialTab}
+          />
+        )}
+      </React.Suspense>
+
+      {/* NOVA ACCOUNT & CLOUD SYNC MODAL */}
+      <React.Suspense fallback={null}>
+        {isAccountModalOpen && (
+          <AccountModal
+            isOpen={isAccountModalOpen}
+            onClose={() => setIsAccountModalOpen(false)}
+            onPerformSync={handlePerformSync}
           />
         )}
       </React.Suspense>

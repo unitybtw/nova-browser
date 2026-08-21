@@ -32,7 +32,8 @@ import {
   PanelLeft,
   Pin,
   HelpCircle,
-  Compass
+  Compass,
+  Cloud
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
@@ -137,6 +138,7 @@ export interface SidebarTabsProps {
   onOpenDownloads?: () => void;
   onOpenHistory?: () => void;
   onOpenSettings?: () => void;
+  onOpenAccount?: () => void;
   onOpenHelp?: () => void;
   onOpenExtensions?: () => void;
   bookmarks?: Bookmark[];
@@ -382,6 +384,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenDownloads,
   onOpenHistory,
   onOpenSettings,
+  onOpenAccount,
   onOpenHelp,
   onOpenExtensions,
   bookmarks = [],
@@ -1107,6 +1110,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   >
                     <Clock className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                     History
+                  </button>
+                )}
+                {onOpenAccount && (
+                  <button
+                    onClick={() => { onOpenAccount(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
+                  >
+                    <Cloud className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    Nova Account & Sync
                   </button>
                 )}
                 {onOpenSettings && (
