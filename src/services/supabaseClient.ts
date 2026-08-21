@@ -15,8 +15,8 @@ const STORAGE_KEY = 'nova_supabase_config';
 
 // Default Supabase project endpoints for Nova Cloud Sync
 const DEFAULT_CONFIG: SupabaseConfig = {
-  url: import.meta.env?.VITE_SUPABASE_URL || 'https://nmjjscusiwaleiqglzsx.supabase.co',
-  anonKey: import.meta.env?.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tampzY3VzaXdhbGVpcWdsenN4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODczMDM1MDYsImV4cCI6MjEwMjg3OTUwNn0.f-yHnup6Fk2C-iS2dealt2LjbV6dWnHKLpz6PWDd470',
+  url: import.meta.env?.VITE_SUPABASE_URL || '',
+  anonKey: import.meta.env?.VITE_SUPABASE_ANON_KEY || '',
   isCustom: false
 };
 
