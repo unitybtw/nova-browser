@@ -113,7 +113,7 @@ export const RealBrowserSandbox: React.FC = () => {
         <iframe
           ref={iframeRef}
           key={`${activeFeature}-${activeBg}`}
-          src={`/browser-demo/index.html?demo=true&feature=${activeFeature}&bg=${activeBg}&theme=dark`}
+          src={`/browser-demo/index.html?demo=true&feature=${activeFeature}&bg=${activeBg}&theme=dark&tabs=horizontal`}
           onLoad={() => setIsLoading(false)}
           className="w-full h-full border-0 pointer-events-auto bg-[#070a11]"
           title={`Nova Browser Live - ${activeFeature}`}

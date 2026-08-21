@@ -79,13 +79,14 @@ const EMPTY_ARRAY: any[] = [];
 
 // Demo mode query parameter inspection
 const getDemoParams = () => {
-  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark' as const };
+  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark' as const, tabs: 'horizontal' };
   const params = new URLSearchParams(window.location.search);
   return {
     isDemo: params.get('demo') === 'true',
     feature: params.get('feature') || 'default',
     bg: params.get('bg') || 'default',
-    theme: ((params.get('theme') === 'light' ? 'light' : 'dark') as 'dark' | 'light')
+    theme: ((params.get('theme') === 'light' ? 'light' : 'dark') as 'dark' | 'light'),
+    tabs: params.get('tabs') || 'horizontal'
   };
 };
 
@@ -104,6 +105,39 @@ function App() {
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
     }
+  }, [demoParams.isDemo]);
+
+  // Autonomous Animated AI Cursor for Demo Mode
+  useEffect(() => {
+    if (!demoParams.isDemo) return;
+
+    let step = 0;
+    const interval = setInterval(() => {
+      if (step === 0) {
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: { x: Math.round(window.innerWidth * 0.38), y: 75, action: 'move' }
+        }));
+      } else if (step === 1) {
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: { x: Math.round(window.innerWidth * 0.45), y: 160, action: 'move' }
+        }));
+      } else if (step === 2) {
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: { x: Math.round(window.innerWidth * 0.45), y: 160, action: 'click' }
+        }));
+      } else if (step === 3) {
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: { x: Math.round(window.innerWidth * 0.65), y: 260, action: 'move' }
+        }));
+      } else if (step === 4) {
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: { x: Math.round(window.innerWidth * 0.65), y: 260, action: 'click' }
+        }));
+      }
+      step = (step + 1) % 5;
+    }, 1800);
+
+    return () => clearInterval(interval);
   }, [demoParams.isDemo]);
 
   const [tabs, setTabs] = useState<Tab[]>(() => {
@@ -328,7 +362,7 @@ function App() {
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
       showBookmarksBar: false,
-      useVerticalTabs: true,
+      useVerticalTabs: demoParams.isDemo ? (demoParams.tabs === 'vertical') : true,
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',
