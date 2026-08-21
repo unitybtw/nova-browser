@@ -1,16 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Download, Sun, Moon, ChevronDown, Apple, Monitor } from 'lucide-react';
-import { useTheme } from './ThemeProvider';
+import { Menu, X, ChevronDown, Apple, Monitor, Sparkles } from 'lucide-react';
 import { useLang } from '../i18n/LanguageContext';
 import { languageList } from '../i18n/translations';
+
+const GithubIcon = ({ className = "w-3.5 h-3.5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
+    <path d="M9 18c-4.51 2-5-2-7-2"/>
+  </svg>
+);
 
 export const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [langMenuOpen, setLangMenuOpen] = useState(false);
-  const { isDark, setTheme } = useTheme();
-  const { lang, setLang, t } = useLang();
+  const { lang, setLang } = useLang();
+  const isTr = lang === 'tr';
   const langRef = useRef<HTMLDivElement>(null);
 
   const [os, setOs] = useState<'mac' | 'win' | 'other'>('mac');
@@ -52,82 +58,88 @@ export const Navbar = () => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
-  };
-
-  const currentLang = languageList.find(l => l.code === lang)!;
+  const currentLang = languageList.find(l => l.code === lang) || languageList[0];
 
   return (
     <motion.header
-      initial={{ y: -100 }}
+      initial={{ y: -60 }}
       animate={{ y: 0 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'py-3' : 'py-5'}`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'py-2.5' : 'py-4'}`}
     >
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div
-          className="flex items-center justify-between rounded-2xl px-6 py-3 transition-all duration-300"
-          style={scrolled ? {
-            background: isDark ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)',
-            backdropFilter: 'blur(20px)',
-            WebkitBackdropFilter: 'blur(20px)',
-            boxShadow: isDark
-              ? '0 4px 24px rgba(0,0,0,0.35), 0 1px 0 rgba(255,255,255,0.06) inset'
-              : '0 4px 24px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.8) inset',
-          } : { background: 'transparent', boxShadow: 'none' }}
+          className={`flex items-center justify-between rounded-2xl px-5 py-2.5 transition-all duration-300 border ${
+            scrolled
+              ? 'bg-[#08090c]/90 border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl'
+              : 'bg-transparent border-transparent'
+          }`}
         >
-          {/* Logo */}
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
-              <img src="/browser-assets/nova-icon.png" alt="Nova Browser Logo" className="w-full h-full object-contain" />
+          {/* Brand Logo */}
+          <a href="#" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/15 flex items-center justify-center p-1 group-hover:scale-105 transition-transform">
+              <img src="/browser-assets/nova-icon.png" alt="Nova Browser" className="w-full h-full object-contain" />
             </div>
-            <span className="text-xl font-bold tracking-tight text-foreground">Nova</span>
-          </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-base font-extrabold tracking-tight text-white font-mono">NOVA</span>
+              <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                v1.0.7
+              </span>
+            </div>
+          </a>
 
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8 font-medium text-foreground/80">
-            <a href="#features" className="hover:text-primary transition-colors">{t.nav.features}</a>
-            <a href="#privacy" className="hover:text-primary transition-colors">{t.nav.privacy}</a>
-            <a href="#design" className="hover:text-primary transition-colors">{t.nav.design}</a>
-            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="hover:text-primary transition-colors">{t.nav.github}</a>
+          {/* Desktop Navigation Links */}
+          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-300">
+            <a href="#ai-agent" className="hover:text-white transition-colors flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span>{isTr ? 'Otonom AI' : 'AI Agent'}</span>
+            </a>
+            <a href="#features" className="hover:text-white transition-colors">
+              {isTr ? 'Özellikler' : 'Features'}
+            </a>
+            <a href="#theme-studio" className="hover:text-white transition-colors">
+              {isTr ? 'Tema Stüdyosu' : 'Theme Studio'}
+            </a>
+            <a href="#sync" className="hover:text-white transition-colors">
+              {isTr ? 'Sıfır-Bilgi Eşleme' : 'Sync'}
+            </a>
+            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="hover:text-white transition-colors flex items-center gap-1">
+              <GithubIcon className="w-3.5 h-3.5" />
+              <span>GitHub</span>
+            </a>
           </nav>
 
-          {/* Actions */}
+          {/* Right Action Bar */}
           <div className="hidden md:flex items-center gap-3">
-            {/* Language Switcher */}
+            {/* Language Dropdown */}
             <div ref={langRef} className="relative">
               <button
                 onClick={() => setLangMenuOpen(!langMenuOpen)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-foreground/70 hover:text-foreground hover:bg-foreground/8 transition-colors text-sm font-medium"
-                aria-label="Change language"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 border border-white/5 transition-colors cursor-pointer"
+                aria-label="Language selector"
               >
-                <span className="text-base">{currentLang.flag}</span>
-                <span className="hidden lg:block">{currentLang.name}</span>
-                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${langMenuOpen ? 'rotate-180' : ''}`} />
+                <span>{currentLang.flag}</span>
+                <span className="uppercase text-[11px] font-mono">{currentLang.code}</span>
+                <ChevronDown className={`w-3 h-3 transition-transform ${langMenuOpen ? 'rotate-180' : ''}`} />
               </button>
 
               <AnimatePresence>
                 {langMenuOpen && (
                   <motion.div
-                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    initial={{ opacity: 0, y: -6, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-44 rounded-2xl shadow-xl border border-border/60 overflow-hidden z-50"
-                    style={{
-                      background: isDark ? 'rgba(15, 23, 42, 0.97)' : 'rgba(255,255,255,0.97)',
-                      backdropFilter: 'blur(16px)',
-                    }}
+                    exit={{ opacity: 0, y: -6, scale: 0.95 }}
+                    className="absolute right-0 top-full mt-2 w-36 rounded-xl bg-[#0d1117] border border-white/10 shadow-2xl p-1 z-50"
                   >
                     {languageList.map(l => (
                       <button
                         key={l.code}
                         onClick={() => { setLang(l.code); setLangMenuOpen(false); }}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-primary/10 ${lang === l.code ? 'text-primary bg-primary/5' : 'text-foreground/80'}`}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors cursor-pointer ${
+                          lang === l.code ? 'bg-white/10 text-white font-bold' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
                       >
-                        <span className="text-base">{l.flag}</span>
-                        {l.name}
-                        {lang === l.code && <span className="ml-auto text-primary text-xs">✓</span>}
+                        <span>{l.flag}</span>
+                        <span>{l.name}</span>
                       </button>
                     ))}
                   </motion.div>
@@ -135,118 +147,72 @@ export const Navbar = () => {
               </AnimatePresence>
             </div>
 
-            {/* Theme toggle */}
-            <button
-              onClick={toggleTheme}
-              className="p-2 text-foreground/80 hover:text-primary hover:bg-primary/10 rounded-full transition-colors"
-              aria-label="Toggle Dark Mode"
-            >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-
-            {/* Download */}
+            {/* Direct Download Button */}
             {os === 'win' ? (
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
-                className="bg-[#0078D7] hover:bg-[#005A9E] text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)] flex items-center gap-1.5 cursor-pointer"
               >
-                <Monitor className="w-4 h-4" />
-                {t.hero.downloadWin}
-              </a>
-            ) : os === 'mac' ? (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
-                className="bg-primary hover:bg-primary/90 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
-              >
-                <Apple className="w-4 h-4" />
-                {t.hero.downloadMac}
+                <Monitor className="w-3.5 h-3.5" />
+                <span>{isTr ? 'İndir (.exe)' : 'Download (.exe)'}</span>
               </a>
             ) : (
               <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest"
-                target="_blank"
-                rel="noreferrer"
-                className="bg-foreground hover:bg-foreground/90 text-background px-5 py-2.5 rounded-xl font-medium transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
+                className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.15)] flex items-center gap-1.5 cursor-pointer"
               >
-                <Download className="w-4 h-4" />
-                {t.nav.download}
+                <Apple className="w-4 h-4" />
+                <span>{isTr ? 'İndir (.dmg)' : 'Download (.dmg)'}</span>
               </a>
             )}
           </div>
 
-          {/* Mobile Menu Toggle */}
+          {/* Mobile Menu Button */}
           <div className="md:hidden flex items-center gap-2">
-            <button onClick={toggleTheme} className="p-2 text-foreground">
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-            <button className="p-2 text-foreground" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-              {mobileMenuOpen ? <X /> : <Menu />}
+            <button 
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-xl bg-white/5 border border-white/10 text-white cursor-pointer"
+            >
+              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu */}
+      {/* Mobile Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
-            className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl p-4 flex flex-col gap-3 border border-border/40 shadow-xl"
-            style={{
-              background: isDark ? 'rgba(15, 23, 42, 0.97)' : 'rgba(255,255,255,0.97)',
-              backdropFilter: 'blur(20px)',
-            }}
+            className="md:hidden mx-4 mt-2 p-4 rounded-2xl bg-[#090b10] border border-white/10 shadow-2xl flex flex-col gap-3"
           >
-            <a href="#features" className="px-4 py-2 font-medium text-foreground/80" onClick={() => setMobileMenuOpen(false)}>{t.nav.features}</a>
-            <a href="#privacy" className="px-4 py-2 font-medium text-foreground/80" onClick={() => setMobileMenuOpen(false)}>{t.nav.privacy}</a>
-            <a href="#design" className="px-4 py-2 font-medium text-foreground/80" onClick={() => setMobileMenuOpen(false)}>{t.nav.design}</a>
+            <a href="#ai-agent" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
+              {isTr ? '🤖 Otonom AI Ajanı' : 'AI Agent'}
+            </a>
+            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
+              {isTr ? '✨ Özellikler' : 'Features'}
+            </a>
+            <a href="#theme-studio" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
+              {isTr ? '🎨 Tema Stüdyosu' : 'Theme Studio'}
+            </a>
+            <a href="#sync" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
+              {isTr ? '🔒 Sıfır-Bilgi Eşleme' : 'Sync'}
+            </a>
+            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="text-sm font-semibold text-slate-300 py-1.5">
+              GitHub Repo
+            </a>
 
-            {/* Mobile Language Switcher */}
-            <div className="border-t border-border/40 pt-3">
-              <p className="text-xs text-foreground/40 px-4 mb-2 uppercase tracking-wider font-medium">Language</p>
-              <div className="grid grid-cols-3 gap-2">
-                {languageList.map(l => (
-                  <button
-                    key={l.code}
-                    onClick={() => { setLang(l.code); setMobileMenuOpen(false); }}
-                    className={`flex flex-col items-center gap-1 px-2 py-2 rounded-xl text-xs font-medium transition-colors ${lang === l.code ? 'bg-primary/10 text-primary' : 'text-foreground/60 hover:bg-foreground/5'}`}
-                  >
-                    <span className="text-xl">{l.flag}</span>
-                    {l.name.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {os === 'win' ? (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
-                className="bg-[#0078D7] hover:bg-[#005A9E] text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
-              >
-                <Monitor className="w-4 h-4" />
-                {t.hero.downloadWin}
-              </a>
-            ) : os === 'mac' ? (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
-                className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
-              >
-                <Apple className="w-4 h-4" />
-                {t.hero.downloadMac}
-              </a>
-            ) : (
+            <div className="border-t border-white/10 pt-3 mt-1">
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest"
-                target="_blank"
-                rel="noreferrer"
-                className="bg-primary hover:bg-primary/90 text-white px-4 py-3 rounded-xl font-medium w-full mt-2 text-center transition-colors flex items-center justify-center gap-2"
+                className="w-full bg-white text-black py-2.5 rounded-xl text-center font-bold text-xs flex items-center justify-center gap-2"
               >
-                <Download className="w-4 h-4" />
-                {t.nav.download}
+                <Apple className="w-4 h-4" />
+                <span>{isTr ? 'Nova Browser İndir' : 'Download Nova Browser'}</span>
               </a>
-            )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
