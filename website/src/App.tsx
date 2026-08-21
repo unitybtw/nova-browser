@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { AutonomousAgentSection } from './components/AutonomousAgentSection';
@@ -9,11 +9,18 @@ import { CTA } from './components/CTA';
 import { Footer } from './components/Footer';
 
 export const App: React.FC = () => {
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#050608] text-[#f8fafc] font-sans">
       <Navbar />
       <main>
-        {/* 1. Hero with Authentic Live Interactive Nova Browser */}
+        {/* 1. Hero with Authentic Live Animated Nova Browser */}
         <Hero />
 
         {/* 2. Model Context Protocol (MCP) & Autonomous AI Navigation Spotlight */}
