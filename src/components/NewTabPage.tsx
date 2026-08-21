@@ -284,9 +284,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   // Memoize particle arrays to prevent jitter/regeneration on keystrokes
   const starParticles = React.useMemo(() => {
-    return Array.from({ length: 65 }, (_, i) => ({
+    return Array.from({ length: 36 }, (_, i) => ({
       id: i,
-      size: (i % 3 === 0 ? 3 : i % 2 === 0 ? 2 : 1.5),
+      size: (i % 3 === 0 ? 2.5 : i % 2 === 0 ? 2 : 1.5),
       top: `${(i * 17 + 7) % 96}%`,
       left: `${(i * 23 + 13) % 98}%`,
       duration: 3 + (i % 4) * 1.5,
@@ -295,23 +295,23 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   }, []);
 
   const fireflyParticles = React.useMemo(() => {
-    return Array.from({ length: 28 }, (_, i) => ({
+    return Array.from({ length: 20 }, (_, i) => ({
       id: i,
-      size: 3 + (i % 3) * 2,
+      size: 3 + (i % 3) * 1.5,
       top: `${(i * 19 + 5) % 92}%`,
       left: `${(i * 29 + 11) % 94}%`,
-      driftX: ((i % 5) - 2) * 25,
-      driftY: -40 - (i % 4) * 20,
+      driftX: ((i % 5) - 2) * 20,
+      driftY: -35 - (i % 4) * 15,
       duration: 5 + (i % 4) * 2,
       delay: (i % 6) * 0.7,
     }));
   }, []);
 
   const matrixColumns = React.useMemo(() => {
-    return Array.from({ length: 36 }, (_, i) => ({
+    return Array.from({ length: 24 }, (_, i) => ({
       id: i,
-      left: `${(i / 36) * 100 + 1}%`,
-      height: `${35 + (i % 5) * 12}%`,
+      left: `${(i / 24) * 100 + 1}%`,
+      height: `${30 + (i % 5) * 10}%`,
       speed: 2.2 + (i % 4) * 0.8,
       delay: (i % 7) * 0.4,
       opacity: 0.35 + (i % 3) * 0.25,
@@ -502,19 +502,22 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
-            animate={{ x: [0, 40, 0], y: [0, -30, 0], scale: [1, 1.1, 1] }}
-            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute -top-[20%] -left-[10%] w-[60vw] h-[60vw] rounded-full bg-purple-600/25 blur-[130px]"
+            animate={isActive ? { x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.08, 1] } : false}
+            transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute -top-[15%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-purple-600/20 blur-[60px]"
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
           <motion.div 
-            animate={{ x: [0, -50, 0], y: [0, 40, 0], scale: [1, 1.15, 1] }}
-            transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-            className="absolute -bottom-[20%] -right-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-600/25 blur-[130px]"
+            animate={isActive ? { x: [0, -40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] } : false}
+            transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+            className="absolute -bottom-[15%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-blue-600/20 blur-[60px]"
+            style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
           <motion.div 
-            animate={{ scale: [1, 1.2, 1], opacity: [0.2, 0.35, 0.2] }}
-            transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-            className="absolute top-[25%] right-[20%] w-[45vw] h-[45vw] rounded-full bg-teal-500/20 blur-[110px]"
+            animate={isActive ? { scale: [1, 1.15, 1], opacity: [0.15, 0.28, 0.15] } : false}
+            transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+            className="absolute top-[25%] right-[20%] w-[35vw] h-[35vw] rounded-full bg-teal-500/15 blur-[50px]"
+            style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
           />
         </div>
       )}
@@ -524,18 +527,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#080b12]' : 'bg-slate-50'}`}>
           <motion.div 
             animate={isActive ? { 
-              x: ['0%', '-50%', '0%'],
+              x: ['0%', '-33.33%', '0%'],
             } : false}
-            transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
-            className={`absolute top-[-50%] bottom-[-50%] left-0 w-[400%] blur-[90px] ${isDarkTheme ? 'opacity-65' : 'opacity-35'}`}
+            transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
+            className={`absolute top-[-30%] bottom-[-30%] left-0 w-[300%] blur-[48px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
             style={{
               background: isDarkTheme 
                 ? 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)' 
                 : 'linear-gradient(-45deg, #818cf8, #f472b6, #a855f7, #38bdf8, #818cf8)',
-              willChange: 'transform'
+              willChange: 'transform',
+              transform: 'translateZ(0)'
             }}
           />
-          <div className={`absolute inset-0 backdrop-blur-[60px] ${isDarkTheme ? 'bg-[#080b12]/50' : 'bg-white/40'}`}></div>
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[#080b12]/40' : 'bg-white/30'}`}></div>
         </div>
       )}
 
@@ -543,10 +547,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'cyber_grid' && (
         <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#04060a]' : 'bg-slate-900'}`}>
           {/* Horizon Glow Sun */}
-          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[45vw] h-[45vw] rounded-full bg-gradient-to-b from-cyan-500/20 via-purple-500/15 to-transparent blur-[90px]" />
+          <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40vw] h-[40vw] rounded-full bg-gradient-to-b from-cyan-500/20 via-purple-500/15 to-transparent blur-[60px]" />
           
           <div 
-            className="absolute inset-0"
+            className="absolute inset-0 overflow-hidden"
             style={{
               perspective: '500px',
               perspectiveOrigin: '50% 50%',
@@ -554,16 +558,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           >
             <motion.div 
               animate={isActive ? { 
-                backgroundPositionY: ['0px', '48px'],
+                y: ['0px', '48px'],
               } : false}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
-              className="absolute bottom-0 left-[-50%] right-[-50%] h-[75vh]"
+              className="absolute bottom-0 left-[-50%] right-[-50%] h-[85vh]"
               style={{
                 backgroundImage: 'linear-gradient(rgba(6, 182, 212, 0.4) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(6, 182, 212, 0.4) 1.5px, transparent 1.5px)',
                 backgroundSize: '48px 48px',
-                transform: 'rotateX(68deg) scale(2.4)',
+                transform: 'rotateX(68deg) scale(2.4) translateZ(0)',
                 transformOrigin: '50% 100%',
-                willChange: 'background-position',
+                willChange: 'transform',
               }}
             />
           </div>
@@ -584,12 +588,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 height: `${star.size}px`,
                 top: star.top,
                 left: star.left,
-                boxShadow: '0 0 8px 1.5px rgba(255,255,255,0.7)',
-                willChange: 'transform, opacity'
+                boxShadow: '0 0 6px 1px rgba(255,255,255,0.6)',
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)'
               }}
               animate={isActive ? {
-                scale: [0.6, 1.6, 0.6],
-                opacity: [0.2, 1, 0.2],
+                scale: [0.7, 1.4, 0.7],
+                opacity: [0.2, 0.95, 0.2],
               } : false}
               transition={{
                 duration: star.duration,
@@ -615,14 +620,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 height: `${fly.size}px`,
                 top: fly.top,
                 left: fly.left,
-                boxShadow: '0 0 14px 3px rgba(251, 191, 36, 0.5)',
-                willChange: 'transform, opacity'
+                boxShadow: '0 0 10px 2px rgba(251, 191, 36, 0.45)',
+                willChange: 'transform, opacity',
+                transform: 'translateZ(0)'
               }}
               animate={isActive ? {
                 y: [0, fly.driftY, 0],
                 x: [0, fly.driftX, 0],
-                opacity: [0.1, 0.9, 0.3, 0.9, 0.1],
-                scale: [0.8, 1.3, 0.8]
+                opacity: [0.15, 0.9, 0.35, 0.9, 0.15],
+                scale: [0.85, 1.25, 0.85]
               } : false}
               transition={{
                 duration: fly.duration,
@@ -642,16 +648,17 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           <motion.div
             animate={isActive ? {
               rotate: [0, 360],
-              scale: [1, 1.15, 1]
+              scale: [1, 1.1, 1]
             } : false}
             transition={{ duration: 45, repeat: Infinity, ease: 'linear' }}
-            className="absolute -inset-[80%] blur-[110px] opacity-55"
+            className="absolute -inset-[50%] blur-[56px] opacity-50"
             style={{
               background: 'conic-gradient(from 0deg at 50% 50%, #4338ca, #d946ef, #7c3aed, #06b6d4, #4338ca)',
-              willChange: 'transform'
+              willChange: 'transform',
+              transform: 'translateZ(0)'
             }}
           />
-          <div className="absolute inset-0 backdrop-blur-[70px] bg-black/40"></div>
+          <div className="absolute inset-0 bg-black/40"></div>
         </div>
       )}
 
@@ -668,8 +675,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 height: col.height,
                 top: '-40%',
                 opacity: col.opacity,
-                boxShadow: '0 0 10px 2px rgba(16, 185, 129, 0.5)',
-                willChange: 'transform'
+                boxShadow: '0 0 8px 1.5px rgba(16, 185, 129, 0.4)',
+                willChange: 'transform',
+                transform: 'translateZ(0)'
               }}
               animate={isActive ? {
                 y: ['0vh', '140vh'],
