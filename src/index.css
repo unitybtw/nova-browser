@@ -60,6 +60,25 @@ h1, h2, h3, h4, h5, h6, .font-serif {
   background: #94a3b8;
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.modal-scroll {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.dark .modal-scroll {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
 /* Floating animation */
 @keyframes float-up {
   from {
