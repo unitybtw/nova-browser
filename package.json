@@ -101,6 +101,7 @@
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",
+    "@supabase/supabase-js": "^2.112.3",
     "cross-fetch": "^4.1.0",
     "dompurify": "^3.4.12",
     "electron-updater": "^6.8.9",

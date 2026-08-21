@@ -700,6 +700,15 @@ function App() {
     }
   }, [handlePerformSync]);
 
+  // Realtime Supabase change listener across other active devices
+  useEffect(() => {
+    const unsubscribe = syncService.onRemoteChange(() => {
+      console.log('[NovaSync] Triggering background pull for remote changes');
+      handlePerformSync().catch(() => {});
+    });
+    return () => { unsubscribe(); };
+  }, [handlePerformSync]);
+
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
 
   // Select/focus tab & reset hibernation timer

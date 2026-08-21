@@ -1,11 +1,12 @@
 /**
  * Nova Browser Cloud Sync & Account Service
- * Provides authentication, zero-knowledge end-to-end encryption (E2EE)
- * for passwords, and multi-device data synchronization.
+ * Provides Supabase Cloud Authentication, Zero-Knowledge End-to-End Encryption (E2EE)
+ * for passwords, and multi-device Realtime data synchronization.
  */
 
 import { Bookmark, Folder, Tab, Workspace } from '../types/browser';
 import { HistoryItem, UserSettings } from '../App';
+import { getSupabaseClient, isSupabaseConfigured } from './supabaseClient';
 
 export interface NovaUser {
   id: string;
@@ -31,6 +32,7 @@ export interface SyncStatus {
   lastSyncedAt: number | null;
   isSyncing: boolean;
   syncError: string | null;
+  backend: 'supabase' | 'local_vault';
   itemsSynced: {
     bookmarks: number;
     history: number;
@@ -58,8 +60,8 @@ const STORAGE_KEYS = {
   TOKEN: 'nova_auth_token',
   SYNC_STATUS: 'nova_sync_status',
   CLOUD_VAULT_PREFIX: 'nova_cloud_vault_',
-  SYNC_PREFERENCES: 'nova_sync_preferences',
-  USER_REGISTRY: 'nova_accounts_registry'
+  USER_REGISTRY: 'nova_accounts_registry',
+  MASTER_KEY: 'nova_e2ee_master_key'
 };
 
 const DEFAULT_PREFERENCES: SyncPreferences = {
@@ -77,10 +79,13 @@ class NovaSyncService {
   private lastSyncedAt: number | null = null;
   private lastError: string | null = null;
   private listeners = new Set<(status: SyncStatus) => void>();
+  private remoteSyncListeners = new Set<() => void>();
   private masterKey: string | null = null;
+  private realtimeChannel: any = null;
 
   constructor() {
     this.loadSession();
+    this.initSupabaseListener();
   }
 
   private loadSession() {
@@ -88,10 +93,14 @@ class NovaSyncService {
       const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
       const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
       const savedStatus = localStorage.getItem(STORAGE_KEYS.SYNC_STATUS);
+      const savedMaster = sessionStorage.getItem(STORAGE_KEYS.MASTER_KEY);
       
       if (savedUser && savedToken) {
         this.currentUser = JSON.parse(savedUser);
         this.token = savedToken;
+      }
+      if (savedMaster) {
+        this.masterKey = savedMaster;
       }
       if (savedStatus) {
         const parsed = JSON.parse(savedStatus);
@@ -102,11 +111,73 @@ class NovaSyncService {
     }
   }
 
+  private async initSupabaseListener() {
+    try {
+      const supabase = getSupabaseClient();
+      supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+          const userMeta = session.user.user_metadata || {};
+          this.currentUser = {
+            id: session.user.id,
+            email: session.user.email || '',
+            displayName: userMeta.display_name || session.user.email?.split('@')[0] || 'User',
+            createdAt: new Date(session.user.created_at).getTime(),
+            lastLoginAt: Date.now(),
+            syncPreferences: userMeta.sync_preferences || { ...DEFAULT_PREFERENCES }
+          };
+          this.token = session.access_token;
+          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
+          localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+          this.subscribeToRealtime();
+          this.notify();
+        } else if (event === 'SIGNED_OUT') {
+          this.unsubscribeFromRealtime();
+        }
+      });
+    } catch (e) {
+      console.warn('[NovaSync] Supabase listener init skipped:', e);
+    }
+  }
+
+  private subscribeToRealtime() {
+    if (!this.currentUser) return;
+    try {
+      const supabase = getSupabaseClient();
+      this.unsubscribeFromRealtime();
+
+      this.realtimeChannel = supabase
+        .channel(`sync-vault:${this.currentUser.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'nova_sync_vaults',
+            filter: `user_id=eq.${this.currentUser.id}`
+          },
+          () => {
+            console.log('[NovaSync] Remote sync change received via Realtime WebSocket');
+            this.remoteSyncListeners.forEach(fn => fn());
+          }
+        )
+        .subscribe();
+    } catch (e) {
+      console.warn('[NovaSync] Realtime subscribe failed:', e);
+    }
+  }
+
+  private unsubscribeFromRealtime() {
+    if (this.realtimeChannel) {
+      try {
+        const supabase = getSupabaseClient();
+        supabase.removeChannel(this.realtimeChannel);
+      } catch (e) {}
+      this.realtimeChannel = null;
+    }
+  }
+
   // --- CRYPTOGRAPHY / E2EE ---
 
-  /**
-   * Derive a 256-bit AES-GCM CryptoKey from the user's master password and salt using PBKDF2
-   */
   private async deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const keyMaterial = await crypto.subtle.importKey(
@@ -131,9 +202,6 @@ class NovaSyncService {
     );
   }
 
-  /**
-   * Encrypt passwords payload with AES-GCM 256-bit
-   */
   public async encryptPasswords(passwords: any[], masterPassword: string): Promise<{ ciphertext: string; salt: string; iv: string }> {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -155,9 +223,6 @@ class NovaSyncService {
     };
   }
 
-  /**
-   * Decrypt passwords payload with AES-GCM 256-bit
-   */
   public async decryptPasswords(ciphertext: string, saltStr: string, ivStr: string, masterPassword: string): Promise<any[]> {
     try {
       const salt = new Uint8Array(atob(saltStr).split('').map(c => c.charCodeAt(0)));
@@ -181,9 +246,6 @@ class NovaSyncService {
 
   // --- AUTHENTICATION ---
 
-  /**
-   * Register a new Nova Account
-   */
   public async register(email: string, password: string, displayName?: string): Promise<NovaUser> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
@@ -193,7 +255,52 @@ class NovaSyncService {
       throw new Error('Password must be at least 6 characters');
     }
 
-    // Retrieve local accounts registry
+    const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
+    const supabase = getSupabaseClient();
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: normalizedEmail,
+          password,
+          options: {
+            data: {
+              display_name: finalName,
+              sync_preferences: DEFAULT_PREFERENCES
+            }
+          }
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error('Registration failed');
+
+        const newUser: NovaUser = {
+          id: data.user.id,
+          email: normalizedEmail,
+          displayName: finalName,
+          createdAt: Date.now(),
+          lastLoginAt: Date.now(),
+          syncPreferences: { ...DEFAULT_PREFERENCES }
+        };
+
+        this.currentUser = newUser;
+        this.token = data.session?.access_token || 'sb_token_' + Date.now();
+        this.masterKey = password;
+        sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, password);
+
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+        localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+
+        this.subscribeToRealtime();
+        this.notify();
+        return newUser;
+      } catch (err: any) {
+        console.warn('[NovaSync] Supabase registration error, falling back to local vault:', err);
+        // If Supabase fails due to network/config, fall back to local vault registration
+      }
+    }
+
+    // Local Vault Fallback Registration
     const registryRaw = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
     const registry: Record<string, { user: NovaUser; passwordHash: string }> = registryRaw ? JSON.parse(registryRaw) : {};
 
@@ -201,14 +308,11 @@ class NovaSyncService {
       throw new Error('An account with this email already exists');
     }
 
-    // Generate SHA-256 hash of password for auth verification
     const enc = new TextEncoder();
     const hashBuffer = await crypto.subtle.digest('SHA-256', enc.encode(password + ':' + normalizedEmail));
     const passwordHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
     const userId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-    const finalName = displayName?.trim() || normalizedEmail.split('@')[0];
-
     const newUser: NovaUser = {
       id: userId,
       email: normalizedEmail,
@@ -218,17 +322,13 @@ class NovaSyncService {
       syncPreferences: { ...DEFAULT_PREFERENCES }
     };
 
-    registry[normalizedEmail] = {
-      user: newUser,
-      passwordHash
-    };
-
+    registry[normalizedEmail] = { user: newUser, passwordHash };
     localStorage.setItem(STORAGE_KEYS.USER_REGISTRY, JSON.stringify(registry));
 
-    // Auto login
     this.currentUser = newUser;
     this.token = 'nvt_' + btoa(`${userId}:${Date.now()}`);
     this.masterKey = password;
+    sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, password);
 
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
     localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
@@ -237,15 +337,51 @@ class NovaSyncService {
     return newUser;
   }
 
-  /**
-   * Log into an existing Nova Account
-   */
   public async login(email: string, password: string): Promise<NovaUser> {
     const normalizedEmail = email.trim().toLowerCase();
     if (!normalizedEmail || !password) {
       throw new Error('Email and password are required');
     }
 
+    const supabase = getSupabaseClient();
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password
+        });
+
+        if (error) throw error;
+        if (!data.user) throw new Error('Login failed');
+
+        const userMeta = data.user.user_metadata || {};
+        const loggedUser: NovaUser = {
+          id: data.user.id,
+          email: normalizedEmail,
+          displayName: userMeta.display_name || normalizedEmail.split('@')[0],
+          createdAt: new Date(data.user.created_at).getTime(),
+          lastLoginAt: Date.now(),
+          syncPreferences: userMeta.sync_preferences || { ...DEFAULT_PREFERENCES }
+        };
+
+        this.currentUser = loggedUser;
+        this.token = data.session.access_token;
+        this.masterKey = password;
+        sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, password);
+
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(loggedUser));
+        localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+
+        this.subscribeToRealtime();
+        this.notify();
+        return loggedUser;
+      } catch (err: any) {
+        console.warn('[NovaSync] Supabase auth failed, checking local registry:', err);
+      }
+    }
+
+    // Local Vault Fallback Login
     const registryRaw = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
     const registry: Record<string, { user: NovaUser; passwordHash: string }> = registryRaw ? JSON.parse(registryRaw) : {};
 
@@ -269,6 +405,7 @@ class NovaSyncService {
     this.currentUser = account.user;
     this.token = 'nvt_' + btoa(`${account.user.id}:${Date.now()}`);
     this.masterKey = password;
+    sessionStorage.setItem(STORAGE_KEYS.MASTER_KEY, password);
 
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(account.user));
     localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
@@ -277,10 +414,15 @@ class NovaSyncService {
     return account.user;
   }
 
-  /**
-   * Log out of current account
-   */
-  public logout() {
+  public async logout() {
+    this.unsubscribeFromRealtime();
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = getSupabaseClient();
+        await supabase.auth.signOut();
+      } catch (e) {}
+    }
+
     this.currentUser = null;
     this.token = null;
     this.masterKey = null;
@@ -289,13 +431,11 @@ class NovaSyncService {
     localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem(STORAGE_KEYS.SYNC_STATUS);
+    sessionStorage.removeItem(STORAGE_KEYS.MASTER_KEY);
 
     this.notify();
   }
 
-  /**
-   * Update sync preferences
-   */
   public updatePreferences(prefs: Partial<SyncPreferences>) {
     if (!this.currentUser) return;
     this.currentUser.syncPreferences = {
@@ -308,9 +448,6 @@ class NovaSyncService {
 
   // --- DATA SYNC ENGINE ---
 
-  /**
-   * Perform a full push/pull cloud sync
-   */
   public async syncData(localData: {
     bookmarks: Bookmark[];
     folders: Folder[];
@@ -344,9 +481,44 @@ class NovaSyncService {
 
     try {
       const prefs = this.currentUser.syncPreferences || DEFAULT_PREFERENCES;
-      const cloudVaultKey = STORAGE_KEYS.CLOUD_VAULT_PREFIX + this.currentUser.id;
-      const remoteRaw = localStorage.getItem(cloudVaultKey);
-      let remoteBundle: SyncDataBundle | null = remoteRaw ? JSON.parse(remoteRaw) : null;
+      const supabase = getSupabaseClient();
+      let remoteBundle: SyncDataBundle | null = null;
+
+      // Try fetching from Supabase if configured
+      if (isSupabaseConfigured()) {
+        try {
+          const { data, error } = await supabase
+            .from('nova_sync_vaults')
+            .select('*')
+            .eq('user_id', this.currentUser.id)
+            .maybeSingle();
+
+          if (!error && data) {
+            remoteBundle = {
+              version: 1,
+              timestamp: data.timestamp,
+              userId: data.user_id,
+              bookmarks: data.bookmarks,
+              folders: data.folders,
+              history: data.history,
+              encryptedPasswords: data.encrypted_passwords,
+              passwordsSalt: data.passwords_salt,
+              passwordsIv: data.passwords_iv,
+              settings: data.settings,
+              workspaces: data.workspaces
+            };
+          }
+        } catch (err) {
+          console.warn('[NovaSync] Supabase fetch error, using local vault:', err);
+        }
+      }
+
+      // If no remote bundle found from Supabase, check local cache
+      if (!remoteBundle) {
+        const cloudVaultKey = STORAGE_KEYS.CLOUD_VAULT_PREFIX + this.currentUser.id;
+        const remoteRaw = localStorage.getItem(cloudVaultKey);
+        if (remoteRaw) remoteBundle = JSON.parse(remoteRaw);
+      }
 
       let mergedBookmarks = [...localData.bookmarks];
       let mergedFolders = [...localData.folders];
@@ -355,43 +527,33 @@ class NovaSyncService {
       let mergedSettings = { ...localData.settings };
       let mergedWorkspaces = [...localData.workspaces];
 
-      // Pull & merge remote bundle if it exists
+      // Merge remote bundle if exists
       if (remoteBundle) {
-        // Merge Bookmarks
         if (prefs.syncBookmarks && remoteBundle.bookmarks) {
           const localMap = new Map(localData.bookmarks.map(b => [b.id, b]));
           remoteBundle.bookmarks.forEach(rb => {
-            if (!localMap.has(rb.id)) {
-              localMap.set(rb.id, rb);
-            }
+            if (!localMap.has(rb.id)) localMap.set(rb.id, rb);
           });
           mergedBookmarks = Array.from(localMap.values());
         }
 
-        // Merge Folders
         if (prefs.syncBookmarks && remoteBundle.folders) {
           const folderMap = new Map(localData.folders.map(f => [f.id, f]));
           remoteBundle.folders.forEach(rf => {
-            if (!folderMap.has(rf.id)) {
-              folderMap.set(rf.id, rf);
-            }
+            if (!folderMap.has(rf.id)) folderMap.set(rf.id, rf);
           });
           mergedFolders = Array.from(folderMap.values());
         }
 
-        // Merge History
         if (prefs.syncHistory && remoteBundle.history) {
           const historyMap = new Map(localData.history.map(h => [h.id || `${h.url}_${h.timestamp}`, h]));
           remoteBundle.history.forEach(rh => {
             const key = rh.id || `${rh.url}_${rh.timestamp}`;
-            if (!historyMap.has(key)) {
-              historyMap.set(key, rh);
-            }
+            if (!historyMap.has(key)) historyMap.set(key, rh);
           });
           mergedHistory = Array.from(historyMap.values()).sort((a, b) => b.timestamp - a.timestamp);
         }
 
-        // Merge Passwords (E2EE Decryption)
         if (prefs.syncPasswords && remoteBundle.encryptedPasswords && remoteBundle.passwordsSalt && remoteBundle.passwordsIv && this.masterKey) {
           try {
             const decryptedRemotePasswords = await this.decryptPasswords(
@@ -404,59 +566,74 @@ class NovaSyncService {
             const passMap = new Map(localData.passwords.map(p => [passKey(p), p]));
             decryptedRemotePasswords.forEach((rp: any) => {
               const k = passKey(rp);
-              if (!passMap.has(k)) {
-                passMap.set(k, rp);
-              }
+              if (!passMap.has(k)) passMap.set(k, rp);
             });
             mergedPasswords = Array.from(passMap.values());
           } catch (e) {
-            console.warn('[NovaSync] Skipping remote passwords decryption due to key mismatch:', e);
+            console.warn('[NovaSync] Skipping remote passwords decryption:', e);
           }
         }
 
-        // Merge Settings
         if (prefs.syncSettings && remoteBundle.settings) {
-          mergedSettings = {
-            ...localData.settings,
-            ...remoteBundle.settings
-          };
+          mergedSettings = { ...localData.settings, ...remoteBundle.settings };
         }
 
-        // Merge Workspaces
         if (prefs.syncWorkspaces && remoteBundle.workspaces) {
           const wsMap = new Map(localData.workspaces.map(w => [w.id, w]));
           remoteBundle.workspaces.forEach(rw => {
-            if (!wsMap.has(rw.id)) {
-              wsMap.set(rw.id, rw);
-            }
+            if (!wsMap.has(rw.id)) wsMap.set(rw.id, rw);
           });
           mergedWorkspaces = Array.from(wsMap.values());
         }
       }
 
-      // Now create updated cloud payload bundle
+      // Encrypt sensitive passwords locally before pushing
       let encryptedPassPayload: { ciphertext: string; salt: string; iv: string } | undefined;
       if (prefs.syncPasswords && this.masterKey && mergedPasswords.length > 0) {
         encryptedPassPayload = await this.encryptPasswords(mergedPasswords, this.masterKey);
       }
 
+      const syncTimestamp = Date.now();
+
+      // Upsert to Supabase if configured
+      if (isSupabaseConfigured()) {
+        try {
+          await supabase.from('nova_sync_vaults').upsert({
+            user_id: this.currentUser.id,
+            timestamp: syncTimestamp,
+            bookmarks: prefs.syncBookmarks ? mergedBookmarks : [],
+            folders: prefs.syncBookmarks ? mergedFolders : [],
+            history: prefs.syncHistory ? mergedHistory.slice(0, 1000) : [],
+            encrypted_passwords: encryptedPassPayload?.ciphertext || null,
+            passwords_salt: encryptedPassPayload?.salt || null,
+            passwords_iv: encryptedPassPayload?.iv || null,
+            settings: prefs.syncSettings ? mergedSettings : {},
+            workspaces: prefs.syncWorkspaces ? mergedWorkspaces : [],
+            updated_at: new Date().toISOString()
+          });
+        } catch (err) {
+          console.warn('[NovaSync] Supabase upsert error:', err);
+        }
+      }
+
+      // Also save locally as offline fallback
+      const cloudVaultKey = STORAGE_KEYS.CLOUD_VAULT_PREFIX + this.currentUser.id;
       const newBundle: SyncDataBundle = {
         version: 1,
-        timestamp: Date.now(),
+        timestamp: syncTimestamp,
         userId: this.currentUser.id,
         bookmarks: prefs.syncBookmarks ? mergedBookmarks : undefined,
         folders: prefs.syncBookmarks ? mergedFolders : undefined,
-        history: prefs.syncHistory ? mergedHistory.slice(0, 1000) : undefined, // Keep last 1000 history items
+        history: prefs.syncHistory ? mergedHistory.slice(0, 1000) : undefined,
         encryptedPasswords: encryptedPassPayload?.ciphertext,
         passwordsSalt: encryptedPassPayload?.salt,
         passwordsIv: encryptedPassPayload?.iv,
         settings: prefs.syncSettings ? mergedSettings : undefined,
         workspaces: prefs.syncWorkspaces ? mergedWorkspaces : undefined
       };
-
-      // Save to cloud vault
       localStorage.setItem(cloudVaultKey, JSON.stringify(newBundle));
-      this.lastSyncedAt = Date.now();
+
+      this.lastSyncedAt = syncTimestamp;
       localStorage.setItem(STORAGE_KEYS.SYNC_STATUS, JSON.stringify({ lastSyncedAt: this.lastSyncedAt }));
 
       const syncedCounts = {
@@ -497,6 +674,7 @@ class NovaSyncService {
       lastSyncedAt: this.lastSyncedAt,
       isSyncing: this.isSyncing,
       syncError: this.lastError,
+      backend: isSupabaseConfigured() ? 'supabase' : 'local_vault',
       itemsSynced: {
         bookmarks: 0,
         history: 0,
@@ -511,6 +689,13 @@ class NovaSyncService {
     listener(this.getStatus());
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  public onRemoteChange(listener: () => void) {
+    this.remoteSyncListeners.add(listener);
+    return () => {
+      this.remoteSyncListeners.delete(listener);
     };
   }
 

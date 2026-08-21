@@ -18,7 +18,8 @@ import {
   FolderTree,
   Eye,
   EyeOff,
-  Sparkles
+  Sparkles,
+  Zap
 } from 'lucide-react';
 import { syncService, NovaUser, SyncStatus, SyncPreferences } from '../services/syncService';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
@@ -230,9 +231,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   {/* Sync Control & Status */}
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-blue-500/5 border border-cyan-500/15 flex items-center justify-between">
                     <div>
-                      <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 block">
-                        Cloud Sync Status
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 block">
+                          Cloud Sync Status
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          {syncStatus.backend === 'supabase' ? '⚡ Supabase Realtime' : '📁 Local Vault'}
+                        </span>
+                      </div>
                       <span className="text-[11px] text-slate-400 dark:text-slate-500">
                         Last sync: {formatLastSync(syncStatus.lastSyncedAt)}
                       </span>

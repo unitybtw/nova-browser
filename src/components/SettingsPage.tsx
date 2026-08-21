@@ -5,6 +5,7 @@ import { UserSettings } from '../App';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { getSupabaseConfig, saveSupabaseConfig, isSupabaseConfigured } from '../services/supabaseClient';
 
 const PasswordList = () => {
   const [passwords, setPasswords] = useState<any[]>([]);
@@ -1155,6 +1156,89 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </form>
                   </div>
                 )}
+                {/* SUPABASE CLOUD BACKEND CONFIGURATION */}
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4 mt-6">
+                  <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700/50 pb-3">
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-emerald-500" />
+                        Supabase Cloud Database Settings
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Configure your own free Supabase PostgreSQL project for cross-device sync.
+                      </p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      isSupabaseConfigured() 
+                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                        : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+                    }`}>
+                      {isSupabaseConfigured() ? '⚡ Supabase Active' : '📁 Local Vault Mode'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Supabase Project URL</label>
+                      <input
+                        type="url"
+                        defaultValue={getSupabaseConfig().url}
+                        id="supabase-url-input"
+                        placeholder="https://your-project-id.supabase.co"
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Supabase Anon Public API Key</label>
+                      <input
+                        type="password"
+                        defaultValue={getSupabaseConfig().anonKey.includes('dummyKeyForDemo') ? '' : getSupabaseConfig().anonKey}
+                        id="supabase-key-input"
+                        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..."
+                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2">
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                      SQL Schema: <span className="font-mono text-cyan-600 dark:text-cyan-400">supabase_schema.sql</span> included in project root.
+                    </p>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          saveSupabaseConfig('', '');
+                          const urlInput = document.getElementById('supabase-url-input') as HTMLInputElement;
+                          const keyInput = document.getElementById('supabase-key-input') as HTMLInputElement;
+                          if (urlInput) urlInput.value = '';
+                          if (keyInput) keyInput.value = '';
+                          setSyncMsg('Reset to default configuration');
+                          setTimeout(() => setSyncMsg(null), 3000);
+                        }}
+                        className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                      >
+                        Reset Default
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          const urlInput = document.getElementById('supabase-url-input') as HTMLInputElement;
+                          const keyInput = document.getElementById('supabase-key-input') as HTMLInputElement;
+                          if (urlInput && keyInput) {
+                            saveSupabaseConfig(urlInput.value, keyInput.value);
+                            setSyncMsg('Supabase project configuration saved!');
+                            setTimeout(() => setSyncMsg(null), 3000);
+                          }
+                        }}
+                        className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                      >
+                        Save & Connect
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </section>
             </div>
           )}
