@@ -1089,9 +1089,11 @@ function App() {
 
     const handleOpenSidePanel = () => setIsSidePanelOpen(true);
     const handleOpenWorkspaceManager = () => setIsWorkspaceManagerOpen(true);
+    const handleOpenAccountModal = () => setIsAccountModalOpen(true);
     
     window.addEventListener('open-ai-sidepanel', handleOpenSidePanel);
     window.addEventListener('open-workspace-manager', handleOpenWorkspaceManager);
+    window.addEventListener('open-account-modal', handleOpenAccountModal);
 
     return () => {
       if (typeof cleanupShortcut === 'function') cleanupShortcut();
@@ -1100,6 +1102,7 @@ function App() {
       if (typeof cleanupExtInstall === 'function') cleanupExtInstall();
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
       window.removeEventListener('open-workspace-manager', handleOpenWorkspaceManager);
+      window.removeEventListener('open-account-modal', handleOpenAccountModal);
     };
   }, []);
 
