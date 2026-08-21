@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark } from 'lucide-react';
 import { UserSettings } from '../App';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
@@ -923,51 +923,56 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* NOVA ACCOUNT & SYNC */}
           {activeTab === 'account' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <section>
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2.5">
-                      <Cloud className="w-5 h-5 text-cyan-500" />
-                      Nova Account & Multi-Device Sync
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                      Synchronize your bookmarks, history, encrypted passwords, settings and workspaces across devices.
-                    </p>
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+              <section className="space-y-6">
+                <div className="border-b border-slate-200 dark:border-slate-800/80 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-sm shadow-cyan-500/20">
+                      <Cloud className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                        Nova Cloud Sync
+                      </h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                        Access your bookmarks, saved passwords, browsing history, and settings from any computer.
+                      </p>
+                    </div>
                   </div>
                 </div>
 
                 {syncMsg && (
-                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5 mb-6">
+                  <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
                     <Check className="w-4 h-4 shrink-0" />
                     <span>{syncMsg}</span>
                   </div>
                 )}
                 {syncErr && (
-                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5 mb-6">
+                  <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
                     <ShieldAlert className="w-4 h-4 shrink-0" />
                     <span>{syncErr}</span>
                   </div>
                 )}
 
                 {syncStatus.isLoggedIn && syncStatus.user ? (
+                  /* LOGGED IN VIEW */
                   <div className="space-y-6">
-                    {/* User Info Card */}
-                    <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    {/* User Profile Card */}
+                    <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-lg flex items-center justify-center shadow-md shadow-cyan-500/20 uppercase">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-xl flex items-center justify-center shadow-md shadow-cyan-500/20 uppercase">
                           {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">{syncStatus.user.displayName}</h3>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                              <ShieldCheck className="w-3 h-3" /> E2EE Active
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                              <ShieldCheck className="w-3 h-3" /> End-to-End Encrypted
                             </span>
                           </div>
                           <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{syncStatus.user.email}</p>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                            Account ID: <span className="font-mono">{syncStatus.user.id}</span>
+                            Status: <span className="text-emerald-500 font-medium">● Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                           </p>
                         </div>
                       </div>
@@ -979,7 +984,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             setSyncMsg(null);
                             setSyncLoading(true);
                             try {
-                              // Trigger sync from local storage
                               const rawB = localStorage.getItem('bookmarks');
                               const rawF = localStorage.getItem('folders_session');
                               const rawH = localStorage.getItem('browsing_history');
@@ -996,7 +1000,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 workspaces: rawW ? JSON.parse(rawW) : []
                               });
 
-                              setSyncMsg('Sync successfully completed!');
+                              setSyncMsg('Sync completed successfully!');
                               setTimeout(() => setSyncMsg(null), 3000);
                             } catch (e: any) {
                               setSyncErr(e.message || 'Sync failed');
@@ -1005,7 +1009,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             }
                           }}
                           disabled={syncLoading}
-                          className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+                          className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                         >
                           <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
                           <span>{syncLoading ? 'Syncing...' : 'Sync Now'}</span>
@@ -1013,43 +1017,99 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
                         <button
                           onClick={() => syncService.logout()}
-                          className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 rounded-xl text-xs font-semibold transition-colors"
+                          className="px-4 py-2.5 bg-slate-100 hover:bg-red-50 hover:text-red-600 dark:bg-slate-700/50 dark:hover:bg-red-500/10 dark:text-slate-300 dark:hover:text-red-400 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
                         >
                           Sign Out
                         </button>
                       </div>
                     </div>
 
-                    {/* Sync Categories List */}
-                    <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 border-b border-slate-200 dark:border-slate-700/50 pb-2">
-                        Sync Preferences
-                      </h3>
+                    {/* Pair Device Code Card */}
+                    <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                            <Laptop className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Pair Another Computer</h4>
+                            <p className="text-xs text-slate-400 dark:text-slate-500">Quickly transfer your data to a second device using a 1-click sync code.</p>
+                          </div>
+                        </div>
 
-                      <div className="space-y-3">
+                        <button
+                          onClick={async () => {
+                            try {
+                              const rawB = localStorage.getItem('bookmarks');
+                              const rawF = localStorage.getItem('folders_session');
+                              const rawH = localStorage.getItem('browsing_history');
+                              const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                              const rawW = localStorage.getItem('workspaces_session');
+                              const rawS = localStorage.getItem('user_settings');
+
+                              const code = await syncService.generateSyncChainCode({
+                                bookmarks: rawB ? JSON.parse(rawB) : [],
+                                folders: rawF ? JSON.parse(rawF) : [],
+                                history: rawH ? JSON.parse(rawH) : [],
+                                passwords: rawP ? JSON.parse(rawP) : [],
+                                settings: rawS ? JSON.parse(rawS) : ({} as any),
+                                workspaces: rawW ? JSON.parse(rawW) : []
+                              });
+
+                              navigator.clipboard.writeText(code);
+                              setCopiedSyncCode(true);
+                              setSyncMsg(`Sync Code Copied to Clipboard: ${code}`);
+                              setTimeout(() => setCopiedSyncCode(false), 3000);
+                            } catch (err: any) {
+                              setSyncErr(err.message || 'Failed to generate code');
+                            }
+                          }}
+                          className="px-4 py-2 bg-slate-100 dark:bg-slate-700/60 hover:bg-cyan-500 hover:text-white dark:hover:bg-cyan-500 dark:hover:text-white text-slate-700 dark:text-slate-200 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Link2 className="w-3.5 h-3.5" />
+                          <span>{copiedSyncCode ? 'Code Copied!' : 'Copy Device Code'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Synced Categories */}
+                    <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-sm">
+                      <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                        Synchronized Data
+                      </h4>
+
+                      <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                         {[
-                          { key: 'syncBookmarks', label: 'Bookmarks & Folders', desc: 'Sync your saved websites and bookmark bar folders' },
-                          { key: 'syncPasswords', label: 'Saved Passwords', desc: 'Zero-knowledge client-side encrypted with your master key' },
-                          { key: 'syncHistory', label: 'Browsing History', desc: 'Sync recently visited pages across all your Nova installations' },
-                          { key: 'syncSettings', label: 'Settings & Appearance', desc: 'Theme, wallpaper, search engine, and keyboard shortcuts' },
-                          { key: 'syncWorkspaces', label: 'Workspaces', desc: 'Custom tab workspaces, icons, and arrangements' },
+                          { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark, desc: 'Your saved bookmarks and toolbar folders' },
+                          { key: 'syncPasswords', label: 'Saved Passwords', icon: Key, desc: 'Zero-knowledge AES-256 encrypted passwords' },
+                          { key: 'syncHistory', label: 'Browsing History', icon: Cloud, desc: 'Your visited page history across devices' },
+                          { key: 'syncSettings', label: 'Settings & Appearance', icon: Settings, desc: 'Themes, search engine, shortcuts' },
+                          { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree, desc: 'Custom tab workspaces and icons' },
                         ].map(item => {
                           const isChecked = syncStatus.user?.syncPreferences[item.key as keyof SyncPreferences] ?? true;
+                          const Icon = item.icon;
+
                           return (
-                            <div
-                              key={item.key}
+                            <div 
+                              key={item.key} 
                               onClick={() => {
                                 if (syncStatus.user) {
                                   syncService.updatePreferences({ [item.key]: !isChecked });
                                 }
                               }}
-                              className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900/80 transition-colors cursor-pointer"
+                              className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity"
                             >
-                              <div>
-                                <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">{item.label}</h4>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400">{item.desc}</p>
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                                  <Icon className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 block">{item.label}</span>
+                                  <span className="text-[11px] text-slate-400 dark:text-slate-500">{item.desc}</span>
+                                </div>
                               </div>
-                              <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isChecked ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
+
+                              <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isChecked ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
                                 <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isChecked ? 'translate-x-4' : 'translate-x-0'}`} />
                               </div>
                             </div>
@@ -1059,246 +1119,189 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     </div>
                   </div>
                 ) : (
-                  /* Inline Authentication Card */
-                  <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 max-w-lg mx-auto space-y-6">
-                    <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                      <button
-                        onClick={() => { setSyncAuthMode('login'); setSyncErr(null); }}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                          syncAuthMode === 'login' 
-                            ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-xs' 
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
-                      >
-                        Sign In
-                      </button>
-                      <button
-                        onClick={() => { setSyncAuthMode('register'); setSyncErr(null); }}
-                        className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${
-                          syncAuthMode === 'register' 
-                            ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-xs' 
-                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                        }`}
-                      >
-                        Create Account
-                      </button>
-                    </div>
+                  /* UNAUTHENTICATED HERO & SIGN IN / PAIRING */
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Card 1: Account Login / Register */}
+                    <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-5 shadow-sm">
+                      <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+                        <button
+                          onClick={() => { setSyncAuthMode('login'); setSyncErr(null); }}
+                          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                            syncAuthMode === 'login' 
+                              ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-xs' 
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Sign In
+                        </button>
+                        <button
+                          onClick={() => { setSyncAuthMode('register'); setSyncErr(null); }}
+                          className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                            syncAuthMode === 'register' 
+                              ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 shadow-xs' 
+                              : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                          }`}
+                        >
+                          Create Account
+                        </button>
+                      </div>
 
-                    <form
-                      onSubmit={async (e) => {
-                        e.preventDefault();
-                        setSyncErr(null);
-                        setSyncMsg(null);
-                        setSyncLoading(true);
-                        try {
-                          if (syncAuthMode === 'login') {
-                            await syncService.login(syncEmail, syncPassword);
-                            setSyncMsg('Logged in successfully!');
-                          } else {
-                            await syncService.register(syncEmail, syncPassword, syncName);
-                            setSyncMsg('Account created successfully!');
+                      <form
+                        onSubmit={async (e) => {
+                          e.preventDefault();
+                          setSyncErr(null);
+                          setSyncMsg(null);
+                          setSyncLoading(true);
+                          try {
+                            if (syncAuthMode === 'login') {
+                              await syncService.login(syncEmail, syncPassword);
+                              setSyncMsg('Logged in successfully!');
+                            } else {
+                              await syncService.register(syncEmail, syncPassword, syncName);
+                              setSyncMsg('Account created successfully!');
+                            }
+                            setSyncEmail('');
+                            setSyncPassword('');
+                            setSyncName('');
+                          } catch (err: any) {
+                            setSyncErr(err.message || 'Authentication failed');
+                          } finally {
+                            setSyncLoading(false);
                           }
-                          setSyncEmail('');
-                          setSyncPassword('');
-                          setSyncName('');
-                        } catch (err: any) {
-                          setSyncErr(err.message || 'Authentication failed');
-                        } finally {
-                          setSyncLoading(false);
-                        }
-                      }}
-                      className="space-y-4"
-                    >
-                      {syncAuthMode === 'register' && (
+                        }}
+                        className="space-y-4"
+                      >
+                        {syncAuthMode === 'register' && (
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Name</label>
+                            <input
+                              type="text"
+                              required
+                              value={syncName}
+                              onChange={(e) => setSyncName(e.target.value)}
+                              placeholder="Your Name"
+                              className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500"
+                            />
+                          </div>
+                        )}
+
                         <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Name</label>
+                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Email Address</label>
                           <input
-                            type="text"
+                            type="email"
                             required
-                            value={syncName}
-                            onChange={(e) => setSyncName(e.target.value)}
-                            placeholder="Your Name"
+                            value={syncEmail}
+                            onChange={(e) => setSyncEmail(e.target.value)}
+                            placeholder="name@example.com"
                             className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500"
                           />
                         </div>
-                      )}
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Email Address</label>
-                        <input
-                          type="email"
-                          required
-                          value={syncEmail}
-                          onChange={(e) => setSyncEmail(e.target.value)}
-                          placeholder="name@example.com"
-                          className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Password</label>
-                        <input
-                          type="password"
-                          required
-                          value={syncPassword}
-                          onChange={(e) => setSyncPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={syncLoading}
-                        className="w-full py-2.5 rounded-xl font-semibold text-xs bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {syncLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                        <span>{syncAuthMode === 'login' ? 'Sign In & Sync' : 'Create Nova Account'}</span>
-                      </button>
-                    </form>
-                  </div>
-                )}
-                {/* SYNC CHAIN PAIRING CARD */}
-                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-3 mt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <Link2 className="w-4 h-4 text-cyan-500" />
-                        Pair Another Computer (Brave-Style Sync Chain)
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        Transfer all bookmarks, passwords, and history to another laptop or desktop using a secure 1-click code.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={async () => {
-                        try {
-                          const rawB = localStorage.getItem('bookmarks');
-                          const rawF = localStorage.getItem('folders_session');
-                          const rawH = localStorage.getItem('browsing_history');
-                          const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-                          const rawW = localStorage.getItem('workspaces_session');
-                          const rawS = localStorage.getItem('user_settings');
-
-                          const code = await syncService.generateSyncChainCode({
-                            bookmarks: rawB ? JSON.parse(rawB) : [],
-                            folders: rawF ? JSON.parse(rawF) : [],
-                            history: rawH ? JSON.parse(rawH) : [],
-                            passwords: rawP ? JSON.parse(rawP) : [],
-                            settings: rawS ? JSON.parse(rawS) : ({} as any),
-                            workspaces: rawW ? JSON.parse(rawW) : []
-                          });
-
-                          navigator.clipboard.writeText(code);
-                          setCopiedSyncCode(true);
-                          setSyncMsg(`Sync Code Generated & Copied: ${code}`);
-                          setTimeout(() => setCopiedSyncCode(false), 3000);
-                        } catch (err: any) {
-                          setSyncErr(err.message || 'Failed to generate code');
-                        }
-                      }}
-                      className="px-4 py-2 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>{copiedSyncCode ? 'Code Copied!' : 'Generate Sync Code'}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* ADVANCED SUPABASE CLOUD BACKEND (COLLAPSIBLE) */}
-                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4 mt-6">
-                  <div 
-                    onClick={() => setShowAdvancedDb(!showAdvancedDb)}
-                    className="flex items-center justify-between cursor-pointer select-none"
-                  >
-                    <div>
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-emerald-500" />
-                        Advanced: Custom Supabase Project (Optional)
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                        For developers who want to self-host their own database instead of built-in zero-config sync.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        isSupabaseConfigured() 
-                          ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
-                          : 'bg-slate-100 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300'
-                      }`}>
-                        {isSupabaseConfigured() ? '⚡ Custom Active' : 'Default Zero-Config'}
-                      </span>
-                      {showAdvancedDb ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                    </div>
-                  </div>
-
-                  {showAdvancedDb && (
-                    <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700/50 animate-in fade-in duration-300">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Supabase Project URL</label>
-                          <input
-                            type="url"
-                            defaultValue={getSupabaseConfig().url}
-                            id="supabase-url-input"
-                            placeholder="https://your-project-id.supabase.co"
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
-                          />
-                        </div>
 
                         <div className="space-y-1">
-                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Supabase Anon Public API Key</label>
+                          <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Password</label>
                           <input
                             type="password"
-                            defaultValue={getSupabaseConfig().anonKey.includes('dummyKeyForDemo') ? '' : getSupabaseConfig().anonKey}
-                            id="supabase-key-input"
-                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI..."
-                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                            required
+                            value={syncPassword}
+                            onChange={(e) => setSyncPassword(e.target.value)}
+                            placeholder="••••••••"
+                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
                           />
                         </div>
+
+                        <button
+                          type="submit"
+                          disabled={syncLoading}
+                          className="w-full py-3 rounded-xl font-bold text-xs bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white shadow-md shadow-cyan-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          {syncLoading && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
+                          <span>{syncAuthMode === 'login' ? 'Sign In & Sync' : 'Create Nova Account'}</span>
+                        </button>
+                      </form>
+                    </div>
+
+                    {/* Card 2: 1-Click Device Pairing */}
+                    <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-sm">
+                      <div className="space-y-3">
+                        <div className="p-3 w-fit rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                          <Laptop className="w-6 h-6" />
+                        </div>
+                        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+                          Quick Device Pairing
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Want to transfer all your bookmarks, passwords, and history to another computer without creating an account? Use a temporary 1-click device pairing code.
+                        </p>
                       </div>
 
-                      <div className="flex items-center justify-between pt-2">
-                        <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                          SQL Schema: <span className="font-mono text-cyan-600 dark:text-cyan-400">supabase_schema.sql</span> included in project root.
-                        </p>
-
+                      <div className="space-y-3 pt-2">
                         <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            placeholder="Enter pairing code: nova-xxxx..."
+                            id="quick-pair-input"
+                            className="flex-1 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
+                          />
                           <button
-                            onClick={() => {
-                              saveSupabaseConfig('', '');
-                              const urlInput = document.getElementById('supabase-url-input') as HTMLInputElement;
-                              const keyInput = document.getElementById('supabase-key-input') as HTMLInputElement;
-                              if (urlInput) urlInput.value = '';
-                              if (keyInput) keyInput.value = '';
-                              setSyncMsg('Reset to default zero-config');
-                              setTimeout(() => setSyncMsg(null), 3000);
-                            }}
-                            className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-                          >
-                            Reset Default
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              const urlInput = document.getElementById('supabase-url-input') as HTMLInputElement;
-                              const keyInput = document.getElementById('supabase-key-input') as HTMLInputElement;
-                              if (urlInput && keyInput) {
-                                saveSupabaseConfig(urlInput.value, keyInput.value);
-                                setSyncMsg('Custom Supabase configuration saved!');
-                                setTimeout(() => setSyncMsg(null), 3000);
+                            onClick={async () => {
+                              const input = document.getElementById('quick-pair-input') as HTMLInputElement;
+                              if (!input || !input.value.trim()) return;
+                              setSyncLoading(true);
+                              try {
+                                await syncService.joinSyncChain(input.value.trim());
+                                setSyncMsg('Device paired successfully! Data synced.');
+                              } catch (err: any) {
+                                setSyncErr(err.message || 'Pairing failed');
+                              } finally {
+                                setSyncLoading(false);
                               }
                             }}
-                            className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold transition-colors shadow-xs"
+                            className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shrink-0"
                           >
-                            Save & Connect
+                            Pair Device
                           </button>
                         </div>
+
+                        <div className="text-center pt-1">
+                          <span className="text-[11px] text-slate-400 dark:text-slate-500">or on this computer</span>
+                        </div>
+
+                        <button
+                          onClick={async () => {
+                            try {
+                              const rawB = localStorage.getItem('bookmarks');
+                              const rawF = localStorage.getItem('folders_session');
+                              const rawH = localStorage.getItem('browsing_history');
+                              const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                              const rawW = localStorage.getItem('workspaces_session');
+                              const rawS = localStorage.getItem('user_settings');
+
+                              const code = await syncService.generateSyncChainCode({
+                                bookmarks: rawB ? JSON.parse(rawB) : [],
+                                folders: rawF ? JSON.parse(rawF) : [],
+                                history: rawH ? JSON.parse(rawH) : [],
+                                passwords: rawP ? JSON.parse(rawP) : [],
+                                settings: rawS ? JSON.parse(rawS) : ({} as any),
+                                workspaces: rawW ? JSON.parse(rawW) : []
+                              });
+
+                              navigator.clipboard.writeText(code);
+                              setCopiedSyncCode(true);
+                              setSyncMsg(`Your Device Code: ${code} (Copied!)`);
+                              setTimeout(() => setCopiedSyncCode(false), 3000);
+                            } catch (err: any) {
+                              setSyncErr(err.message || 'Failed to generate code');
+                            }
+                          }}
+                          className="w-full py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                          <span>{copiedSyncCode ? 'Device Code Copied!' : 'Generate Code For This Computer'}</span>
+                        </button>
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </section>
             </div>
           )}
