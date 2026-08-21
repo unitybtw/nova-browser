@@ -59,32 +59,37 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
+    const controller = new AbortController();
     const fetchSuggestions = async () => {
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(inputValue.trim(), searchEngine, clientLocale);
-          if (Array.isArray(results)) {
+          if (Array.isArray(results) && !controller.signal.aborted) {
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(inputValue.trim())}&hl=${lang}&gl=${country}`);
+        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(inputValue.trim())}&hl=${lang}&gl=${country}`, { signal: controller.signal });
         if (response.ok) {
           const data = await response.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1])) {
+          if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted) {
             setSuggestions(data[1].slice(0, 5));
           }
         }
-      } catch (err) {
+      } catch (err: any) {
+        if (err.name === 'AbortError') return;
         // ignore errors
       }
     };
 
     const timer = setTimeout(fetchSuggestions, 150);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [inputValue, isAIMode, searchEngine]);
 
   // Compute matching items for list navigation

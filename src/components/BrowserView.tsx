@@ -623,7 +623,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               e.stopPropagation();
               onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
             }}
-            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 group-hover:scale-105"
+            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-colors shadow-lg shadow-indigo-600/30 flex items-center gap-2 group-hover:scale-105"
           >
             <Zap className="w-4 h-4" />
             Reload Tab

@@ -71,6 +71,23 @@ const DEFAULT_SPEED_DIALS = [
   { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' }
 ];
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: { 
+    opacity: 1, 
+    transition: { staggerChildren: 0.04, delayChildren: 0.01 }
+  }
+};
+
+const itemVariants: any = {
+  hidden: { opacity: 0, y: 10 },
+  visible: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
+  }
+};
+
 export const NewTabPage: React.FC<NewTabPageProps> = ({ 
   onNavigate,
   searchEngine = 'google',
@@ -264,22 +281,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = ({
     setSpeedDials(speedDials.filter((_: any, i: number) => i !== index));
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: { 
-      opacity: 1, 
-      transition: { staggerChildren: 0.04, delayChildren: 0.01 }
-    }
-  };
-
-  const itemVariants: any = {
-    hidden: { opacity: 0, y: 10 },
-    visible: { 
-      opacity: 1, 
-      y: 0, 
-      transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
-    }
-  };
 
   // Memoize particle arrays to prevent jitter/regeneration on keystrokes
   const starParticles = React.useMemo(() => {

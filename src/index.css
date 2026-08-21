@@ -78,7 +78,7 @@ h1, h2, h3, h4, h5, h6, .font-serif {
 
 /* Premium Interactive Globals */
 button {
-  transition-property: all;
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;
 }

@@ -31,7 +31,8 @@ import {
   Trash2,
   PanelLeft,
   Pin,
-  HelpCircle
+  HelpCircle,
+  Compass
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
@@ -422,13 +423,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     };
   }, []);
 
-  // Filter out blank new tabs so they do not duplicate the "+ New Tab" action button!
-  const visitedTabs = useMemo(() => tabs.filter(t => {
-    const isBlank = !t.url || t.url === 'nova://newtab' || t.url === 'about:blank' || t.url === 'https://newtab';
-    // If it's a blank new tab, don't show as a second "+ New Tab" item in the tab list
-    return !isBlank;
-  }), [tabs]);
-
   const renderTab = (tab: Tab, isNested: boolean = false) => {
     const isActive = tab.id === activeTabId;
     const isSplitChild = tab.id === splitTabId;
@@ -437,6 +431,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     if (isSplitChild && splitTabId && activeTabId) {
       return null;
     }
+
+    const isNewTabUrl = !tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
 
     return (
       <motion.div
@@ -491,7 +487,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         }}
         onMouseEnter={(e) => handleMouseEnter(tab, e)}
         onMouseLeave={handleMouseLeave}
-        className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-all duration-150 group/tab select-none ${
+        className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none ${
           isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
         } ${
           isDragOver
@@ -513,19 +509,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               <Clock className="w-3.5 h-3.5 opacity-70" />
             ) : tab.url === 'nova://downloads' ? (
               <Download className="w-3.5 h-3.5 opacity-70" />
+            ) : isNewTabUrl ? (
+              <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70" />
             )}
           </div>
           <span className="truncate text-[13px] tracking-tight flex-1">
-            {tab.title || tab.url || 'Tab'}
+            {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
           </span>
           {tab.isPinned && (
             <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
           )}
         </div>
 
-        <div className={`flex items-center gap-1 transition-all duration-150 shrink-0 ${
+        <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
           isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
         }`}>
           {tab.isMuted ? (
@@ -631,7 +629,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <form onSubmit={handleOmniboxSubmit}>
-            <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-all duration-200 border ${
+            <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-colors duration-200 border ${
               isOmniboxFocused 
                 ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10' 
                 : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
@@ -756,7 +754,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     if (onNavigate) onNavigate(fav.url);
                     else onNewTab(fav.url);
                   }}
-                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-all duration-150 shadow-xs cursor-pointer"
+                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-colors duration-150 shadow-xs cursor-pointer"
                   title={`${fav.name} (${fav.url})`}
                 >
                   <div className="w-4 h-4 flex items-center justify-center transition-transform duration-150 group-hover/fav:scale-110">
@@ -778,7 +776,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {favorites.length < 4 && (
               <button
                 onClick={() => setIsAddFavOpen(true)}
-                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
+                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
                 title="Add Favorite"
               >
                 <Plus className="w-3.5 h-3.5 opacity-60" />
@@ -900,7 +898,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 5. NEW TAB ACTION BUTTON (Arc Style: Highlights when on New Tab, opens Spotlight on click) */}
+        {/* 5. NEW TAB ACTION BUTTON */}
         <div 
           className="px-3 pb-1.5 no-drag"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -909,12 +907,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             whileHover={{ scale: 1.01 }}
             whileTap={{ scale: 0.98 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
-            className={`w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-colors text-left group cursor-pointer ${
-              isCurrentNewTab
-                ? 'bg-white text-slate-900 font-semibold border border-slate-200/80 shadow-xs dark:bg-white/12 dark:text-white dark:font-medium dark:border-white/10 dark:shadow-sm'
-                : 'hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white'
-            }`}
+            onClick={() => onNewTab()}
+            className="w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-colors text-left group cursor-pointer hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white"
           >
             <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
             <span className="text-[13px] tracking-tight flex-1">New Tab</span>
@@ -937,7 +931,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           <AnimatePresence>
             {/* Folders */}
             {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
-              const folderTabs = visitedTabs.filter(t => t.folderId === folder.id);
+              const folderTabs = tabs.filter(t => t.folderId === folder.id);
               return (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -957,7 +951,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-all group/folder"
+                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder"
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -990,8 +984,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               );
             })}
 
-            {/* Root Visited Tabs */}
-            {visitedTabs.filter(t => !t.folderId).map(tab => renderTab(tab, false))}
+            {/* Root Tabs */}
+            {tabs.filter(t => !t.folderId).map(tab => renderTab(tab, false))}
           </AnimatePresence>
         </div>
 
@@ -1074,7 +1068,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <motion.button
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.92 }}
-              onClick={() => onOpenSpotlight ? onOpenSpotlight() : onNewTab()}
+              onClick={() => onNewTab()}
               className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
               title="New Tab"
             >

@@ -179,6 +179,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.onvoiceschanged = updateWebVoices;
     }
+
+    return () => {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
+    };
   }, []);
 
   // Escape key support to close modals or reader mode

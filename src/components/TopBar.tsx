@@ -168,7 +168,7 @@ const MemoizedTabItem = React.memo(({
       title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
       className={`group flex items-center justify-between ${
         isPinned ? 'px-2 min-w-[38px] max-w-[38px] justify-center' : splitTab ? 'px-1.5 min-w-[120px] max-w-[320px]' : 'px-3 min-w-[120px] max-w-[240px]'
-      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-all no-drag relative ${
+      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative ${
         tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
         tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
         'h-[34px] rounded-t-xl border-t border-x'
@@ -260,7 +260,7 @@ const MemoizedTabItem = React.memo(({
             {tab.isMuted ? (
               <button
                 onClick={(e) => onToggleMuteTab(tab.id, e)}
-                className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
+                className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-colors shrink-0"
                 title="Unmute Tab"
               >
                 <VolumeX className="w-3.5 h-3.5 text-red-500" />
@@ -270,7 +270,7 @@ const MemoizedTabItem = React.memo(({
                 {onTogglePip && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onTogglePip(tab.id); }}
-                    className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-blue-500 dark:hover:bg-slate-700 transition-all shrink-0"
+                    className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-blue-500 dark:hover:bg-slate-700 transition-colors shrink-0"
                     title="Picture in Picture"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-picture-in-picture-2"><path d="M21 9V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v10c0 1.1.9 2 2 2h4"/><rect width="10" height="7" x="12" y="13" rx="2"/></svg>
@@ -278,7 +278,7 @@ const MemoizedTabItem = React.memo(({
                 )}
                 <button
                   onClick={(e) => onToggleMuteTab(tab.id, e)}
-                  className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-all shrink-0"
+                  className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 dark:hover:bg-slate-700 transition-colors shrink-0"
                   title="Mute Tab"
                 >
                   <Volume2 className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
@@ -298,7 +298,7 @@ const MemoizedTabItem = React.memo(({
                   e.stopPropagation();
                   onCloseTab(tab.id, e);
                 }}
-                className={`p-0.5 rounded-full transition-all shrink-0 ${
+                className={`p-0.5 rounded-full transition-colors shrink-0 ${
                   isActive
                     ? 'hover:bg-slate-200 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
                     : 'opacity-0 group-hover:opacity-100 hover:bg-slate-300 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
@@ -478,7 +478,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
 
   return (
-    <div className="flex-1 flex w-full mx-1 transition-all duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
+    <div className="flex-1 flex w-full mx-1 duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
       <div className="w-full relative">
         <form onSubmit={handleSearchSubmit} className="relative group w-full">
           <div 
@@ -560,7 +560,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               setTimeout(() => setShowSuggestions(false), 200);
             }}
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
-            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-300 shadow-2xs ${
+            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${
               isIncognito 
                 ? 'pl-28 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
                 : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
@@ -587,7 +587,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               <button 
                 type="button"
                 onClick={onResetZoom}
-                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-all hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
+                className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
                 title="Zoom Level (Click to reset 100%)"
               >
                 {Math.round(activeTab.zoomFactor * 100)}%
@@ -598,7 +598,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               <button 
                 type="button" 
                 onClick={onToggleReaderMode}
-                className={`p-1 rounded-lg transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+                className={`p-1 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
                 title="Toggle Reader Mode"
               >
                 <BookOpen className="w-3.5 h-3.5" />
@@ -608,7 +608,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             <button 
               type="button" 
               onClick={onToggleBookmark}
-              className={`p-1 rounded-lg transition-all ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+              className={`p-1 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
               title="Bookmark Page"
             >
               <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-cyan-500 text-cyan-500' : ''}`} />
@@ -869,24 +869,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     }
   };
 
-  const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
 
-  useEffect(() => {
-    let cleanup: (() => void) | void;
-    if ((window as any).electronAPI?.onAdBlocked) {
-      cleanup = (window as any).electronAPI.onAdBlocked((_: any, data: { tabId: string }) => {
-        const tab = tabsRef.current.find(t => t.id === data.tabId);
-        if (tab) {
-          tab.blockedAdsCount = (tab.blockedAdsCount || 0) + 1;
-          setForceUpdate(v => v + 1);
-        }
-      });
-    }
-    return () => {
-      if (typeof cleanup === 'function') cleanup();
-    };
-  }, []);
 
   useEffect(() => {
     const fetchWhitelist = async () => {
@@ -1223,7 +1206,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             whileHover={{ scale: 1.04 }} 
             whileTap={{ scale: 0.96 }}
             onClick={onToggleAIAssistant}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all font-semibold text-xs shrink-0 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-colors font-semibold text-xs shrink-0 ${
               isIncognito 
                 ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20' 
                 : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 shadow-xs'
@@ -1310,7 +1293,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <button
               ref={downloadsBtnRef}
               onClick={() => setIsDownloadsOpen(!isDownloadsOpen)}
-              className={`p-1.5 rounded-lg transition-all relative cursor-pointer ${
+              className={`p-1.5 rounded-lg transition-colors relative cursor-pointer ${
                 (activeDownloadsCount || 0) > 0
                   ? 'text-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20 shadow-xs'
                   : isIncognito 

@@ -142,7 +142,7 @@ function App() {
     } catch (e) {}
 
     if (startupBehavior === 'continue') {
-      const saved = localStorage.getItem('tabs_session');
+      const saved = localStorage.getItem('nova_session_tabs');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
@@ -170,6 +170,8 @@ function App() {
     }
     return tabs[0]?.id || '1';
   });
+  const activeTabIdRef = useRef(activeTabId);
+  useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
 
   const [folders, setFolders] = useState<Folder[]>(() => {
     if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
@@ -231,6 +233,8 @@ function App() {
   const [splitTabId, setSplitTabId] = useState<string | null>(() => {
     return demoParams.isDemo && demoParams.feature === 'split' ? '2' : null;
   });
+  const splitTabIdRef = useRef(splitTabId);
+  useEffect(() => { splitTabIdRef.current = splitTabId; }, [splitTabId]);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [extensions, setExtensions] = useState<Extension[]>([]);
@@ -300,10 +304,12 @@ function App() {
   }, [closeAllModals]);
 
   // Onboarding state
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(true);
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    if (demoParams.isDemo) return false;
+    return localStorage.getItem('nova_onboarding_complete') !== 'true';
+  });
 
   useEffect(() => {
-    setShowOnboarding(true);
     (window as any).openOnboarding = () => setShowOnboarding(true);
   }, []);
 
@@ -664,8 +670,8 @@ function App() {
       setTabs(prevTabs =>
         prevTabs.map(tab => {
           if (
-            tab.id === activeTabId ||
-            tab.id === splitTabId ||
+            tab.id === activeTabIdRef.current ||
+            tab.id === splitTabIdRef.current ||
             tab.isPlayingAudio ||
             tab.isPinned ||
             tab.isSuspended ||
@@ -683,7 +689,7 @@ function App() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [activeTabId, splitTabId, settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
+  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
 
   // Track closed tabs for Cmd+Shift+T
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
@@ -891,7 +897,7 @@ function App() {
         } else if (command === 'new-incognito') {
           handleNewIncognitoTab();
         } else if (command === 'close-tab') {
-          if (activeTabId) handleCloseTab(activeTabId);
+          if (activeTabIdRef.current) handleCloseTab(activeTabIdRef.current);
         } else if (command === 'reopen-tab') {
           handleReopenClosedTab();
         } else if (command === 'open-help') {
@@ -2331,7 +2337,7 @@ function App() {
               onClick={handleExpandSidebar}
               onMouseEnter={handleHoverSidebarOpen}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
+              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
               title="Expand Sidebar (⌘S)"
             >
               <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
