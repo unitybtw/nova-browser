@@ -993,7 +993,7 @@ function App() {
         });
       };
 
-      cleanupDownloads = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
+      const removeDownloadListener = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
         pendingUpdates[data.id] = data;
         
         // Immediate update for new downloads or completion/cancellation
@@ -1005,6 +1005,14 @@ function App() {
           }, 100); // Fast 100ms UI progress update
         }
       });
+
+      cleanupDownloads = () => {
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+          throttleTimer = null;
+        }
+        if (typeof removeDownloadListener === 'function') removeDownloadListener();
+      };
     }
 
     let cleanupExtInstall: (() => void) | void;

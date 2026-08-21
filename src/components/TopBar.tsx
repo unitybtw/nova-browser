@@ -375,6 +375,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const [isSiteInfoOpen, setIsSiteInfoOpen] = useState(false);
   const siteInfoBtnRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isFocused) {
@@ -557,7 +564,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             }}
             onBlur={() => {
               setIsFocused(false);
-              setTimeout(() => setShowSuggestions(false), 200);
+              if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+              blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
             className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${

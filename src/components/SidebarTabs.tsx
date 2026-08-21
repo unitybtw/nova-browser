@@ -415,6 +415,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const omniboxInputRef = useRef<HTMLInputElement>(null);
+  const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Top Favorites state
   const [favorites, setFavorites] = useState<FavoriteApp[]>(() => {
@@ -568,6 +569,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
@@ -682,7 +684,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   }
                 }}
                 onBlur={() => {
-                  setTimeout(() => {
+                  if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
+                  blurTimerRef.current = setTimeout(() => {
                     setIsOmniboxFocused(false);
                     setShowSuggestions(false);
                   }, 200);
