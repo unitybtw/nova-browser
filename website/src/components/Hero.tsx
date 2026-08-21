@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Monitor, ChevronRight } from 'lucide-react';
-import { LiveAnimatedBrowser } from './LiveAnimatedBrowser';
+import { RealBrowserSandbox } from './RealBrowserSandbox';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -35,7 +35,7 @@ export const Hero: React.FC = () => {
             <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
             <span className="font-bold">NOVA BROWSER 1.0</span>
             <span className="text-white/20">|</span>
-            <span className="text-slate-300">Open-Source & AI-Native Browser</span>
+            <span className="text-slate-300">Open-Source & AI-Native Desktop Browser</span>
             <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
           </motion.div>
 
@@ -98,13 +98,13 @@ export const Hero: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Live Animated Authentic Browser Component */}
+        {/* Real Live Authentic Browser Sandbox */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         >
-          <LiveAnimatedBrowser />
+          <RealBrowserSandbox />
         </motion.div>
 
       </div>
