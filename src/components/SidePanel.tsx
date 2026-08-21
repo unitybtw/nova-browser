@@ -18,10 +18,19 @@ export const SidePanel = React.memo(({
   isOpen, 
   onClose
 }: SidePanelProps) => {
-  const [messages, setMessages] = useState<ChatCompletionMessageParam[]>([]);
+  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
+  const [messages, setMessages] = useState<ChatCompletionMessageParam[]>(() => {
+    if (isDemo) {
+      return [
+        { role: 'user', content: 'Can you summarize what makes Nova Browser special?' },
+        { role: 'assistant', content: '🚀 **Nova Browser** is an AI-native browser featuring:\n\n- **Autonomous MCP Agents**: Full browser control with visual cursor feedback.\n- **Zero-Knowledge Cloud Sync**: 1-click device pairing with AES-256-GCM encryption.\n- **Privacy Shield**: Built-in adblocker & tracker protection.\n- **Dual-View Split Screen** & customizable workspaces!' }
+      ];
+    }
+    return [];
+  });
   const [input, setInput] = useState('');
   const [isInitializing, setIsInitializing] = useState(false);
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(isDemo);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
