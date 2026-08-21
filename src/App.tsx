@@ -64,7 +64,7 @@ const HelpModal = React.lazy(() => import('./components/HelpModal').then(m => ({
 import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Folder, Bookmark, Extension } from './types/browser';
+import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -1120,6 +1120,17 @@ function App() {
         return [...prev, newTab];
       }
     });
+  }, []);
+
+  const handleUpdateWorkspaces = useCallback((newWorkspaces: Workspace[]) => {
+    const validIds = new Set(newWorkspaces.map(w => w.id));
+    setWorkspaces(newWorkspaces);
+    setTabs(prev => prev.map(t => {
+      if (t.workspaceId && !validIds.has(t.workspaceId)) {
+        return { ...t, workspaceId: newWorkspaces[0]?.id || 'default' };
+      }
+      return t;
+    }));
   }, []);
 
   const handleNewIncognitoTab = useCallback(() => {
@@ -2763,7 +2774,7 @@ function App() {
             isOpen={isWorkspaceManagerOpen} 
             onClose={handleCloseWorkspaceManager} 
             workspaces={workspaces} 
-            onUpdateWorkspaces={setWorkspaces} 
+            onUpdateWorkspaces={handleUpdateWorkspaces} 
             activeWorkspaceId={activeWorkspaceId} 
             onSelectWorkspace={handleSelectWorkspace} 
             isIncognito={activeTab?.isIncognito} 

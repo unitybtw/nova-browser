@@ -100,7 +100,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all shadow-2xs space-y-3"
+                    className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/80 transition-colors shadow-2xs space-y-3"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-center gap-3.5 min-w-0">
@@ -136,7 +136,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                     {item.state === 'progressing' && (
                       <div className="w-full bg-slate-200 dark:bg-slate-700/80 h-1.5 rounded-full overflow-hidden">
                         <div 
-                          className="bg-cyan-500 h-full transition-all duration-300 rounded-full"
+                          className="bg-cyan-500 h-full transition-[width] duration-300 rounded-full"
                           style={{ width: `${percent}%` }}
                         />
                       </div>
