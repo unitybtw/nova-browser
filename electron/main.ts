@@ -2642,8 +2642,13 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
           });
           activeTtsProcess = proc;
 
-          proc.stdin.write(text, 'utf8');
-          proc.stdin.end();
+          if (proc.stdin) {
+            proc.stdin.on('error', () => {});
+            try {
+              proc.stdin.write(text, 'utf8');
+              proc.stdin.end();
+            } catch (_) {}
+          }
 
           proc.on('close', (code) => {
             if (activeTtsProcess === proc) activeTtsProcess = null;
