@@ -40,8 +40,11 @@
 ## 📸 Screenshots
 
 <div align="center">
-  <img src="assets/preview.png" alt="Nova Browser Main Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 20px;" />
+  <img src="assets/newtab.png" alt="Nova Browser Start Page" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 24px;" />
   <p><em>Nova Start Page & Dashboard: Vertical Sidebar, Omni Search, Quick Dials & Task Management</em></p>
+  <br/>
+  <img src="assets/preview.png" alt="Nova Browser with AI Assistant" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 24px;" />
+  <p><em>Active Browsing Experience: Multi-Tab Workspaces, Webview & Built-in AI Sidepanel</em></p>
   <br/>
   <img src="assets/sync.png" alt="Nova Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
   <p><em>Nova Sync: Zero-Knowledge 1-Click Multi-Device Pairing Code & Cloud Sync</em></p>
