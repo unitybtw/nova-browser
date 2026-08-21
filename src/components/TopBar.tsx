@@ -52,6 +52,7 @@ import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../uti
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { UserSettings } from '../App';
+import { tabThumbnailCache } from '../services/thumbnailCache';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -1498,44 +1499,48 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     </header>
 
     {/* Tab Peek rendered via Portal to escape overflow-hidden */}
-    {hoveredTab && hoveredTab.thumbnail && createPortal(
-      <AnimatePresence>
-        <motion.div
-          key="topbar-tab-peek"
-          initial={{ opacity: 0, y: -10, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -5, scale: 0.95 }}
-          transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none bg-white dark:bg-slate-800"
-          style={{
-            position: 'fixed',
-            top: 50,
-            left: Math.max(10, Math.min(hoverPos.left + (hoverPos.width / 2) - (272 / 2), window.innerWidth - 282)),
-            zIndex: 999999,
-            width: 272,
-            borderRadius: 12,
-            overflow: 'hidden',
-            boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
-            border: '1px solid rgba(0,0,0,0.08)',
-          }}
-        >
-          <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
-            <div className="flex items-center gap-2">
-              {hoveredTab.favicon && (
-                <img src={hoveredTab.favicon} style={{ width: '16px', height: '16px', borderRadius: '4px' }} />
-              )}
-              <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
-                {hoveredTab.title || 'New Tab'}
+    {(() => {
+      const thumb = hoveredTab ? (tabThumbnailCache.get(hoveredTab.id) || hoveredTab.thumbnail) : undefined;
+      if (!hoveredTab || !thumb) return null;
+      return createPortal(
+        <AnimatePresence>
+          <motion.div
+            key="topbar-tab-peek"
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.95 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="pointer-events-none bg-white dark:bg-slate-800"
+            style={{
+              position: 'fixed',
+              top: 50,
+              left: Math.max(10, Math.min(hoverPos.left + (hoverPos.width / 2) - (272 / 2), window.innerWidth - 282)),
+              zIndex: 999999,
+              width: 272,
+              borderRadius: 12,
+              overflow: 'hidden',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08)',
+              border: '1px solid rgba(0,0,0,0.08)',
+            }}
+          >
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+              <div className="flex items-center gap-2">
+                {hoveredTab.favicon && (
+                  <img src={hoveredTab.favicon} style={{ width: '16px', height: '16px', borderRadius: '4px' }} />
+                )}
+                <div className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
+                  {hoveredTab.title || 'New Tab'}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="bg-slate-100 dark:bg-slate-900 w-full relative" style={{ aspectRatio: '16/9' }}>
-            <img src={hoveredTab.thumbnail} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
-          </div>
-        </motion.div>
-      </AnimatePresence>,
-      document.body
-    )}
+            <div className="bg-slate-100 dark:bg-slate-900 w-full relative" style={{ aspectRatio: '16/9' }}>
+              <img src={thumb} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} />
+            </div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      );
+    })()}
 
     {/* Drag to Split Screen Ghost Tab */}
     {ghostTab && createPortal(

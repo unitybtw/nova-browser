@@ -8,6 +8,7 @@ import { HistoryItem } from '../App';
 import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
+import { tabThumbnailCache } from '../services/thumbnailCache';
 
 // Performance: Code-split internal browser pages
 const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
@@ -529,15 +530,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       try {
         const ourWcId = webview?.getWebContentsId?.();
         if (ourWcId && ourWcId === webContentsId && dataUrl && tab?.id) {
-          onUpdateTab(tab.id, { thumbnail: dataUrl });
+          tabThumbnailCache.set(tab.id, dataUrl);
         }
       } catch (_) {}
     });
 
     return () => { try { unsubscribe?.(); } catch (_) {} };
-  }, [isNewTab, tab?.id, onUpdateTab]);
+  }, [isNewTab, tab?.id]);
 
-  // Capture thumbnail when switching away from this tab
+  // Capture thumbnail when switching away from this tab (stored in memory cache)
   useEffect(() => {
     if (!isActive && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
       const capture = async () => {
@@ -545,13 +546,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           const wcId = webviewRef.current.getWebContentsId();
           const thumbnailDataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
           if (thumbnailDataUrl && tab?.id) {
-            onUpdateTab(tab.id, { thumbnail: thumbnailDataUrl });
+            tabThumbnailCache.set(tab.id, thumbnailDataUrl);
           }
         } catch (err) {}
       };
       capture();
     }
-  }, [isActive, isNewTab, tab?.id, onUpdateTab]);
+  }, [isActive, isNewTab, tab?.id]);
 
   // Immediately clear loading state for internal React pages since they don't use webview
   useEffect(() => {

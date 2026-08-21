@@ -65,6 +65,7 @@ import { Onboarding } from './components/Onboarding';
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
+import { tabThumbnailCache } from './services/thumbnailCache';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -694,6 +695,7 @@ function App() {
   // Track closed tabs for Cmd+Shift+T
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
+    tabThumbnailCache.remove(id);
     setTabs(prevTabs => {
       const targetTab = prevTabs.find(t => t.id === id);
       

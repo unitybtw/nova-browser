@@ -38,6 +38,7 @@ import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
+import { tabThumbnailCache } from '../services/thumbnailCache';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -149,11 +150,12 @@ const TabPeekPortal: React.FC<{
   tab: Tab | null;
   pos: { top: number; left: number };
 }> = ({ tab, pos }) => {
-  if (!tab || !tab.thumbnail) return null;
+  const thumbnail = tab ? (tabThumbnailCache.get(tab.id) || tab.thumbnail) : undefined;
+  if (!tab || !thumbnail) return null;
 
   return createPortal(
     <AnimatePresence>
-      {tab && tab.thumbnail && (
+      {tab && thumbnail && (
         <motion.div
           key="tab-peek"
           initial={{ opacity: 0, x: -12, scale: 0.95 }}
@@ -177,7 +179,7 @@ const TabPeekPortal: React.FC<{
           </div>
           <div className="bg-slate-100 dark:bg-slate-950 overflow-hidden" style={{ aspectRatio: '16/9' }}>
             <img
-              src={tab.thumbnail}
+              src={thumbnail}
               alt="Tab preview"
               style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
             />
