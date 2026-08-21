@@ -41,10 +41,10 @@
 
 <div align="center">
   <img src="assets/preview.png" alt="Nova Browser Main Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 20px;" />
-  <p><em>Main Browser Interface: Vertical Tabs, Glassmorphic TopBar, Live Site & AI Sidepanel</em></p>
+  <p><em>Nova Start Page & Dashboard: Vertical Sidebar, Omni Search, Quick Dials & Task Management</em></p>
   <br/>
-  <img src="assets/newtab.png" alt="Nova Browser New Tab Page" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
-  <p><em>Nova Start Page: Dynamic Speed Dials, Omni Search & Interactive Tasks Widget</em></p>
+  <img src="assets/sync.png" alt="Nova Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
+  <p><em>Nova Sync: Zero-Knowledge 1-Click Multi-Device Pairing Code & Cloud Sync</em></p>
 </div>
 
 ---
