@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Apple, Monitor, ChevronRight, Bot, LayoutDashboard, Lock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Apple, Monitor, ChevronRight } from 'lucide-react';
+import { LiveAnimatedBrowser } from './LiveAnimatedBrowser';
 
 const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -11,7 +12,6 @@ const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 export const Hero: React.FC = () => {
   const [os, setOs] = useState<'mac' | 'win'>('mac');
-  const [activeTab, setActiveTab] = useState<'ai' | 'newtab' | 'sync'>('ai');
 
   useEffect(() => {
     const ua = window.navigator.userAgent.toLowerCase();
@@ -98,96 +98,13 @@ export const Hero: React.FC = () => {
           </motion.div>
         </div>
 
-        {/* Real High-Resolution Browser Screenshot Showcase */}
+        {/* Live Animated Authentic Browser Component */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.3 }}
-          className="max-w-6xl mx-auto"
         >
-          {/* Switcher Navigation Tabs */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mb-4">
-            <button
-              onClick={() => setActiveTab('ai')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'ai'
-                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
-                  : 'card-glass text-slate-400 hover:text-white'
-              }`}
-            >
-              <Bot className="w-4 h-4 text-cyan-500" />
-              <span>Autonomous AI & MCP Sidepanel</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('newtab')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'newtab'
-                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
-                  : 'card-glass text-slate-400 hover:text-white'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4 text-purple-400" />
-              <span>Start Page & Speed Dials</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('sync')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
-                activeTab === 'sync'
-                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-105'
-                  : 'card-glass text-slate-400 hover:text-white'
-              }`}
-            >
-              <Lock className="w-4 h-4 text-emerald-400" />
-              <span>Zero-Knowledge 1-Click Sync</span>
-            </button>
-          </div>
-
-          {/* Genuine Screenshot Container */}
-          <div className="rounded-2xl p-1.5 sm:p-2 bg-gradient-to-b from-white/15 via-white/5 to-transparent border border-white/10 shadow-[0_25px_80px_rgba(0,0,0,0.8)] overflow-hidden">
-            <div className="relative w-full rounded-xl overflow-hidden bg-black aspect-[16/10] flex items-center justify-center">
-              <AnimatePresence mode="wait">
-                {activeTab === 'ai' && (
-                  <motion.img
-                    key="ai-preview"
-                    src="/assets/preview.png"
-                    alt="Nova Browser Autonomous AI Agent and MCP Sidepanel"
-                    initial={{ opacity: 0, scale: 0.99 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-                {activeTab === 'newtab' && (
-                  <motion.img
-                    key="newtab-preview"
-                    src="/assets/newtab.png"
-                    alt="Nova Browser Clean Start Page and Speed Dials"
-                    initial={{ opacity: 0, scale: 0.99 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-                {activeTab === 'sync' && (
-                  <motion.img
-                    key="sync-preview"
-                    src="/assets/sync.png"
-                    alt="Nova Browser Zero-Knowledge Device Pairing Code"
-                    initial={{ opacity: 0, scale: 0.99 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="w-full h-full object-contain"
-                  />
-                )}
-              </AnimatePresence>
-            </div>
-          </div>
-
+          <LiveAnimatedBrowser />
         </motion.div>
 
       </div>
