@@ -26,6 +26,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const focusTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const handleClose = () => {
     onStopFind();
@@ -37,12 +38,14 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
 
   useEffect(() => {
     if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = setTimeout(() => inputRef.current?.focus(), 50);
     } else {
       onStopFind();
       setSearchText('');
     }
     return () => {
+      if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
       onStopFind();
     };
   }, [isOpen]);
@@ -85,7 +88,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
           className="absolute top-12 left-1/2 z-50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 shadow-2xl rounded-2xl p-2 flex items-center gap-2 outline-none w-full max-w-lg"
           tabIndex={-1}
         >
-          <div className="relative flex-1 flex items-center bg-slate-100/60 dark:bg-slate-800/60 rounded-xl px-3 py-1 border border-transparent focus-within:border-cyan-500/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-all">
+          <div className="relative flex-1 flex items-center bg-slate-100/60 dark:bg-slate-800/60 rounded-xl px-3 py-1 border border-transparent focus-within:border-cyan-500/50 focus-within:bg-white dark:focus-within:bg-slate-900 transition-colors">
             <Search className={`w-4 h-4 mr-2 ${noMatches ? 'text-red-500' : 'text-slate-400 dark:text-slate-500'}`} />
             <input
               ref={inputRef}
@@ -110,7 +113,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
                   setMatchCase(!matchCase);
                   triggerSearch(searchText, true, !matchCase, wholeWord);
                 }}
-                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-all ${matchCase ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors ${matchCase ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                 title="Match Case"
               >
                 Aa
@@ -120,7 +123,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
                   setWholeWord(!wholeWord);
                   triggerSearch(searchText, true, matchCase, !wholeWord);
                 }}
-                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-all mr-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors mr-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                 title="Whole Word"
               >
                 W

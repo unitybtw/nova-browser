@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share2, X, Copy, Check, QrCode } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
@@ -18,12 +18,20 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
 }) => {
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(url);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   // Generate Google Chart API QR Code image URL for sharing with mobile phone
@@ -78,7 +86,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
               {/* Copy Button */}
               <button
                 onClick={handleCopy}
-                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium text-xs transition-all duration-200 ${
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-medium text-xs transition-colors duration-200 ${
                   copied 
                     ? 'bg-emerald-500 text-white shadow-sm' 
                     : 'bg-cyan-500 hover:bg-cyan-600 text-white shadow-sm'

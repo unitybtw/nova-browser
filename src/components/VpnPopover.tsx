@@ -86,7 +86,7 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                   <button
                     key={loc.id}
                     onClick={() => onSelectLocation(loc)}
-                    className={`w-full flex items-center justify-between p-2.5 px-3 rounded-xl transition-all ${
+                    className={`w-full flex items-center justify-between p-2.5 px-3 rounded-xl transition-colors ${
                       selectedLocation.id === loc.id
                         ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-semibold border border-cyan-500/30'
                         : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-medium'

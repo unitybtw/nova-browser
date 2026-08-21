@@ -23,6 +23,13 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
   const [currentImage, setCurrentImage] = useState<string | null>(initialImageDataUrl);
   const [captureMode, setCaptureMode] = useState<'visible' | 'full'>('visible');
   const containerRef = useRef<HTMLDivElement>(null);
+  const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -59,7 +66,8 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
         new ClipboardItem({ [blob.type]: blob })
       ]);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy screenshot to clipboard:', err);
     }
