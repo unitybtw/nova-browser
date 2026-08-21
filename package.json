@@ -93,7 +93,6 @@
     "preview": "vite preview",
     "pack:win": "npm run build && electron-builder --win",
     "pack:mac": "npm run build && electron-builder --mac",
-    "dev:website": "npm --prefix website run dev",
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
   "dependencies": {
