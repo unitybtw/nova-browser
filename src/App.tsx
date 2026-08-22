@@ -266,7 +266,38 @@ function App() {
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
-  const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(DEFAULT_VPN_LOCATIONS);
+  const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(() => {
+    try {
+      const saved = localStorage.getItem('nova_vpn_locations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return [...DEFAULT_VPN_LOCATIONS, ...parsed];
+        }
+      }
+    } catch (e) {}
+    return DEFAULT_VPN_LOCATIONS;
+  });
+
+  const handleAddVpnLocation = useCallback((newLoc: VpnLocation) => {
+    setVpnLocations(prev => {
+      const updated = [...prev, newLoc];
+      try {
+        localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
+      } catch (e) {}
+      return updated;
+    });
+  }, []);
+
+  const handleRemoveVpnLocation = useCallback((id: string) => {
+    setVpnLocations(prev => {
+      const updated = prev.filter(l => l.id !== id);
+      try {
+        localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
+      } catch (e) {}
+      return updated;
+    });
+  }, []);
 
   // Automated Real Browser Demo Showcase for Website
   useEffect(() => {
@@ -2890,6 +2921,8 @@ function App() {
         selectedLocation={vpnLocation}
         locations={vpnLocations}
         onSelectLocation={setVpnLocation}
+        onAddLocation={handleAddVpnLocation}
+        onRemoveLocation={handleRemoveVpnLocation}
         anchorRef={vpnAnchorRef}
       />
 

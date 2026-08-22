@@ -17,13 +17,23 @@ export function isValidUrlOrDomain(input: string): boolean {
     return true;
   }
 
-  // Localhost or loopback IP
-  if (/^localhost(:\d+)?(\/.*)?$/i.test(trimmed) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/.test(trimmed)) {
+  // Localhost, 0.0.0.0, or loopback IP with optional port and path
+  if (/^(localhost|0\.0\.0\.0|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(trimmed)) {
     return true;
   }
 
-  // IPv4 address
+  // IPv4 address with optional port and path
   if (/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(trimmed)) {
+    return true;
+  }
+
+  // Intranet and developer local domain names (.local, .test, .internal, .lan, .home, .docker)
+  if (/^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i.test(trimmed)) {
+    return true;
+  }
+
+  // Domain with port (e.g. dev-server:3000, mysite.com:8080)
+  if (/^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*:\d+(\/.*)?$/.test(trimmed)) {
     return true;
   }
 
@@ -64,8 +74,13 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
     return trimmed;
   }
 
-  // Localhost or 127.0.0.1 with optional port and path
-  if (/^localhost(:\d+)?(\/.*)?$/i.test(trimmed) || /^127\.0\.0\.1(:\d+)?(\/.*)?$/.test(trimmed)) {
+  // Localhost, 0.0.0.0, or 127.0.0.1 with optional port and path
+  if (/^(localhost|0\.0\.0\.0|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(trimmed)) {
+    return 'http://' + trimmed;
+  }
+
+  // Intranet / local domains (.local, .test, .internal, .lan, .home, .docker)
+  if (/^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker)(:\d+)?(\/.*)?$/i.test(trimmed)) {
     return 'http://' + trimmed;
   }
 
