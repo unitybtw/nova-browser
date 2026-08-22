@@ -1155,18 +1155,43 @@ Tasks & Guidelines:
   }
 
   // A fast, lightweight method exclusively for background tasks like Link Preview (No tools, no orchestrator)
-  public async summarize(text: string): Promise<string> {
+  public async summarize(text: string, pageTitle?: string): Promise<string> {
     if (!this.engine) throw new Error("Engine not initialized");
     
-    const reply = await this.engine.chat.completions.create({
-      messages: [
-        { role: "system", content: "You are a fast summarization AI. Summarize the provided text in exactly 1 or 2 short sentences in English. Do NOT include any conversational filler like 'Here is the summary:' or 'Summary:'. ONLY return the summary text." },
-        { role: "user", content: text }
-      ],
-      temperature: 0.3
-    });
-    
-    return reply.choices[0].message.content || "";
+    try {
+      const reply = await this.engine.chat.completions.create({
+        messages: [
+          { 
+            role: "system", 
+            content: "You are a fast, concise web summarization AI. Summarize the provided webpage content in 2 to 3 complete, coherent sentences in the same language as the original text (e.g. Turkish if the text is in Turkish, English if English). Never cut off sentences mid-way; always finish every sentence completely with proper punctuation. Do NOT include conversational filler like 'Here is the summary:' or 'Özet:'." 
+          },
+          { 
+            role: "user", 
+            content: `${pageTitle ? `Title: ${pageTitle}\n\n` : ''}Content:\n${text.substring(0, 2500)}` 
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 220
+      });
+      
+      let result = reply.choices[0].message.content || "";
+      result = result.trim();
+
+      // Ensure clean ending at a sentence boundary if truncated
+      if (result && !/[.!?]$/.test(result)) {
+        const lastPeriod = Math.max(result.lastIndexOf('.'), result.lastIndexOf('!'), result.lastIndexOf('?'));
+        if (lastPeriod > 40) {
+          result = result.substring(0, lastPeriod + 1);
+        } else {
+          result += '.';
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      console.warn('[aiAgent] Summarize failed, falling back to clean text extraction:', e);
+      throw e;
+    }
   }
 }
 
