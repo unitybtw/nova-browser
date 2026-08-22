@@ -2727,6 +2727,8 @@ function App() {
                 onTabDragEnd={handleTabDragEnd}
                 onTabDrag={handleTabDrag}
                 onDropToSplitScreen={handleDropToSplitScreen}
+                splitTabId={splitTabId}
+                onCloseSplit={handleCloseSplitView}
               />
             </motion.div>
           )}
