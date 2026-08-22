@@ -79,8 +79,8 @@ class AIAgent {
     }
   }
   
-  // Fast, lightweight, multilingual default model (<800MB download vs 4.5GB 8B)
-  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
+  // High-performance, lightweight Function Calling model (Lightest model with native WebLLM tools support: ~3.8GB)
+  private modelId = "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC"; 
 
   private getThemeColor(): string {
     try {
@@ -421,9 +421,22 @@ class AIAgent {
       const { CreateWebWorkerMLCEngine } = await import("@mlc-ai/web-llm");
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
 
+      const SUPPORTED_TOOL_MODELS = [
+        "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
+        "Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC",
+        "Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC",
+        "Hermes-3-Llama-3.1-8B-q4f16_1-MLC",
+        "Hermes-3-Llama-3.1-8B-q4f32_1-MLC"
+      ];
+
       try {
         const storedModel = localStorage.getItem('nova_ai_model');
-        if (storedModel) this.modelId = storedModel;
+        if (storedModel && SUPPORTED_TOOL_MODELS.includes(storedModel)) {
+          this.modelId = storedModel;
+        } else {
+          this.modelId = "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC";
+          localStorage.setItem('nova_ai_model', this.modelId);
+        }
       } catch {}
 
       this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
