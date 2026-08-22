@@ -101,10 +101,60 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
 ];
 
 // Natural Language Intent Extractor: Instantly executes common browser commands with 100% reliability
-export function detectDirectIntent(userText: string): { name: string; arguments: any } | null {
+export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string } | null {
   if (!userText || typeof userText !== 'string') return null;
   const text = userText.trim().toLowerCase();
 
+  // Normalize Turkish characters and typos (e.g. "knalını" -> "kanalını", "enese" -> "enes", "baturru" -> "batur")
+  const normalized = text
+    .replace(/\bknalını\b|\bknalini\b|\bknalı\b|\bknali\b/g, 'kanalını')
+    .replace(/\byotube\b|\byoutbe\b|\byutube\b/g, 'youtube')
+    .replace(/\bgogle\b|\bgoole\b/g, 'google');
+
+  // 1. YouTube Compound Searches (e.g. "youtube aç ve enes batur kanalını aç", "youtube'da tarkan aç", "youtube enes batur izle")
+  const ytCompoundMatch = 
+    normalized.match(/^youtube(?:'da|\s+da)?\s+(?:aç|ac|a git|'a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:kanalını\s*aç|kanalini\s*ac|kanalını|kanalini|videosunu\s*aç|videosunu\s*ac|videosu|videosunu|şarkısını\s*aç|şarkısını|izle|dinle|ara|aç|ac)?$/i) ||
+    normalized.match(/^(?:bana\s+)?(.+?)\s*(?:kanalını\s*aç|kanalini\s*ac|knalını\s*aç|knalini\s*ac|videosunu\s*aç|videosunu\s*ac|videosunu|izle)$/i) ||
+    normalized.match(/^youtube\s+(.+)$/i);
+
+  if (ytCompoundMatch && ytCompoundMatch[1]) {
+    let query = ytCompoundMatch[1]
+      .replace(/^(aç|ac|ve|git)\s+/gi, '')
+      .replace(/\s+(kanalını|kanalini|knalını|knalini|videosunu|şarkısını|şarkısı|izle|dinle|aç|ac|ara)$/gi, '')
+      .replace(/\s+(ve|ile)\s+/gi, ' ')
+      .trim();
+
+    if (query && query !== 'aç' && query !== 'ac' && query !== 'git' && query !== 'youtube') {
+      const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
+      return { 
+        name: 'navigate_to_url', 
+        arguments: { url: searchUrl },
+        directReply: `YouTube'da "${query}" arandı ve açıldı.`
+      };
+    }
+  }
+
+  // 2. Google Search Compound (e.g. "google'da hava durumu ara", "google aç ve hava durumu ara", "istanbul hava durumu ara")
+  const googleCompoundMatch = 
+    normalized.match(/^google(?:'da|\s+da)?\s+(?:aç|ac|a git|'a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|bak|aç|ac)?$/i) ||
+    normalized.match(/^(?:google'da\s+ara|ara|search for|search|bana ara)\s*[:\s]\s*(.+)$/i) ||
+    normalized.match(/^(.+?)\s+(?:nedir|nerede|kaç|hakkında bilgi ver|fiyatları)$/i);
+
+  if (googleCompoundMatch && googleCompoundMatch[1]) {
+    let query = googleCompoundMatch[1]
+      .replace(/^(aç|ac|ve|git)\s+/gi, '')
+      .replace(/\s+(ara|bul|bak|aç|ac)$/gi, '')
+      .trim();
+    if (query && query !== 'aç' && query !== 'ac' && query !== 'git' && query !== 'google' && !query.startsWith('yeni sekme') && !query.startsWith('sayfa')) {
+      return {
+        name: 'navigate_to_url',
+        arguments: { url: `https://www.google.com/search?q=${encodeURIComponent(query)}` },
+        directReply: `Google'da "${query}" arandı.`
+      };
+    }
+  }
+
+  // 3. Direct site opening
   const sites: Record<string, string> = {
     'youtube': 'https://youtube.com',
     'google': 'https://google.com',
@@ -132,48 +182,46 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
       new RegExp(`^${siteKey}\\.com(\\s*(aç|ac))?$`, 'i')
     ];
     for (const pat of patterns) {
-      if (pat.test(text)) {
-        return { name: 'navigate_to_url', arguments: { url: siteUrl } };
+      if (pat.test(normalized)) {
+        return { 
+          name: 'navigate_to_url', 
+          arguments: { url: siteUrl },
+          directReply: `${siteKey.charAt(0).toUpperCase() + siteKey.slice(1)} açıldı.`
+        };
       }
     }
   }
 
-  // Direct URL pattern: "https://..." or "domain.com"
+  // 4. Direct URL
   if (/^https?:\/\/[^\s]+$/i.test(text) || /^[a-z0-9-]+\.(com|org|net|io|dev|app|edu|gov|tr)(\/[^\s]*)?$/i.test(text)) {
-    return { name: 'navigate_to_url', arguments: { url: text } };
+    const u = text.startsWith('http') ? text : 'https://' + text;
+    return { name: 'navigate_to_url', arguments: { url: u }, directReply: `${u} açıldı.` };
   }
 
-  // Search queries: "google'da ara: ...", "ara: ...", "hava durumunu ara", "search for ..."
-  const searchMatch = text.match(/^(?:google(?:'da)?\s+)?(?:ara|search for|search|search google for|bana ara)\s*[:\s]\s*(.+)$/i) ||
-                      text.match(/^(.+?)\s+(?:nedir|nerede|kaç|hakkında bilgi ver|ara|fiyatları)$/i);
-  if (searchMatch && searchMatch[1] && searchMatch[1].length > 2 && !searchMatch[1].startsWith('yeni sekme') && !searchMatch[1].startsWith('sayfa')) {
-    return { name: 'navigate_to_url', arguments: { url: searchMatch[1].trim() } };
+  // 5. Tab management
+  if (/^(yeni sekme|yeni sekme aç|yeni sekme ac|yeni sekme oluştur|open new tab|new tab|create tab)$/i.test(normalized)) {
+    return { name: 'manage_tabs', arguments: { action: 'create' }, directReply: "Yeni sekme açıldı." };
+  }
+  if (/^(sekmeyi kapat|bu sekmeyi kapat|close tab|close current tab)$/i.test(normalized)) {
+    return { name: 'manage_tabs', arguments: { action: 'close' }, directReply: "Sekme kapatıldı." };
   }
 
-  // Tab management
-  if (/^(yeni sekme|yeni sekme aç|yeni sekme ac|yeni sekme oluştur|open new tab|new tab|create tab)$/i.test(text)) {
-    return { name: 'manage_tabs', arguments: { action: 'create' } };
-  }
-  if (/^(sekmeyi kapat|bu sekmeyi kapat|close tab|close current tab)$/i.test(text)) {
-    return { name: 'manage_tabs', arguments: { action: 'close' } };
-  }
-
-  // Page reading & summary
-  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|read page|read this page|summarize page)$/i.test(text)) {
+  // 6. Page reading
+  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|read page|read this page|summarize page)$/i.test(normalized)) {
     return { name: 'read_page_content', arguments: {} };
   }
 
-  // Scrolling
-  if (/^(aşağı kaydır|asagi kaydir|aşağı in|sayfayı aşağı kaydır|scroll down)$/i.test(text)) {
-    return { name: 'scroll_page', arguments: { direction: 'down' } };
+  // 7. Scrolling
+  if (/^(aşağı kaydır|asagi kaydir|aşağı in|sayfayı aşağı kaydır|scroll down)$/i.test(normalized)) {
+    return { name: 'scroll_page', arguments: { direction: 'down' }, directReply: "Sayfa aşağı kaydırıldı." };
   }
-  if (/^(yukarı kaydır|yukari kaydir|yukarı çık|sayfayı yukarı kaydır|scroll up)$/i.test(text)) {
-    return { name: 'scroll_page', arguments: { direction: 'up' } };
+  if (/^(yukarı kaydır|yukari kaydir|yukarı çık|sayfayı yukarı kaydır|scroll up)$/i.test(normalized)) {
+    return { name: 'scroll_page', arguments: { direction: 'up' }, directReply: "Sayfa yukarı kaydırıldı." };
   }
 
-  // Screenshot
-  if (/^(ekran görüntüsü al|ekran goruntusu al|screenshot al|take screenshot|screenshot)$/i.test(text)) {
-    return { name: 'take_screenshot', arguments: {} };
+  // 8. Screenshot
+  if (/^(ekran görüntüsü al|ekran goruntusu al|screenshot al|take screenshot|screenshot)$/i.test(normalized)) {
+    return { name: 'take_screenshot', arguments: {}, directReply: "Ekran görüntüsü alındı." };
   }
 
   return null;
@@ -1233,11 +1281,20 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
         });
         
-        if (funcName === 'navigate_to_url') {
+        if (directIntent.directReply) {
+          friendlyResponse = directIntent.directReply;
+        } else if (funcName === 'navigate_to_url') {
           const u = directIntent.arguments.url;
-          if (u.includes('youtube.com')) friendlyResponse = "YouTube acildi.";
-          else if (u.includes('google.com/search')) friendlyResponse = "Google aramasi yapildi.";
-          else friendlyResponse = `${u} sayfasi acildi.`;
+          if (u.includes('youtube.com/results?search_query=')) {
+            const q = decodeURIComponent(u.split('search_query=')[1] || '');
+            friendlyResponse = `YouTube'da "${q}" arandi ve acildi.`;
+          } else if (u.includes('youtube.com')) {
+            friendlyResponse = "YouTube acildi.";
+          } else if (u.includes('google.com/search')) {
+            friendlyResponse = "Google aramasi yapildi.";
+          } else {
+            friendlyResponse = `${u} sayfasi acildi.`;
+          }
         } else if (funcName === 'manage_tabs') {
           if (directIntent.arguments.action === 'create') friendlyResponse = "Yeni sekme acildi.";
           else if (directIntent.arguments.action === 'close') friendlyResponse = "Sekme kapatildi.";
