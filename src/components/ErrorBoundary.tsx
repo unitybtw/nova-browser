@@ -24,6 +24,17 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Unhandled React Error:', error, errorInfo);
+    // If chunk hash mismatch occurs after a rebuild, auto-reload once to refresh chunks
+    if (
+      error?.message?.includes('Failed to fetch dynamically imported module') ||
+      error?.message?.includes('Importing a module script failed')
+    ) {
+      if (!sessionStorage.getItem('chunk_reload_triggered')) {
+        sessionStorage.setItem('chunk_reload_triggered', 'true');
+        window.location.reload();
+        return;
+      }
+    }
     this.setState({ errorInfo });
   }
 

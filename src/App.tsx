@@ -56,16 +56,38 @@ import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 
-// Performance: Lazy load heavy modals and panels to reduce initial bundle size & boot time
-const ShareModal = React.lazy(() => import('./components/ShareModal').then(m => ({ default: m.ShareModal })));
-const ExtensionsModal = React.lazy(() => import('./components/ExtensionsModal').then(m => ({ default: m.ExtensionsModal })));
-const ScreenshotModal = React.lazy(() => import('./components/ScreenshotModal').then(m => ({ default: m.ScreenshotModal })));
-const ReaderMode = React.lazy(() => import('./components/ReaderMode').then(m => ({ default: m.ReaderMode })));
-const SidePanel = React.lazy(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
-const WorkspaceManager = React.lazy(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
-const HelpModal = React.lazy(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
-const AccountModal = React.lazy(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
-const Onboarding = React.lazy(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
+// Performance: Lazy load heavy modals and panels with resilient retry mechanism
+const lazyWithRetry = <T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>
+) => {
+  return React.lazy(async () => {
+    try {
+      return await factory();
+    } catch (err: any) {
+      console.warn('[LazyLoader] Dynamic import failed, attempting recovery...', err);
+      await new Promise(r => setTimeout(r, 120));
+      try {
+        return await factory();
+      } catch (retryErr) {
+        if (typeof window !== 'undefined' && !sessionStorage.getItem('chunk_retry_triggered')) {
+          sessionStorage.setItem('chunk_retry_triggered', 'true');
+          window.location.reload();
+        }
+        throw retryErr;
+      }
+    }
+  });
+};
+
+const ShareModal = lazyWithRetry(() => import('./components/ShareModal').then(m => ({ default: m.ShareModal })));
+const ExtensionsModal = lazyWithRetry(() => import('./components/ExtensionsModal').then(m => ({ default: m.ExtensionsModal })));
+const ScreenshotModal = lazyWithRetry(() => import('./components/ScreenshotModal').then(m => ({ default: m.ScreenshotModal })));
+const ReaderMode = lazyWithRetry(() => import('./components/ReaderMode').then(m => ({ default: m.ReaderMode })));
+const SidePanel = lazyWithRetry(() => import('./components/SidePanel').then(m => ({ default: m.SidePanel })));
+const WorkspaceManager = lazyWithRetry(() => import('./components/WorkspaceManager').then(m => ({ default: m.WorkspaceManager })));
+const HelpModal = lazyWithRetry(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
+const AccountModal = lazyWithRetry(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
+const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
