@@ -21,6 +21,7 @@ interface NewTabPageProps {
   isIncognito?: boolean;
   theme?: UserSettings['theme'];
   isActive?: boolean;
+  energySaverMode?: boolean;
 }
 
 interface ClockProps {
@@ -100,6 +101,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   isIncognito = false,
   theme = 'dark',
   isActive = true,
+  energySaverMode = false,
 }) => {
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);

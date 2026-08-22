@@ -44,6 +44,9 @@ export interface UserSettings {
   hibernationTimeoutMinutes?: number;
   shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
   aiLinkPreviewEnabled?: boolean;
+  energySaverMode?: boolean;
+  preloadDnsEnabled?: boolean;
+  smoothScrollingEnabled?: boolean;
 }
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
@@ -438,6 +441,9 @@ function App() {
       developerMode: false,
       tabHibernationEnabled: true,
       hibernationTimeoutMinutes: 10,
+      energySaverMode: false,
+      preloadDnsEnabled: true,
+      smoothScrollingEnabled: true,
       shortcuts: {
         newTab: { key: 't', shift: false, meta: true },
         reopenTab: { key: 't', shift: true, meta: true },
@@ -818,6 +824,22 @@ function App() {
   // Manual tab suspension
   const handleSuspendTab = useCallback((id: string) => {
     setTabs(prev => prev.map(t => (t.id === id && t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio) ? { ...t, isSuspended: true } : t));
+  }, [activeTabId, splitTabId]);
+
+  // Instant RAM & Cache Purge Engine
+  const handlePurgeMemory = useCallback(async () => {
+    // 1. Suspend all background inactive tabs immediately
+    setTabs(prev => prev.map(t => (t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio && !t.isPinned) ? { ...t, isSuspended: true } : t));
+    // 2. Clear thumbnail memory cache
+    tabThumbnailCache.clear();
+    // 3. Invoke native Electron session cache purge & host resolver trim
+    try {
+      if ((window as any).electronAPI?.purgeSystemMemory) {
+        await (window as any).electronAPI.purgeSystemMemory();
+      }
+    } catch (err) {
+      console.error('Purge system memory error:', err);
+    }
   }, [activeTabId, splitTabId]);
 
   // Automatic Tab Hibernation (Memory Saver)
@@ -2770,6 +2792,7 @@ function App() {
                   onClearHistory={handleClearHistory}
                   onRemoveHistoryItem={handleRemoveHistoryItem}
                   onClearDownloads={handleClearDownloads}
+                  onPurgeMemory={handlePurgeMemory}
                 />
               </div>
             );
@@ -2851,6 +2874,7 @@ function App() {
               onClearHistory={handleClearHistory}
               onRemoveHistoryItem={handleRemoveHistoryItem}
               onClearDownloads={handleClearDownloads}
+              onPurgeMemory={handlePurgeMemory}
             />
           </div>
         )}

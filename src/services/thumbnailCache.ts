@@ -24,6 +24,11 @@ class TabThumbnailCache {
     }
   }
 
+  clear() {
+    this.cache.clear();
+    this.listeners.forEach(fn => fn());
+  }
+
   subscribe(listener: () => void) {
     this.listeners.add(listener);
     return () => {

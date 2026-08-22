@@ -38,6 +38,7 @@ interface BrowserViewProps {
   onClearDownloads?: () => void;
   onExportData?: () => void;
   onImportData?: (file: File) => void;
+  onPurgeMemory?: () => Promise<void> | void;
 }
 
 export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
@@ -60,7 +61,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onRemoveHistoryItem,
   onClearDownloads,
   onExportData,
-  onImportData
+  onImportData,
+  onPurgeMemory
 }) => {
   const webviewRef = useRef<any>(null);
   
@@ -442,6 +444,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         try {
           const data = JSON.parse(e.message.substring(17));
           if (typeof data.url === 'string' && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
+            // Speed Booster: DNS prefetch and preconnect socket on hover
+            if (settings?.preloadDnsEnabled !== false) {
+              try {
+                const origin = new URL(data.url).origin;
+                if (origin && !origin.startsWith('null')) {
+                  const hint = document.createElement('link');
+                  hint.rel = 'dns-prefetch';
+                  hint.href = origin;
+                  document.head.appendChild(hint);
+                }
+              } catch (_) {}
+            }
+
             setAiPreview({
               isOpen: true,
               url: data.url,
@@ -654,6 +669,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         showTasksWidget={settings.showTasksWidget}
         isIncognito={isIncognito}
         theme={settings.theme}
+        energySaverMode={settings.energySaverMode}
       />
     );
   }
@@ -668,6 +684,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           onExportData={onExportData}
           onImportData={onImportData}
           onClearHistory={onClearHistory}
+          onPurgeMemory={onPurgeMemory}
         />
       </React.Suspense>
     );
@@ -989,6 +1006,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.settings?.privacyShield !== nextProps.settings?.privacyShield) return false;
   if (prevProps.settings?.theme !== nextProps.settings?.theme) return false;
   if (prevProps.settings?.showTasksWidget !== nextProps.settings?.showTasksWidget) return false;
+  if (prevProps.settings?.energySaverMode !== nextProps.settings?.energySaverMode) return false;
+  if (prevProps.settings?.preloadDnsEnabled !== nextProps.settings?.preloadDnsEnabled) return false;
+  if (prevProps.settings?.smoothScrollingEnabled !== nextProps.settings?.smoothScrollingEnabled) return false;
 
   // Deep comparison for settings object changes that affect internal pages
   if ((prevProps.tab?.url?.startsWith('nova://settings') || prevProps.tab?.url?.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;

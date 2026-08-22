@@ -1552,6 +1552,23 @@ ipcMain.handle('clear-ai-models-cache', async (event) => {
   }
 });
 
+// Purge inactive RAM, host resolver cache and session cache for maximum performance
+ipcMain.handle('purge-system-memory', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    const defaultSess = session.defaultSession;
+    await defaultSess.clearCache();
+    await defaultSess.clearHostResolverCache();
+    if (typeof (global as any).gc === 'function') {
+      (global as any).gc();
+    }
+    return true;
+  } catch (err) {
+    console.error('Error purging system memory:', err);
+    return false;
+  }
+});
+
 // Generic Secure Storage API (for future password manager, etc.)
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;

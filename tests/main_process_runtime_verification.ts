@@ -99,6 +99,7 @@ async function verifyMainProcessRuntime() {
     'get-mcp-status',
     'clear-incognito-session',
     'clear-ai-models-cache',
+    'purge-system-memory',
     'secure-store-set',
     'secure-store-get',
     'store-set',

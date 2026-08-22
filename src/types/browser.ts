@@ -41,6 +41,9 @@ export const defaultSettings = {
   tabHibernationEnabled: true,
   hibernationTimeoutMinutes: 10,
   aiLinkPreviewEnabled: false,
+  energySaverMode: false,
+  preloadDnsEnabled: true,
+  smoothScrollingEnabled: true,
 };
 
 export interface Extension {
