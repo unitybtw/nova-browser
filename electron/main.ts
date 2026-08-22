@@ -1397,93 +1397,323 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   }
 });
 
-// Auto-capture thumbnails when any webview finishes loading and push to renderer
+// Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
-  // Native Context Menu for webviews (ensure single listener attachment / clean removal)
   wc.removeAllListeners('context-menu');
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
     if (wc.getType() === 'webview') {
-      const { Menu, MenuItem, clipboard } = require('electron');
+      const { Menu, MenuItem, clipboard, dialog } = require('electron');
       const menu = new Menu();
 
-      // 1. Link Actions
+      const userLocale = (app.getLocale() || '').toLowerCase();
+      const isTr = userLocale.startsWith('tr');
+
+      const labels = {
+        // Spellcheck
+        noGuesses: isTr ? 'Yazım önerisi yok' : 'No guesses found',
+        addToDictionary: isTr ? 'Sözlüğe Ekle' : 'Add to Dictionary',
+
+        // Links
+        openLinkNewTab: isTr ? 'Bağlantıyı yeni sekmede aç' : 'Open Link in New Tab',
+        openLinkNewIncognitoTab: isTr ? 'Bağlantıyı gizli pencerede aç' : 'Open Link in Incognito Window',
+        saveLinkAs: isTr ? 'Bağlantıyı farklı kaydet...' : 'Save Link As...',
+        copyLinkAddress: isTr ? 'Bağlantı adresini kopyala' : 'Copy Link Address',
+
+        // Images
+        openImageNewTab: isTr ? 'Resmi yeni sekmede aç' : 'Open Image in New Tab',
+        saveImageAs: isTr ? 'Resmi farklı kaydet...' : 'Save Image As...',
+        copyImage: isTr ? 'Resmi kopyala' : 'Copy Image',
+        copyImageAddress: isTr ? 'Resim adresini kopyala' : 'Copy Image Address',
+        searchImageLens: isTr ? 'Google Lens ile resim ara' : 'Search Image with Google Lens',
+
+        // Audio & Video
+        play: isTr ? 'Oynat' : 'Play',
+        pause: isTr ? 'Duraklat' : 'Pause',
+        mute: isTr ? 'Sesi kapat' : 'Mute',
+        unmute: isTr ? 'Sesi aç' : 'Unmute',
+        loop: isTr ? 'Döngü' : 'Loop',
+        showControls: isTr ? 'Denetimleri göster' : 'Show Controls',
+        pictureInPicture: isTr ? 'Resim içinde resim (PiP)' : 'Picture in Picture',
+        saveVideoAs: isTr ? 'Videoyu farklı kaydet...' : 'Save Video As...',
+        copyVideoAddress: isTr ? 'Video adresini kopyala' : 'Copy Video Address',
+        saveAudioAs: isTr ? 'Sesi farklı kaydet...' : 'Save Audio As...',
+        copyAudioAddress: isTr ? 'Ses adresini kopyala' : 'Copy Audio Address',
+
+        // Selection
+        copy: isTr ? 'Kopyala' : 'Copy',
+        cut: isTr ? 'Kes' : 'Cut',
+        paste: isTr ? 'Yapıştır' : 'Paste',
+        pasteAsPlainText: isTr ? 'Düz metin olarak yapıştır' : 'Paste as Plain Text',
+        selectAll: isTr ? 'Tümünü seç' : 'Select All',
+        undo: isTr ? 'Geri al' : 'Undo',
+        redo: isTr ? 'Yinele' : 'Redo',
+        delete: isTr ? 'Sil' : 'Delete',
+        searchFor: (query: string) => isTr ? `Google'da "${query}" için ara` : `Search Google for "${query}"`,
+        aiExplain: isTr ? '✨ Nova AI ile Açıkla' : '✨ Explain with Nova AI',
+
+        // Page Navigation
+        back: isTr ? 'Geri' : 'Back',
+        forward: isTr ? 'İleri' : 'Forward',
+        reload: isTr ? 'Yeniden Yükle' : 'Reload',
+        savePageAs: isTr ? 'Farklı kaydet...' : 'Save As...',
+        print: isTr ? 'Yazdır...' : 'Print...',
+        viewSource: isTr ? 'Sayfa kaynağını görüntüle' : 'View Page Source',
+        inspect: isTr ? 'İncele' : 'Inspect',
+      };
+
+      // 1. Spellcheck Suggestions (if misspelled word)
+      if (params.misspelledWord) {
+        if (params.dictionarySuggestions && params.dictionarySuggestions.length > 0) {
+          for (const suggestion of params.dictionarySuggestions) {
+            menu.append(new MenuItem({
+              label: suggestion,
+              click: () => wc.replaceMisspelling(suggestion)
+            }));
+          }
+        } else {
+          menu.append(new MenuItem({
+            label: labels.noGuesses,
+            enabled: false
+          }));
+        }
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({
+          label: labels.addToDictionary,
+          click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 2. Link Actions
       if (params.linkURL) {
         menu.append(new MenuItem({
-          label: 'Open Link in New Tab',
+          label: labels.openLinkNewTab,
           click: () => mainWindow?.webContents.send('new-tab', params.linkURL)
         }));
         menu.append(new MenuItem({
-          label: 'Copy Link Address',
+          label: labels.openLinkNewIncognitoTab,
+          click: () => mainWindow?.webContents.send('new-incognito-tab', params.linkURL)
+        }));
+        menu.append(new MenuItem({
+          label: labels.saveLinkAs,
+          click: () => {
+            nextDownloadAsSaveAs = true;
+            wc.downloadURL(params.linkURL);
+          }
+        }));
+        menu.append(new MenuItem({
+          label: labels.copyLinkAddress,
           click: () => clipboard.writeText(params.linkURL)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
-      // 2. Image Actions
+      // 3. Image Actions
       if (params.srcURL && params.mediaType === 'image') {
         menu.append(new MenuItem({
-          label: 'Open Image in New Tab',
+          label: labels.openImageNewTab,
           click: () => mainWindow?.webContents.send('new-tab', params.srcURL)
         }));
         menu.append(new MenuItem({
-          label: 'Save Image As...',
+          label: labels.saveImageAs,
           click: () => {
             nextDownloadAsSaveAs = true;
             wc.downloadURL(params.srcURL);
           }
         }));
         menu.append(new MenuItem({
-          label: 'Copy Image Address',
+          label: labels.copyImage,
+          click: () => {
+            try {
+              wc.copyImageAt(params.x, params.y);
+            } catch {
+              clipboard.writeText(params.srcURL);
+            }
+          }
+        }));
+        menu.append(new MenuItem({
+          label: labels.copyImageAddress,
           click: () => clipboard.writeText(params.srcURL)
         }));
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      // 3. Text Selection Actions (Non-editable)
-      if (params.selectionText && !params.isEditable) {
-        menu.append(new MenuItem({ role: 'copy', label: 'Copy', accelerator: 'CmdOrCtrl+C' }));
         menu.append(new MenuItem({
-          label: `Search Google for: "${params.selectionText.length > 20 ? params.selectionText.substring(0, 20) + '...' : params.selectionText}"`,
-          click: () => mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(params.selectionText)}`)
+          label: labels.searchImageLens,
+          click: () => mainWindow?.webContents.send('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
-      // 4. Editable Field Actions (Inputs, Textareas)
-      if (params.isEditable) {
-        menu.append(new MenuItem({ role: 'undo', label: 'Undo' }));
-        menu.append(new MenuItem({ role: 'redo', label: 'Redo' }));
-        menu.append(new MenuItem({ type: 'separator' }));
-        menu.append(new MenuItem({ role: 'cut', label: 'Cut' }));
-        menu.append(new MenuItem({ role: 'copy', label: 'Copy' }));
-        menu.append(new MenuItem({ role: 'paste', label: 'Paste' }));
-        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: 'Paste and Match Style' }));
-        menu.append(new MenuItem({ role: 'delete', label: 'Delete' }));
-        menu.append(new MenuItem({ type: 'separator' }));
-        menu.append(new MenuItem({ role: 'selectAll', label: 'Select All' }));
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      // 5. Standard Navigation (if clicking on empty space)
-      if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
-        menu.append(new MenuItem({ label: 'Back', click: () => wc.goBack(), enabled: wc.navigationHistory.canGoBack() }));
-        menu.append(new MenuItem({ label: 'Forward', click: () => wc.goForward(), enabled: wc.navigationHistory.canGoForward() }));
-        menu.append(new MenuItem({ label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => wc.reload() }));
-        menu.append(new MenuItem({ type: 'separator' }));
-      }
-
-      // 6. Developer Tools
-      try {
-        const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
-        if (fs.existsSync(settingsPath)) {
-          const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-          if (settings.developerMode) {
-            menu.append(new MenuItem({ label: 'Inspect Element', click: () => wc.inspectElement(params.x, params.y) }));
+      // 4. Video & Audio Actions
+      if (params.mediaType === 'video' || params.mediaType === 'audio') {
+        const isVideo = params.mediaType === 'video';
+        const flags = params.mediaFlags as any;
+        if (flags) {
+          if (flags.canPlay) {
+            menu.append(new MenuItem({
+              label: flags.isPaused ? labels.play : labels.pause,
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) { if(el.paused) el.play(); else el.pause(); } })()`)
+            }));
           }
+          if (flags.canMute) {
+            menu.append(new MenuItem({
+              label: flags.isMuted ? labels.unmute : labels.mute,
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.muted = !el.muted; })()`)
+            }));
+          }
+          if (flags.canLoop) {
+            menu.append(new MenuItem({
+              label: labels.loop,
+              type: 'checkbox',
+              checked: flags.isLooping,
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.loop = !el.loop; })()`)
+            }));
+          }
+          if (flags.canShowControls) {
+            menu.append(new MenuItem({
+              label: labels.showControls,
+              type: 'checkbox',
+              checked: flags.isShowingControls,
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.controls = !el.controls; })()`)
+            }));
+          }
+          if (isVideo && flags.canPictureInPicture) {
+            menu.append(new MenuItem({
+              label: labels.pictureInPicture,
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover'); if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`)
+            }));
+          }
+          menu.append(new MenuItem({ type: 'separator' }));
         }
-      } catch (e) {}
-      
+        if (params.srcURL) {
+          menu.append(new MenuItem({
+            label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
+            click: () => {
+              nextDownloadAsSaveAs = true;
+              wc.downloadURL(params.srcURL);
+            }
+          }));
+          menu.append(new MenuItem({
+            label: isVideo ? labels.copyVideoAddress : labels.copyAudioAddress,
+            click: () => clipboard.writeText(params.srcURL)
+          }));
+          menu.append(new MenuItem({ type: 'separator' }));
+        }
+      }
+
+      // 5. Selected Text Actions
+      if (params.selectionText && !params.isEditable) {
+        const queryText = params.selectionText.trim();
+        const shortQuery = queryText.length > 24 ? queryText.substring(0, 24) + '...' : queryText;
+        menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({
+          label: labels.searchFor(shortQuery),
+          click: () => mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(queryText)}`)
+        }));
+        menu.append(new MenuItem({
+          label: labels.aiExplain,
+          click: () => mainWindow?.webContents.send('quick-ai-action', queryText)
+        }));
+        menu.append(new MenuItem({
+          label: labels.print,
+          accelerator: 'CmdOrCtrl+P',
+          click: () => wc.print()
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 6. Editable Fields (Inputs, Textareas)
+      if (params.isEditable) {
+        menu.append(new MenuItem({ role: 'undo', label: labels.undo, accelerator: 'CmdOrCtrl+Z' }));
+        menu.append(new MenuItem({ role: 'redo', label: labels.redo, accelerator: process.platform === 'darwin' ? 'Shift+Cmd+Z' : 'CmdOrCtrl+Y' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'cut', label: labels.cut, accelerator: 'CmdOrCtrl+X' }));
+        menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
+        menu.append(new MenuItem({ role: 'paste', label: labels.paste, accelerator: 'CmdOrCtrl+V' }));
+        menu.append(new MenuItem({ role: 'pasteAndMatchStyle', label: labels.pasteAsPlainText, accelerator: 'Shift+CmdOrCtrl+V' }));
+        menu.append(new MenuItem({ role: 'delete', label: labels.delete }));
+        menu.append(new MenuItem({ type: 'separator' }));
+        menu.append(new MenuItem({ role: 'selectAll', label: labels.selectAll, accelerator: 'CmdOrCtrl+A' }));
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 7. Standard Page Navigation (when clicking background / empty page area)
+      if (!params.linkURL && !params.selectionText && params.mediaType === 'none' && !params.isEditable) {
+        menu.append(new MenuItem({
+          label: labels.back,
+          accelerator: process.platform === 'darwin' ? 'Cmd+[' : 'Alt+Left',
+          click: () => wc.goBack(),
+          enabled: wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack()
+        }));
+        menu.append(new MenuItem({
+          label: labels.forward,
+          accelerator: process.platform === 'darwin' ? 'Cmd+]' : 'Alt+Right',
+          click: () => wc.goForward(),
+          enabled: wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward()
+        }));
+        menu.append(new MenuItem({
+          label: labels.reload,
+          accelerator: 'CmdOrCtrl+R',
+          click: () => wc.reload()
+        }));
+        menu.append(new MenuItem({ type: 'separator' }));
+
+        // Save Page As...
+        menu.append(new MenuItem({
+          label: labels.savePageAs,
+          accelerator: 'CmdOrCtrl+S',
+          click: async () => {
+            const currentUrl = wc.getURL();
+            if (currentUrl && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
+              const defaultFilename = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_') + '.html';
+              const saveRes = await dialog.showSaveDialog(mainWindow!, {
+                defaultPath: path.join(app.getPath('downloads'), defaultFilename),
+                filters: [{ name: 'HTML Complete Page', extensions: ['html', 'htm'] }]
+              });
+              if (!saveRes.canceled && saveRes.filePath) {
+                try {
+                  await wc.savePage(saveRes.filePath, 'HTMLComplete');
+                } catch (err) {
+                  console.error('savePage error:', err);
+                }
+              }
+            }
+          }
+        }));
+
+        // Print...
+        menu.append(new MenuItem({
+          label: labels.print,
+          accelerator: 'CmdOrCtrl+P',
+          click: () => wc.print()
+        }));
+
+        // View Page Source
+        menu.append(new MenuItem({
+          label: labels.viewSource,
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
+          click: () => {
+            const currentUrl = wc.getURL();
+            if (currentUrl && !currentUrl.startsWith('view-source:') && !currentUrl.startsWith('nova://')) {
+              mainWindow?.webContents.send('new-tab', `view-source:${currentUrl}`);
+            }
+          }
+        }));
+
+        menu.append(new MenuItem({ type: 'separator' }));
+      }
+
+      // 8. Inspect / DevTools (Always available at bottom just like Chrome)
+      menu.append(new MenuItem({
+        label: labels.inspect,
+        accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+        click: () => {
+          if (wc.isDevToolsOpened()) {
+            wc.devToolsWebContents?.focus();
+          }
+          wc.inspectElement(params.x, params.y);
+        }
+      }));
+
       menu.popup({ window: mainWindow || undefined });
     }
   });

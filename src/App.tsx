@@ -1197,9 +1197,25 @@ function App() {
       });
     }
 
+    let cleanupNewIncognitoTab: any = null;
+    let cleanupQuickAI: any = null;
+
     if (window.electronAPI?.onNewTab) {
       cleanupNewTab = window.electronAPI.onNewTab((_event: any, url: string) => {
         handleNewTab(url);
+      });
+    }
+
+    if ((window as any).electronAPI?.onNewIncognitoTab) {
+      cleanupNewIncognitoTab = (window as any).electronAPI.onNewIncognitoTab((_event: any, url: string) => {
+        handleNewIncognitoTab(url);
+      });
+    }
+
+    if ((window as any).electronAPI?.onQuickAIAction) {
+      cleanupQuickAI = (window as any).electronAPI.onQuickAIAction((_event: any, text: string) => {
+        setIsSidePanelOpen(true);
+        window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: { action: `Explain or summarize this selection:\n\n"${text}"` } }));
       });
     }
 
@@ -1274,6 +1290,8 @@ function App() {
     return () => {
       if (typeof cleanupShortcut === 'function') cleanupShortcut();
       if (typeof cleanupNewTab === 'function') cleanupNewTab();
+      if (typeof cleanupNewIncognitoTab === 'function') cleanupNewIncognitoTab();
+      if (typeof cleanupQuickAI === 'function') cleanupQuickAI();
       if (typeof cleanupDownloads === 'function') cleanupDownloads();
       if (typeof cleanupExtInstall === 'function') cleanupExtInstall();
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
@@ -1373,12 +1391,13 @@ function App() {
     }));
   }, []);
 
-  const handleNewIncognitoTab = useCallback(() => {
+  const handleNewIncognitoTab = useCallback((url?: string) => {
+    const targetUrl = url || 'nova://newtab';
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
-      url: 'nova://newtab',
-      title: 'Private Tab',
-      isLoading: false,
+      url: targetUrl,
+      title: targetUrl !== 'nova://newtab' ? targetUrl : 'Private Tab',
+      isLoading: targetUrl !== 'nova://newtab',
       canGoBack: false,
       canGoForward: false,
       isIncognito: true

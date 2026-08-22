@@ -89,6 +89,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('new-tab', handler);
     return () => ipcRenderer.removeListener('new-tab', handler);
   },
+  onNewIncognitoTab: (callback: (event: any, url?: string) => void) => {
+    const handler = (_event: any, url?: string) => callback(null, url);
+    ipcRenderer.on('new-incognito-tab', handler);
+    return () => ipcRenderer.removeListener('new-incognito-tab', handler);
+  },
+  onQuickAIAction: (callback: (event: any, text: string) => void) => {
+    const handler = (_event: any, text: string) => callback(null, text);
+    ipcRenderer.on('quick-ai-action', handler);
+    return () => ipcRenderer.removeListener('quick-ai-action', handler);
+  },
   onDownloadUpdate: (callback: (event: any, data: any) => void) => {
     const handler = (_event: any, data: any) => callback(null, data);
     ipcRenderer.on('download-update', handler);
