@@ -383,17 +383,25 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
   });
 
   const devUrl = 'http://localhost:5173';
-  if (process.env.NODE_ENV === 'development' || !app.isPackaged) {
+  const distHtmlPath = path.join(__dirname, '../dist/index.html');
+
+  if (app.isPackaged) {
+    mainWindow.loadFile(distHtmlPath);
+  } else {
+    let attempts = 0;
+    const maxAttempts = fs.existsSync(distHtmlPath) ? 2 : 20;
     const loadDev = () => {
+      attempts++;
       mainWindow?.loadURL(devUrl).catch(() => {
-        setTimeout(loadDev, 500);
+        if (attempts >= maxAttempts && fs.existsSync(distHtmlPath)) {
+          console.log('[Main] Loading local dist/index.html build...');
+          mainWindow?.loadFile(distHtmlPath);
+        } else {
+          setTimeout(loadDev, 300);
+        }
       });
     };
     loadDev();
-    // mainWindow?.webContents.openDevTools({ mode: 'bottom' });
-
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
 
