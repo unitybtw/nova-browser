@@ -2151,7 +2151,11 @@ function App() {
   const handleRemoveExtension = useCallback(async (id: string) => {
     if (window.confirm('Are you sure you want to remove this extension?')) {
       try {
-        await (window as any).electronAPI?.removeExtension?.(id);
+        const res = await (window as any).electronAPI?.removeExtension?.(id);
+        if (res?.error) {
+          alert('Failed to remove extension: ' + res.error);
+          return;
+        }
         setExtensions(prev => prev.filter(e => e.id !== id));
       } catch (e) {
         console.error('Failed to remove extension:', e);

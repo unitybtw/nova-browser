@@ -2472,24 +2472,80 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
   if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
     return { error: 'Invalid extension ID format' };
   }
-  const win = BrowserWindow.getAllWindows()[0];
-  if (!win) return { error: 'No window available' };
+  
   try {
-    await win.webContents.session.removeExtension(extensionId);
-    loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+    const foundExt = loadedExtensions.find((e) => e.id === extensionId);
     
-    // Also delete it from disk so it doesn't load on next startup
+    // 1. Close any active popup windows for this extension
+    if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
+      try {
+        activeExtensionPopupWin.close();
+        activeExtensionPopupWin = null;
+      } catch (_) {}
+    }
+
+    // 2. Remove from Electron runtime sessions (both default and window sessions)
+    try {
+      await session.defaultSession.removeExtension(extensionId);
+    } catch (_) {}
+
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && win.webContents?.session && win.webContents.session !== session.defaultSession) {
+        try {
+          await win.webContents.session.removeExtension(extensionId);
+        } catch (_) {}
+      }
+    }
+
+    // 3. Remove from in-memory state
+    loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+
+    // 4. Remove from disabled extensions list so it doesn't linger
+    const disabledIds = getDisabledExtensionIds();
+    if (disabledIds.includes(extensionId)) {
+      setDisabledExtensionIds(disabledIds.filter((id) => id !== extensionId));
+    }
+
+    // 5. Permanently remove extension directory from disk
     const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+    
+    // Path 1: Direct ID folder
     const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
     if (extDir.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(extDir)) {
-      fs.rmSync(extDir, { recursive: true, force: true });
+      try {
+        fs.rmSync(extDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      } catch (rmErr) {
+        console.error(`[Extensions] Error removing directory ${extDir}:`, rmErr);
+      }
     }
-    
-    if (win) win.webContents.send('extension-changed');
+
+    // Path 2: Loaded extension recorded path (if different)
+    if (foundExt?.path) {
+      const recordedPath = path.resolve(foundExt.path);
+      if (recordedPath.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(recordedPath)) {
+        try {
+          fs.rmSync(recordedPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+        } catch (_) {}
+      }
+    }
+
+    // Path 3: Clean up any lingering downloaded .crx files in temp_extensions
+    const tempCrx = path.join(app.getPath('userData'), 'temp_extensions', `${extensionId}.crx`);
+    if (fs.existsSync(tempCrx)) {
+      try { fs.rmSync(tempCrx, { force: true }); } catch (_) {}
+    }
+
+    // 6. Notify all browser windows of the change
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        win.webContents.send('extension-changed');
+      }
+    }
+
     return { success: true };
-  } catch (err) {
-    console.error('Failed to remove extension', err);
-    return { error: (err as any).message || 'Failed to remove extension' };
+  } catch (err: any) {
+    console.error('Failed to remove extension:', err);
+    return { error: err?.message || 'Failed to remove extension' };
   }
 });
 
@@ -2558,6 +2614,12 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     
     const win = BrowserWindow.getAllWindows()[0];
     
+    // Clear disabled state if extension was previously disabled
+    const disabledIds = getDisabledExtensionIds();
+    if (disabledIds.includes(extensionId)) {
+      setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId));
+    }
+
     // Check if it's already loaded to prevent duplicate loading
     const isAlreadyLoaded = loadedExtensions.some(e => e.id === extensionId);
     let extInfo;
@@ -2570,8 +2632,12 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     
     try { fs.unlinkSync(crxFilePath); } catch (e) {}
     
-    // Notify the frontend immediately so it doesn't wait for polling
-    if (win) win.webContents.send('extension-changed');
+    // Notify all frontend windows immediately
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) {
+        w.webContents.send('extension-changed');
+      }
+    }
     
     return { success: true, extension: extInfo };
   } catch (err: any) {

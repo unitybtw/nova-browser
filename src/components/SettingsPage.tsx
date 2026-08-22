@@ -672,6 +672,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
     let cleanup: (() => void) | void;
     let cleanupStatus: (() => void) | void;
+    let cleanupExt: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
@@ -682,9 +683,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         setMcpStatus(prev => prev ? { ...prev, running: isRunning } : { running: isRunning, port: 3020, clientCount: 0, clients: [] });
       });
     }
+    if ((window as any).electronAPI?.onExtensionChanged) {
+      cleanupExt = (window as any).electronAPI.onExtensionChanged(async () => {
+        if ((window as any).electronAPI?.listExtensions) {
+          const list = await (window as any).electronAPI.listExtensions();
+          setExtensions(list || []);
+        }
+      });
+    }
     return () => {
       if (typeof cleanup === 'function') cleanup();
       if (typeof cleanupStatus === 'function') cleanupStatus();
+      if (typeof cleanupExt === 'function') cleanupExt();
     };
   }, [fetchMcpStatus]);
 
@@ -2134,7 +2144,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               onClick={async () => {
                                 if (window.confirm(`Are you sure you want to remove "${ext.name}"?`)) {
                                   try {
-                                    await (window as any).electronAPI?.removeExtension?.(ext.id);
+                                    const res = await (window as any).electronAPI?.removeExtension?.(ext.id);
+                                    if (res?.error) {
+                                      alert('Failed to remove extension: ' + res.error);
+                                      return;
+                                    }
                                     setExtensions(prev => prev.filter(e => e.id !== ext.id));
                                   } catch (e) {
                                     console.error('Failed to remove extension:', e);
