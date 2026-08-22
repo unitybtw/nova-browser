@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { aiAgent } from '../services/aiAgent';
+import { aiAgent, AVAILABLE_AI_MODELS } from '../services/aiAgent';
 import { aiMemory, MemoryItem, TaskSummary } from '../services/aiMemory';
 import { tts } from '../services/tts';
 import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
@@ -29,6 +29,7 @@ export const SidePanel = React.memo(({
     return [];
   });
   const [input, setInput] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => aiAgent.getModel());
   const [isInitializing, setIsInitializing] = useState(false);
   const [isReady, setIsReady] = useState(isDemo);
   const [progress, setProgress] = useState(0);
@@ -453,33 +454,73 @@ export const SidePanel = React.memo(({
                 )}
               </div>
             ) : !isReady ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4">
-                <Bot className="w-12 h-12 text-slate-300 dark:text-slate-600" />
-                <div className="space-y-2 w-full px-4">
-                  <h3 className="font-medium text-slate-700 dark:text-slate-300">Local AI Engine</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Loads a local AI model running on WebGPU. The first load may take some time.</p>
+              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-2">
+                <Bot className="w-10 h-10 text-accent animate-pulse" />
+                <div className="space-y-2 w-full px-2">
+                  <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Hafif ve Hızlı Yapay Zeka Motoru</h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">ReAct mimarisi sayesinde WebGPU üzerinde yerel ve ultra hızlı çalışır.</p>
                   
+                  {/* Model Selector Cards */}
+                  {!isInitializing && (
+                    <div className="flex flex-col gap-2 my-3 text-left">
+                      {AVAILABLE_AI_MODELS.map((model) => {
+                        const isSelected = selectedModelId === model.id;
+                        return (
+                          <div
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModelId(model.id);
+                              aiAgent.setModel(model.id);
+                            }}
+                            className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-accent bg-accent/10 dark:bg-accent/20 shadow-xs ring-1 ring-accent'
+                                : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                                {model.name}
+                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
+                                  {model.size}
+                                </span>
+                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
+                                  {model.speed}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                              {model.description}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {isInitializing ? (
                     <div className="space-y-2 mt-4">
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
                         <div 
                           className="bg-accent h-full transition-all duration-300 ease-out"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <p className="text-[10px] text-slate-400 truncate">{progressText}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">{progressText}</p>
                     </div>
                   ) : (
-                    <div className="mt-4 space-y-2">
+                    <div className="mt-3 space-y-2">
                       {initError && (
                         <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{initError}</p>
                       )}
                       <button
                         onClick={handleInit}
-                        className="px-4 py-2 w-full bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
+                        className="px-4 py-2.5 w-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
                       >
                         <Sparkles className="w-4 h-4" />
-                        Start AI
+                        Yapay Zekayı Başlat ({AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.size || '~800 MB'})
                       </button>
                     </div>
                   )}

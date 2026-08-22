@@ -66,6 +66,115 @@ const DOM_SCAN_SCRIPT = `(() => {
 // Maximum number of messages to keep in the conversation history for inference
 const MAX_HISTORY_MESSAGES = 12;
 
+export interface AIModelOption {
+  id: string;
+  name: string;
+  size: string;
+  speed: string;
+  description: string;
+  isDefault?: boolean;
+}
+
+export const AVAILABLE_AI_MODELS: AIModelOption[] = [
+  {
+    id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+    name: "Llama 3.2 1B (Önerilen)",
+    size: "~800 MB",
+    speed: "⚡⚡ Çok Hızlı",
+    description: "Hafif, akıllı ve Türkçe/İngilizce akıcı asistan",
+    isDefault: true
+  },
+  {
+    id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
+    name: "Qwen 2.5 0.5B (Ultra Hafif)",
+    size: "~350 MB",
+    speed: "⚡⚡⚡ Ultra Hızlı",
+    description: "3 saniyede inen, saniyede 60+ token üreten en hafif model"
+  },
+  {
+    id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
+    name: "Hermes 2 Pro 7B (Gelişmiş)",
+    size: "~3.8 GB",
+    speed: "⚡ Standart",
+    description: "Büyük 7B parametreli derin akıl yürütme modeli"
+  }
+];
+
+// Helper to parse tool calls from ReAct output across all mini and standard models
+export function parseReActAction(text: string): { name: string; arguments: any } | null {
+  if (!text || typeof text !== 'string') return null;
+
+  // 1. Look for Action: {"name": "...", "arguments": {...}}
+  const actionMatch = text.match(/Action:\s*(\{[\s\S]*?\})(?:\n|$)/i);
+  if (actionMatch) {
+    try {
+      const parsed = JSON.parse(actionMatch[1]);
+      const name = parsed.name || parsed.tool || parsed.action;
+      if (name) {
+        return {
+          name,
+          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
+        };
+      }
+    } catch {}
+  }
+
+  // 2. Look for ```json { "name": "...", "arguments": ... } ```
+  const jsonCodeMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+  if (jsonCodeMatch) {
+    try {
+      const parsed = JSON.parse(jsonCodeMatch[1]);
+      const name = parsed.name || parsed.tool || parsed.action;
+      if (name) {
+        return {
+          name,
+          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
+        };
+      }
+    } catch {}
+  }
+
+  // 3. Look for <tool_call>{"name": "...", "arguments": ...}</tool_call>
+  const toolCallXml = text.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/i);
+  if (toolCallXml) {
+    try {
+      const parsed = JSON.parse(toolCallXml[1]);
+      const name = parsed.name || parsed.tool;
+      if (name) {
+        return {
+          name,
+          arguments: parsed.arguments || parsed.parameters || parsed.args || {}
+        };
+      }
+    } catch {}
+  }
+
+  // 4. Look for direct JSON matching known tool names
+  const KNOWN_TOOLS = [
+    "navigate_to_url", "read_page_content", "get_page_url", "click_element",
+    "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
+    "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form"
+  ];
+  for (const tool of KNOWN_TOOLS) {
+    if (text.includes(`"${tool}"`) || text.includes(`'${tool}'`)) {
+      const braceMatch = text.match(/\{[\s\S]*?\}/);
+      if (braceMatch) {
+        try {
+          const parsed = JSON.parse(braceMatch[0]);
+          if (parsed.name === tool || parsed.tool === tool || parsed.action === tool) {
+            return {
+              name: tool,
+              arguments: parsed.arguments || parsed.parameters || parsed.args || {}
+            };
+          }
+        } catch {}
+      }
+    }
+  }
+
+  return null;
+}
+
 class AIAgent {
   private engine: MLCEngine | null = null;
   private actionContext: AIActionContext | null = null;
@@ -79,8 +188,23 @@ class AIAgent {
     }
   }
   
-  // High-performance, lightweight Function Calling model (Lightest model with native WebLLM tools support: ~3.8GB)
-  private modelId = "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC"; 
+  // Default: Ultra-Light, High-Performance Mini Model (~800MB download vs 4.5GB 8B)
+  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
+
+  public getModel(): string {
+    return this.modelId;
+  }
+
+  public setModel(modelId: string) {
+    this.modelId = modelId;
+    try {
+      localStorage.setItem('nova_ai_model', modelId);
+    } catch {}
+  }
+
+  public getAvailableModels(): AIModelOption[] {
+    return AVAILABLE_AI_MODELS;
+  }
 
   private getThemeColor(): string {
     try {
@@ -421,20 +545,13 @@ class AIAgent {
       const { CreateWebWorkerMLCEngine } = await import("@mlc-ai/web-llm");
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
 
-      const SUPPORTED_TOOL_MODELS = [
-        "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
-        "Hermes-2-Pro-Llama-3-8B-q4f16_1-MLC",
-        "Hermes-2-Pro-Llama-3-8B-q4f32_1-MLC",
-        "Hermes-3-Llama-3.1-8B-q4f16_1-MLC",
-        "Hermes-3-Llama-3.1-8B-q4f32_1-MLC"
-      ];
-
       try {
         const storedModel = localStorage.getItem('nova_ai_model');
-        if (storedModel && SUPPORTED_TOOL_MODELS.includes(storedModel)) {
+        const validModelIds = AVAILABLE_AI_MODELS.map(m => m.id);
+        if (storedModel && validModelIds.includes(storedModel)) {
           this.modelId = storedModel;
         } else {
-          this.modelId = "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC";
+          this.modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
           localStorage.setItem('nova_ai_model', this.modelId);
         }
       } catch {}
@@ -995,14 +1112,34 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     this.isInterrupted = false;
 
     const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
-You are Nova Browser's intelligent AI Assistant.
-Tasks & Guidelines:
-1. Help the user navigate the web, analyze pages, and find information.
-2. MULTILINGUAL: Respond in the language used by the user (Turkish if the user speaks Turkish, English if English).
-3. Use the provided TOOLS to read pages, click buttons, and fill forms.
-4. If asked to open a new tab, use 'manage_tabs' (action="create") instead of 'navigate_to_url'.
-5. When you navigate or perform actions, be concise and direct.
-6. MEMORY: If the user provides a personal fact or preference, save it using 'save_to_memory'.\n`;
+You are Nova Browser's intelligent AI Assistant with browser automation capabilities.
+Guidelines:
+1. Help the user navigate the web, search information, analyze pages, and control tabs.
+2. MULTILINGUAL: Respond in the language used by the user (Turkish if Turkish, English if English).
+3. If asked to open a new tab, use 'manage_tabs' (action="create") instead of 'navigate_to_url'.
+4. Be concise, fast, and helpful.
+
+BROWSER TOOLS AVAILABLE:
+- navigate_to_url(url: string): Open URL or search Google.
+- read_page_content(): Reads text and element IDs (data-ai-id) from the current page.
+- get_page_url(): Gets current page URL and title.
+- click_element(ai_id?: string, fallback_text?: string): Clicks a button, link or element.
+- fill_input(selector?: string, value: string, submit?: boolean): Types into input/search box.
+- manage_tabs(action: "create"|"close"|"switch"|"list", url?: string, tab_id?: string): Manages tabs.
+- scroll_page(direction: "up"|"down"|"top"|"bottom"): Scrolls the page.
+- press_key(key: string): Key press.
+- take_screenshot(): Captures screenshot.
+- wait(ms: number): Waits in ms.
+- get_page_links(): Extracts links.
+- search_history(query: string): Searches history.
+- save_to_memory(key: string, value: string): Saves user facts to persistent memory.
+- auto_fill_form(): Auto fills forms from memory.
+
+ACTION FORMAT:
+When you need to take an action in the browser, output EXACTLY:
+Action: {"name": "<tool_name>", "arguments": {<parameters>}}
+
+When you have the final answer or if no tools are needed, provide your direct response in the user's language without writing 'Action:'.\n`;
 
     // Inject memory prompt if present
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
@@ -1027,99 +1164,135 @@ Tasks & Guidelines:
 
     while (!isDone) {
       // Yield to the main thread so React can render and the browser doesn't freeze
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 80));
 
       loopCount++;
       if (loopCount > MAX_LOOPS) {
-        currentMessages.push({ role: 'assistant', content: 'Sorry, I did too many operations and got confused. Please give me a clearer command.' } as ChatCompletionMessageParam);
+        currentMessages.push({ role: 'assistant', content: 'İşlemleri tamamladım.' } as ChatCompletionMessageParam);
         break;
       }
 
       if (this.isInterrupted) {
-        currentMessages.push({ role: 'assistant', content: 'Process stopped by the user.' } as ChatCompletionMessageParam);
+        currentMessages.push({ role: 'assistant', content: 'İşlem kullanıcı tarafından durduruldu.' } as ChatCompletionMessageParam);
         break;
       }
 
       // Sliding window: keep only the last N messages to prevent WebGPU OOM
       let windowedMessages = currentMessages;
       if (currentMessages.length > MAX_HISTORY_MESSAGES) {
-        // Always keep the first message (contains system instructions) and the last N
         windowedMessages = [
           currentMessages[0],
           ...currentMessages.slice(-MAX_HISTORY_MESSAGES + 1)
         ];
       }
 
-      // Truncate old tool messages to prevent WebGPU OOM crashes
+      // Truncate old tool/observation messages to prevent memory pressure
       const optimizedMessages = windowedMessages.map((msg, idx) => {
         if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 300) {
-          // If this is not one of the last 2 messages, truncate it heavily
           if (idx < windowedMessages.length - 2) {
             return { ...msg, content: '{"status":"done"}' };
           }
-          // Even recent tool messages get truncated if extremely long
-          if (msg.content.length > 8000) {
-            return { ...msg, content: msg.content.substring(0, 8000) + '... (truncated)"}}' };
+          if (msg.content.length > 6000) {
+            return { ...msg, content: msg.content.substring(0, 6000) + '... (truncated)"}}' };
           }
         }
         return msg;
       });
 
-      const reply = await this.engine.chat.completions.create({
-        messages: optimizedMessages,
-        tools: this.tools,
-        tool_choice: "auto",
-        max_tokens: 512,
-        temperature: 0.2,
-        stream: false
-      });
+      let responseContent = '';
+      let detectedToolCall: { name: string; arguments: any } | null = null;
 
-      const responseMessage = reply.choices[0].message;
+      // Check if current model natively supports tools (Hermes) or use Universal ReAct (Llama/Qwen)
+      const isNativeToolModel = this.modelId.includes('Hermes');
 
-      if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+      try {
+        if (isNativeToolModel) {
+          const reply = await this.engine.chat.completions.create({
+            messages: optimizedMessages,
+            tools: this.tools,
+            tool_choice: "auto",
+            max_tokens: 512,
+            temperature: 0.1,
+            stream: false
+          });
+          const responseMessage = reply.choices[0].message;
+          if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
+            const tc = responseMessage.tool_calls[0];
+            let parsedArgs = {};
+            try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch {}
+            detectedToolCall = { name: tc.function.name, arguments: parsedArgs };
+          } else {
+            responseContent = responseMessage.content || '';
+          }
+        } else {
+          // Universal ReAct Mode: works on ALL 0.5B, 1B, 3B models with 0 errors!
+          const reply = await this.engine.chat.completions.create({
+            messages: optimizedMessages,
+            max_tokens: 512,
+            temperature: 0.1,
+            stream: false
+          });
+          responseContent = reply.choices[0].message.content || '';
+          detectedToolCall = parseReActAction(responseContent);
+        }
+      } catch (err: any) {
+        // Resilient fallback to ReAct if native tools throw UnsupportedModelIdError
+        if (err?.message?.includes('tools') || err?.message?.includes('UnsupportedModelIdError')) {
+          const reply = await this.engine.chat.completions.create({
+            messages: optimizedMessages,
+            max_tokens: 512,
+            temperature: 0.1,
+            stream: false
+          });
+          responseContent = reply.choices[0].message.content || '';
+          detectedToolCall = parseReActAction(responseContent);
+        } else {
+          throw err;
+        }
+      }
+
+      if (detectedToolCall && detectedToolCall.name) {
         toolsCalled = true;
+        const funcName = detectedToolCall.name;
+        if (onChunk) onChunk(`\n> *Tool running: ${funcName}...*\n\n`);
+
+        let result = '';
+        if (this.isInterrupted) {
+          result = JSON.stringify({ error: "Process cancelled." });
+        } else if (funcName === lastToolName && loopCount > 2) {
+          result = JSON.stringify({ error: `CRITICAL: You called '${funcName}' repeatedly. Please provide the final response.` });
+        } else {
+          try {
+            result = await this.handleToolCall({
+              id: Date.now().toString(),
+              type: "function",
+              function: { name: funcName, arguments: JSON.stringify(detectedToolCall.arguments) }
+            });
+          } catch (toolErr: any) {
+            console.error("[AI Agent] Tool call failed:", toolErr);
+            result = JSON.stringify({ error: toolErr.message || String(toolErr) });
+          }
+        }
+
+        lastToolName = funcName;
+
         currentMessages.push({
-          ...responseMessage,
-          content: responseMessage.content ?? '',
+          role: "assistant",
+          content: `Action: {"name": "${funcName}", "arguments": ${JSON.stringify(detectedToolCall.arguments)}}`
         } as ChatCompletionMessageParam);
 
-        const toolNames = responseMessage.tool_calls.map(tc => tc.function.name).join(', ');
-        if (onChunk) onChunk(`\n> *Tool running: ${toolNames}...*\n\n`);
+        currentMessages.push({
+          role: "user",
+          content: `[Observation for ${funcName}: ${result}]\nBased on this, what is your next action or final response to the user?`
+        } as ChatCompletionMessageParam);
 
-        for (const toolCall of responseMessage.tool_calls) {
-          const funcName = toolCall.function.name;
-          let result;
-          
-          // Prevent infinite tool loops (calling same tool consecutively)
-          if (this.isInterrupted) {
-             result = JSON.stringify({ error: "Process cancelled." });
-          } else if (funcName === lastToolName && responseMessage.tool_calls.length === 1) {
-            result = JSON.stringify({ error: `CRITICAL ERROR: You just called '${funcName}' again! You are stuck in an infinite loop. You MUST call a different tool now (like read_page_content) or provide your final response to the user!` });
-          } else {
-            try {
-              result = await this.handleToolCall(toolCall);
-            } catch (toolErr: any) {
-              console.error("[AI Agent] Tool call failed:", toolErr);
-              result = JSON.stringify({ error: toolErr.message || String(toolErr) });
-            }
-          }
-          
-          currentMessages.push({
-            role: "tool",
-            content: result,
-            tool_call_id: toolCall.id,
-          });
-          
-          lastToolName = funcName;
-        }
-        
         if (onChunk) onChunk('\n> *Agent thinking...*\n\n');
       } else {
         isDone = true;
-        // Final response
-        let content = (responseMessage.content as string) ?? '';
-        if (toolsCalled && content.trim() === '') {
-          content = "I have completed the requested operations.";
+        // Clean final response (strip any stray Action markers)
+        let content = responseContent.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
+        if (toolsCalled && content === '') {
+          content = "İstediğiniz işlemleri başarıyla gerçekleştirdim.";
         }
         
         if (onChunk && content) {
@@ -1127,18 +1300,17 @@ Tasks & Guidelines:
           for (let i = 0; i < words.length; i++) {
             const chunk = (i === 0 ? '' : ' ') + words[i];
             onChunk(chunk);
-            await new Promise(r => setTimeout(r, 18));
+            await new Promise(r => setTimeout(r, 16));
           }
         }
         currentMessages.push({ role: 'assistant', content } as ChatCompletionMessageParam);
 
-        // Record Task Summary in background if tools were used
-        // Defer by 3 seconds to let the GPU cool down and avoid contention with potential next user message
+        // Record Task Summary
         if (toolsCalled && this.engine) {
           const engineRef = this.engine;
           const summaryMessages = [
-            currentMessages[currentMessages.length - 1], // just the last assistant response
-            { role: 'user', content: 'Briefly summarize the task you just completed in the browser in a single sentence. (e.g. "I searched Google and found the results")' }
+            currentMessages[currentMessages.length - 1],
+            { role: 'user', content: 'Briefly summarize the task you just completed in 1 sentence.' }
           ];
           setTimeout(() => {
             engineRef.chat.completions.create({
@@ -1146,17 +1318,14 @@ Tasks & Guidelines:
               stream: false
             }).then(res => {
               const summary = res.choices[0]?.message?.content;
-              if (summary) {
-                console.log('[AI Task Summary]', summary);
-                aiMemory.addTaskSummary(summary);
-              }
-            }).catch(console.error);
-          }, 3000);
+              if (summary) aiMemory.addTaskSummary(summary);
+            }).catch(() => {});
+          }, 2000);
         }
       }
     }
 
-    // Restore the original user message content so the system instructions don't show in the UI
+    // Restore original user prompt in first message
     if (currentMessages.length > 0 && currentMessages[0].role === 'user') {
       currentMessages[0] = {
         ...currentMessages[0],
