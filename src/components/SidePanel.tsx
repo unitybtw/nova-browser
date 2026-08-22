@@ -23,7 +23,7 @@ export const SidePanel = React.memo(({
     if (isDemo) {
       return [
         { role: 'user', content: 'Can you summarize what makes Nova Browser special?' },
-        { role: 'assistant', content: '🚀 **Nova Browser** is an AI-native browser featuring:\n\n- **Autonomous MCP Agents**: Full browser control with visual cursor feedback.\n- **Zero-Knowledge Cloud Sync**: 1-click device pairing with AES-256-GCM encryption.\n- **Privacy Shield**: Built-in adblocker & tracker protection.\n- **Dual-View Split Screen** & customizable workspaces!' }
+        { role: 'assistant', content: '**Nova Browser** yapay zeka tabanli bir tarayicidir:\n\n- **Otonom Ajanlar**: Gorsel imlec ile tam tarayici kontrolu.\n- **Sifir Bilgili Senkronizasyon**: AES-256-GCM sifreleme ile 1 tikla cihaz eslestirme.\n- **Gizlilik Kalkani**: Yerlesik reklam ve takipci engelleme.\n- **Dual-View Bolunmus Ekran** ve ozellestirilebilir calisma alanlari.' }
       ];
     }
     return [];

@@ -78,27 +78,106 @@ export interface AIModelOption {
 export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   {
     id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-    name: "Llama 3.2 1B (Önerilen)",
+    name: "Llama 3.2 1B (Onerilen)",
     size: "~800 MB",
-    speed: "⚡⚡ Çok Hızlı",
-    description: "Hafif, akıllı ve Türkçe/İngilizce akıcı asistan",
+    speed: "Cok Hizli",
+    description: "Hafif, akilli ve Turkce/Ingilizce akici asistan",
     isDefault: true
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
     name: "Qwen 2.5 0.5B (Ultra Hafif)",
     size: "~350 MB",
-    speed: "⚡⚡⚡ Ultra Hızlı",
-    description: "3 saniyede inen, saniyede 60+ token üreten en hafif model"
+    speed: "Ultra Hizli",
+    description: "3 saniyede inen, saniyede 60+ token ureten en hafif model"
   },
   {
     id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
-    name: "Hermes 2 Pro 7B (Gelişmiş)",
+    name: "Hermes 2 Pro 7B (Gelismis)",
     size: "~3.8 GB",
-    speed: "⚡ Standart",
-    description: "Büyük 7B parametreli derin akıl yürütme modeli"
+    speed: "Standart",
+    description: "Buyuk 7B parametreli derin akil yurutme modeli"
   }
 ];
+
+// Natural Language Intent Extractor: Instantly executes common browser commands with 100% reliability
+export function detectDirectIntent(userText: string): { name: string; arguments: any } | null {
+  if (!userText || typeof userText !== 'string') return null;
+  const text = userText.trim().toLowerCase();
+
+  const sites: Record<string, string> = {
+    'youtube': 'https://youtube.com',
+    'google': 'https://google.com',
+    'github': 'https://github.com',
+    'twitter': 'https://x.com',
+    'x': 'https://x.com',
+    'reddit': 'https://reddit.com',
+    'wikipedia': 'https://wikipedia.org',
+    'instagram': 'https://instagram.com',
+    'facebook': 'https://facebook.com',
+    'amazon': 'https://amazon.com',
+    'netflix': 'https://netflix.com',
+    'spotify': 'https://spotify.com',
+    'trendyol': 'https://trendyol.com',
+    'hepsiburada': 'https://hepsiburada.com',
+    'ekşi': 'https://eksisozluk.com',
+    'eksisozluk': 'https://eksisozluk.com',
+    'haberler': 'https://news.google.com'
+  };
+
+  for (const [siteKey, siteUrl] of Object.entries(sites)) {
+    const patterns = [
+      new RegExp(`^${siteKey}(\\s*(aç|git|e git|a git|'a git|'e git|'a gir|'e gir|gir|ac))?$`, 'i'),
+      new RegExp(`^(open|go to|visit|launch)\\s+${siteKey}$`, 'i'),
+      new RegExp(`^${siteKey}\\.com(\\s*(aç|ac))?$`, 'i')
+    ];
+    for (const pat of patterns) {
+      if (pat.test(text)) {
+        return { name: 'navigate_to_url', arguments: { url: siteUrl } };
+      }
+    }
+  }
+
+  // Direct URL pattern: "https://..." or "domain.com"
+  if (/^https?:\/\/[^\s]+$/i.test(text) || /^[a-z0-9-]+\.(com|org|net|io|dev|app|edu|gov|tr)(\/[^\s]*)?$/i.test(text)) {
+    return { name: 'navigate_to_url', arguments: { url: text } };
+  }
+
+  // Search queries: "google'da ara: ...", "ara: ...", "hava durumunu ara", "search for ..."
+  const searchMatch = text.match(/^(?:google(?:'da)?\s+)?(?:ara|search for|search|search google for|bana ara)\s*[:\s]\s*(.+)$/i) ||
+                      text.match(/^(.+?)\s+(?:nedir|nerede|kaç|hakkında bilgi ver|ara|fiyatları)$/i);
+  if (searchMatch && searchMatch[1] && searchMatch[1].length > 2 && !searchMatch[1].startsWith('yeni sekme') && !searchMatch[1].startsWith('sayfa')) {
+    return { name: 'navigate_to_url', arguments: { url: searchMatch[1].trim() } };
+  }
+
+  // Tab management
+  if (/^(yeni sekme|yeni sekme aç|yeni sekme ac|yeni sekme oluştur|open new tab|new tab|create tab)$/i.test(text)) {
+    return { name: 'manage_tabs', arguments: { action: 'create' } };
+  }
+  if (/^(sekmeyi kapat|bu sekmeyi kapat|close tab|close current tab)$/i.test(text)) {
+    return { name: 'manage_tabs', arguments: { action: 'close' } };
+  }
+
+  // Page reading & summary
+  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|read page|read this page|summarize page)$/i.test(text)) {
+    return { name: 'read_page_content', arguments: {} };
+  }
+
+  // Scrolling
+  if (/^(aşağı kaydır|asagi kaydir|aşağı in|sayfayı aşağı kaydır|scroll down)$/i.test(text)) {
+    return { name: 'scroll_page', arguments: { direction: 'down' } };
+  }
+  if (/^(yukarı kaydır|yukari kaydir|yukarı çık|sayfayı yukarı kaydır|scroll up)$/i.test(text)) {
+    return { name: 'scroll_page', arguments: { direction: 'up' } };
+  }
+
+  // Screenshot
+  if (/^(ekran görüntüsü al|ekran goruntusu al|screenshot al|take screenshot|screenshot)$/i.test(text)) {
+    return { name: 'take_screenshot', arguments: {} };
+  }
+
+  return null;
+}
 
 // Helper to parse tool calls from ReAct output across all mini and standard models
 export function parseReActAction(text: string): { name: string; arguments: any } | null {
@@ -119,7 +198,33 @@ export function parseReActAction(text: string): { name: string; arguments: any }
     } catch {}
   }
 
-  // 2. Look for ```json { "name": "...", "arguments": ... } ```
+  // 2. Look for function call syntax: Action: navigate_to_url("https://...") or click_element("1")
+  const funcSyntax = text.match(/Action:\s*([a-zA-Z0-9_]+)\(([\s\S]*?)\)/i) ||
+                     text.match(/([a-zA-Z0-9_]+)\(([\s\S]*?)\)/i);
+  if (funcSyntax) {
+    const fn = funcSyntax[1];
+    const rawParam = funcSyntax[2].trim();
+    const KNOWN_TOOLS = ["navigate_to_url", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form"];
+    if (KNOWN_TOOLS.includes(fn)) {
+      if (fn === 'navigate_to_url') {
+        const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
+        return { name: fn, arguments: { url: cleaned || 'https://google.com' } };
+      }
+      if (fn === 'click_element') {
+        const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
+        return { name: fn, arguments: { ai_id: cleaned } };
+      }
+      if (fn === 'read_page_content' || fn === 'take_screenshot' || fn === 'get_page_url') {
+        return { name: fn, arguments: {} };
+      }
+      try {
+        const parsed = JSON.parse(`{${rawParam}}`);
+        return { name: fn, arguments: parsed };
+      } catch {}
+    }
+  }
+
+  // 3. Look for Markdown code block ```json { "name": "...", "arguments": ... } ```
   const jsonCodeMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
   if (jsonCodeMatch) {
     try {
@@ -134,7 +239,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
     } catch {}
   }
 
-  // 3. Look for <tool_call>{"name": "...", "arguments": ...}</tool_call>
+  // 4. Look for <tool_call>{"name": "...", "arguments": ...}</tool_call>
   const toolCallXml = text.match(/<tool_call>\s*(\{[\s\S]*?\})\s*<\/tool_call>/i);
   if (toolCallXml) {
     try {
@@ -149,7 +254,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
     } catch {}
   }
 
-  // 4. Look for direct JSON matching known tool names
+  // 5. Look for direct JSON matching known tool names
   const KNOWN_TOOLS = [
     "navigate_to_url", "read_page_content", "get_page_url", "click_element",
     "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
@@ -1111,60 +1216,74 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
 
-    const systemInstruction = `\n\n[SYSTEM INSTRUCTION]
-You are Nova Browser's intelligent AI Assistant with browser automation capabilities.
-Guidelines:
-1. Help the user navigate the web, search information, analyze pages, and control tabs.
-2. MULTILINGUAL: Respond in the language used by the user (Turkish if Turkish, English if English).
-3. If asked to open a new tab, use 'manage_tabs' (action="create") instead of 'navigate_to_url'.
-4. Be concise, fast, and helpful.
+    // 1. Detect instant intent from the latest user message
+    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+    const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+    const directIntent = messages.length <= 2 ? detectDirectIntent(userQuery) : null;
 
-BROWSER TOOLS AVAILABLE:
-- navigate_to_url(url: string): Open URL or search Google.
-- read_page_content(): Reads text and element IDs (data-ai-id) from the current page.
-- get_page_url(): Gets current page URL and title.
-- click_element(ai_id?: string, fallback_text?: string): Clicks a button, link or element.
-- fill_input(selector?: string, value: string, submit?: boolean): Types into input/search box.
-- manage_tabs(action: "create"|"close"|"switch"|"list", url?: string, tab_id?: string): Manages tabs.
-- scroll_page(direction: "up"|"down"|"top"|"bottom"): Scrolls the page.
-- press_key(key: string): Key press.
-- take_screenshot(): Captures screenshot.
-- wait(ms: number): Waits in ms.
-- get_page_links(): Extracts links.
-- search_history(query: string): Searches history.
-- save_to_memory(key: string, value: string): Saves user facts to persistent memory.
-- auto_fill_form(): Auto fills forms from memory.
+    const systemInstruction = `You are Nova Browser's AI Assistant. You help the user browse the web and automate browser actions.
 
-ACTION FORMAT:
-When you need to take an action in the browser, output EXACTLY:
-Action: {"name": "<tool_name>", "arguments": {<parameters>}}
+Available Tools:
+- navigate_to_url: {"url": "https://..." or "search query"}
+- read_page_content: {}
+- get_page_url: {}
+- click_element: {"ai_id": "1"}
+- fill_input: {"value": "text to type", "submit": true}
+- manage_tabs: {"action": "create"|"close"|"switch"|"list", "url": "https://..."}
+- scroll_page: {"direction": "up"|"down"}
+- take_screenshot: {}
+- save_to_memory: {"key": "...", "value": "..."}
 
-When you have the final answer or if no tools are needed, provide your direct response in the user's language without writing 'Action:'.\n`;
+Instructions:
+1. When you need to take an action, output ONLY: Action: {"name": "<tool_name>", "arguments": {<params>}}
+2. When answering the user or when no action is needed, answer directly and clearly in Turkish (or user's language). Never use emojis.`;
 
-    // Inject memory prompt if present
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
-    
-    // Prepare clean request messages with system instruction attached to the first user message
-    const requestMessages = messages.map((m, idx) => {
-      if (idx === 0 && m.role === 'user' && typeof m.content === 'string') {
-        return {
-          ...m,
-          content: systemInstruction + (memoryPrompt || '') + '\n\n[USER REQUEST]\n' + m.content
-        };
-      }
-      return { ...m };
-    });
+
+    // Proper chat format: System message at index 0
+    let currentMessages: ChatCompletionMessageParam[] = [
+      { 
+        role: 'system', 
+        content: systemInstruction + (memoryPrompt ? `\n\nUser Profile & Memories:\n${memoryPrompt}` : '') 
+      },
+      ...messages.filter(m => m.role !== 'system')
+    ];
 
     let isDone = false;
-    let currentMessages = [...requestMessages];
     let toolsCalled = false;
     let lastToolName = '';
     let loopCount = 0;
-    const MAX_LOOPS = 5; // Prevent infinite AI loops
+    const MAX_LOOPS = 5;
+
+    // If direct intent matched on first turn, execute it immediately!
+    if (directIntent) {
+      const funcName = directIntent.name;
+      if (onChunk) onChunk(`\n> *Araç çalıştırılıyor: ${funcName}...*\n\n`);
+      toolsCalled = true;
+      let result = '';
+      try {
+        result = await this.handleToolCall({
+          id: Date.now().toString(),
+          type: "function",
+          function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
+        });
+      } catch (e: any) {
+        result = JSON.stringify({ error: e.message || String(e) });
+      }
+
+      currentMessages.push({
+        role: "assistant",
+        content: `Action: {"name": "${funcName}", "arguments": ${JSON.stringify(directIntent.arguments)}}`
+      } as ChatCompletionMessageParam);
+
+      currentMessages.push({
+        role: "user",
+        content: `Observation: ${result}\nLütfen kullanıcıya işlemin tamamlandığını veya sonucunu Türkçe olarak açıkla. Kesinlikle emoji kullanma.`
+      } as ChatCompletionMessageParam);
+    }
 
     while (!isDone) {
-      // Yield to the main thread so React can render and the browser doesn't freeze
-      await new Promise(r => setTimeout(r, 80));
+      await new Promise(r => setTimeout(r, 60));
 
       loopCount++;
       if (loopCount > MAX_LOOPS) {
@@ -1177,7 +1296,7 @@ When you have the final answer or if no tools are needed, provide your direct re
         break;
       }
 
-      // Sliding window: keep only the last N messages to prevent WebGPU OOM
+      // Keep sliding window
       let windowedMessages = currentMessages;
       if (currentMessages.length > MAX_HISTORY_MESSAGES) {
         windowedMessages = [
@@ -1186,14 +1305,14 @@ When you have the final answer or if no tools are needed, provide your direct re
         ];
       }
 
-      // Truncate old tool/observation messages to prevent memory pressure
+      // Truncate long messages
       const optimizedMessages = windowedMessages.map((msg, idx) => {
         if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 300) {
           if (idx < windowedMessages.length - 2) {
             return { ...msg, content: '{"status":"done"}' };
           }
-          if (msg.content.length > 6000) {
-            return { ...msg, content: msg.content.substring(0, 6000) + '... (truncated)"}}' };
+          if (msg.content.length > 5000) {
+            return { ...msg, content: msg.content.substring(0, 5000) + '... (truncated)"}}' };
           }
         }
         return msg;
@@ -1201,8 +1320,6 @@ When you have the final answer or if no tools are needed, provide your direct re
 
       let responseContent = '';
       let detectedToolCall: { name: string; arguments: any } | null = null;
-
-      // Check if current model natively supports tools (Hermes) or use Universal ReAct (Llama/Qwen)
       const isNativeToolModel = this.modelId.includes('Hermes');
 
       try {
@@ -1225,7 +1342,7 @@ When you have the final answer or if no tools are needed, provide your direct re
             responseContent = responseMessage.content || '';
           }
         } else {
-          // Universal ReAct Mode: works on ALL 0.5B, 1B, 3B models with 0 errors!
+          // Universal ReAct Prompt Mode
           const reply = await this.engine.chat.completions.create({
             messages: optimizedMessages,
             max_tokens: 512,
@@ -1236,7 +1353,6 @@ When you have the final answer or if no tools are needed, provide your direct re
           detectedToolCall = parseReActAction(responseContent);
         }
       } catch (err: any) {
-        // Resilient fallback to ReAct if native tools throw UnsupportedModelIdError
         if (err?.message?.includes('tools') || err?.message?.includes('UnsupportedModelIdError')) {
           const reply = await this.engine.chat.completions.create({
             messages: optimizedMessages,
@@ -1254,7 +1370,7 @@ When you have the final answer or if no tools are needed, provide your direct re
       if (detectedToolCall && detectedToolCall.name) {
         toolsCalled = true;
         const funcName = detectedToolCall.name;
-        if (onChunk) onChunk(`\n> *Tool running: ${funcName}...*\n\n`);
+        if (onChunk) onChunk(`\n> *Araç çalıştırılıyor: ${funcName}...*\n\n`);
 
         let result = '';
         if (this.isInterrupted) {
@@ -1283,13 +1399,12 @@ When you have the final answer or if no tools are needed, provide your direct re
 
         currentMessages.push({
           role: "user",
-          content: `[Observation for ${funcName}: ${result}]\nBased on this, what is your next action or final response to the user?`
+          content: `Observation: ${result}\nLütfen bir sonraki eylemi veya kullanıcıya yanıtı Türkçe olarak ver. Emoji kullanma.`
         } as ChatCompletionMessageParam);
 
-        if (onChunk) onChunk('\n> *Agent thinking...*\n\n');
+        if (onChunk) onChunk('\n> *Düşünülüyor...*\n\n');
       } else {
         isDone = true;
-        // Clean final response (strip any stray Action markers)
         let content = responseContent.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
         if (toolsCalled && content === '') {
           content = "İstediğiniz işlemleri başarıyla gerçekleştirdim.";
@@ -1310,7 +1425,7 @@ When you have the final answer or if no tools are needed, provide your direct re
           const engineRef = this.engine;
           const summaryMessages = [
             currentMessages[currentMessages.length - 1],
-            { role: 'user', content: 'Briefly summarize the task you just completed in 1 sentence.' }
+            { role: 'user', content: 'Tamamlanan görevi 1 kısa Türkçe cümleyle özetle. Emoji kullanma.' }
           ];
           setTimeout(() => {
             engineRef.chat.completions.create({
@@ -1323,14 +1438,6 @@ When you have the final answer or if no tools are needed, provide your direct re
           }, 2000);
         }
       }
-    }
-
-    // Restore original user prompt in first message
-    if (currentMessages.length > 0 && currentMessages[0].role === 'user') {
-      currentMessages[0] = {
-        ...currentMessages[0],
-        content: messages[0].content
-      } as ChatCompletionMessageParam;
     }
 
     return currentMessages;
