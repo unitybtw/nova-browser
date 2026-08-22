@@ -417,7 +417,17 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
               {activeTab === 'about' && (
                 <div className="space-y-5 text-center py-2">
                   <div className="w-16 h-16 mx-auto rounded-2xl bg-cyan-500/10 border border-cyan-500/30 p-2 flex items-center justify-center shadow-lg shadow-cyan-500/10">
-                    <img src="/nova-icon.png" alt="Nova Browser" className="w-full h-full object-contain" />
+                    <img 
+                      src="./nova-icon.png" 
+                      alt="Nova Browser" 
+                      className="w-full h-full object-contain" 
+                      onError={(e) => {
+                        const img = e.target as HTMLImageElement;
+                        if (!img.src.includes('nova-icon-pure.png')) {
+                          img.src = './nova-icon-pure.png';
+                        }
+                      }}
+                    />
                   </div>
                   
                   <div className="space-y-1">

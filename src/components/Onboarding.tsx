@@ -158,8 +158,18 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
         className="mb-8"
       >
-        <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-2xl shadow-cyan-500/40 flex items-center justify-center mb-6 mx-auto">
-          <img src="/nova-icon-pure.png" alt="Nova" className="w-20 h-20 object-contain scale-110" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 shadow-2xl shadow-cyan-500/40 flex items-center justify-center mb-6 mx-auto p-3 relative overflow-hidden">
+          <img 
+            src="./nova-icon-pure.png" 
+            alt="Nova" 
+            className="w-full h-full object-contain scale-110 drop-shadow-[0_0_12px_rgba(255,255,255,0.3)]" 
+            onError={(e) => { 
+              const target = e.target as HTMLImageElement;
+              if (!target.src.includes('nova-icon.png')) {
+                target.src = './nova-icon.png';
+              }
+            }} 
+          />
         </div>
       </motion.div>
       <motion.h1
