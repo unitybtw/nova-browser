@@ -306,6 +306,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleFailLoad = (e: any) => {
+      if (e.errorCode === -3) return;
       if (!e.isMainFrame || !tab?.id) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
       onUpdateTab(tab.id, { isLoading: false, title: `Error: ${e.errorDescription || 'Failed'}` });
       console.error('[Webview] Failed to load:', e.errorDescription, 'Code:', e.errorCode);
@@ -666,6 +667,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           onUpdateSettings={onUpdateSettings || NOOP}
           onExportData={onExportData}
           onImportData={onImportData}
+          onClearHistory={onClearHistory}
         />
       </React.Suspense>
     );
@@ -940,11 +942,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           } catch (e) {
             console.error('Failed to save password', e);
           }
-          setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }));
+          setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))
         }}
       />
       
-      {settings.aiLinkPreviewEnabled && (
+      {(settings.aiLinkPreviewEnabled ?? true) && (
         <AILinkPreview 
           url={aiPreview.url}
           x={aiPreview.x}

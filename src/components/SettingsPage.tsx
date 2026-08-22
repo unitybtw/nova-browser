@@ -436,6 +436,7 @@ export interface SettingsPageProps {
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
   onExportData?: () => void;
   onImportData?: (file: File) => void;
+  onClearHistory?: () => void;
 }
 
 interface UpdateInfo {
@@ -577,7 +578,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   settings,
   onUpdateSettings,
   onExportData,
-  onImportData
+  onImportData,
+  onClearHistory
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
   const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
@@ -752,7 +754,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { name: 'browser_zoom', desc: 'Set page zoom level', level: 'medium' },
 
     { name: 'browser_type', desc: 'Type text into an input', level: 'sensitive' },
-    { name: 'browser_run_js', desc: 'Execute arbitrary JavaScript', level: 'sensitive' },
     { name: 'browser_press_key', desc: 'Simulate a keyboard key press', level: 'sensitive' },
     { name: 'browser_select_option', desc: 'Select a dropdown option', level: 'sensitive' },
   ];
@@ -902,7 +903,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <button
                     onClick={() => {
                       if (window.confirm("Are you sure you want to clear your browsing history?")) {
-                        localStorage.removeItem('browsing_history');
+                        if (onClearHistory) {
+                          onClearHistory();
+                        } else {
+                          localStorage.removeItem('browsing_history');
+                        }
                         alert("Browsing history cleared.");
                       }
                     }}

@@ -25,6 +25,7 @@ interface NewTabPageProps {
 
 interface ClockProps {
   variants?: any;
+  isActive?: boolean;
 }
 
 const getInitialTimeAndGreeting = () => {
@@ -37,12 +38,13 @@ const getInitialTimeAndGreeting = () => {
   return { time, greet };
 };
 
-export const Clock: React.FC<ClockProps> = React.memo(({ variants }) => {
+export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = true }) => {
   const initial = useMemo(() => getInitialTimeAndGreeting(), []);
   const [timeStr, setTimeStr] = useState(initial.time);
   const [greeting, setGreeting] = useState(initial.greet);
 
   useEffect(() => {
+    if (!isActive) return;
     const updateTime = () => {
       const now = new Date();
       setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -53,7 +55,7 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants }) => {
     };
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isActive]);
 
   return (
     <motion.div variants={variants} className="text-center mb-4">
@@ -470,9 +472,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'gradient' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
-            animate={{ 
+            animate={isActive ? { 
               backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-            }}
+            } : false}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
             className="absolute -inset-[50%] blur-3xl opacity-80"
             style={{
@@ -701,7 +703,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
-        <Clock variants={itemVariants} />
+        <Clock variants={itemVariants} isActive={isActive} />
 
         {/* Omnibox / Search Form */}
         <motion.div variants={itemVariants} className="w-full relative z-30" ref={searchContainerRef}>

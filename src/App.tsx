@@ -1785,6 +1785,11 @@ function App() {
         return unique.slice(0, 10).map(u => ({ title: u.title, url: u.url }));
       }
     });
+    
+    (window as any).__nova_executeMcpAction = executeMcpAction;
+    return () => {
+      delete (window as any).__nova_executeMcpAction;
+    };
   }, [activeTabId, handleNavigate, handleNewTab, handleCloseTab, tabs, history, bookmarks]);
 
   const handleUpdateTab = useCallback((id: string, updates: Partial<Tab>) => {

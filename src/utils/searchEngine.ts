@@ -13,7 +13,7 @@ export function isValidUrlOrDomain(input: string): boolean {
   }
 
   // Explicit protocols
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('file://')) {
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return true;
   }
 
@@ -50,7 +50,7 @@ export function isValidUrlOrDomain(input: string): boolean {
   ];
   const parts = trimmed.split('.');
   const lastPart = parts[parts.length - 1]?.toLowerCase()?.split(/[:/?#]/)[0];
-  if (parts.length === 2 && nonTldExtensions.includes(lastPart)) {
+  if (nonTldExtensions.includes(lastPart)) {
     return false;
   }
 
@@ -70,7 +70,7 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
   }
 
   // Already has HTTP or HTTPS protocol
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('file://')) {
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
 

@@ -54,8 +54,8 @@ export const SidePanel = React.memo(({
       
       // Auto-clear completed/failed/denied actions after 3 seconds to prevent memory leak
       const completedActions = actions.filter(a => a.state === 'completed' || a.state === 'failed' || a.state === 'denied');
-      if (completedActions.length > 5) {
-        // Keep only the 5 most recent completed actions
+      if (completedActions.length > 50) {
+        // Keep only the 50 most recent completed actions
         orchestrator.clearQueue();
       }
     });
@@ -500,10 +500,10 @@ export const SidePanel = React.memo(({
                         : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-200 dark:border-slate-700 prose prose-sm dark:prose-invert max-w-none prose-p:leading-snug prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700'
                     }`}>
                       {msg.role === 'user' ? (
-                        msg.content as string
+                        typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)
                       ) : (
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {msg.content as string}
+                          {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}
                         </ReactMarkdown>
                       )}
                     </div>

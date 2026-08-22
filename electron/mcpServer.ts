@@ -466,8 +466,8 @@ export class BrowserMCPServer {
 
     const result = await this.mainWindow.webContents.executeJavaScript(`
       (async () => {
-        if (typeof window.executeMcpAction === 'function') {
-          return await window.executeMcpAction(${JSON.stringify(toolName)}, ${JSON.stringify(args)});
+        if (typeof window.__nova_executeMcpAction === 'function') {
+          return await window.__nova_executeMcpAction(${JSON.stringify(toolName)}, ${JSON.stringify(args)});
         }
         return "Error: executeMcpAction not available";
       })()

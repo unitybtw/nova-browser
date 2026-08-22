@@ -1646,12 +1646,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         else onNewTab();
       }}
       onReloadTab={(tabId) => {
-        if (tabId === activeTabId) onReload();
+        const wv = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
+        if (wv && wv.reload) wv.reload();
+        else if (tabId === activeTabId && onReload) onReload();
       }}
       onDuplicateTab={(tabId) => onDuplicateTab(tabId)}
       onTogglePinTab={(tabId) => onTogglePinTab(tabId)}
       onToggleMuteTab={(tabId) => onToggleMuteTab(tabId)}
       onBookmarkTab={(targetTab) => {
+        if (onSelectTab) onSelectTab(targetTab.id);
         if (onToggleBookmark) onToggleBookmark();
       }}
       onCloseTab={(tabId) => onCloseTab(tabId)}
