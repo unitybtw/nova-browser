@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark } from 'lucide-react';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power } from 'lucide-react';
 import { UserSettings } from '../App';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
@@ -725,6 +725,33 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if ((window as any).electronAPI?.setMcpToolEnabled) {
       await (window as any).electronAPI.setMcpToolEnabled(toolName, currentlyDisabled); // true means enable it, false means disable it
       fetchMcpStatus();
+    }
+  };
+
+  const handleToggleExtension = async (extId: string, currentEnabled: boolean) => {
+    try {
+      const nextState = !currentEnabled;
+      if ((window as any).electronAPI?.toggleExtension) {
+        await (window as any).electronAPI.toggleExtension(extId, nextState);
+      }
+      setExtensions(prev => prev.map(e => e.id === extId ? { ...e, enabled: nextState } : e));
+    } catch (e) {
+      console.error('Failed to toggle extension:', e);
+    }
+  };
+
+  const handleRemoveExtension = async (ext: any) => {
+    if (window.confirm(`Are you sure you want to remove "${ext.name}"?`)) {
+      try {
+        const res = await (window as any).electronAPI?.removeExtension?.(ext.id);
+        if (res?.error) {
+          alert('Failed to remove extension: ' + res.error);
+          return;
+        }
+        setExtensions(prev => prev.filter(e => e.id !== ext.id));
+      } catch (e) {
+        console.error('Failed to remove extension:', e);
+      }
     }
   };
 
@@ -2085,8 +2112,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
                     <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                       {extensions.map((ext: any) => (
-                        <div key={ext.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <div className="flex items-center gap-4 flex-1">
+                        <div key={ext.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                          <div className="flex items-center gap-4 flex-1 min-w-0">
                             <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/50 dark:border-white/5">
                               {ext.iconData ? (
                                 <img src={ext.iconData} alt={ext.name} className="w-7 h-7 object-contain" />
@@ -2097,19 +2124,37 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{ext.name}</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{ext.name}</span>
                                 {ext.version && (
                                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-mono">
                                     v{ext.version}
                                   </span>
                                 )}
+                                {ext.enabled !== false ? (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
+                                    Active
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20 font-medium">
+                                    Disabled
+                                  </span>
+                                )}
                               </div>
                               <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{ext.description || 'No description available'}</div>
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1">ID: {ext.id}</div>
+                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1 select-all">ID: {ext.id}</div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                            {/* Toggle Extension Enable/Disable */}
+                            <button
+                              onClick={() => handleToggleExtension(ext.id, ext.enabled !== false)}
+                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ext.enabled !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
+                              title={ext.enabled !== false ? 'Disable Extension' : 'Enable Extension'}
+                            >
+                              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${ext.enabled !== false ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+
                             {ext.popupUrl && (
                               <button
                                 onClick={(e) => {
@@ -2123,8 +2168,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
                                 title="Open Extension Popup"
                               >
-                                <Play className="w-3.5 h-3.5" />
-                                Popup
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Popup</span>
                               </button>
                             )}
                             {ext.optionsUrl && (
@@ -2137,28 +2182,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 title="Open Options"
                               >
                                 <Settings className="w-3.5 h-3.5" />
-                                Options
+                                <span>Options</span>
                               </button>
                             )}
                             <button 
-                              onClick={async () => {
-                                if (window.confirm(`Are you sure you want to remove "${ext.name}"?`)) {
-                                  try {
-                                    const res = await (window as any).electronAPI?.removeExtension?.(ext.id);
-                                    if (res?.error) {
-                                      alert('Failed to remove extension: ' + res.error);
-                                      return;
-                                    }
-                                    setExtensions(prev => prev.filter(e => e.id !== ext.id));
-                                  } catch (e) {
-                                    console.error('Failed to remove extension:', e);
-                                  }
-                                }
-                              }}
-                              className="p-2 rounded-xl text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors cursor-pointer"
-                              title="Remove Extension"
+                              onClick={() => handleRemoveExtension(ext)}
+                              className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                              title={`Remove ${ext.name}`}
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Remove</span>
                             </button>
                           </div>
                         </div>
