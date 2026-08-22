@@ -172,7 +172,7 @@ const MemoizedTabItem = React.memo(({
       data-tab-id={tab.id}
       title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
       className={`group flex items-center justify-between ${
-        isPinned ? 'px-2 min-w-[38px] max-w-[38px] justify-center' : splitTab ? 'px-1.5 min-w-[120px] max-w-[320px]' : 'px-3 min-w-[120px] max-w-[240px]'
+        isPinned ? 'px-2 min-w-[38px] max-w-[38px] justify-center' : splitTab ? 'px-1.5 min-w-[260px] max-w-[420px]' : 'px-3 min-w-[120px] max-w-[240px]'
       } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative ${
         tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
         tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
@@ -207,35 +207,47 @@ const MemoizedTabItem = React.memo(({
           )}
         </div>
       ) : splitTab ? (
-        <div className="flex w-full items-center h-full">
+        <div className="flex w-full items-center h-full gap-1">
           {/* Primary Tab Half */}
           <div 
-            className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-1.5 px-2 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
             onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
             title={tab.title}
           >
             {tab.isLoading ? (
               <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : tab.favicon ? (
-              <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" />
+              <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
             <span className="truncate text-[12px] font-semibold">{tab.title || tab.url || 'New Tab'}</span>
           </div>
 
-          <div className="w-[1px] h-4 bg-slate-300/80 dark:bg-slate-600/80 shrink-0 mx-0.5" />
+          <div className="flex items-center px-0.5 shrink-0" title="Split Screen Mode">
+            <div className="w-[1px] h-3.5 bg-slate-300/80 dark:bg-slate-600/80" />
+          </div>
 
           {/* Secondary Tab Half */}
           <div 
-            className="flex flex-1 items-center gap-1.5 px-1.5 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            className="flex flex-1 items-center gap-1.5 px-2 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
             onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
             title={splitTab.title}
           >
-            {splitTab.favicon ? <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0" /> : <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />}
+            {splitTab.isLoading ? (
+              <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
+            ) : splitTab.favicon ? (
+              <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            )}
             <span className="truncate text-[12px] font-semibold flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
             
-            <button onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} className="ml-auto p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors">
+            <button 
+              onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} 
+              className="ml-auto p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors cursor-pointer"
+              title="Close Split View"
+            >
               <X className="w-3 h-3" />
             </button>
           </div>
@@ -1074,11 +1086,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
           <Reorder.Group
             axis="x"
-            values={tabs}
+            values={tabs.filter(t => t.id !== splitTabId)}
             onReorder={(newTabs) => {
               if (ghostTab) return;
               if (onReorderFullList) {
-                onReorderFullList(newTabs);
+                if (splitTabId) {
+                  const splitItem = tabs.find(t => t.id === splitTabId);
+                  onReorderFullList(splitItem ? [...newTabs, splitItem] : newTabs);
+                } else {
+                  onReorderFullList(newTabs);
+                }
               }
             }}
             ref={tabsContainerRef}
@@ -1086,13 +1103,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px]"
           >
             <AnimatePresence>
-            {tabs.map((tab) => {
-              const isActive = tab.id === activeTabId;
+            {tabs.filter(t => t.id !== splitTabId).map((tab) => {
               const isSplitChild = tab.id === splitTabId;
-              
-              if (isSplitChild && splitTabId && activeTabId) return null;
+              if (isSplitChild && splitTabId) return null;
 
-              const splitTab = isActive && splitTabId ? tabs.find(t => t.id === splitTabId) : null;
+              const isPrimarySplit = (tab.id === activeTabId || tab.id === splitTabId) && !!splitTabId;
+              const splitTab = isPrimarySplit ? tabs.find(t => t.id === splitTabId) : null;
+              const isActive = tab.id === activeTabId || tab.id === splitTabId;
 
               return (
                 <MemoizedTabItem

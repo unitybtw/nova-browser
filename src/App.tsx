@@ -839,7 +839,13 @@ function App() {
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
-    setActiveTabId(id);
+    setActiveTabId(prevActiveId => {
+      if (splitTabIdRef.current && id === splitTabIdRef.current) {
+        setSplitTabId(prevActiveId);
+        return id;
+      }
+      return id;
+    });
     setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
   }, []);
 
@@ -2461,13 +2467,6 @@ function App() {
   }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
-
-  // If active tab is the same as split tab, reset split view cleanly in effect
-  useEffect(() => {
-    if (splitTabId && activeTabId === splitTabId) {
-      setSplitTabId(null);
-    }
-  }, [splitTabId, activeTabId]);
 
   // Compute second tab for split view (if available)
   const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
