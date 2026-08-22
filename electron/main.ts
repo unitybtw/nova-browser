@@ -786,7 +786,43 @@ app.whenReady().then(async () => {
   createWindow();
   setupApplicationMenu();
 
-  // --- STRICT PERMISSION SYSTEM (SECURITY) ---
+  // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
+  interface PendingPermission {
+    requestId: string;
+    permission: string;
+    url: string;
+    origin: string;
+    permissionName: string;
+    mediaTypes?: string[];
+    callback: (allow: boolean) => void;
+    timeoutId: NodeJS.Timeout;
+  }
+
+  const pendingPermissions = new Map<string, PendingPermission>();
+  // Origin -> (Permission -> Boolean)
+  const rememberedPermissions = new Map<string, Map<string, boolean>>();
+
+  ipcMain.handle('permission-response', async (_event, { requestId, allow, remember }: { requestId: string; allow: boolean; remember?: boolean }) => {
+    const pending = pendingPermissions.get(requestId);
+    if (pending) {
+      clearTimeout(pending.timeoutId);
+      pendingPermissions.delete(requestId);
+      if (remember && pending.origin) {
+        if (!rememberedPermissions.has(pending.origin)) {
+          rememberedPermissions.set(pending.origin, new Map());
+        }
+        rememberedPermissions.get(pending.origin)!.set(pending.permission, allow);
+      }
+      try {
+        pending.callback(allow);
+      } catch (err) {
+        console.error('[Permission] Error in callback:', err);
+      }
+      return { success: true };
+    }
+    return { success: false, error: 'Request not found or timed out' };
+  });
+
   const applyStrictSecurityToSession = (targetSession: Electron.Session) => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
@@ -795,17 +831,36 @@ app.whenReady().then(async () => {
       if (isTrustedAppOrigin(url)) {
         return callback(true);
       }
+
+      let origin = '';
+      try {
+        origin = new URL(url).origin;
+      } catch {
+        origin = url;
+      }
+
+      // Check remembered permissions for this origin
+      if (origin && rememberedPermissions.has(origin)) {
+        const originPerms = rememberedPermissions.get(origin)!;
+        if (originPerms.has(permission)) {
+          return callback(originPerms.get(permission)!);
+        }
+      }
       
-      // Map permission names for the user dialog
+      // Map permission names for Chrome-style UI
       const permissionNames: Record<string, string> = {
         'media': 'Camera and Microphone',
         'geolocation': 'Location (GPS)',
         'notifications': 'Notifications',
-        'midiSysex': 'Music Devices (MIDI)',
+        'midi': 'MIDI Devices',
+        'midiSysex': 'MIDI Devices (SysEx)',
         'pointerLock': 'Pointer Lock',
         'fullscreen': 'Fullscreen',
         'openExternal': 'Open External App',
-        'clipboard-read': 'Read Clipboard'
+        'clipboard-read': 'Read Clipboard',
+        'clipboard-sanitized-write': 'Write Clipboard',
+        'display-capture': 'Screen Sharing',
+        'window-management': 'Window Management'
       };
       
       const permissionName = permissionNames[permission] || permission;
@@ -814,19 +869,39 @@ app.whenReady().then(async () => {
         return callback(false);
       }
 
-      dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        buttons: ['Allow', 'Block'],
-        defaultId: 1, // Default to Block
-        cancelId: 1,
-        title: 'Security Warning: Permission Request',
-        message: 'A site wants to access your device!',
-        detail: `Site: ${url}\n\nThis site is requesting "${permissionName}" permission.\nWhat would you like to do?`
-      }).then(({ response }) => {
-        // response === 0 means "Allow"
-        callback(response === 0);
-      }).catch(() => {
-        callback(false);
+      const requestId = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+      const timeoutId = setTimeout(() => {
+        const req = pendingPermissions.get(requestId);
+        if (req) {
+          pendingPermissions.delete(requestId);
+          try { req.callback(false); } catch {}
+        }
+      }, 60000); // 60 seconds timeout
+
+      const mediaTypes = (details as any)?.mediaTypes;
+
+      pendingPermissions.set(requestId, {
+        requestId,
+        permission,
+        url,
+        origin,
+        permissionName,
+        mediaTypes,
+        callback,
+        timeoutId
+      });
+
+      // Send sleek event to renderer TopBar
+      mainWindow.webContents.send('permission-request', {
+        requestId,
+        permission,
+        url,
+        origin,
+        permissionName,
+        mediaTypes,
+        webContentsId: webContents.id,
+        timestamp: Date.now()
       });
     });
 
@@ -836,8 +911,14 @@ app.whenReady().then(async () => {
         return true; 
       }
       
-      // For external websites, deny by default for silent checks.
-      // This prevents silent fingerprinting based on permission status.
+      // For external websites, check if permission was previously remembered
+      if (requestingOrigin && rememberedPermissions.has(requestingOrigin)) {
+        const originPerms = rememberedPermissions.get(requestingOrigin)!;
+        if (originPerms.has(permission)) {
+          return originPerms.get(permission)!;
+        }
+      }
+
       return false;
     });
   };

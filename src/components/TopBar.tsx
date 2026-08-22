@@ -50,10 +50,11 @@ import {
   User,
   Cloud
 } from 'lucide-react';
-import { Tab, Bookmark, Workspace } from '../types/browser';
+import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
+import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { UserSettings } from '../App';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { syncService, SyncStatus } from '../services/syncService';
@@ -127,6 +128,9 @@ interface TopBarProps {
   onDropToSplitScreen?: (tabId: string) => void;
   splitTabId?: string | null;
   onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
+  permissionRequests?: PermissionRequest[];
+  onRespondPermission?: (requestId: string, allow: boolean, remember: boolean) => void;
+  onDismissPermission?: (requestId: string) => void;
 }
 
 const MemoizedTabItem = React.memo(({ 
@@ -379,6 +383,9 @@ interface OmniboxBarProps {
   onToggleBookmark?: () => void;
   onResetZoom?: () => void;
   isBookmarked: boolean;
+  permissionRequests?: PermissionRequest[];
+  onRespondPermission?: (requestId: string, allow: boolean, remember: boolean) => void;
+  onDismissPermission?: (requestId: string) => void;
 }
 
 export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
@@ -392,6 +399,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   onToggleBookmark,
   onResetZoom,
   isBookmarked,
+  permissionRequests,
+  onRespondPermission,
+  onDismissPermission,
 }) => {
   const [searchValue, setSearchValue] = useState('');
   const [isFocused, setIsFocused] = useState(false);
@@ -403,6 +413,33 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const siteInfoBtnRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const relevantPermissionRequests = useMemo(() => {
+    if (!permissionRequests || !activeTab?.url) return [];
+    let currentOrigin = '';
+    try {
+      currentOrigin = new URL(activeTab.url).origin;
+    } catch {
+      currentOrigin = activeTab.url;
+    }
+    return permissionRequests.filter(req => {
+      let reqOrigin = '';
+      try {
+        reqOrigin = new URL(req.url || req.origin).origin;
+      } catch {
+        reqOrigin = req.origin || req.url;
+      }
+      return reqOrigin === currentOrigin || (req.webContentsId && req.webContentsId === activeTab.webContentsId);
+    });
+  }, [permissionRequests, activeTab?.url, activeTab?.webContentsId]);
+
+  const [isPermissionPromptDismissed, setIsPermissionPromptDismissed] = useState(false);
+
+  useEffect(() => {
+    if (relevantPermissionRequests.length > 0) {
+      setIsPermissionPromptDismissed(false);
+    }
+  }, [relevantPermissionRequests.length]);
 
   useEffect(() => {
     return () => {
@@ -552,6 +589,41 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             blockedAdsCount={activeTab?.blockedAdsCount || 0}
             buttonRef={siteInfoBtnRef}
           />
+
+          {/* Chrome-Style Permission Prompt Bubble */}
+          {!isPermissionPromptDismissed && relevantPermissionRequests.length > 0 && onRespondPermission && (
+            <PermissionPromptPopover
+              requests={relevantPermissionRequests}
+              onRespond={(requestId, allow, remember) => {
+                onRespondPermission(requestId, allow, remember);
+              }}
+              onDismiss={(requestId) => {
+                if (onDismissPermission) {
+                  onDismissPermission(requestId);
+                }
+                setIsPermissionPromptDismissed(true);
+              }}
+            />
+          )}
+
+          {/* Chrome-Style Omnibox Permission Chip */}
+          {relevantPermissionRequests.length > 0 && (
+            <div 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsPermissionPromptDismissed(prev => !prev);
+              }}
+              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
+                isIncognito ? 'left-28' : 'left-10'
+              }`}
+              title="Site İzin İsteği (Tıklayarak pencereyi aç/kapat)"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
+              <span className="text-[11px] font-semibold whitespace-nowrap">İzin İsteği</span>
+            </div>
+          )}
+
           <input
             type="text"
             value={searchValue}
@@ -596,9 +668,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             }}
             placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
             className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${
+              relevantPermissionRequests.length > 0
+                ? isIncognito ? 'pl-52' : 'pl-34'
+                : isIncognito ? 'pl-28' : 'pl-11'
+            } ${
               isIncognito 
-                ? 'pl-28 bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
-                : 'pl-11 bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
+                ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
+                : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
             } ${isAIMode ? 'border-cyan-400/50 ring-4 ring-cyan-500/20 bg-cyan-950/30 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
             }`}
@@ -606,7 +682,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           {/* Title & URL Overlay for Vertical Tabs Mode */}
           {useVerticalTabs && !isFocused && !isAIMode && (
-            <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${isIncognito ? 'pl-28' : 'pl-11'}`}>
+            <div className={`absolute inset-0 pointer-events-none flex flex-col justify-center pr-24 ${
+              relevantPermissionRequests.length > 0
+                ? isIncognito ? 'pl-52' : 'pl-34'
+                : isIncognito ? 'pl-28' : 'pl-11'
+            }`}>
               <span className="text-[12px] font-semibold truncate text-slate-800 dark:text-slate-200 leading-[14px]">
                 {activeTab?.title || 'New Tab'}
               </span>
@@ -833,7 +913,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onTabDrag,
   onDropToSplitScreen,
   splitTabId,
-  onCloseSplit
+  onCloseSplit,
+  permissionRequests,
+  onRespondPermission,
+  onDismissPermission
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
@@ -1266,6 +1349,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           onToggleBookmark={onToggleBookmark}
           onResetZoom={onResetZoom}
           isBookmarked={isBookmarked}
+          permissionRequests={permissionRequests}
+          onRespondPermission={onRespondPermission}
+          onDismissPermission={onDismissPermission}
         />
 
         {/* Extensions / Action Controls / More Menu */}

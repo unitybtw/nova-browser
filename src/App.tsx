@@ -90,7 +90,7 @@ const AccountModal = lazyWithRetry(() => import('./components/AccountModal').the
 const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
+import { Tab, Folder, Bookmark, Extension, Workspace, PermissionRequest } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
 
@@ -578,6 +578,43 @@ function App() {
         } catch (_) {}
       };
     }
+  }, []);
+
+  // Permission requests state (Chrome-style top bar prompts)
+  const [permissionRequests, setPermissionRequests] = useState<PermissionRequest[]>([]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.onPermissionRequest) {
+      const removeListener = (window as any).electronAPI.onPermissionRequest((_event: any, request: PermissionRequest) => {
+        setPermissionRequests(prev => {
+          const filtered = prev.filter(r => r.requestId !== request.requestId);
+          return [...filtered, request];
+        });
+      });
+      return () => {
+        try { removeListener?.(); } catch (_) {}
+      };
+    }
+  }, []);
+
+  const handleRespondPermission = useCallback(async (requestId: string, allow: boolean, remember: boolean) => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.respondPermissionRequest) {
+      try {
+        await (window as any).electronAPI.respondPermissionRequest(requestId, allow, remember);
+      } catch (e) {
+        console.error('Failed to respond to permission request:', e);
+      }
+    }
+    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
+  }, []);
+
+  const handleDismissPermission = useCallback((requestId: string) => {
+    if (typeof window !== 'undefined' && (window as any).electronAPI?.respondPermissionRequest) {
+      try {
+        (window as any).electronAPI.respondPermissionRequest(requestId, false, false);
+      } catch (e) {}
+    }
+    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
   }, []);
 
   // Downloads state
@@ -2736,6 +2773,9 @@ function App() {
                 onDropToSplitScreen={handleDropToSplitScreen}
                 splitTabId={splitTabId}
                 onCloseSplit={handleCloseSplitView}
+                permissionRequests={permissionRequests}
+                onRespondPermission={handleRespondPermission}
+                onDismissPermission={handleDismissPermission}
               />
             </motion.div>
           )}

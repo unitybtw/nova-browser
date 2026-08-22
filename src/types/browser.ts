@@ -78,3 +78,14 @@ export interface DownloadItem {
   savePath?: string;
   isPaused?: boolean;
 }
+
+export interface PermissionRequest {
+  requestId: string;
+  permission: string;
+  url: string;
+  origin: string;
+  permissionName: string;
+  mediaTypes?: string[];
+  webContentsId?: number;
+  timestamp: number;
+}

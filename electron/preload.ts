@@ -133,4 +133,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   nativeTtsGetVoices: () => ipcRenderer.invoke('native-tts-get-voices'),
   nativeTtsSpeak: (text: string, voiceName?: string, rate?: number, lang?: string) => ipcRenderer.invoke('native-tts-speak', text, voiceName, rate, lang),
   nativeTtsStop: () => ipcRenderer.invoke('native-tts-stop'),
+  // Permission Requests (Chrome-style Top Bar Bubble)
+  onPermissionRequest: (callback: (event: any, request: any) => void) => {
+    const handler = (_event: any, request: any) => callback(null, request);
+    ipcRenderer.on('permission-request', handler);
+    return () => ipcRenderer.removeListener('permission-request', handler);
+  },
+  respondPermissionRequest: (requestId: string, allow: boolean, remember?: boolean) => ipcRenderer.invoke('permission-response', { requestId, allow, remember }),
 });
