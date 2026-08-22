@@ -731,31 +731,31 @@ class AIAgent {
           url = 'https://' + url;
         }
         
-        // Ensure the URL doesn't have raw spaces which breaks the webview
         try {
           url = new URL(url).href;
         } catch (e) {
-          // If it fails to parse even after adding https, fallback to a google search
           url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
         }
 
         this.actionContext.onNavigate(url);
-        await new Promise(r => setTimeout(r, 2500));
-        
-        // Auto-read page content using the shared scan script
-        const pageData = await this.actionContext.onExecuteScript(DOM_SCAN_SCRIPT);
+        await new Promise(r => setTimeout(r, 1200));
         
         result = { 
           success: true, 
-          navigatedTo: url, 
-          pageData: typeof pageData === 'string' ? JSON.parse(pageData) : pageData,
-          hint: "SUCCESS. The page is now open and the content/selectors are provided above. DO NOT call navigate_to_url again! Next, use fill_input to interact with an input, or answer the user." 
+          url,
+          message: "Sayfa basariyla acildi."
         };
       }
 
       else if (functionName === "read_page_content") {
-        const data = await this.actionContext.onExecuteScript(DOM_SCAN_SCRIPT);
-        result = { success: true, pageData: JSON.parse(data) };
+        let text = '';
+        try {
+          const raw = await this.actionContext.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, 400)`);
+          text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        } catch (e) {
+          text = 'Sayfa metni alinamadi.';
+        }
+        result = { success: true, text };
       }
 
       else if (functionName === "get_page_url") {
@@ -1216,32 +1216,73 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
 
-    // 1. Detect instant intent from the latest user message
+    // 1. Direct Instant Intent Execution for browser commands
     const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
     const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
-    const directIntent = messages.length <= 2 ? detectDirectIntent(userQuery) : null;
+    const directIntent = detectDirectIntent(userQuery);
 
-    const systemInstruction = `You are Nova Browser's AI Assistant. You help the user browse the web and automate browser actions.
+    if (directIntent) {
+      const funcName = directIntent.name;
+      if (onChunk) onChunk(`Islem yapiliyor: ${funcName}...\n\n`);
+      
+      let friendlyResponse = "Islem tamamlandi.";
+      try {
+        await this.handleToolCall({
+          id: Date.now().toString(),
+          type: "function",
+          function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
+        });
+        
+        if (funcName === 'navigate_to_url') {
+          const u = directIntent.arguments.url;
+          if (u.includes('youtube.com')) friendlyResponse = "YouTube acildi.";
+          else if (u.includes('google.com/search')) friendlyResponse = "Google aramasi yapildi.";
+          else friendlyResponse = `${u} sayfasi acildi.`;
+        } else if (funcName === 'manage_tabs') {
+          if (directIntent.arguments.action === 'create') friendlyResponse = "Yeni sekme acildi.";
+          else if (directIntent.arguments.action === 'close') friendlyResponse = "Sekme kapatildi.";
+          else friendlyResponse = "Sekme islemi yapildi.";
+        } else if (funcName === 'scroll_page') {
+          friendlyResponse = directIntent.arguments.direction === 'down' ? "Sayfa asagi kaydirildi." : "Sayfa yukari kaydirildi.";
+        } else if (funcName === 'take_screenshot') {
+          friendlyResponse = "Ekran goruntusu alindi.";
+        } else if (funcName === 'read_page_content') {
+          let pageText = '';
+          try {
+            pageText = await this.actionContext?.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, 300)`);
+          } catch {}
+          friendlyResponse = `Sayfa icerigi:\n\n${pageText || 'Sayfada metin bulunamadi.'}`;
+        }
+      } catch (e: any) {
+        friendlyResponse = `Islem basarisiz: ${e.message || String(e)}`;
+      }
 
+      if (onChunk) {
+        onChunk(friendlyResponse);
+      }
+
+      // Return ONLY clean user messages + single clean assistant response
+      return [...messages, { role: 'assistant', content: friendlyResponse }];
+    }
+
+    // 2. Conversational reasoning & multi-step execution
+    const systemInstruction = `You are Nova Browser's AI Assistant. You help the user browse the web and answer questions clearly.
 Available Tools:
 - navigate_to_url: {"url": "https://..." or "search query"}
 - read_page_content: {}
-- get_page_url: {}
 - click_element: {"ai_id": "1"}
-- fill_input: {"value": "text to type", "submit": true}
-- manage_tabs: {"action": "create"|"close"|"switch"|"list", "url": "https://..."}
+- fill_input: {"value": "text", "submit": true}
+- manage_tabs: {"action": "create"|"close"}
 - scroll_page: {"direction": "up"|"down"}
-- take_screenshot: {}
-- save_to_memory: {"key": "...", "value": "..."}
 
-Instructions:
-1. When you need to take an action, output ONLY: Action: {"name": "<tool_name>", "arguments": {<params>}}
-2. When answering the user or when no action is needed, answer directly and clearly in Turkish (or user's language). Never use emojis.`;
+Rules:
+1. If you need a tool, output: Action: {"name": "<tool>", "arguments": { ... }}
+2. If answering the user, answer directly and concisely in Turkish or user language. Never use emojis.`;
 
     const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
 
-    // Proper chat format: System message at index 0
-    let currentMessages: ChatCompletionMessageParam[] = [
+    // Internal loop messages (isolated from user-facing conversation)
+    let internalMessages: ChatCompletionMessageParam[] = [
       { 
         role: 'system', 
         content: systemInstruction + (memoryPrompt ? `\n\nUser Profile & Memories:\n${memoryPrompt}` : '') 
@@ -1250,197 +1291,84 @@ Instructions:
     ];
 
     let isDone = false;
-    let toolsCalled = false;
-    let lastToolName = '';
+    let finalAnswer = '';
     let loopCount = 0;
-    const MAX_LOOPS = 5;
-
-    // If direct intent matched on first turn, execute it immediately!
-    if (directIntent) {
-      const funcName = directIntent.name;
-      if (onChunk) onChunk(`\n> *Araç çalıştırılıyor: ${funcName}...*\n\n`);
-      toolsCalled = true;
-      let result = '';
-      try {
-        result = await this.handleToolCall({
-          id: Date.now().toString(),
-          type: "function",
-          function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
-        });
-      } catch (e: any) {
-        result = JSON.stringify({ error: e.message || String(e) });
-      }
-
-      currentMessages.push({
-        role: "assistant",
-        content: `Action: {"name": "${funcName}", "arguments": ${JSON.stringify(directIntent.arguments)}}`
-      } as ChatCompletionMessageParam);
-
-      currentMessages.push({
-        role: "user",
-        content: `Observation: ${result}\nLütfen kullanıcıya işlemin tamamlandığını veya sonucunu Türkçe olarak açıkla. Kesinlikle emoji kullanma.`
-      } as ChatCompletionMessageParam);
-    }
+    const MAX_LOOPS = 4;
 
     while (!isDone) {
-      await new Promise(r => setTimeout(r, 60));
-
+      await new Promise(r => setTimeout(r, 40));
       loopCount++;
-      if (loopCount > MAX_LOOPS) {
-        currentMessages.push({ role: 'assistant', content: 'İşlemleri tamamladım.' } as ChatCompletionMessageParam);
+
+      if (loopCount > MAX_LOOPS || this.isInterrupted) {
+        finalAnswer = this.isInterrupted ? 'Islem durduruldu.' : 'Islem tamamlandi.';
         break;
       }
 
-      if (this.isInterrupted) {
-        currentMessages.push({ role: 'assistant', content: 'İşlem kullanıcı tarafından durduruldu.' } as ChatCompletionMessageParam);
-        break;
-      }
-
-      // Keep sliding window
-      let windowedMessages = currentMessages;
-      if (currentMessages.length > MAX_HISTORY_MESSAGES) {
+      // Sliding window
+      let windowedMessages = internalMessages;
+      if (internalMessages.length > MAX_HISTORY_MESSAGES) {
         windowedMessages = [
-          currentMessages[0],
-          ...currentMessages.slice(-MAX_HISTORY_MESSAGES + 1)
+          internalMessages[0],
+          ...internalMessages.slice(-MAX_HISTORY_MESSAGES + 1)
         ];
       }
 
-      // Truncate long messages
-      const optimizedMessages = windowedMessages.map((msg, idx) => {
-        if (msg.role === 'tool' && typeof msg.content === 'string' && msg.content.length > 300) {
-          if (idx < windowedMessages.length - 2) {
-            return { ...msg, content: '{"status":"done"}' };
-          }
-          if (msg.content.length > 5000) {
-            return { ...msg, content: msg.content.substring(0, 5000) + '... (truncated)"}}' };
-          }
-        }
-        return msg;
-      });
-
-      let responseContent = '';
-      let detectedToolCall: { name: string; arguments: any } | null = null;
-      const isNativeToolModel = this.modelId.includes('Hermes');
-
+      let responseText = '';
       try {
-        if (isNativeToolModel) {
-          const reply = await this.engine.chat.completions.create({
-            messages: optimizedMessages,
-            tools: this.tools,
-            tool_choice: "auto",
-            max_tokens: 512,
-            temperature: 0.1,
-            stream: false
-          });
-          const responseMessage = reply.choices[0].message;
-          if (responseMessage.tool_calls && responseMessage.tool_calls.length > 0) {
-            const tc = responseMessage.tool_calls[0];
-            let parsedArgs = {};
-            try { parsedArgs = JSON.parse(tc.function.arguments || '{}'); } catch {}
-            detectedToolCall = { name: tc.function.name, arguments: parsedArgs };
-          } else {
-            responseContent = responseMessage.content || '';
-          }
-        } else {
-          // Universal ReAct Prompt Mode
-          const reply = await this.engine.chat.completions.create({
-            messages: optimizedMessages,
-            max_tokens: 512,
-            temperature: 0.1,
-            stream: false
-          });
-          responseContent = reply.choices[0].message.content || '';
-          detectedToolCall = parseReActAction(responseContent);
-        }
-      } catch (err: any) {
-        if (err?.message?.includes('tools') || err?.message?.includes('UnsupportedModelIdError')) {
-          const reply = await this.engine.chat.completions.create({
-            messages: optimizedMessages,
-            max_tokens: 512,
-            temperature: 0.1,
-            stream: false
-          });
-          responseContent = reply.choices[0].message.content || '';
-          detectedToolCall = parseReActAction(responseContent);
-        } else {
-          throw err;
-        }
+        const reply = await this.engine.chat.completions.create({
+          messages: windowedMessages,
+          max_tokens: 350,
+          temperature: 0.1,
+          stream: false
+        });
+        responseText = reply.choices[0]?.message?.content || '';
+      } catch (e: any) {
+        finalAnswer = 'Bir hata olustu. Lutfen tekrar deneyin.';
+        break;
       }
 
-      if (detectedToolCall && detectedToolCall.name) {
-        toolsCalled = true;
-        const funcName = detectedToolCall.name;
-        if (onChunk) onChunk(`\n> *Araç çalıştırılıyor: ${funcName}...*\n\n`);
-
-        let result = '';
-        if (this.isInterrupted) {
-          result = JSON.stringify({ error: "Process cancelled." });
-        } else if (funcName === lastToolName && loopCount > 2) {
-          result = JSON.stringify({ error: `CRITICAL: You called '${funcName}' repeatedly. Please provide the final response.` });
-        } else {
-          try {
-            result = await this.handleToolCall({
-              id: Date.now().toString(),
-              type: "function",
-              function: { name: funcName, arguments: JSON.stringify(detectedToolCall.arguments) }
-            });
-          } catch (toolErr: any) {
-            console.error("[AI Agent] Tool call failed:", toolErr);
-            result = JSON.stringify({ error: toolErr.message || String(toolErr) });
-          }
+      const action = parseReActAction(responseText);
+      if (action && action.name) {
+        if (onChunk) onChunk(`> Arac calistiriliyor: ${action.name}...\n\n`);
+        let toolResult = '';
+        try {
+          toolResult = await this.handleToolCall({
+            id: Date.now().toString(),
+            type: 'function',
+            function: { name: action.name, arguments: JSON.stringify(action.arguments) }
+          });
+        } catch (err: any) {
+          toolResult = JSON.stringify({ error: err.message || String(err) });
         }
 
-        lastToolName = funcName;
-
-        currentMessages.push({
-          role: "assistant",
-          content: `Action: {"name": "${funcName}", "arguments": ${JSON.stringify(detectedToolCall.arguments)}}`
+        internalMessages.push({
+          role: 'assistant',
+          content: `Action: {"name": "${action.name}", "arguments": ${JSON.stringify(action.arguments)}}`
         } as ChatCompletionMessageParam);
 
-        currentMessages.push({
-          role: "user",
-          content: `Observation: ${result}\nLütfen bir sonraki eylemi veya kullanıcıya yanıtı Türkçe olarak ver. Emoji kullanma.`
+        internalMessages.push({
+          role: 'user',
+          content: `Observation: ${toolResult}\nLutfen kullaniciya sonucu kisa ve oz acikla. Kesinlikle emoji kullanma.`
         } as ChatCompletionMessageParam);
-
-        if (onChunk) onChunk('\n> *Düşünülüyor...*\n\n');
       } else {
         isDone = true;
-        let content = responseContent.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
-        if (toolsCalled && content === '') {
-          content = "İstediğiniz işlemleri başarıyla gerçekleştirdim.";
-        }
-        
-        if (onChunk && content) {
-          const words = content.split(' ');
-          for (let i = 0; i < words.length; i++) {
-            const chunk = (i === 0 ? '' : ' ') + words[i];
-            onChunk(chunk);
-            await new Promise(r => setTimeout(r, 16));
-          }
-        }
-        currentMessages.push({ role: 'assistant', content } as ChatCompletionMessageParam);
-
-        // Record Task Summary
-        if (toolsCalled && this.engine) {
-          const engineRef = this.engine;
-          const summaryMessages = [
-            currentMessages[currentMessages.length - 1],
-            { role: 'user', content: 'Tamamlanan görevi 1 kısa Türkçe cümleyle özetle. Emoji kullanma.' }
-          ];
-          setTimeout(() => {
-            engineRef.chat.completions.create({
-              messages: summaryMessages as ChatCompletionMessageParam[],
-              stream: false
-            }).then(res => {
-              const summary = res.choices[0]?.message?.content;
-              if (summary) aiMemory.addTaskSummary(summary);
-            }).catch(() => {});
-          }, 2000);
+        finalAnswer = responseText.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
+        if (!finalAnswer) {
+          finalAnswer = 'Islemleri tamamladim.';
         }
       }
     }
 
-    return currentMessages;
+    if (onChunk && finalAnswer) {
+      const words = finalAnswer.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        onChunk((i === 0 ? '' : ' ') + words[i]);
+        await new Promise(r => setTimeout(r, 12));
+      }
+    }
+
+    // Return ONLY the original messages + single clean assistant response
+    return [...messages, { role: 'assistant', content: finalAnswer }];
   }
 
   // A fast, lightweight method exclusively for background tasks like Link Preview (No tools, no orchestrator)
