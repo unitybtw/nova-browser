@@ -125,7 +125,7 @@ export interface SidebarTabsProps {
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
   splitTabId?: string | null;
-  onCloseSplit?: () => void;
+  onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
   onNavigate?: (url: string) => void;
   onGoBack?: () => void;
   onGoForward?: () => void;
@@ -195,12 +195,15 @@ const TabPeekPortal: React.FC<{
 
 interface SidebarTabItemProps {
   tab: Tab;
+  splitTab?: Tab | null;
+  activeTabId?: string;
   isActive: boolean;
   isDragOver: boolean;
   isNested: boolean;
   tabsLength: number;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
+  onCloseSplit?: () => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
@@ -213,12 +216,15 @@ interface SidebarTabItemProps {
 
 const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   tab,
+  splitTab,
+  activeTabId,
   isActive,
   isDragOver,
   isNested,
   tabsLength,
   onSelectTab,
   onCloseTab,
+  onCloseSplit,
   onToggleMuteTab,
   onTabDragStart,
   onTabDragEnd,
@@ -286,58 +292,109 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 dark:text-slate-300/80 dark:hover:bg-white/6 dark:hover:text-white'
       }`}
     >
-      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-        <div className="w-4 h-4 flex items-center justify-center shrink-0">
-          {tab.isLoading ? (
-            <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
-          ) : tab.favicon ? (
-            <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
-          ) : tab.url === 'nova://settings' ? (
-            <Settings className="w-3.5 h-3.5 opacity-70" />
-          ) : tab.url === 'nova://history' ? (
-            <Clock className="w-3.5 h-3.5 opacity-70" />
-          ) : tab.url === 'nova://downloads' ? (
-            <Download className="w-3.5 h-3.5 opacity-70" />
-          ) : isNewTabUrl ? (
-            <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
-          ) : (
-            <Globe className="w-3.5 h-3.5 opacity-70" />
-          )}
-        </div>
-        <span className="truncate text-[13px] tracking-tight flex-1">
-          {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
-        </span>
-        {tab.isPinned && (
-          <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
-        )}
-      </div>
-
-      <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
-        isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
-      }`}>
-        {tab.isMuted ? (
-          <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
-            <VolumeX className="w-3 h-3" />
-          </button>
-        ) : tab.isPlayingAudio ? (
-          <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
-            <Volume2 className="w-3 h-3 animate-pulse" />
-          </button>
-        ) : null}
-        {tab.isSuspended && (
-          <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
-            <Moon className="w-3 h-3" />
-          </span>
-        )}
-        {tabsLength > 1 && !tab.isPinned && (
-          <button 
-            onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
-            className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+      {splitTab ? (
+        <div className="flex items-center w-full gap-1">
+          {/* Primary Split Subtab */}
+          <div 
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+              activeTabId === tab.id 
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
+                : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
+            }`}
+            onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
+            title={tab.title}
           >
-            <X className="w-3 h-3" />
-          </button>
-        )}
-      </div>
+            {tab.favicon ? (
+              <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            )}
+            <span className="truncate text-[12px]">{tab.title || 'New Tab'}</span>
+          </div>
+
+          <div className="w-px h-3.5 bg-slate-300 dark:bg-white/20 shrink-0" />
+
+          {/* Secondary Split Subtab */}
+          <div 
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+              activeTabId === splitTab.id 
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
+                : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
+            }`}
+            onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
+            title={splitTab.title}
+          >
+            {splitTab.favicon ? (
+              <img src={splitTab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+            ) : (
+              <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
+            )}
+            <span className="truncate text-[12px] flex-1">{splitTab.title || 'New Tab'}</span>
+            <button 
+              onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }}
+              className="p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0"
+              title="Close Split View"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+            <div className="w-4 h-4 flex items-center justify-center shrink-0">
+              {tab.isLoading ? (
+                <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
+              ) : tab.favicon ? (
+                <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
+              ) : tab.url === 'nova://settings' ? (
+                <Settings className="w-3.5 h-3.5 opacity-70" />
+              ) : tab.url === 'nova://history' ? (
+                <Clock className="w-3.5 h-3.5 opacity-70" />
+              ) : tab.url === 'nova://downloads' ? (
+                <Download className="w-3.5 h-3.5 opacity-70" />
+              ) : isNewTabUrl ? (
+                <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+              ) : (
+                <Globe className="w-3.5 h-3.5 opacity-70" />
+              )}
+            </div>
+            <span className="truncate text-[13px] tracking-tight flex-1">
+              {tab.title || (isNewTabUrl ? 'New Tab' : tab.url) || 'New Tab'}
+            </span>
+            {tab.isPinned && (
+              <Pin className="w-2.5 h-2.5 text-cyan-500 shrink-0 opacity-80" />
+            )}
+          </div>
+
+          <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
+            isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+          }`}>
+            {tab.isMuted ? (
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
+                <VolumeX className="w-3 h-3" />
+              </button>
+            ) : tab.isPlayingAudio ? (
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
+                <Volume2 className="w-3 h-3 animate-pulse" />
+              </button>
+            ) : null}
+            {tab.isSuspended && (
+              <span className="p-0.5 text-indigo-500/70 dark:text-indigo-300/70 shrink-0" title="Sleeping Tab">
+                <Moon className="w-3 h-3" />
+              </span>
+            )}
+            {tabsLength > 1 && !tab.isPinned && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </motion.div>
   );
 });
@@ -1012,29 +1069,44 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         className="relative"
                       >
                         <div className="flex flex-col gap-0.5 pb-1">
-                          {folderTabs.map(tab => {
-                            if (tab.id === splitTabId && splitTabId && activeTabId) return null;
-                            return (
-                              <SidebarTabItem
-                                key={tab.id}
-                                tab={tab}
-                                isActive={tab.id === activeTabId}
-                                isDragOver={dragOverTabId === tab.id}
-                                isNested={true}
-                                tabsLength={tabs.length}
-                                onSelectTab={onSelectTab}
-                                onCloseTab={onCloseTab}
-                                onToggleMuteTab={onToggleMuteTab}
-                                onTabDragStart={onTabDragStart}
-                                onTabDragEnd={onTabDragEnd}
-                                onReorderTabs={onReorderTabs}
-                                onOpenContextMenu={handleOpenContextMenu}
-                                onMouseEnter={handleMouseEnter}
-                                onMouseLeave={handleMouseLeave}
-                                setDragOverTabId={setDragOverTabId}
-                              />
-                            );
-                          })}
+                          {(() => {
+                            const renderedSplitIds = new Set<string>();
+                            return folderTabs.filter(tab => {
+                              if (tab.splitWith) {
+                                if (renderedSplitIds.has(tab.id)) return false;
+                                const other = tabs.find(t => t.id === tab.splitWith);
+                                if (other) renderedSplitIds.add(other.id);
+                                return true;
+                              }
+                              return true;
+                            }).map(tab => {
+                              const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+                              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
+                              return (
+                                <SidebarTabItem
+                                  key={tab.id}
+                                  tab={tab}
+                                  splitTab={splitTab}
+                                  activeTabId={activeTabId}
+                                  isActive={isActive}
+                                  isDragOver={dragOverTabId === tab.id}
+                                  isNested={true}
+                                  tabsLength={tabs.length}
+                                  onSelectTab={onSelectTab}
+                                  onCloseTab={onCloseTab}
+                                  onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                                  onToggleMuteTab={onToggleMuteTab}
+                                  onTabDragStart={onTabDragStart}
+                                  onTabDragEnd={onTabDragEnd}
+                                  onReorderTabs={onReorderTabs}
+                                  onOpenContextMenu={handleOpenContextMenu}
+                                  onMouseEnter={handleMouseEnter}
+                                  onMouseLeave={handleMouseLeave}
+                                  setDragOverTabId={setDragOverTabId}
+                                />
+                              );
+                            });
+                          })()}
                         </div>
                       </motion.div>
                     )}
@@ -1044,29 +1116,44 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             })}
 
             {/* Root Tabs */}
-            {tabs.filter(t => !t.folderId).map(tab => {
-              if (tab.id === splitTabId && splitTabId && activeTabId) return null;
-              return (
-                <SidebarTabItem
-                  key={tab.id}
-                  tab={tab}
-                  isActive={tab.id === activeTabId}
-                  isDragOver={dragOverTabId === tab.id}
-                  isNested={false}
-                  tabsLength={tabs.length}
-                  onSelectTab={onSelectTab}
-                  onCloseTab={onCloseTab}
-                  onToggleMuteTab={onToggleMuteTab}
-                  onTabDragStart={onTabDragStart}
-                  onTabDragEnd={onTabDragEnd}
-                  onReorderTabs={onReorderTabs}
-                  onOpenContextMenu={handleOpenContextMenu}
-                  onMouseEnter={handleMouseEnter}
-                  onMouseLeave={handleMouseLeave}
-                  setDragOverTabId={setDragOverTabId}
-                />
-              );
-            })}
+            {(() => {
+              const renderedSplitIds = new Set<string>();
+              return tabs.filter(t => !t.folderId).filter(tab => {
+                if (tab.splitWith) {
+                  if (renderedSplitIds.has(tab.id)) return false;
+                  const other = tabs.find(t => t.id === tab.splitWith);
+                  if (other) renderedSplitIds.add(other.id);
+                  return true;
+                }
+                return true;
+              }).map(tab => {
+                const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+                const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
+                return (
+                  <SidebarTabItem
+                    key={tab.id}
+                    tab={tab}
+                    splitTab={splitTab}
+                    activeTabId={activeTabId}
+                    isActive={isActive}
+                    isDragOver={dragOverTabId === tab.id}
+                    isNested={false}
+                    tabsLength={tabs.length}
+                    onSelectTab={onSelectTab}
+                    onCloseTab={onCloseTab}
+                    onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                    onToggleMuteTab={onToggleMuteTab}
+                    onTabDragStart={onTabDragStart}
+                    onTabDragEnd={onTabDragEnd}
+                    onReorderTabs={onReorderTabs}
+                    onOpenContextMenu={handleOpenContextMenu}
+                    onMouseEnter={handleMouseEnter}
+                    onMouseLeave={handleMouseLeave}
+                    setDragOverTabId={setDragOverTabId}
+                  />
+                );
+              });
+            })()}
           </AnimatePresence>
         </div>
 

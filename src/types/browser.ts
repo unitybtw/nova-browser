@@ -18,6 +18,7 @@ export interface Tab {
   webContentsId?: number;
   isSuspended?: boolean;
   lastAccessed?: number;
+  splitWith?: string;
 }
 
 export interface Folder {

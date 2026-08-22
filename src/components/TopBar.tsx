@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { DownloadsPopover } from './DownloadsPopover';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
@@ -44,12 +44,13 @@ import {
   ScanSearch,
   VenetianMask,
   Moon,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   User,
   Cloud
 } from 'lucide-react';
-import { Tab, Bookmark } from '../types/browser';
+import { Tab, Bookmark, Workspace } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
@@ -68,23 +69,20 @@ const WORKSPACE_COLORS: Record<string, string> = {
 
 interface TopBarProps {
   tabs: Tab[];
-  workspaces?: import('../types/browser').Workspace[];
+  workspaces?: Workspace[];
   activeWorkspaceId?: string;
   onSelectWorkspace?: (id: string) => void;
   activeTabId: string;
   bookmarks: Bookmark[];
-  isSplitView: boolean;
-  isIncognito?: boolean;
-  useVerticalTabs?: boolean;
+  isSplitView?: boolean;
   tabStyle?: 'rounded' | 'square' | 'floating';
-  searchEngine?: UserSettings['searchEngine'];
+  isIncognito?: boolean;
+  searchEngine: UserSettings['searchEngine'];
   onToggleBookmark: () => void;
   onOpenHistory: () => void;
   onOpenDownloads: () => void;
   onOpenSettings: () => void;
   onOpenHelp?: () => void;
-  onOpenShare: () => void;
-  onTakeScreenshot: () => void;
   onOpenFindInPage: () => void;
   onToggleSplitView: () => void;
   onZoomIn: () => void;
@@ -103,9 +101,12 @@ interface TopBarProps {
   onReorderFullList?: (newTabs: Tab[]) => void;
   onTogglePip?: (id: string) => void;
   onSelectTab: (id: string) => void;
-  onNewTab: (url?: string) => void;
-  onNewIncognitoTab: () => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
+  onNewTab: (url?: string) => void;
+  onNewIncognitoTab?: () => void;
+  onOpenShare?: () => void;
+  onTakeScreenshot?: () => void;
+  useVerticalTabs?: boolean;
   onNavigate: (url: string) => void;
   onGoBack: () => void;
   onGoForward: () => void;
@@ -125,11 +126,11 @@ interface TopBarProps {
   onTabDrag?: (y: number) => void;
   onDropToSplitScreen?: (tabId: string) => void;
   splitTabId?: string | null;
-  onCloseSplit?: () => void;
+  onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
 }
 
 const MemoizedTabItem = React.memo(({ 
-  tab, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
+  tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
   tabsLength, setGhostTab, onOpenContextMenu
@@ -210,7 +211,11 @@ const MemoizedTabItem = React.memo(({
         <div className="flex w-full items-center h-full gap-1">
           {/* Primary Tab Half */}
           <div 
-            className="flex flex-1 items-center gap-1.5 px-2 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer ${
+              activeTabId === tab.id
+                ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
+            }`}
             onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
             title={tab.title}
           >
@@ -221,7 +226,7 @@ const MemoizedTabItem = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] font-semibold">{tab.title || tab.url || 'New Tab'}</span>
+            <span className="truncate text-[12px]">{tab.title || tab.url || 'New Tab'}</span>
           </div>
 
           <div className="flex items-center px-0.5 shrink-0" title="Split Screen Mode">
@@ -230,7 +235,11 @@ const MemoizedTabItem = React.memo(({
 
           {/* Secondary Tab Half */}
           <div 
-            className="flex flex-1 items-center gap-1.5 px-2 min-w-0 h-full rounded-md hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer ${
+              activeTabId === splitTab.id
+                ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
+                : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
+            }`}
             onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
             title={splitTab.title}
           >
@@ -241,7 +250,7 @@ const MemoizedTabItem = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px] font-semibold flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
+            <span className="truncate text-[12px] flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
             
             <button 
               onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} 
@@ -338,7 +347,7 @@ const MemoizedTabItem = React.memo(({
 }, (prevProps: any, nextProps: any) => {
   return (
     prevProps.isActive === nextProps.isActive &&
-    prevProps.isSplitChild === nextProps.isSplitChild &&
+    prevProps.activeTabId === nextProps.activeTabId &&
     prevProps.splitTab?.id === nextProps.splitTab?.id &&
     prevProps.splitTab?.title === nextProps.splitTab?.title &&
     prevProps.splitTab?.url === nextProps.splitTab?.url &&
@@ -347,6 +356,7 @@ const MemoizedTabItem = React.memo(({
     prevProps.tab.id === nextProps.tab.id &&
     prevProps.tab.url === nextProps.tab.url &&
     prevProps.tab.title === nextProps.tab.title &&
+    prevProps.tab.splitWith === nextProps.tab.splitWith &&
     prevProps.tab.favicon === nextProps.tab.favicon &&
     prevProps.tab.isLoading === nextProps.tab.isLoading &&
     prevProps.tab.isMuted === nextProps.tab.isMuted &&
@@ -828,7 +838,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
   useEffect(() => {
-    const unsubscribe = syncService.subscribe(status => {
+    const unsubscribe = syncService.subscribe((status: SyncStatus) => {
       setSyncStatus(status);
     });
     return () => { unsubscribe(); };
@@ -859,6 +869,24 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const visibleTabs = useMemo(() => {
+    const renderedSplitIds = new Set<string>();
+    const result: Tab[] = [];
+    for (const tab of tabs) {
+      if (tab.splitWith) {
+        if (renderedSplitIds.has(tab.id)) continue;
+        const other = tabs.find(t => t.id === tab.splitWith);
+        if (other) {
+          renderedSplitIds.add(other.id);
+        }
+        result.push(tab);
+      } else {
+        result.push(tab);
+      }
+    }
+    return result;
+  }, [tabs]);
 
   const checkScroll = useCallback(() => {
     const el = tabsContainerRef.current;
@@ -1086,16 +1114,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
           <Reorder.Group
             axis="x"
-            values={tabs.filter(t => t.id !== splitTabId)}
+            values={visibleTabs}
             onReorder={(newTabs) => {
               if (ghostTab) return;
               if (onReorderFullList) {
-                if (splitTabId) {
-                  const splitItem = tabs.find(t => t.id === splitTabId);
-                  onReorderFullList(splitItem ? [...newTabs, splitItem] : newTabs);
-                } else {
-                  onReorderFullList(newTabs);
+                const full: Tab[] = [];
+                for (const t of newTabs) {
+                  full.push(t);
+                  if (t.splitWith) {
+                    const partner = tabs.find(p => p.id === t.splitWith);
+                    if (partner && !full.some(x => x.id === partner.id)) {
+                      full.push(partner);
+                    }
+                  }
                 }
+                onReorderFullList(full);
               }
             }}
             ref={tabsContainerRef}
@@ -1103,21 +1136,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px]"
           >
             <AnimatePresence>
-            {tabs.filter(t => t.id !== splitTabId).map((tab) => {
-              const isSplitChild = tab.id === splitTabId;
-              if (isSplitChild && splitTabId) return null;
-
-              const isPrimarySplit = (tab.id === activeTabId || tab.id === splitTabId) && !!splitTabId;
-              const splitTab = isPrimarySplit ? tabs.find(t => t.id === splitTabId) : null;
-              const isActive = tab.id === activeTabId || tab.id === splitTabId;
+            {visibleTabs.map((tab: Tab) => {
+              const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
 
               return (
                 <MemoizedTabItem
                   key={tab.id}
                   tab={tab}
+                  activeTabId={activeTabId}
                   index={tabs.findIndex(t => t.id === tab.id)}
                   isActive={isActive}
-                  isSplitChild={isSplitChild}
                   splitTab={splitTab}
                   ghostTab={ghostTab}
                   tabStyle={tabStyle}
@@ -1127,7 +1156,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onTabDragEnd={onTabDragEnd}
                   onDropToSplitScreen={onDropToSplitScreen}
                   onSelectTab={onSelectTab}
-                  onCloseSplit={onCloseSplit}
+                  onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
                   onToggleMuteTab={onToggleMuteTab}
                   onTogglePip={onTogglePip}
                   onCloseTab={onCloseTab}
@@ -1513,12 +1542,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                           <button onClick={onZoomIn} className="p-1 rounded-md hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300" title="Zoom In"><ZoomIn className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
-                      <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
-                        <Camera className="w-4 h-4 text-slate-400" /> Screenshot
-                      </button>
-                      <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
-                        <Share2 className="w-4 h-4 text-slate-400" /> Share Link
-                      </button>
+                      {onTakeScreenshot && (
+                        <button onClick={() => { onTakeScreenshot(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                          <Camera className="w-4 h-4 text-slate-400" /> Screenshot
+                        </button>
+                      )}
+                      {onOpenShare && (
+                        <button onClick={() => { onOpenShare(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
+                          <Share2 className="w-4 h-4 text-slate-400" /> Share Link
+                        </button>
+                      )}
                       <button onClick={() => { onOpenFindInPage(); setIsMoreMenuOpen(false); }} className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors text-left">
                         <Search className="w-4 h-4 text-slate-400" /> Find in Page
                       </button>

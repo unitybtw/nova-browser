@@ -152,8 +152,8 @@ function App() {
       }
       if (demoParams.feature === 'split') {
         return [
-          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false },
-          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false }
+          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false, splitWith: '2' },
+          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, splitWith: '1' }
         ];
       }
       if (demoParams.feature === 'shield') {
@@ -262,11 +262,6 @@ function App() {
   const [isFindInPageOpen, setIsFindInPageOpen] = useState(false);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
-  const [splitTabId, setSplitTabId] = useState<string | null>(() => {
-    return demoParams.isDemo && demoParams.feature === 'split' ? '2' : null;
-  });
-  const splitTabIdRef = useRef(splitTabId);
-  useEffect(() => { splitTabIdRef.current = splitTabId; }, [splitTabId]);
   const [splitRatio, setSplitRatio] = useState(50);
   const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [extensions, setExtensions] = useState<Extension[]>([]);
@@ -337,7 +332,6 @@ function App() {
           { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
         ]);
         setActiveTabId('1');
-        setSplitTabId(null);
         setIsSidePanelOpen(true);
 
         setTimeout(() => {
@@ -355,7 +349,6 @@ function App() {
         // Scene 2: New Tab Page with Clock, Tasks, Speed Dials
         setIsSidePanelOpen(false);
         setActiveTabId('2');
-        setSplitTabId(null);
 
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('ai-cursor', {
@@ -372,11 +365,10 @@ function App() {
         // Scene 3: Dual Split Screen Multitasking (React 19 & Tailwind CSS)
         setIsSidePanelOpen(false);
         setTabs([
-          { id: '1', url: 'https://react.dev/reference/react', title: 'React 19 Docs', isLoading: false, canGoBack: false, canGoForward: false },
-          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, canGoBack: false, canGoForward: false }
+          { id: '1', url: 'https://react.dev/reference/react', title: 'React 19 Docs', isLoading: false, canGoBack: false, canGoForward: false, splitWith: '2' },
+          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, canGoBack: false, canGoForward: false, splitWith: '1' }
         ]);
         setActiveTabId('1');
-        setSplitTabId('2');
       }
 
       cycle = (cycle + 1) % 3;
@@ -837,15 +829,17 @@ function App() {
 
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
 
+  // Active Tab & Derived Split Partner Tab
+  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
+  const splitTabId = useMemo(() => {
+    if (!activeTab || !activeTab.splitWith) return null;
+    const partner = tabs.find(t => t.id === activeTab.splitWith);
+    return partner ? partner.id : null;
+  }, [activeTab, tabs]);
+
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
-    setActiveTabId(prevActiveId => {
-      if (splitTabIdRef.current && id === splitTabIdRef.current) {
-        setSplitTabId(prevActiveId);
-        return id;
-      }
-      return id;
-    });
+    setActiveTabId(id);
     setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
   }, []);
 
@@ -870,69 +864,66 @@ function App() {
     }
   }, [activeTabId, splitTabId]);
 
-  // Automatic Tab Hibernation (Memory Saver)
+  // Tab Hibernation Checker Engine (Idle Timer)
   useEffect(() => {
-    if (settings.tabHibernationEnabled === false) return;
+    if (!settings.tabHibernationEnabled) return;
     const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
     
     const interval = setInterval(() => {
       const now = Date.now();
-      setTabs(prevTabs =>
-        prevTabs.map(tab => {
+      setTabs(prevTabs => {
+        let changed = false;
+        const updated = prevTabs.map(tab => {
           if (
-            tab.id === activeTabIdRef.current ||
-            tab.id === splitTabIdRef.current ||
-            tab.isPlayingAudio ||
+            tab.id === activeTabId ||
+            (splitTabId && tab.id === splitTabId) ||
             tab.isPinned ||
+            tab.isPlayingAudio ||
             tab.isSuspended ||
-            !tab.lastAccessed
+            tab.isLoading
           ) {
             return tab;
           }
-          if (now - tab.lastAccessed > timeoutMs) {
-            console.log(`[MemorySaver] Auto-hibernating tab ${tab.id} (${tab.title || tab.url})`);
+          const idleTime = now - (tab.lastAccessed || now);
+          if (idleTime > timeoutMs) {
+            changed = true;
             return { ...tab, isSuspended: true };
           }
           return tab;
-        })
-      );
-    }, 30000);
+        });
+        return changed ? updated : prevTabs;
+      });
+    }, 30000); // Check every 30s
 
     return () => clearInterval(interval);
-  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
+  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, activeTabId, splitTabId]);
 
-  // Track closed tabs for Cmd+Shift+T
+  // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    tabThumbnailCache.remove(id);
+    e?.stopPropagation();
     setTabs(prevTabs => {
       const targetTab = prevTabs.find(t => t.id === id);
-      
       if (prevTabs.length <= 1) {
-        if (targetTab && targetTab.url !== 'nova://newtab') {
-          return [{
-            ...targetTab,
-            url: 'nova://newtab',
-            title: 'New Tab',
-            favicon: undefined,
-            isLoading: false,
-            canGoBack: false,
-            canGoForward: false
-          }];
-        }
-        return prevTabs;
+        return [{
+          id: Date.now().toString(),
+          url: 'nova://newtab',
+          title: 'New Tab',
+          isLoading: false,
+          canGoBack: false,
+          canGoForward: false
+        }];
       }
       if (targetTab) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
       const targetIdx = prevTabs.findIndex(t => t.id === id);
-      const newTabs = prevTabs.filter(t => t.id !== id);
+      const newTabs = prevTabs
+        .filter(t => t.id !== id)
+        .map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t);
+      
       if (activeTabId === id && newTabs.length > 0) {
         const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
         setActiveTabId(newTabs[nextActiveIdx].id);
-      }
-      if (splitTabId === id) {
-        setSplitTabId(null);
       }
       
       // If closing an incognito tab and no more incognito tabs exist, clear session
@@ -945,7 +936,7 @@ function App() {
       
       return newTabs;
     });
-  }, [activeTabId, splitTabId]);
+  }, [activeTabId]);
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
@@ -1253,8 +1244,6 @@ function App() {
       window.removeEventListener('open-account-modal', handleOpenAccountModal);
     };
   }, []);
-
-  const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
 
   // Folder Management
   const handleCreateFolder = useCallback(() => {
@@ -1987,30 +1976,46 @@ function App() {
   }, [activeTabId]);
   const handleOpenFindInPage = useCallback(() => setIsFindInPageOpen(prev => !prev), []);
   
+  const handleCloseSplitView = useCallback((tab1Id?: string, tab2Id?: string) => {
+    setTabs(prev => prev.map(t => {
+      if (tab1Id && tab2Id) {
+        if (t.id === tab1Id || t.id === tab2Id) return { ...t, splitWith: undefined };
+      } else if (t.id === activeTabId || (splitTabId && t.id === splitTabId)) {
+        return { ...t, splitWith: undefined };
+      }
+      return t;
+    }));
+  }, [activeTabId, splitTabId]);
+
   const handleToggleSplitView = useCallback(() => {
     if (splitTabId) {
-      setSplitTabId(null);
+      handleCloseSplitView();
     } else {
       const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
-      const otherTab = workspaceTabs.find(t => t.id !== activeTabId);
+      const otherTab = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
       if (otherTab) {
-        setSplitTabId(otherTab.id);
+        setTabs(prev => prev.map(t => {
+          if (t.id === activeTabId) return { ...t, splitWith: otherTab.id };
+          if (t.id === otherTab.id) return { ...t, splitWith: activeTabId };
+          return t;
+        }));
       } else {
         const newId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
-        setTabs(prev => [...prev, {
+        const newTab: Tab = {
           id: newId,
           url: 'nova://newtab',
           title: 'New Tab',
           isLoading: false,
           canGoBack: false,
           canGoForward: false,
-          workspaceId: activeWorkspaceId
-        }]);
-        setSplitTabId(newId);
+          workspaceId: activeWorkspaceId,
+          splitWith: activeTabId
+        };
+        setTabs(prev => [...prev.map(t => t.id === activeTabId ? { ...t, splitWith: newId } : t), newTab]);
       }
       setSplitRatio(50);
     }
-  }, [splitTabId, tabs, activeWorkspaceId, activeTabId]);
+  }, [splitTabId, tabs, activeWorkspaceId, activeTabId, handleCloseSplitView]);
 
   const handleGoBack = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
@@ -2219,14 +2224,16 @@ function App() {
     setIsDragOverMain(false);
   }, []);
   const handleTabDrag = useCallback((y: number) => setIsDragOverMain(y > 60), []);
-  const handleDropToSplitScreen = useCallback((tabId: string) => {
-    setActiveTabId(prev => {
-      if (tabId !== prev) setSplitTabId(tabId);
-      return prev;
-    });
-  }, []);
+  const handleDropToSplitScreen = useCallback((droppedTabId: string) => {
+    if (!droppedTabId || droppedTabId === activeTabId) return;
+    setTabs(prev => prev.map(t => {
+      if (t.id === activeTabId) return { ...t, splitWith: droppedTabId };
+      if (t.id === droppedTabId) return { ...t, splitWith: activeTabId };
+      if (t.splitWith === activeTabId || t.splitWith === droppedTabId) return { ...t, splitWith: undefined };
+      return t;
+    }));
+  }, [activeTabId]);
   const handleToggleReaderMode = useCallback(() => setIsReaderModeOpen(prev => !prev), []);
-  const handleCloseSplitView = useCallback(() => setSplitTabId(null), []);
   const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
   const handleOpenSpotlight = useCallback(() => setIsSpotlightOpen(true), []);
 
@@ -2750,7 +2757,7 @@ function App() {
           const tabId = e.dataTransfer.getData('text/plain');
           const draggedTab = tabs.find(t => t.id === tabId);
           if (draggedTab && tabId !== activeTabId) {
-            setSplitTabId(tabId);
+            handleDropToSplitScreen(tabId);
           }
         }}
       >
@@ -2874,7 +2881,7 @@ function App() {
                 Split View: {secondaryTab.title || secondaryTab.url}
               </div>
               <button 
-                onClick={handleCloseSplitView}
+                onClick={() => handleCloseSplitView()}
                 className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-colors"
                 title="Close Split View"
               >
