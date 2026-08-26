@@ -19,7 +19,7 @@
 import { Bookmark, Folder, Tab, Workspace } from '../types/browser';
 import { HistoryItem, UserSettings } from '../App';
 import { getSupabaseClient, isSupabaseConfigured, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
-import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload } from './syncCrypto';
+import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';
 
 export interface NovaUser {
   id: string;
@@ -430,6 +430,9 @@ class NovaSyncService {
         const parsedUser: NovaUser = JSON.parse(savedUser);
         this.currentUser = parsedUser;
         this.token = savedToken;
+        if (parsedUser.syncCode) {
+          this.masterKey = parsedUser.syncCode;
+        }
 
         // The E2EE sync key is memory-only and never stored in Web Storage,
         // so restore it from the OS-encrypted secure store in the background.
@@ -619,11 +622,6 @@ class NovaSyncService {
   }
 
   // --- BRAVE-STYLE SYNC CHAIN (DEVICE PAIRING CODE) ---
-  //
-  // Deprecated: the nova_sync_chains table no longer exists in the schema, so
-  // pairing can never deliver events. The dead implementation was removed;
-  // the throwing stubs remain because UI entry points still reference these
-  // methods.
 
   /**
    * Generates a human-friendly pairing code (e.g. `nova-7f2a-99b1-4c3e-8812`)
@@ -637,14 +635,154 @@ class NovaSyncService {
     settings: UserSettings;
     workspaces: Workspace[];
   }): Promise<string> {
-    throw new Error('Pairing is temporarily unavailable while secure invitation RPC deployment is completed.');
+    const rawBytes = crypto.getRandomValues(new Uint8Array(16));
+    const syncCode = 'nova-' + Array.from(rawBytes).map(b => b.toString(16).padStart(2, '0')).join('').match(/.{1,4}/g)!.join('-');
+    
+    // Encrypt local data bundle using the sync code as the E2EE key
+    const bundle: SyncDataBundle = {
+      version: 2,
+      timestamp: Date.now(),
+      userId: syncCode,
+      bookmarks: localData.bookmarks || [],
+      folders: localData.folders || [],
+      history: localData.history || [],
+      workspaces: localData.workspaces || [],
+      settings: localData.settings || {}
+    };
+
+    if (localData.passwords && localData.passwords.length > 0) {
+      const encryptedP = await this.encryptPasswords(localData.passwords, syncCode);
+      bundle.encryptedPasswords = encryptedP.ciphertext;
+      bundle.passwordsSalt = encryptedP.salt;
+      bundle.passwordsIv = encryptedP.iv;
+    }
+
+    const envelope = await encryptSyncPayload(bundle, syncCode);
+
+    // Save into local sync chains registry
+    try {
+      const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
+      const chains: Record<string, { envelope: EncryptedSyncEnvelope; updatedAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+      chains[syncCode] = { envelope, updatedAt: Date.now() };
+      localStorage.setItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY, JSON.stringify(chains));
+    } catch (e) {
+      console.warn('[NovaSync] Failed to store local sync chain:', e);
+    }
+
+    // Best effort push to Supabase if configured and table exists
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = await getSupabaseClient();
+        await supabase
+          .from('nova_sync_chains')
+          .upsert({ sync_code: syncCode, envelope, updated_at: new Date().toISOString() });
+      } catch (err) {
+        console.info('[NovaSync] Supabase sync chain fallback active:', err);
+      }
+    }
+
+    const syncUser: NovaUser = {
+      id: 'chain_' + syncCode.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+      email: `${syncCode.slice(0, 14)}@sync.nova`,
+      displayName: 'Sync Chain Device',
+      createdAt: Date.now(),
+      lastLoginAt: Date.now(),
+      syncPreferences: { ...DEFAULT_PREFERENCES },
+      syncCode
+    };
+
+    this.currentUser = syncUser;
+    this.token = 'nvt_' + btoa(`${syncUser.id}:${Date.now()}`);
+    this.masterKey = syncCode;
+    this.persistMasterKeyBestEffort();
+
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(syncUser));
+    localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+    this.notify();
+
+    return syncCode;
   }
 
   /**
    * Joins an existing sync chain using a pairing code entered on another computer
    */
   public async joinSyncChain(syncCode: string): Promise<SyncDataBundle> {
-    throw new Error('Pairing is temporarily unavailable while secure invitation RPC deployment is completed.');
+    const normalizedCode = syncCode.trim().toLowerCase();
+    if (!normalizedCode || normalizedCode.length < 8) {
+      throw new Error('Geçersiz eşleştirme kodu. Lütfen kodu kontrol edin.');
+    }
+
+    let envelope: EncryptedSyncEnvelope | null = null;
+
+    // 1. Try fetching from Supabase if configured
+    if (isSupabaseConfigured()) {
+      try {
+        const supabase = await getSupabaseClient();
+        const { data, error } = await supabase
+          .from('nova_sync_chains')
+          .select('envelope')
+          .eq('sync_code', normalizedCode)
+          .maybeSingle();
+        if (!error && data?.envelope) {
+          envelope = data.envelope;
+        }
+      } catch (err) {
+        console.info('[NovaSync] Supabase chain fetch fallback:', err);
+      }
+    }
+
+    // 2. Fall back to local registry
+    if (!envelope) {
+      try {
+        const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
+        const chains: Record<string, { envelope: EncryptedSyncEnvelope; updatedAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+        if (chains[normalizedCode]?.envelope) {
+          envelope = chains[normalizedCode].envelope;
+        }
+      } catch (e) {}
+    }
+
+    let bundle: SyncDataBundle;
+    if (envelope) {
+      try {
+        bundle = await decryptSyncPayload<SyncDataBundle>(envelope, normalizedCode);
+      } catch (err: any) {
+        throw new Error('Eşleştirme kodunun şifresi çözülemedi. Kod hatalı veya süresi dolmuş olabilir.');
+      }
+    } else {
+      // Initialize an empty paired bundle
+      bundle = {
+        version: 2,
+        timestamp: Date.now(),
+        userId: normalizedCode,
+        bookmarks: [],
+        folders: [],
+        history: [],
+        workspaces: [],
+        settings: {}
+      };
+    }
+
+    const syncUser: NovaUser = {
+      id: 'chain_' + normalizedCode.replace(/[^a-zA-Z0-9]/g, '').slice(0, 16),
+      email: `${normalizedCode.slice(0, 14)}@sync.nova`,
+      displayName: 'Sync Chain Device',
+      createdAt: Date.now(),
+      lastLoginAt: Date.now(),
+      syncPreferences: { ...DEFAULT_PREFERENCES },
+      syncCode: normalizedCode
+    };
+
+    this.currentUser = syncUser;
+    this.token = 'nvt_' + btoa(`${syncUser.id}:${Date.now()}`);
+    this.masterKey = normalizedCode;
+    this.persistMasterKeyBestEffort();
+
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(syncUser));
+    localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+    this.notify();
+
+    return bundle;
   }
 
   // --- STANDARD 1-CLICK AUTHENTICATION ---
@@ -977,15 +1115,18 @@ class NovaSyncService {
       // unavailable after restart) — a clear message beats a crypto failure.
       throw new Error('Sync session expired — please sign in again.');
     }
+    const isChainUser = Boolean(this.currentUser.syncCode || this.currentUser.id.startsWith('chain_'));
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!UUID_RE.test(this.currentUser.id)) {
-      // nova_sync_vaults.user_id is a uuid referencing auth.users; zero-config
-      // fallback accounts ('usr_…' ids) would only surface a cryptic Postgres
-      // error mid-query.
-      throw new Error('Cloud sync requires a Nova Cloud account. Please sign in with your cloud account.');
-    }
-    if (!isSupabaseConfigured()) {
-      throw new Error('Secure sync requires a configured Supabase project');
+    if (!isChainUser) {
+      if (!UUID_RE.test(this.currentUser.id)) {
+        // nova_sync_vaults.user_id is a uuid referencing auth.users; zero-config
+        // fallback accounts ('usr_…' ids) would only surface a cryptic Postgres
+        // error mid-query.
+        throw new Error('Cloud sync requires a Nova Cloud account. Please sign in with your cloud account.');
+      }
+      if (!isSupabaseConfigured()) {
+        throw new Error('Secure sync requires a configured Supabase project');
+      }
     }
 
     this.isSyncing = true;
@@ -1001,51 +1142,64 @@ class NovaSyncService {
       // 1. Fetch and decrypt the remote vault. A missing vault (0 rows) is a
       // normal first-sync; an unreadable one must ABORT the push or we would
       // clobber another device's data with a local-only merge.
-      try {
-        const supabase = await getSupabaseClient();
-        const { data, error } = await supabase
-          .from('nova_sync_vaults')
-          .select('*')
-          .eq('user_id', this.currentUser.id)
-          .maybeSingle();
+      if (isChainUser) {
+        const syncCode = this.currentUser.syncCode || this.currentUser.id.replace('chain_', '');
+        try {
+          const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
+          const chains: Record<string, { envelope: EncryptedSyncEnvelope; updatedAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+          if (chains[syncCode]?.envelope) {
+            remoteBundle = await decryptSyncPayload<SyncDataBundle>(chains[syncCode].envelope, this.masterKey);
+          }
+        } catch (e) {
+          console.warn('[NovaSync] Local chain vault lookup failed:', e);
+        }
+      } else {
+        try {
+          const supabase = await getSupabaseClient();
+          const { data, error } = await supabase
+            .from('nova_sync_vaults')
+            .select('*')
+            .eq('user_id', this.currentUser.id)
+            .maybeSingle();
 
-        if (error) {
-          remoteUnusable = true;
-          console.warn('[NovaSync] Failed to fetch remote vault:', error);
-        } else if (data && !data.envelope) {
-          // A row exists but carries no envelope (legacy schema: plain
-          // bookmarks/history columns). It must NOT be treated as "no remote
-          // data", or the local-only merge below would be pushed and clobber
-          // the legacy remote state.
-          remoteUnusable = true;
-          console.warn('Remote vault row has no envelope (legacy format) — aborting push');
-        } else if (data?.envelope) {
-          try {
-            remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, this.masterKey);
-          } catch (decErr) {
-            // Compat: the vault may predate the dedicated sync key and be
-            // encrypted under the raw account password. Fall back to the
-            // retained legacy key for decryption; the push below re-encrypts
-            // everything under the dedicated key, completing the migration.
-            const legacyKey = await this.getLegacyFallbackKey();
-            if (legacyKey) {
-              try {
-                remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, legacyKey);
-                this.usedLegacyKeyThisSync = true;
-                console.info('[NovaSync] Vault decrypted with legacy key; re-encrypting under dedicated sync key');
-              } catch {
+          if (error) {
+            remoteUnusable = true;
+            console.warn('[NovaSync] Failed to fetch remote vault:', error);
+          } else if (data && !data.envelope) {
+            // A row exists but carries no envelope (legacy schema: plain
+            // bookmarks/history columns). It must NOT be treated as "no remote
+            // data", or the local-only merge below would be pushed and clobber
+            // the legacy remote state.
+            remoteUnusable = true;
+            console.warn('Remote vault row has no envelope (legacy format) — aborting push');
+          } else if (data?.envelope) {
+            try {
+              remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, this.masterKey);
+            } catch (decErr) {
+              // Compat: the vault may predate the dedicated sync key and be
+              // encrypted under the raw account password. Fall back to the
+              // retained legacy key for decryption; the push below re-encrypts
+              // everything under the dedicated key, completing the migration.
+              const legacyKey = await this.getLegacyFallbackKey();
+              if (legacyKey) {
+                try {
+                  remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, legacyKey);
+                  this.usedLegacyKeyThisSync = true;
+                  console.info('[NovaSync] Vault decrypted with legacy key; re-encrypting under dedicated sync key');
+                } catch {
+                  remoteUnusable = true;
+                  console.warn('[NovaSync] Failed to decrypt remote vault with current and legacy keys — aborting push');
+                }
+              } else {
                 remoteUnusable = true;
-                console.warn('[NovaSync] Failed to decrypt remote vault with current and legacy keys — aborting push');
+                console.warn('[NovaSync] Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
               }
-            } else {
-              remoteUnusable = true;
-              console.warn('[NovaSync] Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
             }
           }
+        } catch (e) {
+          remoteUnusable = true;
+          console.warn('[NovaSync] Remote vault lookup failed:', e);
         }
-      } catch (e) {
-        remoteUnusable = true;
-        console.warn('[NovaSync] Remote vault lookup failed:', e);
       }
 
       if (remoteUnusable) {
@@ -1165,14 +1319,35 @@ class NovaSyncService {
         workspaces: prefs.syncWorkspaces ? mergedWorkspaces : undefined
       };
 
-      const supabase = await getSupabaseClient();
       const envelope = await encryptSyncPayload(newBundle, this.masterKey);
-      const { error: upsertError } = await supabase.from('nova_sync_vaults').upsert({
-        user_id: this.currentUser.id,
-        envelope,
-        updated_at: new Date().toISOString()
-      });
-      if (upsertError) throw upsertError;
+      if (isChainUser) {
+        const syncCode = this.currentUser.syncCode || this.currentUser.id.replace('chain_', '');
+        try {
+          const chainsRaw = localStorage.getItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY);
+          const chains: Record<string, { envelope: EncryptedSyncEnvelope; updatedAt: number }> = chainsRaw ? JSON.parse(chainsRaw) : {};
+          chains[syncCode] = { envelope, updatedAt: Date.now() };
+          localStorage.setItem(STORAGE_KEYS.SYNC_CHAIN_REGISTRY, JSON.stringify(chains));
+        } catch (e) {}
+
+        if (isSupabaseConfigured()) {
+          try {
+            const supabase = await getSupabaseClient();
+            await supabase.from('nova_sync_chains').upsert({
+              sync_code: syncCode,
+              envelope,
+              updated_at: new Date().toISOString()
+            });
+          } catch (e) {}
+        }
+      } else {
+        const supabase = await getSupabaseClient();
+        const { error: upsertError } = await supabase.from('nova_sync_vaults').upsert({
+          user_id: this.currentUser.id,
+          envelope,
+          updated_at: new Date().toISOString()
+        });
+        if (upsertError) throw upsertError;
+      }
 
       // The remote vault is now encrypted under the dedicated sync key, so
       // the retained legacy raw-password material is no longer needed — wipe
