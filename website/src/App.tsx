@@ -1,5 +1,6 @@
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import InteractiveAppShowcase from './components/InteractiveAppShowcase';
 import ProductTour from './components/ProductTour';
 import WorkGrid from './components/WorkGrid';
 import CapabilitiesAccordion from './components/CapabilitiesAccordion';
@@ -13,6 +14,7 @@ export default function App() {
       <Navbar />
       <main>
         <Hero />
+        <InteractiveAppShowcase />
         <ProductTour />
         <WorkGrid />
         <CapabilitiesAccordion />
