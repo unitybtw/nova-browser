@@ -95,6 +95,8 @@ export const SidePanel = React.memo(({
   const [pendingFiles, setPendingFiles] = useState<PendingFileAttachment[]>([]);
   const [attachmentHint, setAttachmentHint] = useState('');
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -808,37 +810,71 @@ export const SidePanel = React.memo(({
               </div>
             ) : (
               <>
-                {messages.filter(m => m.role !== 'system' && m.role !== 'tool' && (m.role === 'user' || (m.content && String(m.content).trim().length > 0))).map((msg, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
-                  >
-                    <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed overflow-hidden shadow-sm ${
-                      msg.role === 'user' 
-                        ? 'bg-slate-800 dark:bg-slate-100 text-white dark:text-slate-900 rounded-br-none font-medium' 
-                        : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-200 dark:border-slate-700 prose prose-sm dark:prose-invert max-w-none prose-p:leading-snug prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700'
-                    }`}>
-                      {msg.role === 'user' ? (
-                        typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)
-                      ) : (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                          {typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2)}
-                        </ReactMarkdown>
+                {messages.filter(m => m.role !== 'system' && m.role !== 'tool' && (m.role === 'user' || (m.content && String(m.content).trim().length > 0))).map((msg, idx) => {
+                  const isUser = msg.role === 'user';
+                  const textContent = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2);
+                  const isCopied = copiedIdx === idx;
+
+                  return (
+                    <motion.div
+                      key={idx}
+                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.2 }}
+                      className={`flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}
+                    >
+                      <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                        {isUser ? (
+                          <span>Siz</span>
+                        ) : (
+                          <div className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
+                            <Sparkles className="w-3 h-3" />
+                            <span>Nova Asistan</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className={`max-w-[90%] rounded-2xl px-4 py-3 text-xs leading-relaxed overflow-hidden shadow-sm transition-all ${
+                        isUser 
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-xs font-medium' 
+                          : 'bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-xs dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl'
+                      }`}>
+                        {isUser ? (
+                          <span className="whitespace-pre-wrap break-words">{textContent}</span>
+                        ) : (
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {textContent}
+                          </ReactMarkdown>
+                        )}
+                      </div>
+
+                      {!isUser && (
+                        <div className="flex items-center gap-1 px-1">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(textContent);
+                              setCopiedIdx(idx);
+                              setTimeout(() => setCopiedIdx(null), 2000);
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            title="Metni Kopyala"
+                          >
+                            {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Paperclip className="w-3 h-3" />}
+                            <span>{isCopied ? 'Kopyalandı' : 'Kopyala'}</span>
+                          </button>
+                          <button
+                            onClick={() => tts.speak(textContent)}
+                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            title="Sesli Oku"
+                          >
+                            <Volume2 className="w-3 h-3" />
+                            <span>Sesli Oku</span>
+                          </button>
+                        </div>
                       )}
-                    </div>
-                    {msg.role === 'assistant' && (
-                      <button
-                        onClick={() => tts.speak(msg.content as string)}
-                        className="flex items-center gap-1 px-2 py-1 mt-1 text-[10px] font-medium text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors rounded-md hover:bg-slate-100 dark:hover:bg-slate-800"
-                        title="Read Aloud"
-                      >
-                        <Volume2 className="w-3 h-3" /> Read
-                      </button>
-                    )}
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  );
+                })}
                 
                 {/* Live streaming bubble */}
                 {isLoading && streamingText ? (
@@ -846,9 +882,13 @@ export const SidePanel = React.memo(({
                     key="streaming"
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex justify-start"
+                    className="flex flex-col gap-1.5 items-start"
                   >
-                    <div className="max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none border border-slate-200 dark:border-slate-700 prose prose-sm dark:prose-invert max-w-none prose-p:leading-snug prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700">
+                    <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-medium">
+                      <Sparkles className="w-3 h-3 animate-pulse" />
+                      <span>Nova Asistan yanıtlıyor...</span>
+                    </div>
+                    <div className="max-w-[90%] rounded-2xl px-4 py-3 text-xs leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-tl-xs border border-cyan-500/30 dark:border-cyan-500/30 prose prose-xs dark:prose-invert max-w-none prose-p:leading-relaxed">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
                     </div>
                   </motion.div>
@@ -856,28 +896,27 @@ export const SidePanel = React.memo(({
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="flex flex-col gap-2"
+                    className="flex flex-col gap-2 p-3 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl"
                   >
-                    <div className="flex items-center gap-2 text-slate-400">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span className="text-xs">Thinking...</span>
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 text-xs font-medium">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400" />
+                      <span>Yapay zeka düşünüyor ve sayfayı analiz ediyor...</span>
                     </div>
                     
                     {queuedActions.filter(a => a.state === 'executing').map(action => (
                       <motion.div
                         key={action.id}
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col gap-2 p-3 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm"
+                        className="flex flex-col gap-1.5 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
                       >
-                        <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300 text-sm font-medium">
-                          <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                          Executing Action...
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono font-semibold text-cyan-600 dark:text-cyan-400">
+                            {action.toolName}
+                          </span>
+                          <span className="text-[10px] text-slate-400">Çalıştırılıyor</span>
                         </div>
-                        <p className="text-xs text-slate-500 font-mono">
-                          {action.toolName}
-                        </p>
-                        <div className="text-[10px] text-slate-400 break-all bg-white dark:bg-slate-900 p-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                        <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 break-all bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-lg">
                           {JSON.stringify(action.args)}
                         </div>
                       </motion.div>
@@ -892,30 +931,30 @@ export const SidePanel = React.memo(({
                     key={action.id}
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-2 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-500/40 rounded-xl shadow-sm"
+                    className="flex flex-col gap-2 p-3 bg-amber-50/90 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/40 rounded-2xl shadow-sm"
                   >
-                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium">
-                      <ShieldAlert className="w-4 h-4" />
-                      Approval Required
+                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 text-xs font-semibold">
+                      <ShieldAlert className="w-4 h-4 text-amber-500" />
+                      İşlem Onayı Gerekiyor
                     </div>
-                    <p className="text-xs text-slate-500 font-mono">
-                      {action.toolName}
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                      Asistan şu tarayıcı komutunu çalıştırmak istiyor:
                     </p>
-                    <div className="text-[10px] text-slate-400 break-all bg-white dark:bg-slate-900 p-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
-                      {JSON.stringify(action.args)}
+                    <div className="text-[10px] font-mono text-slate-600 dark:text-slate-300 break-all bg-white dark:bg-slate-900 p-2 rounded-xl border border-amber-200 dark:border-amber-800/40">
+                      <span className="font-bold text-amber-600 dark:text-amber-400">{action.toolName}</span>: {JSON.stringify(action.args)}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 mt-1">
                       <button
                         onClick={() => orchestrator.approveAction(action.id)}
-                        className="flex-1 px-2 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors flex items-center justify-center gap-1 active:scale-95"
+                        className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                       >
-                        <Check className="w-3.5 h-3.5" /> Approve
+                        <Check className="w-3.5 h-3.5" /> Onayla
                       </button>
                       <button
                         onClick={() => orchestrator.denyAction(action.id)}
-                        className="flex-1 px-2 py-1.5 text-xs font-semibold rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors flex items-center justify-center gap-1 active:scale-95"
+                        className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" /> Deny
+                        <X className="w-3.5 h-3.5" /> Reddet
                       </button>
                     </div>
                   </motion.div>
@@ -923,20 +962,20 @@ export const SidePanel = React.memo(({
 
                 {/* Quick Action Starter Prompts */}
                 {isReady && messages.length <= 1 && !isLoading && (
-                  <div className="flex flex-col gap-2 p-3 mt-2 rounded-2xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-200/80 dark:border-white/8">
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Quick Actions</span>
+                  <div className="flex flex-col gap-2 p-3 mt-2 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-700/80">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Hızlı Başlangıç</span>
                     <div className="flex flex-wrap gap-1.5">
                       {[
-                        '✨ Summarize this page',
-                        '💡 Key takeaways',
-                        '❓ Explain simply',
-                        '🌐 Translate to Turkish',
-                        '📝 Extract action items'
+                        'Sayfayı özetle',
+                        'Önemli noktaları çıkar',
+                        'Türkçeye çevir',
+                        'Aksiyon maddeleri listele',
+                        'Ekran görüntüsü al'
                       ].map((promptText, i) => (
                         <button
                           key={i}
                           onClick={() => handleAIAction(promptText)}
-                          className="px-2.5 py-1 text-xs font-medium rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 hover:border-cyan-500 dark:hover:border-cyan-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-all shadow-2xs active:scale-95 text-left cursor-pointer"
+                          className="px-2.5 py-1.5 text-xs font-medium rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-400 hover:text-cyan-600 dark:hover:text-cyan-300 transition-all shadow-2xs active:scale-95 text-left cursor-pointer"
                         >
                           {promptText}
                         </button>
@@ -950,10 +989,10 @@ export const SidePanel = React.memo(({
             )}
           </div>
 
-          {/* Footer (Input) - Always visible when ready */}
+          {/* Modern Assistant UI Elements Composer Footer */}
           {isReady && (
-            <div className="p-3.5 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
-              {/* Global agent status pill (hidden while idle) */}
+            <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-[#151122]/95 backdrop-blur-md">
+              {/* Global agent status pill */}
               {statusPill && (
                 <div className="mb-2">
                   <motion.div
@@ -970,7 +1009,7 @@ export const SidePanel = React.memo(({
                   {loadProgressPct !== null && (
                     <div className="mt-1 h-0.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                       <div
-                        className="h-full bg-accent transition-all duration-300 ease-out"
+                        className="h-full bg-cyan-500 transition-all duration-300 ease-out"
                         style={{ width: `${loadProgressPct}%` }}
                       />
                     </div>
@@ -978,9 +1017,14 @@ export const SidePanel = React.memo(({
                 </div>
               )}
 
-              {/* Pending attachment chips */}
+              {/* Transient inline hint */}
+              {attachmentHint && (
+                <p className="mb-2 text-[10px] text-red-500 dark:text-red-400 font-medium">{attachmentHint}</p>
+              )}
+
+              {/* Attachment Tray */}
               {(pendingImages.length > 0 || pendingFiles.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                <div className="flex flex-wrap items-center gap-1.5 mb-2 p-1.5 bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-xl">
                   {pendingImages.map(img => (
                     <div key={img.id} className="relative group flex-shrink-0">
                       <img
@@ -1002,7 +1046,7 @@ export const SidePanel = React.memo(({
                   {pendingFiles.map(f => (
                     <div
                       key={f.id}
-                      className="flex items-center gap-1 pl-1.5 pr-1 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 max-w-[130px]"
+                      className="flex items-center gap-1 pl-2 pr-1 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 max-w-[130px]"
                     >
                       <FileText className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
                       <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate" title={f.name}>
@@ -1011,7 +1055,7 @@ export const SidePanel = React.memo(({
                       <button
                         type="button"
                         onClick={() => removePendingFile(f.id)}
-                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0 cursor-pointer"
                         title="Eki kaldır"
                       >
                         <X className="w-3 h-3" />
@@ -1021,77 +1065,128 @@ export const SidePanel = React.memo(({
                 </div>
               )}
 
-              {/* Non-vision model warning when images are pending (advisory only) */}
-              {pendingImages.length > 0 && !selectedModelSupportsVision && (
-                <p className="mb-2 text-[10px] text-amber-600 dark:text-amber-400">
-                  Görseller için Phi 3.5 Vision modelini seçin
-                </p>
-              )}
+              {/* Main Composer Box */}
+              <div className="relative flex flex-col rounded-2xl border border-slate-200/90 dark:border-slate-700/90 bg-white dark:bg-slate-900/90 shadow-sm focus-within:border-cyan-500/60 dark:focus-within:border-cyan-400/60 focus-within:ring-2 focus-within:ring-cyan-500/10 transition-all">
+                {/* Textarea */}
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  placeholder={isListening ? "Dinleniyor..." : "Bir soru sorun, sayfa analizi veya tarayıcı komutu verin..."}
+                  rows={Math.min(5, Math.max(1, input.split('\n').length))}
+                  disabled={isLoading || isListening}
+                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-32"
+                />
 
-              {/* Transient inline hint for skipped/unreadable attachments */}
-              {attachmentHint && (
-                <p className="mb-2 text-[10px] text-red-500 dark:text-red-400">{attachmentHint}</p>
-              )}
+                {/* Bottom Controls Bar */}
+                <div className="flex items-center justify-between px-2.5 py-2">
+                  <div className="flex items-center gap-1">
+                    {/* Model Picker Pill */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsModelDropdownOpen(prev => !prev)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        title="Model Seç"
+                      >
+                        <Bot className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+                        <span className="truncate max-w-[90px]">
+                          {AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2'}
+                        </span>
+                      </button>
 
-              <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
-                {hasSpeechRecognition && (
-                  <button
-                    type="button"
-                    onMouseDown={handleMouseDownMic}
-                    onMouseUp={handleMouseUpMic}
-                    onMouseLeave={handleMouseUpMic}
-                    className={`p-2.5 rounded-xl transition-all shadow-sm flex-shrink-0 cursor-pointer ${
-                      isListening 
-                        ? 'bg-red-500 text-white animate-pulse shadow-red-500/30' 
-                        : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-white/10'
-                    }`}
-                    title="Push to Talk"
-                  >
-                    {isListening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isLoading}
-                  className="p-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-white/10 transition-all shadow-sm flex-shrink-0 disabled:opacity-40 cursor-pointer"
-                  title="Görsel veya dosya ekle"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </button>
-                <div className="relative flex-1 flex items-center">
-                  <input
-                    type="text"
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    placeholder={isListening ? "Listening..." : "Ask something, navigate, analyze..."}
-                    className="w-full bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-400 rounded-xl py-2.5 pl-4 pr-10 text-xs outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-colors"
-                    disabled={isLoading}
-                  />
-                  {isLoading ? (
+                      {isModelDropdownOpen && (
+                        <div className="absolute bottom-full left-0 mb-2 z-50 w-52 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 shadow-xl">
+                          <div className="text-[10px] font-semibold text-slate-400 px-2 py-1">Yapay Zeka Modelleri</div>
+                          {AVAILABLE_AI_MODELS.map(m => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedModelId(m.id);
+                                aiAgent.setModel(m.id);
+                                setIsModelDropdownOpen(false);
+                              }}
+                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                                selectedModelId === m.id
+                                  ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
+                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
+                              }`}
+                            >
+                              <span>{m.name}</span>
+                              <span className="text-[9px] px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">{m.size}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* File Attachment Button */}
                     <button
                       type="button"
-                      onClick={handleStop}
-                      className="absolute right-2 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
-                      title="Durdur"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isLoading}
+                      className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 cursor-pointer"
+                      title="Görsel veya Dosya Ekle"
                     >
-                      <Square className="w-4 h-4 fill-current" />
+                      <Paperclip className="w-3.5 h-3.5" />
                     </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0}
-                      className="absolute right-2 p-1.5 rounded-lg text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-40 cursor-pointer"
-                      title="Gönder"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </form>
+                  </div>
 
-              {/* Hidden attachment picker (reset after each pick so the same
-                  file can be chosen again) */}
+                  {/* Right Side: Audio visualizer & Action button */}
+                  <div className="flex items-center gap-1.5">
+                    {isListening && (
+                      <div className="flex items-center gap-0.5 px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-medium animate-pulse">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+                        <span>Dinleniyor</span>
+                      </div>
+                    )}
+
+                    {isLoading ? (
+                      <button
+                        type="button"
+                        onClick={handleStop}
+                        className="flex size-7 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors shadow-xs cursor-pointer"
+                        title="Durdur"
+                      >
+                        <Square className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    ) : hasSpeechRecognition && !input.trim() && pendingImages.length === 0 && pendingFiles.length === 0 ? (
+                      <button
+                        type="button"
+                        onMouseDown={handleMouseDownMic}
+                        onMouseUp={handleMouseUpMic}
+                        onMouseLeave={handleMouseUpMic}
+                        className={`flex size-7 items-center justify-center rounded-full transition-all cursor-pointer ${
+                          isListening
+                            ? 'bg-red-500 text-white shadow-md animate-pulse'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                        title="Bas Konuş"
+                      >
+                        <Mic className="w-3.5 h-3.5" />
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0}
+                        className="flex size-7 items-center justify-center rounded-full bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                        title="Gönder"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Hidden attachment input */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1112,3 +1207,4 @@ export const SidePanel = React.memo(({
     </AnimatePresence>
   );
 });
+
