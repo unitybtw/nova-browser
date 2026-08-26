@@ -1,13 +1,49 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
+
+// H-3: index.html keeps a loose CSP so the Vite dev server keeps working
+// (HMR websocket, react-refresh inline bootstrap, eval-based transforms).
+// For production builds the meta tag below is swapped for a hardened policy
+// via transformIndexHtml (apply: 'build' keeps dev mode untouched).
+const HARDENED_PROD_CSP = [
+  "default-src 'self'",
+  "script-src 'self'",
+  // Google Fonts (loaded via <link> in index.html) must stay allowed — the
+  // header CSP in electron/main.ts allows them too; policies intersect.
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: blob: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  // NOTE: `https:` in connect-src is intentionally broad — WebLLM downloads
+  // model shards from arbitrary Hugging Face CDN URLs inside renderer workers,
+  // which cannot be enumerated ahead of time.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws: wss: http://localhost:* https:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-src https://*.supabase.co",
+  "form-action 'self'"
+].join('; ');
+
+function hardenCspForProduction(): Plugin {
+  return {
+    name: 'nova-harden-csp-production',
+    apply: 'build',
+    transformIndexHtml(html) {
+      return html.replace(
+        /<meta\s+http-equiv=["']Content-Security-Policy["'][^>]*>/i,
+        `<meta http-equiv="Content-Security-Policy" content="${HARDENED_PROD_CSP}">`
+      );
+    }
+  };
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss()
+    tailwindcss(),
+    hardenCspForProduction()
   ],
   resolve: {
     alias: {

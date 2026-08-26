@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent, AVAILABLE_AI_MODELS } from '../services/aiAgent';
@@ -619,6 +619,42 @@ export const SidePanel = React.memo(({
                     ))}
                   </motion.div>
                 ) : null}
+
+                {/* Action approval gate (C-1): non read-only tool calls wait here
+                    for an explicit user decision before the agent may run them. */}
+                {queuedActions.filter(a => a.state === 'pending').map(action => (
+                  <motion.div
+                    key={action.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col gap-2 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-300 dark:border-amber-500/40 rounded-xl shadow-sm"
+                  >
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-sm font-medium">
+                      <ShieldAlert className="w-4 h-4" />
+                      Approval Required
+                    </div>
+                    <p className="text-xs text-slate-500 font-mono">
+                      {action.toolName}
+                    </p>
+                    <div className="text-[10px] text-slate-400 break-all bg-white dark:bg-slate-900 p-1.5 rounded-lg border border-slate-100 dark:border-slate-800">
+                      {JSON.stringify(action.args)}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => orchestrator.approveAction(action.id)}
+                        className="flex-1 px-2 py-1.5 text-xs font-semibold rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white transition-colors flex items-center justify-center gap-1 active:scale-95"
+                      >
+                        <Check className="w-3.5 h-3.5" /> Approve
+                      </button>
+                      <button
+                        onClick={() => orchestrator.denyAction(action.id)}
+                        className="flex-1 px-2 py-1.5 text-xs font-semibold rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors flex items-center justify-center gap-1 active:scale-95"
+                      >
+                        <X className="w-3.5 h-3.5" /> Deny
+                      </button>
+                    </div>
+                  </motion.div>
+                ))}
 
                 {/* Quick Action Starter Prompts */}
                 {isReady && messages.length <= 1 && !isLoading && (

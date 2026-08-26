@@ -12,6 +12,9 @@ interface Window {
     storeSet?: (key: string, value: string) => Promise<boolean>;
     storeGet?: (key: string) => Promise<string | null>;
     onAdBlocked?: (callback: (event: any, tabId: number) => void) => () => void;
+    // MCP action bridge (main process <-> renderer round-trip)
+    onMcpActionRequest?: (callback: (id: string, toolName: string, args: any) => void) => () => void;
+    respondMcpAction?: (id: string, result: unknown) => void;
   };
 }
 

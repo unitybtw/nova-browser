@@ -69,6 +69,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
   setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
+  // MCP action bridge (H-2): the main process asks this trusted app page to
+  // execute a browser_* tool via IPC instead of injecting JS into the UI
+  // context. Results are returned through a sender-validated channel.
+  // NOTE: must be ipcRenderer.send — the main side listens with ipcMain.on,
+  // and invoke() only reaches ipcMain.handle() listeners.
+  onMcpActionRequest: (callback: (id: string, toolName: string, args: any) => void) => {
+    const handler = (_event: any, id: string, toolName: string, args: any) => callback(id, toolName, args);
+    ipcRenderer.on('mcp-action-request', handler);
+    return () => ipcRenderer.removeListener('mcp-action-request', handler);
+  },
+  respondMcpAction: (id: string, result: unknown) => {
+    ipcRenderer.send('mcp-action-response', { id, result });
+  },
   clearIncognitoSession: () => ipcRenderer.invoke('clear-incognito-session'),
   clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),

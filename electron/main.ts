@@ -8,6 +8,7 @@ import fs from 'fs';
 import child_process from 'child_process';
 // @ts-ignore
 import unzip from 'unzip-crx-3';
+import JSZip from 'jszip';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { autoUpdater } from 'electron-updater';
@@ -99,13 +100,67 @@ function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEv
   return true;
 }
 
+// ─── MCP renderer action bridge ───
+// 🔒 Security (H-2): The MCP server used to call window.__nova_executeMcpAction()
+// inside the MAIN WINDOW via webContents.executeJavaScript(), so any XSS in the
+// privileged UI context could seize one-call browser control. Now the main
+// process sends an 'mcp-action-request' IPC to the renderer and awaits the
+// result on a channel that is gated by isTrustedSender() below.
+
+interface PendingMcpAction {
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+  timer: NodeJS.Timeout;
+}
+
+const pendingMcpActions = new Map<string, PendingMcpAction>();
+
+ipcMain.on('mcp-action-response', (event: Electron.IpcMainEvent, payload: { id?: unknown; result?: unknown }) => {
+  if (!isTrustedSender(event)) return;
+  const id = payload?.id;
+  if (typeof id !== 'string') return;
+  const pending = pendingMcpActions.get(id);
+  if (!pending) return;
+  pendingMcpActions.delete(id);
+  clearTimeout(pending.timer);
+  pending.resolve(payload.result);
+});
+
+/**
+ * Asks the trusted main window renderer to execute an MCP browser_* tool and
+ * waits for its response. Rejects after a 15s timeout or if the window is gone.
+ */
+export function requestRendererMcpAction(win: BrowserWindow | null, toolName: string, args: Record<string, unknown>): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    if (!win || win.isDestroyed()) {
+      reject(new Error('Nova Browser window is not available'));
+      return;
+    }
+    const id = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+    const timer = setTimeout(() => {
+      pendingMcpActions.delete(id);
+      reject(new Error(`MCP action '${toolName}' timed out waiting for renderer response`));
+    }, 15000);
+    pendingMcpActions.set(id, { resolve, reject, timer });
+    try {
+      win.webContents.send('mcp-action-request', id, toolName, args);
+    } catch (err) {
+      clearTimeout(timer);
+      pendingMcpActions.delete(id);
+      reject(err instanceof Error ? err : new Error(String(err)));
+    }
+  });
+}
+
 // 🔒 Security: Validate dev server and app internal page origins strictly
 function isTrustedAppOrigin(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return false;
   try {
     const parsed = new URL(urlStr);
     if (parsed.protocol === 'nova:' || parsed.protocol === 'devtools:') return true;
-    if (parsed.origin === 'http://localhost:5173') return true;
+    // 🔒 Security (M-1): The Vite dev server is only trusted in unpackaged dev builds.
+    // In packaged builds localhost:5173 must never be treated as an app origin.
+    if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
       const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
       const navPath = decodeURIComponent(parsed.pathname);
@@ -286,12 +341,15 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         });
       } else {
         const defaultDir = app.getPath('downloads');
-        let targetPath = path.join(defaultDir, filename);
+        // 🔒 Security (M-7): item.getFilename() is server-controlled (Content-Disposition).
+        // Strip directory components, separators, and leading dots before it touches disk.
+        const safeName = path.basename(filename).replace(/[/\\]/g, '_').replace(/^\.+/, '').trim() || 'download';
+        let targetPath = path.join(defaultDir, safeName);
         // Auto-increment filename if already exists to avoid silent overwrite
         try {
           if (fs.existsSync(targetPath)) {
-            const ext = path.extname(filename);
-            const base = path.basename(filename, ext);
+            const ext = path.extname(safeName);
+            const base = path.basename(safeName, ext);
             let counter = 1;
             while (fs.existsSync(path.join(defaultDir, `${base} (${counter})${ext}`))) {
               counter++;
@@ -299,6 +357,11 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
             targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
           }
         } catch {}
+        // 🔒 Security (M-7): Final containment check — the resolved save path must
+        // stay inside the downloads directory. Fall back to a fixed name otherwise.
+        if (!path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
+          targetPath = path.join(defaultDir, 'download');
+        }
         item.setSavePath(targetPath);
         item.once('done', (_event, state) => {
           if (state === 'completed') {
@@ -377,7 +440,9 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     let isAppFile = false;
     try {
       const parsed = new URL(details.url);
-      if (parsed.origin === 'http://localhost:5173') {
+      // 🔒 Security (M-1): Dev-server COOP/COEP headers and dev CSP only apply
+      // in unpackaged dev builds; a packaged app must never trust localhost:5173.
+      if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
         isDevLocalhost = true;
       }
       if (parsed.protocol === 'file:') {
@@ -2695,7 +2760,10 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      // 🔒 Security (M-8): Extension popup content is untrusted — run it in the
+      // Chromium sandbox. The active-tab bridge is injected via executeJavaScript
+      // from the main process, which does not require an unsandboxed renderer.
+      sandbox: true,
       session: session.defaultSession
     }
   });
@@ -3035,6 +3103,70 @@ async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
+// 🔒 Security (M-5): Mirror unzip-crx-3's CRX unwrapping so the inner zip payload
+// can be inspected BEFORE anything is written to disk. unzip-crx-3 joins entry
+// names onto the destination with no validation, which allows zip-slip.
+function getCrxInnerZip(buffer: Buffer): Buffer {
+  // Plain zip packages (PK\x03\x04) are passed through untouched
+  if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+    return buffer;
+  }
+  const readU32 = (offset: number) => buffer.readUInt32LE(offset);
+  const version = buffer[4];
+  if (version === 2) {
+    const publicKeyLength = readU32(8);
+    const signatureLength = readU32(12);
+    return buffer.subarray(16 + publicKeyLength + signatureLength);
+  }
+  if (version === 3) {
+    const headerSize = readU32(8);
+    return buffer.subarray(12 + headerSize);
+  }
+  throw new Error('Unsupported CRX container format.');
+}
+
+async function assertCrxEntriesSafe(buffer: Buffer, targetDir: string): Promise<void> {
+  const zip = await JSZip.loadAsync(getCrxInnerZip(buffer));
+  const resolvedTarget = path.resolve(targetDir);
+  for (const entryName of Object.keys(zip.files)) {
+    // Reject Windows drive-letter/UNC paths and backslash separators outright
+    if (/^[a-zA-Z]:[\\/]/.test(entryName) || entryName.startsWith('\\\\')) {
+      throw new Error(`Extension contains an unsafe entry path: ${entryName}`);
+    }
+    const normalized = entryName.replace(/\\/g, '/');
+    if (normalized.split('/').some((segment) => segment === '..')) {
+      throw new Error(`Extension contains a parent-directory traversal entry: ${entryName}`);
+    }
+    if (path.isAbsolute(normalized)) {
+      throw new Error(`Extension contains an absolute entry path: ${entryName}`);
+    }
+    const outPath = path.resolve(resolvedTarget, normalized);
+    if (!outPath.startsWith(resolvedTarget + path.sep)) {
+      throw new Error(`Extension entry escapes the extraction directory: ${entryName}`);
+    }
+  }
+}
+
+// Defense in depth: after extraction, nothing on disk may resolve outside the
+// target dir, and the CRX/zip format cannot legitimately produce symlinks.
+function assertExtractionContained(dir: string): void {
+  const resolvedDir = path.resolve(dir);
+  const stack: string[] = [resolvedDir];
+  while (stack.length > 0) {
+    const currentDir = stack.pop()!;
+    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+      const entryPath = path.join(currentDir, entry.name);
+      if (!path.resolve(entryPath).startsWith(resolvedDir + path.sep)) {
+        throw new Error(`Extension extraction escaped the target directory: ${entry.name}`);
+      }
+      if (entry.isSymbolicLink()) {
+        throw new Error(`Extension contains a symbolic link entry: ${entry.name}`);
+      }
+      if (entry.isDirectory()) stack.push(entryPath);
+    }
+  }
+}
+
 ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
   // 🔒 Security: Allow only trusted main window OR Chrome Web Store origin
   const senderUrl = event.sender?.getURL() || '';
@@ -3049,7 +3181,33 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     const match = urlOrId.match(/[a-p]{32}/);
     if (!match) return { error: 'Geçersiz eklenti URL\'si veya ID\'si' };
     const extensionId = match[0];
-    
+
+    // 🔒 Security (H-1): Installs requested from Chrome Web Store page content are
+    // NOT strictly user-initiated in Nova's UI — the webstore preload forwards any
+    // window 'NOVA_INSTALL_EXTENSION' postMessage (and the injected
+    // chrome.webstore shim), so arbitrary page scripts can trigger an install.
+    // Gate those requests behind an explicit, trusted native confirmation naming
+    // the extension before main proceeds. Requests from Nova's own main window
+    // (isTrustedSender) already come from user interaction with Nova UI.
+    if (!isFromMainWindow) {
+      const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+      const confirmOptions: Electron.MessageBoxOptions = {
+        type: 'question',
+        buttons: ['Cancel', 'Install'],
+        defaultId: 0,
+        cancelId: 0,
+        title: 'Install extension?',
+        message: `Allow this page to install extension "${extensionId}" into Nova?`,
+        detail: 'The Chrome Web Store page you are viewing requested this installation. Only allow it if you trust this extension.'
+      };
+      const { response } = parentWin
+        ? await dialog.showMessageBox(parentWin, confirmOptions)
+        : await dialog.showMessageBox(confirmOptions);
+      if (response !== 1) {
+        return { error: 'Installation cancelled by user.' };
+      }
+    }
+
     const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=mac&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=unknown&prodversion=126.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
     
     const res = await fetch(crxUrl, {
@@ -3086,9 +3244,18 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
     const extractPath = path.join(extensionsBaseDir, extensionId);
+
+    // 🔒 Security (M-5): Validate every zip entry against the extraction target
+    // BEFORE extracting — rejects absolute paths, '..' segments, and any path
+    // that would resolve outside the target dir (zip-slip).
+    await assertCrxEntriesSafe(buffer, extractPath);
+
     if (!fs.existsSync(extractPath)) {
       fs.mkdirSync(extractPath, { recursive: true });
       await unzip(crxFilePath, extractPath);
+
+      // 🔒 Security (M-5): Post-extraction containment + symlink sweep.
+      assertExtractionContained(extractPath);
 
       // Verify realpath of extractPath to prevent directory escaping
       try {

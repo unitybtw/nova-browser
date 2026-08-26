@@ -8,19 +8,32 @@ if ((window as any).__novaPreloadInjected) {
 } else if (isChromeWebStore) {
   (window as any).__novaPreloadInjected = true;
 
-  // Create Trusted Types policy to bypass CSP for innerHTML
-  let policy: any = null;
-  if ((window as any).trustedTypes && (window as any).trustedTypes.createPolicy) {
-    try {
-      policy = (window as any).trustedTypes.createPolicy('nova-extension', {
-        createHTML: (s: string) => s.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\bon\w+\s*=\s*["'][^"']*["']/gi, ''),
-        createScript: (s: string) => s,
-        createScriptURL: (s: string) => s
-      });
-    } catch(e) {}
-  }
-  
-  const toHTML = (html: string) => policy ? policy.createHTML(html) : html;
+  // 🔒 Security (L-5): The previous Trusted Types passthrough policy
+  // ('nova-extension') forwarded HTML through a bypassable regex script-stripper
+  // (e.g. unquoted event handlers like <img src=x onerror=alert(1)> survived).
+  // All markup is now built with explicit DOM APIs (createElementNS +
+  // setAttribute), so no innerHTML/Trusted Types policy is needed at all.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  type SvgPart = { tag: string; attrs: Record<string, string> };
+  const buildSvgElement = (size: number, parts: SvgPart[]): SVGElement => {
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('width', String(size));
+    svg.setAttribute('height', String(size));
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    for (const part of parts) {
+      const el = document.createElementNS(SVG_NS, part.tag);
+      for (const [attr, value] of Object.entries(part.attrs)) {
+        el.setAttribute(attr, value);
+      }
+      svg.appendChild(el);
+    }
+    return svg;
+  };
 
   // 1. Setup the IPC bridge in the isolated world
   const showNovaToast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
@@ -36,22 +49,30 @@ if ((window as any).__novaPreloadInjected) {
 
     toast.style.cssText = `position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-20px); background-color: ${bgColor}; color: white; padding: 12px 24px; border-radius: 8px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 14px; font-weight: 500; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2); z-index: 999999; opacity: 0; transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; gap: 8px;`;
 
-    let iconSvg = '';
+    let iconParts: SvgPart[];
     if (type === 'info') {
-      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+      iconParts = [
+        { tag: 'circle', attrs: { cx: '12', cy: '12', r: '10' } },
+        { tag: 'line', attrs: { x1: '12', y1: '16', x2: '12', y2: '12' } },
+        { tag: 'line', attrs: { x1: '12', y1: '8', x2: '12.01', y2: '8' } }
+      ];
     } else if (type === 'success') {
-      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+      iconParts = [
+        { tag: 'path', attrs: { d: 'M22 11.08V12a10 10 10 0 1 1-5.93-9.14' } },
+        { tag: 'polyline', attrs: { points: '22 4 12 14.01 9 11.01' } }
+      ];
     } else {
-      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>`;
+      iconParts = [
+        { tag: 'circle', attrs: { cx: '12', cy: '12', r: '10' } },
+        { tag: 'line', attrs: { x1: '12', y1: '8', x2: '12', y2: '12' } },
+        { tag: 'line', attrs: { x1: '12', y1: '16', x2: '12.01', y2: '16' } }
+      ];
     }
 
     const textSpan = document.createElement('span');
     textSpan.textContent = message;
-    
-    const svgWrap = document.createElement('div');
-    svgWrap.innerHTML = toHTML(iconSvg);
-    
-    toast.appendChild(svgWrap.firstChild!);
+
+    toast.appendChild(buildSvgElement(18, iconParts));
     toast.appendChild(textSpan);
     document.body.appendChild(toast);
 
@@ -213,7 +234,11 @@ if ((window as any).__novaPreloadInjected) {
       leftContainer.style.cssText = 'display: flex; align-items: center; gap: 12px;';
       
       const iconWrap = document.createElement('div');
-      iconWrap.innerHTML = toHTML("<svg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z'></path><polyline points='3.27 6.96 12 12.01 20.73 6.96'></polyline><line x1='12' y1='22.08' x2='12' y2='12'></line></svg>");
+      iconWrap.appendChild(buildSvgElement(24, [
+        { tag: 'path', attrs: { d: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' } },
+        { tag: 'polyline', attrs: { points: '3.27 6.96 12 12.01 20.73 6.96' } },
+        { tag: 'line', attrs: { x1: '12', y1: '22.08', x2: '12', y2: '12' } }
+      ]));
       
       const textWrap = document.createElement('div');
       const title = document.createElement('div');

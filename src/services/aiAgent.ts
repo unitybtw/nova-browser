@@ -793,13 +793,13 @@ class AIAgent {
     }
 
     try {
-      // Pause execution and ask for user approval before doing the action
+      // Pause execution and ask for user approval before doing the action.
+      // Read-only tools are auto-approved inside the orchestrator; all other
+      // tools stay 'pending' until the user approves or denies the action card
+      // in the AI side panel. On denial, denyAction() has already marked the
+      // action 'denied' in the queue.
       const approved = await orchestrator.enqueueAction(functionName, args);
       if (!approved) {
-        const actionList = orchestrator.getQueue();
-        if (actionList.length > 0) {
-          orchestrator.updateActionState(actionList[actionList.length - 1].id, 'denied');
-        }
         return JSON.stringify({ error: "User denied the action." });
       }
 
@@ -1219,7 +1219,18 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       }
 
       else if (functionName === "scroll_page") {
-        const { direction, amount = 600 } = args;
+        // 🔒 Security (M-1): direction/amount come from model-generated JSON and
+        // are interpolated into a script executed on the page. Validate strictly
+        // and interpolate ONLY whitelisted values (same discipline as the
+        // browser_scroll handler in App.tsx).
+        const VALID_SCROLL_DIRECTIONS = ['up', 'down', 'top', 'bottom'];
+        const rawDirection = typeof args.direction === 'string' ? args.direction : '';
+        if (!VALID_SCROLL_DIRECTIONS.includes(rawDirection)) {
+          throw new Error(`Invalid scroll direction: must be one of ${VALID_SCROLL_DIRECTIONS.join(', ')}`);
+        }
+        const direction: string = rawDirection;
+        const parsedAmount = Math.floor(Number(args.amount));
+        const amount = Math.min(Math.max(Number.isFinite(parsedAmount) ? parsedAmount : 600, 0), 10000);
         const script = `(async () => {
           // Visual Scanning Effect
           try {
@@ -1259,7 +1270,11 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "save_to_memory") {
         const { fact, category } = args;
-        const memory = aiMemory.addMemory(fact, category || 'fact');
+        // 🔒 Security (H-5): this memory originates from a TOOL, not a direct
+        // user request. aiMemory tags it source:'tool', so model-authored
+        // 'instruction' entries stay session-only and can never persist into
+        // the system prompt of future sessions (persistent prompt injection).
+        const memory = aiMemory.addMemory(fact, category || 'fact', true);
         result = { success: true, memory };
       }
 

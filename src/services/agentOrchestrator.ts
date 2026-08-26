@@ -11,9 +11,23 @@ export interface QueuedAction {
 
 type Subscriber = (actions: QueuedAction[]) => void;
 
+// 🔒 Security (C-1): Tools that only READ state (page text, URLs, tab lists,
+// history) may auto-execute. Every other tool call is queued as 'pending' and
+// waits for an explicit user decision via approveAction()/denyAction() before
+// it runs. Keep this list strictly read-only — never add mutating tools here.
+const READ_ONLY_TOOLS = new Set([
+  'read_page_content',
+  'get_page_url',
+  'get_page_links',
+  'get_all_tabs',
+  'search_history'
+]);
+
 class AgentOrchestrator {
   /** Maximum number of terminal-state (completed/failed/denied) actions kept in the queue */
   private static readonly MAX_TERMINAL_ACTIONS = 50;
+  /** How long a pending approval may wait before it is auto-denied (5 min) */
+  private static readonly PENDING_TIMEOUT_MS = 5 * 60 * 1000;
 
   private queue: QueuedAction[] = [];
   private subscribers: Set<Subscriber> = new Set();
@@ -69,15 +83,40 @@ class AgentOrchestrator {
       id,
       toolName,
       args,
-      state: 'executing' // Automatically skip pending state
+      // Read-only tools auto-execute; everything else requires user approval
+      state: READ_ONLY_TOOLS.has(toolName) ? 'executing' : 'pending'
     };
     
     this.queue.push(action);
     this.pruneTerminalActions();
     this.notify();
 
-    // Auto-approve the action immediately
-    return Promise.resolve(true);
+    if (action.state === 'executing') {
+      return Promise.resolve(true);
+    }
+
+    // Wait for the user's decision. approveAction(id) resolves true,
+    // denyAction(id) resolves false (and marks the action 'denied').
+    // Safety net: if nobody answers within PENDING_TIMEOUT_MS (e.g. the panel
+    // is closed and the approval card is invisible), deny so the agent loop
+    // can never hang forever.
+    return new Promise<boolean>((resolve, reject) => {
+      const timer = window.setTimeout(() => {
+        if (this.resolvers.has(id)) {
+          this.denyAction(id);
+        }
+      }, AgentOrchestrator.PENDING_TIMEOUT_MS);
+      this.resolvers.set(id, {
+        resolve: (val) => {
+          window.clearTimeout(timer);
+          resolve(val);
+        },
+        reject: (err) => {
+          window.clearTimeout(timer);
+          reject(err);
+        }
+      });
+    });
   }
 
   public approveAction(id: string) {
@@ -122,8 +161,11 @@ class AgentOrchestrator {
   }
 
   public clearQueue() {
-    this.queue = [];
+    // Resolve any in-flight approval waits as denied so callers don't hang
+    // forever when the user stops the agent while an action is pending.
+    this.resolvers.forEach(({ resolve }) => resolve(false));
     this.resolvers.clear();
+    this.queue = [];
     this.notify();
   }
 

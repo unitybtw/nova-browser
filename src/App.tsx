@@ -56,6 +56,7 @@ import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
+import { isSafeNavigationUrl } from './utils/safeNavigation';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -1405,9 +1406,8 @@ function App() {
   const handleNewTab = useCallback((url?: string | any) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
-    // Security: Block malicious protocols
-    const lowerUrl = finalUrl.toLowerCase();
-    if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('file:') || lowerUrl.startsWith('data:text/html')) {
+    // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
+    if (!isSafeNavigationUrl(finalUrl)) {
       finalUrl = 'nova://newtab';
     }
     
@@ -1463,7 +1463,14 @@ function App() {
   }, []);
 
   const handleNewIncognitoTab = useCallback((url?: string | any) => {
-    const targetUrl = typeof url === 'string' ? url : 'nova://newtab';
+    let targetUrl = typeof url === 'string' ? url : 'nova://newtab';
+
+    // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts).
+    // This handler previously skipped validation (M-7); it now matches handleNewTab.
+    if (!isSafeNavigationUrl(targetUrl)) {
+      targetUrl = 'nova://newtab';
+    }
+
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
       url: targetUrl,
@@ -1540,9 +1547,8 @@ function App() {
   const handleNavigate = useCallback((url: string) => {
     if (!url || typeof url !== 'string') return;
     
-    // Security: Block malicious protocols
-    const lowerUrl = url.trim().toLowerCase();
-    if (lowerUrl.startsWith('javascript:') || lowerUrl.startsWith('file:') || lowerUrl.startsWith('data:text/html') || lowerUrl.startsWith('vbscript:')) {
+    // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
+    if (!isSafeNavigationUrl(url)) {
       console.warn('Blocked malicious navigation protocol:', url);
       return;
     }
@@ -1966,9 +1972,22 @@ function App() {
       }
     });
 
-    (window as any).__nova_executeMcpAction = executeMcpAction;
+    // 3. MCP action bridge over IPC — replaces the old window.__nova_executeMcpAction
+    // global (H-2): a function reachable from the privileged UI context gave any
+    // XSS one-call browser control. The main process now delivers 'mcp-action-request'
+    // events that only this trusted app page receives via the contextBridge, and
+    // results go back through a sender-validated invoke channel in main.ts.
+    const electronAPI = window.electronAPI;
+    let unsubscribeMcpBridge: (() => void) | undefined;
+    if (electronAPI?.onMcpActionRequest && electronAPI.respondMcpAction) {
+      unsubscribeMcpBridge = electronAPI.onMcpActionRequest((id, toolName, args) => {
+        executeMcpAction(toolName, args)
+          .then(result => electronAPI.respondMcpAction?.(id, result))
+          .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));
+      });
+    }
     return () => {
-      delete (window as any).__nova_executeMcpAction;
+      unsubscribeMcpBridge?.();
     };
   // Data and handlers are read through browserDataRef/mcpHandlersRef at call
   // time, so this setup only needs to run once per mount.

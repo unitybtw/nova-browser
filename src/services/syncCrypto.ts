@@ -14,18 +14,28 @@ export interface PairingInvitation {
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-function bytesToBase64(bytes: Uint8Array): string {
+/**
+ * Loop-based base64 encoder (M-6/L-2): avoids the `btoa(String.fromCharCode(...bytes))`
+ * spread idiom, which can blow the call stack for large payloads.
+ */
+export function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary);
 }
 
-function base64ToBytes(value: string): Uint8Array {
+export function base64ToBytes(value: string): Uint8Array {
   const binary = atob(value);
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
+/**
+ * PBKDF2-SHA256 @ 600k iterations -> AES-GCM-256 key. Shared by every sync
+ * payload encryption path so parameters stay uniform across the codebase.
+ * Note: the returned key is non-extractable; callers that need the raw key
+ * material as a storable string must derive bits themselves.
+ */
+export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
   if (!passphrase || passphrase.length < 12) {
     throw new Error('Sync passphrase must contain at least 12 characters');
   }
