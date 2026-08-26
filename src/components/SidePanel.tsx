@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, FileText, Wrench, AlertCircle, ChevronDown } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
@@ -859,7 +859,7 @@ export const SidePanel = React.memo(({
                             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             title="Metni Kopyala"
                           >
-                            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Paperclip className="w-3.5 h-3.5" />}
+                            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                             <span>{isCopied ? 'Kopyalandı' : 'Kopyala'}</span>
                           </button>
                           <button
@@ -1108,10 +1108,28 @@ export const SidePanel = React.memo(({
                             <button
                               key={m.id}
                               type="button"
-                              onClick={() => {
-                                setSelectedModelId(m.id);
-                                aiAgent.setModel(m.id);
+                              onClick={async () => {
+                                const newModelId = m.id;
+                                setSelectedModelId(newModelId);
                                 setIsModelDropdownOpen(false);
+                                if (newModelId !== aiAgent.getModel()) {
+                                  aiAgent.setModel(newModelId);
+                                  setIsReady(false);
+                                  setIsInitializing(true);
+                                  setInitError('');
+                                  try {
+                                    await aiAgent.init((p, text) => {
+                                      setProgress(p);
+                                      setProgressText(text);
+                                    });
+                                    setIsReady(true);
+                                    setMessages(prev => [...prev, { role: 'assistant', content: `Yapay zeka modeli **${m.name}** olarak değiştirildi ve hazır.` }]);
+                                  } catch (err: any) {
+                                    setInitError('Model yüklenemedi: ' + (err?.message || 'Hata'));
+                                  } finally {
+                                    setIsInitializing(false);
+                                  }
+                                }
                               }}
                               className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                                 selectedModelId === m.id

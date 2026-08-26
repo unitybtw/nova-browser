@@ -512,10 +512,17 @@ class AIAgent {
   }
 
   public setModel(modelId: string) {
+    if (this.modelId === modelId) return;
     this.modelId = modelId;
     try {
       localStorage.setItem('nova_ai_model', modelId);
     } catch {}
+    if (this.engine) {
+      try {
+        this.engine.unload?.();
+      } catch (e) {}
+      this.engine = null;
+    }
   }
 
   public getAvailableModels(): AIModelOption[] {
