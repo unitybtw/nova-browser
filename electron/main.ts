@@ -210,7 +210,29 @@ function updateAdblockWhitelist(whitelist: string[]) {
 }
 
 // Initialize AdBlocker globally so IPC can access it
-ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
+// ⚡ Perf: cache the serialized engine on disk. Without `caching`, fromCached()
+// just runs init() on every launch → re-downloads ~14 filter lists (~5-10MB)
+// and re-parses ~80k filters each startup. Shape per @cliqz/adblocker typings:
+// interface Caching { path: string; read: (path) => Promise<Uint8Array>; write: (path, buffer) => Promise<void> }
+const ADBLOCKER_CACHE_PATH = path.join(app.getPath('userData'), 'adblocker-engine.cache');
+const ADBLOCKER_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // refetch filter lists older than 3 days
+ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
+  path: ADBLOCKER_CACHE_PATH,
+  read: async (p) => {
+    // TTL: a stale engine silently decays blocking quality, so treat old
+    // caches as missing — the library's .catch() then takes the refetch path.
+    const stat = await fs.promises.stat(p);
+    if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
+      throw new Error('adblocker cache expired');
+    }
+    return fs.promises.readFile(p);
+  },
+  // Swallow write failures: if the disk is read-only/full, ad blocking must
+  // still come up this session (a rejected write would leave blocker null).
+  write: async (p, buffer) => {
+    try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }
+  },
+}).then((engine) => {
   blocker = engine;
 
   // Activate blocking immediately if the engine finished loading after window creation
@@ -268,6 +290,7 @@ function createWindow() {
       }
     } : {}),
     trafficLightPosition: { x: 14, y: 14 },
+    show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
@@ -277,6 +300,16 @@ function createWindow() {
       sandbox: true
     }
   });
+
+  // ⚡ Perf: don't paint a blank window while content loads — show once the
+  // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
+  // never fires (e.g. dev-server retry loop failing for a while).
+  mainWindow.once('ready-to-show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+  });
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
+  }, 3000);
 
   // 🔒 Security: Prevent Drag and Drop navigation on the main UI window
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -427,15 +460,6 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
   // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    const responseHeaders: Record<string, string[]> = {};
-    if (details.responseHeaders) {
-      for (const [key, value] of Object.entries(details.responseHeaders)) {
-        if (value) {
-          responseHeaders[key] = Array.isArray(value) ? value : [value];
-        }
-      }
-    }
-
     let isDevLocalhost = false;
     let isAppFile = false;
     try {
@@ -449,6 +473,23 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         isAppFile = true;
       }
     } catch {}
+
+    // ⚡ Perf: remote traffic only ever gets X-Content-Type-Options here (and
+    // only when Privacy Shield is on) — skip cloning every response header and
+    // building the map entirely when nothing would be added anyway.
+    if (!isDevLocalhost && !isAppFile && !isPrivacyShieldEnabled) {
+      callback({});
+      return;
+    }
+
+    const responseHeaders: Record<string, string[]> = {};
+    if (details.responseHeaders) {
+      for (const [key, value] of Object.entries(details.responseHeaders)) {
+        if (value) {
+          responseHeaders[key] = Array.isArray(value) ? value : [value];
+        }
+      }
+    }
 
     if (isDevLocalhost) {
       responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
@@ -502,26 +543,30 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
 
 
-  // Listen for console messages from the renderer process and log them safely to the terminal
-  mainWindow?.webContents.on('console-message', (event: any, ...rest: any[]) => {
-    const level = typeof event?.level === 'number' ? event.level : (typeof rest[0] === 'number' ? rest[0] : 0);
-    let message = typeof event?.message === 'string' ? event.message : (typeof rest[1] === 'string' ? rest[1] : (typeof event === 'string' ? event : ''));
-    const line = typeof event?.lineNumber === 'number' ? event.lineNumber : (typeof rest[2] === 'number' ? rest[2] : 0);
-    const sourceId = typeof event?.sourceId === 'string' ? event.sourceId : (typeof rest[3] === 'string' ? rest[3] : '');
+  // Listen for console messages from the renderer process and log them safely to the terminal.
+  // ⚡ Perf: dev-only value — skip regex-sanitizing/printing every renderer
+  // console line entirely in packaged builds.
+  if (!app.isPackaged) {
+    mainWindow?.webContents.on('console-message', (event: any, ...rest: any[]) => {
+      const level = typeof event?.level === 'number' ? event.level : (typeof rest[0] === 'number' ? rest[0] : 0);
+      let message = typeof event?.message === 'string' ? event.message : (typeof rest[1] === 'string' ? rest[1] : (typeof event === 'string' ? event : ''));
+      const line = typeof event?.lineNumber === 'number' ? event.lineNumber : (typeof rest[2] === 'number' ? rest[2] : 0);
+      const sourceId = typeof event?.sourceId === 'string' ? event.sourceId : (typeof rest[3] === 'string' ? rest[3] : '');
 
-    if (!message && typeof event === 'object' && event !== null && 'message' in event) {
-      message = String(event.message);
-    }
+      if (!message && typeof event === 'object' && event !== null && 'message' in event) {
+        message = String(event.message);
+      }
 
-    // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
-    if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
-      console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
-      return;
-    }
-    if (message) {
-      console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
-    }
-  });
+      // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
+      if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
+        console.log(`[Renderer] [${level}] [REDACTED_SENSITIVE_LOG] (${sourceId}:${line})`);
+        return;
+      }
+      if (message) {
+        console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
+      }
+    });
+  }
 
   // ⌨️ App-local keyboard shortcuts via before-input-event.
   // Replaces the old system-wide globalShortcut hooks which intercepted Cmd+K/Cmd+F
@@ -1046,12 +1091,19 @@ app.whenReady().then(async () => {
   // Initialize and auto-start MCP Server
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
-  try {
-    await mcpServer.start();
+  // ⚡ Perf: don't block startup (extension loading below) on the MCP bind.
+  // Fire-and-forget keeps the rest of the startup order deterministic; a bind
+  // failure is logged but must not stall first paint.
+  mcpServer.start().then(() => {
     console.log('[MCP] Server started on port 3020');
-  } catch (err) {
+    // The renderer fetches MCP status once on mount, which can race this
+    // async bind — push the corrected state so the UI pill never sticks
+    // at OFFLINE while the server is actually listening.
+    sendToMainWindow('mcp-status-changed', true);
+  }).catch((err) => {
     console.error('[MCP] Failed to start server:', err);
-  }
+    sendToMainWindow('mcp-status-changed', false);
+  });
 
   // Auto Updater Configuration
   autoUpdater.autoDownload = true;
@@ -2429,7 +2481,11 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
     providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
   }
 
-  // ⚡ Perf + 🔒 Privacy: Fast staggered fallback to keep latency ultra-low
+  // ⚡ Perf + 🔒 Privacy: Fast staggered fallback to keep latency ultra-low.
+  // Resolve as soon as results are usable: if any provider already returned
+  // non-empty results and nothing is in flight, cancel pending stagger timers
+  // instead of waiting them out (they only exist to probe fallbacks when we
+  // have NO answer yet). Keeps the guaranteed ≥300ms floor off the happy path.
   const FALLBACK_STAGGER_MS = 150;
   const resultsByPriority = new Map<number, string[]>();
   let anyNonEmpty = false;
@@ -2438,9 +2494,21 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
   const staggerTimers: ReturnType<typeof setTimeout>[] = [];
 
   let allSettledResolve: () => void;
-  const allSettled = new Promise<void>((resolve) => { allSettledResolve = resolve; });
+  let settled = false; // late provider resolutions after settle are ignored
+  const allSettled = new Promise<void>((resolve) => {
+    allSettledResolve = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+  });
   const maybeAllSettled = () => {
-    if (activeRuns === 0 && scheduledStarts === 0) allSettledResolve();
+    if (activeRuns > 0) return;
+    if (anyNonEmpty || scheduledStarts === 0) {
+      staggerTimers.forEach(clearTimeout);
+      scheduledStarts = 0;
+      allSettledResolve();
+    }
   };
 
   const runProvider = (idx: number) => {

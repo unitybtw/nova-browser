@@ -3,7 +3,10 @@
  * Manages Supabase connection, credentials, and real-time syncing.
  */
 
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+// PERF: type-only import — erased at compile time so @supabase/supabase-js
+// (~216KB vendor chunk) is NOT pulled into the entry bundle. The runtime
+// module is loaded via dynamic import on first getSupabaseClient() call.
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export interface SupabaseConfig {
   url: string;
@@ -38,6 +41,9 @@ const DEFAULT_CONFIG: SupabaseConfig = {
 
 let cachedClient: SupabaseClient | null = null;
 let currentConfigKey = '';
+// In-flight (or resolved) lazy construction. Kept so concurrent callers share
+// a single dynamic import + createClient call; reset when config changes.
+let clientPromise: Promise<SupabaseClient> | null = null;
 
 export const getSupabaseConfig = (): SupabaseConfig => {
   try {
@@ -66,6 +72,7 @@ export const saveSupabaseConfig = (url: string, anonKey: string): void => {
     localStorage.removeItem(STORAGE_KEY);
     cachedClient = null;
     currentConfigKey = '';
+    clientPromise = null;
     return;
   }
 
@@ -78,6 +85,7 @@ export const saveSupabaseConfig = (url: string, anonKey: string): void => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
   cachedClient = null;
   currentConfigKey = '';
+  clientPromise = null;
 };
 
 // --- H-4: secure session storage -------------------------------------------
@@ -117,42 +125,60 @@ const electronSecureStorage = {
   }
 };
 
-export const getSupabaseClient = (): SupabaseClient => {
+/**
+ * Lazily constructs (and caches) the Supabase client. PERF: the client and
+ * the @supabase/supabase-js module itself are only loaded on the first actual
+ * auth/sync use — never at module import / first paint. Concurrent callers
+ * share one in-flight construction; a config change invalidates the cache.
+ */
+export const getSupabaseClient = (): Promise<SupabaseClient> => {
   const config = getSupabaseConfig();
   const configKey = `${config.url}_${config.anonKey}`;
 
   if (cachedClient && currentConfigKey === configKey) {
-    return cachedClient;
+    return Promise.resolve(cachedClient);
   }
 
-  try {
-    cachedClient = createClient(config.url, config.anonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: false,
-        storageKey: SUPABASE_AUTH_STORAGE_KEY,
-        // H-4: route session persistence (JWTs!) through the OS-keychain-
-        // backed secure store instead of localStorage. Falls back to
-        // supabase-js' default (localStorage) only when the Electron bridge
-        // is unavailable, i.e. plain web dev mode.
-        storage: hasElectronSecureStore() ? electronSecureStorage : undefined
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10
-        }
+  if (!clientPromise) {
+    clientPromise = (async () => {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const client = createClient(config.url, config.anonKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: false,
+            storageKey: SUPABASE_AUTH_STORAGE_KEY,
+            // H-4: route session persistence (JWTs!) through the OS-keychain-
+            // backed secure store instead of localStorage. Falls back to
+            // supabase-js' default (localStorage) only when the Electron bridge
+            // is unavailable, i.e. plain web dev mode.
+            storage: hasElectronSecureStore() ? electronSecureStorage : undefined
+          },
+          realtime: {
+            params: {
+              eventsPerSecond: 10
+            }
+          }
+        });
+        cachedClient = client;
+        currentConfigKey = configKey;
+        return client;
+      } catch (err) {
+        console.warn('[Supabase] Failed to initialize Supabase client:', err);
+        // Fallback dummy client if url is malformed. It resolves the shared
+        // clientPromise, so it IS cached until the config changes — matching
+        // the previous synchronous behavior of one client per config.
+        const { createClient } = await import('@supabase/supabase-js');
+        return createClient('https://fallback.supabase.co', 'dummy', {
+          auth: { persistSession: false }
+        });
       }
-    });
-    currentConfigKey = configKey;
-    return cachedClient;
-  } catch (err) {
-    console.warn('[Supabase] Failed to initialize Supabase client:', err);
-    // Fallback dummy client if url is malformed
-    return createClient('https://fallback.supabase.co', 'dummy', {
-      auth: { persistSession: false }
-    });
+    })();
+    // Allow a later call to retry after a failed construction.
+    clientPromise.catch(() => { clientPromise = null; });
   }
+  return clientPromise;
 };
 
 export const isSupabaseConfigured = (): boolean => {

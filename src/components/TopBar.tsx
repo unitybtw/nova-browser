@@ -356,6 +356,9 @@ const MemoizedTabItem = React.memo(({
     prevProps.splitTab?.title === nextProps.splitTab?.title &&
     prevProps.splitTab?.url === nextProps.splitTab?.url &&
     prevProps.splitTab?.favicon === nextProps.splitTab?.favicon &&
+    prevProps.splitTab?.isLoading === nextProps.splitTab?.isLoading &&
+    prevProps.splitTab?.isMuted === nextProps.splitTab?.isMuted &&
+    prevProps.splitTab?.isPlayingAudio === nextProps.splitTab?.isPlayingAudio &&
     prevProps.ghostTab?.id === nextProps.ghostTab?.id &&
     prevProps.tab.id === nextProps.tab.id &&
     prevProps.tab.url === nextProps.tab.url &&
@@ -990,11 +993,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     return result;
   }, [tabs]);
 
+  // PERF: scroll/resize can fire at very high frequency; coalesce the layout
+  // reads (scrollLeft/clientWidth/scrollWidth) to at most one batch per frame.
+  const checkScrollRafRef = useRef<number | null>(null);
   const checkScroll = useCallback(() => {
-    const el = tabsContainerRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 2);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    if (checkScrollRafRef.current !== null) return;
+    checkScrollRafRef.current = requestAnimationFrame(() => {
+      checkScrollRafRef.current = null;
+      const el = tabsContainerRef.current;
+      if (!el) return;
+      setCanScrollLeft(el.scrollLeft > 2);
+      setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    });
   }, []);
 
   useEffect(() => {
@@ -1004,6 +1014,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     el.addEventListener('scroll', checkScroll);
     window.addEventListener('resize', checkScroll);
     return () => {
+      if (checkScrollRafRef.current !== null) {
+        cancelAnimationFrame(checkScrollRafRef.current);
+        checkScrollRafRef.current = null;
+      }
       el.removeEventListener('scroll', checkScroll);
       window.removeEventListener('resize', checkScroll);
     };
@@ -1012,11 +1026,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   useEffect(() => {
     if (!tabsContainerRef.current) return;
     const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
-    if (activeTabEl) {
-      setTimeout(() => {
-        activeTabEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
-      }, 150);
-    }
+    // PERF: instant scroll (no 150ms setTimeout + smooth behavior) so switching
+    // tabs feels immediate like Chrome instead of trailing the click.
+    activeTabEl?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
   }, [activeTabId, tabs.length]);
 
   const handleWheel = (e: React.WheelEvent<any>) => {
@@ -1786,4 +1798,67 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     />
     </>
   );
+}, (prevProps, nextProps) => {
+  // Hand-written comparator (same style as MemoizedTabItem / BrowserView):
+  // the tabs array identity changes on every webview event, so compare only
+  // the fields this component actually renders. Callback props are ignored —
+  // they are stable useCallback references from App (same convention as the
+  // other memoized chrome components).
+
+  // Scalars & flags that directly gate rendered output
+  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
+  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
+  if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;
+  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
+  if (prevProps.showBookmarksBar !== nextProps.showBookmarksBar) return false;
+  if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;
+  if (prevProps.isSplitView !== nextProps.isSplitView) return false;
+  if (prevProps.tabStyle !== nextProps.tabStyle) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;
+  if (prevProps.splitTabId !== nextProps.splitTabId) return false;
+
+  // Array-valued props compared by reference (state arrays from App; stable
+  // unless actually changed)
+  if (prevProps.workspaces !== nextProps.workspaces) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+  if (prevProps.downloads !== nextProps.downloads) return false;
+  if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
+
+  // Tabs: length + order-sensitive per-field comparison of every field the
+  // strip or the active-tab-derived UI reads:
+  //   strip items: id, url, title, favicon, isLoading, isMuted, isPinned,
+  //                isPlayingAudio, isSuspended, splitWith
+  //   active tab:  canGoBack, canGoForward, zoomFactor, blockedAdsCount,
+  //                webContentsId (+ url/title/favicon/id above)
+  const prevTabs = prevProps.tabs;
+  const nextTabs = nextProps.tabs;
+  if (prevTabs === nextTabs) return true;
+  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
+  for (let i = 0; i < prevTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.url !== b.url ||
+      a.title !== b.title ||
+      a.favicon !== b.favicon ||
+      a.isLoading !== b.isLoading ||
+      a.isMuted !== b.isMuted ||
+      a.isPinned !== b.isPinned ||
+      a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isSuspended !== b.isSuspended ||
+      a.splitWith !== b.splitWith ||
+      a.canGoBack !== b.canGoBack ||
+      a.canGoForward !== b.canGoForward ||
+      a.zoomFactor !== b.zoomFactor ||
+      a.blockedAdsCount !== b.blockedAdsCount ||
+      a.webContentsId !== b.webContentsId
+    ) {
+      return false;
+    }
+  }
+  return true;
 });

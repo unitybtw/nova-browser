@@ -234,10 +234,48 @@ class NovaSyncService {
   // post-push cleanup can wipe the legacy material.
   private usedLegacyKeyThisSync = false;
   private realtimeChannel: any = null;
+  // In-flight lazy Supabase auth-listener initialization. Kept so concurrent
+  // triggers share one init; reset on failure so a later auth action retries.
+  private supabaseInitPromise: Promise<void> | null = null;
 
   constructor() {
     this.loadSession();
-    this.initSupabaseListener();
+    // PERF (first paint): constructing the Supabase client pulls the ~216KB
+    // vendor chunk and starts its auth listener. Defer both off the module-
+    // import/first-paint path — session restore still happens shortly after
+    // startup via INITIAL_SESSION, just once the window is interactive.
+    this.scheduleSupabaseInit();
+  }
+
+  /**
+   * Schedules listener initialization for when the renderer is idle instead
+   * of running it synchronously during service construction (module import).
+   */
+  private scheduleSupabaseInit(): void {
+    const idleApi = typeof window !== 'undefined' ? (window as any) : null;
+    if (typeof idleApi?.requestIdleCallback === 'function') {
+      idleApi.requestIdleCallback(() => { void this.ensureSupabaseListener(); }, { timeout: 3000 });
+    } else if (typeof window !== 'undefined') {
+      setTimeout(() => { void this.ensureSupabaseListener(); }, 0);
+    } else {
+      void this.ensureSupabaseListener();
+    }
+  }
+
+  /**
+   * Idempotent, retry-on-failure initialization of the Supabase auth state
+   * listener. Also invoked directly by register/login/logout so the listener
+   * is guaranteed to be attached on first actual auth use even if the idle
+   * callback has not fired yet.
+   */
+  private ensureSupabaseListener(): Promise<void> {
+    if (!this.supabaseInitPromise) {
+      this.supabaseInitPromise = this.initSupabaseListener().catch(e => {
+        console.warn('[NovaSync] Supabase listener init skipped:', e);
+        this.supabaseInitPromise = null;
+      });
+    }
+    return this.supabaseInitPromise;
   }
 
   private get electronAPI(): any {
@@ -414,7 +452,7 @@ class NovaSyncService {
   private async initSupabaseListener() {
     try {
       if (!isSupabaseConfigured()) return;
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClient();
       supabase.auth.onAuthStateChange((event, session) => {
         // INITIAL_SESSION is handled alongside SIGNED_IN so that sessions
         // restored by supabase-js from its storage adapter re-hydrate this
@@ -435,10 +473,10 @@ class NovaSyncService {
           // H-4: the JWT is persisted by supabase-js through the secure
           // storage adapter — deliberately no localStorage token mirror here.
           this.restoreMasterKeysForUser(session.user.id);
-          this.subscribeToRealtime();
+          void this.subscribeToRealtime();
           this.notify();
         } else if (event === 'SIGNED_OUT') {
-          this.unsubscribeFromRealtime();
+          void this.unsubscribeFromRealtime();
         }
       });
     } catch (e) {
@@ -446,11 +484,11 @@ class NovaSyncService {
     }
   }
 
-  private subscribeToRealtime() {
+  private async subscribeToRealtime() {
     if (!this.currentUser || !isSupabaseConfigured()) return;
     try {
-      const supabase = getSupabaseClient();
-      this.unsubscribeFromRealtime();
+      const supabase = await getSupabaseClient();
+      await this.unsubscribeFromRealtime();
 
       // NOTE: the legacy branch that subscribed to `nova_sync_chains` for
       // users with a persisted syncCode was removed — that table no longer
@@ -477,14 +515,15 @@ class NovaSyncService {
     }
   }
 
-  private unsubscribeFromRealtime() {
-    if (this.realtimeChannel) {
-      try {
-        const supabase = getSupabaseClient();
-        supabase.removeChannel(this.realtimeChannel);
-      } catch (e) {}
-      this.realtimeChannel = null;
-    }
+  private async unsubscribeFromRealtime(): Promise<void> {
+    // Null the channel synchronously so overlapping calls can't double-remove.
+    const channel = this.realtimeChannel;
+    this.realtimeChannel = null;
+    if (!channel) return;
+    try {
+      const supabase = await getSupabaseClient();
+      supabase.removeChannel(channel);
+    } catch (e) {}
   }
 
   // --- CRYPTOGRAPHY / E2EE ---
@@ -629,7 +668,9 @@ class NovaSyncService {
 
     if (isSupabaseConfigured()) {
       try {
-        const supabase = getSupabaseClient();
+        // First actual auth use: make sure the deferred auth listener is up.
+        void this.ensureSupabaseListener();
+        const supabase = await getSupabaseClient();
         const { data, error } = await supabase.auth.signUp({
           email: normalizedEmail,
           password,
@@ -670,7 +711,7 @@ class NovaSyncService {
         // H-4: token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
-        this.subscribeToRealtime();
+        void this.subscribeToRealtime();
         this.notify();
         return newUser;
       } catch (err: any) {
@@ -740,7 +781,9 @@ class NovaSyncService {
 
     if (isSupabaseConfigured()) {
       try {
-        const supabase = getSupabaseClient();
+        // First actual auth use: make sure the deferred auth listener is up.
+        void this.ensureSupabaseListener();
+        const supabase = await getSupabaseClient();
         const { data, error } = await supabase.auth.signInWithPassword({
           email: normalizedEmail,
           password
@@ -788,7 +831,7 @@ class NovaSyncService {
         // H-4: token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
-        this.subscribeToRealtime();
+        void this.subscribeToRealtime();
         this.notify();
         return loggedUser;
       } catch (err: any) {
@@ -846,10 +889,13 @@ class NovaSyncService {
   }
 
   public async logout() {
-    this.unsubscribeFromRealtime();
+    void this.unsubscribeFromRealtime();
     if (isSupabaseConfigured()) {
       try {
-        const supabase = getSupabaseClient();
+        // First actual auth use: make sure the deferred auth listener is up
+        // so signOut() also clears any secure-store session via its events.
+        void this.ensureSupabaseListener();
+        const supabase = await getSupabaseClient();
         await supabase.auth.signOut();
       } catch (e) {}
     }
@@ -960,7 +1006,7 @@ class NovaSyncService {
       // normal first-sync; an unreadable one must ABORT the push or we would
       // clobber another device's data with a local-only merge.
       try {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClient();
         const { data, error } = await supabase
           .from('nova_sync_vaults')
           .select('*')
@@ -1123,7 +1169,7 @@ class NovaSyncService {
         workspaces: prefs.syncWorkspaces ? mergedWorkspaces : undefined
       };
 
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClient();
       const envelope = await encryptSyncPayload(newBundle, this.masterKey);
       const { error: upsertError } = await supabase.from('nova_sync_vaults').upsert({
         user_id: this.currentUser.id,

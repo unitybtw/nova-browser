@@ -589,9 +589,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return () => { try { unsubscribe?.(); } catch (_) {} };
   }, [isNewTab, tab?.id]);
 
-  // Capture thumbnail when switching away from this tab (stored in memory cache)
+  // Capture thumbnail when switching away from this tab (stored in memory cache).
+  // PERF: capturePage is a GPU readback that competes with the incoming tab's
+  // recomposite on every switch. Only pay for it when this tab was continuously
+  // active for >=5s — quick tab flicking skips the capture entirely.
+  const activeSinceRef = useRef(0);
   useEffect(() => {
-    if (!isActive && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
+    if (isActive) {
+      activeSinceRef.current = Date.now();
+      return;
+    }
+    const MIN_ACTIVE_MS_BEFORE_CAPTURE = 5000;
+    const wasContinuouslyActive =
+      activeSinceRef.current > 0 &&
+      Date.now() - activeSinceRef.current >= MIN_ACTIVE_MS_BEFORE_CAPTURE;
+    if (wasContinuouslyActive && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
       const capture = async () => {
         try {
           const wcId = webviewRef.current.getWebContentsId();

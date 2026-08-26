@@ -592,13 +592,22 @@ function App() {
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlockedBatch) {
       const removeListener = (window as any).electronAPI.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
-        setTabs(prev => prev.map(t => {
-          const count = t.webContentsId !== undefined ? batch[t.webContentsId] : undefined;
-          if (count) {
-            return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + count };
-          }
-          return t;
-        }));
+        setTabs(prev => {
+          let changed = false;
+          const updated = prev.map(t => {
+            const count = t.webContentsId !== undefined ? batch[t.webContentsId] : undefined;
+            if (count) {
+              changed = true;
+              return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + count };
+            }
+            return t;
+          });
+          // Identity guard: batches that don't hit any mounted tab (e.g. this
+          // fires every 2s per ad-blocking tab, including background ones)
+          // must not allocate a new array — returning prev lets React bail
+          // out of the re-render entirely.
+          return changed ? updated : prev;
+        });
       });
       return () => removeListener();
     }
@@ -608,14 +617,20 @@ function App() {
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI?.onTabAudioChanged) {
       const removeListener = (window as any).electronAPI.onTabAudioChanged((_event: any, { webContentsId, isPlayingAudio }: { webContentsId: number; isPlayingAudio: boolean }) => {
-        setTabs(prevTabs =>
-          prevTabs.map(tab => {
+        setTabs(prevTabs => {
+          let changed = false;
+          const updated = prevTabs.map(tab => {
             if (tab.webContentsId === webContentsId) {
+              // Same-value events (duplicate media notifications) must not
+              // rebuild the tabs array — return prev so React bails out.
+              if (tab.isPlayingAudio === isPlayingAudio) return tab;
+              changed = true;
               return { ...tab, isPlayingAudio };
             }
             return tab;
-          })
-        );
+          });
+          return changed ? updated : prevTabs;
+        });
       });
       return () => {
         try {
@@ -933,6 +948,12 @@ function App() {
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
+    // PERF: re-clicking the already-active tab (double-click, spotlight
+    // re-select) previously ran the full setTabs cascade for nothing. Skip it
+    // unless the tab actually needs waking from hibernation.
+    if (id === activeTabIdRef.current && !tabsRef.current.find(t => t.id === id)?.isSuspended) {
+      return;
+    }
     setActiveTabId(id);
     setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
   }, []);
@@ -1995,15 +2016,23 @@ function App() {
 
   const handleUpdateTab = useCallback((id: string, updates: Partial<Tab>) => {
     // Pure tabs update only — no side effects inside the updater (StrictMode-safe)
-    setTabs(prev => prev.map(t => {
-      if (t.id === id) {
-        // Only apply updates if there are actual changes
-        const hasChanges = Object.entries(updates).some(([k, v]) => (t as any)[k] !== v);
-        if (!hasChanges) return t;
-        return { ...t, ...updates };
-      }
-      return t;
-    }));
+    setTabs(prev => {
+      let changed = false;
+      const updated = prev.map(t => {
+        if (t.id === id) {
+          // Only apply updates if there are actual changes
+          const hasChanges = Object.entries(updates).some(([k, v]) => (t as any)[k] !== v);
+          if (!hasChanges) return t;
+          changed = true;
+          return { ...t, ...updates };
+        }
+        return t;
+      });
+      // Identity guard: when nothing actually changed, return prev so React
+      // bails out instead of re-rendering the whole App subtree off a fresh
+      // array allocation (webview events fire constantly on background tabs).
+      return changed ? updated : prev;
+    });
 
     // History recording is derived from the pre-update tab state OUTSIDE the
     // tabs updater so setHistory is never called from within another updater.
@@ -2797,7 +2826,7 @@ function App() {
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 backdrop-blur-3xl border-r border-slate-200 dark:border-white/10"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 backdrop-blur-md border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
