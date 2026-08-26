@@ -349,7 +349,7 @@ const MemoizedTabItem = React.memo(({
               </span>
             )}
 
-            {tabsLength > 1 && (
+            {!tab.isPinned && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();

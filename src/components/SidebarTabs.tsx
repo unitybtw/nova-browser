@@ -413,10 +413,11 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 <Moon className="w-3 h-3" />
               </span>
             )}
-            {tabsLength > 1 && !tab.isPinned && (
+            {!tab.isPinned && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
-                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                title="Close Tab"
               >
                 <X className="w-3 h-3" />
               </button>
