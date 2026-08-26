@@ -80,7 +80,7 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
       label: 'Nova',
       color: 'text-cyan-500',
       bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
-      icon: 'Home',
+      icon: 'Search',
       tooltip: 'Nova internal page'
     };
   }
@@ -96,7 +96,7 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
         label: 'Nova',
         color: 'text-cyan-500',
         bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
-        icon: 'Home',
+        icon: 'Search',
         tooltip: 'Nova internal page'
       };
     }

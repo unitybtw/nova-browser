@@ -49,6 +49,7 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
+  Compass,
   Cloud
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
@@ -305,7 +306,7 @@ const MemoizedTabItem = React.memo(({
             ) : tab.url === 'nova://downloads' ? (
               <Download className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             ) : (tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab') ? (
-              tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Plus className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              tab.isIncognito ? <VenetianMask className="w-3.5 h-3.5 text-slate-400 shrink-0" /> : <Compass className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             ) : (
               <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             )}
@@ -614,7 +615,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 const sec = getUrlSecurityInfo(activeTab?.url || '');
                 return (
                   <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-all hover:scale-105 active:scale-95 ${sec.bgColor} ${sec.color}`} title={`${sec.tooltip} (Click for site info & permissions)`}>
-                    {sec.level === 'internal' && <Home className="w-3.5 h-3.5" />}
+                    {sec.level === 'internal' && (
+                      (activeTab?.url === 'nova://settings' || activeTab?.url?.includes('settings')) ? <Settings className="w-3.5 h-3.5" /> :
+                      (activeTab?.url === 'nova://history' || activeTab?.url?.includes('history')) ? <Clock className="w-3.5 h-3.5" /> :
+                      (activeTab?.url === 'nova://downloads' || activeTab?.url?.includes('downloads')) ? <Download className="w-3.5 h-3.5" /> :
+                      <Search className="w-3.5 h-3.5" />
+                    )}
                     {sec.level === 'secure' && <Lock className="w-3.5 h-3.5" />}
                     {sec.level === 'http' && <Unlock className="w-3.5 h-3.5" />}
                     {sec.level === 'dangerous' && <ShieldAlert className="w-3.5 h-3.5" />}
