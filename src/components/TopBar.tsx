@@ -19,6 +19,7 @@ import {
   Clock,
   Download,
   Columns,
+  Columns2,
   Pin,
   PinOff,
   Volume2,
@@ -212,10 +213,10 @@ const MemoizedTabItem = React.memo(({
           )}
         </div>
       ) : splitTab ? (
-        <div className="flex w-full items-center h-full gap-1">
+        <div className="flex w-full items-center h-full gap-0.5">
           {/* Primary Tab Half */}
           <div 
-            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer ${
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer group/split-left relative ${
               activeTabId === tab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
@@ -230,16 +231,38 @@ const MemoizedTabItem = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px]">{tab.title || tab.url || 'New Tab'}</span>
+            <span className="truncate text-[12px] flex-1">{tab.title || tab.url || 'New Tab'}</span>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseTab(tab.id);
+              }}
+              className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Left Tab"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
 
-          <div className="flex items-center px-0.5 shrink-0" title="Split Screen Mode">
-            <div className="w-[1px] h-3.5 bg-slate-300/80 dark:bg-slate-600/80" />
+          {/* Unsplit / Separate Tabs Button */}
+          <div className="flex items-center px-0.5 shrink-0">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseSplit?.(tab.id, splitTab.id);
+              }}
+              className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer group/unsplit"
+              title="Separate Tabs (Split'i Ayır)"
+            >
+              <div className="w-[1px] h-3.5 bg-slate-300/80 dark:bg-slate-600/80 group-hover/unsplit:hidden" />
+              <Columns2 className="w-3 h-3 hidden group-hover/unsplit:block text-slate-500 dark:text-slate-300" />
+            </button>
           </div>
 
           {/* Secondary Tab Half */}
           <div 
-            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer ${
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
@@ -257,9 +280,12 @@ const MemoizedTabItem = React.memo(({
             <span className="truncate text-[12px] flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
             
             <button 
-              onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }} 
-              className="ml-auto p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-colors cursor-pointer"
-              title="Close Split View"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onCloseTab(splitTab.id); 
+              }} 
+              className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Right Tab"
             >
               <X className="w-3 h-3" />
             </button>

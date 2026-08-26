@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelRight, PanelLeft } from 'lucide-react';
+import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 // Downloads / history / permission domains were extracted into hooks under
@@ -300,6 +300,7 @@ function App() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
+  const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHoverRevealing, setIsHoverRevealing] = useState(false);
@@ -984,8 +985,13 @@ function App() {
     }
 
     if (activeTabIdRef.current === id && newTabs.length > 0) {
-      const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
-      setActiveTabId(newTabs[nextActiveIdx].id);
+      const partnerTab = targetTab?.splitWith ? newTabs.find(t => t.id === targetTab.splitWith) : null;
+      if (partnerTab) {
+        setActiveTabId(partnerTab.id);
+      } else {
+        const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
+        setActiveTabId(newTabs[nextActiveIdx].id);
+      }
     }
 
     // If closing an incognito tab and no more incognito tabs exist, clear session
@@ -2297,7 +2303,7 @@ function App() {
     setIsDragOverMain(false);
   }, []);
   const handleTabDrag = useCallback((y: number) => setIsDragOverMain(y > 60), []);
-  const handleDropToSplitScreen = useCallback((droppedTabId: string) => {
+  const handleDropToSplitScreen = useCallback((droppedTabId: string, side: 'left' | 'right' = 'right') => {
     if (!droppedTabId || droppedTabId === activeTabId) return;
     setTabs(prev => prev.map(t => {
       if (t.id === activeTabId) return { ...t, splitWith: droppedTabId };
@@ -2305,6 +2311,9 @@ function App() {
       if (t.splitWith === activeTabId || t.splitWith === droppedTabId) return { ...t, splitWith: undefined };
       return t;
     }));
+    if (side === 'left') {
+      setActiveTabId(droppedTabId);
+    }
   }, [activeTabId]);
   const handleToggleReaderMode = useCallback(() => setIsReaderModeOpen(prev => !prev), []);
   const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
@@ -2853,32 +2862,48 @@ function App() {
           const types = Array.from(e.dataTransfer?.types || []);
           if (types.includes('text/plain')) {
             e.preventDefault();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const isLeft = (e.clientX - rect.left) < rect.width / 2;
+            setSplitDragSide(isLeft ? 'left' : 'right');
             setIsDragOverMain(true);
           }
         }}
-        onDragLeave={() => setIsDragOverMain(false)}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+            setIsDragOverMain(false);
+          }
+        }}
         onDrop={(e) => {
           e.preventDefault();
           setIsDragOverMain(false);
           const tabId = e.dataTransfer.getData('text/plain');
           const draggedTab = tabs.find(t => t.id === tabId);
           if (draggedTab && tabId !== activeTabId) {
-            handleDropToSplitScreen(tabId);
+            const rect = e.currentTarget.getBoundingClientRect();
+            const isLeft = (e.clientX - rect.left) < rect.width / 2;
+            handleDropToSplitScreen(tabId, isLeft ? 'left' : 'right');
           }
         }}
       >
-        {/* Split Screen Drop Overlay */}
+        {/* Split Screen Drop Overlay (Left or Right) */}
         <AnimatePresence>
           {isDragOverMain && (
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-y-0 right-0 w-[45%] bg-blue-500/10 border-l-2 border-blue-500/50 backdrop-blur-sm z-[999] flex items-center justify-center pointer-events-none"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.15 }}
+              className={`absolute inset-y-0 ${
+                splitDragSide === 'left' ? 'left-0 border-r-2' : 'right-0 border-l-2'
+              } w-[48%] bg-blue-500/15 border-blue-500/60 backdrop-blur-sm z-[999] flex items-center justify-center pointer-events-none`}
             >
-              <div className="bg-blue-600 text-white px-5 py-3 rounded-2xl shadow-2xl flex flex-col items-center gap-2 text-sm font-medium">
-                <PanelRight className="w-8 h-8" />
-                Drop to Split View
+              <div className="bg-blue-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex flex-col items-center gap-2.5 text-sm font-semibold">
+                {splitDragSide === 'left' ? (
+                  <PanelLeft className="w-8 h-8" />
+                ) : (
+                  <PanelRight className="w-8 h-8" />
+                )}
+                <span>{splitDragSide === 'left' ? 'Sol Tarafa Yerleştir (Split Left)' : 'Sağ Tarafa Yerleştir (Split Right)'}</span>
               </div>
             </motion.div>
           )}
@@ -2982,16 +3007,40 @@ function App() {
         {/* Secondary View (Split Screen) */}
         {secondaryTab && (
           <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none">
-            <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
-              <div className="px-2 py-1 bg-slate-800/80 text-white rounded text-[10px] font-medium backdrop-blur-xs shadow-md">
-                Split View: {secondaryTab.title || secondaryTab.url}
-              </div>
-              <button 
-                onClick={() => handleCloseSplitView()}
-                className="p-1 bg-red-500 hover:bg-red-600 text-white rounded-full shadow-md transition-colors"
-                title="Close Split View"
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
+              <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
+                {secondaryTab.title || secondaryTab.url}
+              </span>
+
+              {/* Swap Left/Right */}
+              <button
+                onClick={() => {
+                  if (activeTabId && secondaryTab) {
+                    setActiveTabId(secondaryTab.id);
+                  }
+                }}
+                className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title="Swap Left & Right (Yer Değiştir)"
               >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                <ArrowLeftRight className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Unsplit / Separate Tabs */}
+              <button
+                onClick={() => handleCloseSplitView()}
+                className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                title="Separate Tabs (Split'i Ayır)"
+              >
+                <Columns2 className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Close Tab */}
+              <button 
+                onClick={() => handleCloseTab(secondaryTab.id)}
+                className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
+                title="Close Tab (Sekmeyi Kapat)"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
             <BrowserView 

@@ -31,6 +31,7 @@ import {
   Trash2,
   PanelLeft,
   Pin,
+  Columns2,
   HelpCircle,
   Compass,
   Cloud,
@@ -207,7 +208,7 @@ interface SidebarTabItemProps {
   tabsLength: number;
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
-  onCloseSplit?: () => void;
+  onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
@@ -297,10 +298,10 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       }`}
     >
       {splitTab ? (
-        <div className="flex items-center w-full gap-1">
+        <div className="flex items-center w-full gap-0.5">
           {/* Primary Split Subtab */}
           <div 
-            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-left relative ${
               activeTabId === tab.id 
                 ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
@@ -313,14 +314,35 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
-            <span className="truncate text-[12px]">{tab.title || 'New Tab'}</span>
+            <span className="truncate text-[12px] flex-1">{tab.title || 'New Tab'}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCloseTab(tab.id);
+              }}
+              className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Left Tab"
+            >
+              <X className="w-3 h-3" />
+            </button>
           </div>
 
-          <div className="w-px h-3.5 bg-slate-300 dark:bg-white/20 shrink-0" />
+          {/* Unsplit / Separate Tabs Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onCloseSplit?.(tab.id, splitTab.id);
+            }}
+            className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 group/unsplit cursor-pointer"
+            title="Separate Tabs (Split'i Ayır)"
+          >
+            <div className="w-px h-3.5 bg-slate-300 dark:bg-white/20 group-hover/unsplit:hidden" />
+            <Columns2 className="w-3 h-3 hidden group-hover/unsplit:block text-slate-500 dark:text-slate-300" />
+          </button>
 
           {/* Secondary Split Subtab */}
           <div 
-            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id 
                 ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
@@ -335,9 +357,12 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             )}
             <span className="truncate text-[12px] flex-1">{splitTab.title || 'New Tab'}</span>
             <button 
-              onClick={(e) => { e.stopPropagation(); onCloseSplit?.(); }}
-              className="p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0"
-              title="Close Split View"
+              onClick={(e) => { 
+                e.stopPropagation(); 
+                onCloseTab(splitTab.id); 
+              }}
+              className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
+              title="Close Right Tab"
             >
               <X className="w-3 h-3" />
             </button>
