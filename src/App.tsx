@@ -1983,8 +1983,14 @@ function App() {
   }, [handleNewTab]);
 
   const handleOpenDownloads = useCallback(() => {
-    handleNewTab('nova://downloads');
-  }, [handleNewTab]);
+    closeAllModals();
+    const existing = tabs.find(t => t.url === 'nova://downloads');
+    if (existing) {
+      setActiveTabId(existing.id);
+    } else {
+      handleNewTab('nova://downloads');
+    }
+  }, [tabs, handleNewTab, closeAllModals]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
 
@@ -2473,6 +2479,13 @@ function App() {
         e.preventDefault();
         closeAllModals();
         handleOpenDownloads();
+        return;
+      }
+
+      // Toggle AI Assistant (Cmd + I / Cmd + Shift + A)
+      if ((meta && key === 'i' && !e.altKey && !shift) || (meta && shift && key === 'a')) {
+        e.preventDefault();
+        handleToggleAIAssistant();
         return;
       }
 

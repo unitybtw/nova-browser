@@ -761,7 +761,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
                     : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
-                title="Nova AI Asistan (⌘J)"
+                title="Nova AI Asistan (⌘I)"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-cyan-500 fill-cyan-500/20 animate-pulse' : 'text-cyan-600 dark:text-cyan-400'}`} />
               </button>
@@ -850,18 +850,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     title="Extensions"
                   >
                     <Puzzle className="w-3.5 h-3.5 opacity-70" />
-                  </button>
-                )}
-                {onToggleAIAssistant && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onToggleAIAssistant(); }}
-                    className={`p-0.5 rounded transition-colors cursor-pointer ${
-                      isAIAssistantOpen ? 'text-cyan-500' : 'text-slate-400 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400'
-                    }`}
-                    title="Nova AI Asistan (⌘J)"
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -1252,7 +1240,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
-                    Nova AI Asistan (⌘J)
+                    Nova AI Asistan (⌘I)
                   </button>
                 )}
                 {onOpenDownloads && (
@@ -1261,7 +1249,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                    Downloads
+                    Downloads (⌘J)
                   </button>
                 )}
                 {onOpenHistory && (
