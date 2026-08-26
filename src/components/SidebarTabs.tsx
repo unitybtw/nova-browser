@@ -689,7 +689,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
-      <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-zinc-800 dark:text-zinc-200 z-50 bg-zinc-50 dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 font-sans">
+      <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-zinc-800 dark:text-zinc-200 z-50 bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800 font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div 

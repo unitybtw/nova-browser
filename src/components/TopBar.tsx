@@ -1145,7 +1145,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   return (
     <>
-    <header className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}>
+    <header className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-zinc-950 border-zinc-800 text-zinc-100 dark' : 'bg-white border-zinc-200 dark:bg-[#0c0c0e] dark:border-zinc-800 text-zinc-900 dark:text-zinc-100'}`}>
       {/* 
         ROW 1: Tabs & Window Controls spacer
       */}

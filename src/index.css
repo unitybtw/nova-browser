@@ -4,10 +4,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-accent: var(--nova-accent, var(--color-blue-500));
-  --color-accent-hover: var(--nova-accent-hover, var(--color-blue-600));
-  --color-accent-light: var(--nova-accent-light, var(--color-blue-100));
-  --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
+  --color-accent: var(--nova-accent, #18181b);
+  --color-accent-hover: var(--nova-accent-hover, #09090b);
+  --color-accent-light: var(--nova-accent-light, #f4f4f5);
+  --color-accent-dark: var(--nova-accent-dark, #000000);
   --color-accent-text: var(--nova-accent-text, #ffffff);
 
   --color-background: var(--background);

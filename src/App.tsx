@@ -17,7 +17,7 @@ export interface UserSettings {
   privacyShield: boolean;
   theme: 'light' | 'dark' | 'system';
   fontSize: 'small' | 'medium' | 'large';
-  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
+  accentColor: 'monochrome' | 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
   customAccentColor?: string;
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
@@ -473,8 +473,8 @@ function App() {
       privacyShield: true,
       theme: demoParams.isDemo ? demoParams.theme : 'dark',
       fontSize: 'medium',
-      accentColor: 'blue',
-      customAccentColor: '#3b82f6',
+      accentColor: 'monochrome',
+      customAccentColor: '#18181b',
       showBookmarksBar: false,
       useVerticalTabs: demoParams.isDemo ? (demoParams.tabs === 'vertical') : true,
       mcpServerEnabled: false,
@@ -736,23 +736,30 @@ function App() {
     } else {
       // Map standard colors
       const defaultColorMap: Record<string, string> = {
+        'monochrome': '#18181b',
         'blue': '#3b82f6',
         'emerald': '#10b981',
         'purple': '#a855f7',
         'rose': '#f43f5e',
         'amber': '#f59e0b'
       };
-      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['blue'];
+      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['monochrome'];
       
-      // If it's standard blue, we can either clear or just set it
-      if (settings.accentColor === 'blue') {
+      if (settings.accentColor === 'monochrome' || !settings.accentColor) {
         accentStyleEl.innerHTML = `
           :root {
-            --nova-accent: ${hex};
-            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
-            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
-            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
+            --nova-accent: #18181b;
+            --nova-accent-hover: #09090b;
+            --nova-accent-light: #f4f4f5;
+            --nova-accent-dark: #000000;
             --nova-accent-text: #ffffff;
+          }
+          .dark {
+            --nova-accent: #ffffff;
+            --nova-accent-hover: #e4e4e7;
+            --nova-accent-light: #27272a;
+            --nova-accent-dark: #fafafa;
+            --nova-accent-text: #000000;
           }
         `;
       } else {
@@ -2594,7 +2601,7 @@ function App() {
     <div className={`flex flex-row h-full w-full overflow-hidden text-zinc-900 dark:text-zinc-100 relative ${
       activeTab?.isIncognito
         ? 'bg-zinc-950 dark:bg-black'
-        : 'bg-zinc-100 dark:bg-black'
+        : 'bg-white dark:bg-black'
     } transition-colors duration-200`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}

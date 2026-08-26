@@ -1320,27 +1320,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
-                <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
+                <div className="flex gap-4 p-4 bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800">
                   {[
+                    { id: 'monochrome', color: 'bg-zinc-900 dark:bg-white border-2 border-zinc-300 dark:border-zinc-700' },
                     { id: 'blue', color: 'bg-[#3b82f6]' },
                     { id: 'emerald', color: 'bg-[#10b981]' },
                     { id: 'purple', color: 'bg-[#a855f7]' },
                     { id: 'rose', color: 'bg-[#f43f5e]' },
                     { id: 'amber', color: 'bg-[#f59e0b]' },
-                    { id: 'custom', color: 'bg-slate-200 dark:bg-slate-700' }
+                    { id: 'custom', color: 'bg-zinc-200 dark:bg-zinc-700' }
                   ].map(c => (
                     <button
                       key={c.id}
                       onClick={() => onUpdateSettings({ accentColor: c.id as any })}
-                      className={`w-12 h-12 rounded-full ${c.color} shadow-lg transition-transform hover:scale-110 flex items-center justify-center relative`}
+                      className={`w-12 h-12 rounded-full ${c.color} shadow-md transition-transform hover:scale-110 flex items-center justify-center relative cursor-pointer`}
+                      title={c.id.charAt(0).toUpperCase() + c.id.slice(1)}
                     >
                       {c.id === 'custom' && (
                         <div 
                           className="absolute inset-0 rounded-full flex items-center justify-center" 
-                          style={{ backgroundColor: settings.customAccentColor || '#3b82f6' }} 
+                          style={{ backgroundColor: settings.customAccentColor || '#18181b' }} 
                         />
                       )}
-                      {settings.accentColor === c.id && <div className="w-4 h-4 bg-white rounded-full opacity-90 z-10" />}
+                      {settings.accentColor === c.id && (
+                        <div className={`w-4 h-4 rounded-full opacity-90 z-10 ${c.id === 'monochrome' ? 'bg-white dark:bg-zinc-900' : 'bg-white'}`} />
+                      )}
                     </button>
                   ))}
                 </div>
