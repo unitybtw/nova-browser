@@ -1,23 +1,19 @@
 import Navbar from './components/Navbar';
-import ParallaxStarsHero from './components/ParallaxStarsHero';
-import ContinuousTicker from './components/ContinuousTicker';
-import MagicBentoGrid from './components/MagicBentoGrid';
-import InteractiveAppShowcase from './components/InteractiveAppShowcase';
-import StatisticsBenchmark from './components/StatisticsBenchmark';
-import DownloadSection from './components/DownloadSection';
+import Hero from './components/Hero';
+import FeatureBento from './components/FeatureBento';
+import Benchmarks from './components/Benchmarks';
+import Downloads from './components/Downloads';
 import Footer from './components/Footer';
 
 export default function App() {
   return (
-    <div id="top" className="min-h-screen bg-[#090A0F] text-slate-100 selection:bg-indigo-600 selection:text-white">
+    <div id="top" className="min-h-screen bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
       <Navbar />
       <main>
-        <ParallaxStarsHero speed={1} />
-        <ContinuousTicker />
-        <MagicBentoGrid />
-        <InteractiveAppShowcase />
-        <StatisticsBenchmark />
-        <DownloadSection />
+        <Hero />
+        <FeatureBento />
+        <Benchmarks />
+        <Downloads />
       </main>
       <Footer />
     </div>
