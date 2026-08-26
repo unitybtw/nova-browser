@@ -521,9 +521,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     if (!searchValue.trim()) return;
 
     let targetValue = searchValue;
-    const matchedBookmarks = bookmarks
-      .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-      .slice(0, 3);
+    const searchLower = searchValue.toLowerCase();
+    const matchedBookmarks = Array.isArray(bookmarks)
+      ? bookmarks
+          .filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
+                       (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower)))
+          .slice(0, 3)
+      : [];
 
     if (selectedIndex > -1 && selectedIndex < suggestions.length) {
       targetValue = suggestions[selectedIndex];
@@ -649,7 +653,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 setSelectedIndex(-1);
               } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                const matchedBookmarksCount = bookmarks.filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase())).slice(0, 3).length;
+                const searchLower = searchValue.toLowerCase();
+                const matchedBookmarksCount = Array.isArray(bookmarks)
+                  ? bookmarks.filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
+                                          (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower))).slice(0, 3).length
+                  : 0;
                 const maxIndex = suggestions.length + matchedBookmarksCount - 1;
                 setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
               } else if (e.key === 'ArrowUp') {
@@ -744,9 +752,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         {/* Search Suggestions Dropdown */}
         <AnimatePresence>
           {showSuggestions && searchValue.trim().length > 0 && (() => {
-            const matchedBookmarks = bookmarks
-              .filter(b => b.title.toLowerCase().includes(searchValue.toLowerCase()) || b.url.toLowerCase().includes(searchValue.toLowerCase()))
-              .slice(0, 3);
+            const searchLower = searchValue.toLowerCase();
+            const matchedBookmarks = Array.isArray(bookmarks)
+              ? bookmarks
+                  .filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
+                               (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower)))
+                  .slice(0, 3)
+              : [];
             
             return (
               <motion.div 
@@ -1030,7 +1042,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         if ((window as any).electronAPI?.storeGet) {
           const val = await (window as any).electronAPI.storeGet('adblocker_whitelist');
           if (val) {
-            setAdblockWhitelist(JSON.parse(val));
+            const parsed = JSON.parse(val);
+            setAdblockWhitelist(Array.isArray(parsed) ? parsed : []);
           }
         }
       } catch (e) {}
@@ -1104,13 +1117,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       currentHostname = new URL(urlToParse).hostname;
     }
   } catch(e) {}
-  const isWhitelisted = adblockWhitelist.includes(currentHostname);
+  const isWhitelisted = Array.isArray(adblockWhitelist) && Boolean(currentHostname) && adblockWhitelist.includes(currentHostname);
   
   const handleToggleWhitelist = async () => {
     if (!currentHostname) return;
+    const currentList = Array.isArray(adblockWhitelist) ? adblockWhitelist : [];
     const newWhitelist = isWhitelisted 
-      ? adblockWhitelist.filter(h => h !== currentHostname)
-      : [...adblockWhitelist, currentHostname];
+      ? currentList.filter(h => h !== currentHostname)
+      : [...currentList, currentHostname];
     
     setAdblockWhitelist(newWhitelist);
     if ((window as any).electronAPI?.storeSet) {

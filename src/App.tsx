@@ -2925,7 +2925,8 @@ function App() {
       <main 
         className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden"
         onDragOver={(e) => {
-          if (e.dataTransfer.types.includes('text/plain')) {
+          const types = Array.from(e.dataTransfer?.types || []);
+          if (types.includes('text/plain')) {
             e.preventDefault();
             setIsDragOverMain(true);
           }
