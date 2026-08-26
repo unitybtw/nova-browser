@@ -1,5 +1,4 @@
-import express from 'express';
-import rateLimit from 'express-rate-limit';
+import type { Express, Request } from 'express';
 import { BrowserWindow, safeStorage } from 'electron';
 import { randomUUID, createHash, timingSafeEqual } from 'crypto';
 import fs from 'fs';
@@ -7,7 +6,8 @@ import path from 'path';
 import { app as electronApp } from 'electron';
 // 🔒 Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
-import { requestRendererMcpAction } from './main.js';
+// Imported from main/mcpBridge (not main.ts) to avoid a circular import.
+import { requestRendererMcpAction } from './main/mcpBridge.js';
 
 interface McpTool {
   name: string;
@@ -311,7 +311,7 @@ interface SseClient {
 }
 
 export class BrowserMCPServer {
-  private app: express.Express;
+  private warnedQueryToken = false;
   private server: any;
   private mainWindow: BrowserWindow | null = null;
   private clients: Map<string, SseClient> = new Map();
@@ -322,10 +322,9 @@ export class BrowserMCPServer {
   private tokenFilePath: string = '';
 
   constructor(private port: number = 3020) {
-    this.app = express();
-    // VULN-28: Add rate limiting
-    this.app.use(rateLimit({ windowMs: 60 * 1000, max: 120, message: 'Too many requests' }));
-    this.app.use(express.json({ limit: '10mb' }));
+    // ⚡ Perf: express/express-rate-limit are NOT required here — they are
+    // dynamically imported in start() so the main bundle doesn't pay their
+    // parse/require cost on every launch when the MCP server never starts.
     // Set token file path in app userData
     try {
       this.tokenFilePath = path.join(electronApp.getPath('userData'), 'nova-mcp-token');
@@ -337,7 +336,6 @@ export class BrowserMCPServer {
     } catch {
       this.token = process.env.MCP_TOKEN || randomUUID();
     }
-    this.setupRoutes();
     // Restore persisted per-tool enable/disable settings (safe: internal try/catch)
     this.loadToolSettings();
   }
@@ -422,12 +420,19 @@ export class BrowserMCPServer {
     }
   }
 
-  private isAuthenticated(req: express.Request): boolean {
+  private isAuthenticated(req: Request): boolean {
     // Check Authorization header: Bearer <token>
     const authHeader = req.headers.authorization || '';
     if (authHeader.startsWith('Bearer ') && this.tokenMatches(authHeader.slice(7))) return true;
-    // Check query param: ?token=<token>
-    if (typeof req.query.token === 'string' && this.tokenMatches(req.query.token)) return true;
+    // Check query param: ?token=<token> — DEPRECATED (kept one-release for backward
+    // compat). Tokens in URLs leak into logs/proxies; prefer the header above.
+    if (typeof req.query.token === 'string') {
+      if (!this.warnedQueryToken) {
+        this.warnedQueryToken = true;
+        console.warn('[MCP Server] DEPRECATION: auth via the "?token=" query parameter is deprecated and leaks into logs. Use the "Authorization: Bearer" header instead.');
+      }
+      return this.tokenMatches(req.query.token);
+    }
     return false;
   }
 
@@ -485,9 +490,9 @@ export class BrowserMCPServer {
     return typeof result === 'string' ? result : JSON.stringify(result);
   }
 
-  private setupRoutes() {
+  private setupRoutes(app: Express) {
     // 🔒 Security: Prevent DNS rebinding attacks by strictly validating the Host header
-    this.app.use((req, res, next) => {
+    app.use((req, res, next) => {
       const host = req.headers.host || '';
       const allowedHosts = [`localhost:${this.port}`, `127.0.0.1:${this.port}`, 'localhost', '127.0.0.1'];
       if (!allowedHosts.includes(host)) {
@@ -497,7 +502,7 @@ export class BrowserMCPServer {
     });
 
     // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*)
-    this.app.use((req, res, next) => {
+    app.use((req, res, next) => {
       const origin = req.headers.origin;
       if (origin) {
         try {
@@ -516,7 +521,7 @@ export class BrowserMCPServer {
       next();
     });
 
-    this.app.use((req, res, next) => {
+    app.use((req, res, next) => {
       if (req.method === 'OPTIONS') {
         res.sendStatus(200);
       } else {
@@ -525,7 +530,7 @@ export class BrowserMCPServer {
     });
 
     // Health check endpoint — only return minimal info without auth
-    this.app.get('/health', (req, res) => {
+    app.get('/health', (req, res) => {
       if (this.isAuthenticated(req)) {
         // Authenticated: return detailed info
         res.json({
@@ -548,7 +553,7 @@ export class BrowserMCPServer {
     });
 
     // MCP over SSE — client connects here
-    this.app.get('/sse', (req, res) => {
+    app.get('/sse', (req, res) => {
       if (!this.isAuthenticated(req)) {
         return res.status(401).send('Unauthorized: Invalid or missing token');
       }
@@ -602,7 +607,7 @@ export class BrowserMCPServer {
     });
 
     // MCP message endpoint — client POSTs JSON-RPC here
-    this.app.post('/message', async (req, res) => {
+    app.post('/message', async (req, res) => {
       if (!this.isAuthenticated(req)) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
@@ -695,7 +700,7 @@ export class BrowserMCPServer {
     });
 
     // Direct tool call endpoint (for testing without full MCP protocol)
-    this.app.post('/call', async (req, res) => {
+    app.post('/call', async (req, res) => {
       if (!this.isAuthenticated(req)) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
@@ -712,7 +717,7 @@ export class BrowserMCPServer {
     });
 
     // List available tools
-    this.app.get('/tools', (req, res) => {
+    app.get('/tools', (req, res) => {
       if (!this.isAuthenticated(req)) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
@@ -720,12 +725,25 @@ export class BrowserMCPServer {
     });
   }
 
-  public start(): Promise<void> {
+  public async start(): Promise<void> {
+    // ⚡ Perf: load express + express-rate-limit lazily — they are only parsed/
+    // required when the MCP server actually starts, not on every app launch.
+    const [{ default: express }, { default: rateLimit }] = await Promise.all([
+      import('express'),
+      import('express-rate-limit')
+    ]);
+
+    const app = express();
+    // VULN-28: Add rate limiting
+    app.use(rateLimit({ windowMs: 60 * 1000, max: 120, message: 'Too many requests' }));
+    app.use(express.json({ limit: '10mb' }));
+    this.setupRoutes(app);
+
     return new Promise((resolve, reject) => {
       try {
         // SECURITY NOTE: Fixed port 3020 is used for backward compatibility with existing
         // integrations. A dynamic or configurable port would reduce predictability for attackers.
-        this.server = this.app.listen(this.port, '127.0.0.1', () => {
+        this.server = app.listen(this.port, '127.0.0.1', () => {
           console.log(`[MCP Server] ✓ Running at http://localhost:${this.port}`);
           console.log(`[MCP Server] SSE endpoint: http://localhost:${this.port}/sse`);
           console.log(`[MCP Server] Health: http://localhost:${this.port}/health`);

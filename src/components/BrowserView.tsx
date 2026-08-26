@@ -303,7 +303,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleStartNavigation = (e: any) => {
       if (e.isMainFrame && tab?.id) {
-        onUpdateTab(tab.id, { isLoading: true, blockedAdsCount: 0 });
+        // onUpdateTab shallow-merges updates and treats ANY value difference
+        // as a change (undefined -> 0 included), so unconditionally resetting
+        // blockedAdsCount allocated a fresh tab object on every navigation and
+        // cascaded re-renders through every tabs consumer. Only include the
+        // reset when the counter actually holds blocked ads. Read the live
+        // count via latestTabRef: the captured `tab` goes stale for
+        // blockedAdsCount because this effect doesn't depend on it.
+        const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
+        const updates: Partial<Tab> = { isLoading: true };
+        if (currentBlockedAds) {
+          updates.blockedAdsCount = 0;
+        }
+        onUpdateTab(tab.id, updates);
       }
     };
 
@@ -569,25 +581,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     }
   }, [tab?.isMuted]);
-
-  // Receive thumbnails pushed from the main process (via web-contents-created + did-stop-loading)
-  useEffect(() => {
-    const electronAPI = (window as any).electronAPI;
-    if (!electronAPI?.onTabThumbnailUpdate || isNewTab || !tab?.id) return;
-
-    const unsubscribe = electronAPI.onTabThumbnailUpdate((_event: any, { webContentsId, dataUrl }: { webContentsId: number; dataUrl: string }) => {
-      // Check if this thumbnail belongs to our webview
-      const webview = webviewRef.current;
-      try {
-        const ourWcId = webview?.getWebContentsId?.();
-        if (ourWcId && ourWcId === webContentsId && dataUrl && tab?.id) {
-          tabThumbnailCache.set(tab.id, dataUrl);
-        }
-      } catch (_) {}
-    });
-
-    return () => { try { unsubscribe?.(); } catch (_) {} };
-  }, [isNewTab, tab?.id]);
 
   // Capture thumbnail when switching away from this tab (stored in memory cache).
   // PERF: capturePage is a GPU readback that competes with the incoming tab's

@@ -9,6 +9,7 @@
   "build": {
     "appId": "com.nova.browser",
     "productName": "Nova Browser",
+    "afterPack": "scripts/apply-fuses.cjs",
     "directories": {
       "output": "dist-electron-builder",
       "buildResources": "build"
@@ -92,7 +93,7 @@
   },
   "scripts": {
     "dev:web": "vite",
-    "build:electron": "esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:cross-fetch --external:express --external:@modelcontextprotocol/sdk --format=cjs --out-extension:.js=.cjs",
+    "build:electron": "esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:cross-fetch --external:express --external:express-rate-limit --external:@modelcontextprotocol/sdk --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
@@ -124,6 +125,7 @@
     "unzip-crx-3": "^0.2.0"
   },
   "devDependencies": {
+    "@electron/fuses": "^2.1.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/dompurify": "^3.0.5",
     "@types/express": "^5.0.6",

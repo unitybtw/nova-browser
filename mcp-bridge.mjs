@@ -10,10 +10,13 @@ import * as EventSourceLib from "eventsource";
 global.EventSource = EventSourceLib.default || EventSourceLib;
 async function main() {
   const sseUrl = new URL(process.env.MCP_SSE_URL || 'http://localhost:3020/sse');
-  if (process.env.MCP_TOKEN) {
-    sseUrl.searchParams.set('token', process.env.MCP_TOKEN);
-  }
-  const sseTransport = new SSEClientTransport(sseUrl);
+  // 🔒 Security: send the token via the Authorization header instead of the URL
+  // query string — query strings leak into logs, history and proxies.
+  const sseTransport = new SSEClientTransport(sseUrl, process.env.MCP_TOKEN ? {
+    requestInit: {
+      headers: { Authorization: `Bearer ${process.env.MCP_TOKEN}` }
+    }
+  } : undefined);
   const client = new Client({ name: "mcp-bridge", version: "1.0.0" }, { capabilities: {} });
   try {
     await client.connect(sseTransport);

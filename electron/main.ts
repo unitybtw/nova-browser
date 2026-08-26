@@ -6,11 +6,12 @@ import dns from 'dns';
 import { promisify } from 'util';
 import fs from 'fs';
 import child_process from 'child_process';
-// @ts-ignore
-import unzip from 'unzip-crx-3';
-import JSZip from 'jszip';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
+import { initMcpBridge } from './main/mcpBridge.js';
+import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } from './main/downloads.js';
+import { initSuggestions } from './main/suggestions.js';
+import { installFromWebstore } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 
 // Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
@@ -103,51 +104,7 @@ function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEv
 // 🔒 Security: MCP browser_* tools are forwarded to the renderer over an
 // 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
 // below — never executed as injected JS in the privileged UI context.
-
-interface PendingMcpAction {
-  resolve: (value: unknown) => void;
-  reject: (err: Error) => void;
-  timer: NodeJS.Timeout;
-}
-
-const pendingMcpActions = new Map<string, PendingMcpAction>();
-
-ipcMain.on('mcp-action-response', (event: Electron.IpcMainEvent, payload: { id?: unknown; result?: unknown }) => {
-  if (!isTrustedSender(event)) return;
-  const id = payload?.id;
-  if (typeof id !== 'string') return;
-  const pending = pendingMcpActions.get(id);
-  if (!pending) return;
-  pendingMcpActions.delete(id);
-  clearTimeout(pending.timer);
-  pending.resolve(payload.result);
-});
-
-/**
- * Asks the trusted main window renderer to execute an MCP browser_* tool and
- * waits for its response. Rejects after a 15s timeout or if the window is gone.
- */
-export function requestRendererMcpAction(win: BrowserWindow | null, toolName: string, args: Record<string, unknown>): Promise<unknown> {
-  return new Promise((resolve, reject) => {
-    if (!win || win.isDestroyed()) {
-      reject(new Error('Nova Browser window is not available'));
-      return;
-    }
-    const id = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
-    const timer = setTimeout(() => {
-      pendingMcpActions.delete(id);
-      reject(new Error(`MCP action '${toolName}' timed out waiting for renderer response`));
-    }, 15000);
-    pendingMcpActions.set(id, { resolve, reject, timer });
-    try {
-      win.webContents.send('mcp-action-request', id, toolName, args);
-    } catch (err) {
-      clearTimeout(timer);
-      pendingMcpActions.delete(id);
-      reject(err instanceof Error ? err : new Error(String(err)));
-    }
-  });
-}
+initMcpBridge(isTrustedSender);
 
 // 🔒 Security: Validate dev server and app internal page origins strictly
 function isTrustedAppOrigin(urlStr: string): boolean {
@@ -185,10 +142,6 @@ function isPhishing(urlStr: string) {
 let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
 let blocker: ElectronBlocker | null = null;
-const activeDownloads = new Map<string, Electron.DownloadItem>();
-// Tracks sessions that already have a 'will-download' handler so window recreation
-// doesn't stack duplicate listeners (which would duplicate download handling).
-const downloadsRegistered = new WeakSet<Electron.Session>();
 let mcpServer: BrowserMCPServer | null = null;
 
 let currentWhitelistFilters: any[] = [];
@@ -346,111 +299,6 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 });
 
   // Downloads Manager: Handle file downloads via Electron IPC
-  function registerDownloadsManager(targetSession: Electron.Session) {
-    if (downloadsRegistered.has(targetSession)) return;
-    downloadsRegistered.add(targetSession);
-    targetSession.on('will-download', (event, item, webContents) => {
-      const downloadId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
-      const filename = item.getFilename();
-      const totalBytes = item.getTotalBytes();
-      activeDownloads.set(downloadId, item);
-
-      // Auto-install CRX extensions from Chrome Web Store
-      if (filename.endsWith('.crx')) {
-        item.cancel();
-        activeDownloads.delete(downloadId);
-        return;
-      }
-
-      if (nextDownloadAsSaveAs) {
-        nextDownloadAsSaveAs = false;
-        // Do not set save path so Electron shows the Save Dialog automatically
-        item.once('done', (_event, state) => {
-          if (state === 'completed') activeDownloads.delete(downloadId);
-        });
-      } else {
-        const defaultDir = app.getPath('downloads');
-        // 🔒 Security: item.getFilename() is server-controlled (Content-Disposition) —
-        // strip directory components, separators, and leading dots before it touches disk.
-        const safeName = path.basename(filename).replace(/[/\\]/g, '_').replace(/^\.+/, '').trim() || 'download';
-        let targetPath = path.join(defaultDir, safeName);
-        // Auto-increment filename if already exists to avoid silent overwrite
-        try {
-          if (fs.existsSync(targetPath)) {
-            const ext = path.extname(safeName);
-            const base = path.basename(safeName, ext);
-            let counter = 1;
-            while (fs.existsSync(path.join(defaultDir, `${base} (${counter})${ext}`))) {
-              counter++;
-            }
-            targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
-          }
-        } catch {}
-        // 🔒 Security: final containment check — the resolved save path must stay
-        // inside the downloads directory. Fall back to a fixed name otherwise.
-        if (!path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
-          targetPath = path.join(defaultDir, 'download');
-        }
-        item.setSavePath(targetPath);
-        item.once('done', (_event, state) => {
-          if (state === 'completed') {
-            activeDownloads.delete(downloadId);
-          }
-        });
-      }
-
-      sendToMainWindow('download-update', {
-        id: downloadId,
-        filename: path.basename(item.getSavePath() || filename),
-        url: item.getURL(),
-        receivedBytes: 0,
-        totalBytes,
-        state: 'progressing',
-        startTime: Date.now(),
-        savePath: item.getSavePath() || undefined
-      });
-
-      item.on('updated', (event, state) => {
-        if (state === 'interrupted') {
-          sendToMainWindow('download-update', {
-            id: downloadId,
-            filename: path.basename(item.getSavePath() || filename),
-            url: item.getURL(),
-            receivedBytes: item.getReceivedBytes(),
-            totalBytes,
-            state: 'cancelled',
-            savePath: item.getSavePath() || undefined
-          });
-        } else if (state === 'progressing') {
-          sendToMainWindow('download-update', {
-            id: downloadId,
-            filename: path.basename(item.getSavePath() || filename),
-            url: item.getURL(),
-            receivedBytes: item.getReceivedBytes(),
-            totalBytes,
-            state: 'progressing',
-            isPaused: item.isPaused(),
-            savePath: item.getSavePath() || undefined
-          });
-        }
-      });
-
-      item.once('done', (event, state) => {
-        activeDownloads.delete(downloadId);
-        sendToMainWindow('download-update', {
-          id: downloadId,
-          filename: path.basename(item.getSavePath() || filename),
-          url: item.getURL(),
-          receivedBytes: item.getReceivedBytes(),
-          totalBytes: item.getTotalBytes(),
-          state: state === 'completed' ? 'completed' : 'cancelled',
-          savePath: item.getSavePath() || undefined,
-          isPaused: false
-        });
-      });
-    });
-  }
-
   registerDownloadsManager(session.defaultSession);
   registerDownloadsManager(session.fromPartition('incognito'));
 
@@ -584,8 +432,6 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     try { mcpServer.setMainWindow(mainWindow); } catch (e) {}
   }
 }
-
-let nextDownloadAsSaveAs = false;
 
 // Track URLs that failed HTTPS upgrade to prevent infinite loops with eviction cap (max 1000 items)
 const MAX_UPGRADED_URLS = 1000;
@@ -1327,12 +1173,12 @@ app.on('web-contents-created', (_event, contents) => {
           addUpgradedUrl(navigationUrl);
           const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
           
-          // Try loading HTTPS. If it fails, fallback to HTTP.
-          contents.loadURL(httpsUrl).catch(() => {
-            // If HTTPS fails (e.g. SSL error), fallback to HTTP
-            contents.loadURL(navigationUrl).catch(() => {
-              console.warn('HTTPS upgrade and HTTP fallback both failed for:', navigationUrl);
-            });
+          // 🔒 Security (L-7): never auto-fall back to plain HTTP when the HTTPS
+          // upgrade fails — a MITM can force that downgrade. Log and stay put.
+          // navigationUrl is now in upgradedUrls, so an EXPLICIT user retry of
+          // the http:// URL is still allowed through (see the check above).
+          contents.loadURL(httpsUrl).catch((upgradeErr: any) => {
+            console.warn('HTTPS upgrade failed, refusing to downgrade to HTTP for:', navigationUrl, upgradeErr?.message || upgradeErr);
           });
         }
       } catch {}
@@ -1668,7 +1514,7 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.saveLinkAs,
           click: () => {
-            nextDownloadAsSaveAs = true;
+            markNextDownloadAsSaveAs();
             wc.downloadURL(params.linkURL);
           }
         }));
@@ -1688,7 +1534,7 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.saveImageAs,
           click: () => {
-            nextDownloadAsSaveAs = true;
+            markNextDownloadAsSaveAs();
             wc.downloadURL(params.srcURL);
           }
         }));
@@ -1758,7 +1604,7 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
             click: () => {
-              nextDownloadAsSaveAs = true;
+              markNextDownloadAsSaveAs();
               wc.downloadURL(params.srcURL);
             }
           }));
@@ -1901,76 +1747,8 @@ app.on('web-contents-created', (_event, wc) => {
   });
 });
 
-// Download Controls
-ipcMain.handle('pause-download', (event, id: string) => {
-  if (!isTrustedSender(event)) return false;
-  if (!id || typeof id !== 'string') return false;
-  const item = activeDownloads.get(id);
-  if (item && !item.isPaused()) {
-    item.pause();
-    return true;
-  }
-  return false;
-});
-
-ipcMain.handle('resume-download', (event, id: string) => {
-  if (!isTrustedSender(event)) return false;
-  if (!id || typeof id !== 'string') return false;
-  const item = activeDownloads.get(id);
-  if (item && item.canResume()) {
-    item.resume();
-    return true;
-  }
-  return false;
-});
-
-ipcMain.handle('cancel-download', (event, id: string) => {
-  if (!isTrustedSender(event)) return false;
-  if (!id || typeof id !== 'string') return false;
-  const item = activeDownloads.get(id);
-  if (item) {
-    item.cancel();
-    activeDownloads.delete(id);
-    return true;
-  }
-  return false;
-});
-
-ipcMain.handle('open-download', (event, pathStr: string) => {
-  if (!isTrustedSender(event)) return false;
-  if (!pathStr || typeof pathStr !== 'string') return false;
-  const downloadsPath = app.getPath('downloads');
-  try {
-    const resolvedPath = path.resolve(pathStr);
-    const realPath = fs.realpathSync(resolvedPath);
-    const realDownloads = fs.realpathSync(downloadsPath);
-    if (realPath && realPath.startsWith(realDownloads + path.sep) && fs.existsSync(realPath)) {
-      shell.openPath(realPath);
-      return true;
-    }
-  } catch (err) {
-    console.error('Error opening download:', err);
-  }
-  return false;
-});
-
-ipcMain.handle('show-download-in-folder', (event, pathStr: string) => {
-  if (!isTrustedSender(event)) return false;
-  if (!pathStr || typeof pathStr !== 'string') return false;
-  const downloadsPath = app.getPath('downloads');
-  try {
-    const resolvedPath = path.resolve(pathStr);
-    const realPath = fs.realpathSync(resolvedPath);
-    const realDownloads = fs.realpathSync(downloadsPath);
-    if (realPath && realPath.startsWith(realDownloads + path.sep) && fs.existsSync(realPath)) {
-      shell.showItemInFolder(realPath);
-      return true;
-    }
-  } catch (err) {
-    console.error('Error showing download in folder:', err);
-  }
-  return false;
-});
+// Download Controls (handlers live in main/downloads.ts)
+initDownloads(sendToMainWindow, isTrustedSender);
 
 // MCP Server Controls
 ipcMain.handle('start-mcp-server', async (event) => {
@@ -2310,242 +2088,8 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   return { error: 'Too many redirects' };
 });
 
-// IPC Handler for Autocomplete Suggestions with Regional Intelligence & In-Memory LRU Cache
-const SUGGESTIONS_CACHE_TTL_MS = 15 * 60 * 1000; // entries expire after 15 minutes
-const SUGGESTIONS_CACHE_MAX_ENTRIES = 400;
-interface SuggestionsCacheEntry { list: string[]; cachedAt: number; }
-const suggestionsCache = new Map<string, SuggestionsCacheEntry>();
-
-function getSuggestionsFromCache(cacheKey: string): string[] | null {
-  const entry = suggestionsCache.get(cacheKey);
-  if (!entry) return null;
-  // Expired entries are treated as misses and purged lazily on access
-  if (Date.now() - entry.cachedAt > SUGGESTIONS_CACHE_TTL_MS) {
-    suggestionsCache.delete(cacheKey);
-    return null;
-  }
-  return entry.list;
-}
-
-function cacheSuggestions(cacheKey: string, list: string[]): void {
-  // Proper trim: evict oldest-inserted entries until back under the cap
-  // (instead of the old drift-prone one-delete-per-insert check)
-  while (suggestionsCache.size >= SUGGESTIONS_CACHE_MAX_ENTRIES) {
-    const oldestKey = suggestionsCache.keys().next().value;
-    if (!oldestKey) break;
-    suggestionsCache.delete(oldestKey);
-  }
-  suggestionsCache.set(cacheKey, { list, cachedAt: Date.now() });
-}
-
-function resolveLocaleDetails(clientLocale?: string) {
-  const rawLocale = (typeof clientLocale === 'string' && clientLocale.trim()) 
-    ? clientLocale.trim() 
-    : (app.getLocale() || 'tr-TR');
-  const parts = rawLocale.replace('_', '-').split('-');
-  const lang = (parts[0] || 'tr').toLowerCase();
-  const country = (parts[1] || (lang === 'tr' ? 'tr' : 'us')).toLowerCase();
-  const ddgRegion = `${country}-${lang}`;
-  const acceptLanguage = `${lang}-${country.toUpperCase()},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
-  return { lang, country, ddgRegion, acceptLanguage };
-}
-
-ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, clientLocale?: string) => {
-  if (!isTrustedSender(event)) return [];
-  if (!query || typeof query !== 'string') return [];
-  const cleanQ = query.trim();
-  if (!cleanQ) return [];
-
-  const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(clientLocale);
-  const normalizedKey = cleanQ.normalize('NFC').toLowerCase();
-  const cacheKey = `${normalizedKey}_${engine || 'default'}_${lang}_${country}`;
-
-  const cachedList = getSuggestionsFromCache(cacheKey);
-  if (cachedList !== null) {
-    return cachedList;
-  }
-
-  const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
-
-  const fetchGoogle = async (): Promise<string[]> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 650);
-    try {
-      const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${lang}&gl=${country}`;
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': userAgent,
-          'Accept-Language': acceptLanguage
-        }
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-        }
-      }
-    } catch (_) {} finally {
-      clearTimeout(timeout);
-    }
-    return [];
-  };
-
-  const fetchDuckDuckGo = async (): Promise<string[]> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 650);
-    try {
-      const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': userAgent,
-          'Accept-Language': acceptLanguage
-        }
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-        }
-      }
-    } catch (_) {} finally {
-      clearTimeout(timeout);
-    }
-    return [];
-  };
-
-  const fetchBing = async (): Promise<string[]> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 650);
-    try {
-      const market = `${lang}-${country.toUpperCase()}`;
-      const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${lang}&setmkt=${market}`;
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': userAgent,
-          'Accept-Language': acceptLanguage
-        }
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-        }
-      }
-    } catch (_) {} finally {
-      clearTimeout(timeout);
-    }
-    return [];
-  };
-
-  const fetchBrave = async (): Promise<string[]> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 650);
-    try {
-      const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false`;
-      const res = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': userAgent,
-          'Accept-Language': acceptLanguage
-        }
-      });
-      clearTimeout(timeout);
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-        }
-      }
-    } catch (_) {} finally {
-      clearTimeout(timeout);
-    }
-    return [];
-  };
-
-  let providers = [fetchGoogle, fetchDuckDuckGo, fetchBing];
-  if (engine === 'duckduckgo') {
-    providers = [fetchDuckDuckGo, fetchGoogle, fetchBing];
-  } else if (engine === 'bing') {
-    providers = [fetchBing, fetchGoogle, fetchDuckDuckGo];
-  } else if (engine === 'brave') {
-    providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
-  }
-
-  // ⚡ Perf + 🔒 Privacy: Fast staggered fallback to keep latency ultra-low.
-  // Resolve as soon as results are usable: if any provider already returned
-  // non-empty results and nothing is in flight, cancel pending stagger timers
-  // instead of waiting them out (they only exist to probe fallbacks when we
-  // have NO answer yet). Keeps the guaranteed ≥300ms floor off the happy path.
-  const FALLBACK_STAGGER_MS = 150;
-  const resultsByPriority = new Map<number, string[]>();
-  let anyNonEmpty = false;
-  let activeRuns = 0;
-  let scheduledStarts = providers.length - 1;
-  const staggerTimers: ReturnType<typeof setTimeout>[] = [];
-
-  let allSettledResolve: () => void;
-  let settled = false; // late provider resolutions after settle are ignored
-  const allSettled = new Promise<void>((resolve) => {
-    allSettledResolve = () => {
-      if (settled) return;
-      settled = true;
-      resolve();
-    };
-  });
-  const maybeAllSettled = () => {
-    if (activeRuns > 0) return;
-    if (anyNonEmpty || scheduledStarts === 0) {
-      staggerTimers.forEach(clearTimeout);
-      scheduledStarts = 0;
-      allSettledResolve();
-    }
-  };
-
-  const runProvider = (idx: number) => {
-    activeRuns++;
-    providers[idx]()
-      .then((list) => {
-        resultsByPriority.set(idx, Array.isArray(list) ? list : []);
-        if (resultsByPriority.get(idx)!.length > 0) anyNonEmpty = true;
-      })
-      .catch(() => {})
-      .finally(() => {
-        activeRuns--;
-        maybeAllSettled();
-      });
-  };
-
-  runProvider(0);
-  for (let i = 1; i < providers.length; i++) {
-    staggerTimers.push(
-      setTimeout(() => {
-        scheduledStarts--;
-        // Privacy: skip lower-priority engines entirely once we have an answer.
-        if (!anyNonEmpty) runProvider(i);
-        else maybeAllSettled();
-      }, FALLBACK_STAGGER_MS * i)
-    );
-  }
-
-  await allSettled;
-  staggerTimers.forEach(clearTimeout);
-
-  for (let i = 0; i < providers.length; i++) {
-    const list = resultsByPriority.get(i);
-    if (list && list.length > 0) {
-      cacheSuggestions(cacheKey, list);
-      return list;
-    }
-  }
-
-  return [];
-});
+// Autocomplete Suggestions handler (providers + LRU cache + staggered fallback live in main/suggestions.ts)
+initSuggestions(isTrustedSender);
 
 // Open dialog to select a folder for unpacked extension
 ipcMain.handle('select-extension-folder', async (event) => {
@@ -3136,235 +2680,16 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
   }
 });
 
-// Install from Chrome Web Store
-// 🔒 Security: read an HTTP response body while enforcing a hard byte limit.
-// Aborts as soon as the limit is exceeded instead of buffering an unbounded payload.
-async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
-  const body = res.body;
-  if (body && typeof body.on === 'function') {
-    // Node-style stream (cross-fetch in Electron main)
-    return await new Promise<Buffer>((resolve, reject) => {
-      const chunks: Buffer[] = [];
-      let received = 0;
-      body.on('data', (chunk: Buffer) => {
-        received += chunk.length;
-        if (received > maxBytes) {
-          try { body.destroy(); } catch (_) {}
-          reject(new Error(`Extension package exceeds maximum allowed size (${maxBytes} bytes).`));
-          return;
-        }
-        chunks.push(chunk);
-      });
-      body.on('end', () => resolve(Buffer.concat(chunks)));
-      body.on('error', (err: any) => reject(err));
-    });
-  }
-  // Fallback (no streaming body): buffered read, still validated against the cap
-  const arrayBuffer = await res.arrayBuffer();
-  if (arrayBuffer.byteLength > maxBytes) {
-    throw new Error(`Extension package exceeds maximum allowed size (${maxBytes} bytes).`);
-  }
-  return Buffer.from(arrayBuffer);
-}
-
-// 🔒 Security: mirror unzip-crx-3's CRX unwrapping so the inner zip payload can
-// be inspected BEFORE anything is written to disk — unzip-crx-3 joins entry names
-// onto the destination with no validation, which allows zip-slip.
-function getCrxInnerZip(buffer: Buffer): Buffer {
-  // Plain zip packages (PK\x03\x04) are passed through untouched
-  if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
-    return buffer;
-  }
-  const readU32 = (offset: number) => buffer.readUInt32LE(offset);
-  const version = buffer[4];
-  if (version === 2) {
-    const publicKeyLength = readU32(8);
-    const signatureLength = readU32(12);
-    return buffer.subarray(16 + publicKeyLength + signatureLength);
-  }
-  if (version === 3) {
-    const headerSize = readU32(8);
-    return buffer.subarray(12 + headerSize);
-  }
-  throw new Error('Unsupported CRX container format.');
-}
-
-async function assertCrxEntriesSafe(buffer: Buffer, targetDir: string): Promise<void> {
-  const zip = await JSZip.loadAsync(getCrxInnerZip(buffer));
-  const resolvedTarget = path.resolve(targetDir);
-  for (const entryName of Object.keys(zip.files)) {
-    // Reject Windows drive-letter/UNC paths and backslash separators outright
-    if (/^[a-zA-Z]:[\\/]/.test(entryName) || entryName.startsWith('\\\\')) {
-      throw new Error(`Extension contains an unsafe entry path: ${entryName}`);
-    }
-    const normalized = entryName.replace(/\\/g, '/');
-    if (normalized.split('/').some((segment) => segment === '..')) {
-      throw new Error(`Extension contains a parent-directory traversal entry: ${entryName}`);
-    }
-    if (path.isAbsolute(normalized)) {
-      throw new Error(`Extension contains an absolute entry path: ${entryName}`);
-    }
-    const outPath = path.resolve(resolvedTarget, normalized);
-    if (!outPath.startsWith(resolvedTarget + path.sep)) {
-      throw new Error(`Extension entry escapes the extraction directory: ${entryName}`);
-    }
-  }
-}
-
-// Defense in depth: after extraction, nothing on disk may resolve outside the
-// target dir, and the CRX/zip format cannot legitimately produce symlinks.
-function assertExtractionContained(dir: string): void {
-  const resolvedDir = path.resolve(dir);
-  const stack: string[] = [resolvedDir];
-  while (stack.length > 0) {
-    const currentDir = stack.pop()!;
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
-      const entryPath = path.join(currentDir, entry.name);
-      if (!path.resolve(entryPath).startsWith(resolvedDir + path.sep)) {
-        throw new Error(`Extension extraction escaped the target directory: ${entry.name}`);
-      }
-      if (entry.isSymbolicLink()) {
-        throw new Error(`Extension contains a symbolic link entry: ${entry.name}`);
-      }
-      if (entry.isDirectory()) stack.push(entryPath);
-    }
-  }
-}
-
-ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
-  // 🔒 Security: Allow only trusted main window OR Chrome Web Store origin
-  const senderUrl = event.sender?.getURL() || '';
-  const isFromMainWindow = isTrustedSender(event);
-  const isFromWebstore = senderUrl.startsWith('https://chromewebstore.google.com/') || senderUrl.startsWith('https://chrome.google.com/webstore/');
-  if (!isFromMainWindow && !isFromWebstore) {
-    return { error: 'Unauthorized: install-from-webstore can only be called from Chrome Web Store or Nova main window.' };
-  }
-
-  try {
-    // Extract ID: 32 characters of a-p
-    const match = urlOrId.match(/[a-p]{32}/);
-    if (!match) return { error: 'Geçersiz eklenti URL\'si veya ID\'si' };
-    const extensionId = match[0];
-
-    // 🔒 Security: installs requested from Chrome Web Store page content are not
-    // strictly user-initiated — the webstore preload forwards postMessage install
-    // requests, so page scripts can trigger them. Gate those behind a native
-    // confirmation; requests from Nova's own window already come from UI interaction.
-    if (!isFromMainWindow) {
-      const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-      const confirmOptions: Electron.MessageBoxOptions = {
-        type: 'question',
-        buttons: ['Cancel', 'Install'],
-        defaultId: 0,
-        cancelId: 0,
-        title: 'Install extension?',
-        message: `Allow this page to install extension "${extensionId}" into Nova?`,
-        detail: 'The Chrome Web Store page you are viewing requested this installation. Only allow it if you trust this extension.'
-      };
-      const { response } = parentWin
-        ? await dialog.showMessageBox(parentWin, confirmOptions)
-        : await dialog.showMessageBox(confirmOptions);
-      if (response !== 1) {
-        return { error: 'Installation cancelled by user.' };
-      }
-    }
-
-    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=mac&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=unknown&prodversion=126.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
-    
-    const res = await fetch(crxUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-      }
-    });
-    
-    if (!res.ok) {
-      const errText = await res.text().catch(() => '');
-      throw new Error(`Eklenti indirilemedi (HTTP ${res.status}): ${errText.substring(0, 100)}`);
-    }
-
-    // 🔒 Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
-    // Reject early on a declared Content-Length over the limit; abort mid-stream otherwise.
-    const MAX_CRX_BYTES = 100 * 1024 * 1024;
-    const declaredLength = Number.parseInt(res.headers.get('content-length') || '', 10);
-    if (Number.isFinite(declaredLength) && declaredLength > MAX_CRX_BYTES) {
-      throw new Error(`Extension package exceeds maximum allowed size (${MAX_CRX_BYTES} bytes).`);
-    }
-
-    const buffer = await readBodyWithLimit(res, MAX_CRX_BYTES);
-
-    // 🔒 Security: Validate CRX magic header (Cr24: 0x43 0x72 0x32 0x34) or PK zip header (0x50 0x4B)
-    if (buffer.length < 4 || ((buffer[0] !== 0x43 || buffer[1] !== 0x72 || buffer[2] !== 0x32 || buffer[3] !== 0x34) && (buffer[0] !== 0x50 || buffer[1] !== 0x4B))) {
-      throw new Error('Downloaded file is not a valid extension package format.');
-    }
-    
-    const tempPath = path.join(app.getPath('userData'), 'temp_extensions');
-    if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
-    
-    const crxFilePath = path.join(tempPath, `${extensionId}.crx`);
-    fs.writeFileSync(crxFilePath, buffer);
-    
-    const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
-    const extractPath = path.join(extensionsBaseDir, extensionId);
-
-    // 🔒 Security: validate every zip entry against the extraction target BEFORE
-    // extracting — rejects absolute paths, '..' segments, and any path that would
-    // resolve outside the target dir (zip-slip).
-    await assertCrxEntriesSafe(buffer, extractPath);
-
-    if (!fs.existsSync(extractPath)) {
-      fs.mkdirSync(extractPath, { recursive: true });
-      await unzip(crxFilePath, extractPath);
-
-      // 🔒 Security: post-extraction containment + symlink sweep.
-      assertExtractionContained(extractPath);
-
-      // Verify realpath of extractPath to prevent directory escaping
-      try {
-        const realExtract = fs.realpathSync(extractPath);
-        const realBase = fs.realpathSync(extensionsBaseDir);
-        if (!realExtract.startsWith(realBase + path.sep)) {
-          fs.rmSync(extractPath, { recursive: true, force: true });
-          throw new Error('Extension extraction path escaped target directory.');
-        }
-      } catch (err) {
-        fs.rmSync(extractPath, { recursive: true, force: true });
-        throw err;
-      }
-    }
-    
-    const win = BrowserWindow.getAllWindows()[0];
-    
-    // Clear disabled state if extension was previously disabled
-    const disabledIds = getDisabledExtensionIds();
-    if (disabledIds.includes(extensionId)) {
-      setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId));
-    }
-
-    // Check if it's already loaded to prevent duplicate loading
-    const isAlreadyLoaded = loadedExtensions.some(e => e.id === extensionId);
-    let extInfo;
-    if (!isAlreadyLoaded) {
-      extInfo = await win?.webContents.session.loadExtension(extractPath) || await session.defaultSession.loadExtension(extractPath);
-      loadedExtensions.push(extInfo);
-    } else {
-      extInfo = loadedExtensions.find(e => e.id === extensionId);
-    }
-    
-    try { fs.unlinkSync(crxFilePath); } catch (e) {}
-    
-    // Notify all frontend windows immediately
-    for (const w of BrowserWindow.getAllWindows()) {
-      if (!w.isDestroyed()) {
-        w.webContents.send('extension-changed');
-      }
-    }
-    
-    return { success: true, extension: extInfo };
-  } catch (err: any) {
-    console.error('Web Store Install Error:', err);
-    return { error: err.message || 'Bilinmeyen bir hata oluştu.' };
-  }
-});
+// Install from Chrome Web Store (CRX download + zip-slip guards live in main/crxInstaller.ts)
+ipcMain.handle('install-from-webstore', (event, urlOrId: string) => installFromWebstore({
+  isTrustedSender,
+  getMainWindow: () => (mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined),
+  isExtensionLoaded: (extensionId: string) => loadedExtensions.some(e => e.id === extensionId),
+  findLoadedExtension: (extensionId: string) => loadedExtensions.find(e => e.id === extensionId),
+  addLoadedExtension: (extInfo) => { loadedExtensions.push(extInfo); },
+  getDisabledExtensionIds,
+  setDisabledExtensionIds
+}, event, urlOrId));
 
 // --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
 let activeTtsProcess: child_process.ChildProcess | null = null;

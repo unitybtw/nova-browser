@@ -135,11 +135,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   // Tab thumbnails
   captureTabThumbnail: (webContentsId: number) => ipcRenderer.invoke('capture-tab-thumbnail', webContentsId),
-  onTabThumbnailUpdate: (callback: (event: any, data: { webContentsId: number; dataUrl: string }) => void) => {
-    const handler = (_event: any, data: any) => callback(null, data);
-    ipcRenderer.on('tab-thumbnail-update', handler);
-    return () => ipcRenderer.removeListener('tab-thumbnail-update', handler);
-  },
   onTabAudioChanged: (callback: (event: any, data: { webContentsId: number; isPlayingAudio: boolean }) => void) => {
     const handler = (_event: any, data: any) => callback(null, data);
     ipcRenderer.on('tab-audio-changed', handler);

@@ -3,24 +3,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { PanelRight, PanelLeft } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
-export interface HistoryItem {
-  id: string;
-  url: string;
-  title: string;
-  favicon?: string;
-  timestamp: number;
-}
-
-export interface DownloadItem {
-  id: string;
-  filename: string;
-  url: string;
-  receivedBytes: number;
-  totalBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
-  isPaused?: boolean;
-  savePath?: string;
-}
+// Downloads / history / permission domains were extracted into hooks under
+// src/hooks. The item types moved with them and are re-exported here so the
+// existing `from '../App'` import paths (DownloadToast, DownloadsPopover,
+// HistoryPage, BrowserView, syncService) keep resolving unchanged.
+import { useDownloads } from './hooks/useDownloads';
+export type { DownloadItem } from './hooks/useDownloads';
+import { useHistoryRecorder, type HistoryItem } from './hooks/useHistoryRecorder';
+export type { HistoryItem };
+import { usePermissionRequests } from './hooks/usePermissionRequests';
 export interface UserSettings {
   searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia' | 'yahoo';
   privacyShield: boolean;
@@ -99,7 +90,7 @@ const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m 
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Folder, Bookmark, Extension, Workspace, PermissionRequest } from './types/browser';
+import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
 
@@ -640,68 +631,18 @@ function App() {
     }
   }, []);
 
-  // Permission requests state (Chrome-style top bar prompts)
-  const [permissionRequests, setPermissionRequests] = useState<PermissionRequest[]>([]);
+  // Permission requests state (Chrome-style top bar prompts) + onPermissionRequest
+  // IPC listener + respond/dismiss handlers (extracted to usePermissionRequests)
+  const { permissionRequests, handleRespondPermission, handleDismissPermission } = usePermissionRequests();
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.onPermissionRequest) {
-      const removeListener = (window as any).electronAPI.onPermissionRequest((_event: any, request: PermissionRequest) => {
-        setPermissionRequests(prev => {
-          const filtered = prev.filter(r => r.requestId !== request.requestId);
-          return [...filtered, request];
-        });
-      });
-      return () => {
-        try { removeListener?.(); } catch (_) {}
-      };
-    }
-  }, []);
+  // Downloads state + onDownloadUpdate IPC listener with ~100ms progress batching
+  // + clear handler (extracted to useDownloads)
+  const { downloads, handleClearDownloads } = useDownloads();
 
-  const handleRespondPermission = useCallback(async (requestId: string, allow: boolean, remember: boolean) => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.respondPermissionRequest) {
-      try {
-        await (window as any).electronAPI.respondPermissionRequest(requestId, allow, remember);
-      } catch (e) {
-        console.error('Failed to respond to permission request:', e);
-      }
-    }
-    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
-  }, []);
-
-  const handleDismissPermission = useCallback((requestId: string) => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.respondPermissionRequest) {
-      try {
-        (window as any).electronAPI.respondPermissionRequest(requestId, false, false);
-      } catch (e) {}
-    }
-    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
-  }, []);
-
-  // Downloads state
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
-
-  // History state
-  const [history, setHistory] = useState<HistoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('browsing_history');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to load browsing_history from localStorage:', e);
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem('browsing_history', JSON.stringify(history));
-      } catch (e) {}
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [history]);
+  // History state + debounced (~2s) localStorage persistence + navigation
+  // recorder that handleUpdateTab calls OUTSIDE the tabs updater
+  // (extracted to useHistoryRecorder)
+  const { history, setHistory, recordVisit } = useHistoryRecorder();
 
   // Save session whenever tabs changes (Excluding Incognito Tabs)
   useEffect(() => {
@@ -1210,10 +1151,10 @@ function App() {
   // (e.g. ⌘T creating a tab in a stale workspace, ⌘W closing a stale active tab).
   const handlersRef = useRef<AppEventHandlers>(null!);
 
-  // Listen to IPC events from main process (Shortcuts & Downloads) with cleanups
+  // Listen to IPC events from main process (Shortcuts; downloads moved to
+  // useDownloads) with cleanups
   useEffect(() => {
     let cleanupShortcut: (() => void) | void;
-    let cleanupDownloads: (() => void) | void;
     let cleanupNewTab: (() => void) | void;
 
     if (window.electronAPI?.onShortcut) {
@@ -1308,62 +1249,6 @@ function App() {
       });
     }
 
-    if (window.electronAPI?.onDownloadUpdate) {
-      let pendingUpdates: Record<string, DownloadItem> = {};
-      let throttleTimer: any = null;
-
-      const flushUpdates = () => {
-        if (throttleTimer) {
-          clearTimeout(throttleTimer);
-          throttleTimer = null;
-        }
-        // Capture and clear the pending bag OUTSIDE the updater
-        // (StrictMode-safe): mutating it inside the updater would empty the
-        // bag on the first double-invoke pass and silently drop updates on
-        // the second.
-        const captured = pendingUpdates;
-        pendingUpdates = {};
-        setDownloads(prev => {
-          const updated = [...prev];
-          let hasChanges = false;
-
-          Object.values(captured).forEach(pendingData => {
-            const existingIdx = updated.findIndex(d => d.id === pendingData.id);
-            if (existingIdx !== -1) {
-              updated[existingIdx] = { ...updated[existingIdx], ...pendingData };
-              hasChanges = true;
-            } else {
-              updated.unshift(pendingData);
-              hasChanges = true;
-            }
-          });
-
-          return hasChanges ? updated : prev;
-        });
-      };
-
-      const removeDownloadListener = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
-        pendingUpdates[data.id] = data;
-        
-        // Immediate update for new downloads or completion/cancellation
-        if (data.receivedBytes === 0 || data.state === 'completed' || data.state === 'cancelled' || data.state === 'interrupted') {
-          flushUpdates();
-        } else if (!throttleTimer) {
-          throttleTimer = setTimeout(() => {
-            flushUpdates();
-          }, 100); // Fast 100ms UI progress update
-        }
-      });
-
-      cleanupDownloads = () => {
-        if (throttleTimer) {
-          clearTimeout(throttleTimer);
-          throttleTimer = null;
-        }
-        if (typeof removeDownloadListener === 'function') removeDownloadListener();
-      };
-    }
-
     let cleanupExtInstall: (() => void) | void;
     if ((window as any).electronAPI?.onExtensionInstalledSilently) {
       cleanupExtInstall = (window as any).electronAPI.onExtensionInstalledSilently((_event: any, data: any) => {
@@ -1386,7 +1271,6 @@ function App() {
       if (typeof cleanupNewTab === 'function') cleanupNewTab();
       if (typeof cleanupNewIncognitoTab === 'function') cleanupNewIncognitoTab();
       if (typeof cleanupQuickAI === 'function') cleanupQuickAI();
-      if (typeof cleanupDownloads === 'function') cleanupDownloads();
       if (typeof cleanupExtInstall === 'function') cleanupExtInstall();
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
       window.removeEventListener('open-workspace-manager', handleOpenWorkspaceManager);
@@ -2041,27 +1925,8 @@ function App() {
     const updated = { ...current, ...updates };
 
     // Add to history if title or url loaded and not blank/newtab AND NOT INCOGNITO
-    if (!updated.isIncognito && (updates.title || updates.url)) {
-      const targetUrl = updated.url;
-      if (targetUrl && targetUrl !== 'nova://newtab' && targetUrl !== 'about:blank' && !targetUrl.startsWith('chrome://')) {
-        setHistory(hPrev => {
-          // If same URL was just recorded, update title/favicon if improved
-          if (hPrev.length > 0 && hPrev[0]?.url === targetUrl) {
-            if (updated.title && hPrev[0].title !== updated.title) {
-              return [{ ...hPrev[0], title: updated.title, favicon: updated.favicon || hPrev[0].favicon }, ...hPrev.slice(1)];
-            }
-            return hPrev;
-          }
-          return [{
-            id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
-            url: targetUrl,
-            title: updated.title || targetUrl,
-            favicon: updated.favicon,
-            timestamp: Date.now()
-          }, ...hPrev.slice(0, 500)]; // keep last 500
-        });
-      }
-    }
+    // (gating + dedupe rules live in useHistoryRecorder.recordVisit)
+    recordVisit(updated, updates);
   }, []);
 
   const handleToggleMuteTab = useCallback((id: string, e?: React.MouseEvent) => {
@@ -2294,9 +2159,6 @@ function App() {
     setHistory(prev => prev.filter(item => item.id !== id));
     try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => item.id !== id))); } catch (e) {}
   }, [history]);
-
-  const handleClearDownloads = useCallback(() => setDownloads([]), []);
-
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
 
