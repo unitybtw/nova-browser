@@ -56,8 +56,9 @@ export const SidePanel = React.memo(({
       // Auto-clear completed/failed/denied actions after 3 seconds to prevent memory leak
       const completedActions = actions.filter(a => a.state === 'completed' || a.state === 'failed' || a.state === 'denied');
       if (completedActions.length > 50) {
-        // Keep only the 50 most recent completed actions
-        orchestrator.clearQueue();
+        // Remove only terminal actions — clearQueue() would also wipe executing
+        // actions, making their subsequent updateActionState calls no-ops.
+        orchestrator.pruneCompleted();
       }
     });
     return () => { unsubscribe(); };
@@ -249,6 +250,10 @@ export const SidePanel = React.memo(({
   const isOpenRef = useRef(isOpen);
   isOpenRef.current = isOpen;
 
+  // Tracks the deferred quick-action dispatch so it can be cancelled if the
+  // panel unmounts within the 300ms window (prevents a post-unmount setState).
+  const quickActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const handleQuickAction = (e: Event) => {
       const customEvent = e as CustomEvent;
@@ -258,13 +263,23 @@ export const SidePanel = React.memo(({
           // Tell App.tsx to open SidePanel via a new event, or we need App.tsx to listen and open it!
           window.dispatchEvent(new CustomEvent('open-ai-sidepanel'));
         }
-        setTimeout(() => {
+        if (quickActionTimerRef.current !== null) {
+          clearTimeout(quickActionTimerRef.current);
+        }
+        quickActionTimerRef.current = setTimeout(() => {
+          quickActionTimerRef.current = null;
           handleAIActionRef.current(actionText);
         }, 300);
       }
     };
     window.addEventListener('ai-quick-action', handleQuickAction);
-    return () => window.removeEventListener('ai-quick-action', handleQuickAction);
+    return () => {
+      window.removeEventListener('ai-quick-action', handleQuickAction);
+      if (quickActionTimerRef.current !== null) {
+        clearTimeout(quickActionTimerRef.current);
+        quickActionTimerRef.current = null;
+      }
+    };
   }, []);
 
   return (

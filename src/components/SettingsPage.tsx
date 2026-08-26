@@ -1552,6 +1552,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.aiLinkPreviewEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                   </div>
+
+                  {/* Password Manager */}
+                  <div className="p-5 flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Password Manager</div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Offer to save and autofill passwords on websites. Credentials are encrypted on this device.</div>
+                    </div>
+                    <button
+                      onClick={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.passwordManagerEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                    >
+                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.passwordManagerEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
                 </div>
               </section>
 

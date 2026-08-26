@@ -723,6 +723,45 @@ class AIAgent {
     }
   }
 
+  /**
+   * Adaptive post-navigation wait. Replaces the old blind 1200ms sleep: poll
+   * the live page through the action context until document.readyState is
+   * 'complete' (checked every 150ms, capped at 6s), so already-loaded pages
+   * proceed almost immediately while slow ones still get a fair window.
+   * A minimum settle delay runs first so the navigation has time to actually
+   * start — otherwise the previous document could still report 'complete'.
+   * Remains interruptible: bails out as soon as this.isInterrupted flips.
+   */
+  private async waitForPageLoadSettled(): Promise<void> {
+    const POLL_INTERVAL_MS = 150;
+    const MAX_WAIT_MS = 6000;
+    const MIN_SETTLE_MS = 300;
+    // If script execution keeps failing (web dev mode without an Electron
+    // webview, or prolonged mid-navigation context destruction), stop polling
+    // instead of burning the entire cap.
+    const MAX_CONSECUTIVE_ERRORS = 5;
+
+    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+    await sleep(MIN_SETTLE_MS);
+
+    const deadline = Date.now() + MAX_WAIT_MS;
+    let consecutiveErrors = 0;
+    while (Date.now() < deadline) {
+      if (this.isInterrupted) return;
+      try {
+        const readyState = await this.actionContext?.onExecuteScript(`document.readyState`);
+        if (readyState === 'complete') return;
+        consecutiveErrors = 0;
+      } catch (e) {
+        // Execution context briefly destroyed during navigation is expected;
+        // keep polling unless failures persist.
+        consecutiveErrors++;
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) return;
+      }
+      await sleep(POLL_INTERVAL_MS);
+    }
+  }
+
   public async handleToolCall(toolCall: any): Promise<string> {
     if (!toolCall || !toolCall.function || typeof toolCall.function.name !== 'string') {
       return JSON.stringify({ error: "Invalid tool call format" });
@@ -786,10 +825,10 @@ class AIAgent {
         }
 
         this.actionContext.onNavigate(url);
-        await new Promise(r => setTimeout(r, 1200));
-        
-        result = { 
-          success: true, 
+        await this.waitForPageLoadSettled();
+
+        result = {
+          success: true,
           url,
           message: "Sayfa basariyla acildi."
         };
@@ -1084,14 +1123,16 @@ class AIAgent {
       }
 
       else if (functionName === "auto_fill_form") {
-        // Fetch inputs from the page
+        // Fetch inputs from the page (including any tagged data-ai-id so the
+        // model can reference elements the same way fill_input expects)
         const script = `(() => {
           return Array.from(document.querySelectorAll('input, textarea')).map(el => ({
             tag: el.tagName,
             type: el.type,
             name: el.name,
             placeholder: el.placeholder,
-            id: el.id
+            id: el.id,
+            ai_id: el.getAttribute('data-ai-id')
           }));
         })();`;
         const inputs = await this.actionContext.onExecuteScript(script);
@@ -1127,14 +1168,51 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         }
 
         if (fillCommands.length > 0) {
+          const failedCommands: { selector: string; reason: string }[] = [];
           for (const cmd of fillCommands) {
             if (cmd.selector && cmd.value) {
-              await this.handleToolCall(
-                { id: Math.random().toString(), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ selector: cmd.selector, value: cmd.value }) } }
-              );
+              // fill_input resolves elements via [data-ai-id], so map the CSS
+              // selector to its tagged ai_id first (tagging on the fly if the
+              // element has not been indexed by read_page_content yet).
+              const resolveScript = `(() => {
+                try {
+                  const el = document.querySelector(${JSON.stringify(cmd.selector)});
+                  if (!el) return JSON.stringify({ error: 'Element not found for selector: ' + ${JSON.stringify(cmd.selector)} });
+                  let aiId = el.getAttribute('data-ai-id');
+                  if (!aiId) {
+                    aiId = 'af_' + Math.random().toString(36).substring(2, 10);
+                    el.setAttribute('data-ai-id', aiId);
+                  }
+                  return JSON.stringify({ ai_id: aiId });
+                } catch (e) {
+                  return JSON.stringify({ error: 'Invalid selector: ' + ${JSON.stringify(cmd.selector)} });
+                }
+              })();`;
+              const rawResolved = await this.actionContext.onExecuteScript(resolveScript);
+              let resolved: any = rawResolved;
+              if (typeof resolved === 'string') {
+                try { resolved = JSON.parse(resolved); } catch (_) { resolved = null; }
+              }
+
+              if (resolved && resolved.ai_id) {
+                await this.handleToolCall(
+                  { id: Math.random().toString(), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ ai_id: resolved.ai_id, value: cmd.value }) } }
+                );
+              } else {
+                // Surface a clear error instead of silently skipping the field
+                failedCommands.push({
+                  selector: cmd.selector,
+                  reason: resolved?.error || 'Could not resolve element for selector'
+                });
+              }
             }
           }
-          result = { success: true, filled: fillCommands.length, hint: "Form was auto-filled." };
+          result = {
+            success: true,
+            filled: fillCommands.length,
+            ...(failedCommands.length > 0 ? { failed: failedCommands } : {}),
+            hint: "Form was auto-filled."
+          };
         } else {
           result = { success: false, hint: "No matching fields found to auto-fill based on memory." };
         }

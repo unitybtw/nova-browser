@@ -63,8 +63,8 @@ export async function decryptSyncPayload<T>(envelope: EncryptedSyncEnvelope, pas
 
 export function createPairingToken(): string {
   return bytesToBase64(crypto.getRandomValues(new Uint8Array(32)))
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
     .replace(/=+$/, '');
 }
 

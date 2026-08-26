@@ -47,6 +47,7 @@ export interface UserSettings {
   energySaverMode?: boolean;
   preloadDnsEnabled?: boolean;
   smoothScrollingEnabled?: boolean;
+  passwordManagerEnabled?: boolean;
 }
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
@@ -89,6 +90,13 @@ const HelpModal = lazyWithRetry(() => import('./components/HelpModal').then(m =>
 const AccountModal = lazyWithRetry(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
 const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 
+// VpnPopover requires an anchorRef prop, but no element ever attaches to it
+// (the VPN toggle lives inside TopBar's more-menu, which is unmounted while
+// closed), so the popover has always used its fallback positioning
+// (top: 50, right: 80). This shared empty ref keeps that exact behavior
+// without allocating a new object per render.
+const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
+
 import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace, PermissionRequest } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
@@ -101,6 +109,29 @@ const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
 ];
 
 const EMPTY_ARRAY: any[] = [];
+
+// Bag of latest event handler identities for mount-time IPC listeners.
+// Listeners registered once with [] deps would otherwise capture stale
+// mount-time closures; they read handlersRef.current instead (see below).
+type AppEventHandlers = {
+  handleNewTab: (url?: string | any) => void;
+  handleNewIncognitoTab: (url?: string) => void;
+  handleCloseTab: (id: string, e?: React.MouseEvent) => void;
+  handleReopenClosedTab: () => void;
+  closeAllModals: () => void;
+  handleOpenSettings: () => void;
+  handlePrintPage: () => void;
+  handleOpenDevTools: () => void;
+  handleReload: () => void;
+  handleZoomIn: () => void;
+  handleZoomOut: () => void;
+  handleResetZoom: () => void;
+  handleOpenHistory: () => void;
+  handleOpenDownloads: () => void;
+  handleToggleBookmarkActive: () => void;
+  handleGoBack: () => void;
+  handleGoForward: () => void;
+};
 
 // Demo mode query parameter inspection
 const getDemoParams = () => {
@@ -204,6 +235,12 @@ function App() {
   const activeTabIdRef = useRef(activeTabId);
   useEffect(() => { activeTabIdRef.current = activeTabId; }, [activeTabId]);
 
+  // Latest-tabs ref: lets handlers compute new arrays OUTSIDE setState updaters,
+  // keeping every updater pure (React StrictMode double-invokes updater functions
+  // in dev, so any side effect inside them would run twice).
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+
   const [folders, setFolders] = useState<Folder[]>(() => {
     if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
       return [
@@ -249,8 +286,12 @@ function App() {
   });
 
   useEffect(() => {
-    localStorage.setItem('workspaces_session', JSON.stringify(workspaces));
-    localStorage.setItem('active_workspace_session', activeWorkspaceId);
+    try {
+      localStorage.setItem('workspaces_session', JSON.stringify(workspaces));
+    } catch (e) {}
+    try {
+      localStorage.setItem('active_workspace_session', activeWorkspaceId);
+    } catch (e) {}
   }, [workspaces, activeWorkspaceId]);
 
   // AI Assistant State
@@ -458,6 +499,7 @@ function App() {
       energySaverMode: false,
       preloadDnsEnabled: true,
       smoothScrollingEnabled: true,
+      passwordManagerEnabled: false,
       shortcuts: {
         newTab: { key: 't', shift: false, meta: true },
         reopenTab: { key: 't', shift: true, meta: true },
@@ -492,7 +534,9 @@ function App() {
 
   // Sync settings with local storage and backend
   useEffect(() => {
-    localStorage.setItem('user_settings', JSON.stringify(settings));
+    try {
+      localStorage.setItem('user_settings', JSON.stringify(settings));
+    } catch (e) {}
     if ((window as any).electronAPI?.storeSet) {
       (window as any).electronAPI.storeSet('settings', JSON.stringify(settings));
     }
@@ -636,7 +680,9 @@ function App() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      localStorage.setItem('browsing_history', JSON.stringify(history));
+      try {
+        localStorage.setItem('browsing_history', JSON.stringify(history));
+      } catch (e) {}
     }, 2000);
     return () => clearTimeout(timer);
   }, [history]);
@@ -646,7 +692,9 @@ function App() {
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
     const timer = setTimeout(() => {
-      localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
+      try {
+        localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
+      } catch (e) {}
     }, 2000);
 
     return () => clearTimeout(timer);
@@ -671,11 +719,15 @@ function App() {
   }, [tabs, activeTabId]);
 
   useEffect(() => {
-    localStorage.setItem('active_tab_session', activeTabId);
+    try {
+      localStorage.setItem('active_tab_session', activeTabId);
+    } catch (e) {}
   }, [activeTabId]);
 
   useEffect(() => {
-    localStorage.setItem('folders_session', JSON.stringify(folders));
+    try {
+      localStorage.setItem('folders_session', JSON.stringify(folders));
+    } catch (e) {}
   }, [folders]);
 
   // Apply Theme Mode & Custom Accent
@@ -805,7 +857,9 @@ function App() {
 
   // Save bookmarks to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+    try {
+      localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+    } catch (e) {}
   }, [bookmarks]);
 
   // Cloud Sync Handler
@@ -865,6 +919,8 @@ function App() {
   }, [handlePerformSync]);
 
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
+  const closedTabsStackRef = useRef(closedTabsStack);
+  closedTabsStackRef.current = closedTabsStack;
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
@@ -936,44 +992,50 @@ function App() {
   }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, activeTabId, splitTabId]);
 
   // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
+  // All side effects (closed-tabs stack, active-tab selection, incognito session
+  // cleanup) are computed from tabsRef OUTSIDE the setState updater so every
+  // updater stays pure (StrictMode double-invokes updater functions in dev).
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    setTabs(prevTabs => {
-      const targetTab = prevTabs.find(t => t.id === id);
-      if (prevTabs.length <= 1) {
-        return [{
-          id: Date.now().toString(),
-          url: 'nova://newtab',
-          title: 'New Tab',
-          isLoading: false,
-          canGoBack: false,
-          canGoForward: false
-        }];
+    const prevTabs = tabsRef.current;
+    const targetTab = prevTabs.find(t => t.id === id);
+
+    if (prevTabs.length <= 1) {
+      setTabs([{
+        id: Date.now().toString(),
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false
+      }]);
+      return;
+    }
+
+    const targetIdx = prevTabs.findIndex(t => t.id === id);
+    const newTabs = prevTabs
+      .filter(t => t.id !== id)
+      .map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t);
+
+    if (targetTab) {
+      setClosedTabsStack(stack => [...stack, targetTab]);
+    }
+
+    if (activeTabIdRef.current === id && newTabs.length > 0) {
+      const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
+      setActiveTabId(newTabs[nextActiveIdx].id);
+    }
+
+    // If closing an incognito tab and no more incognito tabs exist, clear session
+    if (targetTab?.isIncognito) {
+      const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
+      if (!remainingIncognitoTabs && (window as any).electronAPI?.clearIncognitoSession) {
+        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
       }
-      if (targetTab) {
-        setClosedTabsStack(stack => [...stack, targetTab]);
-      }
-      const targetIdx = prevTabs.findIndex(t => t.id === id);
-      const newTabs = prevTabs
-        .filter(t => t.id !== id)
-        .map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t);
-      
-      if (activeTabId === id && newTabs.length > 0) {
-        const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
-        setActiveTabId(newTabs[nextActiveIdx].id);
-      }
-      
-      // If closing an incognito tab and no more incognito tabs exist, clear session
-      if (targetTab?.isIncognito) {
-        const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
-        if (!remainingIncognitoTabs && (window as any).electronAPI?.clearIncognitoSession) {
-          (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
-        }
-      }
-      
-      return newTabs;
-    });
-  }, [activeTabId]);
+    }
+
+    setTabs(newTabs);
+  }, []);
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
@@ -999,26 +1061,26 @@ function App() {
   }, []);
 
   const handleDuplicateTab = useCallback((tabId: string) => {
-    setTabs(prev => {
-      const idx = prev.findIndex(t => t.id === tabId);
-      if (idx === -1) return prev;
-      const original = prev[idx];
-      const newTab: Tab = {
-        ...original,
-        id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
-        title: original.title,
-        url: original.url,
-        favicon: original.favicon,
-        isLoading: false,
-        canGoBack: false,
-        canGoForward: false,
-        isPinned: false
-      };
-      const newTabs = [...prev];
-      newTabs.splice(idx + 1, 0, newTab);
-      setActiveTabId(newTab.id);
-      return newTabs;
-    });
+    // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
+    const prev = tabsRef.current;
+    const idx = prev.findIndex(t => t.id === tabId);
+    if (idx === -1) return;
+    const original = prev[idx];
+    const newTab: Tab = {
+      ...original,
+      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
+      title: original.title,
+      url: original.url,
+      favicon: original.favicon,
+      isLoading: false,
+      canGoBack: false,
+      canGoForward: false,
+      isPinned: false
+    };
+    const newTabs = [...prev];
+    newTabs.splice(idx + 1, 0, newTab);
+    setTabs(newTabs);
+    setActiveTabId(newTab.id);
   }, []);
 
   const handleTogglePinTab = useCallback((tabId: string) => {
@@ -1035,32 +1097,32 @@ function App() {
   }, []);
 
   const handleCloseOtherTabs = useCallback((tabId: string) => {
-    setTabs(prev => {
-      const target = prev.find(t => t.id === tabId);
-      if (!target) return prev;
-      // Preserve pinned tabs and target tab
-      const toKeep = prev.filter(t => t.id === tabId || t.isPinned);
-      const toClose = prev.filter(t => t.id !== tabId && !t.isPinned);
-      setClosedTabsStack(stack => [...stack, ...toClose]);
-      setActiveTabId(tabId);
-      return toKeep;
-    });
+    // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
+    const prev = tabsRef.current;
+    const target = prev.find(t => t.id === tabId);
+    if (!target) return;
+    // Preserve pinned tabs and target tab
+    const toKeep = prev.filter(t => t.id === tabId || t.isPinned);
+    const toClose = prev.filter(t => t.id !== tabId && !t.isPinned);
+    setClosedTabsStack(stack => [...stack, ...toClose]);
+    setActiveTabId(tabId);
+    setTabs(toKeep);
   }, []);
 
   const handleCloseTabsToRight = useCallback((index: number) => {
-    setTabs(prev => {
-      if (index < 0 || index >= prev.length - 1) return prev;
-      const toKeep = prev.slice(0, index + 1);
-      const toClose = prev.slice(index + 1).filter(t => !t.isPinned);
-      const pinnedToRight = prev.slice(index + 1).filter(t => t.isPinned);
-      setClosedTabsStack(stack => [...stack, ...toClose]);
-      const nextTabs = [...toKeep, ...pinnedToRight];
-      if (!nextTabs.some(t => t.id === activeTabId)) {
-        setActiveTabId(prev[index].id);
-      }
-      return nextTabs;
-    });
-  }, [activeTabId]);
+    // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
+    const prev = tabsRef.current;
+    if (index < 0 || index >= prev.length - 1) return;
+    const toKeep = prev.slice(0, index + 1);
+    const toClose = prev.slice(index + 1).filter(t => !t.isPinned);
+    const pinnedToRight = prev.slice(index + 1).filter(t => t.isPinned);
+    setClosedTabsStack(stack => [...stack, ...toClose]);
+    const nextTabs = [...toKeep, ...pinnedToRight];
+    if (!nextTabs.some(t => t.id === activeTabIdRef.current)) {
+      setActiveTabId(prev[index].id);
+    }
+    setTabs(nextTabs);
+  }, []);
 
   const handleNewTabRight = useCallback((index: number) => {
     const newId = Date.now().toString();
@@ -1110,16 +1172,22 @@ function App() {
   }, [activeTabId]);
 
   const handleReopenClosedTab = useCallback(() => {
-    setClosedTabsStack(stack => {
-      if (stack.length === 0) return stack;
-      const lastTab = stack[stack.length - 1];
-      setTabs(prev => [...prev, lastTab]);
-      setActiveTabId(lastTab.id);
-      return stack.slice(0, -1);
-    });
+    // Read the stack from the ref OUTSIDE any updater (StrictMode-safe)
+    const stack = closedTabsStackRef.current;
+    if (stack.length === 0) return;
+    const lastTab = stack[stack.length - 1];
+    setTabs(prev => [...prev, lastTab]);
+    setActiveTabId(lastTab.id);
+    setClosedTabsStack(stack.slice(0, -1));
   }, []);
 
 
+
+  // Ref holding the LATEST handler identities for the mount-time listeners below.
+  // Re-assigned every render (see assignment after all handlers are defined) so
+  // listeners registered once with [] deps never invoke stale closures
+  // (e.g. ⌘T creating a tab in a stale workspace, ⌘W closing a stale active tab).
+  const handlersRef = useRef<AppEventHandlers>(null!);
 
   // Listen to IPC events from main process (Shortcuts & Downloads) with cleanups
   useEffect(() => {
@@ -1132,35 +1200,35 @@ function App() {
         if (command === 'search' || command === 'toggle-omnibox') {
           setIsSpotlightOpen(prev => !prev);
         } else if (command === 'new-tab') {
-          handleNewTab();
+          handlersRef.current.handleNewTab();
         } else if (command === 'new-incognito') {
-          handleNewIncognitoTab();
+          handlersRef.current.handleNewIncognitoTab();
         } else if (command === 'close-tab') {
-          if (activeTabIdRef.current) handleCloseTab(activeTabIdRef.current);
+          if (activeTabIdRef.current) handlersRef.current.handleCloseTab(activeTabIdRef.current);
         } else if (command === 'reopen-tab') {
-          handleReopenClosedTab();
+          handlersRef.current.handleReopenClosedTab();
         } else if (command === 'open-help') {
-          closeAllModals();
+          handlersRef.current.closeAllModals();
           setHelpInitialTab('help');
           setIsHelpOpen(true);
         } else if (command === 'shortcuts-help') {
-          closeAllModals();
+          handlersRef.current.closeAllModals();
           setHelpInitialTab('shortcuts');
           setIsHelpOpen(true);
         } else if (command === 'ai-help') {
-          closeAllModals();
+          handlersRef.current.closeAllModals();
           setHelpInitialTab('ai');
           setIsHelpOpen(true);
         } else if (command === 'privacy-help') {
-          closeAllModals();
+          handlersRef.current.closeAllModals();
           setHelpInitialTab('privacy');
           setIsHelpOpen(true);
         } else if (command === 'about-help') {
-          closeAllModals();
+          handlersRef.current.closeAllModals();
           setHelpInitialTab('about');
           setIsHelpOpen(true);
         } else if (command === 'settings') {
-          handleOpenSettings();
+          handlersRef.current.handleOpenSettings();
         } else if (command === 'focus-url') {
           const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
           if (searchInput) {
@@ -1168,31 +1236,31 @@ function App() {
             searchInput.select();
           }
         } else if (command === 'print') {
-          handlePrintPage();
+          handlersRef.current.handlePrintPage();
         } else if (command === 'devtools') {
-          handleOpenDevTools();
+          handlersRef.current.handleOpenDevTools();
         } else if (command === 'reload' || command === 'force-reload') {
-          handleReload();
+          handlersRef.current.handleReload();
         } else if (command === 'zoom-in') {
-          handleZoomIn();
+          handlersRef.current.handleZoomIn();
         } else if (command === 'zoom-out') {
-          handleZoomOut();
+          handlersRef.current.handleZoomOut();
         } else if (command === 'zoom-reset') {
-          handleResetZoom();
+          handlersRef.current.handleResetZoom();
         } else if (command === 'history') {
-          handleOpenHistory();
+          handlersRef.current.handleOpenHistory();
         } else if (command === 'downloads') {
-          handleOpenDownloads();
+          handlersRef.current.handleOpenDownloads();
         } else if (command === 'bookmark') {
-          handleToggleBookmarkActive();
+          handlersRef.current.handleToggleBookmarkActive();
         } else if (command === 'toggle-bookmarks-bar') {
           setSettings(s => ({ ...s, showBookmarksBar: !s.showBookmarksBar }));
         } else if (command === 'find') {
           setIsFindInPageOpen(prev => !prev);
         } else if (command === 'go-back') {
-          handleGoBack();
+          handlersRef.current.handleGoBack();
         } else if (command === 'go-forward') {
-          handleGoForward();
+          handlersRef.current.handleGoForward();
         }
       });
     }
@@ -1202,13 +1270,13 @@ function App() {
 
     if (window.electronAPI?.onNewTab) {
       cleanupNewTab = window.electronAPI.onNewTab((_event: any, url: string) => {
-        handleNewTab(url);
+        handlersRef.current.handleNewTab(url);
       });
     }
 
     if ((window as any).electronAPI?.onNewIncognitoTab) {
       cleanupNewIncognitoTab = (window as any).electronAPI.onNewIncognitoTab((_event: any, url: string) => {
-        handleNewIncognitoTab(url);
+        handlersRef.current.handleNewIncognitoTab(url);
       });
     }
 
@@ -1228,11 +1296,17 @@ function App() {
           clearTimeout(throttleTimer);
           throttleTimer = null;
         }
+        // Capture and clear the pending bag OUTSIDE the updater
+        // (StrictMode-safe): mutating it inside the updater would empty the
+        // bag on the first double-invoke pass and silently drop updates on
+        // the second.
+        const captured = pendingUpdates;
+        pendingUpdates = {};
         setDownloads(prev => {
           const updated = [...prev];
           let hasChanges = false;
-          
-          Object.values(pendingUpdates).forEach(pendingData => {
+
+          Object.values(captured).forEach(pendingData => {
             const existingIdx = updated.findIndex(d => d.id === pendingData.id);
             if (existingIdx !== -1) {
               updated[existingIdx] = { ...updated[existingIdx], ...pendingData };
@@ -1242,8 +1316,7 @@ function App() {
               hasChanges = true;
             }
           });
-          
-          pendingUpdates = {};
+
           return hasChanges ? updated : prev;
         });
       };
@@ -1358,26 +1431,24 @@ function App() {
 
   const handleSelectWorkspace = useCallback((workspaceId: string) => {
     setActiveWorkspaceId(workspaceId);
-    setTabs(prev => {
-      const workspaceTabs = prev.filter(t => t.workspaceId === workspaceId || (!t.workspaceId && workspaceId === 'default'));
-      if (workspaceTabs.length > 0) {
-        setActiveTabId(workspaceTabs[0].id);
-        return prev;
-      } else {
-        // Create a new tab if empty workspace
-        const newTab: Tab = {
-          id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
-          url: 'nova://newtab',
-          title: 'New Tab',
-          isLoading: false,
-          canGoBack: false,
-          canGoForward: false,
-          workspaceId: workspaceId
-        };
-        setActiveTabId(newTab.id);
-        return [...prev, newTab];
-      }
-    });
+    // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
+    const workspaceTabs = tabsRef.current.filter(t => t.workspaceId === workspaceId || (!t.workspaceId && workspaceId === 'default'));
+    if (workspaceTabs.length > 0) {
+      setActiveTabId(workspaceTabs[0].id);
+    } else {
+      // Create a new tab if empty workspace
+      const newTab: Tab = {
+        id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        workspaceId: workspaceId
+      };
+      setTabs(prev => [...prev, newTab]);
+      setActiveTabId(newTab.id);
+    }
   }, []);
 
   const handleUpdateWorkspaces = useCallback((newWorkspaces: Workspace[]) => {
@@ -1513,14 +1584,24 @@ function App() {
         return prev.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t);
       }
       
-      return prev.map(t => t.id === targetId ? { 
-        ...t, 
-        url, 
+      return prev.map(t => t.id === targetId ? {
+        ...t,
+        url,
         isLoading: !isInternalPage,
         ...(newTitle ? { title: newTitle } : {})
       } : t);
     });
   }, [activeTabId]);
+
+  // Latest-data & latest-handler refs: let the MCP/AI-context effect below keep
+  // a stable [] dependency list (instead of rebuilding executeMcpAction and
+  // re-registering the AI action context on EVERY tabs/history/bookmarks
+  // change) while still reading fresh values at call time. Same
+  // render-time-assignment pattern as tabsRef above.
+  const browserDataRef = useRef({ activeTabId, tabs, history, bookmarks });
+  browserDataRef.current = { activeTabId, tabs, history, bookmarks };
+  const mcpHandlersRef = useRef({ handleNavigate, handleNewTab, handleCloseTab, handleSelectTab });
+  mcpHandlersRef.current = { handleNavigate, handleNewTab, handleCloseTab, handleSelectTab };
 
   // Setup AI Agent Action Context and MCP Action Bridge
   useEffect(() => {
@@ -1533,12 +1614,14 @@ function App() {
         return "Error: Invalid toolName parameter";
       }
       const safeArgs = (args && typeof args === 'object') ? args : {};
+      // Read fresh data at call time via refs (see browserDataRef above)
+      const { activeTabId, tabs } = browserDataRef.current;
       const activeWebview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-      
+
       switch (toolName) {
         case 'browser_navigate':
           if (!safeArgs.url || typeof safeArgs.url !== 'string') return "Error: Missing or invalid 'url' parameter";
-          handleNavigate(safeArgs.url);
+          mcpHandlersRef.current.handleNavigate(safeArgs.url);
           return `Navigated to ${safeArgs.url}`;
 
         case 'browser_read_page':
@@ -1622,7 +1705,7 @@ function App() {
           return `Error: Tab ${args.tabId} not found.`;
 
         case 'browser_close_tab':
-          handleCloseTab(args.tabId);
+          mcpHandlersRef.current.handleCloseTab(args.tabId);
           return `Closed tab ${args.tabId}`;
 
         case 'browser_screenshot':
@@ -1647,7 +1730,7 @@ function App() {
 
         case 'browser_new_tab': {
           const newUrl = args.url || 'nova://newtab';
-          handleNewTab(newUrl);
+          mcpHandlersRef.current.handleNewTab(newUrl);
           return `Opened new tab: ${newUrl}`;
         }
 
@@ -1786,7 +1869,7 @@ function App() {
         case 'browser_duplicate_tab': {
           const currentTab = tabs.find(t => t.id === activeTabId);
           if (currentTab) {
-            handleNewTab(currentTab.url);
+            mcpHandlersRef.current.handleNewTab(currentTab.url);
             return `Duplicated tab: ${currentTab.url}`;
           }
           return "Error: No active tab to duplicate";
@@ -1800,10 +1883,10 @@ function App() {
     // 2. Original aiAgent context setup
     aiAgent.setActionContext({
       onNavigate: (url: string) => {
-        handleNavigate(url);
+        mcpHandlersRef.current.handleNavigate(url);
       },
       onExecuteScript: async (script: string) => {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview && webview.executeJavaScript) {
           try {
             return await webview.executeJavaScript(script);
@@ -1812,21 +1895,21 @@ function App() {
             throw e;
           }
         }
-        
-        const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
+
+        const iframe = document.querySelector(`iframe[data-tab-id="${browserDataRef.current.activeTabId}"]`) as HTMLIFrameElement;
         if (iframe) {
           console.warn("AI scripts cannot be executed in iframes due to cross-origin security. Please run the app in Electron.");
           return "Error: Cannot read page content in web development mode. Please run the desktop app.";
         }
-        
+
         throw new Error("No active webview or iframe found");
       },
-      onCreateTab: (url: string) => handleNewTab(url),
-      onCloseTab: (id: string) => handleCloseTab(id),
-      onSwitchTab: (id: string) => handleSelectTab(id),
-      onGetAllTabs: () => tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
+      onCreateTab: (url: string) => mcpHandlersRef.current.handleNewTab(url),
+      onCloseTab: (id: string) => mcpHandlersRef.current.handleCloseTab(id),
+      onSwitchTab: (id: string) => mcpHandlersRef.current.handleSelectTab(id),
+      onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: (direction, amount) => {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         const cleanAmount = Math.abs(Number(amount) || 500);
         if (webview && webview.executeJavaScript) {
           if (direction === 'up') webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
@@ -1838,7 +1921,7 @@ function App() {
         }
       },
       onPressKey: (key: string) => {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview) {
           webview.sendInputEvent({ type: 'keyDown', keyCode: key });
           webview.sendInputEvent({ type: 'char', keyCode: key });
@@ -1846,7 +1929,7 @@ function App() {
         }
       },
       onTakeScreenshot: async () => {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview) {
           const image = await webview.capturePage();
           return image.toDataURL();
@@ -1857,7 +1940,7 @@ function App() {
         return new Promise(resolve => setTimeout(resolve, ms));
       },
       onGetPageLinks: async () => {
-        const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview) {
           return await webview.executeJavaScript(`
             Array.from(document.querySelectorAll('a')).map(a => ({
@@ -1871,6 +1954,7 @@ function App() {
       onSearchHistory: (query: string) => {
         const q = query.toLowerCase();
         // search history and bookmarks
+        const { history, bookmarks } = browserDataRef.current;
         const results = [
           ...history.filter(h => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q)),
           ...bookmarks.filter(b => b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))
@@ -1880,48 +1964,58 @@ function App() {
         return unique.slice(0, 10).map(u => ({ title: u.title, url: u.url }));
       }
     });
-    
+
     (window as any).__nova_executeMcpAction = executeMcpAction;
     return () => {
       delete (window as any).__nova_executeMcpAction;
     };
-  }, [activeTabId, handleNavigate, handleNewTab, handleCloseTab, tabs, history, bookmarks]);
+  // Data and handlers are read through browserDataRef/mcpHandlersRef at call
+  // time, so this setup only needs to run once per mount.
+  }, []);
 
   const handleUpdateTab = useCallback((id: string, updates: Partial<Tab>) => {
+    // Pure tabs update only — no side effects inside the updater (StrictMode-safe)
     setTabs(prev => prev.map(t => {
       if (t.id === id) {
         // Only apply updates if there are actual changes
         const hasChanges = Object.entries(updates).some(([k, v]) => (t as any)[k] !== v);
         if (!hasChanges) return t;
-
-        const updated = { ...t, ...updates };
-        
-        // Add to history if title or url loaded and not blank/newtab AND NOT INCOGNITO
-        if (!updated.isIncognito && (updates.title || updates.url)) {
-          const targetUrl = updated.url;
-          if (targetUrl && targetUrl !== 'nova://newtab' && targetUrl !== 'about:blank' && !targetUrl.startsWith('chrome://')) {
-            setHistory(hPrev => {
-              // If same URL was just recorded, update title/favicon if improved
-              if (hPrev.length > 0 && hPrev[0]?.url === targetUrl) {
-                if (updated.title && hPrev[0].title !== updated.title) {
-                  return [{ ...hPrev[0], title: updated.title, favicon: updated.favicon || hPrev[0].favicon }, ...hPrev.slice(1)];
-                }
-                return hPrev;
-              }
-              return [{
-                id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
-                url: targetUrl,
-                title: updated.title || targetUrl,
-                favicon: updated.favicon,
-                timestamp: Date.now()
-              }, ...hPrev.slice(0, 500)]; // keep last 500
-            });
-          }
-        }
-        return updated;
+        return { ...t, ...updates };
       }
       return t;
     }));
+
+    // History recording is derived from the pre-update tab state OUTSIDE the
+    // tabs updater so setHistory is never called from within another updater.
+    const current = tabsRef.current.find(t => t.id === id);
+    if (!current) return;
+    const hasChanges = Object.entries(updates).some(([k, v]) => (current as any)[k] !== v);
+    if (!hasChanges) return;
+
+    const updated = { ...current, ...updates };
+
+    // Add to history if title or url loaded and not blank/newtab AND NOT INCOGNITO
+    if (!updated.isIncognito && (updates.title || updates.url)) {
+      const targetUrl = updated.url;
+      if (targetUrl && targetUrl !== 'nova://newtab' && targetUrl !== 'about:blank' && !targetUrl.startsWith('chrome://')) {
+        setHistory(hPrev => {
+          // If same URL was just recorded, update title/favicon if improved
+          if (hPrev.length > 0 && hPrev[0]?.url === targetUrl) {
+            if (updated.title && hPrev[0].title !== updated.title) {
+              return [{ ...hPrev[0], title: updated.title, favicon: updated.favicon || hPrev[0].favicon }, ...hPrev.slice(1)];
+            }
+            return hPrev;
+          }
+          return [{
+            id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+            url: targetUrl,
+            title: updated.title || targetUrl,
+            favicon: updated.favicon,
+            timestamp: Date.now()
+          }, ...hPrev.slice(0, 500)]; // keep last 500
+        });
+      }
+    }
   }, []);
 
   const handleToggleMuteTab = useCallback((id: string, e?: React.MouseEvent) => {
@@ -1982,6 +2076,20 @@ function App() {
   }, [handleNewTab]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
+
+  // Stable chrome-modal openers: inline arrows passed to memoized SidebarTabs /
+  // TopBar defeat React.memo and re-render the whole tab strip on every App render.
+  const handleOpenAccount = useCallback(() => {
+    closeAllModals();
+    setIsAccountModalOpen(true);
+  }, [closeAllModals]);
+
+  const handleOpenHelp = useCallback(() => {
+    closeAllModals();
+    setHelpInitialTab('help');
+    setIsHelpOpen(true);
+  }, [closeAllModals]);
+
   const handleOpenShare = useCallback(() => openModal('share'), [openModal]);
   const handleTakeScreenshot = useCallback(async () => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
@@ -2125,22 +2233,21 @@ function App() {
     else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
     else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
 
-    setHistory(prev => {
-      const remaining = prev.filter(item => {
-        const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
-        return !isNaN(itemTime) && itemTime < cutoff;
-      });
-      try { localStorage.setItem('browsing_history', JSON.stringify(remaining)); } catch (e) {}
-      return remaining;
-    });
-  }, []);
+    // Persistence happens OUTSIDE the updater (StrictMode-safe): the updater
+    // stays pure and the same filtered snapshot is written to localStorage
+    // right after the setHistory call.
+    const isOlderThanCutoff = (item: HistoryItem) => {
+      const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
+      return !isNaN(itemTime) && itemTime < cutoff;
+    };
+
+    setHistory(prev => prev.filter(isOlderThanCutoff));
+    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(isOlderThanCutoff))); } catch (e) {}
+  }, [history]);
   const handleRemoveHistoryItem = useCallback((id: string) => {
-    setHistory(prev => {
-      const remaining = prev.filter(item => item.id !== id);
-      try { localStorage.setItem('browsing_history', JSON.stringify(remaining)); } catch (e) {}
-      return remaining;
-    });
-  }, []);
+    setHistory(prev => prev.filter(item => item.id !== id));
+    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => item.id !== id))); } catch (e) {}
+  }, [history]);
 
   const handleClearDownloads = useCallback(() => setDownloads([]), []);
 
@@ -2200,8 +2307,6 @@ function App() {
     setIsHoverRevealing(false);
   }, []);
 
-  const vpnAnchorRef = useRef<HTMLButtonElement | null>(null);
-
   const handleToggleExtension = useCallback(async (id: string) => {
     const ext = extensions.find(e => e.id === id);
     const nextEnabled = ext?.enabled === false ? true : false;
@@ -2233,15 +2338,13 @@ function App() {
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
 
   const handleSpotlightSelectTab = useCallback((tabId: string) => {
-    setTabs(currentTabs => {
-      const t = currentTabs.find(tab => tab.id === tabId);
-      if (t && t.workspaceId) {
-        setActiveWorkspaceId(t.workspaceId);
-      } else if (t && !t.workspaceId) {
-        setActiveWorkspaceId('default');
-      }
-      return currentTabs;
-    });
+    // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
+    const t = tabsRef.current.find(tab => tab.id === tabId);
+    if (t && t.workspaceId) {
+      setActiveWorkspaceId(t.workspaceId);
+    } else if (t && !t.workspaceId) {
+      setActiveWorkspaceId('default');
+    }
     setActiveTabId(tabId);
   }, []);
 
@@ -2317,6 +2420,29 @@ function App() {
     }
   }, [activeTabId]);
 
+  // Keep the latest handler identities for the mount-time IPC listeners above.
+  // Assigned during render AFTER all handlers are defined; listeners read
+  // handlersRef.current at event time so they always invoke fresh closures.
+  handlersRef.current = {
+    handleNewTab,
+    handleNewIncognitoTab,
+    handleCloseTab,
+    handleReopenClosedTab,
+    closeAllModals,
+    handleOpenSettings,
+    handlePrintPage,
+    handleOpenDevTools,
+    handleReload,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    handleOpenHistory,
+    handleOpenDownloads,
+    handleToggleBookmarkActive,
+    handleGoBack,
+    handleGoForward
+  };
+
   // Global Chrome Keyboard Shortcuts Listener
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -2357,13 +2483,7 @@ function App() {
       
       if (matches('reopenTab')) {
         e.preventDefault();
-        setClosedTabsStack(stack => {
-          if (stack.length === 0) return stack;
-          const lastTab = stack[stack.length - 1];
-          setTabs(prev => [...prev, lastTab]);
-          setActiveTabId(lastTab.id);
-          return stack.slice(0, -1);
-        });
+        handleReopenClosedTab();
         return;
       }
 
@@ -2405,9 +2525,11 @@ function App() {
       // Next / Previous Tab (Ctrl+Tab / Ctrl+Shift+Tab)
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
         e.preventDefault();
-        setTabs(currentTabs => {
-          if (currentTabs.length <= 1) return currentTabs;
-          const currentIndex = currentTabs.findIndex(t => t.id === activeTabId);
+        // Compute from refs OUTSIDE the updater (StrictMode-safe). Tabs are
+        // unchanged here — only the selection moves.
+        const currentTabs = tabsRef.current;
+        if (currentTabs.length > 1) {
+          const currentIndex = currentTabs.findIndex(t => t.id === activeTabIdRef.current);
           let nextIndex = 0;
           if (e.shiftKey) {
             nextIndex = currentIndex <= 0 ? currentTabs.length - 1 : currentIndex - 1;
@@ -2415,8 +2537,7 @@ function App() {
             nextIndex = currentIndex >= currentTabs.length - 1 ? 0 : currentIndex + 1;
           }
           setActiveTabId(currentTabs[nextIndex].id);
-          return currentTabs;
-        });
+        }
         return;
       }
 
@@ -2457,14 +2578,14 @@ function App() {
       if (meta && !shift && /^[1-9]$/.test(key)) {
         e.preventDefault();
         const num = parseInt(key, 10);
-        setTabs(currentTabs => {
-          if (num === 9 && currentTabs.length > 0) {
-            setActiveTabId(currentTabs[currentTabs.length - 1].id);
-          } else if (num <= currentTabs.length) {
-            setActiveTabId(currentTabs[num - 1].id);
-          }
-          return currentTabs;
-        });
+        // Compute from tabsRef OUTSIDE the updater (StrictMode-safe). Tabs are
+        // unchanged here — only the selection moves.
+        const currentTabs = tabsRef.current;
+        if (num === 9 && currentTabs.length > 0) {
+          setActiveTabId(currentTabs[currentTabs.length - 1].id);
+        } else if (num <= currentTabs.length) {
+          setActiveTabId(currentTabs[num - 1].id);
+        }
         return;
       }
 
@@ -2527,7 +2648,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
 
@@ -2607,8 +2728,8 @@ function App() {
               onOpenDownloads={handleOpenDownloads}
               onOpenHistory={handleOpenHistory}
               onOpenSettings={handleOpenSettings}
-              onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
-              onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
+              onOpenAccount={handleOpenAccount}
+              onOpenHelp={handleOpenHelp}
               onOpenExtensions={handleOpenExtensions}
               bookmarks={bookmarks}
               isCollapsed={false}
@@ -2700,8 +2821,8 @@ function App() {
                   onOpenDownloads={handleOpenDownloads}
                   onOpenHistory={handleOpenHistory}
                   onOpenSettings={handleOpenSettings}
-                  onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
-                  onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
+                  onOpenAccount={handleOpenAccount}
+                  onOpenHelp={handleOpenHelp}
                   onOpenExtensions={handleOpenExtensions}
                   bookmarks={bookmarks}
                   isCollapsed={true}
@@ -2753,8 +2874,8 @@ function App() {
                 onOpenHistory={handleOpenHistory}
                 onOpenDownloads={handleOpenDownloads}
                 onOpenSettings={handleOpenSettings}
-                onOpenAccount={() => { closeAllModals(); setIsAccountModalOpen(true); }}
-                onOpenHelp={() => { closeAllModals(); setHelpInitialTab('help'); setIsHelpOpen(true); }}
+                onOpenAccount={handleOpenAccount}
+                onOpenHelp={handleOpenHelp}
                 onOpenExtensions={handleOpenExtensions}
                 onOpenShare={handleOpenShare}
                 onTakeScreenshot={handleTakeScreenshot}
@@ -3045,7 +3166,7 @@ function App() {
         onSelectLocation={setVpnLocation}
         onAddLocation={handleAddVpnLocation}
         onRemoveLocation={handleRemoveVpnLocation}
-        anchorRef={vpnAnchorRef}
+        anchorRef={VPN_ANCHOR_REF}
       />
 
       </div>

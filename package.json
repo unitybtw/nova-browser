@@ -17,6 +17,12 @@
       "dist/**/*",
       "dist-electron/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "electron/blocked-domains.json",
+        "to": "blocked-domains.json"
+      }
+    ],
     "publish": [
       {
         "provider": "github",

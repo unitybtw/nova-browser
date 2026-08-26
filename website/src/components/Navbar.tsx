@@ -1,155 +1,144 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Apple, Monitor, Menu, X, Sparkles, Shield, Cpu, Layers } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { Github, Menu, X } from 'lucide-react';
 
-const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
-    <path d="M9 18c-4.51 2-5-2-7-2"/>
-  </svg>
-);
+const GITHUB_URL = 'https://github.com/unitybtw/nova-browser';
+const RELEASES_URL = 'https://github.com/unitybtw/nova-browser/releases/latest';
 
-export const Navbar: React.FC = () => {
+const EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
+
+const NAV_LINKS = [
+  { label: 'Features', href: '#features' },
+  { label: 'AI Agent', href: '#agent' },
+  { label: 'Performance', href: '#performance' },
+  { label: 'Security', href: '#security' },
+];
+
+export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [os, setOs] = useState<'mac' | 'win'>('mac');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const reduceMotion = !!useReducedMotion();
 
   useEffect(() => {
-    const ua = window.navigator.userAgent.toLowerCase();
-    if (ua.includes('win')) setOs('win');
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  useEffect(() => {
-    const handleScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const surface = scrolled || menuOpen;
 
   return (
-    <motion.header
-      initial={{ y: -60 }}
-      animate={{ y: 0 }}
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? 'py-2.5' : 'py-4'}`}
-    >
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div
-          className={`flex items-center justify-between rounded-2xl px-5 py-2.5 transition-all duration-300 border ${
-            scrolled
-              ? 'bg-[#080a0f]/90 border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.6)] backdrop-blur-xl'
-              : 'bg-transparent border-transparent'
-          }`}
+    <header className="fixed inset-x-0 top-0 z-50">
+      <div
+        className={`transition-all duration-300 ${
+          surface ? 'glass shadow-lg shadow-black/20' : 'border-b border-transparent'
+        }`}
+      >
+        <nav
+          aria-label="Main navigation"
+          className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6"
         >
-          {/* Logo */}
-          <a href="#" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-white/10 border border-white/15 p-1 flex items-center justify-center group-hover:scale-105 transition-transform">
-              <img src="/assets/nova-icon.png" alt="Nova Logo" className="w-full h-full object-contain" />
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-sm text-white tracking-wider">NOVA</span>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                v1.0.7
-              </span>
-            </div>
+          {/* Brand */}
+          <a
+            href="#top"
+            className="flex items-center gap-2.5"
+            onClick={() => setMenuOpen(false)}
+          >
+            <img
+              src="/nova-icon-transparent.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7"
+            />
+            <span className="text-[15px] font-semibold tracking-tight">Nova Browser</span>
           </a>
 
-          {/* Nav Links in English */}
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-300">
-            <a href="#ai-agent" className="hover:text-white transition-colors flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>AI Agent</span>
-            </a>
-            <a href="#performance" className="hover:text-white transition-colors flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-purple-400" />
-              <span>Performance</span>
-            </a>
-            <a href="#security" className="hover:text-white transition-colors flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Privacy</span>
-            </a>
-            <a href="#features" className="hover:text-white transition-colors flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-amber-400" />
-              <span>Features</span>
+          {/* Desktop links */}
+          <ul className="hidden items-center gap-8 md:flex">
+            {NAV_LINKS.map((link) => (
+              <li key={link.href}>
+                <a
+                  href={link.href}
+                  className="text-sm text-muted transition-colors duration-200 hover:text-foreground"
+                >
+                  {link.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Nova Browser on GitHub"
+              className="hidden text-muted transition-colors duration-200 hover:text-foreground sm:block"
+            >
+              <Github size={20} aria-hidden />
             </a>
             <a
-              href="https://github.com/unitybtw/nova-browser"
+              href={RELEASES_URL}
               target="_blank"
-              rel="noreferrer"
-              className="hover:text-white transition-colors flex items-center gap-1"
+              rel="noopener noreferrer"
+              className="rounded-full bg-nova px-5 py-2 text-sm font-semibold text-white transition-colors duration-200 hover:bg-nova-deep"
             >
-              <GithubIcon className="w-3.5 h-3.5" />
-              <span>GitHub</span>
+              Download
             </a>
-          </nav>
-
-          {/* Download CTA */}
-          <div className="hidden md:flex items-center gap-3">
-            {os === 'win' ? (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
-                className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] flex items-center gap-1.5 cursor-pointer"
-              >
-                <Monitor className="w-3.5 h-3.5" />
-                <span>Download for Windows (.exe)</span>
-              </a>
-            ) : (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
-                className="bg-white text-black hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-[0_0_15px_rgba(255,255,255,0.2)] flex items-center gap-1.5 cursor-pointer"
-              >
-                <Apple className="w-3.5 h-3.5" />
-                <span>Download for macOS (.dmg)</span>
-              </a>
-            )}
-          </div>
-
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center">
             <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 rounded-xl bg-white/5 border border-white/10 text-white cursor-pointer"
+              type="button"
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-expanded={menuOpen}
+              aria-label={menuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              className="text-muted transition-colors duration-200 hover:text-foreground md:hidden"
             >
-              {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              {menuOpen ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
             </button>
           </div>
-        </div>
+        </nav>
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile dropdown */}
       <AnimatePresence>
-        {mobileMenuOpen && (
+        {menuOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
+            initial={reduceMotion ? false : { opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="md:hidden mx-4 mt-2 p-4 rounded-2xl bg-[#090b10] border border-white/10 shadow-2xl flex flex-col gap-3"
+            exit={reduceMotion ? undefined : { opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: EXPO }}
+            className="glass mx-4 mt-2 rounded-2xl p-2 md:hidden"
           >
-            <a href="#ai-agent" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              🤖 Autonomous AI Agent
-            </a>
-            <a href="#performance" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              ⚡ Performance Benchmarks
-            </a>
-            <a href="#security" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              🔒 Privacy & E2EE Sync
-            </a>
-            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-sm font-semibold text-slate-300 py-1.5">
-              ✨ All Features
-            </a>
-            <a href="https://github.com/unitybtw/nova-browser" target="_blank" rel="noreferrer" className="text-sm font-semibold text-slate-300 py-1.5">
-              GitHub Repository
-            </a>
-            <div className="border-t border-white/10 pt-3 mt-1">
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest"
-                className="w-full bg-white text-black py-2.5 rounded-xl text-center font-bold text-xs flex items-center justify-center gap-2"
-              >
-                <Apple className="w-4 h-4" />
-                <span>Download Nova Browser</span>
-              </a>
-            </div>
+            <ul className="flex flex-col">
+              {NAV_LINKS.map((link) => (
+                <li key={link.href}>
+                  <a
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="block rounded-xl px-4 py-3 text-sm text-muted transition-colors duration-200 hover:bg-white/5 hover:text-foreground"
+                  >
+                    {link.label}
+                  </a>
+                </li>
+              ))}
+              <li className="mt-1 border-t border-white/8 pt-2">
+                <a
+                  href={GITHUB_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm text-muted transition-colors duration-200 hover:bg-white/5 hover:text-foreground"
+                >
+                  <Github size={16} aria-hidden />
+                  GitHub
+                </a>
+              </li>
+            </ul>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.header>
+    </header>
   );
-};
+}

@@ -478,6 +478,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const omniboxInputRef = useRef<HTMLInputElement>(null);
   const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Top Favorites state
   const [favorites, setFavorites] = useState<FavoriteApp[]>(() => {
@@ -549,36 +550,51 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     }
   }, [activeTab?.url, isOmniboxFocused]);
 
-  // Fetch suggestions
+  // Fetch suggestions (AbortController guards against out-of-order/stale responses,
+  // same pattern as TopBar.tsx)
   useEffect(() => {
     if (!isOmniboxFocused || !searchValue.trim() || searchValue.includes('://')) {
       setSuggestions([]);
       return;
     }
 
-    const timer = setTimeout(async () => {
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
+    const fetchSuggestions = async () => {
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(searchValue, searchEngine, clientLocale);
-          if (Array.isArray(results)) {
+          if (!abortController.signal.aborted && Array.isArray(results)) {
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`);
-        if (res.ok) {
+        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`, {
+          signal: abortController.signal
+        });
+        if (!abortController.signal.aborted && res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
             setSuggestions(data[1].slice(0, 5));
           }
         }
-      } catch (_) {}
-    }, 150);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          // ignore network errors
+        }
+      }
+    };
 
-    return () => clearTimeout(timer);
+    const timer = setTimeout(fetchSuggestions, 150);
+    return () => {
+      clearTimeout(timer);
+      abortController.abort();
+    };
   }, [searchValue, isOmniboxFocused, searchEngine]);
 
   // Handle Omnibox Submit
@@ -603,20 +619,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     omniboxInputRef.current?.blur();
   };
 
-  const handleMouseEnter = (tab: Tab, e: React.MouseEvent) => {
+  // Stable handlers so the memoized SidebarTabItem children don't re-render on
+  // every parent render (and hover position updates bail out when unchanged).
+  const handleMouseEnter = useCallback((tab: Tab, e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setHoverPos({ top: rect.top, left: rect.right + 10 });
+    const top = rect.top;
+    const left = rect.right + 10;
+    setHoverPos(prev => (prev.top === top && prev.left === left ? prev : { top, left }));
 
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredTab(tab);
     }, 350);
-  };
+  }, []);
 
-  const handleMouseLeave = () => {
+  const handleMouseLeave = useCallback(() => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHoveredTab(null);
-  };
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

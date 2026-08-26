@@ -1,19 +1,43 @@
 <!doctype html>
-<html lang="tr" class="dark">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/assets/nova-icon.png" />
+    <link rel="icon" type="image/png" href="/nova-icon-transparent.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nova Browser — AI-Native & High Performance Browser</title>
-    <meta name="description" content="Next-generation open-source AI desktop browser with built-in MCP agent navigation, zero-knowledge sync, and total privacy." />
-    
-    <!-- Preconnect & Preload Fonts -->
+    <title>Nova Browser — The AI-Native Browser</title>
+    <meta
+      name="description"
+      content="Nova Browser is a free, open-source browser with an on-device AI assistant, autonomous MCP agent, military-grade E2EE sync and a built-in privacy shield. Built with Electron + React."
+    />
+    <meta name="theme-color" content="#020617" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Nova Browser — The AI-Native Browser" />
+    <meta
+      property="og:description"
+      content="On-device AI. Autonomous agent. Zero-knowledge sync. Open source."
+    />
+    <meta property="og:image" content="/preview.png" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Nova Browser — The AI-Native Browser" />
+    <meta
+      name="twitter:description"
+      content="On-device AI. Autonomous agent. Zero-knowledge sync. Open source."
+    />
+    <meta name="twitter:image" content="/preview.png" />
+
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" />
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
   </head>
-  <body class="bg-[#050608] text-[#f8fafc] antialiased selection:bg-cyan-500/30 selection:text-cyan-300">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

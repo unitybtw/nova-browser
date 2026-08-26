@@ -1,101 +1,97 @@
-import React from 'react';
-import { motion } from 'framer-motion';
-import { ShieldCheck, Lock, EyeOff, ServerOff } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { EyeOff, Lock, ShieldCheck, type LucideIcon } from 'lucide-react';
 
-export const SecuritySection: React.FC = () => {
-  const securityPillars = [
-    {
-      icon: <Lock className="w-6 h-6 text-emerald-400" />,
-      title: 'Zero-Knowledge Device Pairing',
-      desc: 'Your 1-Click pairing code is the AES-256-GCM encryption key. No email, password, or third-party login required.',
-      badge: 'E2EE AES-256',
-    },
-    {
-      icon: <EyeOff className="w-6 h-6 text-cyan-400" />,
-      title: '0 Telemetry & No Tracking',
-      desc: 'Your visited URLs, search queries, and tab titles are never logged, tracked, or sent to central servers.',
-      badge: '0 Data Collected',
-    },
-    {
-      icon: <ShieldCheck className="w-6 h-6 text-rose-400" />,
-      title: 'Hardware-Accelerated Shield',
-      desc: 'Blocks intrusive ads, cross-site tracking beacons, and cryptocurrency miners at the native network layer.',
-      badge: 'AdBlock Shield',
-    },
-    {
-      icon: <ServerOff className="w-6 h-6 text-purple-400" />,
-      title: '100% Open-Source Codebase',
-      desc: 'The entire Electron main process, preload scripts, and React frontend are publicly auditable on GitHub.',
-      badge: 'MIT License',
-    },
-  ];
+const ROWS: { icon: LucideIcon; title: string; copy: string }[] = [
+  {
+    icon: Lock,
+    title: 'Zero-knowledge vault',
+    copy: 'Servers store ciphertext only — reading your data is mathematically impossible for them.',
+  },
+  {
+    icon: EyeOff,
+    title: 'No telemetry, no tracking',
+    copy: 'Nova never phones home. No analytics, no behavioral profiles, nothing.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Phishing domain blocking',
+    copy: 'Known malicious domains are blocked before a page ever loads.',
+  },
+];
+
+export default function SecuritySection() {
+  const reduceMotion = !!useReducedMotion();
 
   return (
-    <section id="security" className="py-24 relative overflow-hidden bg-[#07090e]">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
-        {/* Header */}
-        <div className="max-w-3xl mx-auto text-center mb-16">
+    <section
+      id="security"
+      aria-labelledby="security-heading"
+      className="scroll-mt-24 px-6 py-24"
+    >
+      <div className="mx-auto grid max-w-6xl items-center gap-12 lg:grid-cols-2">
+        {/* Visual (mirrored: left on desktop, after copy on mobile) */}
+        <div className="relative lg:order-1">
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full card-glass text-xs font-mono text-emerald-400 mb-4 border border-emerald-500/20"
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>CRYPTOGRAPHIC PRIVACY ARCHITECTURE</span>
-          </motion.div>
-
-          <motion.h2
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.1 }}
-            className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-4"
-          >
-            Your Browsing Data <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-white to-cyan-400">
-              Belongs Exclusively to You
-            </span>
-          </motion.h2>
-
-          <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="text-base sm:text-lg text-slate-400 leading-relaxed"
-          >
-            We believe digital privacy should be an absolute default, not an optional setting.
-          </motion.p>
+            aria-hidden
+            className="absolute -top-16 -left-16 h-72 w-72 rounded-full opacity-15 blur-3xl"
+            style={{ background: 'radial-gradient(circle, #fbbf24 0%, transparent 70%)' }}
+            animate={reduceMotion ? undefined : { x: [0, 24, -14, 0], y: [0, -18, 12, 0] }}
+            transition={
+              reduceMotion ? undefined : { duration: 14, repeat: Infinity, ease: 'easeInOut' }
+            }
+          />
+          <motion.div
+            aria-hidden
+            className="absolute -right-16 -bottom-16 h-72 w-72 rounded-full opacity-15 blur-3xl"
+            style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
+            animate={reduceMotion ? undefined : { x: [0, -20, 16, 0], y: [0, 16, -12, 0] }}
+            transition={
+              reduceMotion ? undefined : { duration: 17, repeat: Infinity, ease: 'easeInOut' }
+            }
+          />
+          <div className="glass relative rounded-2xl p-2 shadow-2xl ring-1 ring-white/10">
+            <img
+              src="/sync.png"
+              width={2880}
+              height={1800}
+              loading="lazy"
+              alt="Nova Sync diagram showing end-to-end encrypted payloads traveling between devices"
+              className="h-auto w-full rounded-xl object-cover"
+            />
+          </div>
         </div>
 
-        {/* 4 Security Pillars Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
-          {securityPillars.map((pillar, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: idx * 0.1 }}
-              className="card-glass rounded-3xl p-7 relative hover:border-white/20 transition-all"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                  {pillar.icon}
+        {/* Copy */}
+        <div className="lg:order-2">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-nova-light">
+            Privacy by architecture
+          </p>
+          <h2
+            id="security-heading"
+            className="mt-3 text-3xl font-bold tracking-tight md:text-5xl"
+          >
+            Your data never leaves your device.
+          </h2>
+          <p className="mt-5 leading-relaxed text-muted">
+            Sync payloads are sealed with AES-GCM envelope encryption before they ever touch a
+            server. Your key is derived from your password on-device with PBKDF2 — it never
+            leaves your machine, so nobody else can ever hold it.
+          </p>
+          <ul className="mt-8 space-y-5">
+            {ROWS.map((row) => (
+              <li key={row.title} className="flex items-start gap-4">
+                <div className="flex h-fit w-fit shrink-0 rounded-xl bg-nova/15 p-2.5 text-nova-light">
+                  <row.icon size={18} aria-hidden />
                 </div>
-                <span className="text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">
-                  {pillar.badge}
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-white mb-2">{pillar.title}</h3>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">{pillar.desc}</p>
-            </motion.div>
-          ))}
+                <div>
+                  <h3 className="font-semibold tracking-tight">{row.title}</h3>
+                  <p className="mt-1 text-sm text-muted">{row.copy}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
-
       </div>
     </section>
   );
-};
+}

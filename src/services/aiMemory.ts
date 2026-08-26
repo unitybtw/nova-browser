@@ -24,6 +24,7 @@ class AIMemoryService {
   }
 
   private loadMemories() {
+    if (typeof localStorage === 'undefined') return;
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
@@ -35,6 +36,7 @@ class AIMemoryService {
   }
 
   private loadTaskHistory() {
+    if (typeof localStorage === 'undefined') return;
     try {
       const data = localStorage.getItem(TASK_STORAGE_KEY);
       if (data) {
@@ -46,6 +48,7 @@ class AIMemoryService {
   }
 
   private saveMemories() {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(this.memories));
     } catch (e) {
@@ -54,6 +57,7 @@ class AIMemoryService {
   }
 
   private saveTaskHistory() {
+    if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(this.taskHistory));
     } catch (e) {

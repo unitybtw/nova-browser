@@ -140,6 +140,23 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
     localStorage.setItem(`nova_daily_4k_${todayKey}`, JSON.stringify(results));
   } catch (e) {}
 
+  // Prune stale daily cache entries so localStorage doesn't grow forever
+  // (one ~10KB JSON blob per day would otherwise accumulate indefinitely).
+  // Keep the last 7 days; delete anything older. Unknown-format keys are left
+  // alone rather than guessed at.
+  try {
+    const prefix = 'nova_daily_4k_';
+    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      const ts = Date.parse(key.slice(prefix.length));
+      if (!Number.isNaN(ts) && ts < cutoff) {
+        localStorage.removeItem(key);
+      }
+    }
+  } catch (e) {}
+
   return results;
 }
 

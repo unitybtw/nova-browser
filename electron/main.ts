@@ -1,5 +1,5 @@
 console.log('Main process starting...');
-import { app, BrowserWindow, ipcMain, session, globalShortcut, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
 import dns from 'dns';
@@ -56,13 +56,29 @@ app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');
 let mainWindow: BrowserWindow | null = null;
 let blockedDomains: string[] = [];
 
-try {
-  const blocklistPath = path.join(__dirname, '..', 'electron', 'blocked-domains.json');
-  if (fs.existsSync(blocklistPath)) {
+// Phishing blocklist loader: packaged builds ship the file via extraResources
+// (Contents/Resources/), while dev builds read it from the repo layout.
+const blocklistPaths = [
+  path.join(process.resourcesPath, 'blocked-domains.json'), // packaged (extraResources)
+  path.join(__dirname, '..', 'electron', 'blocked-domains.json'), // dev
+  path.join(process.cwd(), 'electron', 'blocked-domains.json') // dev fallback
+];
+
+for (const blocklistPath of blocklistPaths) {
+  try {
+    if (!fs.existsSync(blocklistPath)) continue;
     blockedDomains = JSON.parse(fs.readFileSync(blocklistPath, 'utf8'));
+    break;
+  } catch (err) {
+    console.error('Failed to load blocked domains:', err);
   }
-} catch (err) {
-  console.error('Failed to load blocked domains:', err);
+}
+
+// Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
+function sendToMainWindow(channel: string, payload?: unknown) {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  } catch (e) { /* window gone */ }
 }
 
 const PHISHING_KEYWORDS = [
@@ -119,6 +135,9 @@ let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
 let blocker: ElectronBlocker | null = null;
 const activeDownloads = new Map<string, Electron.DownloadItem>();
+// Tracks sessions that already have a 'will-download' handler so window recreation
+// doesn't stack duplicate listeners (which would duplicate download handling).
+const downloadsRegistered = new WeakSet<Electron.Session>();
 let mcpServer: BrowserMCPServer | null = null;
 
 let currentWhitelistFilters: any[] = [];
@@ -138,7 +157,12 @@ function updateAdblockWhitelist(whitelist: string[]) {
 // Initialize AdBlocker globally so IPC can access it
 ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
   blocker = engine;
-  
+
+  // Activate blocking immediately if the engine finished loading after window creation
+  if (isPrivacyShieldEnabled) {
+    try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking:', e); }
+  }
+
   // Batch ad-blocked notifications to avoid IPC flooding (can be 50-100+ per page)
   const pendingAdBlocks = new Map<number, number>();
   let adBlockFlushTimer: ReturnType<typeof setInterval> | null = null;
@@ -172,7 +196,7 @@ ElectronBlocker.fromPrebuiltAdsAndTracking(fetch).then((engine) => {
       if (Array.isArray(wl)) updateAdblockWhitelist(wl);
     }
   } catch(e) {}
-});
+}).catch((e) => console.error('Failed to initialize adblocker:', e));
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -209,10 +233,8 @@ function createWindow() {
     console.warn('Blocked main window navigation to non-app path:', url);
   });
 
-  // Inject webstore API into all webviews
-  session.defaultSession.setPreloads([
-    path.join(__dirname, 'webstore-preload.cjs')
-  ]);
+  // Webviews do not receive a global preload. The narrowly-scoped Web Store
+  // preload is assigned during attachment after the destination is validated.
 
   // Apply AdBlocker to session
   if (isPrivacyShieldEnabled && blocker) {
@@ -241,6 +263,8 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
   // Downloads Manager: Handle file downloads via Electron IPC
   function registerDownloadsManager(targetSession: Electron.Session) {
+    if (downloadsRegistered.has(targetSession)) return;
+    downloadsRegistered.add(targetSession);
     targetSession.on('will-download', (event, item, webContents) => {
       const downloadId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
       const filename = item.getFilename();
@@ -283,7 +307,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         });
       }
 
-      mainWindow?.webContents.send('download-update', {
+      sendToMainWindow('download-update', {
         id: downloadId,
         filename: path.basename(item.getSavePath() || filename),
         url: item.getURL(),
@@ -296,7 +320,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
       item.on('updated', (event, state) => {
         if (state === 'interrupted') {
-          mainWindow?.webContents.send('download-update', {
+          sendToMainWindow('download-update', {
             id: downloadId,
             filename: path.basename(item.getSavePath() || filename),
             url: item.getURL(),
@@ -306,7 +330,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
             savePath: item.getSavePath() || undefined
           });
         } else if (state === 'progressing') {
-          mainWindow?.webContents.send('download-update', {
+          sendToMainWindow('download-update', {
             id: downloadId,
             filename: path.basename(item.getSavePath() || filename),
             url: item.getURL(),
@@ -321,7 +345,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
 
       item.once('done', (event, state) => {
         activeDownloads.delete(downloadId);
-        mainWindow?.webContents.send('download-update', {
+        sendToMainWindow('download-update', {
           id: downloadId,
           filename: path.basename(item.getSavePath() || filename),
           url: item.getURL(),
@@ -393,9 +417,15 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     const loadDev = () => {
       attempts++;
       mainWindow?.loadURL(devUrl).catch(() => {
-        if (attempts >= maxAttempts && fs.existsSync(distHtmlPath)) {
-          console.log('[Main] Loading local dist/index.html build...');
-          mainWindow?.loadFile(distHtmlPath);
+        if (attempts >= maxAttempts) {
+          // 🐛 Fix: terminate the retry loop after maxAttempts REGARDLESS of dist existence,
+          // otherwise a missing dist/index.html causes infinite retries.
+          if (fs.existsSync(distHtmlPath)) {
+            console.log('[Main] Loading local dist/index.html build...');
+            mainWindow?.loadFile(distHtmlPath);
+          } else {
+            console.error(`[Main] Dev server unreachable at ${devUrl} after ${maxAttempts} attempts and no dist/index.html build found. Giving up.`);
+          }
         } else {
           setTimeout(loadDev, 300);
         }
@@ -427,6 +457,26 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       console.log(`[Renderer] [${level}] ${message} (${sourceId}:${line})`);
     }
   });
+
+  // ⌨️ App-local keyboard shortcuts via before-input-event.
+  // Replaces the old system-wide globalShortcut hooks which intercepted Cmd+K/Cmd+F
+  // even when OTHER apps were focused and shadowed the menu accelerators.
+  // Cmd+F is intentionally NOT handled here: the Edit menu accelerator ("Find in Page...",
+  // CmdOrCtrl+F) already covers it app-locally and emits the 'find' shortcut the renderer handles.
+  mainWindow?.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.isAutoRepeat) return;
+    const cmdOrCtrl = process.platform === 'darwin' ? input.meta : input.control;
+    if (!cmdOrCtrl || input.alt || input.shift) return;
+    if (input.key?.toLowerCase() === 'k') {
+      event.preventDefault();
+      sendToMainWindow('shortcut', 'toggle-omnibox');
+    }
+  });
+
+  // Keep the MCP server pointed at the current window (macOS close/reopen creates a new BrowserWindow)
+  if (mcpServer && mainWindow && !mainWindow.isDestroyed()) {
+    try { mcpServer.setMainWindow(mainWindow); } catch (e) {}
+  }
 }
 
 let nextDownloadAsSaveAs = false;
@@ -472,7 +522,7 @@ function setupApplicationMenu() {
             if (isMac) {
               app.showAboutPanel();
             } else {
-              mainWindow?.webContents.send('shortcut', 'open-help');
+              sendToMainWindow('shortcut', 'open-help');
             }
           }
         },
@@ -480,7 +530,7 @@ function setupApplicationMenu() {
           label: 'Check for Updates...',
           click: () => {
             autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-            mainWindow?.webContents.send('shortcut', 'check-updates');
+            sendToMainWindow('shortcut', 'check-updates');
           }
         },
         { type: 'separator' as const },
@@ -488,7 +538,7 @@ function setupApplicationMenu() {
           label: 'Preferences...',
           accelerator: 'CmdOrCtrl+,',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'settings');
+            sendToMainWindow('shortcut', 'settings');
           }
         },
         { type: 'separator' as const },
@@ -509,28 +559,28 @@ function setupApplicationMenu() {
           label: 'New Tab',
           accelerator: 'CmdOrCtrl+T',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'new-tab');
+            sendToMainWindow('shortcut', 'new-tab');
           }
         },
         {
           label: 'New Window',
           accelerator: 'CmdOrCtrl+N',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'new-tab');
+            sendToMainWindow('shortcut', 'new-tab');
           }
         },
         {
           label: 'New Incognito Tab',
           accelerator: 'Shift+CmdOrCtrl+N',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'new-incognito');
+            sendToMainWindow('shortcut', 'new-incognito');
           }
         },
         {
           label: 'Open Location / Search...',
           accelerator: 'CmdOrCtrl+L',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'focus-url');
+            sendToMainWindow('shortcut', 'focus-url');
           }
         },
         { type: 'separator' as const },
@@ -538,14 +588,14 @@ function setupApplicationMenu() {
           label: 'Close Tab',
           accelerator: 'CmdOrCtrl+W',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'close-tab');
+            sendToMainWindow('shortcut', 'close-tab');
           }
         },
         {
           label: 'Reopen Closed Tab',
           accelerator: 'Shift+CmdOrCtrl+T',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'reopen-tab');
+            sendToMainWindow('shortcut', 'reopen-tab');
           }
         },
         { type: 'separator' as const },
@@ -553,7 +603,7 @@ function setupApplicationMenu() {
           label: 'Print...',
           accelerator: 'CmdOrCtrl+P',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'print');
+            sendToMainWindow('shortcut', 'print');
           }
         },
         ...(!isMac ? [{ type: 'separator' as const }, { role: 'quit' as const }] : [])
@@ -577,7 +627,7 @@ function setupApplicationMenu() {
           label: 'Find in Page...',
           accelerator: 'CmdOrCtrl+F',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'find');
+            sendToMainWindow('shortcut', 'find');
           }
         }
       ]
@@ -590,14 +640,14 @@ function setupApplicationMenu() {
           label: 'Reload This Page',
           accelerator: 'CmdOrCtrl+R',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'reload');
+            sendToMainWindow('shortcut', 'reload');
           }
         },
         {
           label: 'Force Reload',
           accelerator: 'Shift+CmdOrCtrl+R',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'force-reload');
+            sendToMainWindow('shortcut', 'force-reload');
           }
         },
         { type: 'separator' as const },
@@ -605,21 +655,21 @@ function setupApplicationMenu() {
           label: 'Actual Size (100%)',
           accelerator: 'CmdOrCtrl+0',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'zoom-reset');
+            sendToMainWindow('shortcut', 'zoom-reset');
           }
         },
         {
           label: 'Zoom In',
           accelerator: 'CmdOrCtrl+Plus',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'zoom-in');
+            sendToMainWindow('shortcut', 'zoom-in');
           }
         },
         {
           label: 'Zoom Out',
           accelerator: 'CmdOrCtrl+-',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'zoom-out');
+            sendToMainWindow('shortcut', 'zoom-out');
           }
         },
         { type: 'separator' as const },
@@ -628,7 +678,7 @@ function setupApplicationMenu() {
           label: 'Toggle Developer Tools',
           accelerator: isMac ? 'Alt+Command+I' : 'Ctrl+Shift+I',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'devtools');
+            sendToMainWindow('shortcut', 'devtools');
           }
         }
       ]
@@ -641,14 +691,14 @@ function setupApplicationMenu() {
           label: 'Back',
           accelerator: 'CmdOrCtrl+[',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'go-back');
+            sendToMainWindow('shortcut', 'go-back');
           }
         },
         {
           label: 'Forward',
           accelerator: 'CmdOrCtrl+]',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'go-forward');
+            sendToMainWindow('shortcut', 'go-forward');
           }
         },
         { type: 'separator' as const },
@@ -656,14 +706,14 @@ function setupApplicationMenu() {
           label: 'Show Full History',
           accelerator: 'CmdOrCtrl+Y',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'history');
+            sendToMainWindow('shortcut', 'history');
           }
         },
         {
           label: 'Show Downloads',
           accelerator: 'Shift+CmdOrCtrl+J',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'downloads');
+            sendToMainWindow('shortcut', 'downloads');
           }
         }
       ]
@@ -676,14 +726,14 @@ function setupApplicationMenu() {
           label: 'Bookmark This Tab...',
           accelerator: 'CmdOrCtrl+D',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'bookmark');
+            sendToMainWindow('shortcut', 'bookmark');
           }
         },
         {
           label: 'Show Bookmarks Bar',
           accelerator: 'Shift+CmdOrCtrl+B',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'toggle-bookmarks-bar');
+            sendToMainWindow('shortcut', 'toggle-bookmarks-bar');
           }
         }
       ]
@@ -713,27 +763,27 @@ function setupApplicationMenu() {
           label: 'Nova Browser Help Center',
           accelerator: 'F1',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'open-help');
+            sendToMainWindow('shortcut', 'open-help');
           }
         },
         {
           label: 'Keyboard Shortcuts Guide',
           accelerator: 'CmdOrCtrl+/',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'shortcuts-help');
+            sendToMainWindow('shortcut', 'shortcuts-help');
           }
         },
         { type: 'separator' as const },
         {
           label: 'Nova AI Copilot Guide',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'ai-help');
+            sendToMainWindow('shortcut', 'ai-help');
           }
         },
         {
           label: 'Privacy Shield & Security Info',
           click: () => {
-            mainWindow?.webContents.send('shortcut', 'privacy-help');
+            sendToMainWindow('shortcut', 'privacy-help');
           }
         },
         { type: 'separator' as const },
@@ -760,7 +810,7 @@ function setupApplicationMenu() {
           label: 'Check for Updates...',
           click: () => {
             autoUpdater.checkForUpdatesAndNotify().catch(() => {});
-            mainWindow?.webContents.send('shortcut', 'check-updates');
+            sendToMainWindow('shortcut', 'check-updates');
           }
         },
         {
@@ -769,7 +819,7 @@ function setupApplicationMenu() {
             if (isMac) {
               app.showAboutPanel();
             } else {
-              mainWindow?.webContents.send('shortcut', 'about-help');
+              sendToMainWindow('shortcut', 'about-help');
             }
           }
         }
@@ -803,6 +853,8 @@ app.whenReady().then(async () => {
   const rememberedPermissions = new Map<string, Map<string, boolean>>();
 
   ipcMain.handle('permission-response', async (_event, { requestId, allow, remember }: { requestId: string; allow: boolean; remember?: boolean }) => {
+    // 🔒 Security: only the trusted main window may resolve permission requests
+    if (!isTrustedSender(_event)) return { success: false, error: 'Unauthorized' };
     const pending = pendingPermissions.get(requestId);
     if (pending) {
       clearTimeout(pending.timeoutId);
@@ -942,22 +994,22 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('checking-for-update', () => {
     console.log('Checking for updates...');
-    mainWindow?.webContents.send('update-checking');
+    sendToMainWindow('update-checking');
   });
 
   autoUpdater.on('update-available', (info) => {
     console.log('Update available:', info.version);
-    mainWindow?.webContents.send('update-available', { version: info.version, releaseDate: info.releaseDate });
+    sendToMainWindow('update-available', { version: info.version, releaseDate: info.releaseDate });
   });
 
   autoUpdater.on('update-not-available', (info) => {
     console.log('No update available. Current version is up to date:', info.version);
-    mainWindow?.webContents.send('update-not-available', { version: info.version });
+    sendToMainWindow('update-not-available', { version: info.version });
   });
 
   autoUpdater.on('download-progress', (progress) => {
     console.log(`Download progress: ${Math.round(progress.percent)}%`);
-    mainWindow?.webContents.send('update-download-progress', {
+    sendToMainWindow('update-download-progress', {
       percent: progress.percent,
       bytesPerSecond: progress.bytesPerSecond,
       transferred: progress.transferred,
@@ -967,12 +1019,12 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('update-downloaded', (info) => {
     console.log('Update downloaded:', info.version);
-    mainWindow?.webContents.send('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
+    sendToMainWindow('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
   });
 
   autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
-    mainWindow?.webContents.send('update-error', err?.message || 'Unknown update error');
+    sendToMainWindow('update-error', err?.message || 'Unknown update error');
   });
 
   ipcMain.handle('check-for-updates', async (event) => {
@@ -982,7 +1034,7 @@ app.whenReady().then(async () => {
       return { success: true, version: result?.updateInfo?.version || null };
     } catch (err: any) {
       console.error('Check for updates failed:', err);
-      mainWindow?.webContents.send('update-error', err?.message || 'Check failed');
+      sendToMainWindow('update-error', err?.message || 'Check failed');
       return { success: false, error: err?.message || 'Check failed' };
     }
   });
@@ -1054,21 +1106,9 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
-  app.on('browser-window-focus', () => {
-    globalShortcut.register('CommandOrControl+K', () => {
-      mainWindow?.webContents.send('shortcut', 'toggle-omnibox');
-    });
-
-    globalShortcut.register('CommandOrControl+F', () => {
-      if (mainWindow?.isFocused()) {
-        mainWindow?.webContents.send('shortcut', 'find-in-page');
-      }
-    });
-  });
-
-  app.on('browser-window-blur', () => {
-    globalShortcut.unregisterAll();
-  });
+  // NOTE: System-wide globalShortcut hooks (Cmd+K / Cmd+F) were removed.
+  // Cmd+K is now handled app-locally via before-input-event in createWindow();
+  // Cmd+F is covered by the Edit menu accelerator ("Find in Page...").
 });
 
 app.on('web-contents-created', (_event, contents) => {
@@ -1090,6 +1130,16 @@ app.on('web-contents-created', (_event, contents) => {
       path.resolve(path.join(__dirname, 'webstore-preload.cjs')),
       path.resolve(path.join(__dirname, 'webstore-preload.js'))
     ];
+    try {
+      const host = new URL(params.src || '').hostname.toLowerCase();
+      if (host === 'chromewebstore.google.com' || host === 'chrome.google.com') {
+        webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
+      } else {
+        delete webPreferences.preload;
+      }
+    } catch {
+      delete webPreferences.preload;
+    }
     if (webPreferences.preload) {
       const resolvedPreload = path.resolve(webPreferences.preload);
       if (!authorizedPreloads.includes(resolvedPreload)) {
@@ -1103,7 +1153,7 @@ app.on('web-contents-created', (_event, contents) => {
     try {
       const parsed = new URL(url);
       if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-        mainWindow?.webContents.send('new-tab', url);
+        sendToMainWindow('new-tab', url);
       }
     } catch {}
     return { action: 'deny' };
@@ -1141,7 +1191,7 @@ app.on('web-contents-created', (_event, contents) => {
       // 1. Phishing Check
       if (isPhishing(navigationUrl)) {
         e.preventDefault();
-        mainWindow?.webContents.send('blocked-site', { url: navigationUrl, reason: 'phishing' });
+        sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
         // VULN-05: HTML-escape and JSON.stringify to prevent script injection breakout
         const escapedUrl = navigationUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
         const safeUrlJson = JSON.stringify(escapedUrl);
@@ -1167,7 +1217,9 @@ app.on('web-contents-created', (_event, contents) => {
           // Try loading HTTPS. If it fails, fallback to HTTP.
           contents.loadURL(httpsUrl).catch(() => {
             // If HTTPS fails (e.g. SSL error), fallback to HTTP
-            contents.loadURL(navigationUrl);
+            contents.loadURL(navigationUrl).catch(() => {
+              console.warn('HTTPS upgrade and HTTP fallback both failed for:', navigationUrl);
+            });
           });
         }
       } catch {}
@@ -1176,15 +1228,15 @@ app.on('web-contents-created', (_event, contents) => {
 });
 
 app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-  
   try {
     const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
       if (settings.clearOnExit) {
-        session.defaultSession.clearStorageData();
-        session.defaultSession.clearCache();
+        // 🔧 Robustness: attach catch handlers so cleanup rejections can't float;
+        // quit is intentionally NOT blocked on these async clears.
+        session.defaultSession.clearStorageData().catch((e) => console.warn('[Quit] clearStorageData failed:', e));
+        session.defaultSession.clearCache().catch((e) => console.warn('[Quit] clearCache failed:', e));
       }
     }
   } catch (e) {}
@@ -1210,7 +1262,7 @@ ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
   isPrivacyShieldEnabled = Boolean(enabled);
   if (blocker) {
     if (isPrivacyShieldEnabled) {
-      blocker.enableBlockingInSession(session.defaultSession);
+      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable ad blocking in session:', e); }
     } else {
       try { blocker.disableBlockingInSession(session.defaultSession); } catch(e) {}
     }
@@ -1240,7 +1292,10 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
 
   // Provider 1: Bing Official Daily 4K UHD Image Archive (3840x2160 Ultra HD)
   try {
-    const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US');
+    const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
+      // 🔧 Robustness: hard 10s cap so a hung provider can't stall the handler
+      signal: AbortSignal.timeout(10000)
+    });
     if (bingRes.ok) {
       const bingData = await bingRes.json();
       if (bingData.images && Array.isArray(bingData.images)) {
@@ -1268,7 +1323,9 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   try {
     const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
     const whRes = await fetch(whUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 NovaBrowser/1.0', 'Accept': 'application/json' }
+      headers: { 'User-Agent': 'Mozilla/5.0 NovaBrowser/1.0', 'Accept': 'application/json' },
+      // 🔧 Robustness: hard 10s cap so a hung provider can't stall the handler
+      signal: AbortSignal.timeout(10000)
     });
     if (whRes.ok) {
       const whData = await whRes.json();
@@ -1489,11 +1546,11 @@ app.on('web-contents-created', (_event, wc) => {
       if (params.linkURL) {
         menu.append(new MenuItem({
           label: labels.openLinkNewTab,
-          click: () => mainWindow?.webContents.send('new-tab', params.linkURL)
+          click: () => sendToMainWindow('new-tab', params.linkURL)
         }));
         menu.append(new MenuItem({
           label: labels.openLinkNewIncognitoTab,
-          click: () => mainWindow?.webContents.send('new-incognito-tab', params.linkURL)
+          click: () => sendToMainWindow('new-incognito-tab', params.linkURL)
         }));
         menu.append(new MenuItem({
           label: labels.saveLinkAs,
@@ -1513,7 +1570,7 @@ app.on('web-contents-created', (_event, wc) => {
       if (params.srcURL && params.mediaType === 'image') {
         menu.append(new MenuItem({
           label: labels.openImageNewTab,
-          click: () => mainWindow?.webContents.send('new-tab', params.srcURL)
+          click: () => sendToMainWindow('new-tab', params.srcURL)
         }));
         menu.append(new MenuItem({
           label: labels.saveImageAs,
@@ -1538,7 +1595,7 @@ app.on('web-contents-created', (_event, wc) => {
         }));
         menu.append(new MenuItem({
           label: labels.searchImageLens,
-          click: () => mainWindow?.webContents.send('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
+          click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
         }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
@@ -1551,13 +1608,13 @@ app.on('web-contents-created', (_event, wc) => {
           if (flags.canPlay) {
             menu.append(new MenuItem({
               label: flags.isPaused ? labels.play : labels.pause,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) { if(el.paused) el.play(); else el.pause(); } })()`)
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {})
             }));
           }
           if (flags.canMute) {
             menu.append(new MenuItem({
               label: flags.isMuted ? labels.unmute : labels.mute,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.muted = !el.muted; })()`)
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.muted = !el.muted; })()`).catch(() => {})
             }));
           }
           if (flags.canLoop) {
@@ -1565,7 +1622,7 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.loop,
               type: 'checkbox',
               checked: flags.isLooping,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.loop = !el.loop; })()`)
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.loop = !el.loop; })()`).catch(() => {})
             }));
           }
           if (flags.canShowControls) {
@@ -1573,13 +1630,13 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.showControls,
               type: 'checkbox',
               checked: flags.isShowingControls,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.controls = !el.controls; })()`)
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.controls = !el.controls; })()`).catch(() => {})
             }));
           }
           if (isVideo && flags.canPictureInPicture) {
             menu.append(new MenuItem({
               label: labels.pictureInPicture,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover'); if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`)
+              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover'); if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {})
             }));
           }
           menu.append(new MenuItem({ type: 'separator' }));
@@ -1607,11 +1664,11 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
         menu.append(new MenuItem({
           label: labels.searchFor(shortQuery),
-          click: () => mainWindow?.webContents.send('new-tab', `https://www.google.com/search?q=${encodeURIComponent(queryText)}`)
+          click: () => sendToMainWindow('new-tab', `https://www.google.com/search?q=${encodeURIComponent(queryText)}`)
         }));
         menu.append(new MenuItem({
           label: labels.aiExplain,
-          click: () => mainWindow?.webContents.send('quick-ai-action', queryText)
+          click: () => sendToMainWindow('quick-ai-action', queryText)
         }));
         menu.append(new MenuItem({
           label: labels.print,
@@ -1665,7 +1722,7 @@ app.on('web-contents-created', (_event, wc) => {
             const currentUrl = wc.getURL();
             if (currentUrl && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
               const defaultFilename = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_') + '.html';
-              const saveRes = await dialog.showSaveDialog(mainWindow!, {
+              const saveRes = await dialog.showSaveDialog(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any, {
                 defaultPath: path.join(app.getPath('downloads'), defaultFilename),
                 filters: [{ name: 'HTML Complete Page', extensions: ['html', 'htm'] }]
               });
@@ -1693,8 +1750,20 @@ app.on('web-contents-created', (_event, wc) => {
           accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
           click: () => {
             const currentUrl = wc.getURL();
-            if (currentUrl && !currentUrl.startsWith('view-source:') && !currentUrl.startsWith('nova://')) {
-              mainWindow?.webContents.send('new-tab', `view-source:${currentUrl}`);
+            // 🐛 Fix: internal pages use the `nova:` protocol (rendered as nova://newtab etc.).
+            // Block view-source for ANY nova-prefixed protocol, not just the literal 'nova://' prefix.
+            let isInternalPage = false;
+            let isViewSource = false;
+            try {
+              const parsed = new URL(currentUrl);
+              isInternalPage = parsed.protocol.startsWith('nova');
+              isViewSource = parsed.protocol === 'view-source:';
+            } catch {
+              isInternalPage = currentUrl.toLowerCase().startsWith('nova');
+              isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
+            }
+            if (currentUrl && !isViewSource && !isInternalPage) {
+              sendToMainWindow('new-tab', `view-source:${currentUrl}`);
             }
           }
         }));
@@ -1794,8 +1863,13 @@ ipcMain.handle('show-download-in-folder', (event, pathStr: string) => {
 ipcMain.handle('start-mcp-server', async (event) => {
   if (!isTrustedSender(event)) return false;
   if (mcpServer && !mcpServer.isRunning()) {
-    await mcpServer.start();
-    mainWindow?.webContents.send('mcp-status-changed', true);
+    try {
+      await mcpServer.start();
+    } catch (err) {
+      console.error('[MCP] Failed to start server:', err);
+      return false;
+    }
+    sendToMainWindow('mcp-status-changed', true);
     return true;
   }
   return false;
@@ -1805,7 +1879,7 @@ ipcMain.handle('stop-mcp-server', (event) => {
   if (!isTrustedSender(event)) return false;
   if (mcpServer && mcpServer.isRunning()) {
     mcpServer.stop();
-    mainWindow?.webContents.send('mcp-status-changed', false);
+    sendToMainWindow('mcp-status-changed', false);
     return true;
   }
   return false;
@@ -1894,6 +1968,11 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
     if (typeof value !== 'string') throw new Error('Invalid value format');
+    // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
+    const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
+    if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
+      throw new Error('Value exceeds maximum allowed size of 5MB');
+    }
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     // VULN-06: Warn and mark when encryption is unavailable
     if (safeStorage.isEncryptionAvailable()) {
@@ -2119,7 +2198,32 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
 });
 
 // IPC Handler for Autocomplete Suggestions with Regional Intelligence & In-Memory LRU Cache
-const suggestionsCache = new Map<string, string[]>();
+const SUGGESTIONS_CACHE_TTL_MS = 15 * 60 * 1000; // entries expire after 15 minutes
+const SUGGESTIONS_CACHE_MAX_ENTRIES = 400;
+interface SuggestionsCacheEntry { list: string[]; cachedAt: number; }
+const suggestionsCache = new Map<string, SuggestionsCacheEntry>();
+
+function getSuggestionsFromCache(cacheKey: string): string[] | null {
+  const entry = suggestionsCache.get(cacheKey);
+  if (!entry) return null;
+  // Expired entries are treated as misses and purged lazily on access
+  if (Date.now() - entry.cachedAt > SUGGESTIONS_CACHE_TTL_MS) {
+    suggestionsCache.delete(cacheKey);
+    return null;
+  }
+  return entry.list;
+}
+
+function cacheSuggestions(cacheKey: string, list: string[]): void {
+  // Proper trim: evict oldest-inserted entries until back under the cap
+  // (instead of the old drift-prone one-delete-per-insert check)
+  while (suggestionsCache.size >= SUGGESTIONS_CACHE_MAX_ENTRIES) {
+    const oldestKey = suggestionsCache.keys().next().value;
+    if (!oldestKey) break;
+    suggestionsCache.delete(oldestKey);
+  }
+  suggestionsCache.set(cacheKey, { list, cachedAt: Date.now() });
+}
 
 function resolveLocaleDetails(clientLocale?: string) {
   const rawLocale = (typeof clientLocale === 'string' && clientLocale.trim()) 
@@ -2143,8 +2247,9 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
   const normalizedKey = cleanQ.normalize('NFC').toLowerCase();
   const cacheKey = `${normalizedKey}_${engine || 'default'}_${lang}_${country}`;
 
-  if (suggestionsCache.has(cacheKey)) {
-    return suggestionsCache.get(cacheKey)!;
+  const cachedList = getSuggestionsFromCache(cacheKey);
+  if (cachedList !== null) {
+    return cachedList;
   }
 
   const userAgent = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
@@ -2259,14 +2364,57 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
     providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
   }
 
-  for (const provider of providers) {
-    const list = await provider();
-    if (list.length > 0) {
-      if (suggestionsCache.size > 400) {
-        const firstKey = suggestionsCache.keys().next().value;
-        if (firstKey) suggestionsCache.delete(firstKey);
-      }
-      suggestionsCache.set(cacheKey, list);
+  // ⚡ Perf + 🔒 Privacy: providers start STAGGERED — the next engine is queried
+  // only if no result has arrived within FALLBACK_STAGGER_MS, so a healthy
+  // primary provider sees the query alone (same network behavior as the old
+  // sequential loop in the common case) while worst-case latency stays bounded
+  // (~stagger × (n-1) + one provider timeout) instead of n × timeout.
+  const FALLBACK_STAGGER_MS = 600;
+  const resultsByPriority = new Map<number, string[]>();
+  let anyNonEmpty = false;
+  let activeRuns = 0;
+  let scheduledStarts = providers.length - 1;
+  const staggerTimers: ReturnType<typeof setTimeout>[] = [];
+
+  let allSettledResolve: () => void;
+  const allSettled = new Promise<void>((resolve) => { allSettledResolve = resolve; });
+  const maybeAllSettled = () => {
+    if (activeRuns === 0 && scheduledStarts === 0) allSettledResolve();
+  };
+
+  const runProvider = (idx: number) => {
+    activeRuns++;
+    providers[idx]()
+      .then((list) => {
+        resultsByPriority.set(idx, Array.isArray(list) ? list : []);
+        if (resultsByPriority.get(idx)!.length > 0) anyNonEmpty = true;
+      })
+      .catch(() => {})
+      .finally(() => {
+        activeRuns--;
+        maybeAllSettled();
+      });
+  };
+
+  runProvider(0);
+  for (let i = 1; i < providers.length; i++) {
+    staggerTimers.push(
+      setTimeout(() => {
+        scheduledStarts--;
+        // Privacy: skip lower-priority engines entirely once we have an answer.
+        if (!anyNonEmpty) runProvider(i);
+        else maybeAllSettled();
+      }, FALLBACK_STAGGER_MS * i)
+    );
+  }
+
+  await allSettled;
+  staggerTimers.forEach(clearTimeout);
+
+  for (let i = 0; i < providers.length; i++) {
+    const list = resultsByPriority.get(i);
+    if (list && list.length > 0) {
+      cacheSuggestions(cacheKey, list);
       return list;
     }
   }
@@ -2513,7 +2661,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     }
   }
 
-  const win = mainWindow || BrowserWindow.getAllWindows().find(w => w !== activeExtensionPopupWin) || BrowserWindow.getAllWindows()[0];
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : BrowserWindow.getAllWindows().find(w => w !== activeExtensionPopupWin) || BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No main window available' };
 
   let popupWidth = 380;
@@ -2564,7 +2712,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     try {
       const parsed = new URL(url);
       if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'chrome-extension:') {
-        mainWindow?.webContents.send('new-tab', url);
+        sendToMainWindow('new-tab', url);
       }
     } catch {}
     return { action: 'deny' };
@@ -2725,8 +2873,8 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
   }
 
   // VULN-27: Add user confirmation before reading another app's data
-  if (mainWindow) {
-    const { response } = await dialog.showMessageBox(mainWindow, {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const { response } = await dialog.showMessageBox(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any, {
       type: 'question',
       buttons: ['Import', 'Cancel'],
       defaultId: 1,
@@ -2861,6 +3009,36 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
 });
 
 // Install from Chrome Web Store
+// 🔒 Security: read an HTTP response body while enforcing a hard byte limit.
+// Aborts as soon as the limit is exceeded instead of buffering an unbounded payload.
+async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
+  const body = res.body;
+  if (body && typeof body.on === 'function') {
+    // Node-style stream (cross-fetch in Electron main)
+    return await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let received = 0;
+      body.on('data', (chunk: Buffer) => {
+        received += chunk.length;
+        if (received > maxBytes) {
+          try { body.destroy(); } catch (_) {}
+          reject(new Error(`Extension package exceeds maximum allowed size (${maxBytes} bytes).`));
+          return;
+        }
+        chunks.push(chunk);
+      });
+      body.on('end', () => resolve(Buffer.concat(chunks)));
+      body.on('error', (err: any) => reject(err));
+    });
+  }
+  // Fallback (no streaming body): buffered read, still validated against the cap
+  const arrayBuffer = await res.arrayBuffer();
+  if (arrayBuffer.byteLength > maxBytes) {
+    throw new Error(`Extension package exceeds maximum allowed size (${maxBytes} bytes).`);
+  }
+  return Buffer.from(arrayBuffer);
+}
+
 ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
   // 🔒 Security: Allow only trusted main window OR Chrome Web Store origin
   const senderUrl = event.sender?.getURL() || '';
@@ -2888,9 +3066,16 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
       const errText = await res.text().catch(() => '');
       throw new Error(`Eklenti indirilemedi (HTTP ${res.status}): ${errText.substring(0, 100)}`);
     }
-    
-    const arrayBuffer = await res.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+
+    // 🔒 Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
+    // Reject early on a declared Content-Length over the limit; abort mid-stream otherwise.
+    const MAX_CRX_BYTES = 100 * 1024 * 1024;
+    const declaredLength = Number.parseInt(res.headers.get('content-length') || '', 10);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_CRX_BYTES) {
+      throw new Error(`Extension package exceeds maximum allowed size (${MAX_CRX_BYTES} bytes).`);
+    }
+
+    const buffer = await readBodyWithLimit(res, MAX_CRX_BYTES);
 
     // 🔒 Security: Validate CRX magic header (Cr24: 0x43 0x72 0x32 0x34) or PK zip header (0x50 0x4B)
     if (buffer.length < 4 || ((buffer[0] !== 0x43 || buffer[1] !== 0x72 || buffer[2] !== 0x32 || buffer[3] !== 0x34) && (buffer[0] !== 0x50 || buffer[1] !== 0x4B))) {
@@ -2959,13 +3144,20 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
 
 // --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
 let activeTtsProcess: child_process.ChildProcess | null = null;
+// Generation counter: each speak request invalidates the previous one so a
+// killed request's close-handler can never spawn a fallback that talks over
+// the newer request.
+let ttsGeneration = 0;
+
+// ⚡ Perf: async execFile so a slow `/usr/bin/say` can never block the Electron main process
+const execFileAsync = promisify(child_process.execFile);
 
 ipcMain.handle('native-tts-get-voices', async (event) => {
   if (!isTrustedSender(event)) return [];
   if (process.platform === 'darwin') {
     try {
-      const output = child_process.execFileSync('/usr/bin/say', ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
-      const lines = output.split('\n');
+      const { stdout } = await execFileAsync('/usr/bin/say', ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
+      const lines = stdout.split('\n');
       const list: { name: string; lang: string; description: string }[] = [];
       for (const line of lines) {
         const match = line.match(/^([^\t#]+?)\s+([a-zA-Z]{2}_[a-zA-Z0-9]+)\s+#\s*(.*)$/);
@@ -2995,6 +3187,11 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
     text = text.substring(0, 500000);
   }
 
+  // Invalidate any in-flight request BEFORE killing it: its close handler runs
+  // on a future tick, so bumping the generation first guarantees it observes
+  // the mismatch and never spawns a voice-fallback over this request.
+  const myGeneration = ++ttsGeneration;
+
   if (activeTtsProcess) {
     try {
       activeTtsProcess.kill();
@@ -3004,6 +3201,24 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
   if (process.platform === 'darwin') {
     return new Promise((resolve) => {
+      // 🔧 Robustness: hard overall cap so a hung `say` process can never leave this
+      // handler pending forever. Single shared deadline across voice-fallback retries.
+      let settled = false;
+      let sayTimedOut = false;
+      const sayTimeout = setTimeout(() => {
+        sayTimedOut = true;
+        if (activeTtsProcess) {
+          try { activeTtsProcess.kill(); } catch (_) {}
+          activeTtsProcess = null;
+        }
+      }, 120000);
+      const finish = (result: { success: boolean; error?: string }) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(sayTimeout);
+        resolve(result);
+      };
+
       // 🔒 Security: Sanitize voice name strictly against command flag injection
       let cleanVoice: string | null = null;
       if (voiceName && typeof voiceName === 'string') {
@@ -3044,6 +3259,11 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
           });
           activeTtsProcess = proc;
 
+          // 🔧 Robustness: drain stderr so pipe backpressure can never stall the process
+          if (proc.stderr) {
+            proc.stderr.on('data', () => {});
+          }
+
           if (proc.stdin) {
             proc.stdin.on('error', () => {});
             try {
@@ -3054,24 +3274,29 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
           proc.on('close', (code) => {
             if (activeTtsProcess === proc) activeTtsProcess = null;
-            if (code === 0) {
-              resolve({ success: true });
+            if (myGeneration !== ttsGeneration) {
+              // A newer speak request superseded this one.
+              finish({ success: false, error: 'Superseded by a newer speech request' });
+            } else if (sayTimedOut) {
+              finish({ success: false, error: 'Speech synthesis timed out' });
+            } else if (code === 0) {
+              finish({ success: true });
             } else if (commandArgs.includes('-v')) {
               // If failed with custom voice, try fallback to default system voice
               const fallbackArgs = commandArgs.filter((a, i) => a !== '-v' && commandArgs[i - 1] !== '-v');
               runSay(fallbackArgs);
             } else {
-              resolve({ success: false, error: `Process exited with code ${code}` });
+              finish({ success: false, error: `Process exited with code ${code}` });
             }
           });
 
           proc.on('error', (err) => {
             if (activeTtsProcess === proc) activeTtsProcess = null;
-            resolve({ success: false, error: err.message });
+            finish({ success: false, error: err.message });
           });
         } catch (err: any) {
           activeTtsProcess = null;
-          resolve({ success: false, error: err.message });
+          finish({ success: false, error: err.message });
         }
       };
 
@@ -3093,4 +3318,3 @@ ipcMain.handle('native-tts-stop', async (event) => {
   }
   return false;
 });
-

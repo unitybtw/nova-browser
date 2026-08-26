@@ -1,7 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { BrowserWindow, safeStorage } from 'electron';
-import { randomUUID } from 'crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { app as electronApp } from 'electron';
@@ -274,7 +274,8 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_wait: 'safe',
   browser_get_element_text: 'safe',
   browser_scroll_to_element: 'safe',
-  // 🟡 Medium — allowed by default, can be disabled
+  browser_full_page_screenshot: 'safe',
+  // 🟡 Medium — disabled by default, can be enabled in settings
   browser_click: 'medium',
   browser_hover: 'medium',
   browser_focus: 'medium',
@@ -285,16 +286,19 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_pin_tab: 'medium',
   browser_duplicate_tab: 'medium',
   browser_zoom: 'medium',
-  // 🔴 Sensitive — disabled by default, user must enable
+  // 🔴 Sensitive — disabled by default, can be enabled in settings
   browser_type: 'sensitive',
 
   browser_press_key: 'sensitive',
   browser_select_option: 'sensitive',
-  browser_full_page_screenshot: 'safe',
 };
 
-// Default disabled tools (sensitive level)
-const DEFAULT_DISABLED_TOOLS = new Set<string>();
+// Default disabled tools (all medium & sensitive levels; users can re-enable them in settings)
+const DEFAULT_DISABLED_TOOLS = new Set<string>(
+  Object.entries(TOOL_PERMISSIONS)
+    .filter(([, permission]) => permission !== 'safe')
+    .map(([name]) => name)
+);
 
 interface SseClient {
   id: string;
@@ -331,6 +335,8 @@ export class BrowserMCPServer {
       this.token = process.env.MCP_TOKEN || randomUUID();
     }
     this.setupRoutes();
+    // Restore persisted per-tool enable/disable settings (safe: internal try/catch)
+    this.loadToolSettings();
   }
 
   private loadOrGenerateToken(): string {
@@ -400,12 +406,25 @@ export class BrowserMCPServer {
     } catch {}
   }
 
+  // 🔒 Security: constant-time token comparison. Both sides are hashed with SHA-256
+  // first so the buffers always have equal length (a timingSafeEqual requirement) and
+  // comparison cost is independent of where the first differing byte occurs.
+  private tokenMatches(provided: string): boolean {
+    try {
+      const expected = createHash('sha256').update(this.token).digest();
+      const actual = createHash('sha256').update(provided).digest();
+      return timingSafeEqual(expected, actual);
+    } catch {
+      return false;
+    }
+  }
+
   private isAuthenticated(req: express.Request): boolean {
     // Check Authorization header: Bearer <token>
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ') && authHeader.slice(7) === this.token) return true;
+    if (authHeader.startsWith('Bearer ') && this.tokenMatches(authHeader.slice(7))) return true;
     // Check query param: ?token=<token>
-    if (req.query.token === this.token) return true;
+    if (typeof req.query.token === 'string' && this.tokenMatches(req.query.token)) return true;
     return false;
   }
 
@@ -427,13 +446,6 @@ export class BrowserMCPServer {
 
   public getClientCount() {
     return this.clients.size;
-  }
-
-  private broadcastToClients(event: string, data: any) {
-    const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of this.clients.values()) {
-      try { client.res.write(payload); } catch (_) {}
-    }
   }
 
   private sendToClient(clientId: string, event: string, data: any) {
@@ -600,13 +612,22 @@ export class BrowserMCPServer {
 
       const body = req.body;
       const sessionId = req.query.sessionId as string;
-      
+
+      // 🔒 Security: only route responses to KNOWN sessions. A missing or unknown
+      // sessionId must never fall back to broadcasting tool results to ALL clients.
+      if (!sessionId || !this.clients.has(sessionId)) {
+        return res.status(sessionId ? 404 : 400).json({
+          jsonrpc: '2.0',
+          id: body?.id ?? null,
+          error: {
+            code: sessionId ? -32000 : -32600,
+            message: sessionId ? 'Unknown sessionId' : 'Missing sessionId'
+          }
+        });
+      }
+
       const respondToClient = (payload: any) => {
-        if (sessionId) {
-          this.sendToClient(sessionId, 'message', payload);
-        } else {
-          this.broadcastToClients('message', payload);
-        }
+        this.sendToClient(sessionId, 'message', payload);
       };
       
       try {
@@ -629,7 +650,7 @@ export class BrowserMCPServer {
           const responsePayload = {
             jsonrpc: '2.0',
             id: body.id,
-            result: { tools: TOOLS }
+            result: { tools: TOOLS.filter((tool) => this.isToolAllowed(tool.name)) }
           };
           respondToClient(responsePayload);
           return res.status(202).json({ status: 'accepted' });
@@ -698,7 +719,7 @@ export class BrowserMCPServer {
       if (!this.isAuthenticated(req)) {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
-      res.json({ tools: TOOLS });
+      res.json({ tools: TOOLS.filter((tool) => this.isToolAllowed(tool.name)) });
     });
   }
 
@@ -717,6 +738,8 @@ export class BrowserMCPServer {
 
         this.server.on('error', (err: any) => {
           console.error('[MCP Server] Failed to start:', err);
+          // Clear the handle so isRunning() returns false and the server can be restarted
+          this.server = null;
           reject(err);
         });
       } catch (err) {

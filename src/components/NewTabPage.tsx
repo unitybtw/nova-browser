@@ -112,6 +112,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const [speedDials, setSpeedDials] = useState(() => {
+    // Incognito: never read persistent storage
+    if (isIncognito) return DEFAULT_SPEED_DIALS;
     try {
       const saved = localStorage.getItem('nova_speed_dials');
       if (saved) {
@@ -126,6 +128,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
 
   const [todos, setTodos] = useState<Todo[]>(() => {
+    // Incognito: never read persistent storage
+    if (isIncognito) return [];
     try {
       const saved = localStorage.getItem('nova_todos');
       if (saved) {
@@ -200,7 +204,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   }, [query, isFocused]);
 
   useEffect(() => {
-    localStorage.setItem('nova_todos', JSON.stringify(todos));
+    if (isIncognito) return; // Incognito: never persist
+    try {
+      localStorage.setItem('nova_todos', JSON.stringify(todos));
+    } catch (e) {}
   }, [todos]);
 
   const handleAddTodo = (e: React.FormEvent) => {
@@ -223,7 +230,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   };
 
   useEffect(() => {
-    localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
+    if (isIncognito) return; // Incognito: never persist
+    try {
+      localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
+    } catch (e) {}
   }, [speedDials]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

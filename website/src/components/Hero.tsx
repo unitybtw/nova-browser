@@ -1,113 +1,145 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Apple, Monitor, ChevronRight } from 'lucide-react';
-import { RealBrowserSandbox } from './RealBrowserSandbox';
+import { motion, useReducedMotion, type Variants } from 'framer-motion';
+import { Download, Github, Sparkles } from 'lucide-react';
 
-const GithubIcon = ({ className = "w-4 h-4" }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
-    <path d="M9 18c-4.51 2-5-2-7-2"/>
-  </svg>
-);
+const GITHUB_URL = 'https://github.com/unitybtw/nova-browser';
+const RELEASES_URL = 'https://github.com/unitybtw/nova-browser/releases/latest';
 
-export const Hero: React.FC = () => {
-  const [os, setOs] = useState<'mac' | 'win'>('mac');
+const EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
-  useEffect(() => {
-    const ua = window.navigator.userAgent.toLowerCase();
-    if (ua.includes('win')) setOs('win');
-  }, []);
+const stack: Variants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+};
+
+const rise: Variants = {
+  hidden: { opacity: 0, y: 28 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EXPO } },
+};
+
+/* Product frame: rises with a slight perspective tilt that flattens on hover */
+const frame: Variants = {
+  hidden: { opacity: 0, y: 48, rotateX: 12 },
+  visible: { opacity: 1, y: 0, rotateX: 6, transition: { duration: 0.6, ease: EXPO } },
+};
+
+export default function Hero() {
+  const reduceMotion = !!useReducedMotion();
+  const initialState = reduceMotion ? ('visible' as const) : ('hidden' as const);
 
   return (
-    <section className="relative pt-32 pb-20 overflow-hidden top-beam-cyan">
-      <div className="absolute inset-0 linear-grid pointer-events-none opacity-40" />
+    <section
+      id="hero"
+      aria-labelledby="hero-heading"
+      className="relative overflow-hidden pt-36 pb-20"
+    >
+      {/* Faint top glow */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 h-[480px]"
+        style={{
+          background:
+            'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(99, 102, 241, 0.14), transparent 70%)',
+        }}
+      />
 
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
-        {/* Announcement Header */}
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full card-glass text-xs font-mono text-cyan-400 mb-6 border border-cyan-500/20"
-          >
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-            <span className="font-bold">NOVA BROWSER 1.0</span>
-            <span className="text-white/20">|</span>
-            <span className="text-slate-300">Open-Source & AI-Native Desktop Browser</span>
-            <ChevronRight className="w-3.5 h-3.5 text-slate-500" />
-          </motion.div>
-
-          {/* Main Title */}
-          <motion.h1
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.08 }}
-            className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-white mb-6 leading-[1.1]"
-          >
-            Built for speed. <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-white to-slate-400">
-              Powered by intelligence.
-            </span>
-          </motion.h1>
-
-          <motion.p
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.16 }}
-            className="text-base sm:text-lg md:text-xl text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed"
-          >
-            An AI-native desktop browser with autonomous Model Context Protocol (MCP) agents, zero-knowledge encrypted device pairing, and zero telemetry.
-          </motion.p>
-
-          {/* Download CTAs */}
-          <motion.div
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: 0.24 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 max-w-md sm:max-w-none mx-auto mb-14"
-          >
-            {os === 'win' ? (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe"
-                className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Monitor className="w-4 h-4" />
-                <span>Download for Windows (.exe)</span>
-              </a>
-            ) : (
-              <a
-                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
-                className="w-full sm:w-auto bg-white text-black hover:bg-slate-200 px-8 py-3.5 rounded-xl font-bold text-sm transition-all shadow-[0_0_25px_rgba(255,255,255,0.2)] flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Apple className="w-4 h-4" />
-                <span>Download for macOS (.dmg)</span>
-              </a>
-            )}
-
-            <a
-              href="https://github.com/unitybtw/nova-browser"
-              target="_blank"
-              rel="noreferrer"
-              className="w-full sm:w-auto card-glass text-slate-200 hover:text-white px-7 py-3.5 rounded-xl font-semibold text-sm transition-all border border-white/10 hover:border-white/20 flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <GithubIcon className="w-4 h-4" />
-              <span>Star on GitHub</span>
-            </a>
-          </motion.div>
-        </div>
-
-        {/* Real Live Authentic Browser Sandbox */}
+      <motion.div
+        variants={stack}
+        initial={initialState}
+        animate="visible"
+        className="relative mx-auto max-w-6xl px-6 text-center"
+      >
+        {/* Status pill */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, delay: 0.3 }}
+          variants={rise}
+          className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-star"
         >
-          <RealBrowserSandbox />
+          <Sparkles size={14} aria-hidden />
+          Free &amp; Open Source
         </motion.div>
 
-      </div>
+        <motion.h1
+          id="hero-heading"
+          variants={rise}
+          className="mx-auto mt-6 max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl"
+        >
+          The browser that <span className="text-gradient">thinks with you.</span>
+        </motion.h1>
+
+        <motion.p
+          variants={rise}
+          className="mx-auto mt-6 max-w-2xl text-lg text-muted md:text-xl"
+        >
+          On-device AI assistant, an autonomous agent that drives the browser for you,
+          zero-knowledge encrypted sync and a built-in privacy shield — without sending your
+          data anywhere.
+        </motion.p>
+
+        {/* CTAs */}
+        <motion.div
+          variants={rise}
+          className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+        >
+          <a
+            href={RELEASES_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-full bg-nova px-7 py-3.5 font-semibold text-white shadow-[0_0_40px_rgba(99,102,241,0.35)] transition-all duration-200 hover:bg-nova-deep active:scale-[0.97]"
+          >
+            <Download size={18} aria-hidden />
+            Download for macOS
+          </a>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="glass inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold transition-all duration-200 hover:bg-white/[0.08] active:scale-[0.97]"
+          >
+            <Github size={18} aria-hidden />
+            Star on GitHub
+          </a>
+        </motion.div>
+
+        <motion.p variants={rise} className="mt-5 text-sm text-faint">
+          Also available for Windows · electron + react · MIT licensed
+        </motion.p>
+
+        {/* Product visual */}
+        <div className="relative mx-auto mt-16 max-w-5xl [perspective:1400px]">
+          {/* Ambient light blobs */}
+          <motion.div
+            aria-hidden
+            className="absolute -top-24 -left-28 h-80 w-80 rounded-full opacity-20 blur-3xl"
+            style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
+            animate={reduceMotion ? undefined : { x: [0, 42, -18, 0], y: [0, 26, -12, 0] }}
+            transition={
+              reduceMotion ? undefined : { duration: 16, repeat: Infinity, ease: 'easeInOut' }
+            }
+          />
+          <motion.div
+            aria-hidden
+            className="absolute -right-28 -bottom-28 h-80 w-80 rounded-full opacity-20 blur-3xl"
+            style={{ background: 'radial-gradient(circle, #fbbf24 0%, transparent 70%)' }}
+            animate={reduceMotion ? undefined : { x: [0, -34, 22, 0], y: [0, -22, 16, 0] }}
+            transition={
+              reduceMotion ? undefined : { duration: 18, repeat: Infinity, ease: 'easeInOut' }
+            }
+          />
+
+          <motion.div
+            variants={frame}
+            whileHover={reduceMotion ? undefined : { rotateX: 0, y: -6 }}
+            className="glass relative overflow-hidden rounded-2xl p-2 shadow-2xl ring-1 ring-white/10"
+          >
+            <img
+              src="/preview.png"
+              width={2880}
+              height={1800}
+              alt="Nova Browser running on macOS with the on-device AI assistant panel open beside a web page"
+              className="h-auto w-full rounded-xl object-cover"
+            />
+          </motion.div>
+        </div>
+      </motion.div>
     </section>
   );
-};
+}

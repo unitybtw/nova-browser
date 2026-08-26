@@ -107,7 +107,8 @@ export function getBestVoice(voices: SpeechSynthesisVoice[], langCode: string): 
     if (name.includes('neural')) score += 45;
     if (name.includes('enhanced') || name.includes('premium')) score += 40;
     if (name.includes('google') && !name.includes('translate')) score += 30;
-    if (name.includes('siri') || name.includes('compact') === false) score += 20;
+    // Award bonus for Siri voices, but NOT low-fidelity "compact" variants
+    if (name.includes('siri') && !name.includes('compact')) score += 20;
 
     if (targetPrefix === 'tr') {
       if (name.includes('yelda')) score += 25;

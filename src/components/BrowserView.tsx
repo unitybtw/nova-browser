@@ -17,6 +17,10 @@ const DownloadsPage = React.lazy(() => import('./DownloadsPage').then(m => ({ de
 
 const NOOP = () => {};
 
+// Origins already hinted via <link rel="dns-prefetch">. Deduping by origin keeps
+// document.head bounded (growth is capped by the number of distinct origins visited).
+const dnsPrefetchedOrigins = new Set<string>();
+
 interface BrowserViewProps {
   tab?: Tab | null;
   isActive: boolean;
@@ -65,17 +69,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onPurgeMemory
 }) => {
   const webviewRef = useRef<any>(null);
-  
+
   const getSafeUrl = (u?: string) => (u && u.startsWith('nova://')) ? 'about:blank' : (u || 'about:blank');
   const lastLoadedUrl = useRef<string>(tab?.url || '');
-  const webviewInitialSrc = useRef<string>(getSafeUrl(tab?.url));
   const isWebviewReady = useRef<boolean>(false);
-
-  useEffect(() => {
-    if (tab?.url) {
-      webviewInitialSrc.current = getSafeUrl(tab.url);
-    }
-  }, [tab?.url]);
 
   const isNewTab = React.useMemo(() => (
     !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
@@ -114,9 +111,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     tab?.url === 'nova://downloads' || tab?.url === 'about:downloads'
   ), [tab?.url]);
 
-  const domReadyRef = useRef(false);
   const latestTabRef = useRef(tab);
-  
+  // Latest-settings ref: the main webview effect intentionally does NOT depend
+  // on `settings` (re-running would re-attach 18 listeners and reset webview
+  // state), so its callbacks read current values through this ref instead of
+  // stale closure captures.
+  const latestSettingsRef = useRef(settings);
+  latestSettingsRef.current = settings;
+
   useEffect(() => {
     latestTabRef.current = tab;
   }, [tab]);
@@ -127,14 +129,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     if (!webview || !tab?.id) return;
 
     const handleDomReady = async () => {
-      domReadyRef.current = true;
       let wcId = undefined;
       try { wcId = webview.getWebContentsId(); } catch (e) {}
       onUpdateTab(tab.id, {
         isLoading: false,
         canGoBack: webview.canGoBack?.() || false,
         canGoForward: webview.canGoForward?.() || false,
-        title: webview.getTitle?.() || tab?.url || '',
+        title: webview.getTitle?.() || latestTabRef.current?.url || '',
         webContentsId: wcId
       });
 
@@ -144,97 +145,117 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           webview.setZoomFactor(currentTab.zoomFactor);
         } else {
           const zoomMap = { small: 0.85, medium: 1.0, large: 1.25 };
-          webview.setZoomFactor(zoomMap[settings.fontSize || 'medium'] || 1.0);
+          webview.setZoomFactor(zoomMap[latestSettingsRef.current.fontSize || 'medium'] || 1.0);
         }
       } catch (err) {
         console.error('Failed to set zoom factor', err);
       }
 
-      // 1. Password Autofill & Capture Logic
-      try {
-        // Fetch saved passwords for current domain
-        let hostname = '';
-        try { hostname = new URL(tab?.url || '').hostname; } catch (e) {}
-        
-        let savedPasswords: any[] = [];
+      // Passwords are never filled automatically. Explicit user interaction is
+      // required before credentials are exposed to a web page.
+      // NOTE: Only the password-autofill portion is gated behind the password
+      // manager setting. The AI link-preview injection and mute handling below
+      // must run regardless of that setting.
+      if (latestSettingsRef.current.passwordManagerEnabled === true) {
+        // 1. Password Autofill & Capture Logic
         try {
-          const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-          if (raw) {
-            const all = JSON.parse(raw);
-            savedPasswords = all.filter((p: any) => p.hostname === hostname);
-          }
-        } catch (e) {}
-
-        const autofillScript = `
-          (function() {
-            if (window.__nova_pw_injected) return;
-            window.__nova_pw_injected = true;
-
-            // Autofill existing credentials
-            const savedCredentials = ${JSON.stringify(savedPasswords)};
-            if (savedCredentials.length > 0) {
-              const cred = savedCredentials[0];
-              const pwdInputs = Array.from(document.querySelectorAll('input[type="password"]'));
-              if (pwdInputs.length > 0) {
-                const root = pwdInputs[0].closest('form') || pwdInputs[0].closest('div') || document;
-                const textInputs = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
-                if (textInputs.length > 0) {
-                  textInputs[0].value = cred.username;
-                  textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                  textInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                pwdInputs[0].value = cred.password;
-                pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                pwdInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
-              }
-            }
-
-            // In-page fallback password capture listener
-            let lastUser = '';
-            document.addEventListener('input', (e) => {
-              const t = e.target;
-              if (t && t.tagName === 'INPUT') {
-                const type = (t.type || '').toLowerCase();
-                const name = (t.name || '').toLowerCase();
-                if (type === 'text' || type === 'email' || type === 'tel' || name.includes('user') || name.includes('email') || name.includes('login')) {
-                  if (t.value && t.value.trim()) lastUser = t.value.trim();
-                }
-              }
-            }, true);
-
-            const checkAndEmit = () => {
-              const pwds = Array.from(document.querySelectorAll('input[type="password"]'));
-              const activePwd = pwds.find(p => p.value && p.value.length > 0);
-              if (!activePwd || !activePwd.value) return;
-
-              const root = activePwd.closest('form') || activePwd.closest('div') || document;
-              let userInp = root.querySelector('input[autocomplete="username"], input[autocomplete="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[type="email"], input[type="text"]');
-              const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
-              
-              if (foundUser && activePwd.value) {
-                console.log('NOVA_SAVE_PW::' + JSON.stringify({
-                  hostname: window.location.hostname,
-                  username: foundUser,
-                  password: activePwd.value
-                }));
-              }
-            };
-
-            document.addEventListener('submit', checkAndEmit, true);
-            document.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAndEmit(); }, true);
-            document.addEventListener('click', (e) => {
-              const btn = e.target && e.target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
-              if (btn) {
-                const txt = (btn.textContent || btn.value || '').toLowerCase();
-                if (btn.type === 'submit' || /log|sign|giriş|kayıt|devam|next|continue|submit|ileri/i.test(txt)) {
-                  setTimeout(checkAndEmit, 50);
-                }
-              }
-            }, true);
-          })();
+          // Fetch saved passwords for current domain.
+          // Read the URL through latestTabRef: tab.url can change (SPA
+          // navigations) without this effect re-running.
+          let hostname = '';
+          try { hostname = new URL(latestTabRef.current?.url || '').hostname; } catch (e) {}
           
+          let savedPasswords: any[] = [];
+          try {
+            const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+            if (raw) {
+              const all = JSON.parse(raw);
+              savedPasswords = all.filter((p: any) => p.hostname === hostname);
+            }
+          } catch (e) {}
+
+          const passwordScript = `
+            (function() {
+              if (window.__nova_pw_injected) return;
+              window.__nova_pw_injected = true;
+
+              // Autofill existing credentials
+              const savedCredentials = ${JSON.stringify(savedPasswords)};
+              if (savedCredentials.length > 0) {
+                const cred = savedCredentials[0];
+                const pwdInputs = Array.from(document.querySelectorAll('input[type="password"]'));
+                if (pwdInputs.length > 0) {
+                  const root = pwdInputs[0].closest('form') || pwdInputs[0].closest('div') || document;
+                  const textInputs = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
+                  if (textInputs.length > 0) {
+                    textInputs[0].value = cred.username;
+                    textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    textInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+                  }
+                  pwdInputs[0].value = cred.password;
+                  pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+                  pwdInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+                }
+              }
+
+              // In-page fallback password capture listener
+              let lastUser = '';
+              document.addEventListener('input', (e) => {
+                const t = e.target;
+                if (t && t.tagName === 'INPUT') {
+                  const type = (t.type || '').toLowerCase();
+                  const name = (t.name || '').toLowerCase();
+                  if (type === 'text' || type === 'email' || type === 'tel' || name.includes('user') || name.includes('email') || name.includes('login')) {
+                    if (t.value && t.value.trim()) lastUser = t.value.trim();
+                  }
+                }
+              }, true);
+
+              const checkAndEmit = () => {
+                const pwds = Array.from(document.querySelectorAll('input[type="password"]'));
+                const activePwd = pwds.find(p => p.value && p.value.length > 0);
+                if (!activePwd || !activePwd.value) return;
+
+                const root = activePwd.closest('form') || activePwd.closest('div') || document;
+                let userInp = root.querySelector('input[autocomplete="username"], input[autocomplete="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[type="email"], input[type="text"]');
+                const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
+                
+                if (foundUser && activePwd.value) {
+                  // SECURITY NOTE: This console.log IS the transport channel for the
+                  // captured credential (piped to the renderer via the 'console-message'
+                  // event), so the payload necessarily contains the password. It must
+                  // not be duplicated or logged anywhere else.
+                  console.log('NOVA_SAVE_PW::' + JSON.stringify({
+                    hostname: window.location.hostname,
+                    username: foundUser,
+                    password: activePwd.value
+                  }));
+                }
+              };
+
+              document.addEventListener('submit', checkAndEmit, true);
+              document.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAndEmit(); }, true);
+              document.addEventListener('click', (e) => {
+                const btn = e.target && e.target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
+                if (btn) {
+                  const txt = (btn.textContent || btn.value || '').toLowerCase();
+                  if (btn.type === 'submit' || /log|sign|giriş|kayıt|devam|next|continue|submit|ileri/i.test(txt)) {
+                    setTimeout(checkAndEmit, 50);
+                  }
+                }
+              }, true);
+            })();
+          `;
+          webview.executeJavaScript(passwordScript).catch(() => {});
+        } catch (e) {}
+      }
+
+      // 2. AI Link Preview injection — independent of the password manager setting
+      // (the script self-gates on aiLinkPreviewEnabled)
+      try {
+        const linkPreviewScript = `
           (function() {
-            if (!${Boolean(settings.aiLinkPreviewEnabled ?? true)}) return;
+            if (!${Boolean(latestSettingsRef.current.aiLinkPreviewEnabled ?? true)}) return;
             if (window.__nova_hover_injected) return;
             window.__nova_hover_injected = true;
             let hoverTimer = null;
@@ -273,9 +294,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             });
           })();
         `;
-        webview.executeJavaScript(autofillScript);
-        if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
+        webview.executeJavaScript(linkPreviewScript).catch(() => {});
       } catch (e) {}
+
+      // 3. Mute state must always be applied, regardless of feature gates
+      if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
     };
 
     const handleStartNavigation = (e: any) => {
@@ -290,7 +313,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || tab?.url || ''
+          title: webview.getTitle?.() || latestTabRef.current?.url || ''
         });
       }
     };
@@ -302,7 +325,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || tab?.url || ''
+          title: webview.getTitle?.() || latestTabRef.current?.url || ''
         });
       }
     };
@@ -390,38 +413,50 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handlePasswordDetected = async (hostname: string, username: string, password: string) => {
+      // Derive the hostname at EVENT time from the live webview. The captured
+      // `tab?.url` closure goes stale after SPA navigations (this effect does
+      // not depend on tab.url), which previously caused credentials to be
+      // attributed to — and saved under — the wrong host.
       let actualHostname = '';
       try {
-        actualHostname = new URL(tab?.url || '').hostname;
+        const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        actualHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
       } catch (_) {}
 
-      if (actualHostname && actualHostname === hostname && username && password) {
-        const cleanUser = String(username).substring(0, 100);
-        const cleanPass = String(password).substring(0, 500);
+      if (!(actualHostname && actualHostname === hostname && username && password)) return;
 
-        let isUpdate = false;
-        try {
-          const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-          if (raw) {
-            const all = JSON.parse(raw);
-            const existing = all.find((p: any) => p.hostname === actualHostname && p.username === cleanUser);
-            if (existing) {
-              if (existing.password === cleanPass) {
-                return;
-              }
-              isUpdate = true;
+      const cleanUser = String(username).substring(0, 100);
+      const cleanPass = String(password).substring(0, 500);
+
+      let isUpdate = false;
+      try {
+        const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        if (raw) {
+          const all = JSON.parse(raw);
+          const existing = all.find((p: any) => p.hostname === actualHostname && p.username === cleanUser);
+          if (existing) {
+            if (existing.password === cleanPass) {
+              return;
             }
+            isUpdate = true;
           }
-        } catch (_) {}
+        }
+      } catch (_) {}
 
-        setPasswordPrompt({
-          isOpen: true,
-          hostname: actualHostname,
-          username: cleanUser,
-          password: cleanPass,
-          isUpdate
-        });
-      }
+      // Guard against races: while awaiting the secure store, this tab's
+      // webview may have been closed or replaced. Don't surface a save prompt
+      // for a dead context.
+      const stillMounted = webviewRef.current === webview &&
+        !(typeof webview.isDestroyed === 'function' && webview.isDestroyed());
+      if (!stillMounted) return;
+
+      setPasswordPrompt({
+        isOpen: true,
+        hostname: actualHostname,
+        username: cleanUser,
+        password: cleanPass,
+        isUpdate
+      });
     };
 
     const handleIpcMessage = (e: any) => {
@@ -445,10 +480,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           const data = JSON.parse(e.message.substring(17));
           if (typeof data.url === 'string' && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
             // Speed Booster: DNS prefetch and preconnect socket on hover
-            if (settings?.preloadDnsEnabled !== false) {
+            if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
               try {
                 const origin = new URL(data.url).origin;
-                if (origin && !origin.startsWith('null')) {
+                if (origin && !origin.startsWith('null') && !dnsPrefetchedOrigins.has(origin)) {
+                  dnsPrefetchedOrigins.add(origin);
                   const hint = document.createElement('link');
                   hint.rel = 'dns-prefetch';
                   hint.href = origin;
@@ -502,7 +538,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return () => {
       clearTimeout(readyCheckTimer);
       isWebviewReady.current = false;
-      domReadyRef.current = false;
       webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
       webview.removeEventListener('did-stop-loading', handleStopLoading);
@@ -1017,4 +1052,3 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   return true;
 });
-

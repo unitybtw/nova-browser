@@ -22,8 +22,10 @@ export function isValidUrlOrDomain(input: string): boolean {
     return true;
   }
 
-  // IPv4 address with optional port and path
-  if (/^(\d{1,3}\.){3}\d{1,3}(:\d+)?(\/.*)?$/.test(trimmed)) {
+  // IPv4 address with optional port and path.
+  // Each octet must be 0-255 (canonical range check), so e.g. 999.1.1.1 is
+  // correctly rejected instead of being treated as a navigable IP.
+  if (/^((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(:\d+)?(\/.*)?$/.test(trimmed)) {
     return true;
   }
 

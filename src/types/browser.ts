@@ -45,6 +45,7 @@ export const defaultSettings = {
   energySaverMode: false,
   preloadDnsEnabled: true,
   smoothScrollingEnabled: true,
+  passwordManagerEnabled: false,
 };
 
 export interface Extension {
