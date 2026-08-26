@@ -620,8 +620,8 @@ export const SidePanel = React.memo(({
                   </motion.div>
                 ) : null}
 
-                {/* Action approval gate (C-1): non read-only tool calls wait here
-                    for an explicit user decision before the agent may run them. */}
+                {/* Action approval gate: non read-only tool calls wait here for
+                    an explicit user decision before the agent may run them. */}
                 {queuedActions.filter(a => a.state === 'pending').map(action => (
                   <motion.div
                     key={action.id}

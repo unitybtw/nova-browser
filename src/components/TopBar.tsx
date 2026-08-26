@@ -993,8 +993,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     return result;
   }, [tabs]);
 
-  // PERF: scroll/resize can fire at very high frequency; coalesce the layout
-  // reads (scrollLeft/clientWidth/scrollWidth) to at most one batch per frame.
+  // PERF: coalesce high-frequency scroll/resize layout reads to one batch per frame.
   const checkScrollRafRef = useRef<number | null>(null);
   const checkScroll = useCallback(() => {
     if (checkScrollRafRef.current !== null) return;
@@ -1026,8 +1025,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   useEffect(() => {
     if (!tabsContainerRef.current) return;
     const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
-    // PERF: instant scroll (no 150ms setTimeout + smooth behavior) so switching
-    // tabs feels immediate like Chrome instead of trailing the click.
+    // PERF: instant scroll — switching tabs should feel immediate.
     activeTabEl?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
   }, [activeTabId, tabs.length]);
 
@@ -1799,13 +1797,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     </>
   );
 }, (prevProps, nextProps) => {
-  // Hand-written comparator (same style as MemoizedTabItem / BrowserView):
-  // the tabs array identity changes on every webview event, so compare only
-  // the fields this component actually renders. Callback props are ignored —
-  // they are stable useCallback references from App (same convention as the
-  // other memoized chrome components).
+  // Compare only rendered fields — tabs array identity changes on every webview
+  // event. Callback props are stable useCallback references from App.
 
-  // Scalars & flags that directly gate rendered output
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;

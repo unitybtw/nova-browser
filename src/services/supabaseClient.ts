@@ -17,13 +17,12 @@ export interface SupabaseConfig {
 const STORAGE_KEY = 'nova_supabase_config';
 
 // Auth storage key used by supabase-js. Exported so the sync service can
-// scrub stale JWT copies from localStorage on logout (H-4: sessions now live
-// in the OS-keychain-backed secure store, not Web Storage).
+// scrub stale JWT copies from localStorage on logout (sessions now live in
+// the OS-keychain-backed secure store, not Web Storage).
 export const SUPABASE_AUTH_STORAGE_KEY = 'nova_sb_auth_token';
 
-// M-4: a custom endpoint read from localStorage must never be blindly
-// trusted — it could otherwise point the anon key at an attacker-controlled
-// host. Only accept genuine Supabase project URLs of the form
+// A custom endpoint read from localStorage must never be blindly trusted —
+// it could otherwise point the anon key at an attacker-controlled host. Only accept genuine Supabase project URLs of the form
 // https://<project-ref>.supabase.co. Project refs are lowercase alphanumeric
 // IDs; they are commonly 20 chars but vary in length, so accept [a-z0-9]{10,}
 // instead of a fixed width. Anything else falls back to the env default.
@@ -88,7 +87,7 @@ export const saveSupabaseConfig = (url: string, anonKey: string): void => {
   clientPromise = null;
 };
 
-// --- H-4: secure session storage -------------------------------------------
+// --- Secure session storage -------------------------------------------------
 
 const hasElectronSecureStore = (): boolean =>
   typeof window !== 'undefined' &&
@@ -149,8 +148,8 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
             autoRefreshToken: true,
             detectSessionInUrl: false,
             storageKey: SUPABASE_AUTH_STORAGE_KEY,
-            // H-4: route session persistence (JWTs!) through the OS-keychain-
-            // backed secure store instead of localStorage. Falls back to
+            // Route session persistence (JWTs!) through the OS-keychain-backed
+            // secure store instead of localStorage. Falls back to
             // supabase-js' default (localStorage) only when the Electron bridge
             // is unavailable, i.e. plain web dev mode.
             storage: hasElectronSecureStore() ? electronSecureStorage : undefined

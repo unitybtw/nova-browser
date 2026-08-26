@@ -100,12 +100,9 @@ function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEv
   return true;
 }
 
-// ─── MCP renderer action bridge ───
-// 🔒 Security (H-2): The MCP server used to call window.__nova_executeMcpAction()
-// inside the MAIN WINDOW via webContents.executeJavaScript(), so any XSS in the
-// privileged UI context could seize one-call browser control. Now the main
-// process sends an 'mcp-action-request' IPC to the renderer and awaits the
-// result on a channel that is gated by isTrustedSender() below.
+// 🔒 Security: MCP browser_* tools are forwarded to the renderer over an
+// 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
+// below — never executed as injected JS in the privileged UI context.
 
 interface PendingMcpAction {
   resolve: (value: unknown) => void;
@@ -158,8 +155,7 @@ function isTrustedAppOrigin(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
     if (parsed.protocol === 'nova:' || parsed.protocol === 'devtools:') return true;
-    // 🔒 Security (M-1): The Vite dev server is only trusted in unpackaged dev builds.
-    // In packaged builds localhost:5173 must never be treated as an app origin.
+    // 🔒 Security: The Vite dev server is only trusted in unpackaged dev builds.
     if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
       const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
@@ -374,8 +370,8 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
         });
       } else {
         const defaultDir = app.getPath('downloads');
-        // 🔒 Security (M-7): item.getFilename() is server-controlled (Content-Disposition).
-        // Strip directory components, separators, and leading dots before it touches disk.
+        // 🔒 Security: item.getFilename() is server-controlled (Content-Disposition) —
+        // strip directory components, separators, and leading dots before it touches disk.
         const safeName = path.basename(filename).replace(/[/\\]/g, '_').replace(/^\.+/, '').trim() || 'download';
         let targetPath = path.join(defaultDir, safeName);
         // Auto-increment filename if already exists to avoid silent overwrite
@@ -390,8 +386,8 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
             targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
           }
         } catch {}
-        // 🔒 Security (M-7): Final containment check — the resolved save path must
-        // stay inside the downloads directory. Fall back to a fixed name otherwise.
+        // 🔒 Security: final containment check — the resolved save path must stay
+        // inside the downloads directory. Fall back to a fixed name otherwise.
         if (!path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
           targetPath = path.join(defaultDir, 'download');
         }
@@ -464,8 +460,8 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     let isAppFile = false;
     try {
       const parsed = new URL(details.url);
-      // 🔒 Security (M-1): Dev-server COOP/COEP headers and dev CSP only apply
-      // in unpackaged dev builds; a packaged app must never trust localhost:5173.
+      // 🔒 Security: dev-server COOP/COEP headers and dev CSP only apply in
+      // unpackaged dev builds; a packaged app must never trust localhost:5173.
       if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
         isDevLocalhost = true;
       }
@@ -2828,9 +2824,9 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // 🔒 Security (M-8): Extension popup content is untrusted — run it in the
-      // Chromium sandbox. The active-tab bridge is injected via executeJavaScript
-      // from the main process, which does not require an unsandboxed renderer.
+      // 🔒 Security: extension popup content is untrusted — run it in the
+      // Chromium sandbox (the active-tab bridge is injected via executeJavaScript,
+      // which does not require an unsandboxed renderer).
       sandbox: true,
       session: session.defaultSession
     }
@@ -3171,9 +3167,9 @@ async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-// 🔒 Security (M-5): Mirror unzip-crx-3's CRX unwrapping so the inner zip payload
-// can be inspected BEFORE anything is written to disk. unzip-crx-3 joins entry
-// names onto the destination with no validation, which allows zip-slip.
+// 🔒 Security: mirror unzip-crx-3's CRX unwrapping so the inner zip payload can
+// be inspected BEFORE anything is written to disk — unzip-crx-3 joins entry names
+// onto the destination with no validation, which allows zip-slip.
 function getCrxInnerZip(buffer: Buffer): Buffer {
   // Plain zip packages (PK\x03\x04) are passed through untouched
   if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
@@ -3250,13 +3246,10 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     if (!match) return { error: 'Geçersiz eklenti URL\'si veya ID\'si' };
     const extensionId = match[0];
 
-    // 🔒 Security (H-1): Installs requested from Chrome Web Store page content are
-    // NOT strictly user-initiated in Nova's UI — the webstore preload forwards any
-    // window 'NOVA_INSTALL_EXTENSION' postMessage (and the injected
-    // chrome.webstore shim), so arbitrary page scripts can trigger an install.
-    // Gate those requests behind an explicit, trusted native confirmation naming
-    // the extension before main proceeds. Requests from Nova's own main window
-    // (isTrustedSender) already come from user interaction with Nova UI.
+    // 🔒 Security: installs requested from Chrome Web Store page content are not
+    // strictly user-initiated — the webstore preload forwards postMessage install
+    // requests, so page scripts can trigger them. Gate those behind a native
+    // confirmation; requests from Nova's own window already come from UI interaction.
     if (!isFromMainWindow) {
       const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
       const confirmOptions: Electron.MessageBoxOptions = {
@@ -3313,16 +3306,16 @@ ipcMain.handle('install-from-webstore', async (event, urlOrId: string) => {
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
     const extractPath = path.join(extensionsBaseDir, extensionId);
 
-    // 🔒 Security (M-5): Validate every zip entry against the extraction target
-    // BEFORE extracting — rejects absolute paths, '..' segments, and any path
-    // that would resolve outside the target dir (zip-slip).
+    // 🔒 Security: validate every zip entry against the extraction target BEFORE
+    // extracting — rejects absolute paths, '..' segments, and any path that would
+    // resolve outside the target dir (zip-slip).
     await assertCrxEntriesSafe(buffer, extractPath);
 
     if (!fs.existsSync(extractPath)) {
       fs.mkdirSync(extractPath, { recursive: true });
       await unzip(crxFilePath, extractPath);
 
-      // 🔒 Security (M-5): Post-extraction containment + symlink sweep.
+      // 🔒 Security: post-extraction containment + symlink sweep.
       assertExtractionContained(extractPath);
 
       // Verify realpath of extractPath to prevent directory escaping

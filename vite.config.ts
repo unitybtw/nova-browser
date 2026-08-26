@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
-// H-3: index.html keeps a loose CSP so the Vite dev server keeps working
+// index.html keeps a loose CSP so the Vite dev server keeps working
 // (HMR websocket, react-refresh inline bootstrap, eval-based transforms).
 // For production builds the meta tag below is swapped for a hardened policy
 // via transformIndexHtml (apply: 'build' keeps dev mode untouched).

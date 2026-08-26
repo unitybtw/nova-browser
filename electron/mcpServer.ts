@@ -5,7 +5,7 @@ import { randomUUID, createHash, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { app as electronApp } from 'electron';
-// 🔒 Security (H-2): browser_* tools are forwarded to the renderer over a
+// 🔒 Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
 import { requestRendererMcpAction } from './main.js';
 
@@ -479,10 +479,7 @@ export class BrowserMCPServer {
       return `Waited ${ms}ms`;
     }
 
-    // 🔒 Security (H-2): Forward the tool call to the renderer via IPC and wait
-    // for its response (15s timeout, window-destroyed handled in main.ts).
-    // This replaces the old webContents.executeJavaScript() injection of
-    // window.__nova_executeMcpAction into the privileged UI context.
+    // Forward the tool call to the renderer via IPC and wait for its response.
     const result = await requestRendererMcpAction(this.mainWindow, toolName, args);
 
     return typeof result === 'string' ? result : JSON.stringify(result);

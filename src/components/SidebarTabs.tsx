@@ -682,10 +682,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   return (
     <>
-      {/* PERF: near-opaque solid surface instead of backdrop-blur-3xl — a
-          persistent blur over live page content forces a continuous blur
-          recomposite on every page repaint. The hover-reveal overlay in App
-          keeps its (reduced) blur since it is momentary. */}
+      {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
+          live page content forces a recomposite on every page repaint. */}
       <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
@@ -1335,12 +1333,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     </>
   );
 }, (prevProps, nextProps) => {
-  // Hand-written comparator (same style as MemoizedTabItem / BrowserView):
-  // compare only what this component renders so background-tab events that
-  // rebuild the tabs array don't re-render the whole sidebar. Callback props
-  // are ignored — they are stable useCallback references from App.
+  // Compare only rendered fields; callback props are stable useCallback refs.
 
-  // Scalars & flags that gate rendered output
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
@@ -1358,11 +1352,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.workspaces !== nextProps.workspaces) return false;
   if (prevProps.bookmarks !== nextProps.bookmarks) return false;
 
-  // Tabs: length + order-sensitive comparison of every field rendered by
-  // SidebarTabItem / the list filters:
-  //   item render: id, url, title, favicon, isLoading, isPinned,
-  //                isPlayingAudio, isMuted, isSuspended, splitWith
-  //   filtering:   folderId (root list skips foldered tabs), splitWith
+  // Tabs: length + order-sensitive comparison of every rendered field
+  // (incl. folderId, used by the root-list filter).
   const prevTabs = prevProps.tabs;
   const nextTabs = nextProps.tabs;
   if (prevTabs === nextTabs) return true;

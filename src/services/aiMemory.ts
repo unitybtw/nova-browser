@@ -4,7 +4,7 @@ export interface MemoryItem {
   category: 'preference' | 'fact' | 'instruction';
   createdAt: number;
   /**
-   * 🔒 Security (H-5) provenance: 'user' = entered directly by the user,
+   * 🔒 Security provenance: 'user' = entered directly by the user,
    * 'tool' = saved by the AI via the save_to_memory tool while a tool call was
    * executing. Tool-saved 'instruction' entries are session-only: they are
    * never persisted and therefore never injected into future system prompts.
@@ -72,7 +72,7 @@ class AIMemoryService {
   }
 
   /**
-   * 🔒 Security (H-5): memories saved by a TOOL with category 'instruction' are
+   * 🔒 Security: memories saved by a TOOL with category 'instruction' are
    * session-only — they must never reach localStorage, so they can never be
    * injected into the system prompt of a future session.
    */

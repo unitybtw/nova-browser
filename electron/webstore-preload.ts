@@ -8,11 +8,8 @@ if ((window as any).__novaPreloadInjected) {
 } else if (isChromeWebStore) {
   (window as any).__novaPreloadInjected = true;
 
-  // 🔒 Security (L-5): The previous Trusted Types passthrough policy
-  // ('nova-extension') forwarded HTML through a bypassable regex script-stripper
-  // (e.g. unquoted event handlers like <img src=x onerror=alert(1)> survived).
-  // All markup is now built with explicit DOM APIs (createElementNS +
-  // setAttribute), so no innerHTML/Trusted Types policy is needed at all.
+  // 🔒 Security: all markup is built with explicit DOM APIs (createElementNS +
+  // setAttribute) — no innerHTML, no Trusted Types policy needed.
   const SVG_NS = 'http://www.w3.org/2000/svg';
   type SvgPart = { tag: string; attrs: Record<string, string> };
   const buildSvgElement = (size: number, parts: SvgPart[]): SVGElement => {

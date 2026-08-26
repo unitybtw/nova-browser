@@ -948,9 +948,8 @@ function App() {
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
-    // PERF: re-clicking the already-active tab (double-click, spotlight
-    // re-select) previously ran the full setTabs cascade for nothing. Skip it
-    // unless the tab actually needs waking from hibernation.
+    // Performance: skip the setTabs cascade when re-selecting the active tab
+    // unless it needs waking from hibernation.
     if (id === activeTabIdRef.current && !tabsRef.current.find(t => t.id === id)?.isSuspended) {
       return;
     }
@@ -1486,8 +1485,7 @@ function App() {
   const handleNewIncognitoTab = useCallback((url?: string | any) => {
     let targetUrl = typeof url === 'string' ? url : 'nova://newtab';
 
-    // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts).
-    // This handler previously skipped validation (M-7); it now matches handleNewTab.
+    // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
     if (!isSafeNavigationUrl(targetUrl)) {
       targetUrl = 'nova://newtab';
     }
@@ -1993,11 +1991,10 @@ function App() {
       }
     });
 
-    // 3. MCP action bridge over IPC — replaces the old window.__nova_executeMcpAction
-    // global (H-2): a function reachable from the privileged UI context gave any
-    // XSS one-call browser control. The main process now delivers 'mcp-action-request'
+    // 3. MCP action bridge over IPC: the main process delivers 'mcp-action-request'
     // events that only this trusted app page receives via the contextBridge, and
-    // results go back through a sender-validated invoke channel in main.ts.
+    // results go back through a sender-validated channel. Never expose this as a
+    // window global — that would give any UI-context XSS one-call browser control.
     const electronAPI = window.electronAPI;
     let unsubscribeMcpBridge: (() => void) | undefined;
     if (electronAPI?.onMcpActionRequest && electronAPI.respondMcpAction) {

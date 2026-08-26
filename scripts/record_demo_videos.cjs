@@ -1,5 +1,5 @@
 /**
- * Records a REAL, single-take product tour video of the Nova Browser web build.
+ * Records a single-take product tour video of the Nova Browser web build.
  *
  * The app ships with a built-in directed demo (App.tsx "Automated Real Browser
  * Demo Showcase"): when loaded with ?demo=true it cycles three 6.5s stages —

@@ -11,7 +11,7 @@ export interface QueuedAction {
 
 type Subscriber = (actions: QueuedAction[]) => void;
 
-// 🔒 Security (C-1): Tools that only READ state (page text, URLs, tab lists,
+// 🔒 Security: Tools that only READ state (page text, URLs, tab lists,
 // history) may auto-execute. Every other tool call is queued as 'pending' and
 // waits for an explicit user decision via approveAction()/denyAction() before
 // it runs. Keep this list strictly read-only — never add mutating tools here.

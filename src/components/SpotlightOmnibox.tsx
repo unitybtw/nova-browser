@@ -355,18 +355,14 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     </AnimatePresence>
   );
 }, (prevProps, nextProps) => {
-  // Hand-written comparator (same style as MemoizedTabItem / BrowserView).
-  // This component stays mounted even while closed, so check isOpen first for
-  // a cheap bail-out on every background-tab event while the spotlight is shut.
+  // Stays mounted while closed — bail out early on isOpen to ignore
+  // background-tab events entirely.
   if (prevProps.isOpen !== nextProps.isOpen) return false;
   if (!prevProps.isOpen && !nextProps.isOpen) return true;
 
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
 
-  // Tabs list: every rendered field — id (key/close action), title, url,
-  // favicon (+ failedFavicons lookups by id). Order-sensitive because the
-  // result list is index-navigable.
   const prevTabs = prevProps.tabs;
   const nextTabs = nextProps.tabs;
   if (prevTabs === nextTabs) return true;
@@ -384,6 +380,5 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return false;
     }
   }
-  // Callback props are ignored — stable useCallback references from App.
   return true;
 });

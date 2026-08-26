@@ -15,7 +15,7 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
 /**
- * Loop-based base64 encoder (M-6/L-2): avoids the `btoa(String.fromCharCode(...bytes))`
+ * Loop-based base64 encoder: avoids the `btoa(String.fromCharCode(...bytes))`
  * spread idiom, which can blow the call stack for large payloads.
  */
 export function bytesToBase64(bytes: Uint8Array): string {

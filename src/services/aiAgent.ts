@@ -1219,10 +1219,9 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       }
 
       else if (functionName === "scroll_page") {
-        // 🔒 Security (M-1): direction/amount come from model-generated JSON and
-        // are interpolated into a script executed on the page. Validate strictly
-        // and interpolate ONLY whitelisted values (same discipline as the
-        // browser_scroll handler in App.tsx).
+        // 🔒 Security: direction/amount come from model-generated JSON and are
+        // interpolated into a script executed on the page — validate strictly and
+        // interpolate ONLY whitelisted values.
         const VALID_SCROLL_DIRECTIONS = ['up', 'down', 'top', 'bottom'];
         const rawDirection = typeof args.direction === 'string' ? args.direction : '';
         if (!VALID_SCROLL_DIRECTIONS.includes(rawDirection)) {
@@ -1270,10 +1269,10 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "save_to_memory") {
         const { fact, category } = args;
-        // 🔒 Security (H-5): this memory originates from a TOOL, not a direct
-        // user request. aiMemory tags it source:'tool', so model-authored
+        // 🔒 Security: this memory originates from a TOOL, not a direct user
+        // request. aiMemory tags it source:'tool', so model-authored
         // 'instruction' entries stay session-only and can never persist into
-        // the system prompt of future sessions (persistent prompt injection).
+        // the system prompt of future sessions.
         const memory = aiMemory.addMemory(fact, category || 'fact', true);
         result = { success: true, memory };
       }

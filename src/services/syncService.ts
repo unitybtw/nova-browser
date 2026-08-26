@@ -4,13 +4,13 @@
  * Supabase-backed E2EE sync vault: data is stored as a version-2 envelope
  * (AES-GCM-256, PBKDF2-SHA256 600k iterations — see syncCrypto.ts). The E2EE
  * secret is a dedicated sync key derived from the account password (min 12
- * chars) via PBKDF2-SHA256 @ 600k with a per-account random salt (M-3); the
+ * chars) via PBKDF2-SHA256 @ 600k with a per-account random salt; the
  * raw password is never persisted or used as the long-lived key. The derived
  * key is kept in memory and persisted only in the OS-keychain-backed secure
  * store, scoped per user id.
  *
  * Local (zero-config) account passwords are stored as salted PBKDF2-SHA256
- * hashes (600k iterations) and compared in constant time (M-2/L-3).
+ * hashes (600k iterations) and compared in constant time.
  *
  * Cloud sync requires a Supabase-linked (UUID) account; local fallback
  * accounts cannot sync. Legacy sync-chain/pairing APIs are deprecated (throw).
@@ -72,8 +72,8 @@ export interface SyncDataBundle {
 
 /**
  * Entry of the local (zero-config) account registry persisted in
- * localStorage 'nova_accounts_registry'. `syncKeySalt` was added with M-3 and
- * is absent on accounts registered before the migration.
+ * localStorage 'nova_accounts_registry'. `syncKeySalt` is absent on accounts
+ * registered before the migration.
  */
 interface LocalRegistryEntry {
   user: NovaUser;
@@ -97,7 +97,7 @@ const STORAGE_KEYS = {
 // restored for another; this constant is the legacy/global fallback name.
 const SECURE_STORE_MASTER_KEY = 'sync_master_key';
 
-// M-3 migration: secure-store entry that holds the pre-hardening value (the
+// Migration shim: secure-store entry that holds the pre-hardening value (the
 // RAW ACCOUNT PASSWORD) after an account is migrated to a dedicated derived
 // sync key. It is kept only so envelopes still encrypted under the raw
 // password remain decryptable until the next successful sync re-encrypts
@@ -111,14 +111,14 @@ const SECURE_STORE_LEGACY_MASTER_KEY_PREFIX = 'sync_master_key_legacy_';
 const SYNC_KEY_FORMAT_PREFIX = 'nk2$';
 
 // Local-account password hash format: pbkdf2$<iterations>$<saltB64>$<hashB64>
-// (M-2/L-3: replaces the old unsalted SHA-256(password + ':' + email) hex.)
+// (replaces the old unsalted SHA-256(password + ':' + email) hex digest.)
 const PASSWORD_HASH_FORMAT = 'pbkdf2';
 const PBKDF2_ITERATIONS = 600_000;
 const PBKDF2_SALT_BYTES = 16;
 const PBKDF2_HASH_BYTES = 32;
 
 /**
- * Constant-time byte comparison (M-2/L-3): XOR-accumulate loop over two
+ * Constant-time byte comparison: XOR-accumulate loop over two
  * equal-length Uint8Arrays. A length mismatch returns false up front — the
  * compared digest lengths are public constants, not secrets.
  */
@@ -175,8 +175,7 @@ async function verifyLocalPassword(password: string, email: string, storedHash: 
 
   // Legacy scheme: SHA-256(password + ':' + email), lowercase hex.
   // 🔒 Only accept well-formed legacy digests — an attacker who can write the
-  // registry must not be able to plant an arbitrary downgrade hash they know
-  // the preimage of (S-4).
+  // registry must not be able to plant an arbitrary downgrade hash.
   if (!/^[0-9a-f]{64}$/.test(storedHash)) return false;
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${password}:${email}`));
   const calculatedHex = Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -187,7 +186,7 @@ const isDedicatedSyncKey = (value: string | null | undefined): value is string =
   typeof value === 'string' && value.startsWith(SYNC_KEY_FORMAT_PREFIX);
 
 /**
- * Derive the dedicated sync key (M-3): PBKDF2-SHA256 @ 600k over the account
+ * Derive the dedicated sync key: PBKDF2-SHA256 @ 600k over the account
  * password with a per-account random salt, returned as a storable
  * "nk2$<saltB64>$<keyB64>" string. syncCrypto.deriveKey() cannot be reused
  * here because its AES-GCM CryptoKey is non-extractable — we need the raw
@@ -223,7 +222,7 @@ class NovaSyncService {
   private lastError: string | null = null;
   private listeners = new Set<(status: SyncStatus) => void>();
   private remoteSyncListeners = new Set<() => void>();
-  // Dedicated derived sync key (M-3) — NEVER the raw account password.
+  // Dedicated derived sync key — NEVER the raw account password.
   private masterKey: string | null = null;
   // Memory-only fallback holding the legacy raw password (or the pre-migration
   // keychain value) so envelopes encrypted under it stay readable until the
@@ -311,7 +310,7 @@ class NovaSyncService {
     return uid ? `sync_master_key_${uid}` : SECURE_STORE_MASTER_KEY;
   }
 
-  /** Secure-store key preserving the pre-M-3 raw-password entry (see above). */
+  /** Secure-store key preserving the legacy raw-password entry (see above). */
   private legacyMasterKeyStoreName(userId?: string): string {
     const uid = userId ?? this.currentUser?.id;
     return uid ? `${SECURE_STORE_LEGACY_MASTER_KEY_PREFIX}${uid}` : SECURE_STORE_MASTER_KEY;
@@ -366,7 +365,7 @@ class NovaSyncService {
   }
 
   /**
-   * Legacy raw-password fallback for decryption (M-3 compat). Sources, in
+   * Legacy raw-password fallback for decrypting pre-migration envelopes. Sources, in
    * order: the in-memory value captured at migration time, then the retained
    * secure-store entry written when the keychain was migrated.
    */
@@ -382,7 +381,7 @@ class NovaSyncService {
   }
 
   /**
-   * M-3: establish the long-lived E2EE secret WITHOUT persisting the raw
+   * Establish the long-lived E2EE secret WITHOUT persisting the raw
    * password. Reuses an existing dedicated key from the secure store when
    * present; otherwise derives one via PBKDF2-SHA256 @ 600k with a per-account
    * salt (`preferredSaltB64`, e.g. mirrored from Supabase user_metadata so all
@@ -456,8 +455,7 @@ class NovaSyncService {
       supabase.auth.onAuthStateChange((event, session) => {
         // INITIAL_SESSION is handled alongside SIGNED_IN so that sessions
         // restored by supabase-js from its storage adapter re-hydrate this
-        // service after a restart (the manual localStorage token mirror was
-        // removed as part of H-4).
+        // service after a restart.
         if (session?.user && (event === 'SIGNED_IN' || event === 'INITIAL_SESSION')) {
           const userMeta = session.user.user_metadata || {};
           this.currentUser = {
@@ -470,8 +468,8 @@ class NovaSyncService {
           };
           this.token = session.access_token;
           localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
-          // H-4: the JWT is persisted by supabase-js through the secure
-          // storage adapter — deliberately no localStorage token mirror here.
+          // The JWT is persisted by supabase-js through the secure storage
+          // adapter — deliberately no localStorage token mirror here.
           this.restoreMasterKeysForUser(session.user.id);
           void this.subscribeToRealtime();
           this.notify();
@@ -531,7 +529,7 @@ class NovaSyncService {
   public async encryptPasswords(passwords: any[], masterPassword: string): Promise<{ ciphertext: string; salt: string; iv: string }> {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
-    // M-5: reuse syncCrypto.deriveKey (PBKDF2-SHA256 @ 600k) so the inner
+    // Reuse syncCrypto.deriveKey (PBKDF2-SHA256 @ 600k) so the inner
     // passwords blob uses the same parameters as the outer vault envelope.
     const key = await deriveSyncCryptoKey(masterPassword, salt);
 
@@ -573,7 +571,7 @@ class NovaSyncService {
       );
       return JSON.parse(new TextDecoder().decode(decrypted));
     } catch (currentErr) {
-      // M-5 compat: blobs written before the parameter unification used
+      // Compat: blobs written before the parameter unification used
       // PBKDF2 @ 100k. Retry with the legacy parameters; on success the next
       // sync push opportunistically re-encrypts the blob at 600k (the merged
       // passwords always go through encryptPasswords() above).
@@ -594,7 +592,7 @@ class NovaSyncService {
   }
 
   /**
-   * LEGACY (M-5): PBKDF2-SHA256 @ 100k. Only used to decrypt password blobs
+   * LEGACY: PBKDF2-SHA256 @ 100k. Only used to decrypt password blobs
    * written before the parameters were unified at 600k.
    */
   private async deriveLegacyPasswordBlobKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
@@ -623,9 +621,9 @@ class NovaSyncService {
   // --- BRAVE-STYLE SYNC CHAIN (DEVICE PAIRING CODE) ---
   //
   // Deprecated: the nova_sync_chains table no longer exists in the schema, so
-  // pairing can never deliver events. The dead implementation was removed
-  // (L-1); the throwing stubs remain because UI entry points still reference
-  // these methods.
+  // pairing can never deliver events. The dead implementation was removed;
+  // the throwing stubs remain because UI entry points still reference these
+  // methods.
 
   /**
    * Generates a human-friendly pairing code (e.g. `nova-7f2a-99b1-4c3e-8812`)
@@ -639,7 +637,6 @@ class NovaSyncService {
     settings: UserSettings;
     workspaces: Workspace[];
   }): Promise<string> {
-    void localData;
     throw new Error('Pairing is temporarily unavailable while secure invitation RPC deployment is completed.');
   }
 
@@ -647,7 +644,6 @@ class NovaSyncService {
    * Joins an existing sync chain using a pairing code entered on another computer
    */
   public async joinSyncChain(syncCode: string): Promise<SyncDataBundle> {
-    void syncCode;
     throw new Error('Pairing is temporarily unavailable while secure invitation RPC deployment is completed.');
   }
 
@@ -694,8 +690,8 @@ class NovaSyncService {
         this.currentUser = newUser;
         this.token = data.session?.access_token || 'sb_token_' + Date.now();
 
-        // M-3: derive a dedicated sync key instead of using the raw password
-        // as the long-lived E2EE secret. The per-account salt is mirrored
+        // Derive a dedicated sync key instead of using the raw password as
+        // the long-lived E2EE secret. The per-account salt is mirrored
         // into user_metadata (best-effort) so every device derives the SAME
         // key for this account.
         const saltB64 = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
@@ -708,7 +704,7 @@ class NovaSyncService {
         this.persistMasterKeyBestEffort();
 
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-        // H-4: token persistence is handled by supabase-js through its secure
+        // Token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
         void this.subscribeToRealtime();
@@ -733,9 +729,9 @@ class NovaSyncService {
       throw new Error('An account with this email already exists');
     }
 
-    // M-2/L-3: salted PBKDF2-SHA256 (600k) instead of a bare SHA-256 digest.
+    // Salted PBKDF2-SHA256 (600k) instead of a bare SHA-256 digest.
     const passwordHash = await hashLocalPassword(password);
-    // Per-account salt for the dedicated sync key (M-3), kept in the registry
+    // Per-account salt for the dedicated sync key, kept in the registry
     // so future logins re-derive the same key.
     const syncKeySalt = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
 
@@ -754,7 +750,7 @@ class NovaSyncService {
 
     this.currentUser = newUser;
     this.token = 'nvt_' + btoa(`${userId}:${Date.now()}`);
-    // M-3: store the derived sync key — never the raw password.
+    // Store the derived sync key — never the raw password.
     await this.acquireSyncKey(password, syncKeySalt);
     this.persistMasterKeyBestEffort();
 
@@ -805,7 +801,7 @@ class NovaSyncService {
         this.currentUser = loggedUser;
         this.token = data.session.access_token;
 
-        // M-3: derive/reuse the dedicated sync key instead of using the raw
+        // Derive/reuse the dedicated sync key instead of using the raw
         // password as the long-lived E2EE secret. Prefer the per-account salt
         // from user_metadata so every device derives the same key; if the
         // account has none yet (pre-migration), publish a fresh one
@@ -828,7 +824,7 @@ class NovaSyncService {
         this.persistMasterKeyBestEffort();
 
         localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(loggedUser));
-        // H-4: token persistence is handled by supabase-js through its secure
+        // Token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
         void this.subscribeToRealtime();
@@ -853,7 +849,7 @@ class NovaSyncService {
       throw new Error('Invalid email or password');
     }
 
-    // M-2/L-3: verify against the pbkdf2$ format (constant-time compare) or,
+    // Verify against the pbkdf2$ format (constant-time compare) or,
     // for legacy accounts, the old SHA-256 scheme — then transparently
     // upgrade the stored hash on success.
     const passwordOk = await verifyLocalPassword(password, normalizedEmail, account.passwordHash);
@@ -866,7 +862,7 @@ class NovaSyncService {
 
     account.user.lastLoginAt = Date.now();
 
-    // M-3: make sure a sync-key salt exists (accounts registered before the
+    // Make sure a sync-key salt exists (accounts registered before the
     // migration lack one) so logins re-derive the same dedicated key.
     if (!account.syncKeySalt) {
       account.syncKeySalt = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
@@ -903,8 +899,8 @@ class NovaSyncService {
     // Best-effort wipe of the persisted sync keys. The preload bridge has no
     // remove API, so overwrite with an empty string instead. The store
     // entries are scoped per user, so capture the names BEFORE clearing
-    // currentUser below. Both the dedicated derived key (M-3) and the
-    // retained legacy raw-password entry are wiped.
+    // currentUser below. Both the dedicated derived key and the retained
+    // legacy raw-password entry are wiped.
     const masterKeyStore = this.masterKeyStoreName();
     const legacyKeyStore = this.legacyMasterKeyStoreName();
     if (typeof window !== 'undefined' && (window as any).electronAPI?.secureStoreSet) {
@@ -930,7 +926,7 @@ class NovaSyncService {
     // Legacy cleanup: older builds leaked the master key into Web Storage.
     localStorage.removeItem(STORAGE_KEYS.MASTER_KEY);
     sessionStorage.removeItem(STORAGE_KEYS.MASTER_KEY);
-    // H-4: cloud sessions now live in the Electron secure store via the
+    // Cloud sessions now live in the Electron secure store via the
     // supabase-js storage adapter; scrub any JWT copy that older installs
     // persisted in localStorage.
     localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
@@ -1027,7 +1023,7 @@ class NovaSyncService {
           try {
             remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, this.masterKey);
           } catch (decErr) {
-            // M-3 compat: the vault may predate the dedicated sync key and be
+            // Compat: the vault may predate the dedicated sync key and be
             // encrypted under the raw account password. Fall back to the
             // retained legacy key for decryption; the push below re-encrypts
             // everything under the dedicated key, completing the migration.
@@ -1105,7 +1101,7 @@ class NovaSyncService {
             });
             mergedPasswords = Array.from(passMap.values());
           } catch (e) {
-            // M-3 compat: the inner blob may still be encrypted under the raw
+            // Compat: the inner blob may still be encrypted under the raw
             // password — retry with the retained legacy key. Either way the
             // merged passwords are re-encrypted under the dedicated key below.
             const legacyKey = await this.getLegacyFallbackKey();
