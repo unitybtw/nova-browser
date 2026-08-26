@@ -160,7 +160,7 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   }
 ];
 
-// Natural Language Intent Extractor: Instantly executes common browser commands with 100% reliability
+// Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
 export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string } | null {
   if (!userText || typeof userText !== 'string') return null;
   const text = userText.trim().toLowerCase();
@@ -170,6 +170,33 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     .replace(/\bknalını\b|\bknalini\b|\bknalı\b|\bknali\b/g, 'kanalını')
     .replace(/\byotube\b|\byoutbe\b|\byutube\b/g, 'youtube')
     .replace(/\bgogle\b|\bgoole\b/g, 'google');
+
+  // 0. Conversational greetings and friendly chat (Zero-latency instant reply, zero tool hallucination)
+  if (/^(selam|selamlar|slm|merhaba|merhabalar|mrb|hey|hi|hello|günaydın|gunaydin|iyi günler|iyi gunler|iyi akşamlar|iyi aksamlar|nasılsın|nasilsin|naber|ne haber|nbr|sa|as)$/i.test(normalized)) {
+    return {
+      name: 'direct_chat',
+      arguments: {},
+      directReply: "Merhaba! Ben Nova Browser yapay zeka asistanıyım. Web sayfalarını gezebilir, arama yapabilir, sayfaları okuyup özetleyebilir veya sorularınızı yanıtlayabilirim. Size nasıl yardımcı olabilirim?"
+    };
+  }
+
+  // 0b. Identity and capabilities queries
+  if (/^(sen kimsin|kimsin|sen nesin|ne yapabilirsin|neler yapabilirsin|yardım|yardim|help|about|who are you|what can you do)$/i.test(normalized)) {
+    return {
+      name: 'direct_chat',
+      arguments: {},
+      directReply: "Nova Browser asistanı olarak sekmeleri yönetebilir, Google ve YouTube'da arama yapabilir, web sayfalarını okuyup özetleyebilir ve sorularınızı yanıtlayabilirim."
+    };
+  }
+
+  // 0c. Gratitude & pleasantries
+  if (/^(teşekkürler|tesekkurler|teşekkür ederim|tesekkur ederim|sağol|sagol|eyvallah|tşk|tsk|thanks|thank you)$/i.test(normalized)) {
+    return {
+      name: 'direct_chat',
+      arguments: {},
+      directReply: "Rica ederim! Başka bir işlem yapmak veya sormak istediğiniz bir konu olursa buradayım."
+    };
+  }
 
   // 1. YouTube Compound Searches (e.g. "youtube aç ve enes batur kanalını aç", "youtube'da tarkan aç", "youtube enes batur izle")
   const ytCompoundMatch = 
@@ -757,7 +784,7 @@ class AIAgent {
       type: "function",
       function: {
         name: "auto_fill_form",
-        description: "Automatically fills all inputs in a form using the user's stored Memory Vault information. Call this when you detect a large form that needs filling.",
+        description: "Fills form inputs on the active web page using stored memory. NEVER call this for casual chat, questions, or greetings. ONLY call this when the user explicitly asks to fill out a form on the current web page.",
         parameters: { type: "object", properties: {} }
       }
     },
@@ -861,14 +888,15 @@ class AIAgent {
 TOOLS:
 ${toolLines}
 
-OUTPUT: one JSON object per turn, nothing else.
-To act: {"tool": "<name>", "arguments": {...}} | To answer: {"reply": "<answer>"}
-Never combine both. After each tool you get an Observation; continue or reply.
+OUTPUT FORMAT: One JSON object per turn, nothing else.
+- To execute a browser tool: {"tool": "<name>", "arguments": {...}}
+- To answer or converse: {"reply": "<your response>"}
 
-RULES:
-1. Grounding: only state facts found in page content, tool results, or the conversation. If you don't know something or a tool fails, say so plainly — never invent results.
-2. Call read_page_content before click_element/fill_input; it lists elements with ai_id numbers.
-3. Answer in Turkish, or the user's language. Never use emojis.`;
+CRITICAL RULES:
+1. GENERAL CHAT & GREETINGS: If the user says hello ('selam', 'merhaba'), asks a general question, thanks you, or chats, DO NOT call any tool! Immediately output {"reply": "<helpful friendly answer>"}.
+2. ONLY USE TOOLS FOR EXPLICIT ACTIONS: Only use tools when the user explicitly commands a browser action (e.g. open a site, search something, click an element, read page).
+3. NEVER CALL auto_fill_form unless the user explicitly tells you to fill a form on the current web page.
+4. Answer in Turkish (or the user's language). Ground your facts in reality. STRICT RULE: NEVER USE EMOJIS ANYWHERE.`;
   }
 
   private initPromise: Promise<void> | null = null;
@@ -1759,6 +1787,14 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       if (directIntent) {
         const funcName = directIntent.name;
+
+        // Direct conversational responses (greetings, identity, capabilities, thanks) bypass tool execution completely
+        if (funcName === 'direct_chat' || !funcName) {
+          const directReply = directIntent.directReply || "Merhaba! Size nasıl yardımcı olabilirim?";
+          if (onChunk) onChunk(directReply);
+          return [...messages, { role: 'assistant', content: directReply }];
+        }
+
         if (onChunk) onChunk(`Islem yapiliyor: ${funcName}...\n\n`);
 
         let friendlyResponse = "Islem tamamlandi.";
@@ -1832,6 +1868,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       const MAX_LOOPS = 4;
       // Honest-failure bookkeeping: never claim success when nothing ran.
       let executedAnyTool = false;
+      const executedToolSignatures: string[] = [];
       const NO_VALID_OUTPUT_MSG = 'Uzgunum, bu istegi isleyemedim: model gecerli bir arac cagrisi veya yanit uretmedi. Lutfen tekrar deneyin.';
       const LOOP_EXHAUSTED_MSG = 'Arac adimlari calistirildi ancak sonuc ozetlenemedi. Devam etmek icin lutfen mesaj gonderin.';
 
@@ -1868,6 +1905,32 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         // Shared tool-execution block for both decoding paths
         const executeTool = async (name: string, args: any, assistantEcho: string): Promise<void> => {
+          const sig = `${name}:${JSON.stringify(args || {})}`;
+          if (executedToolSignatures.includes(sig)) {
+            console.warn(`[AI Agent] Repeated tool call detected: ${sig}. Forcing final answer.`);
+            internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
+            internalMessages.push({
+              role: 'user',
+              content: 'Observation: Bu islem zaten calistirildi. Lutfen baska bir arac cagirmadan, kullaniciya dogrudan {"reply": "..."} formatinda nihai yaniti ver.'
+            } as ChatCompletionMessageParam);
+            return;
+          }
+          executedToolSignatures.push(sig);
+
+          // Guard against hallucinated auto_fill_form on general chat
+          if (name === 'auto_fill_form') {
+            const hasFormIntent = /(form|doldur|kayıt|giris|input|fill)/i.test(userQuery);
+            if (!hasFormIntent) {
+              console.warn('[AI Agent] auto_fill_form hallucinated on general conversation; prompting reply.');
+              internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
+              internalMessages.push({
+                role: 'user',
+                content: 'Observation: Sayfada aktif bir form doldurma islemi istenmedi. Lutfen kullanicinin mesajina dogrudan {"reply": "..."} formatinda yanit ver.'
+              } as ChatCompletionMessageParam);
+              return;
+            }
+          }
+
           if (onChunk) onChunk(`> Arac calistiriliyor: ${name}...\n\n`);
           let toolResult = '';
           try {
@@ -1884,7 +1947,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
           internalMessages.push({
             role: 'user',
-            content: `Observation: ${toolResult}\nLutfen kullaniciya sonucu kisa ve oz acikla. Kesinlikle emoji kullanma.`
+            content: `Observation: ${toolResult}\nLutfen bu sonucu kullaniciya dogrudan {"reply": "..."} formatinda acikla. Baska bir arac cagirma.`
           } as ChatCompletionMessageParam);
         };
 
