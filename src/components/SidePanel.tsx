@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, FileText, Wrench, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { aiAgent, AVAILABLE_AI_MODELS } from '../services/aiAgent';
+import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
 import { aiMemory, MemoryItem, TaskSummary } from '../services/aiMemory';
 import { tts } from '../services/tts';
 import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
@@ -13,6 +13,51 @@ interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
 }
+
+/** Image waiting to be sent with the next chat turn (data URL form). */
+interface PendingImageAttachment {
+  id: string;
+  name: string;
+  dataUrl: string;
+}
+
+/** Text file waiting to be sent with the next chat turn. */
+interface PendingFileAttachment {
+  id: string;
+  name: string;
+  text: string;
+}
+
+const MAX_PENDING_IMAGES = 4;
+const MAX_PENDING_FILES = 4;
+/** Text files larger than this are rejected outright. */
+const MAX_TEXT_FILE_BYTES = 256 * 1024;
+/** Read-time truncation budget; the engine truncates further per file. */
+const TEXT_FILE_READ_CAP_CHARS = 200 * 1024;
+
+const ATTACH_INPUT_ACCEPT = 'image/*,.txt,.md,.json,.csv,.js,.ts,.html,.css,.xml,.yml,.yaml';
+
+const isImageFile = (file: File) =>
+  file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
+
+const isTextFile = (file: File) =>
+  file.type.startsWith('text/') || /\.(txt|md|json|csv|js|ts|html|css|xml|yml|yaml)$/i.test(file.name);
+
+const readFileAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Dosya okunamadı'));
+    reader.readAsDataURL(file);
+  });
+
+const readFileAsText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(reader.error ?? new Error('Dosya okunamadı'));
+    reader.readAsText(file);
+  });
 
 export const SidePanel = React.memo(({ 
   isOpen, 
@@ -45,8 +90,16 @@ export const SidePanel = React.memo(({
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>({ state: 'idle' });
+  const [pendingImages, setPendingImages] = useState<PendingImageAttachment[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<PendingFileAttachment[]>([]);
+  const [attachmentHint, setAttachmentHint] = useState('');
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentIdRef = useRef(0);
+  const attachmentHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSpeechRecognition = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   useEffect(() => {
@@ -62,6 +115,12 @@ export const SidePanel = React.memo(({
       }
     });
     return () => { unsubscribe(); };
+  }, []);
+
+  // Global agent lifecycle status; onStatus() emits the current state
+  // immediately on subscribe and returns the unsubscribe function.
+  useEffect(() => {
+    return aiAgent.onStatus(setAgentStatus);
   }, []);
 
   // Initialize SpeechRecognition with proper lifecycle cleanup
@@ -129,6 +188,115 @@ export const SidePanel = React.memo(({
     return tts.subscribe(setIsSpeaking);
   }, []);
 
+  // -----------------------------------------------------------------------
+  // Attachments: picker / drag & drop / paste share one processing path.
+  // -----------------------------------------------------------------------
+
+  // Transient inline hint (panel has no global toast system)
+  const showAttachmentHint = useCallback((message: string) => {
+    setAttachmentHint(message);
+    if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
+    attachmentHintTimerRef.current = setTimeout(() => {
+      attachmentHintTimerRef.current = null;
+      setAttachmentHint('');
+    }, 3000);
+  }, []);
+
+  useEffect(() => () => {
+    if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
+  }, []);
+
+  const addFilesToAttachments = useCallback(async (incoming: FileList | File[]) => {
+    const files = Array.from(incoming);
+    if (files.length === 0) return;
+    const skipped: string[] = [];
+
+    const imageCandidates = files.filter(isImageFile);
+    const textCandidates = files.filter(f => !imageCandidates.includes(f) && isTextFile(f));
+    const unsupported = files.filter(f => !imageCandidates.includes(f) && !textCandidates.includes(f));
+    if (unsupported.length > 0) {
+      skipped.push(`Desteklenmeyen dosya türü: ${unsupported[0].name}`);
+    }
+
+    // Enforce pending caps; accept what fits and tell the user about the rest
+    const imageSlots = Math.max(0, MAX_PENDING_IMAGES - pendingImages.length);
+    const acceptedImages = imageCandidates.slice(0, imageSlots);
+    if (imageCandidates.length > acceptedImages.length) {
+      skipped.push(`En fazla ${MAX_PENDING_IMAGES} görsel eklenebilir`);
+    }
+
+    const sizedTextFiles = textCandidates.filter(f => f.size <= MAX_TEXT_FILE_BYTES);
+    if (sizedTextFiles.length < textCandidates.length) {
+      skipped.push('256 KB üzerindeki dosyalar atlandı');
+    }
+    const fileSlots = Math.max(0, MAX_PENDING_FILES - pendingFiles.length);
+    const acceptedFiles = sizedTextFiles.slice(0, fileSlots);
+    if (sizedTextFiles.length > acceptedFiles.length) {
+      skipped.push(`En fazla ${MAX_PENDING_FILES} dosya eklenebilir`);
+    }
+
+    let readFailures = 0;
+    const newImages: PendingImageAttachment[] = [];
+    for (const file of acceptedImages) {
+      try {
+        newImages.push({
+          id: `img-${attachmentIdRef.current++}`,
+          name: file.name,
+          dataUrl: await readFileAsDataUrl(file),
+        });
+      } catch (err) {
+        console.error('[SidePanel] Image read failed:', file.name, err);
+        readFailures++;
+      }
+    }
+
+    const newFiles: PendingFileAttachment[] = [];
+    for (const file of acceptedFiles) {
+      try {
+        newFiles.push({
+          id: `file-${attachmentIdRef.current++}`,
+          name: file.name,
+          text: (await readFileAsText(file)).slice(0, TEXT_FILE_READ_CAP_CHARS),
+        });
+      } catch (err) {
+        console.error('[SidePanel] File read failed:', file.name, err);
+        readFailures++;
+      }
+    }
+    if (readFailures > 0) skipped.push('Bazı dosyalar okunamadı');
+
+    if (newImages.length > 0) setPendingImages(prev => [...prev, ...newImages]);
+    if (newFiles.length > 0) setPendingFiles(prev => [...prev, ...newFiles]);
+    if (skipped.length > 0) showAttachmentHint(skipped.slice(0, 2).join(' · '));
+  }, [pendingImages.length, pendingFiles.length, showAttachmentHint]);
+
+  // Ref mirror so the window-level paste listener always calls the latest
+  // closure without re-registering on every attachment change.
+  const addFilesRef = useRef(addFilesToAttachments);
+  addFilesRef.current = addFilesToAttachments;
+
+  // Paste images from the clipboard; plain text paste stays untouched.
+  useEffect(() => {
+    if (!isOpen || !isReady) return;
+    const handlePaste = (e: ClipboardEvent) => {
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+      if (!Array.from(files).some(f => f.type.startsWith('image/'))) return;
+      e.preventDefault();
+      addFilesRef.current(files);
+    };
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [isOpen, isReady]);
+
+  const removePendingImage = useCallback((id: string) => {
+    setPendingImages(prev => prev.filter(img => img.id !== id));
+  }, []);
+
+  const removePendingFile = useCallback((id: string) => {
+    setPendingFiles(prev => prev.filter(f => f.id !== id));
+  }, []);
+
   // Only scroll into view when messages change, or when streaming chunk arrives
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -182,10 +350,23 @@ export const SidePanel = React.memo(({
     }
   };
 
-  const handleAIAction = async (text: string) => {
-    if (!text.trim() || isLoading) return;
+  const handleAIAction = async (text: string, attachments?: ChatAttachments) => {
+    const hasAttachments = Boolean(
+      attachments && ((attachments.images?.length ?? 0) > 0 || (attachments.files?.length ?? 0) > 0)
+    );
+    if ((!text.trim() && !hasAttachments) || isLoading) return;
 
-    const userMsg: ChatCompletionMessageParam = { role: 'user', content: text };
+    // Attachment-only turns still need visible content in the user bubble
+    let userContent = text;
+    if (!userContent.trim() && hasAttachments) {
+      const kinds = [
+        ...((attachments!.images?.length ?? 0) > 0 ? ['görsel'] : []),
+        ...((attachments!.files?.length ?? 0) > 0 ? ['dosya'] : []),
+      ];
+      userContent = `(eklenen ${kinds.join(' ve ')})`;
+    }
+
+    const userMsg: ChatCompletionMessageParam = { role: 'user', content: userContent };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsLoading(true);
@@ -204,7 +385,7 @@ export const SidePanel = React.memo(({
       let streamedSoFar = '';
       let lastRenderTime = 0;
       const THROTTLE_MS = 80; // Only update UI max ~12 times a second to prevent React freezing
-      
+
       const updatedMessages = await aiAgent.chat(newMessages, (chunk) => {
         streamedSoFar += chunk;
         const now = performance.now();
@@ -212,16 +393,23 @@ export const SidePanel = React.memo(({
           setStreamingText(streamedSoFar);
           lastRenderTime = now;
         }
-      });
+      }, attachments);
 
       setStreamingText('');
       setMessages(updatedMessages.filter(m => m.role !== 'tool'));
       setMemories(aiMemory.getMemories());
+      // Chips are cleared only on success so a failed turn can be retried
+      if (attachments) {
+        setPendingImages([]);
+        setPendingFiles([]);
+      }
     } catch (err: any) {
       console.error('[AI Chat Error]', err);
       const rawMsg = err?.message ?? err?.toString() ?? '';
       let errMsg: string;
-      if (rawMsg.includes('Engine not initialized')) {
+      if (err instanceof AiError && err.code === 'vision_required') {
+        errMsg = 'Görselleriniz işlenemedi: seçili model görsel içeriği desteklemiyor. Görüntü analizi için model listesinden "Phi 3.5 Vision" modelini seçip tekrar deneyin.';
+      } else if (rawMsg.includes('Engine not initialized')) {
         errMsg = 'AI engine is not loaded yet. Please click the "Start AI" button first.';
       } else if (rawMsg.includes('ContentTypeError')) {
         errMsg = 'Message format error occurred. Please reset the chat and try again.';
@@ -238,10 +426,13 @@ export const SidePanel = React.memo(({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const hasPendingAttachments = pendingImages.length > 0 || pendingFiles.length > 0;
+    if ((!input.trim() && !hasPendingAttachments) || isLoading) return;
     const currentInput = input;
+    const images = pendingImages.map(img => img.dataUrl);
+    const files = pendingFiles.map(f => ({ name: f.name, text: f.text }));
     setInput('');
-    await handleAIAction(currentInput);
+    await handleAIAction(currentInput, hasPendingAttachments ? { images, files } : undefined);
   };
 
   const handleAIActionRef = useRef(handleAIAction);
@@ -281,6 +472,63 @@ export const SidePanel = React.memo(({
       }
     };
   }, []);
+
+  // Whether the selected model can ingest image content parts (drives the
+  // inline hint under pending image chips; sending is never blocked here —
+  // the engine throws the typed AiError instead).
+  const selectedModelSupportsVision = Boolean(
+    AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.vision
+  );
+
+  // Global agent status pill content (Feature: single state line above input)
+  const statusPill: { icon: React.ReactNode; label: string; detail?: string; classes: string } | null = (() => {
+    switch (agentStatus.state) {
+      case 'loading_model':
+        return {
+          icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
+          label: 'Model yükleniyor',
+          detail: agentStatus.detail,
+          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
+        };
+      case 'thinking':
+        return {
+          icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
+          label: 'Düşünüyor…',
+          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
+        };
+      case 'acting':
+        return {
+          icon: <Wrench className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
+          label: 'İşlem yapılıyor',
+          detail: agentStatus.detail,
+          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
+        };
+      case 'waiting_approval':
+        return {
+          icon: <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />,
+          label: 'Onay bekleniyor',
+          classes: 'bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-500/40 text-amber-600 dark:text-amber-400',
+        };
+      case 'error':
+        return {
+          icon: <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />,
+          label: agentStatus.detail || 'Bir hata oluştu',
+          classes: 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400',
+        };
+      default:
+        return null;
+    }
+  })();
+
+  // Download % parsed from the loading detail ("42% Fetching..."); null when
+  // not trivially parseable, in which case no progress bar is rendered.
+  const loadProgressPct = agentStatus.state === 'loading_model'
+    ? (() => {
+        const match = agentStatus.detail?.match(/(\d+)%/);
+        if (!match) return null;
+        return Math.min(100, Math.max(0, parseInt(match[1], 10)));
+      })()
+    : null;
 
   return (
     <AnimatePresence>
@@ -358,7 +606,29 @@ export const SidePanel = React.memo(({
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+          <div
+            className={`flex-1 overflow-y-auto p-4 flex flex-col gap-4 transition-colors ${
+              isDraggingFiles && isReady && !showMemoryVault ? 'ring-2 ring-inset ring-cyan-400 bg-cyan-50/50 dark:bg-cyan-500/5 rounded-xl' : ''
+            }`}
+            onDragOver={(e) => {
+              if (!isReady || showMemoryVault) return;
+              e.preventDefault();
+              setIsDraggingFiles(true);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                setIsDraggingFiles(false);
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingFiles(false);
+              if (!isReady || showMemoryVault) return;
+              if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+                addFilesToAttachments(e.dataTransfer.files);
+              }
+            }}
+          >
             {/* Memory Vault Overlay */}
             {showMemoryVault ? (
               <div className="flex-1 flex flex-col overflow-y-auto">
@@ -688,6 +958,86 @@ export const SidePanel = React.memo(({
           {/* Footer (Input) - Always visible when ready */}
           {isReady && (
             <div className="p-3.5 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
+              {/* Global agent status pill (hidden while idle) */}
+              {statusPill && (
+                <div className="mb-2">
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs ${statusPill.classes}`}
+                  >
+                    {statusPill.icon}
+                    <span className="font-medium flex-shrink-0">{statusPill.label}</span>
+                    {statusPill.detail && (
+                      <span className="truncate opacity-80" title={statusPill.detail}>{statusPill.detail}</span>
+                    )}
+                  </motion.div>
+                  {loadProgressPct !== null && (
+                    <div className="mt-1 h-0.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+                      <div
+                        className="h-full bg-accent transition-all duration-300 ease-out"
+                        style={{ width: `${loadProgressPct}%` }}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Pending attachment chips */}
+              {(pendingImages.length > 0 || pendingFiles.length > 0) && (
+                <div className="flex flex-wrap items-center gap-1.5 mb-2">
+                  {pendingImages.map(img => (
+                    <div key={img.id} className="relative group flex-shrink-0">
+                      <img
+                        src={img.dataUrl}
+                        alt={img.name}
+                        title={img.name}
+                        className="h-10 w-10 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePendingImage(img.id)}
+                        className="absolute -top-1 -right-1 p-0.5 rounded-full bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 hover:bg-red-500 hover:text-white transition-colors"
+                        title="Eki kaldır"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  ))}
+                  {pendingFiles.map(f => (
+                    <div
+                      key={f.id}
+                      className="flex items-center gap-1 pl-1.5 pr-1 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 max-w-[130px]"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
+                      <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate" title={f.name}>
+                        {f.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePendingFile(f.id)}
+                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0"
+                        title="Eki kaldır"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Non-vision model warning when images are pending (advisory only) */}
+              {pendingImages.length > 0 && !selectedModelSupportsVision && (
+                <p className="mb-2 text-[10px] text-amber-600 dark:text-amber-400">
+                  Görseller için Phi 3.5 Vision modelini seçin
+                </p>
+              )}
+
+              {/* Transient inline hint for skipped/unreadable attachments */}
+              {attachmentHint && (
+                <p className="mb-2 text-[10px] text-red-500 dark:text-red-400">{attachmentHint}</p>
+              )}
+
               <form onSubmit={handleSubmit} className="relative flex items-center gap-2">
                 {hasSpeechRecognition && (
                   <button
@@ -705,6 +1055,15 @@ export const SidePanel = React.memo(({
                     {isListening ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />}
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  className="p-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-white/10 transition-all shadow-sm flex-shrink-0 disabled:opacity-40 cursor-pointer"
+                  title="Görsel veya dosya ekle"
+                >
+                  <Paperclip className="w-4 h-4" />
+                </button>
                 <div className="relative flex-1 flex items-center">
                   <input
                     type="text"
@@ -716,13 +1075,29 @@ export const SidePanel = React.memo(({
                   />
                   <button
                     type="submit"
-                    disabled={isLoading || !input.trim()}
+                    disabled={isLoading || (!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0)}
                     className="absolute right-2 p-1.5 rounded-lg text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-40 cursor-pointer"
                   >
                     {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   </button>
                 </div>
               </form>
+
+              {/* Hidden attachment picker (reset after each pick so the same
+                  file can be chosen again) */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ATTACH_INPUT_ACCEPT}
+                className="hidden"
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    addFilesToAttachments(e.target.files);
+                  }
+                  e.target.value = '';
+                }}
+              />
             </div>
           )}
         </motion.div>

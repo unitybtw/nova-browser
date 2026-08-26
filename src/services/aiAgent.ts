@@ -1,7 +1,57 @@
-import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam } from "@mlc-ai/web-llm";
+import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam, ChatCompletionContentPart } from "@mlc-ai/web-llm";
 import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
+
+// ---------------------------------------------------------------------------
+// Public API types
+// ---------------------------------------------------------------------------
+
+/** Optional user attachments for a chat turn (FIX 7). */
+export interface ChatAttachments {
+  /** Image data URLs (e.g. "data:image/png;base64,..."). Requires a vision model. */
+  images?: string[];
+  /** Text files already read to strings by the caller. */
+  files?: { name: string; text: string }[];
+}
+
+/** Typed error thrown by the agent so the UI can map codes to friendly copy. */
+export class AiError extends Error {
+  public readonly code: string;
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = 'AiError';
+    this.code = code;
+  }
+}
+
+/** Lifecycle status of the agent, broadcast via aiAgent.onStatus() (FIX 6). */
+export type AgentStatus = {
+  state: 'idle' | 'loading_model' | 'thinking' | 'acting' | 'waiting_approval' | 'error';
+  detail?: string;
+};
+
+type AgentStatusCallback = (status: AgentStatus) => void;
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/** Fallback model used when no (or a stale) model id is stored locally. */
+export const DEFAULT_AI_MODEL_ID = "Llama-3.2-3B-Instruct-q4f16_1-MLC";
+
+/** Max tokens per agent-loop generation (headroom for constrained Action JSON). */
+const AGENT_MAX_TOKENS = 700;
+/** Max tokens for background summarization. */
+const SUMMARIZE_MAX_TOKENS = 300;
+/** Total char budget across ALL attached text files on >=4096-token models (B2). */
+const ATTACH_TOTAL_BUDGET_CHARS_LARGE = 8000;
+/** Total char budget across ALL attached text files on small-window models (B2). */
+const ATTACH_TOTAL_BUDGET_CHARS_SMALL = 3000;
+/** Approximate chars per token used to estimate the attachment context cost (B2). */
+const ATTACH_CHARS_PER_TOKEN = 4;
+/** Minimum tokens that must remain for the conversation after attachments (B2). */
+const MIN_CONVERSATION_TOKEN_RESERVE = 1200;
 
 export interface AIActionContext {
   onNavigate: (url: string) => void;
@@ -66,6 +116,12 @@ const DOM_SCAN_SCRIPT = `(() => {
 // Maximum number of messages to keep in the conversation history for inference
 const MAX_HISTORY_MESSAGES = 12;
 
+/** Outcome of parsing one grammar-constrained agent turn (FIX 1). */
+type ConstrainedOutcome =
+  | { kind: 'action'; name: string; arguments: any }
+  | { kind: 'reply'; text: string }
+  | { kind: 'invalid'; reason: string };
+
 export interface AIModelOption {
   id: string;
   name: string;
@@ -73,16 +129,41 @@ export interface AIModelOption {
   speed: string;
   description: string;
   isDefault?: boolean;
+  /** True only for multimodal models that accept image content parts. */
+  vision?: boolean;
 }
 
+// All ids verified against @mlc-ai/web-llm 0.2.84 prebuiltAppConfig.model_list
 export const AVAILABLE_AI_MODELS: AIModelOption[] = [
+  {
+    id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
+    name: "Llama 3.2 3B (Önerilen)",
+    size: "~1.7 GB",
+    speed: "Hızlı",
+    description: "Dengeli akil yurutme, Turkce/Ingilizce akici — cogu kullanici icin ideal",
+    isDefault: true
+  },
+  {
+    id: "Qwen2.5-3B-Instruct-q4f16_1-MLC",
+    name: "Qwen 2.5 3B",
+    size: "~1.9 GB",
+    speed: "Hızlı",
+    description: "Guclu akil yurutme ve cok dilli destek sunan orta boy model"
+  },
+  {
+    id: "Phi-3.5-vision-instruct-q4f16_1-MLC",
+    name: "Phi 3.5 Vision (Görsel destekli)",
+    size: "~2.4 GB",
+    speed: "Standart",
+    description: "Gorsel icerik analizi yapabilen cok modlu model (ekran goruntusu/gorsel ekleyin)",
+    vision: true
+  },
   {
     id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
     name: "Llama 3.2 1B (Onerilen)",
     size: "~800 MB",
     speed: "Cok Hizli",
-    description: "Hafif, akilli ve Turkce/Ingilizce akici asistan",
-    isDefault: true
+    description: "Hafif, akilli ve Turkce/Ingilizce akici asistan"
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
@@ -333,19 +414,90 @@ class AIAgent {
   private actionContext: AIActionContext | null = null;
   private isInitializing = false;
   private isInterrupted = false;
-  
+
+  // --- Status emitter (FIX 6) ---
+  private statusSubscribers: Set<AgentStatusCallback> = new Set();
+
+  /** Subscribe to agent lifecycle status. Returns an unsubscribe function. */
+  public onStatus(cb: AgentStatusCallback): () => void {
+    this.statusSubscribers.add(cb);
+    cb(this.currentStatus());
+    return () => {
+      this.statusSubscribers.delete(cb);
+    };
+  }
+
+  private lastStatus: AgentStatus = { state: 'idle' };
+
+  private currentStatus(): AgentStatus {
+    return { ...this.lastStatus };
+  }
+
+  private emitStatus(state: AgentStatus['state'], detail?: string) {
+    this.lastStatus = detail !== undefined ? { state, detail } : { state };
+    this.statusSubscribers.forEach(cb => {
+      try {
+        cb({ ...this.lastStatus });
+      } catch (e) {
+        // A faulty subscriber must never break the agent loop
+        console.error('[AI Agent] Status subscriber threw:', e);
+      }
+    });
+  }
+
   public interrupt() {
     this.isInterrupted = true;
     if (this.engine) {
       this.engine.interruptGenerate();
     }
   }
-  
-  // Default: Ultra-Light, High-Performance Mini Model (~800MB download vs 4.5GB 8B)
-  private modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC"; 
+
+  // Default: balanced 3B model (see DEFAULT_AI_MODEL_ID / AVAILABLE_AI_MODELS)
+  private modelId = DEFAULT_AI_MODEL_ID;
 
   public getModel(): string {
     return this.modelId;
+  }
+
+  /**
+   * Resolves a stored model id against the current catalog. Stale ids from
+   * older versions (e.g. removed entries) gracefully fall back to the default.
+   */
+  private resolveModelId(stored: string | null | undefined): string {
+    if (stored && AVAILABLE_AI_MODELS.some(m => m.id === stored)) {
+      return stored;
+    }
+    return DEFAULT_AI_MODEL_ID;
+  }
+
+  /** Whether the currently loaded model accepts image content parts. */
+  public currentModelSupportsVision(): boolean {
+    return !!AVAILABLE_AI_MODELS.find(m => m.id === this.modelId)?.vision;
+  }
+
+  /**
+   * Per-model context window. The tiny 0.5B model keeps its small budget;
+   * everything else gets room for grounded page content + tool JSON.
+   */
+  private getContextWindowSizeForModel(modelId: string): number {
+    return modelId.startsWith('Qwen2.5-0.5B') ? 2048 : 4096;
+  }
+
+  /**
+   * Context window of the loaded engine, captured at init (B3). Budgets for
+   * page reads and attachments are scaled from this so small-window models
+   * (e.g. Qwen2.5-0.5B @ 2048) don't overflow before generation starts.
+   */
+  private ctxWindowSize = 4096;
+
+  /** Page text budget returned by read_page_content, scaled to the window (B3). */
+  private getPageContentMaxChars(): number {
+    return this.ctxWindowSize <= 2048 ? 800 : 3500;
+  }
+
+  /** Page text budget for the instant direct-intent reply path (B3). */
+  private getDirectIntentPageChars(): number {
+    return this.ctxWindowSize <= 2048 ? 400 : 1500;
   }
 
   public setModel(modelId: string) {
@@ -560,21 +712,6 @@ class AIAgent {
     {
       type: "function",
       function: {
-        name: "scroll_page",
-        description: "Scrolls the active browser tab.",
-        parameters: {
-          type: "object",
-          properties: {
-            direction: { type: "string", enum: ["up", "down", "top", "bottom"], description: "The direction to scroll" },
-            amount: { type: "number", description: "The amount of pixels to scroll (only used for up/down)" }
-          },
-          required: ["direction"]
-        }
-      }
-    },
-    {
-      type: "function",
-      function: {
         name: "press_key",
         description: "Simulates pressing a keyboard key on the active tab (e.g., 'Enter', 'Escape').",
         parameters: {
@@ -664,6 +801,92 @@ class AIAgent {
     this.actionContext = context;
   }
 
+  // -----------------------------------------------------------------------
+  // Grammar-constrained decoding (FIX 1) + system prompt generation (FIX 2)
+  // -----------------------------------------------------------------------
+
+  /** Cached tool-name enum + JSON schema string, invalidated on model reload. */
+  private toolCallSchemaString: string | null = null;
+  private toolNameEnum: string[] = [];
+  private constrainedUnsupported = false;
+
+  /**
+   * Builds the response_format schema used to grammar-constrain every agent
+   * turn: the model MUST emit one JSON object with either a `tool` call
+   * (enum built dynamically from the real tools array, so all tools stay
+   * reachable) or a plain `reply` — never free-form ReAct prose.
+   */
+  private getToolCallSchemaString(): string {
+    const toolNames = this.tools.map(t => t?.function?.name).filter((n): n is string => typeof n === 'string');
+    if (this.toolCallSchemaString === null || this.toolNameEnum.join(',') !== toolNames.join(',')) {
+      this.toolNameEnum = toolNames;
+      const schema = {
+        type: "object",
+        properties: {
+          tool: { type: "string", enum: toolNames, description: "Name of the tool to call. Mutually exclusive with reply." },
+          arguments: { type: "object", description: "Arguments object for the chosen tool. Required when tool is set." },
+          reply: { type: "string", description: "Final answer to the user. Mutually exclusive with tool." }
+        },
+        required: [],
+        additionalProperties: false
+      };
+      this.toolCallSchemaString = JSON.stringify(schema);
+    }
+    return this.toolCallSchemaString;
+  }
+
+  /**
+   * Generates the system prompt from the actual tools array so every tool is
+   * advertised with a one-line argument summary (no more hardcoded 6-tool list).
+   * Kept compact (<400 words) for small models.
+   *
+   * B3: on <=2048-token windows (e.g. Qwen2.5-0.5B) a COMPACT variant is
+   * emitted instead: tool name + required args only, no descriptions — but
+   * still the complete tool list, so every tool stays reachable.
+   */
+  private buildSystemPrompt(): string {
+    const compact = this.ctxWindowSize <= 2048;
+    const fnList = this.tools
+      .map(t => t?.function)
+      .filter((fn): fn is { name: string; description?: string; parameters?: any } => !!fn && typeof fn.name === 'string');
+
+    const toolLines = (
+      compact
+        ? fnList.map(fn => {
+            const props: Record<string, any> = fn.parameters?.properties ?? {};
+            const required: string[] = Array.isArray(fn.parameters?.required) ? fn.parameters.required : [];
+            const args = required.map(key => `${key}:${props[key]?.type ?? 'any'}`).join(', ');
+            return `- ${fn.name}${args ? `(${args})` : ''}`;
+          })
+        : fnList.map(fn => {
+            const props: Record<string, any> = fn.parameters?.properties ?? {};
+            const required: string[] = Array.isArray(fn.parameters?.required) ? fn.parameters.required : [];
+            const args = Object.entries(props).map(([key, prop]: [string, any]) => {
+              const req = required.includes(key) ? '' : '?';
+              const enumHint = Array.isArray(prop?.enum) ? `:${prop.enum.join('|')}` : '';
+              return `${key}${req}:${prop?.type ?? 'any'}${enumHint}`;
+            }).join(', ');
+            let desc = String(fn.description || '').split('.')[0].trim();
+            if (desc.length > 60) desc = desc.substring(0, 57).trimEnd() + '...';
+            return `- ${fn.name}: ${desc}.${args ? ` Args: ${args}.` : ''}`;
+          })
+    ).join('\n');
+
+    return `You are Nova Browser's AI assistant. You control a real browser and answer questions.
+
+TOOLS:
+${toolLines}
+
+OUTPUT: one JSON object per turn, nothing else.
+To act: {"tool": "<name>", "arguments": {...}} | To answer: {"reply": "<answer>"}
+Never combine both. After each tool you get an Observation; continue or reply.
+
+RULES:
+1. Grounding: only state facts found in page content, tool results, or the conversation. If you don't know something or a tool fails, say so plainly — never invent results.
+2. Call read_page_content before click_element/fill_input; it lists elements with ai_id numbers.
+3. Answer in Turkish, or the user's language. Never use emojis.`;
+  }
+
   private initPromise: Promise<void> | null = null;
 
   public async init(onProgress?: InitProgressHandler) {
@@ -693,30 +916,41 @@ class AIAgent {
         if (onProgress) {
           onProgress(initProgress.progress * 100, initProgress.text);
         }
+        // Broadcast download progress to status subscribers (FIX 6)
+        const pct = Math.round(initProgress.progress * 100);
+        this.emitStatus('loading_model', `${pct}% ${initProgress.text}`.trim());
       };
 
       const { CreateWebWorkerMLCEngine } = await import("@mlc-ai/web-llm");
       const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
 
+      // Resolve stored model against the catalog; stale ids migrate to default
       try {
         const storedModel = localStorage.getItem('nova_ai_model');
-        const validModelIds = AVAILABLE_AI_MODELS.map(m => m.id);
-        if (storedModel && validModelIds.includes(storedModel)) {
-          this.modelId = storedModel;
-        } else {
-          this.modelId = "Llama-3.2-1B-Instruct-q4f16_1-MLC";
-          localStorage.setItem('nova_ai_model', this.modelId);
-        }
+        this.modelId = this.resolveModelId(storedModel);
+        localStorage.setItem('nova_ai_model', this.modelId);
       } catch {}
 
       this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
         initProgressCallback,
-        context_window_size: 2048
+        context_window_size: this.getContextWindowSizeForModel(this.modelId)
       } as any) as any;
 
-    } catch (err) {
+      // Budgets (page reads, attachments, system prompt) scale with the
+      // loaded model's window (B3).
+      this.ctxWindowSize = this.getContextWindowSizeForModel(this.modelId);
+
+      // Schema cache depends on the tools array only, but reset defensively.
+      // The constrained-decoding capability is also per runtime/model, so a
+      // reload re-tries response_format once before caching the fallback (S1).
+      this.toolCallSchemaString = null;
+      this.constrainedUnsupported = false;
+      this.emitStatus('idle');
+
+    } catch (err: any) {
       console.error("Failed to initialize AI Engine:", err);
       this.engine = null;
+      this.emitStatus('error', err?.message || String(err));
       throw err;
     } finally {
       this.isInitializing = false;
@@ -792,21 +1026,36 @@ class AIAgent {
       return JSON.stringify({ error: "Action context not set. Browser APIs unavailable." });
     }
 
+    // Id of THIS action in the orchestrator queue (S3) — used for status
+    // emission and all bookkeeping instead of getQueue() tail inspection.
+    let actionId: string | null = null;
+
     try {
       // Pause execution and ask for user approval before doing the action.
       // Read-only tools are auto-approved inside the orchestrator; all other
       // tools stay 'pending' until the user approves or denies the action card
       // in the AI side panel. On denial, denyAction() has already marked the
       // action 'denied' in the queue.
-      const approved = await orchestrator.enqueueAction(functionName, args);
+      const { id: queuedId, done: approvalPromise } = orchestrator.enqueueAction(functionName, args);
+      actionId = queuedId;
+
+      // If the orchestrator queued this as 'pending', tell status subscribers
+      // the agent is blocked on user approval (FIX 6). Keyed by our own id,
+      // not by queue position (S3).
+      const queuedAction = orchestrator.getQueue().find(a => a.id === actionId);
+      if (queuedAction && queuedAction.state === 'pending') {
+        this.emitStatus('waiting_approval', functionName);
+      }
+
+      const approved = await approvalPromise;
       if (!approved) {
         return JSON.stringify({ error: "User denied the action." });
       }
 
-      // Find the action id to update state
-      const actionList = orchestrator.getQueue();
-      const currentAction = actionList[actionList.length - 1];
-      orchestrator.updateActionState(currentAction.id, 'executing');
+      orchestrator.updateActionState(actionId, 'executing');
+
+      // Broadcast tool execution (FIX 6)
+      this.emitStatus('acting', functionName);
 
       let result: any;
 
@@ -837,12 +1086,38 @@ class AIAgent {
       else if (functionName === "read_page_content") {
         let text = '';
         try {
-          const raw = await this.actionContext.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, 400)`);
+          const raw = await this.actionContext.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getPageContentMaxChars()})`);
           text = typeof raw === 'string' ? raw : JSON.stringify(raw);
         } catch (e) {
           text = 'Sayfa metni alinamadi.';
         }
-        result = { success: true, text };
+
+        // Revive DOM_SCAN_SCRIPT: tag visible interactive elements with
+        // data-ai-id (the script sets the attributes itself, which is what
+        // makes click_element/fill_input's [data-ai-id="N"] contract work)
+        // and append the inventory to the returned content.
+        let elementsSection = '';
+        try {
+          const scanRaw = await this.actionContext.onExecuteScript(DOM_SCAN_SCRIPT);
+          let scan: any = scanRaw;
+          if (typeof scanRaw === 'string') {
+            try { scan = JSON.parse(scanRaw); } catch { scan = null; }
+          }
+          const items: any[] = Array.isArray(scan?.interactable_elements) ? scan.interactable_elements : [];
+          if (items.length > 0) {
+            const lines = items.map((el: any) => {
+              const typeHint = el.type ? ` type=${el.type}` : '';
+              const label = el.text ? ` "${el.text}"` : '';
+              return `[ai_id=${el.ai_id}] <${el.tag}${typeHint}>${label}`;
+            });
+            elementsSection = `\n\nINTERACTIVE_ELEMENTS (use ai_id with click_element/fill_input):\n${lines.join('\n')}`;
+          }
+        } catch (e) {
+          // Element inventory is best-effort; page text alone is still useful
+          console.warn('[AI Agent] DOM scan failed:', e);
+        }
+
+        result = { success: true, text: text + elementsSection };
       }
 
       else if (functionName === "get_page_url") {
@@ -1340,184 +1615,355 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         throw new Error(`Unknown function: ${functionName}`);
       }
 
-      orchestrator.updateActionState(currentAction.id, 'completed', result);
+      if (actionId) {
+        orchestrator.updateActionState(actionId, 'completed', result);
+      }
       return JSON.stringify(result);
 
     } catch (err: any) {
-      const actionList = orchestrator.getQueue();
-      if (actionList.length > 0) {
-        orchestrator.updateActionState(actionList[actionList.length - 1].id, 'failed', undefined, err.message);
+      if (actionId) {
+        orchestrator.updateActionState(actionId, 'failed', undefined, err.message);
       }
       return JSON.stringify({ error: err.message });
     }
   }
 
-  public async chat(messages: ChatCompletionMessageParam[], onChunk?: (chunk: string) => void): Promise<ChatCompletionMessageParam[]> {
+  /**
+   * Validates a grammar-constrained JSON turn. The schema guarantees
+   * well-formed JSON, but never trust it blindly: check the tool exists in
+   * the real tools array and that arguments are an object.
+   */
+  private validateConstrainedOutput(raw: string): ConstrainedOutcome {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return { kind: 'invalid', reason: 'output was not valid JSON' };
+    }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return { kind: 'invalid', reason: 'output was not a JSON object' };
+    }
+    const toolNames = this.tools.map(t => t?.function?.name).filter((n): n is string => typeof n === 'string');
+    if (typeof parsed.tool === 'string' && parsed.tool.length > 0) {
+      if (!toolNames.includes(parsed.tool)) {
+        return { kind: 'invalid', reason: `unknown tool "${parsed.tool}"` };
+      }
+      let args = parsed.arguments;
+      if (args === undefined || args === null) args = {};
+      if (typeof args !== 'object' || Array.isArray(args)) {
+        return { kind: 'invalid', reason: '"arguments" must be an object' };
+      }
+      return { kind: 'action', name: parsed.tool, arguments: args };
+    }
+    if (typeof parsed.reply === 'string' && parsed.reply.trim().length > 0) {
+      return { kind: 'reply', text: parsed.reply.trim() };
+    }
+    return { kind: 'invalid', reason: 'object must contain either a known "tool" or a non-empty "reply"' };
+  }
+
+  /**
+   * One agent-loop generation. Prefers grammar-constrained decoding
+   * (response_format json_object + schema); if WebLLM rejects response_format
+   * on this model/runtime, falls back to the legacy free-text ReAct path.
+   */
+  private async generateAgentTurn(windowedMessages: ChatCompletionMessageParam[]): Promise<{ text: string; constrained: boolean }> {
+    this.emitStatus('thinking');
+    try {
+      const reply = await this.engine!.chat.completions.create({
+        messages: windowedMessages,
+        temperature: 0.1,
+        max_tokens: AGENT_MAX_TOKENS,
+        stream: false,
+        response_format: { type: "json_object", schema: this.getToolCallSchemaString() }
+      } as any);
+      const text = reply.choices[0]?.message?.content || '';
+      if (text.trim().length > 0) {
+        return { text, constrained: true };
+      }
+      // Empty constrained output: treat as a soft failure and retry via the
+      // legacy path below rather than burning a corrective round-trip.
+      console.warn('[AI Agent] Constrained decoding returned empty output; using legacy path.');
+    } catch (e) {
+      console.warn('[AI Agent] Constrained decoding failed; falling back to free-text:', e);
+    }
+    const reply = await this.engine!.chat.completions.create({
+      messages: windowedMessages,
+      temperature: 0.1,
+      max_tokens: AGENT_MAX_TOKENS,
+      stream: false
+    });
+    return { text: reply.choices[0]?.message?.content || '', constrained: false };
+  }
+
+  public async chat(
+    messages: ChatCompletionMessageParam[],
+    onChunk?: (chunk: string) => void,
+    attachments?: ChatAttachments
+  ): Promise<ChatCompletionMessageParam[]> {
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
 
-    // 1. Direct Instant Intent Execution for browser commands
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
-    const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
-    const directIntent = detectDirectIntent(userQuery);
+    try {
+      // ---------------------------------------------------------------
+      // FIX 7: attachment processing
+      // ---------------------------------------------------------------
+      const images = (attachments?.images ?? []).filter((u): u is string => typeof u === 'string' && u.length > 0);
+      const attachedFiles = (attachments?.files ?? []).filter(f => f && typeof f.name === 'string');
+      const maxFileChars = this.ctxWindowSize <= 2048 ? ATTACH_TOTAL_BUDGET_CHARS_SMALL : ATTACH_TOTAL_BUDGET_CHARS_LARGE;
+      const fileBlocks = attachedFiles
+        .map(f => `<attached_file name="${f.name}">\n${(f.text || '').substring(0, maxFileChars)}\n</attached_file>`)
+        .join('\n\n');
+      const hasAttachments = images.length > 0 || fileBlocks.length > 0;
 
-    if (directIntent) {
-      const funcName = directIntent.name;
-      if (onChunk) onChunk(`Islem yapiliyor: ${funcName}...\n\n`);
-      
-      let friendlyResponse = "Islem tamamlandi.";
-      try {
-        await this.handleToolCall({
-          id: Date.now().toString(),
-          type: "function",
-          function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
-        });
-        
-        if (directIntent.directReply) {
-          friendlyResponse = directIntent.directReply;
-        } else if (funcName === 'navigate_to_url') {
-          const u = directIntent.arguments.url;
-          if (u.includes('youtube.com/results?search_query=')) {
-            const q = decodeURIComponent(u.split('search_query=')[1] || '');
-            friendlyResponse = `YouTube'da "${q}" arandi ve acildi.`;
-          } else if (u.includes('youtube.com')) {
-            friendlyResponse = "YouTube acildi.";
-          } else if (u.includes('google.com/search')) {
-            friendlyResponse = "Google aramasi yapildi.";
-          } else {
-            friendlyResponse = `${u} sayfasi acildi.`;
+      // Images require a vision-capable model — fail fast with a typed,
+      // UI-mappable error instead of silently ignoring the images.
+      if (images.length > 0 && !this.currentModelSupportsVision()) {
+        const msg = 'Seçili model görsel içerik analizi desteklemiyor. Görüntü ekleyebilmek için ayarlardan "Phi 3.5 Vision (Görsel destekli)" modelini indirip seçin.';
+        this.emitStatus('error', msg);
+        throw new AiError('vision_required', msg);
+      }
+
+      // Build augmented copies for inference only; the returned history keeps
+      // the caller's original messages (no multi-MB data URLs persisted).
+      let augmentedMessages = messages;
+      if (hasAttachments) {
+        let lastUserIdx = -1;
+        for (let i = messages.length - 1; i >= 0; i--) {
+          if (messages[i].role === 'user') { lastUserIdx = i; break; }
+        }
+        augmentedMessages = messages.map((m, idx) => {
+          if (idx !== lastUserIdx) return m;
+          const baseText = typeof m.content === 'string' ? m.content : '';
+          const textWithFiles = fileBlocks ? `${baseText}\n\n${fileBlocks}` : baseText;
+          if (images.length > 0) {
+            const parts: ChatCompletionContentPart[] = [
+              { type: 'text', text: textWithFiles },
+              ...images.map(url => ({ type: 'image_url' as const, image_url: { url } }))
+            ];
+            return { role: 'user', content: parts } as ChatCompletionMessageParam;
           }
-        } else if (funcName === 'manage_tabs') {
-          if (directIntent.arguments.action === 'create') friendlyResponse = "Yeni sekme acildi.";
-          else if (directIntent.arguments.action === 'close') friendlyResponse = "Sekme kapatildi.";
-          else friendlyResponse = "Sekme islemi yapildi.";
-        } else if (funcName === 'scroll_page') {
-          friendlyResponse = directIntent.arguments.direction === 'down' ? "Sayfa asagi kaydirildi." : "Sayfa yukari kaydirildi.";
-        } else if (funcName === 'take_screenshot') {
-          friendlyResponse = "Ekran goruntusu alindi.";
-        } else if (funcName === 'read_page_content') {
-          let pageText = '';
-          try {
-            pageText = await this.actionContext?.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, 300)`);
-          } catch {}
-          friendlyResponse = `Sayfa icerigi:\n\n${pageText || 'Sayfada metin bulunamadi.'}`;
-        }
-      } catch (e: any) {
-        friendlyResponse = `Islem basarisiz: ${e.message || String(e)}`;
-      }
-
-      if (onChunk) {
-        onChunk(friendlyResponse);
-      }
-
-      // Return ONLY clean user messages + single clean assistant response
-      return [...messages, { role: 'assistant', content: friendlyResponse }];
-    }
-
-    // 2. Conversational reasoning & multi-step execution
-    const systemInstruction = `You are Nova Browser's AI Assistant. You help the user browse the web and answer questions clearly.
-Available Tools:
-- navigate_to_url: {"url": "https://..." or "search query"}
-- read_page_content: {}
-- click_element: {"ai_id": "1"}
-- fill_input: {"value": "text", "submit": true}
-- manage_tabs: {"action": "create"|"close"}
-- scroll_page: {"direction": "up"|"down"}
-
-Rules:
-1. If you need a tool, output: Action: {"name": "<tool>", "arguments": { ... }}
-2. If answering the user, answer directly and concisely in Turkish or user language. Never use emojis.`;
-
-    const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
-
-    // Internal loop messages (isolated from user-facing conversation)
-    let internalMessages: ChatCompletionMessageParam[] = [
-      { 
-        role: 'system', 
-        content: systemInstruction + (memoryPrompt ? `\n\nUser Profile & Memories:\n${memoryPrompt}` : '') 
-      },
-      ...messages.filter(m => m.role !== 'system')
-    ];
-
-    let isDone = false;
-    let finalAnswer = '';
-    let loopCount = 0;
-    const MAX_LOOPS = 4;
-
-    while (!isDone) {
-      await new Promise(r => setTimeout(r, 40));
-      loopCount++;
-
-      if (loopCount > MAX_LOOPS || this.isInterrupted) {
-        finalAnswer = this.isInterrupted ? 'Islem durduruldu.' : 'Islem tamamlandi.';
-        break;
-      }
-
-      // Sliding window
-      let windowedMessages = internalMessages;
-      if (internalMessages.length > MAX_HISTORY_MESSAGES) {
-        windowedMessages = [
-          internalMessages[0],
-          ...internalMessages.slice(-MAX_HISTORY_MESSAGES + 1)
-        ];
-      }
-
-      let responseText = '';
-      try {
-        const reply = await this.engine.chat.completions.create({
-          messages: windowedMessages,
-          max_tokens: 350,
-          temperature: 0.1,
-          stream: false
+          return { ...m, content: textWithFiles } as ChatCompletionMessageParam;
         });
-        responseText = reply.choices[0]?.message?.content || '';
-      } catch (e: any) {
-        finalAnswer = 'Bir hata olustu. Lutfen tekrar deneyin.';
-        break;
       }
 
-      const action = parseReActAction(responseText);
-      if (action && action.name) {
-        if (onChunk) onChunk(`> Arac calistiriliyor: ${action.name}...\n\n`);
-        let toolResult = '';
+      // ---------------------------------------------------------------
+      // 1. Direct Instant Intent Execution for browser commands.
+      //    Skipped entirely when attachments are present: attachments imply
+      //    free-form intent that the regex bypass cannot represent.
+      // ---------------------------------------------------------------
+      const lastUserMsg = [...augmentedMessages].reverse().find(m => m.role === 'user');
+      const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+      const directIntent = hasAttachments ? null : detectDirectIntent(userQuery);
+
+      if (directIntent) {
+        const funcName = directIntent.name;
+        if (onChunk) onChunk(`Islem yapiliyor: ${funcName}...\n\n`);
+
+        let friendlyResponse = "Islem tamamlandi.";
         try {
-          toolResult = await this.handleToolCall({
+          await this.handleToolCall({
             id: Date.now().toString(),
-            type: 'function',
-            function: { name: action.name, arguments: JSON.stringify(action.arguments) }
+            type: "function",
+            function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
           });
-        } catch (err: any) {
-          toolResult = JSON.stringify({ error: err.message || String(err) });
+
+          if (directIntent.directReply) {
+            friendlyResponse = directIntent.directReply;
+          } else if (funcName === 'navigate_to_url') {
+            const u = directIntent.arguments.url;
+            if (u.includes('youtube.com/results?search_query=')) {
+              const q = decodeURIComponent(u.split('search_query=')[1] || '');
+              friendlyResponse = `YouTube'da "${q}" arandi ve acildi.`;
+            } else if (u.includes('youtube.com')) {
+              friendlyResponse = "YouTube acildi.";
+            } else if (u.includes('google.com/search')) {
+              friendlyResponse = "Google aramasi yapildi.";
+            } else {
+              friendlyResponse = `${u} sayfasi acildi.`;
+            }
+          } else if (funcName === 'manage_tabs') {
+            if (directIntent.arguments.action === 'create') friendlyResponse = "Yeni sekme acildi.";
+            else if (directIntent.arguments.action === 'close') friendlyResponse = "Sekme kapatildi.";
+            else friendlyResponse = "Sekme islemi yapildi.";
+          } else if (funcName === 'scroll_page') {
+            friendlyResponse = directIntent.arguments.direction === 'down' ? "Sayfa asagi kaydirildi." : "Sayfa yukari kaydirildi.";
+          } else if (funcName === 'take_screenshot') {
+            friendlyResponse = "Ekran goruntusu alindi.";
+          } else if (funcName === 'read_page_content') {
+            let pageText = '';
+            try {
+              pageText = await this.actionContext?.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getDirectIntentPageChars()})`) || '';
+            } catch {}
+            friendlyResponse = `Sayfa icerigi:\n\n${pageText || 'Sayfada metin bulunamadi.'}`;
+          }
+        } catch (e: any) {
+          friendlyResponse = `Islem basarisiz: ${e.message || String(e)}`;
+          this.emitStatus('error', friendlyResponse);
         }
 
-        internalMessages.push({
-          role: 'assistant',
-          content: `Action: {"name": "${action.name}", "arguments": ${JSON.stringify(action.arguments)}}`
-        } as ChatCompletionMessageParam);
+        if (onChunk) {
+          onChunk(friendlyResponse);
+        }
 
+        // Return ONLY clean user messages + single clean assistant response
+        return [...messages, { role: 'assistant', content: friendlyResponse }];
+      }
+
+      // ---------------------------------------------------------------
+      // 2. Conversational reasoning & multi-step execution
+      // ---------------------------------------------------------------
+      const systemInstruction = this.buildSystemPrompt();
+      const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
+
+      // Internal loop messages (isolated from user-facing conversation)
+      let internalMessages: ChatCompletionMessageParam[] = [
+        {
+          role: 'system',
+          content: systemInstruction + (memoryPrompt ? `\n\nUser Profile & Memories:\n${memoryPrompt}` : '')
+        },
+        ...augmentedMessages.filter(m => m.role !== 'system')
+      ];
+
+      let isDone = false;
+      let finalAnswer = '';
+      let loopCount = 0;
+      const MAX_LOOPS = 4;
+      // Honest-failure bookkeeping: never claim success when nothing ran.
+      let executedAnyTool = false;
+      const NO_VALID_OUTPUT_MSG = 'Uzgunum, bu istegi isleyemedim: model gecerli bir arac cagrisi veya yanit uretmedi. Lutfen tekrar deneyin.';
+      const LOOP_EXHAUSTED_MSG = 'Arac adimlari calistirildi ancak sonuc ozetlenemedi. Devam etmek icin lutfen mesaj gonderin.';
+
+      while (!isDone) {
+        await new Promise(r => setTimeout(r, 40));
+        loopCount++;
+
+        if (this.isInterrupted) {
+          finalAnswer = 'Islem durduruldu.';
+          break;
+        }
+        if (loopCount > MAX_LOOPS) {
+          finalAnswer = executedAnyTool ? LOOP_EXHAUSTED_MSG : NO_VALID_OUTPUT_MSG;
+          break;
+        }
+
+        // Sliding window
+        let windowedMessages = internalMessages;
+        if (internalMessages.length > MAX_HISTORY_MESSAGES) {
+          windowedMessages = [
+            internalMessages[0],
+            ...internalMessages.slice(-MAX_HISTORY_MESSAGES + 1)
+          ];
+        }
+
+        let turn: { text: string; constrained: boolean };
+        try {
+          turn = await this.generateAgentTurn(windowedMessages);
+        } catch (e: any) {
+          finalAnswer = 'Bir hata olustu. Lutfen tekrar deneyin.';
+          this.emitStatus('error', e?.message || String(e));
+          break;
+        }
+
+        // Shared tool-execution block for both decoding paths
+        const executeTool = async (name: string, args: any, assistantEcho: string): Promise<void> => {
+          if (onChunk) onChunk(`> Arac calistiriliyor: ${name}...\n\n`);
+          let toolResult = '';
+          try {
+            toolResult = await this.handleToolCall({
+              id: Date.now().toString(),
+              type: 'function',
+              function: { name, arguments: JSON.stringify(args) }
+            });
+          } catch (err: any) {
+            toolResult = JSON.stringify({ error: err.message || String(err) });
+          }
+          executedAnyTool = true;
+
+          internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
+          internalMessages.push({
+            role: 'user',
+            content: `Observation: ${toolResult}\nLutfen kullaniciya sonucu kisa ve oz acikla. Kesinlikle emoji kullanma.`
+          } as ChatCompletionMessageParam);
+        };
+
+        if (turn.constrained) {
+          // FIX 1: grammar-constrained path — guaranteed-well-formed JSON,
+          // still validated defensively before acting.
+          const outcome = this.validateConstrainedOutput(turn.text);
+          if (outcome.kind === 'action') {
+            await executeTool(
+              outcome.name,
+              outcome.arguments,
+              JSON.stringify({ tool: outcome.name, arguments: outcome.arguments })
+            );
+            continue;
+          }
+          if (outcome.kind === 'reply') {
+            isDone = true;
+            finalAnswer = outcome.text;
+            break;
+          }
+          // Invalid → one corrective retry instead of fake success
+          if (loopCount >= MAX_LOOPS) {
+            finalAnswer = executedAnyTool ? LOOP_EXHAUSTED_MSG : NO_VALID_OUTPUT_MSG;
+            break;
+          }
+          internalMessages.push({ role: 'assistant', content: turn.text } as ChatCompletionMessageParam);
+          internalMessages.push({
+            role: 'user',
+            content: `Invalid tool call: ${outcome.reason}. Respond again with valid JSON.`
+          } as ChatCompletionMessageParam);
+          continue;
+        }
+
+        // Legacy free-text fallback (models/runtimes without response_format)
+        const action = parseReActAction(turn.text);
+        if (action && action.name) {
+          await executeTool(
+            action.name,
+            action.arguments,
+            `Action: {"name": "${action.name}", "arguments": ${JSON.stringify(action.arguments)}}`
+          );
+          continue;
+        }
+        const cleanedReply = turn.text.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
+        if (cleanedReply) {
+          isDone = true;
+          finalAnswer = cleanedReply;
+          break;
+        }
+        // Neither action nor reply — honest failure, never canned success
+        if (loopCount >= MAX_LOOPS) {
+          finalAnswer = executedAnyTool ? LOOP_EXHAUSTED_MSG : NO_VALID_OUTPUT_MSG;
+          break;
+        }
+        internalMessages.push({ role: 'assistant', content: turn.text } as ChatCompletionMessageParam);
         internalMessages.push({
           role: 'user',
-          content: `Observation: ${toolResult}\nLutfen kullaniciya sonucu kisa ve oz acikla. Kesinlikle emoji kullanma.`
+          content: 'Invalid tool call: no recognizable action or reply. Respond again with valid JSON.'
         } as ChatCompletionMessageParam);
-      } else {
-        isDone = true;
-        finalAnswer = responseText.replace(/Action:\s*\{[\s\S]*?\}/gi, '').trim();
-        if (!finalAnswer) {
-          finalAnswer = 'Islemleri tamamladim.';
+      }
+
+      if (onChunk && finalAnswer) {
+        const words = finalAnswer.split(' ');
+        for (let i = 0; i < words.length; i++) {
+          onChunk((i === 0 ? '' : ' ') + words[i]);
+          await new Promise(r => setTimeout(r, 12));
         }
       }
-    }
 
-    if (onChunk && finalAnswer) {
-      const words = finalAnswer.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        onChunk((i === 0 ? '' : ' ') + words[i]);
-        await new Promise(r => setTimeout(r, 12));
+      // Return ONLY the original messages + single clean assistant response
+      return [...messages, { role: 'assistant', content: finalAnswer }];
+    } finally {
+      // The agent loop has ended (normally or via thrown error): go idle —
+      // unless an error was just emitted. Overwriting 'error' with 'idle'
+      // here would make the error pill unreachable in the UI (B1), so an
+      // error stays sticky; the next chat()/init() call clears it naturally
+      // via its first thinking/loading_model emission.
+      if (this.lastStatus.state !== 'error') {
+        this.emitStatus('idle');
       }
     }
-
-    // Return ONLY the original messages + single clean assistant response
-    return [...messages, { role: 'assistant', content: finalAnswer }];
   }
 
   // A fast, lightweight method exclusively for background tasks like Link Preview (No tools, no orchestrator)
@@ -1537,7 +1983,7 @@ Rules:
           }
         ],
         temperature: 0.2,
-        max_tokens: 220
+        max_tokens: SUMMARIZE_MAX_TOKENS
       });
       
       let result = reply.choices[0].message.content || "";

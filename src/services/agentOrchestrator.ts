@@ -77,7 +77,13 @@ class AgentOrchestrator {
     if (this.queue.length !== before) this.notify();
   }
 
-  public enqueueAction(toolName: string, args: any): Promise<boolean> {
+  /**
+   * Queues a tool action and returns its queue id plus the approval promise
+   * (S3). Read-only tools resolve immediately with the same shape, so callers
+   * can use `id` for status emission and post-approval bookkeeping instead of
+   * fragile getQueue() tail inspection.
+   */
+  public enqueueAction(toolName: string, args: any): { id: string; done: Promise<boolean> } {
     const id = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
     const action: QueuedAction = {
       id,
@@ -86,13 +92,13 @@ class AgentOrchestrator {
       // Read-only tools auto-execute; everything else requires user approval
       state: READ_ONLY_TOOLS.has(toolName) ? 'executing' : 'pending'
     };
-    
+
     this.queue.push(action);
     this.pruneTerminalActions();
     this.notify();
 
     if (action.state === 'executing') {
-      return Promise.resolve(true);
+      return { id, done: Promise.resolve(true) };
     }
 
     // Wait for the user's decision. approveAction(id) resolves true,
@@ -100,7 +106,7 @@ class AgentOrchestrator {
     // Safety net: if nobody answers within PENDING_TIMEOUT_MS (e.g. the panel
     // is closed and the approval card is invisible), deny so the agent loop
     // can never hang forever.
-    return new Promise<boolean>((resolve, reject) => {
+    const done = new Promise<boolean>((resolve, reject) => {
       const timer = window.setTimeout(() => {
         if (this.resolvers.has(id)) {
           this.denyAction(id);
@@ -117,6 +123,7 @@ class AgentOrchestrator {
         }
       });
     });
+    return { id, done };
   }
 
   public approveAction(id: string) {
