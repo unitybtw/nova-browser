@@ -17,7 +17,7 @@ export interface UserSettings {
   privacyShield: boolean;
   theme: 'light' | 'dark' | 'system';
   fontSize: 'small' | 'medium' | 'large';
-  accentColor: 'monochrome' | 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
+  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
   customAccentColor?: string;
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
@@ -473,8 +473,8 @@ function App() {
       privacyShield: true,
       theme: demoParams.isDemo ? demoParams.theme : 'dark',
       fontSize: 'medium',
-      accentColor: 'monochrome',
-      customAccentColor: '#18181b',
+      accentColor: 'blue',
+      customAccentColor: '#3b82f6',
       showBookmarksBar: false,
       useVerticalTabs: demoParams.isDemo ? (demoParams.tabs === 'vertical') : true,
       mcpServerEnabled: false,
@@ -736,30 +736,23 @@ function App() {
     } else {
       // Map standard colors
       const defaultColorMap: Record<string, string> = {
-        'monochrome': '#18181b',
         'blue': '#3b82f6',
         'emerald': '#10b981',
         'purple': '#a855f7',
         'rose': '#f43f5e',
         'amber': '#f59e0b'
       };
-      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['monochrome'];
+      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['blue'];
       
-      if (settings.accentColor === 'monochrome' || !settings.accentColor) {
+      // If it's standard blue, we can either clear or just set it
+      if (settings.accentColor === 'blue') {
         accentStyleEl.innerHTML = `
           :root {
-            --nova-accent: #18181b;
-            --nova-accent-hover: #09090b;
-            --nova-accent-light: #f4f4f5;
-            --nova-accent-dark: #000000;
+            --nova-accent: ${hex};
+            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
+            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
+            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
             --nova-accent-text: #ffffff;
-          }
-          .dark {
-            --nova-accent: #ffffff;
-            --nova-accent-hover: #e4e4e7;
-            --nova-accent-light: #27272a;
-            --nova-accent-dark: #fafafa;
-            --nova-accent-text: #000000;
           }
         `;
       } else {
@@ -2598,11 +2591,11 @@ function App() {
   }
 
   return (
-    <div className={`flex flex-row h-full w-full overflow-hidden text-zinc-900 dark:text-zinc-100 relative ${
+    <div className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
       activeTab?.isIncognito
-        ? 'bg-zinc-950 dark:bg-black'
-        : 'bg-white dark:bg-black'
-    } transition-colors duration-200`}>
+        ? 'bg-slate-950 dark:bg-[#0a0812]'
+        : 'bg-slate-100 dark:bg-[#151122]'
+    } transition-colors duration-300`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
       <AnimatePresence initial={false}>
@@ -2689,11 +2682,11 @@ function App() {
               onClick={handleExpandSidebar}
               onMouseEnter={handleHoverSidebarOpen}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="p-1.5 px-2 rounded-xl bg-white dark:bg-zinc-900 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-200 shadow-xs border border-zinc-200 dark:border-zinc-800 transition-colors flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
+              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
               title="Expand Sidebar (⌘S)"
             >
-              <PanelLeft className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
-              <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-mono">⌘S</span>
+              <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘S</span>
             </button>
           </div>
 
@@ -2707,7 +2700,7 @@ function App() {
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white dark:bg-[#0c0c0e] border-r border-zinc-200 dark:border-zinc-800"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 backdrop-blur-md border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -2767,13 +2760,13 @@ function App() {
         </>
       )}
 
-      {/* Main Viewport Card with solid minimal margin & border */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-200 ease-out ${
+      {/* Main Viewport Card with fluid margin & border radius transition */}
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         settings.useVerticalTabs 
           ? isSidebarCollapsed
-            ? 'bg-white dark:bg-[#121214] m-0 rounded-none border-0'
-            : 'rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-[#121214] m-2 ml-1.5 shadow-none' 
-          : 'bg-white dark:bg-[#121214] rounded-none m-0 border-0'
+            ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
+            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5' 
+          : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
         <AnimatePresence initial={false}>
@@ -2855,7 +2848,7 @@ function App() {
 
       {/* MAIN BROWSER CONTENT */}
       <main 
-        className="flex-1 relative w-full h-full bg-white dark:bg-[#121214] flex overflow-hidden"
+        className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
           if (types.includes('text/plain')) {
