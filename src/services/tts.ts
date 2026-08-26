@@ -133,6 +133,7 @@ export function getBestVoice(voices: SpeechSynthesisVoice[], langCode: string): 
 class TTSService {
   private utterance: SpeechSynthesisUtterance | null = null;
   private _isSpeaking = false;
+  private currentSessionId = 0;
   private listeners: Set<(isSpeaking: boolean) => void> = new Set();
 
   public subscribe(listener: (isSpeaking: boolean) => void): () => void {
@@ -149,47 +150,71 @@ class TTSService {
   }
 
   public async speak(text: string, lang?: string, voiceName?: string, rate: number = 1.0): Promise<void> {
+    if (!text || typeof text !== 'string') return;
+    
+    // Stop any existing speech and increment session
+    this.stop();
+    const sessionId = ++this.currentSessionId;
     const targetLang = lang || detectLanguage(text);
 
     // Prefer Native macOS Speech Engine
     if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsSpeak) {
-      this.stop();
       this._isSpeaking = true;
       this.notify();
 
       const chosenVoice = voiceName || getMacDefaultVoice(targetLang);
       try {
         const res = await (window as any).electronAPI.nativeTtsSpeak(text, chosenVoice, rate);
-        this._isSpeaking = false;
-        this.notify();
-        if (!res?.success && res?.error) {
-          console.warn('Native TTS fallback to Web Speech:', res.error);
-          return this._webSpeak(text, targetLang, rate);
+        if (sessionId !== this.currentSessionId) return; // Stale session, ignore result
+
+        if (res && res.success) {
+          this._isSpeaking = false;
+          this.notify();
+          return;
         }
-        return;
+
+        // Fallback to Web Speech if native failed and not cancelled
+        if (!res?.success && sessionId === this.currentSessionId) {
+          return this._webSpeak(text, targetLang, rate, sessionId);
+        }
       } catch (err) {
-        this._isSpeaking = false;
-        this.notify();
-        return this._webSpeak(text, targetLang, rate);
+        if (sessionId !== this.currentSessionId) return;
+        return this._webSpeak(text, targetLang, rate, sessionId);
+      } finally {
+        if (sessionId === this.currentSessionId) {
+          this._isSpeaking = false;
+          this.notify();
+        }
       }
+      return;
     }
 
-    return this._webSpeak(text, targetLang, rate);
+    return this._webSpeak(text, targetLang, rate, sessionId);
   }
 
-  private _webSpeak(text: string, targetLang: string, rate: number = 1.0): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!window.speechSynthesis) {
-        reject(new Error('Web Speech API desteklenmiyor.'));
+  private _webSpeak(text: string, targetLang: string, rate: number = 1.0, sessionId: number = this.currentSessionId): Promise<void> {
+    return new Promise((resolve) => {
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        resolve();
         return;
       }
 
-      this.stop();
+      if (sessionId !== this.currentSessionId) {
+        resolve();
+        return;
+      }
+
+      window.speechSynthesis.cancel();
 
       const chunks = this._chunkText(text, 220);
       let index = 0;
 
       const speakNext = () => {
+        if (sessionId !== this.currentSessionId) {
+          resolve();
+          return;
+        }
+
         if (index >= chunks.length) {
           this._isSpeaking = false;
           this.notify();
@@ -210,12 +235,18 @@ class TTSService {
         }
 
         utt.onend = () => {
-          setTimeout(speakNext, 30);
+          if (sessionId === this.currentSessionId) {
+            setTimeout(speakNext, 30);
+          } else {
+            resolve();
+          }
         };
-        utt.onerror = (e) => { 
-          this._isSpeaking = false; 
-          this.notify();
-          reject(e); 
+        utt.onerror = () => { 
+          if (sessionId === this.currentSessionId) {
+            this._isSpeaking = false; 
+            this.notify();
+          }
+          resolve(); 
         };
 
         this.utterance = utt;
@@ -225,7 +256,9 @@ class TTSService {
       };
 
       if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => { speakNext(); };
+        window.speechSynthesis.onvoiceschanged = () => { 
+          if (sessionId === this.currentSessionId) speakNext(); 
+        };
       } else {
         speakNext();
       }
@@ -233,8 +266,9 @@ class TTSService {
   }
 
   public stop() {
+    this.currentSessionId++;
     if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsStop) {
-      (window as any).electronAPI.nativeTtsStop();
+      (window as any).electronAPI.nativeTtsStop().catch(() => {});
     }
     if (typeof window !== 'undefined' && window.speechSynthesis) {
       window.speechSynthesis.cancel();
@@ -245,7 +279,7 @@ class TTSService {
   }
 
   public get isSpeaking(): boolean {
-    return this._isSpeaking || (window.speechSynthesis?.speaking ?? false);
+    return this._isSpeaking || (typeof window !== 'undefined' && (window.speechSynthesis?.speaking ?? false));
   }
 
   private _chunkText(text: string, maxLen: number): string[] {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, FileText, Wrench, AlertCircle } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, FileText, Wrench, AlertCircle, ChevronDown } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
@@ -1066,7 +1066,7 @@ export const SidePanel = React.memo(({
               )}
 
               {/* Main Composer Box */}
-              <div className="relative flex flex-col rounded-2xl border border-slate-200/90 dark:border-slate-700/90 bg-white dark:bg-slate-900/90 shadow-sm focus-within:border-cyan-500/60 dark:focus-within:border-cyan-400/60 focus-within:ring-2 focus-within:ring-cyan-500/10 transition-all">
+              <div className="relative flex flex-col rounded-2xl border border-slate-200/90 dark:border-slate-700/90 bg-white dark:bg-slate-900/95 shadow-sm focus-within:border-cyan-500/60 dark:focus-within:border-cyan-400/60 focus-within:ring-2 focus-within:ring-cyan-500/15 transition-all">
                 {/* Textarea */}
                 <textarea
                   value={input}
@@ -1077,32 +1077,33 @@ export const SidePanel = React.memo(({
                       handleSubmit(e);
                     }
                   }}
-                  placeholder={isListening ? "Dinleniyor..." : "Bir soru sorun, sayfa analizi veya tarayıcı komutu verin..."}
-                  rows={Math.min(5, Math.max(1, input.split('\n').length))}
+                  placeholder={isListening ? "Dinleniyor..." : "Bir şey sorun veya komut verin..."}
+                  rows={Math.min(4, Math.max(1, input.split('\n').length))}
                   disabled={isLoading || isListening}
-                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-32"
+                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-28 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 />
 
                 {/* Bottom Controls Bar */}
                 <div className="flex items-center justify-between px-2.5 py-2">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     {/* Model Picker Pill */}
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setIsModelDropdownOpen(prev => !prev)}
-                        className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
                         title="Model Seç"
                       >
-                        <Bot className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
-                        <span className="truncate max-w-[90px]">
-                          {AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2'}
+                        <Bot className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                        <span className="font-semibold text-[10px]">
+                          {(AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2').split('(')[0].trim()}
                         </span>
+                        <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
                       </button>
 
                       {isModelDropdownOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 z-50 w-52 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 shadow-xl">
-                          <div className="text-[10px] font-semibold text-slate-400 px-2 py-1">Yapay Zeka Modelleri</div>
+                        <div className="absolute bottom-full left-0 mb-2 z-50 w-56 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+                          <div className="text-[10px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">Yapay Zeka Modelleri</div>
                           {AVAILABLE_AI_MODELS.map(m => (
                             <button
                               key={m.id}
@@ -1112,14 +1113,17 @@ export const SidePanel = React.memo(({
                                 aiAgent.setModel(m.id);
                                 setIsModelDropdownOpen(false);
                               }}
-                              className={`w-full flex items-center justify-between px-2 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                              className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                                 selectedModelId === m.id
                                   ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
                                   : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
                               }`}
                             >
-                              <span>{m.name}</span>
-                              <span className="text-[9px] px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">{m.size}</span>
+                              <div className="flex flex-col">
+                                <span className="font-medium text-[11px]">{m.name.split('(')[0].trim()}</span>
+                                <span className="text-[9px] text-slate-400">{m.description.slice(0, 30)}...</span>
+                              </div>
+                              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">{m.size}</span>
                             </button>
                           ))}
                         </div>
@@ -1141,7 +1145,7 @@ export const SidePanel = React.memo(({
                   {/* Right Side: Audio visualizer & Action button */}
                   <div className="flex items-center gap-1.5">
                     {isListening && (
-                      <div className="flex items-center gap-0.5 px-2 py-1 rounded-full bg-red-500/10 text-red-500 text-[10px] font-medium animate-pulse">
+                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-[10px] font-medium animate-pulse">
                         <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
                         <span>Dinleniyor</span>
                       </div>
@@ -1151,7 +1155,7 @@ export const SidePanel = React.memo(({
                       <button
                         type="button"
                         onClick={handleStop}
-                        className="flex size-7 items-center justify-center rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors shadow-xs cursor-pointer"
+                        className="flex size-7.5 items-center justify-center rounded-xl bg-red-500 hover:bg-red-600 text-white transition-all shadow-sm active:scale-95 cursor-pointer"
                         title="Durdur"
                       >
                         <Square className="w-3.5 h-3.5 fill-current" />
@@ -1162,9 +1166,9 @@ export const SidePanel = React.memo(({
                         onMouseDown={handleMouseDownMic}
                         onMouseUp={handleMouseUpMic}
                         onMouseLeave={handleMouseUpMic}
-                        className={`flex size-7 items-center justify-center rounded-full transition-all cursor-pointer ${
+                        className={`flex size-7.5 items-center justify-center rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer ${
                           isListening
-                            ? 'bg-red-500 text-white shadow-md animate-pulse'
+                            ? 'bg-red-500 text-white shadow-red-500/30 animate-pulse'
                             : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                         title="Bas Konuş"
@@ -1176,7 +1180,7 @@ export const SidePanel = React.memo(({
                         type="button"
                         onClick={handleSubmit}
                         disabled={!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0}
-                        className="flex size-7 items-center justify-center rounded-full bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-xs disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                        className="flex size-7.5 items-center justify-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
                         title="Gönder"
                       >
                         <Send className="w-3.5 h-3.5" />

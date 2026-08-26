@@ -2824,14 +2824,14 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
           proc.on('close', (code) => {
             if (activeTtsProcess === proc) activeTtsProcess = null;
             if (myGeneration !== ttsGeneration) {
-              // A newer speak request superseded this one.
-              finish({ success: false, error: 'Superseded by a newer speech request' });
+              // A newer speak request or stop request superseded this one.
+              finish({ success: false, error: 'Superseded or stopped' });
             } else if (sayTimedOut) {
               finish({ success: false, error: 'Speech synthesis timed out' });
             } else if (code === 0) {
               finish({ success: true });
-            } else if (commandArgs.includes('-v')) {
-              // If failed with custom voice, try fallback to default system voice
+            } else if (code !== null && commandArgs.includes('-v') && myGeneration === ttsGeneration) {
+              // Only fallback if not cancelled/stopped and custom voice failed
               const fallbackArgs = commandArgs.filter((a, i) => a !== '-v' && commandArgs[i - 1] !== '-v');
               runSay(fallbackArgs);
             } else {
@@ -2858,9 +2858,10 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
 ipcMain.handle('native-tts-stop', async (event) => {
   if (!isTrustedSender(event)) return false;
+  ttsGeneration++; // Increment generation to invalidate any in-flight processes and close handlers
   if (activeTtsProcess) {
     try {
-      activeTtsProcess.kill();
+      activeTtsProcess.kill('SIGKILL');
     } catch (_) {}
     activeTtsProcess = null;
     return true;

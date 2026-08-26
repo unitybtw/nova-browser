@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
-import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo } from '../services/tts';
+import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo, tts } from '../services/tts';
 
 interface HighlightData {
   id: string;
@@ -410,14 +410,18 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     };
   }, [isActive]);
 
+  const readerSessionIdRef = useRef(0);
+
   const effectiveLanguage = selectedLanguage === 'auto' ? detectedLang : selectedLanguage;
 
-  const speakSentence = async (index: number, rate: number = speechRate, targetSentences: string[] = sentences) => {
-    if (!isPlayingRef.current || index >= targetSentences.length) {
+  const speakSentence = async (index: number, rate: number = speechRate, targetSentences: string[] = sentences, sessionId: number = readerSessionIdRef.current) => {
+    if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current || index >= targetSentences.length) {
       isPlayingRef.current = false;
       setIsPlaying(false);
       setIsPaused(false);
-      setCurrentSentenceIndex(0);
+      if (index >= targetSentences.length) {
+        setCurrentSentenceIndex(0);
+      }
       return;
     }
 
@@ -429,12 +433,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const voice = selectedVoiceName || getMacDefaultVoice(effectiveLanguage);
       try {
         const res = await (window as any).electronAPI.nativeTtsSpeak(currentSentence, voice, rate, effectiveLanguage);
-        if (!isPlayingRef.current) return;
+        if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current) return;
         if (res && res.success) {
           const next = index + 1;
           if (next < targetSentences.length) {
             setCurrentSentenceIndex(next);
-            setTimeout(() => speakSentence(next, rate, targetSentences), 30);
+            setTimeout(() => {
+              if (isPlayingRef.current && sessionId === readerSessionIdRef.current) {
+                speakSentence(next, rate, targetSentences, sessionId);
+              }
+            }, 30);
           } else {
             isPlayingRef.current = false;
             setIsPlaying(false);
@@ -467,11 +475,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       if (chosenVoice) utterance.voice = chosenVoice;
 
       utterance.onend = () => {
-        if (!isPlayingRef.current) return;
+        if (!isPlayingRef.current || sessionId !== readerSessionIdRef.current) return;
         const next = index + 1;
         if (next < targetSentences.length) {
           setCurrentSentenceIndex(next);
-          setTimeout(() => speakSentence(next, rate, targetSentences), 20);
+          setTimeout(() => {
+            if (isPlayingRef.current && sessionId === readerSessionIdRef.current) {
+              speakSentence(next, rate, targetSentences, sessionId);
+            }
+          }, 20);
         } else {
           isPlayingRef.current = false;
           setIsPlaying(false);
@@ -481,9 +493,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       };
 
       utterance.onerror = () => {
-        isPlayingRef.current = false;
-        setIsPlaying(false);
-        setIsPaused(false);
+        if (sessionId === readerSessionIdRef.current) {
+          isPlayingRef.current = false;
+          setIsPlaying(false);
+          setIsPaused(false);
+        }
       };
 
       window.speechSynthesis.speak(utterance);
@@ -492,12 +506,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
 
   const toggleSpeech = () => {
     if (isPlaying) {
-      isPlayingRef.current = false;
-      if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
-      if (window.speechSynthesis) window.speechSynthesis.cancel();
-      setIsPlaying(false);
+      stopSpeech();
       setIsPaused(true);
     } else {
+      tts.stop();
+      readerSessionIdRef.current++;
+      const currentSession = readerSessionIdRef.current;
+
       let currentSentences = sentences;
       if (currentSentences.length === 0 && contentRef.current) {
         const text = contentRef.current.innerText || title || '';
@@ -509,7 +524,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         isPlayingRef.current = true;
         setIsPlaying(true);
         setIsPaused(false);
-        speakSentence(currentSentenceIndex, speechRate, currentSentences);
+        speakSentence(currentSentenceIndex, speechRate, currentSentences, currentSession);
       }
     }
   };
@@ -519,9 +534,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const next = currentSentenceIndex + 1;
       setCurrentSentenceIndex(next);
       if (isPlaying) {
-        if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-        speakSentence(next, speechRate);
+        tts.stop();
+        readerSessionIdRef.current++;
+        speakSentence(next, speechRate, sentences, readerSessionIdRef.current);
       }
     }
   };
@@ -531,21 +546,17 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       const prev = currentSentenceIndex - 1;
       setCurrentSentenceIndex(prev);
       if (isPlaying) {
-        if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
-        if (window.speechSynthesis) window.speechSynthesis.cancel();
-        speakSentence(prev, speechRate);
+        tts.stop();
+        readerSessionIdRef.current++;
+        speakSentence(prev, speechRate, sentences, readerSessionIdRef.current);
       }
     }
   };
 
   const stopSpeech = () => {
     isPlayingRef.current = false;
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsStop) {
-      (window as any).electronAPI.nativeTtsStop();
-    }
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    readerSessionIdRef.current++;
+    tts.stop();
     setIsPlaying(false);
     setIsPaused(false);
     setCurrentSentenceIndex(0);
