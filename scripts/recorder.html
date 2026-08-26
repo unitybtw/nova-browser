@@ -1,0 +1,90 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Nova Demo Encoder</title></head>
+<body>
+<canvas id="stage" width="1280" height="800"></canvas>
+<script>
+  // Offline video-encoding helper for scripts/record_demo_videos.cjs.
+  // Receives JPEG frames of the real Nova Browser (offscreen-rendered) over
+  // IPC, paints them onto a canvas and records the canvas stream with
+  // MediaRecorder — producing genuine .webm clips without ffmpeg.
+  const { ipcRenderer } = require('electron');
+
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  let recorder = null;
+  let chunks = [];
+  let lastPoster = null;
+
+  function drawFrame(dataUrl) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      lastPoster = dataUrl;
+    };
+    img.src = dataUrl;
+  }
+
+  function pickMime() {
+    const candidates = [
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
+    return candidates.find((m) => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || '';
+  }
+
+  ipcRenderer.on('frame', (_e, dataUrl) => drawFrame(dataUrl));
+
+  ipcRenderer.on('start', (_e, opts) => {
+    try {
+      chunks = [];
+      const stream = canvas.captureStream(30);
+      const mimeType = pickMime();
+      if (!mimeType) {
+        ipcRenderer.send('encode-error', 'MediaRecorder/webm not supported in this Chromium');
+        return;
+      }
+      recorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: (opts && opts.bitrate) || 4_000_000,
+      });
+      recorder.ondataavailable = (ev) => {
+        if (ev.data && ev.data.size > 0) chunks.push(ev.data);
+      };
+      recorder.start(1000);
+      ipcRenderer.send('started', mimeType);
+    } catch (err) {
+      ipcRenderer.send('encode-error', String(err));
+    }
+  });
+
+  ipcRenderer.on('stop', () => {
+    try {
+      if (!recorder || recorder.state === 'inactive') {
+        ipcRenderer.send('encode-error', 'Recorder not active');
+        return;
+      }
+      recorder.onstop = async () => {
+        try {
+          const blob = new Blob(chunks, { type: 'video/webm' });
+          const buffer = new Uint8Array(await blob.arrayBuffer());
+          ipcRenderer.send('encoded', {
+            buffer: buffer,
+            bytes: blob.size,
+            poster: lastPoster,
+          });
+          recorder = null;
+          chunks = [];
+        } catch (err) {
+          ipcRenderer.send('encode-error', String(err));
+        }
+      };
+      recorder.stop();
+    } catch (err) {
+      ipcRenderer.send('encode-error', String(err));
+    }
+  });
+</script>
+</body>
+</html>
