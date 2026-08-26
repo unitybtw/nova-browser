@@ -1462,8 +1462,8 @@ function App() {
     }));
   }, []);
 
-  const handleNewIncognitoTab = useCallback((url?: string) => {
-    const targetUrl = url || 'nova://newtab';
+  const handleNewIncognitoTab = useCallback((url?: string | any) => {
+    const targetUrl = typeof url === 'string' ? url : 'nova://newtab';
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
       url: targetUrl,
