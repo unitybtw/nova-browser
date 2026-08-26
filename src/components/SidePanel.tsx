@@ -435,6 +435,14 @@ export const SidePanel = React.memo(({
     await handleAIAction(currentInput, hasPendingAttachments ? { images, files } : undefined);
   };
 
+  const handleStop = useCallback(() => {
+    aiAgent.interrupt();
+    tts.stop();
+    orchestrator.clearQueue();
+    setIsLoading(false);
+    setStreamingText('');
+  }, []);
+
   const handleAIActionRef = useRef(handleAIAction);
   handleAIActionRef.current = handleAIAction;
 
@@ -572,19 +580,6 @@ export const SidePanel = React.memo(({
                   title="Purge Downloaded AI Cache & Free Disk Space"
                 >
                   <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-              {isLoading && (
-                <button
-                  onClick={() => {
-                    aiAgent.interrupt();
-                    tts.stop();
-                    orchestrator.clearQueue();
-                  }}
-                  className="p-1.5 rounded-lg text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                  title="Stop Agent"
-                >
-                  <Square className="w-4 h-4 fill-current" />
                 </button>
               )}
               {isSpeaking ? (
@@ -1073,13 +1068,25 @@ export const SidePanel = React.memo(({
                     className="w-full bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-400 rounded-xl py-2.5 pl-4 pr-10 text-xs outline-none text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 transition-colors"
                     disabled={isLoading}
                   />
-                  <button
-                    type="submit"
-                    disabled={isLoading || (!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0)}
-                    className="absolute right-2 p-1.5 rounded-lg text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-40 cursor-pointer"
-                  >
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                  </button>
+                  {isLoading ? (
+                    <button
+                      type="button"
+                      onClick={handleStop}
+                      className="absolute right-2 p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                      title="Durdur"
+                    >
+                      <Square className="w-4 h-4 fill-current" />
+                    </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0}
+                      className="absolute right-2 p-1.5 rounded-lg text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 transition-colors disabled:opacity-40 cursor-pointer"
+                      title="Gönder"
+                    >
+                      <Send className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </form>
 

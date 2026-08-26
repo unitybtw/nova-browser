@@ -133,51 +133,30 @@ export interface AIModelOption {
   vision?: boolean;
 }
 
-// All ids verified against @mlc-ai/web-llm 0.2.84 prebuiltAppConfig.model_list
+// Streamlined model options: recommended general model, vision model, and ultra-light model
 export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   {
     id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     name: "Llama 3.2 3B (Önerilen)",
     size: "~1.7 GB",
     speed: "Hızlı",
-    description: "Dengeli akil yurutme, Turkce/Ingilizce akici — cogu kullanici icin ideal",
+    description: "Dengeli akıl yürütme, Türkçe ve İngilizce akıcı asistan",
     isDefault: true
   },
   {
-    id: "Qwen2.5-3B-Instruct-q4f16_1-MLC",
-    name: "Qwen 2.5 3B",
-    size: "~1.9 GB",
-    speed: "Hızlı",
-    description: "Guclu akil yurutme ve cok dilli destek sunan orta boy model"
-  },
-  {
     id: "Phi-3.5-vision-instruct-q4f16_1-MLC",
-    name: "Phi 3.5 Vision (Görsel destekli)",
+    name: "Phi 3.5 Vision (Görsel Destekli)",
     size: "~2.4 GB",
     speed: "Standart",
-    description: "Gorsel icerik analizi yapabilen cok modlu model (ekran goruntusu/gorsel ekleyin)",
+    description: "Görsel ve ekran görüntüsü analizi yapabilen çok modlu model",
     vision: true
-  },
-  {
-    id: "Llama-3.2-1B-Instruct-q4f16_1-MLC",
-    name: "Llama 3.2 1B (Onerilen)",
-    size: "~800 MB",
-    speed: "Cok Hizli",
-    description: "Hafif, akilli ve Turkce/Ingilizce akici asistan"
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
     name: "Qwen 2.5 0.5B (Ultra Hafif)",
     size: "~350 MB",
-    speed: "Ultra Hizli",
-    description: "3 saniyede inen, saniyede 60+ token ureten en hafif model"
-  },
-  {
-    id: "Hermes-2-Pro-Mistral-7B-q4f16_1-MLC",
-    name: "Hermes 2 Pro 7B (Gelismis)",
-    size: "~3.8 GB",
-    speed: "Standart",
-    description: "Buyuk 7B parametreli derin akil yurutme modeli"
+    speed: "Ultra Hızlı",
+    description: "Düşük kaynak tüketen, anında inen en hafif model"
   }
 ];
 
@@ -448,8 +427,13 @@ class AIAgent {
   public interrupt() {
     this.isInterrupted = true;
     if (this.engine) {
-      this.engine.interruptGenerate();
+      try {
+        this.engine.interruptGenerate();
+      } catch (e) {
+        console.warn('[AI Agent] interruptGenerate error:', e);
+      }
     }
+    this.emitStatus('idle');
   }
 
   // Default: balanced 3B model (see DEFAULT_AI_MODEL_ID / AVAILABLE_AI_MODELS)
@@ -1667,24 +1651,39 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
    * on this model/runtime, falls back to the legacy free-text ReAct path.
    */
   private async generateAgentTurn(windowedMessages: ChatCompletionMessageParam[]): Promise<{ text: string; constrained: boolean }> {
+    if (this.isInterrupted) {
+      return { text: 'Islem durduruldu.', constrained: false };
+    }
     this.emitStatus('thinking');
-    try {
-      const reply = await this.engine!.chat.completions.create({
-        messages: windowedMessages,
-        temperature: 0.1,
-        max_tokens: AGENT_MAX_TOKENS,
-        stream: false,
-        response_format: { type: "json_object", schema: this.getToolCallSchemaString() }
-      } as any);
-      const text = reply.choices[0]?.message?.content || '';
-      if (text.trim().length > 0) {
-        return { text, constrained: true };
+    if (!this.constrainedUnsupported) {
+      try {
+        const reply = await this.engine!.chat.completions.create({
+          messages: windowedMessages,
+          temperature: 0.1,
+          max_tokens: AGENT_MAX_TOKENS,
+          stream: false,
+          response_format: { type: "json_object", schema: this.getToolCallSchemaString() }
+        } as any);
+        if (this.isInterrupted) {
+          return { text: 'Islem durduruldu.', constrained: false };
+        }
+        const text = reply.choices[0]?.message?.content || '';
+        if (text.trim().length > 0) {
+          return { text, constrained: true };
+        }
+        // Empty constrained output: treat as a soft failure and retry via the
+        // legacy path below rather than burning a corrective round-trip.
+        console.warn('[AI Agent] Constrained decoding returned empty output; using legacy path.');
+      } catch (e) {
+        if (this.isInterrupted) {
+          return { text: 'Islem durduruldu.', constrained: false };
+        }
+        console.warn('[AI Agent] Constrained decoding failed; falling back to free-text:', e);
+        this.constrainedUnsupported = true;
       }
-      // Empty constrained output: treat as a soft failure and retry via the
-      // legacy path below rather than burning a corrective round-trip.
-      console.warn('[AI Agent] Constrained decoding returned empty output; using legacy path.');
-    } catch (e) {
-      console.warn('[AI Agent] Constrained decoding failed; falling back to free-text:', e);
+    }
+    if (this.isInterrupted) {
+      return { text: 'Islem durduruldu.', constrained: false };
     }
     const reply = await this.engine!.chat.completions.create({
       messages: windowedMessages,
@@ -1692,6 +1691,9 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       max_tokens: AGENT_MAX_TOKENS,
       stream: false
     });
+    if (this.isInterrupted) {
+      return { text: 'Islem durduruldu.', constrained: false };
+    }
     return { text: reply.choices[0]?.message?.content || '', constrained: false };
   }
 
