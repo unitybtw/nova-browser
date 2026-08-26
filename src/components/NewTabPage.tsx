@@ -65,15 +65,15 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
   return (
     <motion.div 
       variants={variants} 
-      className="flex flex-col items-center justify-center text-center mb-4 px-8 py-5 rounded-3xl bg-white/40 dark:bg-black/35 backdrop-blur-2xl border border-white/50 dark:border-white/15 shadow-xl shadow-black/5 dark:shadow-black/30 transition-all select-none group hover:bg-white/50 dark:hover:bg-black/45"
+      className="flex flex-col items-center justify-center text-center mb-2 select-none"
     >
-      <div className="flex items-center gap-1.5 mb-1.5 px-3.5 py-1 rounded-full bg-white/60 dark:bg-white/10 backdrop-blur-md border border-black/5 dark:border-white/10 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs">
+      <div className="flex items-center gap-1.5 mb-2 px-3.5 py-1 rounded-full bg-slate-900/10 dark:bg-white/10 backdrop-blur-xl border border-slate-900/10 dark:border-white/15 text-xs font-semibold tracking-wider text-slate-800 dark:text-cyan-300 shadow-sm">
         <span>{dateStr}</span>
       </div>
-      <h1 className="text-6xl md:text-7xl font-extralight tracking-tight text-slate-900 dark:text-white font-sans tabular-nums drop-shadow-[0_2px_10px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
+      <h1 className="text-7xl md:text-8xl font-extralight tracking-tight text-slate-900 dark:text-white font-sans tabular-nums drop-shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
         {timeStr}
       </h1>
-      <p className="text-lg md:text-xl text-slate-700 dark:text-slate-200 font-medium tracking-normal mt-1 drop-shadow-sm">
+      <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 font-light tracking-wide mt-1 drop-shadow-[0_1px_8px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
         {greeting}
       </p>
     </motion.div>
@@ -770,7 +770,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               }}
               onKeyDown={handleKeyDown}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-colors duration-200 shadow-xl border bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-cyan-500 dark:focus:border-cyan-500/80 focus:ring-4 focus:ring-cyan-500/15"
+              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20"
             />
             
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -790,7 +790,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               )}
               <button
                 type="submit"
-                className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors shadow-md shadow-cyan-500/25 active:scale-95 font-bold cursor-pointer"
+                className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white transition-all shadow-md shadow-cyan-500/30 active:scale-95 font-bold cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -835,16 +835,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           </AnimatePresence>
 
           {/* Privacy Indicator */}
-          <div className="flex items-center justify-between px-2 mt-2 text-xs opacity-60 font-medium">
+          <div className="flex items-center justify-between px-3 mt-2 text-xs font-medium text-slate-600 dark:text-slate-300 drop-shadow-sm">
             <div className="flex items-center gap-1.5">
               {privacyShield ? (
                 <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
                   <span>Shield Active (AdBlock & Tracker Protection)</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
                   <span>Shield Disabled</span>
                 </>
               ) }
@@ -866,16 +866,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               >
                 <button
                   onClick={() => onNavigate(dial.url)}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-200 border shadow-sm bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/80 dark:bg-white/[0.07] backdrop-blur-xl border-slate-200/80 dark:border-white/15 hover:bg-white dark:hover:bg-white/[0.14] hover:border-cyan-400/50 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0">
+                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800/90 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0 border border-slate-100 dark:border-white/10 group-hover:scale-105 transition-transform">
                     <img 
                       src={`https://www.google.com/s2/favicons?domain=${dial.domain || dial.url}&sz=64`}
                       alt={dial.name}
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-100">{dial.name}</span>
+                  <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-200 group-hover:text-cyan-500 dark:group-hover:text-cyan-300 transition-colors drop-shadow-2xs">{dial.name}</span>
                 </button>
                 <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
                   <button 
@@ -913,10 +913,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setEditingDial({ name: '', url: '', index: null });
                     setIsEditModalOpen(true);
                   }}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-200 border border-dashed opacity-60 hover:opacity-100 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800/40 cursor-pointer"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed border-slate-300 dark:border-white/20 bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl hover:border-cyan-500 dark:hover:border-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300 cursor-pointer shadow-xs"
                 >
                   <Plus className="w-6 h-6" />
-                  <span className="text-xs font-medium">Add</span>
+                  <span className="text-xs font-semibold">Add</span>
                 </button>
               </motion.div>
             )}
