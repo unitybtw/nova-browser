@@ -1471,11 +1471,12 @@ function App() {
       isLoading: targetUrl !== 'nova://newtab',
       canGoBack: false,
       canGoForward: false,
-      isIncognito: true
+      isIncognito: true,
+      workspaceId: activeWorkspaceId
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
-  }, []);
+  }, [activeWorkspaceId]);
 
   const ZOOM_FACTORS = [0.25, 0.33, 0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0];
 
@@ -1952,12 +1953,12 @@ function App() {
         return [];
       },
       onSearchHistory: (query: string) => {
-        const q = query.toLowerCase();
+        const q = (query || '').toLowerCase();
         // search history and bookmarks
         const { history, bookmarks } = browserDataRef.current;
         const results = [
-          ...history.filter(h => h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q)),
-          ...bookmarks.filter(b => b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))
+          ...(Array.isArray(history) ? history.filter(h => (h?.title && typeof h.title === 'string' && h.title.toLowerCase().includes(q)) || (h?.url && typeof h.url === 'string' && h.url.toLowerCase().includes(q))) : []),
+          ...(Array.isArray(bookmarks) ? bookmarks.filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(q)) || (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(q))) : [])
         ];
         // deduplicate by URL
         const unique = Array.from(new Map(results.map(item => [item.url, item])).values());
@@ -3002,8 +3003,8 @@ function App() {
                   isActive={tab.id === activeTabId || tab.id === splitTabId}
                   onCloseTab={handleCloseTab}
                   isIncognito={tab.isIncognito || false}
-                  history={tab.url?.includes('nova://history') ? history : EMPTY_ARRAY}
-                  downloads={tab.url?.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
+                  history={typeof tab?.url === 'string' && tab.url.includes('nova://history') ? history : EMPTY_ARRAY}
+                  downloads={typeof tab?.url === 'string' && tab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
                   onClearHistory={handleClearHistory}
                   onRemoveHistoryItem={handleRemoveHistoryItem}
                   onClearDownloads={handleClearDownloads}
@@ -3084,8 +3085,8 @@ function App() {
               isActive={true}
               onCloseTab={handleCloseTab}
               isIncognito={secondaryTab.isIncognito || false}
-              history={secondaryTab.url?.includes('nova://history') ? history : EMPTY_ARRAY}
-              downloads={secondaryTab.url?.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
+              history={typeof secondaryTab?.url === 'string' && secondaryTab.url.includes('nova://history') ? history : EMPTY_ARRAY}
+              downloads={typeof secondaryTab?.url === 'string' && secondaryTab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
               onClearHistory={handleClearHistory}
               onRemoveHistoryItem={handleRemoveHistoryItem}
               onClearDownloads={handleClearDownloads}

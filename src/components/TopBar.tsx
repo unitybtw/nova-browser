@@ -1701,7 +1701,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             isIncognito ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800'
           }`}
         >
-          {(bookmarks.length > 0 ? bookmarks : [
+          {(Array.isArray(bookmarks) && bookmarks.length > 0 ? bookmarks : [
             { id: 'bm_google', title: 'Google', url: 'https://google.com', addedAt: Date.now() },
             { id: 'bm_github', title: 'GitHub', url: 'https://github.com', addedAt: Date.now() },
             { id: 'bm_youtube', title: 'YouTube', url: 'https://youtube.com', addedAt: Date.now() },

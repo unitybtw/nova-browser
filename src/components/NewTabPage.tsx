@@ -159,7 +159,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   // Fetch search suggestions
   useEffect(() => {
-    const trimmed = query.trim();
+    const trimmed = (typeof query === 'string' ? query : '').trim();
     if (!isFocused || !trimmed || trimmed.includes('://')) {
       setSuggestions([]);
       setShowSuggestions(false);
