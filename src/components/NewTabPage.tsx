@@ -37,13 +37,15 @@ const getInitialTimeAndGreeting = () => {
   let greet = 'Good Evening';
   if (hour < 12) greet = 'Good Morning';
   else if (hour < 18) greet = 'Good Afternoon';
-  return { time, greet };
+  const dateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  return { time, greet, dateStr };
 };
 
 export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = true }) => {
   const initial = useMemo(() => getInitialTimeAndGreeting(), []);
   const [timeStr, setTimeStr] = useState(initial.time);
   const [greeting, setGreeting] = useState(initial.greet);
+  const [dateStr, setDateStr] = useState(initial.dateStr);
 
   useEffect(() => {
     if (!isActive) return;
@@ -54,15 +56,26 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
       if (hour < 12) setGreeting('Good Morning');
       else if (hour < 18) setGreeting('Good Afternoon');
       else setGreeting('Good Evening');
+      setDateStr(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }));
     };
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, [isActive]);
 
   return (
-    <motion.div variants={variants} className="text-center mb-4">
-      <h1 className="text-6xl md:text-7xl font-light tracking-tight text-slate-900 dark:text-white mb-2 font-sans tabular-nums transition-colors">{timeStr}</h1>
-      <p className="text-xl md:text-2xl text-slate-600 dark:text-slate-300 font-medium transition-colors">{greeting}</p>
+    <motion.div 
+      variants={variants} 
+      className="flex flex-col items-center justify-center text-center mb-4 px-8 py-5 rounded-3xl bg-white/40 dark:bg-black/35 backdrop-blur-2xl border border-white/50 dark:border-white/15 shadow-xl shadow-black/5 dark:shadow-black/30 transition-all select-none group hover:bg-white/50 dark:hover:bg-black/45"
+    >
+      <div className="flex items-center gap-1.5 mb-1.5 px-3.5 py-1 rounded-full bg-white/60 dark:bg-white/10 backdrop-blur-md border border-black/5 dark:border-white/10 text-xs font-semibold text-slate-800 dark:text-slate-200 shadow-2xs">
+        <span>{dateStr}</span>
+      </div>
+      <h1 className="text-6xl md:text-7xl font-extralight tracking-tight text-slate-900 dark:text-white font-sans tabular-nums drop-shadow-[0_2px_10px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_16px_rgba(0,0,0,0.6)]">
+        {timeStr}
+      </h1>
+      <p className="text-lg md:text-xl text-slate-700 dark:text-slate-200 font-medium tracking-normal mt-1 drop-shadow-sm">
+        {greeting}
+      </p>
     </motion.div>
   );
 });
