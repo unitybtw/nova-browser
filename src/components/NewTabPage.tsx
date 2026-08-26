@@ -351,11 +351,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       return 'text-white';
     }
     if (!isDarkTheme) {
-      return 'bg-white text-slate-900';
+      return 'bg-white text-zinc-900';
     }
     switch (newTabBackground) {
       case 'gradient':
-        return 'bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 text-white';
+        return 'bg-gradient-to-br from-zinc-900 via-black to-zinc-950 text-white';
       case 'mesh':
       case 'aurora_waves':
       case 'cyber_grid':
@@ -363,11 +363,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       case 'fireflies':
       case 'nebula':
       case 'matrix':
-        return 'bg-[#0B0F19] text-white';
+        return 'bg-black text-white';
       case 'glass':
-        return 'bg-slate-900/90 text-white backdrop-blur-xl';
+        return 'bg-zinc-900 text-white';
       default:
-        return 'bg-[#0B0F19] text-white';
+        return 'bg-black text-white';
     }
   };
 
@@ -732,7 +732,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         {/* Omnibox / Search Form */}
         <motion.div variants={itemVariants} className="w-full relative z-30" ref={searchContainerRef}>
           <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-zinc-400 group-focus-within:text-zinc-900 dark:group-focus-within:text-white transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
@@ -745,7 +745,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               }}
               onKeyDown={handleKeyDown}
               placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-colors duration-200 shadow-xl border bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl border-slate-200/80 dark:border-white/10 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900 focus:border-cyan-500 dark:focus:border-cyan-500/80 focus:ring-4 focus:ring-cyan-500/15"
+              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-colors duration-150 border bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:border-zinc-900 dark:focus:border-zinc-300 focus:ring-2 focus:ring-zinc-900/10 dark:focus:ring-white/10 shadow-xs"
             />
             
             <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -758,14 +758,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setShowSuggestions(false);
                     setSelectedIndex(-1);
                   }}
-                  className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               )}
               <button
                 type="submit"
-                className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors shadow-md shadow-cyan-500/25 active:scale-95 font-bold cursor-pointer"
+                className="p-2 rounded-xl bg-zinc-900 hover:bg-black text-white dark:bg-white dark:hover:bg-zinc-200 dark:text-black transition-colors shadow-xs active:scale-95 font-bold cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -780,7 +780,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-[#121214] border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 divide-y divide-zinc-100 dark:divide-zinc-800"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -794,12 +794,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 text-left text-sm transition-colors cursor-pointer ${
                       idx === selectedIndex 
-                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-l-2 border-cyan-500' 
-                        : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
+                        ? 'bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-white font-semibold border-l-2 border-zinc-900 dark:border-white' 
+                        : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800/60 font-normal'
                     }`}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <Search className={`w-4 h-4 shrink-0 ${idx === selectedIndex ? 'text-cyan-500' : 'text-slate-400'}`} />
+                      <Search className={`w-4 h-4 shrink-0 ${idx === selectedIndex ? 'text-zinc-900 dark:text-white' : 'text-zinc-400'}`} />
                       <span className="truncate">{s}</span>
                     </div>
                     <ArrowRight className="w-3.5 h-3.5 opacity-40 shrink-0" />
@@ -810,16 +810,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           </AnimatePresence>
 
           {/* Privacy Indicator */}
-          <div className="flex items-center justify-between px-2 mt-2 text-xs opacity-60 font-medium">
+          <div className="flex items-center justify-between px-2 mt-2 text-xs opacity-60 font-medium text-zinc-500 dark:text-zinc-400">
             <div className="flex items-center gap-1.5">
               {privacyShield ? (
                 <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-zinc-700 dark:text-zinc-300" />
                   <span>Shield Active (AdBlock & Tracker Protection)</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
                   <span>Shield Disabled</span>
                 </>
               ) }
@@ -841,18 +841,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               >
                 <button
                   onClick={() => onNavigate(dial.url)}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-200 border shadow-sm bg-white/70 dark:bg-slate-800/40 backdrop-blur-md border-slate-200/70 dark:border-slate-700/40 hover:bg-white dark:hover:bg-slate-800/80 hover:border-slate-300 dark:hover:border-slate-600 cursor-pointer"
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-colors duration-150 border shadow-2xs bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 cursor-pointer"
                 >
-                  <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-100 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center overflow-hidden p-2 shadow-2xs shrink-0">
                     <img 
                       src={`https://www.google.com/s2/favicons?domain=${dial.domain || dial.url}&sz=64`}
                       alt={dial.name}
                       className="w-full h-full object-contain"
                     />
                   </div>
-                  <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-100">{dial.name}</span>
+                  <span className="text-xs font-semibold truncate max-w-full text-zinc-800 dark:text-zinc-200">{dial.name}</span>
                 </button>
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-zinc-900/90 rounded-lg p-0.5 z-10">
                   <button 
                     onClick={(e) => {
                       e.stopPropagation();
