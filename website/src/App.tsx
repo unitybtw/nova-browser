@@ -1,27 +1,10 @@
-import Navbar from './components/Navbar';
-import Hero from './components/Hero';
-import InteractiveAppShowcase from './components/InteractiveAppShowcase';
-import ProductTour from './components/ProductTour';
-import WorkGrid from './components/WorkGrid';
-import CapabilitiesAccordion from './components/CapabilitiesAccordion';
-import PerformanceBenchmark from './components/PerformanceBenchmark';
-import DownloadSection from './components/DownloadSection';
-import Footer from './components/Footer';
-
 export default function App() {
   return (
-    <div id="top" className="min-h-screen bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
-      <Navbar />
-      <main>
-        <Hero />
-        <InteractiveAppShowcase />
-        <ProductTour />
-        <WorkGrid />
-        <CapabilitiesAccordion />
-        <PerformanceBenchmark />
-        <DownloadSection />
-      </main>
-      <Footer />
+    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center font-sans">
+      <div className="text-center p-8">
+        <h1 className="text-3xl font-bold mb-2">Nova Browser</h1>
+        <p className="text-slate-400 text-sm">Hazırlanıyor...</p>
+      </div>
     </div>
   );
 }
