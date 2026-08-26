@@ -548,7 +548,7 @@ export const SidePanel = React.memo(({
           animate={{ x: 0, opacity: 1 }}
           exit={{ x: '100%', opacity: 0 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="absolute top-0 right-0 bottom-0 w-80 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
+          className="absolute top-0 right-0 bottom-0 w-88 sm:w-96 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
         >
           {/* Header */}
           <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
@@ -823,21 +823,21 @@ export const SidePanel = React.memo(({
                       transition={{ duration: 0.2 }}
                       className={`flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}
                     >
-                      <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+                      <div className="flex items-center gap-1.5 px-1 text-xs text-slate-400 dark:text-slate-500 font-medium">
                         {isUser ? (
                           <span>Siz</span>
                         ) : (
-                          <div className="flex items-center gap-1 text-cyan-600 dark:text-cyan-400">
-                            <Sparkles className="w-3 h-3" />
+                          <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
+                            <Sparkles className="w-3.5 h-3.5" />
                             <span>Nova Asistan</span>
                           </div>
                         )}
                       </div>
 
-                      <div className={`max-w-[90%] rounded-2xl px-4 py-3 text-xs leading-relaxed overflow-hidden shadow-sm transition-all ${
+                      <div className={`max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm transition-all ${
                         isUser 
-                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-xs font-medium' 
-                          : 'bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-xs dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl'
+                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-xs font-normal' 
+                          : 'bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs'
                       }`}>
                         {isUser ? (
                           <span className="whitespace-pre-wrap break-words">{textContent}</span>
@@ -849,25 +849,25 @@ export const SidePanel = React.memo(({
                       </div>
 
                       {!isUser && (
-                        <div className="flex items-center gap-1 px-1">
+                        <div className="flex items-center gap-1.5 px-1 mt-0.5">
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(textContent);
                               setCopiedIdx(idx);
                               setTimeout(() => setCopiedIdx(null), 2000);
                             }}
-                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             title="Metni Kopyala"
                           >
-                            {isCopied ? <Check className="w-3 h-3 text-emerald-500" /> : <Paperclip className="w-3 h-3" />}
+                            {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Paperclip className="w-3.5 h-3.5" />}
                             <span>{isCopied ? 'Kopyalandı' : 'Kopyala'}</span>
                           </button>
                           <button
                             onClick={() => tts.speak(textContent)}
-                            className="flex items-center gap-1 px-2 py-1 text-[10px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                            className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             title="Sesli Oku"
                           >
-                            <Volume2 className="w-3 h-3" />
+                            <Volume2 className="w-3.5 h-3.5" />
                             <span>Sesli Oku</span>
                           </button>
                         </div>
@@ -884,11 +884,11 @@ export const SidePanel = React.memo(({
                     animate={{ opacity: 1, y: 0 }}
                     className="flex flex-col gap-1.5 items-start"
                   >
-                    <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-medium">
-                      <Sparkles className="w-3 h-3 animate-pulse" />
+                    <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
                       <span>Nova Asistan yanıtlıyor...</span>
                     </div>
-                    <div className="max-w-[90%] rounded-2xl px-4 py-3 text-xs leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-200 rounded-tl-xs border border-cyan-500/30 dark:border-cyan-500/30 prose prose-xs dark:prose-invert max-w-none prose-p:leading-relaxed">
+                    <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-cyan-500/30 dark:border-cyan-500/30 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
                     </div>
                   </motion.div>
@@ -1080,7 +1080,7 @@ export const SidePanel = React.memo(({
                   placeholder={isListening ? "Dinleniyor..." : "Bir şey sorun veya komut verin..."}
                   rows={Math.min(4, Math.max(1, input.split('\n').length))}
                   disabled={isLoading || isListening}
-                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-xs leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-28 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+                  className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[13.5px] leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-32 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
                 />
 
                 {/* Bottom Controls Bar */}

@@ -2639,6 +2639,8 @@ function App() {
               onOpenAccount={handleOpenAccount}
               onOpenHelp={handleOpenHelp}
               onOpenExtensions={handleOpenExtensions}
+              onToggleAIAssistant={handleToggleAIAssistant}
+              isAIAssistantOpen={isSidePanelOpen}
               bookmarks={bookmarks}
               isCollapsed={false}
               onReorderTabs={handleReorderTabs}
@@ -2732,6 +2734,8 @@ function App() {
                   onOpenAccount={handleOpenAccount}
                   onOpenHelp={handleOpenHelp}
                   onOpenExtensions={handleOpenExtensions}
+                  onToggleAIAssistant={handleToggleAIAssistant}
+                  isAIAssistantOpen={isSidePanelOpen}
                   bookmarks={bookmarks}
                   isCollapsed={true}
                   onReorderTabs={handleReorderTabs}

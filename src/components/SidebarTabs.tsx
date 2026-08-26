@@ -33,7 +33,8 @@ import {
   Pin,
   HelpCircle,
   Compass,
-  Cloud
+  Cloud,
+  Sparkles
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
@@ -142,6 +143,8 @@ export interface SidebarTabsProps {
   onOpenAccount?: () => void;
   onOpenHelp?: () => void;
   onOpenExtensions?: () => void;
+  onToggleAIAssistant?: () => void;
+  isAIAssistantOpen?: boolean;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
@@ -445,6 +448,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenAccount,
   onOpenHelp,
   onOpenExtensions,
+  onToggleAIAssistant,
+  isAIAssistantOpen = false,
   bookmarks = [],
   onToggleCollapse,
   isCollapsed = false,
@@ -747,6 +752,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             >
               <RotateCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
+            {onToggleAIAssistant && (
+              <button
+                onClick={onToggleAIAssistant}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                className={`p-1.5 rounded-lg transition-all no-drag cursor-pointer flex items-center justify-center ${
+                  isAIAssistantOpen
+                    ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
+                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
+                }`}
+                title="Nova AI Asistan (⌘J)"
+              >
+                <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-cyan-500 fill-cyan-500/20 animate-pulse' : 'text-cyan-600 dark:text-cyan-400'}`} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -831,6 +850,18 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     title="Extensions"
                   >
                     <Puzzle className="w-3.5 h-3.5 opacity-70" />
+                  </button>
+                )}
+                {onToggleAIAssistant && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onToggleAIAssistant(); }}
+                    className={`p-0.5 rounded transition-colors cursor-pointer ${
+                      isAIAssistantOpen ? 'text-cyan-500' : 'text-slate-400 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400'
+                    }`}
+                    title="Nova AI Asistan (⌘J)"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -1215,6 +1246,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 transition={{ duration: 0.15 }}
                 className="absolute bottom-12 left-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
+                {onToggleAIAssistant && (
+                  <button
+                    onClick={() => { onToggleAIAssistant(); setIsLibraryDropdownOpen(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
+                    Nova AI Asistan (⌘J)
+                  </button>
+                )}
                 {onOpenDownloads && (
                   <button
                     onClick={() => { onOpenDownloads(); setIsLibraryDropdownOpen(false); }}
@@ -1339,6 +1379,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
   if (prevProps.canGoBack !== nextProps.canGoBack) return false;
   if (prevProps.canGoForward !== nextProps.canGoForward) return false;
   if (prevProps.isLoading !== nextProps.isLoading) return false;
