@@ -758,29 +758,29 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   return (
     <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
-      {/* Top Progress Bar (GPU Composited scaleX) */}
+      {/* Top Progress Bar (GPU Composited scaleX - Ultra Fast Responsive Feedback) */}
       <AnimatePresence>
         {tab.isLoading && (
           <motion.div
-            initial={{ opacity: 0, scaleX: 0 }}
+            initial={{ opacity: 1, scaleX: 0.15 }}
             animate={{ 
-              opacity: 1, 
-              scaleX: 0.85,
+              scaleX: [0.15, 0.75, 0.94],
               transition: { 
-                scaleX: { duration: 8, ease: [0.16, 1, 0.3, 1] },
-                opacity: { duration: 0.2 }
+                duration: 1.0,
+                ease: [0.22, 1, 0.36, 1],
+                times: [0, 0.35, 1]
               } 
             }}
             exit={{ 
-              opacity: 0, 
               scaleX: 1, 
+              opacity: 0,
               transition: { 
-                scaleX: { duration: 0.25, ease: 'easeOut' },
-                opacity: { duration: 0.3, delay: 0.15 }
+                scaleX: { duration: 0.12, ease: 'easeOut' },
+                opacity: { duration: 0.15, delay: 0.05 }
               } 
             }}
-            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 12px rgba(99, 102, 241, 0.7)' }}
-            className="absolute top-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-50 shadow-lg"
+            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)' }}
+            className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500 z-50 shadow-md"
           />
         )}
       </AnimatePresence>
