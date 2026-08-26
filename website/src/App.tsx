@@ -1,10 +1,25 @@
+import Navbar from './components/Navbar';
+import ParallaxStarsHero from './components/ParallaxStarsHero';
+import ContinuousTicker from './components/ContinuousTicker';
+import MagicBentoGrid from './components/MagicBentoGrid';
+import InteractiveAppShowcase from './components/InteractiveAppShowcase';
+import StatisticsBenchmark from './components/StatisticsBenchmark';
+import DownloadSection from './components/DownloadSection';
+import Footer from './components/Footer';
+
 export default function App() {
   return (
-    <div className="min-h-screen bg-[#020617] text-white flex items-center justify-center font-sans">
-      <div className="text-center p-8">
-        <h1 className="text-3xl font-bold mb-2">Nova Browser</h1>
-        <p className="text-slate-400 text-sm">Hazırlanıyor...</p>
-      </div>
+    <div id="top" className="min-h-screen bg-[#090A0F] text-slate-100 selection:bg-indigo-600 selection:text-white">
+      <Navbar />
+      <main>
+        <ParallaxStarsHero speed={1} />
+        <ContinuousTicker />
+        <MagicBentoGrid />
+        <InteractiveAppShowcase />
+        <StatisticsBenchmark />
+        <DownloadSection />
+      </main>
+      <Footer />
     </div>
   );
 }
