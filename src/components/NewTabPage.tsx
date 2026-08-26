@@ -75,6 +75,9 @@ const DEFAULT_SPEED_DIALS = [
   { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' }
 ];
 
+// Session-level flag: only run the entrance animation once on initial application launch
+let hasAnimatedInitialLaunch = false;
+
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: { 
@@ -104,6 +107,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   isActive = true,
   energySaverMode = false,
 }) => {
+  // Only animate on the first app launch, all subsequent new tabs open instantly
+  const [shouldAnimate] = useState(() => {
+    if (!hasAnimatedInitialLaunch) {
+      hasAnimatedInitialLaunch = true;
+      return true;
+    }
+    return false;
+  });
+
   const [query, setQuery] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -377,12 +389,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     return (
       <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100">
         <motion.div 
-          variants={containerVariants}
-          initial="hidden"
+          variants={shouldAnimate ? containerVariants : undefined}
+          initial={shouldAnimate ? "hidden" : false}
           animate="visible"
           className="w-full max-w-2xl flex flex-col items-center gap-10 z-10"
         >
-          <motion.div variants={itemVariants} className="flex flex-col items-center text-center">
+          <motion.div variants={shouldAnimate ? itemVariants : undefined} className="flex flex-col items-center text-center">
             <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-2xl shadow-black/50">
               <VenetianMask className="w-16 h-16 text-slate-300" strokeWidth={1.5} />
             </div>
@@ -392,7 +404,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             </p>
           </motion.div>
 
-          <motion.div variants={itemVariants} className="w-full relative group">
+          <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative group">
             <form onSubmit={handleSearch} className="w-full">
               <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                 <Search className="h-5 w-5 text-slate-500" />
@@ -419,9 +431,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   return (
     <motion.div 
-      initial={{ opacity: 0 }}
+      initial={shouldAnimate ? { opacity: 0 } : false}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.2, ease: 'easeOut' }}
+      transition={shouldAnimate ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
       className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
       
@@ -721,16 +733,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Main Content Area */}
       <motion.div 
-        variants={containerVariants}
-        initial="hidden"
+        variants={shouldAnimate ? containerVariants : undefined}
+        initial={shouldAnimate ? "hidden" : false}
         animate="visible"
         className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
-        <Clock variants={itemVariants} isActive={isActive} />
+        <Clock variants={shouldAnimate ? itemVariants : undefined} isActive={isActive} />
 
         {/* Omnibox / Search Form */}
-        <motion.div variants={itemVariants} className="w-full relative z-30" ref={searchContainerRef}>
+        <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
           <form onSubmit={handleSearch} className="relative group">
             <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
@@ -829,7 +841,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </motion.div>
 
         {/* Speed Dials */}
-        <motion.div variants={itemVariants} className="w-full">
+        <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full">
           <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
             {speedDials.map((dial: any, idx: number) => (
               <motion.div 
@@ -902,9 +914,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {/* ToDo / Tasks Widget */}
       {showTasksWidget && (
       <motion.div 
-        initial={{ opacity: 0, y: 15 }}
+        initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+        transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
         className="absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
         style={{ maxHeight: '380px' }}
       >
