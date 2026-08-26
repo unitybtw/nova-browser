@@ -1,58 +1,143 @@
-const GITHUB_URL = 'https://github.com/unitybtw/nova-browser';
-const RELEASES_URL = 'https://github.com/unitybtw/nova-browser/releases/latest';
+import React from 'react';
+import { Github, ArrowUp } from 'lucide-react';
 
-export default function Footer() {
+export const Footer: React.FC = () => {
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
-    <footer className="border-t border-white/8 py-10">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-faint md:flex-row">
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/nova-icon-transparent.png"
-            alt=""
-            width={20}
-            height={20}
-            className="h-5 w-5"
-          />
-          <span>Nova Browser — Free, open-source browser built with Electron &amp; React.</span>
+    <footer className="relative bg-[#171717] text-white pt-24 pb-12 px-6 sm:px-12 rounded-t-[5rem] overflow-hidden border-t border-white/10 mt-12">
+      {/* Subtle radial indigo glow from top center */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[350px] bg-indigo-600/15 blur-[140px] pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto relative z-10">
+        {/* Large-scale Serif Quote */}
+        <div className="mb-20 text-center max-w-4xl mx-auto">
+          <blockquote className="font-display font-normal text-3xl sm:text-4xl lg:text-5xl tracking-tight text-white leading-snug">
+            “The future of computing is local, sovereign, and{' '}
+            <span className="italic font-normal text-indigo-300">organically intelligent</span>.”
+          </blockquote>
+          <p className="font-mono-tracked text-xs text-neutral-400 mt-6 uppercase">
+            — NOVA CORE MANIFESTO // 2026
+          </p>
         </div>
 
-        <nav aria-label="Footer">
-          <ul className="flex items-center gap-6">
-            <li>
-              <a
-                href={GITHUB_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="transition-colors duration-200 hover:text-foreground"
-              >
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a
-                href={RELEASES_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="transition-colors duration-200 hover:text-foreground"
-              >
-                Releases
-              </a>
-            </li>
-            <li>
-              <a
-                href="#top"
-                className="transition-colors duration-200 hover:text-foreground"
-              >
-                Back to top
-              </a>
-            </li>
-          </ul>
-        </nav>
-      </div>
+        {/* 3-Column Metadata Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 py-16 border-t border-b border-white/10 text-sm">
+          {/* Col 1: Project Identity */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <img
+                src="/nova-icon-transparent.png"
+                alt="Nova Logo"
+                className="w-6 h-6 object-contain"
+              />
+              <span className="font-display italic text-xl font-bold">Nova Browser</span>
+            </div>
+            <p className="font-body text-xs text-neutral-400 leading-relaxed max-w-xs mb-4">
+              An open-source AI-native web browser engineered with React, Electron, and on-device WebLLM neural inference.
+            </p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-emerald-400 font-mono text-[10px]">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span>STABLE RELEASE v1.0.7</span>
+            </div>
+          </div>
 
-      <p className="mt-8 text-center text-xs text-faint">
-        © {new Date().getFullYear()} Nova Browser Contributors
-      </p>
+          {/* Col 2: Specifications & Architecture */}
+          <div>
+            <h4 className="font-mono-tracked text-xs text-neutral-300 font-semibold mb-4">
+              ARCHITECTURE SPEC
+            </h4>
+            <ul className="space-y-2.5 font-body text-xs text-neutral-400">
+              <li>
+                <span className="text-neutral-200">Engine:</span> Chromium 130 + Electron + React 18
+              </li>
+              <li>
+                <span className="text-neutral-200">AI Runtime:</span> WebLLM (TVM WebGPU Acceleration)
+              </li>
+              <li>
+                <span className="text-neutral-200">Cryptography:</span> AES-256-GCM + PBKDF2
+              </li>
+              <li>
+                <span className="text-neutral-200">Local Bridge:</span> Model Context Protocol (Port 3020)
+              </li>
+              <li>
+                <span className="text-neutral-200">License:</span> MIT Open Source
+              </li>
+            </ul>
+          </div>
+
+          {/* Col 3: Links & Resources */}
+          <div>
+            <h4 className="font-mono-tracked text-xs text-neutral-300 font-semibold mb-4">
+              SOURCE & COMMUNITY
+            </h4>
+            <ul className="space-y-2.5 font-body text-xs text-neutral-400">
+              <li>
+                <a
+                  href="https://github.com/unitybtw/nova-browser"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors inline-flex items-center gap-1.5"
+                >
+                  <Github className="w-3.5 h-3.5" />
+                  <span>GitHub Repository</span>
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/unitybtw/nova-browser/releases"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors"
+                >
+                  Releases & Changelog
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/unitybtw/nova-browser/issues"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors"
+                >
+                  Report an Issue
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://github.com/unitybtw/nova-browser/blob/main/LICENSE"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-white transition-colors"
+                >
+                  MIT License
+                </a>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Minimalist Monospace Bottom Row */}
+        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-[11px] text-neutral-400">
+          <div>
+            © {new Date().getFullYear()} NOVA BROWSER // ALL RIGHTS RESERVED.
+          </div>
+
+          <div className="flex items-center gap-6">
+            <button
+              onClick={scrollToTop}
+              className="inline-flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
+            >
+              <span>BACK TO TOP</span>
+              <ArrowUp className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
     </footer>
   );
-}
+};
+
+export default Footer;

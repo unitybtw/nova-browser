@@ -1,136 +1,103 @@
-import { motion, useReducedMotion, type Variants } from 'framer-motion';
-import { Download, Github, Sparkles } from 'lucide-react';
-import { HeroDemo } from './HeroDemo';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { ArrowDown, Sparkles, Terminal } from 'lucide-react';
 
-const GITHUB_URL = 'https://github.com/unitybtw/nova-browser';
-const RELEASES_URL = 'https://github.com/unitybtw/nova-browser/releases/latest';
-
-const EXPO: [number, number, number, number] = [0.16, 1, 0.3, 1];
-
-const stack: Variants = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
-};
-
-const rise: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EXPO } },
-};
-
-/* Live demo frame: rises into place (no tilt — it wraps the video product tour) */
-const frame: Variants = {
-  hidden: { opacity: 0, y: 48 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EXPO } },
-};
-
-export default function Hero() {
-  const reduceMotion = !!useReducedMotion();
-  const initialState = reduceMotion ? ('visible' as const) : ('hidden' as const);
-
+export const Hero: React.FC = () => {
   return (
-    <section
-      id="hero"
-      aria-labelledby="hero-heading"
-      className="relative overflow-hidden pt-36 pb-20"
-    >
-      {/* Faint top glow */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[480px]"
-        style={{
-          background:
-            'radial-gradient(ellipse 60% 50% at 50% -10%, rgba(99, 102, 241, 0.14), transparent 70%)',
-        }}
-      />
+    <section className="relative min-h-screen w-full flex flex-col justify-between items-center overflow-hidden bg-[#171717] text-[#fcfbf9] pt-28 pb-0">
+      {/* 30s Ambient Mesh Gradient */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-40">
+        <div className="animate-mesh absolute top-[-20%] left-[-10%] w-[120vw] h-[120vw] rounded-full bg-gradient-to-tr from-indigo-900/40 via-purple-900/30 to-indigo-600/20 blur-[120px]" />
+        <div className="absolute top-[20%] right-[-10%] w-[80vw] h-[80vw] rounded-full bg-gradient-to-br from-indigo-700/30 via-indigo-950/20 to-purple-800/30 blur-[140px]" />
+      </div>
 
-      <motion.div
-        variants={stack}
-        initial={initialState}
-        animate="visible"
-        className="relative mx-auto max-w-6xl px-6 text-center"
-      >
-        {/* Status pill */}
+      {/* Grid line overlay for technical depth */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#ffffff05_1px,transparent_1px),linear-gradient(to_bottom,#ffffff05_1px,transparent_1px)] bg-[size:4rem_4rem] pointer-events-none" />
+
+      {/* Main Hero Copy Container */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 text-center flex-1 flex flex-col justify-center items-center my-auto">
         <motion.div
-          variants={rise}
-          className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-star"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-md mb-8"
         >
-          <Sparkles size={14} aria-hidden />
-          Free &amp; Open Source
+          <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          <span className="font-mono-tracked text-[10px] text-indigo-200">
+            Organic Intelligence Architecture
+          </span>
         </motion.div>
 
+        {/* 11vw - 14vw Grand Display Serif Headline with Leading [0.85] */}
         <motion.h1
-          id="hero-heading"
-          variants={rise}
-          className="mx-auto mt-6 max-w-3xl text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl"
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.15 }}
+          className="font-display font-normal text-[11vw] sm:text-[10vw] lg:text-[8.5vw] tracking-[-0.03em] leading-[0.88] max-w-6xl text-white select-none"
         >
-          The browser that <span className="text-gradient">thinks with you.</span>
+          Thought at the <br />
+          <span className="italic font-normal bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent">
+            Speed of Thought.
+          </span>
         </motion.h1>
 
         <motion.p
-          variants={rise}
-          className="mx-auto mt-6 max-w-2xl text-lg text-muted md:text-xl"
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.35 }}
+          className="font-body text-base sm:text-lg md:text-xl text-neutral-400 max-w-2xl mt-8 font-normal leading-relaxed"
         >
-          On-device AI assistant, an autonomous agent that drives the browser for you,
-          zero-knowledge encrypted sync and a built-in privacy shield — without sending your
-          data anywhere.
+          Nova is an editorial-grade, open-source browser engineered with on-device autonomous AI agents, zero-knowledge sync, and zero-compromise privacy.
         </motion.p>
 
-        {/* CTAs */}
+        {/* Meta badges */}
         <motion.div
-          variants={rise}
-          className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1], delay: 0.45 }}
+          className="flex flex-wrap items-center justify-center gap-6 mt-8 text-neutral-400 text-xs font-mono"
         >
-          <a
-            href={RELEASES_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full bg-nova px-7 py-3.5 font-semibold text-white shadow-[0_0_40px_rgba(99,102,241,0.35)] transition-all duration-200 hover:bg-nova-deep active:scale-[0.97]"
-          >
-            <Download size={18} aria-hidden />
-            Download for macOS
-          </a>
-          <a
-            href={GITHUB_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="glass inline-flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold transition-all duration-200 hover:bg-white/[0.08] active:scale-[0.97]"
-          >
-            <Github size={18} aria-hidden />
-            Star on GitHub
-          </a>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span>LOCAL WEBGPU MODELS</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span>AES-256-GCM ZERO-KNOWLEDGE</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+            <span>SUB-MS ADBLOCK ENGINE</span>
+          </div>
         </motion.div>
+      </div>
 
-        <motion.p variants={rise} className="mt-5 text-sm text-faint">
-          Also available for Windows · electron + react · MIT licensed
-        </motion.p>
+      {/* Signature Concave Wave Bridge Container */}
+      <div className="relative w-full h-[26vh] min-h-[160px] overflow-hidden flex justify-center items-end mt-12">
+        {/* Concave Curve Div */}
+        <div
+          className="absolute w-[140%] sm:w-[125%] h-[240%] bg-[#fcfbf9] left-[-20%] sm:left-[-12.5%] bottom-[-140%] shadow-2xl transition-all duration-700"
+          style={{
+            borderRadius: '50% 50% 0 0',
+          }}
+        />
 
-        {/* Live product demo — the real Nova Browser build, auto-touring its features */}
-        <div className="relative mx-auto mt-16 max-w-6xl [perspective:1400px]">
-          {/* Ambient light blobs */}
-          <motion.div
-            aria-hidden
-            className="absolute -top-24 -left-28 h-80 w-80 rounded-full opacity-20 blur-3xl"
-            style={{ background: 'radial-gradient(circle, #6366f1 0%, transparent 70%)' }}
-            animate={reduceMotion ? undefined : { x: [0, 42, -18, 0], y: [0, 26, -12, 0] }}
-            transition={
-              reduceMotion ? undefined : { duration: 16, repeat: Infinity, ease: 'easeInOut' }
-            }
-          />
-          <motion.div
-            aria-hidden
-            className="absolute -right-28 -bottom-28 h-80 w-80 rounded-full opacity-20 blur-3xl"
-            style={{ background: 'radial-gradient(circle, #fbbf24 0%, transparent 70%)' }}
-            animate={reduceMotion ? undefined : { x: [0, -34, 22, 0], y: [0, -22, 16, 0] }}
-            transition={
-              reduceMotion ? undefined : { duration: 18, repeat: Infinity, ease: 'easeInOut' }
-            }
-          />
-
-          <motion.div variants={frame} className="relative">
-            <HeroDemo />
-          </motion.div>
+        {/* Primary Action Button placed right at the Crest */}
+        <div className="relative z-20 mb-8 sm:mb-12 flex flex-col items-center">
+          <a
+            href="#download"
+            className="animate-button-pulse inline-flex items-center gap-3 px-8 py-4 rounded-full bg-[#171717] text-[#fcfbf9] font-medium text-sm transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#4338ca] shadow-xl group cursor-pointer"
+          >
+            <Terminal className="w-4 h-4 text-indigo-400 group-hover:text-white transition-colors" />
+            <span className="font-mono-tracked text-xs font-bold tracking-widest">
+              INITIALIZE NOVA
+            </span>
+            <ArrowDown className="w-4 h-4 group-hover:translate-y-0.5 transition-transform" />
+          </a>
         </div>
-      </motion.div>
+      </div>
     </section>
   );
-}
+};
+
+export default Hero;

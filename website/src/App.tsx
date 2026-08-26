@@ -1,23 +1,23 @@
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
-import FeaturesBento from './components/FeaturesBento';
-import AgentSection from './components/AgentSection';
-import PerformanceSection from './components/PerformanceSection';
-import SecuritySection from './components/SecuritySection';
-import CTA from './components/CTA';
+import ProductTour from './components/ProductTour';
+import WorkGrid from './components/WorkGrid';
+import CapabilitiesAccordion from './components/CapabilitiesAccordion';
+import PerformanceBenchmark from './components/PerformanceBenchmark';
+import DownloadSection from './components/DownloadSection';
 import Footer from './components/Footer';
 
 export default function App() {
   return (
-    <div id="top" className="min-h-screen bg-void text-foreground">
+    <div id="top" className="min-h-screen bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
       <Navbar />
       <main>
         <Hero />
-        <FeaturesBento />
-        <AgentSection />
-        <PerformanceSection />
-        <SecuritySection />
-        <CTA />
+        <ProductTour />
+        <WorkGrid />
+        <CapabilitiesAccordion />
+        <PerformanceBenchmark />
+        <DownloadSection />
       </main>
       <Footer />
     </div>
