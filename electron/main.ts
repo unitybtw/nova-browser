@@ -40,11 +40,6 @@ app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
 app.commandLine.appendSwitch('enable-quic');
 app.commandLine.appendSwitch('enable-tcp-fast-open');
 app.commandLine.appendSwitch('enable-fast-unload');
-app.commandLine.appendSwitch('disable-background-timer-throttling');
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('disable-renderer-backgrounding');
-app.commandLine.appendSwitch('disk-cache-size', '524288000');
-app.commandLine.appendSwitch('media-cache-size', '104857600');
 app.commandLine.appendSwitch('enable-features', [
   'VaapiVideoDecoder',
   'CanvasOopRasterization',
@@ -54,10 +49,7 @@ app.commandLine.appendSwitch('enable-features', [
   'CSSSubgrid',
   'WebAssemblySimd',
   'OverlayScrollbar',
-  'BlinkSchedulerYield',
-  'Prerender2',
-  'GpuRasterization',
-  'ZeroCopy'
+  'BlinkSchedulerYield'
 ].join(','));
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
