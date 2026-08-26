@@ -38,6 +38,7 @@ import {
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
 import { formatSearchUrl } from '../utils/searchEngine';
+import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 
@@ -553,9 +554,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   // Fetch suggestions (AbortController guards against out-of-order/stale responses,
   // same pattern as TopBar.tsx)
   useEffect(() => {
-    if (!isOmniboxFocused || !searchValue.trim() || searchValue.includes('://')) {
+    const trimmed = searchValue.trim();
+    if (!isOmniboxFocused || !trimmed || trimmed.includes('://')) {
       setSuggestions([]);
       return;
+    }
+
+    // 1. Instant 0ms cache lookup
+    const cacheKey = `${trimmed}_${searchEngine}`;
+    const cached = getClientCachedSuggestions(cacheKey);
+    if (cached) {
+      setSuggestions(cached.slice(0, 5));
     }
 
     abortControllerRef.current?.abort();
@@ -566,21 +575,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(searchValue, searchEngine, clientLocale);
+          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
+            setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(searchValue)}&hl=${lang}&gl=${country}`, {
+        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
           signal: abortController.signal
         });
         if (!abortController.signal.aborted && res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
-            setSuggestions(data[1].slice(0, 5));
+            const list = data[1].slice(0, 5);
+            setClientCachedSuggestions(cacheKey, list);
+            setSuggestions(list);
           }
         }
       } catch (err: any) {
@@ -590,7 +602,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 150);
+    const timer = setTimeout(fetchSuggestions, 35);
     return () => {
       clearTimeout(timer);
       abortController.abort();

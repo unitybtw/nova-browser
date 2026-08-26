@@ -1,5 +1,6 @@
 import { motion, useReducedMotion, type Variants } from 'framer-motion';
 import { Download, Github, Sparkles } from 'lucide-react';
+import { HeroDemo } from './HeroDemo';
 
 const GITHUB_URL = 'https://github.com/unitybtw/nova-browser';
 const RELEASES_URL = 'https://github.com/unitybtw/nova-browser/releases/latest';
@@ -16,10 +17,10 @@ const rise: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.45, ease: EXPO } },
 };
 
-/* Product frame: rises with a slight perspective tilt that flattens on hover */
+/* Live demo frame: rises into place (no tilt — it wraps an interactive iframe) */
 const frame: Variants = {
-  hidden: { opacity: 0, y: 48, rotateX: 12 },
-  visible: { opacity: 1, y: 0, rotateX: 6, transition: { duration: 0.6, ease: EXPO } },
+  hidden: { opacity: 0, y: 48 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: EXPO } },
 };
 
 export default function Hero() {
@@ -103,8 +104,8 @@ export default function Hero() {
           Also available for Windows · electron + react · MIT licensed
         </motion.p>
 
-        {/* Product visual */}
-        <div className="relative mx-auto mt-16 max-w-5xl [perspective:1400px]">
+        {/* Live product demo — the real Nova Browser build, auto-touring its features */}
+        <div className="relative mx-auto mt-16 max-w-6xl [perspective:1400px]">
           {/* Ambient light blobs */}
           <motion.div
             aria-hidden
@@ -125,18 +126,8 @@ export default function Hero() {
             }
           />
 
-          <motion.div
-            variants={frame}
-            whileHover={reduceMotion ? undefined : { rotateX: 0, y: -6 }}
-            className="glass relative overflow-hidden rounded-2xl p-2 shadow-2xl ring-1 ring-white/10"
-          >
-            <img
-              src="/preview.png"
-              width={2880}
-              height={1800}
-              alt="Nova Browser running on macOS with the on-device AI assistant panel open beside a web page"
-              className="h-auto w-full rounded-xl object-cover"
-            />
+          <motion.div variants={frame} className="relative">
+            <HeroDemo />
           </motion.div>
         </div>
       </motion.div>

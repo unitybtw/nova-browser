@@ -2256,7 +2256,7 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
 
   const fetchGoogle = async (): Promise<string[]> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
+    const timeout = setTimeout(() => controller.abort(), 650);
     try {
       const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${lang}&gl=${country}`;
       const res = await fetch(url, {
@@ -2281,7 +2281,7 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
 
   const fetchDuckDuckGo = async (): Promise<string[]> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
+    const timeout = setTimeout(() => controller.abort(), 650);
     try {
       const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
       const res = await fetch(url, {
@@ -2306,7 +2306,7 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
 
   const fetchBing = async (): Promise<string[]> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
+    const timeout = setTimeout(() => controller.abort(), 650);
     try {
       const market = `${lang}-${country.toUpperCase()}`;
       const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${lang}&setmkt=${market}`;
@@ -2332,7 +2332,7 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
 
   const fetchBrave = async (): Promise<string[]> => {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1200);
+    const timeout = setTimeout(() => controller.abort(), 650);
     try {
       const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false`;
       const res = await fetch(url, {
@@ -2364,12 +2364,8 @@ ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, 
     providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
   }
 
-  // ⚡ Perf + 🔒 Privacy: providers start STAGGERED — the next engine is queried
-  // only if no result has arrived within FALLBACK_STAGGER_MS, so a healthy
-  // primary provider sees the query alone (same network behavior as the old
-  // sequential loop in the common case) while worst-case latency stays bounded
-  // (~stagger × (n-1) + one provider timeout) instead of n × timeout.
-  const FALLBACK_STAGGER_MS = 600;
+  // ⚡ Perf + 🔒 Privacy: Fast staggered fallback to keep latency ultra-low
+  const FALLBACK_STAGGER_MS = 150;
   const resultsByPriority = new Map<number, string[]>();
   let anyNonEmpty = false;
   let activeRuns = 0;

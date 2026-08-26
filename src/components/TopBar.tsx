@@ -57,6 +57,7 @@ import { AdBlockerPopover } from './AdBlockerPopover';
 import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { UserSettings } from '../App';
 import { syncService, SyncStatus } from '../services/syncService';
+import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -464,6 +465,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       return;
     }
 
+    // 1. Instant 0ms cache lookup
+    const cacheKey = `${trimmed}_${searchEngine}`;
+    const cached = getClientCachedSuggestions(cacheKey);
+    if (cached) {
+      setSuggestions(cached.slice(0, 6));
+    }
+
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
@@ -474,6 +482,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
+            setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 6));
             return;
           }
@@ -487,7 +496,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         if (!abortController.signal.aborted && response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
-            setSuggestions(data[1].slice(0, 6));
+            const list = data[1].slice(0, 6);
+            setClientCachedSuggestions(cacheKey, list);
+            setSuggestions(list);
           }
         }
       } catch (err: any) {
@@ -497,7 +508,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 150);
+    const timer = setTimeout(fetchSuggestions, 35);
     setSelectedIndex(-1);
     return () => {
       clearTimeout(timer);

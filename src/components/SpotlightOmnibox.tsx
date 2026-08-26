@@ -5,6 +5,7 @@ import { Tab } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { UserSettings } from '../App';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 
 interface SpotlightOmniboxProps {
   isOpen: boolean;
@@ -35,10 +36,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   const [isAIMode, setIsAIMode] = useState(false);
   const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
     if (isOpen) {
@@ -49,14 +50,22 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
-      }, 50);
+      }, 30);
     }
   }, [isOpen]);
 
   useEffect(() => {
-    if (isAIMode || !inputValue.trim() || inputValue.includes('://')) {
+    const trimmed = inputValue.trim();
+    if (isAIMode || !trimmed || trimmed.includes('://')) {
       setSuggestions([]);
       return;
+    }
+
+    // 1. Instant 0ms cache lookup
+    const cacheKey = `${trimmed}_${searchEngine}`;
+    const cached = getClientCachedSuggestions(cacheKey);
+    if (cached) {
+      setSuggestions(cached.slice(0, 5));
     }
 
     const controller = new AbortController();
@@ -64,19 +73,22 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(inputValue.trim(), searchEngine, clientLocale);
+          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (Array.isArray(results) && !controller.signal.aborted) {
+            setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 5));
             return;
           }
         }
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(inputValue.trim())}&hl=${lang}&gl=${country}`, { signal: controller.signal });
+        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
         if (response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted) {
-            setSuggestions(data[1].slice(0, 5));
+            const list = data[1].slice(0, 5);
+            setClientCachedSuggestions(cacheKey, list);
+            setSuggestions(list);
           }
         }
       } catch (err: any) {
@@ -85,7 +97,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 150);
+    const timer = setTimeout(fetchSuggestions, 35);
     return () => {
       clearTimeout(timer);
       controller.abort();

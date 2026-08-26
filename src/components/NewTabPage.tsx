@@ -4,6 +4,7 @@ import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Ch
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../App';
+import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 
 interface Todo {
   id: string;
@@ -158,10 +159,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   // Fetch search suggestions
   useEffect(() => {
-    if (!isFocused || !query.trim() || query.includes('://')) {
+    const trimmed = query.trim();
+    if (!isFocused || !trimmed || trimmed.includes('://')) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
+    }
+
+    // 1. Instant 0ms cache lookup
+    const cacheKey = `${trimmed}_${searchEngine}`;
+    const cached = getClientCachedSuggestions(cacheKey);
+    if (cached) {
+      setSuggestions(cached.slice(0, 6));
+      setShowSuggestions(cached.length > 0);
     }
 
     abortControllerRef.current?.abort();
@@ -172,8 +182,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(query.trim(), searchEngine, clientLocale);
+          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && Array.isArray(results)) {
+            setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 6));
             setShowSuggestions(results.length > 0);
             return;
@@ -181,13 +192,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         }
         const lang = clientLocale.split('-')[0] || 'tr';
         const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(query.trim())}&hl=${lang}&gl=${country}`, {
+        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
           signal: abortController.signal
         });
         if (!abortController.signal.aborted && res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
             const list = data[1].slice(0, 6);
+            setClientCachedSuggestions(cacheKey, list);
             setSuggestions(list);
             setShowSuggestions(list.length > 0);
           }
@@ -195,13 +207,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       } catch (err) {
         // ignore aborted or network errors
       }
-    }, 120);
+    }, 35);
 
     return () => {
       clearTimeout(timer);
       abortController.abort();
     };
-  }, [query, isFocused]);
+  }, [query, isFocused, searchEngine]);
 
   useEffect(() => {
     if (isIncognito) return; // Incognito: never persist
