@@ -41,6 +41,37 @@
       "@context": "https://schema.org",
       "@graph": [
         {
+          "@type": "WebSite",
+          "@id": "https://nova-browser.org/#website",
+          "url": "https://nova-browser.org/",
+          "name": "Nova Browser",
+          "description": "Sovereign On-Device AI Web Browser with Local WebGPU Inference",
+          "inLanguage": "en-US",
+          "publisher": {
+            "@type": "Organization",
+            "@id": "https://nova-browser.org/#organization",
+            "name": "Nova Browser",
+            "url": "https://nova-browser.org",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://nova-browser.org/nova-logo-tight.png"
+            },
+            "sameAs": [
+              "https://github.com/unitybtw/nova-browser"
+            ]
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://nova-browser.org/#organization",
+          "name": "Nova Browser Open Source Project",
+          "url": "https://nova-browser.org",
+          "logo": "https://nova-browser.org/nova-logo-tight.png",
+          "sameAs": [
+            "https://github.com/unitybtw/nova-browser"
+          ]
+        },
+        {
           "@type": "SoftwareApplication",
           "name": "Nova Browser",
           "operatingSystem": "macOS 12+, Windows 10, Windows 11",
