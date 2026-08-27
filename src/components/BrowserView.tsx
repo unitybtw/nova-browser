@@ -15,10 +15,9 @@ import {
   getRestoreOriginalScript 
 } from '../services/translationService';
 
-// Performance: Code-split internal browser pages
-const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
-const HistoryPage = React.lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
-const DownloadsPage = React.lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
+import { SettingsPage } from './SettingsPage';
+import { HistoryPage } from './HistoryPage';
+import { DownloadsPage } from './DownloadsPage';
 
 const NOOP = () => {};
 
@@ -802,44 +801,38 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isSettingsTab) {
     return (
-      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading Settings...</div>}>
-        <SettingsPage
-          url={tab.url}
-          settings={settings}
-          onUpdateSettings={onUpdateSettings || NOOP}
-          onExportData={onExportData}
-          onImportData={onImportData}
-          onClearHistory={onClearHistory}
-          onPurgeMemory={onPurgeMemory}
-        />
-      </React.Suspense>
+      <SettingsPage
+        url={tab.url}
+        settings={settings}
+        onUpdateSettings={onUpdateSettings || NOOP}
+        onExportData={onExportData}
+        onImportData={onImportData}
+        onClearHistory={onClearHistory}
+        onPurgeMemory={onPurgeMemory}
+      />
     );
   }
 
   if (isHistoryTab) {
     return (
-      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading History...</div>}>
-        <HistoryPage
-          history={history}
-          onNavigate={(url) => {
-            onUpdateTab(tab.id, { url, isLoading: true });
-            if (onNavigate) onNavigate(url);
-          }}
-          onClearHistory={onClearHistory || NOOP}
-          onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
-        />
-      </React.Suspense>
+      <HistoryPage
+        history={history}
+        onNavigate={(url) => {
+          onUpdateTab(tab.id, { url, isLoading: true });
+          if (onNavigate) onNavigate(url);
+        }}
+        onClearHistory={onClearHistory || NOOP}
+        onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
+      />
     );
   }
 
   if (isDownloadsTab) {
     return (
-      <React.Suspense fallback={<div className="w-full h-full bg-slate-900 flex items-center justify-center text-white/50">Loading Downloads...</div>}>
-        <DownloadsPage
-          downloads={downloads}
-          onClearDownloads={onClearDownloads || NOOP}
-        />
-      </React.Suspense>
+      <DownloadsPage
+        downloads={downloads}
+        onClearDownloads={onClearDownloads || NOOP}
+      />
     );
   }
 
