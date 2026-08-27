@@ -584,15 +584,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   }, [tab?.isMuted]);
 
   // Capture thumbnail when switching away from this tab (stored in memory cache).
-  // PERF: capturePage is a GPU readback that competes with the incoming tab's
-  // recomposite — only pay for it when this tab was active for >=5s.
   const activeSinceRef = useRef(0);
   useEffect(() => {
     if (isActive) {
       activeSinceRef.current = Date.now();
       return;
     }
-    const MIN_ACTIVE_MS_BEFORE_CAPTURE = 5000;
+    const MIN_ACTIVE_MS_BEFORE_CAPTURE = 600;
     const wasContinuouslyActive =
       activeSinceRef.current > 0 &&
       Date.now() - activeSinceRef.current >= MIN_ACTIVE_MS_BEFORE_CAPTURE;

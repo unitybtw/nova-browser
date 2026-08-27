@@ -43,6 +43,7 @@ import { formatSearchUrl } from '../utils/searchEngine';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
+import { TabHoverPreview } from './TabHoverPreview';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -151,52 +152,6 @@ export interface SidebarTabsProps {
   isCollapsed?: boolean;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
 }
-
-// Tab Peek Popover rendered via Portal
-const TabPeekPortal: React.FC<{
-  tab: Tab | null;
-  pos: { top: number; left: number };
-}> = ({ tab, pos }) => {
-  const thumbnail = tab ? (tabThumbnailCache.get(tab.id) || tab.thumbnail) : undefined;
-  if (!tab || !thumbnail) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      {tab && thumbnail && (
-        <motion.div
-          key="tab-peek"
-          initial={{ opacity: 0, x: -12, scale: 0.95 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          exit={{ opacity: 0, x: -8, scale: 0.95 }}
-          transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="pointer-events-none bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-xl shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden"
-          style={{
-            position: 'fixed',
-            top: Math.min(pos.top, window.innerHeight - 220),
-            left: pos.left,
-            zIndex: 99999,
-            width: 272,
-          }}
-        >
-          <div className="px-3 py-2 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/5">
-            <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap overflow-hidden text-ellipsis">
-              {tab.favicon && <img src={tab.favicon} alt="" style={{ width: 12, height: 12, marginRight: 6, display: 'inline', verticalAlign: 'middle', borderRadius: 2 }} />}
-              {tab.title || tab.url || 'New Tab'}
-            </div>
-          </div>
-          <div className="bg-slate-100 dark:bg-slate-950 overflow-hidden" style={{ aspectRatio: '16/9' }}>
-            <img
-              src={thumbnail}
-              alt="Tab preview"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }}
-            />
-          </div>
-        </motion.div>
-      )}
-    </AnimatePresence>,
-    document.body
-  );
-};
 
 interface SidebarTabItemProps {
   tab: Tab;
@@ -485,7 +440,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
 
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
-  const [hoverPos, setHoverPos] = useState({ top: 0, left: 0 });
+  const [hoverRect, setHoverRect] = useState<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
@@ -640,23 +595,22 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     };
   }, [searchValue, isOmniboxFocused, searchEngine]);
 
-  // Handle Omnibox Submit
-  const handleOmniboxSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleOmniboxSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!searchValue.trim()) return;
 
-    let targetValue = searchValue.trim();
-    if (selectedIndex >= 0 && selectedIndex < suggestions.length) {
+    let targetValue = searchValue;
+    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
       targetValue = suggestions[selectedIndex];
     }
 
-    const formattedUrl = formatSearchUrl(targetValue, searchEngine);
+    const url = formatSearchUrl(targetValue, searchEngine || 'google');
     if (onNavigate) {
-      onNavigate(formattedUrl);
+      onNavigate(url);
     } else {
-      onNewTab(formattedUrl);
+      // Fallback
     }
-
+    setSearchValue('');
     setShowSuggestions(false);
     setIsOmniboxFocused(false);
     omniboxInputRef.current?.blur();
@@ -666,19 +620,25 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   // every parent render (and hover position updates bail out when unchanged).
   const handleMouseEnter = useCallback((tab: Tab, e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    const top = rect.top;
-    const left = rect.right + 10;
-    setHoverPos(prev => (prev.top === top && prev.left === left ? prev : { top, left }));
+    setHoverRect({
+      top: rect.top,
+      left: rect.left,
+      width: rect.width,
+      height: rect.height,
+      right: rect.right,
+      bottom: rect.bottom
+    });
 
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
       setHoveredTab(tab);
-    }, 350);
+    }, 200);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHoveredTab(null);
+    setHoverRect(null);
   }, []);
 
   useEffect(() => {
@@ -1344,8 +1304,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
       </div>
 
-      {/* Tab Peek Portal */}
-      <TabPeekPortal tab={hoveredTab} pos={hoverPos} />
+      {/* Tab Hover Preview */}
+      <TabHoverPreview
+        tab={hoveredTab}
+        rect={hoverRect}
+        position="right"
+        visible={Boolean(hoveredTab && hoverRect && !tabContextMenu.isOpen)}
+      />
 
       {/* Chrome-Style Tab Context Menu */}
       <TabContextMenu
@@ -1381,7 +1346,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           if (onReopenClosedTab) onReopenClosedTab();
         }}
         canReopenClosedTab={canReopenClosedTab}
-        isBookmarked={tabContextMenu.tab ? bookmarks.some(b => b.url === tabContextMenu.tab?.url) : false}
+        isBookmarked={tabContextMenu.tab && bookmarks ? bookmarks.some((b: Bookmark) => b.url === tabContextMenu.tab?.url) : false}
         totalTabs={tabs.length}
       />
     </>

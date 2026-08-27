@@ -60,6 +60,7 @@ import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { UserSettings } from '../App';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
+import { TabHoverPreview } from './TabHoverPreview';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -139,7 +140,7 @@ const MemoizedTabItem = React.memo(({
   tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
-  tabsLength, setGhostTab, onOpenContextMenu
+  tabsLength, setGhostTab, onOpenContextMenu, onTabHover, onTabLeave
 }: any) => {
   if (isSplitChild) return null;
 
@@ -154,7 +155,10 @@ const MemoizedTabItem = React.memo(({
       exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
       whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
-      onDragStart={() => onTabDragStart?.()}
+      onDragStart={() => {
+        onTabLeave?.();
+        onTabDragStart?.();
+      }}
       onDrag={(e, info) => {
         onTabDrag?.(info.point.y);
         if (info.point.y > 60) {
@@ -170,10 +174,24 @@ const MemoizedTabItem = React.memo(({
           onDropToSplitScreen?.(tab.id);
         }
       }}
-      onClick={() => onSelectTab(tab.id)}
+      onClick={() => {
+        onTabLeave?.();
+        onSelectTab(tab.id);
+      }}
+      onMouseEnter={(e) => {
+        if (!splitTab) {
+          onTabHover?.(tab, e.currentTarget);
+        }
+      }}
+      onMouseLeave={() => {
+        if (!splitTab) {
+          onTabLeave?.();
+        }
+      }}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        onTabLeave?.();
         onOpenContextMenu?.(tab, index, e);
       }}
       data-tab-id={tab.id}
@@ -222,7 +240,18 @@ const MemoizedTabItem = React.memo(({
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
-            onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              onTabLeave?.();
+              onSelectTab(tab.id); 
+            }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+              onTabHover?.(tab, e.currentTarget);
+            }}
+            onMouseLeave={() => {
+              onTabLeave?.();
+            }}
             title={tab.title}
           >
             {tab.isLoading ? (
@@ -237,6 +266,7 @@ const MemoizedTabItem = React.memo(({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onTabLeave?.();
                 onCloseTab(tab.id);
               }}
               className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
@@ -251,6 +281,7 @@ const MemoizedTabItem = React.memo(({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onTabLeave?.();
                 onCloseSplit?.(tab.id, splitTab.id);
               }}
               className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer group/unsplit"
@@ -268,7 +299,18 @@ const MemoizedTabItem = React.memo(({
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
-            onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              onTabLeave?.();
+              onSelectTab(splitTab.id); 
+            }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+              onTabHover?.(splitTab, e.currentTarget);
+            }}
+            onMouseLeave={() => {
+              onTabLeave?.();
+            }}
             title={splitTab.title}
           >
             {splitTab.isLoading ? (
@@ -283,6 +325,7 @@ const MemoizedTabItem = React.memo(({
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
+                onTabLeave?.();
                 onCloseTab(splitTab.id); 
               }} 
               className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
@@ -1002,6 +1045,36 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [ghostTab, setGhostTab] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [hoveredTabPreview, setHoveredTabPreview] = useState<{
+    tab: Tab;
+    rect: { top: number; left: number; width: number; height: number; right: number; bottom: number };
+  } | null>(null);
+  const hoverTimeoutRef = useRef<any>(null);
+
+  const handleTabHover = useCallback((tab: Tab, target: HTMLElement) => {
+    clearTimeout(hoverTimeoutRef.current);
+    hoverTimeoutRef.current = setTimeout(() => {
+      if (target) {
+        const r = target.getBoundingClientRect();
+        setHoveredTabPreview({
+          tab,
+          rect: {
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+            right: r.right,
+            bottom: r.bottom
+          }
+        });
+      }
+    }, 200);
+  }, []);
+
+  const handleTabLeave = useCallback(() => {
+    clearTimeout(hoverTimeoutRef.current);
+    setHoveredTabPreview(null);
+  }, []);
 
   const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -1308,6 +1381,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onCloseTab={onCloseTab}
                   tabsLength={tabs.length}
                   setGhostTab={setGhostTab}
+                  onTabHover={handleTabHover}
+                  onTabLeave={handleTabLeave}
                   onOpenContextMenu={(targetTab: Tab, index: number, e: React.MouseEvent) => {
                     setTabContextMenu({
                       isOpen: true,
@@ -1825,6 +1900,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       canReopenClosedTab={canReopenClosedTab}
       isBookmarked={tabContextMenu.tab ? bookmarks.some(b => b.url === tabContextMenu.tab?.url) : false}
       totalTabs={tabs.length}
+    />
+
+    {/* Tab Hover Preview */}
+    <TabHoverPreview
+      tab={hoveredTabPreview?.tab || null}
+      rect={hoveredTabPreview?.rect || null}
+      position="bottom"
+      visible={Boolean(hoveredTabPreview && !ghostTab && !tabContextMenu.isOpen)}
     />
     </>
   );
