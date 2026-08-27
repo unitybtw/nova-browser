@@ -1,8 +1,11 @@
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
+import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
+import Shortcuts from './components/Shortcuts';
 import Benchmarks from './components/Benchmarks';
 import Downloads from './components/Downloads';
+import Faq from './components/Faq';
 import Footer from './components/Footer';
 
 export default function App() {
@@ -11,9 +14,12 @@ export default function App() {
       <Navbar />
       <main>
         <Hero />
+        <TrustPillars />
         <FeatureBento />
+        <Shortcuts />
         <Benchmarks />
         <Downloads />
+        <Faq />
       </main>
       <Footer />
     </div>

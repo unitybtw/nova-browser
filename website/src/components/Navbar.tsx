@@ -18,6 +18,7 @@ export const Navbar: React.FC = () => {
     { label: 'MANIFESTO', href: '#top' },
     { label: 'FEATURES', href: '#features' },
     { label: 'BENCHMARKS', href: '#benchmarks' },
+    { label: 'FAQ', href: '#faq' },
     { label: 'SOURCE', href: 'https://github.com/unitybtw/nova-browser', external: true },
   ];
 
