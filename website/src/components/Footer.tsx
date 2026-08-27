@@ -11,13 +11,13 @@ export const Footer: React.FC = () => {
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-white/10">
           {/* Brand / Manifesto Column */}
-          <div className="col-span-1 md:col-span-6 flex flex-col justify-between">
+          <div className="col-span-1 md:col-span-7 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3 mb-6">
                 <img
-                  src="/nova-icon-transparent.png"
+                  src="/nova-logo-tight.png"
                   alt="Nova Logo"
-                  className="w-11 h-11 object-contain drop-shadow-[0_2px_10px_rgba(6,182,212,0.4)]"
+                  className="w-9 h-9 object-contain"
                 />
                 <span className="font-serif italic text-3xl font-bold tracking-tight text-white">
                   Nova
@@ -37,77 +37,54 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Links Column */}
-          <div className="col-span-1 md:col-span-3">
-            <h4 className="font-mono text-[11px] text-neutral-400 mb-6 tracking-widest uppercase font-semibold">
-              ARCHITECTURE
-            </h4>
-            <ul className="space-y-3 font-mono text-xs text-neutral-300">
-              <li>
-                <a
-                  href="https://github.com/unitybtw/nova-browser"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-300 transition-colors flex items-center gap-1.5"
-                >
-                  <Github className="w-3.5 h-3.5" />
-                  <span>GitHub Repository</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/unitybtw/nova-browser/releases"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-300 transition-colors"
-                >
-                  Releases & Changelog
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/unitybtw/nova-browser/issues"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-300 transition-colors"
-                >
-                  Security Audit & Issues
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://github.com/unitybtw/nova-browser/blob/main/LICENSE"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-300 transition-colors"
-                >
-                  MIT License
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Specs Column */}
-          <div className="col-span-1 md:col-span-3">
-            <h4 className="font-mono text-[11px] text-neutral-400 mb-6 tracking-widest uppercase font-semibold">
-              SYSTEM SPECS
-            </h4>
-            <div className="space-y-3 font-mono text-xs text-neutral-400">
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>Engine</span>
-                <span className="text-white">Chromium 130 + React 19</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>AI Runtime</span>
-                <span className="text-white">WebLLM / WebGPU</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>Memory Base</span>
-                <span className="text-white">~250MB Base</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-2">
-                <span>Local Bridge</span>
-                <span className="text-white">Port 3020 MCP</span>
-              </div>
+          <div className="col-span-1 md:col-span-5 flex flex-col justify-between">
+            <div>
+              <h4 className="font-mono text-[11px] text-neutral-400 mb-6 tracking-widest uppercase font-semibold">
+                RESOURCES & REPOSITORY
+              </h4>
+              <ul className="space-y-3.5 font-mono text-xs text-neutral-300">
+                <li>
+                  <a
+                    href="https://github.com/unitybtw/nova-browser"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-indigo-300 transition-colors flex items-center gap-1.5"
+                  >
+                    <Github className="w-3.5 h-3.5" />
+                    <span>GitHub Repository</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/unitybtw/nova-browser/releases"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-indigo-300 transition-colors"
+                  >
+                    Releases & Changelog
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/unitybtw/nova-browser/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-indigo-300 transition-colors"
+                  >
+                    Security Audit & Issues
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://github.com/unitybtw/nova-browser/blob/main/LICENSE"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-indigo-300 transition-colors"
+                  >
+                    MIT License
+                  </a>
+                </li>
+              </ul>
             </div>
           </div>
         </div>

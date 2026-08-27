@@ -43,7 +43,7 @@ export const Hero: React.FC = () => {
       id: 'newtab' as const,
       title: 'New Tab',
       url: 'nova://newtab',
-      icon: '/nova-icon-transparent.png',
+      icon: '/nova-logo-tight.png',
       isCustomIcon: true,
     },
     {
@@ -281,7 +281,7 @@ export const Hero: React.FC = () => {
                   <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-4 group cursor-pointer">
                     <div className="absolute inset-0 bg-cyan-500/25 rounded-3xl blur-2xl group-hover:bg-cyan-500/50 transition-all duration-500" />
                     <img
-                      src="/nova-icon-transparent.png"
+                      src="/nova-logo-tight.png"
                       alt="Nova Logo"
                       className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_25px_rgba(6,182,212,0.7)] group-hover:scale-105 transition-transform duration-500"
                     />
