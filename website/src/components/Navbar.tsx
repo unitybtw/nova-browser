@@ -17,7 +17,7 @@ export const Navbar: React.FC = () => {
   const NAV_ITEMS = [
     { label: 'MANIFESTO', href: '#top' },
     { label: 'FEATURES', href: '#features' },
-    { label: 'COMMUNITY', href: '#community' },
+    { label: 'DEVELOPER', href: '#developer' },
     { label: 'BENCHMARKS', href: '#benchmarks' },
     { label: 'FAQ', href: '#faq' },
     { label: 'SOURCE', href: 'https://github.com/unitybtw/nova-browser', external: true },

@@ -2,6 +2,9 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
+import ArchitectureComparison from './components/ArchitectureComparison';
+import CommandPalettePreview from './components/CommandPalettePreview';
+import TerminalPlayground from './components/TerminalPlayground';
 import GithubStats from './components/GithubStats';
 import Benchmarks from './components/Benchmarks';
 import Downloads from './components/Downloads';
@@ -16,6 +19,9 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
+        <ArchitectureComparison />
+        <CommandPalettePreview />
+        <TerminalPlayground />
         <GithubStats />
         <Benchmarks />
         <Downloads />
