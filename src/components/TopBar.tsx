@@ -396,6 +396,7 @@ const MemoizedTabItem = React.memo(({
               <button
                 onClick={(e) => {
                   e.stopPropagation();
+                  onTabLeave?.();
                   onCloseTab(tab.id, e);
                 }}
                 className={`p-0.5 rounded-full transition-colors shrink-0 ${
@@ -1074,6 +1075,34 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const handleTabLeave = useCallback(() => {
     clearTimeout(hoverTimeoutRef.current);
     setHoveredTabPreview(null);
+  }, []);
+
+  // Auto-dismiss preview immediately if the hovered tab was closed or removed
+  useEffect(() => {
+    if (hoveredTabPreview && !tabs.some(t => t.id === hoveredTabPreview.tab.id)) {
+      clearTimeout(hoverTimeoutRef.current);
+      setHoveredTabPreview(null);
+    }
+  }, [tabs, hoveredTabPreview]);
+
+  // Global dismiss listeners on scroll, click, or window blur
+  useEffect(() => {
+    const dismiss = () => {
+      clearTimeout(hoverTimeoutRef.current);
+      setHoveredTabPreview(null);
+    };
+
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('wheel', dismiss, { passive: true });
+    window.addEventListener('blur', dismiss);
+    window.addEventListener('keydown', dismiss);
+
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('wheel', dismiss);
+      window.removeEventListener('blur', dismiss);
+      window.removeEventListener('keydown', dismiss);
+    };
   }, []);
 
   const tabsContainerRef = useRef<any>(null);

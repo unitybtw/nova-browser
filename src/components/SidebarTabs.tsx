@@ -273,6 +273,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             <button
               onClick={(e) => {
                 e.stopPropagation();
+                onMouseLeave?.();
                 onCloseTab(tab.id);
               }}
               className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
@@ -286,6 +287,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              onMouseLeave?.();
               onCloseSplit?.(tab.id, splitTab.id);
             }}
             className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 group/unsplit cursor-pointer"
@@ -302,7 +304,11 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
             }`}
-            onClick={(e) => { e.stopPropagation(); onSelectTab(splitTab.id); }}
+            onClick={(e) => { 
+              e.stopPropagation(); 
+              onMouseLeave?.();
+              onSelectTab(splitTab.id); 
+            }}
             title={splitTab.title}
           >
             {splitTab.favicon ? (
@@ -314,6 +320,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             <button 
               onClick={(e) => { 
                 e.stopPropagation(); 
+                onMouseLeave?.();
                 onCloseTab(splitTab.id); 
               }}
               className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
@@ -370,7 +377,11 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             )}
             {!tab.isPinned && (
               <button 
-                onClick={(e) => { e.stopPropagation(); onCloseTab(tab.id, e); }} 
+                onClick={(e) => { 
+                  e.stopPropagation(); 
+                  onMouseLeave?.();
+                  onCloseTab(tab.id, e); 
+                }} 
                 className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
                 title="Close Tab"
               >
@@ -639,6 +650,36 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     setHoveredTab(null);
     setHoverRect(null);
+  }, []);
+
+  // Auto-dismiss preview immediately if the hovered tab was closed or removed
+  useEffect(() => {
+    if (hoveredTab && !tabs.some(t => t.id === hoveredTab.id)) {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      setHoveredTab(null);
+      setHoverRect(null);
+    }
+  }, [tabs, hoveredTab]);
+
+  // Global dismiss listeners on scroll, click, or window blur
+  useEffect(() => {
+    const dismiss = () => {
+      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      setHoveredTab(null);
+      setHoverRect(null);
+    };
+
+    window.addEventListener('pointerdown', dismiss);
+    window.addEventListener('wheel', dismiss, { passive: true });
+    window.addEventListener('blur', dismiss);
+    window.addEventListener('keydown', dismiss);
+
+    return () => {
+      window.removeEventListener('pointerdown', dismiss);
+      window.removeEventListener('wheel', dismiss);
+      window.removeEventListener('blur', dismiss);
+      window.removeEventListener('keydown', dismiss);
+    };
   }, []);
 
   useEffect(() => {

@@ -66,7 +66,7 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = ({
     };
   }, [tab?.id, tab?.thumbnail, tab?.webContentsId]);
 
-  if (!visible || !tab || !rect) return null;
+  if (!tab || !rect) return null;
 
   // Calculate Popover Position
   let top = 0;
@@ -108,8 +108,8 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = ({
           key={`tab-preview-${tab.id}`}
           initial={{ opacity: 0, y: position === 'bottom' ? -8 : 0, x: position === 'right' ? -8 : 0, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.14, ease: 'easeOut' }}
+          exit={{ opacity: 0, y: position === 'bottom' ? -4 : 0, scale: 0.95 }}
+          transition={{ duration: 0.12, ease: 'easeOut' }}
           className="pointer-events-none fixed z-[999999] rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 overflow-hidden select-none flex flex-col"
           style={{
             top,
