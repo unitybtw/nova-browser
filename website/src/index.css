@@ -88,3 +88,41 @@ body {
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
+
+/* Magic UI & Aceternity keyframes */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(calc(-100% - var(--gap))); }
+}
+
+@keyframes marquee-vertical {
+  from { transform: translateY(0); }
+  to { transform: translateY(calc(-100% - var(--gap))); }
+}
+
+.animate-marquee {
+  animation: marquee var(--duration, 40s) linear infinite;
+}
+
+.animate-marquee-vertical {
+  animation: marquee-vertical var(--duration, 40s) linear infinite;
+}
+
+@keyframes border-beam {
+  100% {
+    offset-distance: 100%;
+  }
+}
+
+.animate-border-beam {
+  animation: border-beam calc(var(--duration)*1s) infinite linear;
+}
+
+@keyframes grid {
+  0% { transform: translateY(-50%); }
+  100% { transform: translateY(0); }
+}
+
+.animate-grid {
+  animation: grid 20s linear infinite;
+}

@@ -23,6 +23,8 @@ import {
   Cpu,
   Terminal,
 } from 'lucide-react';
+import { RetroGrid } from './ui/RetroGrid';
+import { BorderBeam } from './ui/BorderBeam';
 
 export const Hero: React.FC = () => {
   const [activeTabId, setActiveTabId] = useState<'newtab' | 'agent' | 'split'>('newtab');
@@ -77,13 +79,16 @@ export const Hero: React.FC = () => {
   ];
 
   return (
-    <section className="relative pt-28 md:pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+    <section className="relative pt-28 md:pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center overflow-hidden">
+      {/* Retro 3D Grid Perspective Background */}
+      <RetroGrid />
+
       {/* Product Tag Badge */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#4338ca]/20 bg-[#4338ca]/5 font-mono text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider mb-6"
+        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#4338ca]/20 bg-[#4338ca]/5 font-mono text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider mb-6 relative z-10"
       >
         <span className="w-2 h-2 rounded-full bg-[#4338ca]" />
         <span>Next-Generation Sovereign Web Browser</span>
@@ -94,7 +99,7 @@ export const Hero: React.FC = () => {
         initial={{ opacity: 0, y: 25 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
-        className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.05]"
+        className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.05] relative z-10"
       >
         Thought at the Speed of{' '}
         <span className="bg-gradient-to-r from-[#4338ca] to-cyan-500 bg-clip-text text-transparent">Thought.</span>
@@ -105,7 +110,7 @@ export const Hero: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-        className="font-sans text-base sm:text-lg md:text-xl text-neutral-600 max-w-2xl mt-6 leading-relaxed"
+        className="font-sans text-base sm:text-lg md:text-xl text-neutral-600 max-w-2xl mt-6 leading-relaxed relative z-10"
       >
         Embedded autonomous local AI agent, native 1-click page translation, zero-knowledge privacy vault, and real-time WebGPU shaders. Uncompromised speed. Unprecedented sovereignty.
       </motion.p>
@@ -115,7 +120,7 @@ export const Hero: React.FC = () => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="pt-8 flex gap-4 flex-wrap justify-center font-mono text-xs uppercase tracking-wider"
+        className="pt-8 flex gap-4 flex-wrap justify-center font-mono text-xs uppercase tracking-wider relative z-10"
       >
         <a
           href="#download"
@@ -140,10 +145,11 @@ export const Hero: React.FC = () => {
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.95, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-6xl mx-auto mt-14 text-left"
+        className="relative w-full max-w-6xl mx-auto mt-14 text-left z-10"
       >
-        {/* Outer App Frame */}
+        {/* Outer App Frame with Animated Border Beam */}
         <div className="relative bg-[#090d16] rounded-2xl overflow-hidden border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
+          <BorderBeam size={250} duration={12} delay={9} colorFrom="#6366f1" colorTo="#06b6d4" />
           
           {/* TOP TAB BAR */}
           <div className="h-11 bg-[#0d1322] border-b border-slate-800/80 flex items-center px-4 gap-3 select-none">
