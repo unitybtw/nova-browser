@@ -17,6 +17,11 @@ import {
   Columns,
   Bot,
   ArrowUpRight,
+  Download,
+  Github,
+  Play,
+  Cpu,
+  Terminal,
 } from 'lucide-react';
 
 export const Hero: React.FC = () => {
@@ -63,12 +68,12 @@ export const Hero: React.FC = () => {
   ];
 
   const SPEED_DIALS = [
-    { name: 'GitHub', url: 'github.com', category: 'Code', icon: '⚡' },
-    { name: 'Claude', url: 'claude.ai', category: 'AI', icon: '✦' },
-    { name: 'ChatGPT', url: 'chatgpt.com', category: 'AI', icon: '🤖' },
-    { name: 'Gemini', url: 'gemini.google.com', category: 'AI', icon: '✨' },
-    { name: 'YouTube', url: 'youtube.com', category: 'Media', icon: '▶' },
-    { name: 'X / Twitter', url: 'x.com', category: 'Social', icon: '𝕏' },
+    { name: 'GitHub', url: 'github.com', category: 'Code', icon: Github },
+    { name: 'Claude', url: 'claude.ai', category: 'AI', icon: Bot },
+    { name: 'ChatGPT', url: 'chatgpt.com', category: 'AI', icon: Sparkles },
+    { name: 'Gemini', url: 'gemini.google.com', category: 'AI', icon: Cpu },
+    { name: 'YouTube', url: 'youtube.com', category: 'Media', icon: Play },
+    { name: 'MCP Bridge', url: 'localhost:3020', category: 'Bridge', icon: Terminal },
   ];
 
   return (
@@ -114,9 +119,10 @@ export const Hero: React.FC = () => {
       >
         <a
           href="#download"
-          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-md active:scale-[0.98]"
+          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-md active:scale-[0.98] inline-flex items-center gap-2"
         >
-          Download for macOS & Windows
+          <Download className="w-4 h-4" />
+          <span>Download for macOS & Windows</span>
         </a>
         <a
           href="https://github.com/unitybtw/nova-browser"
@@ -319,19 +325,22 @@ export const Hero: React.FC = () => {
 
                 {/* Speed Dials Grid */}
                 <div className="relative z-10 grid grid-cols-3 sm:grid-cols-6 gap-3 w-full max-w-2xl">
-                  {SPEED_DIALS.map((dial) => (
-                    <div
-                      key={dial.name}
-                      className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[#121a2f]/60 hover:bg-[#121a2f] border border-slate-800 hover:border-slate-700 cursor-pointer transition-all duration-300 group hover:-translate-y-0.5"
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-sm font-semibold group-hover:scale-105 transition-transform text-slate-200">
-                        {dial.icon}
+                  {SPEED_DIALS.map((dial) => {
+                    const Icon = dial.icon;
+                    return (
+                      <div
+                        key={dial.name}
+                        className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[#10141f] hover:bg-[#161c2c] border border-slate-800 hover:border-slate-700 cursor-pointer transition-all duration-200 group"
+                      >
+                        <div className="w-9 h-9 rounded-xl bg-slate-800/80 flex items-center justify-center group-hover:scale-105 transition-transform">
+                          <Icon className="w-4 h-4 text-slate-300 group-hover:text-cyan-400 transition-colors" />
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-cyan-400 transition-colors truncate w-full text-center">
+                          {dial.name}
+                        </span>
                       </div>
-                      <span className="text-[11px] font-medium text-slate-300 group-hover:text-cyan-400 transition-colors truncate w-full text-center">
-                        {dial.name}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 {/* System Status Footer */}
