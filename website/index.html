@@ -4,20 +4,108 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/nova-logo-tight.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nova Browser — Autonomous On-Device Intelligence</title>
+    <title>Nova Browser — Sovereign On-Device AI Web Browser</title>
     <meta
       name="description"
-      content="Nova Browser is a next-generation, open-source web browser featuring on-device autonomous AI agents, zero-knowledge sync, and native privacy protection."
+      content="Nova Browser is a sovereign, open-source desktop web browser featuring on-device WebGPU AI models, zero-latency Rust ad-blocker, zero-knowledge sync, and Model Context Protocol (MCP) integration."
     />
+    <meta name="keywords" content="Nova Browser, open source AI browser, local LLM browser, WebGPU browser, MCP browser, privacy browser, Arc alternative, Brave alternative, on-device AI" />
+    <meta name="author" content="Nova Browser Open Source Team" />
     <meta name="theme-color" content="#090A0F" />
+    <link rel="canonical" href="https://nova-browser.org/" />
 
-    <!-- Open Graph -->
+    <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Nova Browser — Autonomous On-Device Intelligence" />
+    <meta property="og:url" content="https://nova-browser.org/" />
+    <meta property="og:site_name" content="Nova Browser" />
+    <meta property="og:title" content="Nova Browser — Sovereign On-Device AI Web Browser" />
     <meta
       property="og:description"
-      content="On-device AI. Autonomous agent. Zero-knowledge sync. Open source."
+      content="Run multi-model AI locally on WebGPU with zero cloud latency. Memory-mapped Rust ad-blocker, zero-knowledge sync, and MIT open source."
     />
+    <meta property="og:image" content="https://nova-browser.org/preview.png" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://nova-browser.org/" />
+    <meta name="twitter:title" content="Nova Browser — Sovereign On-Device AI Web Browser" />
+    <meta
+      name="twitter:description"
+      content="Sovereign desktop browser with on-device WebGPU AI inference, Rust ad-blocker, and Model Context Protocol (MCP)."
+    />
+    <meta name="twitter:image" content="https://nova-browser.org/preview.png" />
+
+    <!-- Schema.org JSON-LD for AI Search Engines & Knowledge Graphs (GEO) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": "Nova Browser",
+          "operatingSystem": "macOS 12+, Windows 10, Windows 11",
+          "applicationCategory": "BrowserApplication",
+          "applicationSubCategory": "AI Web Browser",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+          },
+          "description": "Sovereign, open-source desktop web browser featuring on-device WebGPU AI inference, memory-mapped Rust ad-blocker, zero-knowledge cloud sync, and Model Context Protocol (MCP) server.",
+          "url": "https://nova-browser.org",
+          "downloadUrl": "https://github.com/unitybtw/nova-browser/releases",
+          "softwareVersion": "1.1.0",
+          "license": "https://opensource.org/licenses/MIT",
+          "screenshot": "https://nova-browser.org/preview.png",
+          "featureList": [
+            "Local WebGPU LLM Inference (Llama 3.2, Phi-3.5 Vision, Qwen 2.5)",
+            "Model Context Protocol (MCP) Server for Autonomous AI Agents",
+            "Zero-Latency Rust Network Ad-Blocker",
+            "Zero-Knowledge AES-GCM-256 Cloud Sync",
+            "Arc-inspired Vertical and Split Workspaces",
+            "100% Free and MIT Open Source"
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "What is Nova Browser?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Nova Browser is an open-source, privacy-first desktop web browser that runs AI models directly on your device using WebGPU hardware shaders. It requires zero cloud subscriptions and sends no personal data to external AI servers."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How does Nova Browser compare to Arc, Brave, and Chrome?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Unlike Chrome and Arc which send browsing data to remote cloud servers for AI features, Nova Browser executes multi-model LLMs 100% locally on your machine's GPU. It is MIT open-source, features built-in Model Context Protocol (MCP) support, and has zero telemetry."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "How do I install Nova Browser on macOS?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "On macOS, you can install Nova Browser with one terminal command via Homebrew: `brew tap unitybtw/tap && brew install --cask nova-browser`, or download the DMG directly from GitHub Releases."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Does Nova Browser work offline?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Yes. Once the local AI model weights are cached on your machine, all AI summarization, vision understanding, and autonomous actions run completely offline without internet connectivity."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
 
     <!-- Google Fonts: Plus Jakarta Sans, Inter, JetBrains Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
