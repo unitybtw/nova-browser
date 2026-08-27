@@ -167,8 +167,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   });
   const [newTodo, setNewTodo] = useState('');
 
-  // Resolved Daily 4K Ultra HD Wallpaper
-  const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto();
+  // Resolved Daily 4K Ultra HD Wallpaper (only loads if wallpaper mode is active)
+  const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto(newTabBackground === 'unsplash');
 
   // Close suggestions on outside click
   useEffect(() => {

@@ -30,27 +30,42 @@ try {
 
 // Advanced GPU Acceleration, Fast Network & Smooth Compositing flags
 app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
 app.commandLine.appendSwitch('enable-webgl');
-app.commandLine.appendSwitch('disable-software-rasterizer');
 app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
 app.commandLine.appendSwitch('enable-accelerated-video-decode');
-app.commandLine.appendSwitch('enable-native-gpu-memory-buffers');
 app.commandLine.appendSwitch('enable-quic');
 app.commandLine.appendSwitch('enable-tcp-fast-open');
 app.commandLine.appendSwitch('enable-fast-unload');
-app.commandLine.appendSwitch('enable-features', [
-  'VaapiVideoDecoder',
-  'CanvasOopRasterization',
-  'SmoothScrolling',
-  'ParallelDownloading',
-  'BackForwardCache',
-  'CSSSubgrid',
-  'WebAssemblySimd',
-  'OverlayScrollbar',
-  'BlinkSchedulerYield'
-].join(','));
+
+// Platform-tailored high-performance graphics optimizations
+if (process.platform === 'darwin') {
+  // Apple Silicon & macOS Metal API for ultra-smooth 120Hz ProMotion compositing
+  app.commandLine.appendSwitch('use-metal');
+  app.commandLine.appendSwitch('enable-features', [
+    'CanvasOopRasterization',
+    'SmoothScrolling',
+    'ParallelDownloading',
+    'BackForwardCache',
+    'CSSSubgrid',
+    'WebAssemblySimd',
+    'OverlayScrollbar',
+    'BlinkSchedulerYield'
+  ].join(','));
+} else {
+  // Windows / Linux GPU flags
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('enable-features', [
+    'CanvasOopRasterization',
+    'SmoothScrolling',
+    'ParallelDownloading',
+    'BackForwardCache',
+    'CSSSubgrid',
+    'WebAssemblySimd',
+    'OverlayScrollbar',
+    'BlinkSchedulerYield'
+  ].join(','));
+}
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096');

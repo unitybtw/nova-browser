@@ -188,8 +188,9 @@ export function getUnsplashThumbnailUrl(): string {
 
 /**
  * Main React Hook for Daily 4K Wallpapers
+ * Lazy-loads wallpaper assets only when the unsplash background mode is active.
  */
-export function useLiveUnsplashPhoto() {
+export function useLiveUnsplashPhoto(enabled = true) {
   const [photoList, setPhotoList] = useState<WallpaperPhoto[]>(() => {
     return cachedDailyWallpapers.length > 0 ? cachedDailyWallpapers : [DEFAULT_PHOTO];
   });
@@ -197,6 +198,7 @@ export function useLiveUnsplashPhoto() {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let isMounted = true;
     setIsLoading(true);
 
@@ -211,7 +213,7 @@ export function useLiveUnsplashPhoto() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   const currentPhoto = photoList[photoIndex % photoList.length] || photoList[0] || DEFAULT_PHOTO;
 
