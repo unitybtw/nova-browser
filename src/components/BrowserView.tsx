@@ -304,58 +304,130 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       // 3. Mute state must always be applied, regardless of feature gates
       if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
+
+      // 4. Ensure current URL is synchronized on DOM ready
+      try {
+        const currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        if (currentUrl && currentUrl !== 'about:blank' && tab?.id && currentUrl !== latestTabRef.current?.url) {
+          lastLoadedUrl.current = currentUrl;
+          onUpdateTab(tab.id, {
+            url: currentUrl,
+            canGoBack: webview.canGoBack?.() || false,
+            canGoForward: webview.canGoForward?.() || false
+          });
+        }
+      } catch (_) {}
     };
 
     const handleStartNavigation = (e: any) => {
-      if (e.isMainFrame && tab?.id) {
-        const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
-        const updates: Partial<Tab> = { 
-          isLoading: true,
-          isTranslated: false,
-          translatedLang: undefined
+      if (tab?.id) {
+        const isMain = e?.isMainFrame !== false;
+        if (isMain) {
+          const targetUrl = e?.url || (typeof webview.getURL === 'function' ? webview.getURL() : '');
+          const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
+          const updates: Partial<Tab> = { 
+            isLoading: true,
+            isTranslated: false,
+            translatedLang: undefined
+          };
+          if (targetUrl && targetUrl !== 'about:blank') {
+            lastLoadedUrl.current = targetUrl;
+            updates.url = targetUrl;
+          }
+          if (currentBlockedAds) {
+            updates.blockedAdsCount = 0;
+          }
+          onUpdateTab(tab.id, updates);
+        }
+      }
+    };
+
+    const handleWillNavigate = (e: any) => {
+      if (e?.url && tab?.id) {
+        lastLoadedUrl.current = e.url;
+        onUpdateTab(tab.id, {
+          url: e.url,
+          isLoading: true
+        });
+      }
+    };
+
+    const handleRedirectNavigation = (e: any) => {
+      if (e?.url && tab?.id && e.isMainFrame !== false) {
+        lastLoadedUrl.current = e.url;
+        onUpdateTab(tab.id, {
+          url: e.url
+        });
+      }
+    };
+
+    const handleLoadCommit = (e: any) => {
+      if (e?.url && tab?.id && e.isMainFrame !== false && e.url !== 'about:blank') {
+        lastLoadedUrl.current = e.url;
+        onUpdateTab(tab.id, {
+          url: e.url
+        });
+      }
+    };
+
+    const handleFinishLoad = (e: any) => {
+      if (tab?.id && (e?.isMainFrame !== false)) {
+        let currentUrl = '';
+        try {
+          currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        } catch (_) {}
+
+        const updates: Partial<Tab> = {
+          isLoading: false,
+          canGoBack: webview.canGoBack?.() || false,
+          canGoForward: webview.canGoForward?.() || false,
+          title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
         };
-        if (currentBlockedAds) {
-          updates.blockedAdsCount = 0;
+        if (currentUrl && currentUrl !== 'about:blank') {
+          lastLoadedUrl.current = currentUrl;
+          updates.url = currentUrl;
         }
         onUpdateTab(tab.id, updates);
       }
     };
 
-    const handleFinishLoad = (e: any) => {
-      if ((e.isMainFrame || e.isMainFrame === undefined) && tab?.id) {
-        onUpdateTab(tab.id, {
-          isLoading: false,
-          canGoBack: webview.canGoBack?.() || false,
-          canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || latestTabRef.current?.url || ''
-        });
-      }
-    };
-
     const handleStopLoading = () => {
-      // PERFORMANCE FIX: Removed aggressive thumbnail capture on every page load.
       if (tab?.id) {
-        onUpdateTab(tab.id, {
+        let currentUrl = '';
+        try {
+          currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        } catch (_) {}
+
+        const updates: Partial<Tab> = {
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
-          title: webview.getTitle?.() || latestTabRef.current?.url || ''
-        });
+          title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
+        };
+        if (currentUrl && currentUrl !== 'about:blank') {
+          lastLoadedUrl.current = currentUrl;
+          updates.url = currentUrl;
+        }
+        onUpdateTab(tab.id, updates);
       }
     };
 
     const handleFailLoad = (e: any) => {
       if (e.errorCode === -3) return;
-      if (!e.isMainFrame || !tab?.id) return; // Ignore subframe/resource failures (like Youtube ads or trackers)
+      if (e.isMainFrame === false || !tab?.id) return;
       onUpdateTab(tab.id, { isLoading: false, title: `Error: ${e.errorDescription || 'Failed'}` });
       console.error('[Webview] Failed to load:', e.errorDescription, 'Code:', e.errorCode);
     };
 
     const handleNavigateEvent = (e: any) => {
-      if (e.isMainFrame && e.url && tab?.id) {
-        lastLoadedUrl.current = e.url;
+      let targetUrl = e?.url;
+      if (!targetUrl && typeof webview.getURL === 'function') {
+        try { targetUrl = webview.getURL(); } catch (_) {}
+      }
+      if (targetUrl && tab?.id) {
+        lastLoadedUrl.current = targetUrl;
         onUpdateTab(tab.id, {
-          url: e.url,
+          url: targetUrl,
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false
@@ -364,10 +436,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleNavigateInPage = (e: any) => {
-      if (e.isMainFrame && e.url && tab?.id) {
-        lastLoadedUrl.current = e.url;
+      let targetUrl = e?.url;
+      if (!targetUrl && typeof webview.getURL === 'function') {
+        try { targetUrl = webview.getURL(); } catch (_) {}
+      }
+      if (targetUrl && tab?.id) {
+        lastLoadedUrl.current = targetUrl;
         onUpdateTab(tab.id, {
-          url: e.url,
+          url: targetUrl,
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false
@@ -522,7 +598,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     webview.addEventListener('dom-ready', handleDomReady);
+    webview.addEventListener('will-navigate', handleWillNavigate);
     webview.addEventListener('did-start-navigation', handleStartNavigation);
+    webview.addEventListener('did-redirect-navigation', handleRedirectNavigation);
+    webview.addEventListener('load-commit', handleLoadCommit);
     webview.addEventListener('did-stop-loading', handleStopLoading);
     webview.addEventListener('did-finish-load', handleFinishLoad);
     webview.addEventListener('did-fail-load', handleFailLoad);
@@ -553,7 +632,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       clearTimeout(readyCheckTimer);
       isWebviewReady.current = false;
       webview.removeEventListener('dom-ready', handleDomReady);
+      webview.removeEventListener('will-navigate', handleWillNavigate);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
+      webview.removeEventListener('did-redirect-navigation', handleRedirectNavigation);
+      webview.removeEventListener('load-commit', handleLoadCommit);
       webview.removeEventListener('did-stop-loading', handleStopLoading);
       webview.removeEventListener('did-finish-load', handleFinishLoad);
       webview.removeEventListener('did-fail-load', handleFailLoad);
