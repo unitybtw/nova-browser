@@ -14,7 +14,6 @@ import {
   Layers,
   HelpCircle
 } from "lucide-react";
-import confetti from "canvas-confetti";
 
 export const Navbar: React.FC = () => {
   const [scrolled, setScrolled] = useState(false);
@@ -34,14 +33,6 @@ export const Navbar: React.FC = () => {
     e.stopPropagation();
     navigator.clipboard.writeText("brew tap unitybtw/tap && brew install --cask nova-browser");
     setCopiedBrew(true);
-    try {
-      confetti({
-        particleCount: 30,
-        spread: 50,
-        origin: { y: 0.08, x: 0.75 },
-        colors: ["#6366f1", "#06b6d4", "#10b981", "#ffffff"]
-      });
-    } catch (_) {}
     setTimeout(() => setCopiedBrew(false), 2000);
   };
 
