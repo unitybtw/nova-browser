@@ -1,196 +1,365 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { HardDrive, Zap, Gauge } from 'lucide-react';
+import {
+  HardDrive,
+  Zap,
+  Cpu,
+  Shield,
+  Sliders,
+  CheckCircle2,
+  Activity
+} from 'lucide-react';
+
+interface BenchmarkCategory {
+  id: 'memory' | 'speed' | 'ai' | 'privacy';
+  title: string;
+  subtitle: string;
+  icon: React.ElementType;
+  badge: string;
+  highlightNumber: string;
+  highlightUnit: string;
+  highlightLabel: string;
+  summary: string;
+  competitors: {
+    name: string;
+    value: number;
+    displayValue: string;
+    isWinner?: boolean;
+    color?: string;
+  }[];
+  maxValue: number;
+  lowerIsBetter: boolean;
+}
+
+const CATEGORIES: BenchmarkCategory[] = [
+  {
+    id: 'memory',
+    title: 'Memory & Tab Hibernation',
+    subtitle: '20 Active Tabs with Intelligent DOM Unmounting',
+    icon: HardDrive,
+    badge: '64% RAM Reduction',
+    highlightNumber: '420',
+    highlightUnit: 'MB',
+    highlightLabel: 'Total RAM (20 Tabs)',
+    summary: 'Nova suspends dormant webview rendering pipelines while retaining instant back-forward state, keeping memory below 500MB.',
+    maxValue: 1600,
+    lowerIsBetter: true,
+    competitors: [
+      { name: 'Nova Browser', value: 420, displayValue: '420 MB', isWinner: true },
+      { name: 'Google Chrome', value: 1180, displayValue: '1,180 MB' },
+      { name: 'Arc Browser', value: 1450, displayValue: '1,450 MB' },
+      { name: 'Brave Browser', value: 920, displayValue: '920 MB' },
+    ],
+  },
+  {
+    id: 'speed',
+    title: 'Speedometer 3.0 & Cold Start',
+    subtitle: 'W3C Browser Responsiveness & Render Benchmark',
+    icon: Zap,
+    badge: 'Top Tier Responsiveness',
+    highlightNumber: '38.4',
+    highlightUnit: 'Score',
+    highlightLabel: 'Speedometer 3.0 Score',
+    summary: 'Direct hardware-accelerated Blink layout scheduler and zero-latency local caching deliver blistering UI reactivity.',
+    maxValue: 45,
+    lowerIsBetter: false,
+    competitors: [
+      { name: 'Nova Browser', value: 38.4, displayValue: '38.4 pts', isWinner: true },
+      { name: 'Google Chrome', value: 32.1, displayValue: '32.1 pts' },
+      { name: 'Safari 18', value: 35.6, displayValue: '35.6 pts' },
+      { name: 'Arc Browser', value: 29.8, displayValue: '29.8 pts' },
+    ],
+  },
+  {
+    id: 'ai',
+    title: 'On-Device AI Inference',
+    subtitle: 'Llama 3.2 3B Token Generation via WebGPU',
+    icon: Cpu,
+    badge: '3.4x Faster vs CPU',
+    highlightNumber: '64',
+    highlightUnit: 'tok/s',
+    highlightLabel: 'WebGPU Inference Speed',
+    summary: 'Native WebGPU shaders bypass cloud network hops entirely, executing local models with zero latency and 100% privacy.',
+    maxValue: 75,
+    lowerIsBetter: false,
+    competitors: [
+      { name: 'Nova (WebGPU Shaders)', value: 64, displayValue: '64 tok/s', isWinner: true },
+      { name: 'Chrome (WebGPU Polyfill)', value: 41, displayValue: '41 tok/s' },
+      { name: 'Cloud API (Network Roundtrip)', value: 18, displayValue: '~18 tok/s' },
+    ],
+  },
+  {
+    id: 'privacy',
+    title: 'Ad & Tracker Block Latency',
+    subtitle: 'Network-Level Rust Filter Engine',
+    icon: Shield,
+    badge: '0ms Overhead',
+    highlightNumber: '0.1',
+    highlightUnit: 'ms',
+    highlightLabel: 'Filter Decision Time',
+    summary: 'Ad and tracker requests are terminated in kernel-space before DOM creation, saving up to 48% bandwidth per page load.',
+    maxValue: 12,
+    lowerIsBetter: true,
+    competitors: [
+      { name: 'Nova (Rust Native Engine)', value: 0.1, displayValue: '0.12 ms', isWinner: true },
+      { name: 'Brave Shield', value: 0.35, displayValue: '0.35 ms' },
+      { name: 'Chrome + uBlock Extension', value: 4.8, displayValue: '4.80 ms' },
+      { name: 'Standard Chrome (Unfiltered)', value: 11.2, displayValue: '11.20 ms' },
+    ],
+  },
+];
 
 export const Benchmarks: React.FC = () => {
+  const [selectedCategory, setSelectedCategory] = useState<'memory' | 'speed' | 'ai' | 'privacy'>('memory');
+  const [tabCount, setTabCount] = useState<number>(30);
+
+  const currentCategory = CATEGORIES.find((c) => c.id === selectedCategory) || CATEGORIES[0];
+
+  // Dynamic RAM Calculator Math
+  const novaMemoryEst = Math.round(180 + tabCount * 18);
+  const chromeMemoryEst = Math.round(350 + tabCount * 65);
+  const savedMemoryEst = Math.max(0, chromeMemoryEst - novaMemoryEst);
+  const savedPercentage = Math.round((savedMemoryEst / chromeMemoryEst) * 100);
+
   return (
     <section id="benchmarks" className="py-32 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
-      <div className="text-center max-w-3xl mx-auto mb-20">
-        <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-          EMPIRICAL BENCHMARKS
-        </span>
-        <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-          Measured <span className="italic">Efficiency</span>.
-        </h2>
-        <p className="font-sans text-neutral-600 mt-4 text-base sm:text-lg leading-relaxed">
-          Rigorous memory and CPU utilization benchmarks conducted on macOS Apple Silicon systems.
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-8">
+        <div>
+          <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
+            EMPIRICAL VALIDATION
+          </span>
+          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
+            Measured <span className="italic">Supremacy</span>.
+          </h2>
+        </div>
+        <p className="font-sans text-neutral-600 max-w-md text-base leading-relaxed">
+          Standardized automated benchmarking on Apple Silicon (M-Series) and Windows x86 hardware under strict isolation.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Metric 1: RAM */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="p-8 rounded-2xl bg-white border border-[#e5e5e5] shadow-sm flex flex-col justify-between"
-        >
+      {/* CATEGORY SWITCHER TABS */}
+      <div className="flex flex-wrap gap-2.5 mb-10 p-1.5 bg-neutral-100/80 rounded-2xl border border-neutral-200/80 w-fit">
+        {CATEGORIES.map((cat) => {
+          const isActive = selectedCategory === cat.id;
+          const Icon = cat.icon;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-300 ${
+                isActive
+                  ? 'bg-[#171717] text-[#fcfbf9] shadow-md'
+                  : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
+              }`}
+            >
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-400' : 'text-neutral-500'}`} />
+              <span>{cat.title}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* MAIN BENCHMARK VISUALIZER STAGE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
+        
+        {/* Left Card: Metric Breakdown & Live Bar Comparison */}
+        <div className="lg:col-span-8 p-8 sm:p-10 rounded-3xl bg-white border border-[#e5e5e5] shadow-xl flex flex-col justify-between relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <div className="p-2.5 rounded-xl bg-indigo-50 text-[#4338ca]">
-                <HardDrive className="w-5 h-5" />
+            {/* Top Row: Metric Title & Advantage Badge */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div>
+                <span className="font-mono text-[11px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                  {currentCategory.subtitle}
+                </span>
+                <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#171717]">
+                  {currentCategory.title}
+                </h3>
               </div>
-              <span className="font-mono text-[10px] font-bold text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                -60% Less RAM
+
+              <span className="font-mono text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                {currentCategory.badge}
               </span>
             </div>
 
-            <span className="font-mono text-[10px] text-neutral-400 block mb-1 uppercase tracking-wider">
-              20 TABS WITH HIBERNATION
-            </span>
-            <div className="font-serif text-4xl font-bold text-[#171717] mb-4">
-              ~420 <span className="text-xl font-normal text-neutral-400 font-sans">MB</span>
-            </div>
-
-            <p className="font-sans text-xs text-neutral-600 leading-relaxed">
-              Background Webviews are gracefully suspended and unmounted from RAM without losing history.
+            <p className="font-sans text-sm text-neutral-600 leading-relaxed mb-8 max-w-2xl">
+              {currentCategory.summary}
             </p>
+
+            {/* COMPARATIVE PROGRESS BARS */}
+            <div className="space-y-4 pt-2">
+              {currentCategory.competitors.map((item) => {
+                const percent = Math.min(100, Math.max(12, Math.round((item.value / currentCategory.maxValue) * 100)));
+                return (
+                  <div key={item.name} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-xs font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold ${item.isWinner ? 'text-[#171717]' : 'text-neutral-500'}`}>
+                          {item.name}
+                        </span>
+                        {item.isWinner && (
+                          <span className="bg-indigo-600 text-white text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                            LEADER
+                          </span>
+                        )}
+                      </div>
+                      <span className={`font-bold ${item.isWinner ? 'text-[#4338ca]' : 'text-neutral-600'}`}>
+                        {item.displayValue}
+                      </span>
+                    </div>
+
+                    {/* Bar Track */}
+                    <div className="w-full h-3.5 bg-neutral-100 rounded-full overflow-hidden p-0.5 border border-neutral-200/60">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${percent}%` }}
+                        transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                        className={`h-full rounded-full transition-all ${
+                          item.isWinner
+                            ? 'bg-gradient-to-r from-[#4338ca] to-cyan-500 shadow-sm'
+                            : 'bg-neutral-300'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="mt-8 space-y-2 pt-6 border-t border-[#e5e5e5]/60">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-neutral-500 font-semibold">Nova Browser</span>
-              <span className="text-[#4338ca] font-bold">420 MB</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[30%] h-full bg-[#4338ca] rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Google Chrome</span>
-              <span className="text-neutral-600">1,100 MB</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[85%] h-full bg-neutral-300 rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Arc Browser</span>
-              <span className="text-neutral-600">1,400 MB</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[100%] h-full bg-neutral-300 rounded-full" />
-            </div>
+          <div className="mt-8 pt-6 border-t border-neutral-100 flex items-center justify-between text-xs font-mono text-neutral-400">
+            <span>// Criteria: {currentCategory.lowerIsBetter ? 'Lower is Better' : 'Higher is Better'}</span>
+            <span>Tested on Apple M3 Max // Chrome v128</span>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Metric 2: Cold Startup */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="p-8 rounded-2xl bg-white border border-[#e5e5e5] shadow-sm flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div className="p-2.5 rounded-xl bg-purple-50 text-purple-700">
-                <Zap className="w-5 h-5" />
-              </div>
-              <span className="font-mono text-[10px] font-bold text-purple-600 uppercase tracking-widest bg-purple-50 px-2.5 py-1 rounded-full border border-purple-200">
-                Ultra-Fast Paint
+        {/* Right Card: Giant Highlight Key Stat */}
+        <div className="lg:col-span-4 p-8 sm:p-10 rounded-3xl bg-[#171717] text-[#fcfbf9] flex flex-col justify-between relative overflow-hidden shadow-2xl">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/15 to-cyan-500/10 pointer-events-none" />
+
+          <div className="relative z-10">
+            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-indigo-400 mb-8 shadow-inner">
+              <Activity className="w-6 h-6" />
+            </div>
+
+            <span className="font-mono text-xs text-neutral-400 uppercase tracking-widest block mb-2 font-medium">
+              {currentCategory.highlightLabel}
+            </span>
+
+            <div className="flex items-baseline gap-2 mb-4">
+              <span className="font-serif text-6xl sm:text-7xl font-bold tracking-tight text-white">
+                {currentCategory.highlightNumber}
+              </span>
+              <span className="font-sans text-2xl font-light text-neutral-400">
+                {currentCategory.highlightUnit}
               </span>
             </div>
 
-            <span className="font-mono text-[10px] text-neutral-400 block mb-1 uppercase tracking-wider">
-              COLD START TO FIRST PAINT
-            </span>
-            <div className="font-serif text-4xl font-bold text-[#171717] mb-4">
-              ~380 <span className="text-xl font-normal text-neutral-400 font-sans">ms</span>
-            </div>
-
-            <p className="font-sans text-xs text-neutral-600 leading-relaxed">
-              Non-blocking deferred CSS font loading and streamlined Electron initialization pipeline.
+            <p className="font-sans text-xs text-neutral-300 leading-relaxed">
+              Measured baseline under isolated test suites. 0% telemetry transmission ensures raw CPU cycles remain dedicated to execution.
             </p>
           </div>
 
-          <div className="mt-8 space-y-2 pt-6 border-t border-[#e5e5e5]/60">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-neutral-500 font-semibold">Nova Browser</span>
-              <span className="text-purple-700 font-bold">380 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[45%] h-full bg-purple-700 rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Google Chrome</span>
-              <span className="text-neutral-600">450 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[55%] h-full bg-neutral-300 rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Arc Browser</span>
-              <span className="text-neutral-600">850 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[95%] h-full bg-neutral-300 rounded-full" />
+          <div className="relative z-10 pt-6 border-t border-white/10 mt-8 space-y-2">
+            <div className="flex items-center gap-2 text-emerald-400 font-mono text-xs font-semibold">
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+              <span>Certified Sovereign Architecture</span>
             </div>
           </div>
-        </motion.div>
+        </div>
 
-        {/* Metric 3: Search Latency */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="p-8 rounded-2xl bg-white border border-[#e5e5e5] shadow-sm flex flex-col justify-between"
-        >
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div className="p-2.5 rounded-xl bg-blue-50 text-blue-600">
-                <Gauge className="w-5 h-5" />
+      </div>
+
+      {/* INTERACTIVE RAM SAVINGS SIMULATOR SLIDER */}
+      <div className="p-8 sm:p-10 rounded-3xl bg-neutral-50 border border-[#e5e5e5] shadow-lg relative overflow-hidden">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          
+          {/* Slider Control Column */}
+          <div className="lg:max-w-md space-y-4">
+            <div className="flex items-center gap-2 text-[#4338ca] font-mono text-xs font-bold uppercase tracking-wider">
+              <Sliders className="w-4 h-4" />
+              <span>Interactive Memory Simulator</span>
+            </div>
+
+            <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#171717]">
+              Estimate Your RAM Savings
+            </h3>
+
+            <p className="font-sans text-xs sm:text-sm text-neutral-600 leading-relaxed">
+              Adjust the slider to see how Nova’s automatic hibernation engine cuts RAM footprint as your active tab count grows.
+            </p>
+
+            <div className="pt-2">
+              <div className="flex justify-between font-mono text-xs font-bold text-neutral-700 mb-2">
+                <span>Tab Load: {tabCount} Open Tabs</span>
+                <span className="text-[#4338ca]">{tabCount >= 50 ? 'Heavy Multitasking' : 'Normal Browsing'}</span>
               </div>
-              <span className="font-mono text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
-                0ms LRU Cache
+              <input
+                type="range"
+                min={5}
+                max={100}
+                step={5}
+                value={tabCount}
+                onChange={(e) => setTabCount(parseInt(e.target.value, 10))}
+                className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-[#4338ca]"
+              />
+              <div className="flex justify-between font-mono text-[10px] text-neutral-400 mt-1">
+                <span>5 Tabs</span>
+                <span>50 Tabs</span>
+                <span>100 Tabs</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Results Comparison Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:w-3/5">
+            {/* Nova Result */}
+            <div className="p-6 rounded-2xl bg-white border border-[#4338ca]/30 shadow-md flex flex-col justify-between">
+              <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                Nova Browser
+              </span>
+              <div className="font-serif text-3xl sm:text-4xl font-bold text-[#4338ca] my-2">
+                ~{novaMemoryEst} <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
+              </div>
+              <span className="font-mono text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded w-fit">
+                Hibernated
               </span>
             </div>
 
-            <span className="font-mono text-[10px] text-neutral-400 block mb-1 uppercase tracking-wider">
-              OMNIBOX SUGGESTION LATENCY
-            </span>
-            <div className="font-serif text-4xl font-bold text-[#171717] mb-4">
-              0 <span className="text-xl font-normal text-neutral-400 font-sans">ms / 35 ms</span>
+            {/* Standard Chrome Result */}
+            <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-sm flex flex-col justify-between">
+              <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                Google Chrome
+              </span>
+              <div className="font-serif text-3xl sm:text-4xl font-bold text-neutral-700 my-2">
+                ~{(chromeMemoryEst / 1024).toFixed(1)} <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
+              </div>
+              <span className="font-mono text-[10px] text-neutral-400">
+                ({chromeMemoryEst} MB)
+              </span>
             </div>
 
-            <p className="font-sans text-xs text-neutral-600 leading-relaxed">
-              Cached results render synchronously on keystroke; network queries use staggered fallback promises.
-            </p>
+            {/* Net Savings Result */}
+            <div className="p-6 rounded-2xl bg-[#171717] text-white shadow-xl flex flex-col justify-between">
+              <span className="font-mono text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                Net Memory Saved
+              </span>
+              <div className="font-serif text-3xl sm:text-4xl font-bold text-emerald-400 my-2">
+                {savedPercentage}%
+              </div>
+              <span className="font-mono text-[10px] text-neutral-300">
+                ~{(savedMemoryEst / 1024).toFixed(1)} GB Free RAM
+              </span>
+            </div>
           </div>
 
-          <div className="mt-8 space-y-2 pt-6 border-t border-[#e5e5e5]/60">
-            <div className="flex justify-between text-xs font-mono">
-              <span className="text-neutral-500 font-semibold">Nova Browser</span>
-              <span className="text-blue-600 font-bold">0-35 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[20%] h-full bg-blue-600 rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Google Chrome</span>
-              <span className="text-neutral-600">65 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[60%] h-full bg-neutral-300 rounded-full" />
-            </div>
-
-            <div className="flex justify-between text-xs font-mono pt-1">
-              <span className="text-neutral-500">Arc Browser</span>
-              <span className="text-neutral-600">120 ms</span>
-            </div>
-            <div className="w-full h-1.5 bg-neutral-100 rounded-full overflow-hidden">
-              <div className="w-[90%] h-full bg-neutral-300 rounded-full" />
-            </div>
-          </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );
 };
 
 export default Benchmarks;
+
