@@ -125,7 +125,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
       setError(null);
       setData(null);
       setDisplayedSummary('');
-      setLoadingText('Sayfa içeriği alınıyor...');
+      setLoadingText('Fetching page content...');
       
       try {
         let domain = '';
@@ -134,8 +134,6 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
         } catch {
           domain = url;
         }
-
-        // 1. Fetch HTML from Main Process
         const api = (window as any).electronAPI;
         if (!api?.fetchPageHtml) throw new Error("API not available");
         
@@ -143,47 +141,39 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
         if (isCancelled) return;
         
         if (!result.success || !result.html) {
-          throw new Error(result.error || "İçerik yüklenemedi");
+          throw new Error(result.error || "Failed to load content");
         }
 
-        setLoadingText('İçerik analiz ediliyor...');
+        setLoadingText('Analyzing content...');
 
-        // 2. Parse HTML
         const parser = new DOMParser();
         const doc = parser.parseFromString(result.html, 'text/html');
         
-        // 3. Extract Metadata
         const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
         const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
         const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
         const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
 
-        // 4. Extract readable article text using Mozilla Readability
         let pageTitle = ogTitle || doc.title || domain;
-        let articleText = '';
+        let cleanText = '';
         try {
           const reader = new Readability(doc);
           const article = reader.parse();
           if (article?.title) pageTitle = article.title;
-          articleText = article?.textContent || '';
+          cleanText = article?.textContent || '';
         } catch (e) {
-          articleText = doc.body.textContent || '';
+          cleanText = doc.body.textContent || '';
         }
         
-        // Clean text
-        let cleanText = (articleText || doc.body.textContent || '')
-          .replace(/\s+/g, ' ')
-          .trim();
-        
+        cleanText = cleanText.replace(/\s+/g, ' ').trim();
         const wordCount = cleanText.split(/\s+/).filter(Boolean).length;
         const readingTimeMinutes = Math.max(1, Math.round(wordCount / 200));
 
         let finalSummary = '';
         let isAiGenerated = false;
 
-        // 5. Intelligent Summarization
         if (aiAgent.isReady() && cleanText.length > 80) {
-          setLoadingText('Yapay zeka özetliyor...');
+          setLoadingText('AI is summarizing...');
           try {
             const aiSummary = await aiAgent.summarize(cleanText.substring(0, 3000), pageTitle);
             if (aiSummary && aiSummary.length > 25) {
@@ -195,40 +185,38 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           }
         }
 
-        // Fallback to rich meta description or smart complete sentence extraction
         if (!finalSummary) {
           const descriptionCandidate = (ogDesc || metaDesc || '').trim();
-          if (descriptionCandidate.length > 40) {
-            finalSummary = extractCompleteSentences(descriptionCandidate, 260);
+          if (descriptionCandidate.length > 30) {
+            finalSummary = descriptionCandidate;
+          } else if (cleanText.length > 40) {
+            const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [];
+            if (sentences.length > 0) {
+              finalSummary = sentences.slice(0, 2).join(' ').trim();
+            } else {
+              finalSummary = cleanText.substring(0, 180).trim() + '...';
+            }
           } else {
-            finalSummary = extractCompleteSentences(cleanText, 260);
+            finalSummary = 'Preview available. Click to visit this page.';
           }
-        }
-
-        if (!finalSummary || finalSummary.length < 20) {
-          finalSummary = `${domain} üzerindeki bu sayfa konuyla ilgili detaylı bilgiler içermektedir.`;
         }
 
         if (isCancelled) return;
 
         const previewResult: PreviewData = {
-          title: pageTitle.trim(),
+          title: pageTitle,
           domain,
           summary: finalSummary,
+          ogImage: ogImage || undefined,
           readingTimeMinutes,
-          ogImage: ogImage?.startsWith('http') ? ogImage : undefined,
           isAiGenerated
         };
-
-        // Cache result
         previewCache.set(url, previewResult);
         setData(previewResult);
-        setIsLoading(false);
-
       } catch (err: any) {
         if (!isCancelled) {
-          console.error('[AILinkPreview] Error:', err);
-          setError("Sayfa önizlemesi oluşturulamadı.");
+          console.error('Failed to preview link:', err);
+          setError('Preview unavailable for this page');
         }
       } finally {
         if (!isCancelled) {
@@ -236,13 +224,37 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
         }
       }
     };
-    
+
     fetchAndSummarize();
-    
-    return () => {
-      isCancelled = true;
-    };
-  }, [isOpen, url]);
+    return () => { isCancelled = true; };
+  }, [url, isOpen]);
+
+  useEffect(() => {
+    if (!data?.summary) {
+      setDisplayedSummary('');
+      return;
+    }
+
+    if (!data.isAiGenerated) {
+      setDisplayedSummary(data.summary);
+      return;
+    }
+
+    let i = 0;
+    setDisplayedSummary('');
+    const fullText = data.summary;
+    const timer = setInterval(() => {
+      i += 3;
+      if (i >= fullText.length) {
+        setDisplayedSummary(fullText);
+        clearInterval(timer);
+      } else {
+        setDisplayedSummary(fullText.substring(0, i));
+      }
+    }, 15);
+
+    return () => clearInterval(timer);
+  }, [data]);
 
   let domainName = '';
   try {
@@ -251,32 +263,24 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
     domainName = url;
   }
 
+  const topPos = typeof window !== 'undefined' ? Math.min(window.innerHeight - 260, Math.max(10, y + 16)) : y;
+  const leftPos = typeof window !== 'undefined' ? Math.min(window.innerWidth - 340, Math.max(10, x + 16)) : x;
+
   return (
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.94, y: 10 }}
+          initial={{ opacity: 0, scale: 0.96, y: 6 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.94, y: 10 }}
-          transition={{ type: "spring", stiffness: 450, damping: 28 }}
-          style={{
-            position: 'fixed',
-            left: Math.max(16, Math.min(x + 20, window.innerWidth - 380)),
-            top: Math.max(16, Math.min(y - 30, window.innerHeight - 240)),
-            zIndex: 999999,
-          }}
-          className="w-88 md:w-92 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-slate-700/80 shadow-2xl rounded-2xl p-4 overflow-hidden pointer-events-none select-none cursor-default"
+          exit={{ opacity: 0, scale: 0.96, y: 6 }}
+          transition={{ duration: 0.15, ease: "easeOut" }}
+          style={{ top: topPos, left: leftPos, position: 'fixed', zIndex: 999999 }}
+          className="w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-2xl pointer-events-none"
         >
-          {/* Top Bar: Favicon + Domain + Reading Time */}
-          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-2 min-w-0">
-              <img 
-                src={`https://www.google.com/s2/favicons?domain=${domainName}&sz=32`} 
-                alt="" 
-                className="w-4 h-4 rounded-sm shrink-0 object-contain"
-                onError={(e) => { (e.target as HTMLElement).style.display = 'none'; }}
-              />
-              <span className="text-[11.5px] font-semibold text-slate-700 dark:text-slate-300 truncate">
+          <div className="flex items-center justify-between gap-2 pb-2 mb-2 border-b border-slate-100 dark:border-slate-800/80">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+              <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 truncate">
                 {domainName}
               </span>
             </div>
@@ -285,7 +289,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
               {data && (
                 <span className="flex items-center gap-1 text-[10.5px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full">
                   <Clock className="w-3 h-3" />
-                  ~{data.readingTimeMinutes} dk
+                  ~{data.readingTimeMinutes} min
                 </span>
               )}
               <span className="p-1 bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 rounded-lg">
@@ -294,49 +298,35 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
             </div>
           </div>
 
-          {/* Title */}
           {data?.title && (
             <h4 className="text-[13px] font-bold text-slate-900 dark:text-slate-100 leading-snug line-clamp-2 mb-2">
               {data.title}
             </h4>
           )}
 
-          {/* Content Area */}
           <div className="text-[12px] text-slate-600 dark:text-slate-300 leading-relaxed min-h-[46px]">
             {isLoading ? (
               <div className="flex flex-col items-center justify-center py-4 text-slate-500 dark:text-slate-400 gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-500" />
-                <span className="text-[11px] font-medium text-center">{loadingText}</span>
+                <span className="text-[11px] font-medium">{loadingText}</span>
               </div>
             ) : error ? (
               <div className="text-red-500 text-xs text-center py-3 font-medium bg-red-500/5 rounded-xl border border-red-500/10">
                 {error}
               </div>
             ) : (
-              <div className="relative">
-                <p className="inline font-normal">
-                  {displayedSummary}
-                </p>
-                {displayedSummary.length < (data?.summary.length || 0) && (
-                  <motion.span
-                    animate={{ opacity: [1, 0] }}
-                    transition={{ repeat: Infinity, duration: 0.7, ease: "linear" }}
-                    className="inline-block w-[2px] h-[13px] bg-cyan-500 ml-[2px] align-middle rounded-full"
-                  />
-                )}
-              </div>
+              <p>{displayedSummary}</p>
             )}
           </div>
 
-          {/* Footer Badge */}
           {data && !isLoading && (
             <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500">
               <span className="flex items-center gap-1 font-medium text-cyan-600 dark:text-cyan-400">
                 <Sparkles className="w-2.5 h-2.5" />
-                {data.isAiGenerated ? 'Yapay Zeka Özeti' : 'Akıllı Sayfa Önizlemesi'}
+                {data.isAiGenerated ? 'AI Summary' : 'Smart Page Preview'}
               </span>
               <span className="flex items-center gap-1 opacity-80">
-                Açmak için tıklayın <ExternalLink className="w-2.5 h-2.5" />
+                Click to open <ExternalLink className="w-2.5 h-2.5" />
               </span>
             </div>
           )}

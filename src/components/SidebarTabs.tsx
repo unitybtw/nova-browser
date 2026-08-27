@@ -291,7 +291,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               onCloseSplit?.(tab.id, splitTab.id);
             }}
             className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 group/unsplit cursor-pointer"
-            title="Separate Tabs (Split'i Ayır)"
+            title="Separate Tabs"
           >
             <div className="w-px h-3.5 bg-slate-300 dark:bg-white/20 group-hover/unsplit:hidden" />
             <Columns2 className="w-3 h-3 hidden group-hover/unsplit:block text-slate-500 dark:text-slate-300" />

@@ -1428,61 +1428,58 @@ app.on('web-contents-created', (_event, wc) => {
       const { Menu, MenuItem, clipboard, dialog } = require('electron');
       const menu = new Menu();
 
-      const userLocale = (app.getLocale() || '').toLowerCase();
-      const isTr = userLocale.startsWith('tr');
-
       const labels = {
         // Spellcheck
-        noGuesses: isTr ? 'Yazım önerisi yok' : 'No guesses found',
-        addToDictionary: isTr ? 'Sözlüğe Ekle' : 'Add to Dictionary',
+        noGuesses: 'No guesses found',
+        addToDictionary: 'Add to Dictionary',
 
         // Links
-        openLinkNewTab: isTr ? 'Bağlantıyı yeni sekmede aç' : 'Open Link in New Tab',
-        openLinkNewIncognitoTab: isTr ? 'Bağlantıyı gizli pencerede aç' : 'Open Link in Incognito Window',
-        saveLinkAs: isTr ? 'Bağlantıyı farklı kaydet...' : 'Save Link As...',
-        copyLinkAddress: isTr ? 'Bağlantı adresini kopyala' : 'Copy Link Address',
+        openLinkNewTab: 'Open Link in New Tab',
+        openLinkNewIncognitoTab: 'Open Link in Incognito Window',
+        saveLinkAs: 'Save Link As...',
+        copyLinkAddress: 'Copy Link Address',
 
         // Images
-        openImageNewTab: isTr ? 'Resmi yeni sekmede aç' : 'Open Image in New Tab',
-        saveImageAs: isTr ? 'Resmi farklı kaydet...' : 'Save Image As...',
-        copyImage: isTr ? 'Resmi kopyala' : 'Copy Image',
-        copyImageAddress: isTr ? 'Resim adresini kopyala' : 'Copy Image Address',
-        searchImageLens: isTr ? 'Google Lens ile resim ara' : 'Search Image with Google Lens',
+        openImageNewTab: 'Open Image in New Tab',
+        saveImageAs: 'Save Image As...',
+        copyImage: 'Copy Image',
+        copyImageAddress: 'Copy Image Address',
+        searchImageLens: 'Search Image with Google Lens',
 
         // Audio & Video
-        play: isTr ? 'Oynat' : 'Play',
-        pause: isTr ? 'Duraklat' : 'Pause',
-        mute: isTr ? 'Sesi kapat' : 'Mute',
-        unmute: isTr ? 'Sesi aç' : 'Unmute',
-        loop: isTr ? 'Döngü' : 'Loop',
-        showControls: isTr ? 'Denetimleri göster' : 'Show Controls',
-        pictureInPicture: isTr ? 'Resim içinde resim (PiP)' : 'Picture in Picture',
-        saveVideoAs: isTr ? 'Videoyu farklı kaydet...' : 'Save Video As...',
-        copyVideoAddress: isTr ? 'Video adresini kopyala' : 'Copy Video Address',
-        saveAudioAs: isTr ? 'Sesi farklı kaydet...' : 'Save Audio As...',
-        copyAudioAddress: isTr ? 'Ses adresini kopyala' : 'Copy Audio Address',
+        play: 'Play',
+        pause: 'Pause',
+        mute: 'Mute',
+        unmute: 'Unmute',
+        loop: 'Loop',
+        showControls: 'Show Controls',
+        pictureInPicture: 'Picture in Picture',
+        saveVideoAs: 'Save Video As...',
+        copyVideoAddress: 'Copy Video Address',
+        saveAudioAs: 'Save Audio As...',
+        copyAudioAddress: 'Copy Audio Address',
 
         // Selection
-        copy: isTr ? 'Kopyala' : 'Copy',
-        cut: isTr ? 'Kes' : 'Cut',
-        paste: isTr ? 'Yapıştır' : 'Paste',
-        pasteAsPlainText: isTr ? 'Düz metin olarak yapıştır' : 'Paste as Plain Text',
-        selectAll: isTr ? 'Tümünü seç' : 'Select All',
-        undo: isTr ? 'Geri al' : 'Undo',
-        redo: isTr ? 'Yinele' : 'Redo',
-        delete: isTr ? 'Sil' : 'Delete',
-        searchFor: (query: string) => isTr ? `Google'da "${query}" için ara` : `Search Google for "${query}"`,
-        aiExplain: isTr ? '✨ Nova AI ile Açıkla' : '✨ Explain with Nova AI',
+        copy: 'Copy',
+        cut: 'Cut',
+        paste: 'Paste',
+        pasteAsPlainText: 'Paste as Plain Text',
+        selectAll: 'Select All',
+        undo: 'Undo',
+        redo: 'Redo',
+        delete: 'Delete',
+        searchFor: (query: string) => `Search Google for "${query}"`,
+        aiExplain: 'Explain with Nova AI',
 
         // Page Navigation
-        back: isTr ? 'Geri' : 'Back',
-        forward: isTr ? 'İleri' : 'Forward',
-        reload: isTr ? 'Yeniden Yükle' : 'Reload',
-        translatePage: isTr ? 'Sayfayı Türkçeye Çevir' : 'Translate Page',
-        savePageAs: isTr ? 'Farklı kaydet...' : 'Save As...',
-        print: isTr ? 'Yazdır...' : 'Print...',
-        viewSource: isTr ? 'Sayfa kaynağını görüntüle' : 'View Page Source',
-        inspect: isTr ? 'İncele' : 'Inspect',
+        back: 'Back',
+        forward: 'Forward',
+        reload: 'Reload',
+        translatePage: 'Translate Page',
+        savePageAs: 'Save As...',
+        print: 'Print...',
+        viewSource: 'View Page Source',
+        inspect: 'Inspect',
       };
 
       // 1. Spellcheck Suggestions (if misspelled word)
@@ -1739,7 +1736,7 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: labels.translatePage,
             click: () => {
-              sendToMainWindow('trigger-page-translation', { targetLang: isTr ? 'tr' : 'en', webContentsId: wc.id });
+              sendToMainWindow('trigger-page-translation', { targetLang: 'en', webContentsId: wc.id });
             }
           }));
         }

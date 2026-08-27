@@ -822,23 +822,23 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div>
                     <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">Column Width</div>
                     <div className="flex gap-1.5">
-                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Dar</button>
-                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Standart</button>
-                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Geniş</button>
+                      <button onClick={() => handleColumnWidthChange('narrow')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='narrow' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Narrow</button>
+                      <button onClick={() => handleColumnWidthChange('normal')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='normal' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Normal</button>
+                      <button onClick={() => handleColumnWidthChange('wide')} className={`flex-1 py-1.5 px-2 rounded-lg border text-xs transition-all no-drag cursor-pointer ${columnWidth==='wide' ? 'border-cyan-500 bg-cyan-500/10 text-cyan-400' : theme === 'dark' ? 'border-slate-700 hover:bg-slate-800' : 'border-slate-200 hover:bg-slate-50'}`}>Wide</button>
                     </div>
                   </div>
 
                   {/* Natural Voice & Language Settings */}
                   <div className="border-t pt-4 border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
-                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Doğal Ses & Dil Ayarları
+                      <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Natural Voice & Audio Settings
                     </div>
                     
                     <div className="space-y-2.5">
                       {/* Language Selection */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Globe className="w-3 h-3" /> Dil
+                          <Globe className="w-3 h-3" /> Language
                         </span>
                         <select
                           value={selectedLanguage}
@@ -850,19 +850,19 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                             theme === 'dark' ? 'bg-slate-950 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200 text-slate-800'
                           }`}
                         >
-                          <option value="auto">Otomatik ({detectedLang.startsWith('tr') ? 'Türkçe' : detectedLang.startsWith('de') ? 'Almanca' : detectedLang.startsWith('fr') ? 'Fransızca' : detectedLang.startsWith('es') ? 'İspanyolca' : 'İngilizce'})</option>
-                          <option value="tr-TR">Türkçe (Yelda / Doğal)</option>
-                          <option value="en-US">İngilizce (Samantha / Natural)</option>
-                          <option value="de-DE">Almanca (Anna)</option>
-                          <option value="fr-FR">Fransızca (Thomas)</option>
-                          <option value="es-ES">İspanyolca (Mónica)</option>
+                          <option value="auto">Auto ({detectedLang.startsWith('tr') ? 'Turkish' : detectedLang.startsWith('de') ? 'German' : detectedLang.startsWith('fr') ? 'French' : detectedLang.startsWith('es') ? 'Spanish' : 'English'})</option>
+                          <option value="tr-TR">Turkish (Yelda / Natural)</option>
+                          <option value="en-US">English (Samantha / Natural)</option>
+                          <option value="de-DE">German (Anna)</option>
+                          <option value="fr-FR">French (Thomas)</option>
+                          <option value="es-ES">Spanish (Mónica)</option>
                         </select>
                       </div>
 
                       {/* Native / System Voice Picker */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-cyan-400" /> Ses
+                          <Sparkles className="w-3 h-3 text-cyan-400" /> Voice
                         </span>
                         <select
                           value={selectedVoiceName}
@@ -872,11 +872,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                           }`}
                         >
                           <option value="">
-                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Doğal)' : 'Samantha (Apple Natural)') : 'En İyi Doğal Ses'}
+                            {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Natural)' : 'Samantha (Apple Natural)') : 'Best Natural Voice'}
                           </option>
                           
                           {activeNativeVoices.length > 0 && (
-                            <optgroup label="macOS Sistem Sesleri">
+                            <optgroup label="macOS System Voices">
                               {activeNativeVoices.map((v) => (
                                 <option key={v.name} value={v.name}>
                                   {v.name}
@@ -886,7 +886,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                           )}
 
                           {activeWebVoices.length > 0 && activeNativeVoices.length === 0 && (
-                            <optgroup label="Yüklü Sesler">
+                            <optgroup label="Installed Voices">
                               {activeWebVoices.map((v) => (
                                 <option key={v.name} value={v.name}>
                                   {v.name.replace(/Google|Microsoft|Apple|Online \(Natural\)/gi, '').trim() || v.name}
@@ -907,7 +907,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
             {isLoading && (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <div className="w-8 h-8 border-4 border-slate-700 border-t-cyan-500 rounded-full animate-spin mb-4" />
-                <p className="text-sm font-medium">Makale içeriği çıkarılıyor...</p>
+                <p className="text-sm font-medium">Extracting article content...</p>
               </div>
             )}
             
@@ -927,15 +927,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
                   <span className="flex items-center gap-1">
                     <Clock className="w-3.5 h-3.5" />
-                    {readingTime} dk okuma
+                    {readingTime} min read
                   </span>
                   <span className="flex items-center gap-1">
                     <BookOpen className="w-3.5 h-3.5" />
-                    {wordCount.toLocaleString()} kelime
+                    {wordCount.toLocaleString()} words
                   </span>
                   <span className="flex items-center gap-1 text-cyan-400 font-medium">
                     <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Doğal Sesi' : 'macOS Samantha Doğal Sesi') : 'Doğal İnsan Sesi'}
+                    {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : 'Natural Human Voice'}
                   </span>
                 </div>
 
@@ -967,15 +967,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${isPlaying ? 'bg-cyan-400 animate-ping' : 'bg-amber-400'}`} />
                     <span className="text-cyan-400 font-bold">
-                      {isPlaying ? 'Sesli Okunuyor' : 'Duraklatıldı'}
+                      {isPlaying ? 'Reading Aloud' : 'Paused'}
                     </span>
                     <span className="opacity-60 text-[11px]">
-                      ({currentSentenceIndex + 1} / {sentences.length} cümle)
+                      ({currentSentenceIndex + 1} / {sentences.length} sentences)
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px] opacity-70 font-medium truncate max-w-[140px]">
-                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : 'Doğal Ses')}
+                      {selectedVoiceName || (isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda' : 'Samantha') : 'Natural Voice')}
                     </span>
                     <button
                       onClick={changeSpeechRate}
@@ -1006,14 +1006,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       onClick={prevSentence}
                       disabled={currentSentenceIndex <= 0}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
-                      title="Önceki Cümle"
+                      title="Previous Sentence"
                     >
                       <SkipBack className="w-4 h-4" />
                     </button>
                     <button
                       onClick={toggleSpeech}
                       className="p-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                      title={isPlaying ? "Duraklat" : "Devam Et"}
+                      title={isPlaying ? "Pause" : "Resume"}
                     >
                       {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
                     </button>
@@ -1021,7 +1021,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                       onClick={nextSentence}
                       disabled={currentSentenceIndex >= sentences.length - 1}
                       className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 transition-colors cursor-pointer"
-                      title="Sonraki Cümle"
+                      title="Next Sentence"
                     >
                       <SkipForward className="w-4 h-4" />
                     </button>
@@ -1030,10 +1030,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                   <button
                     onClick={stopSpeech}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
-                    title="Okumayı Durdur"
+                    title="Stop Reading"
                   >
                     <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>Durdur</span>
+                    <span>Stop</span>
                   </button>
                 </div>
               </motion.div>

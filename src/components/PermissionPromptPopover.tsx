@@ -48,8 +48,8 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
         const hasAudio = !mediaTypes || mediaTypes.includes('audio');
         if (hasVideo && hasAudio) {
           return {
-            title: 'Kamera ve Mikrofon',
-            desc: 'Kameranızı ve mikrofonunuzu kullanmak',
+            title: 'Camera & Microphone',
+            desc: 'Use your camera and microphone',
             icon: (
               <div className="flex items-center gap-1 text-blue-500">
                 <Camera className="w-4 h-4" />
@@ -60,73 +60,73 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
           };
         } else if (hasVideo) {
           return {
-            title: 'Kamera',
-            desc: 'Kameranızı kullanmak',
+            title: 'Camera',
+            desc: 'Use your camera',
             icon: <Camera className="w-4 h-4 text-blue-500" />,
             bg: 'bg-blue-500/10 dark:bg-blue-500/20'
           };
         } else {
           return {
-            title: 'Mikrofon',
-            desc: 'Mikrofonunuzu kullanmak',
+            title: 'Microphone',
+            desc: 'Use your microphone',
             icon: <Mic className="w-4 h-4 text-purple-500" />,
             bg: 'bg-purple-500/10 dark:bg-purple-500/20'
           };
         }
       case 'geolocation':
         return {
-          title: 'Konum',
-          desc: 'Cihazınızın konumunu öğrenmek',
+          title: 'Location',
+          desc: 'Access your physical location',
           icon: <MapPin className="w-4 h-4 text-emerald-500" />,
           bg: 'bg-emerald-500/10 dark:bg-emerald-500/20'
         };
       case 'notifications':
         return {
-          title: 'Bildirimler',
-          desc: 'Size bildirim göndermek',
+          title: 'Notifications',
+          desc: 'Send you push notifications',
           icon: <Bell className="w-4 h-4 text-amber-500" />,
           bg: 'bg-amber-500/10 dark:bg-amber-500/20'
         };
       case 'clipboard-read':
         return {
-          title: 'Pano',
-          desc: 'Panonuzdaki metin ve görselleri okumak',
+          title: 'Clipboard',
+          desc: 'Read text and images from clipboard',
           icon: <Clipboard className="w-4 h-4 text-cyan-500" />,
           bg: 'bg-cyan-500/10 dark:bg-cyan-500/20'
         };
       case 'pointerLock':
         return {
-          title: 'İmleç Kilidi',
-          desc: 'Fare imlecini kilitlemek',
+          title: 'Pointer Lock',
+          desc: 'Lock and track mouse pointer movement',
           icon: <MousePointer className="w-4 h-4 text-indigo-500" />,
           bg: 'bg-indigo-500/10 dark:bg-indigo-500/20'
         };
       case 'fullscreen':
         return {
-          title: 'Tam Ekran',
-          desc: 'Tam ekran moduna geçmek',
+          title: 'Full Screen',
+          desc: 'Enter full screen display mode',
           icon: <Maximize className="w-4 h-4 text-slate-500" />,
           bg: 'bg-slate-500/10 dark:bg-slate-500/20'
         };
       case 'display-capture':
         return {
-          title: 'Ekran Paylaşımı',
-          desc: 'Ekranınızı veya bir pencereyi kaydetmek/paylaşmak',
+          title: 'Screen Sharing',
+          desc: 'Capture or share your screen/window',
           icon: <Tv className="w-4 h-4 text-rose-500" />,
           bg: 'bg-rose-500/10 dark:bg-rose-500/20'
         };
       case 'midi':
       case 'midiSysex':
         return {
-          title: 'MIDI Cihazları',
-          desc: 'Müzik ve MIDI cihazlarınıza erişmek',
+          title: 'MIDI Devices',
+          desc: 'Access MIDI instruments and controllers',
           icon: <Music className="w-4 h-4 text-pink-500" />,
           bg: 'bg-pink-500/10 dark:bg-pink-500/20'
         };
       default:
         return {
           title: currentRequest.permissionName || perm,
-          desc: `${currentRequest.permissionName || perm} iznine erişmek`,
+          desc: `Access ${currentRequest.permissionName || perm} permission`,
           icon: <ShieldAlert className="w-4 h-4 text-amber-500" />,
           bg: 'bg-amber-500/10 dark:bg-amber-500/20'
         };
@@ -159,7 +159,7 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
                 {domain}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
-                şunu istiyor:
+                wants to:
               </span>
             </div>
           </div>
@@ -167,7 +167,7 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
           <button
             onClick={() => onDismiss(currentRequest.requestId)}
             className="p-1 -mr-1 -mt-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Kapat"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>
@@ -197,11 +197,11 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
               onChange={(e) => setRemember(e.target.checked)}
               className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500/20 border-slate-300 dark:border-slate-600 dark:bg-slate-800 cursor-pointer"
             />
-            <span>Bu site için tercihi hatırla</span>
+            <span>Remember this choice for this site</span>
           </label>
           {requests.length > 1 && (
             <span className="ml-auto text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
-              +{requests.length - 1} istek daha
+              +{requests.length - 1} more
             </span>
           )}
         </div>
@@ -212,14 +212,14 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
             onClick={() => onRespond(currentRequest.requestId, false, remember)}
             className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all active:scale-95 cursor-pointer"
           >
-            Engelle
+            Block
           </button>
           <button
             onClick={() => onRespond(currentRequest.requestId, true, remember)}
             className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-xl shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-            İzin Ver
+            Allow
           </button>
         </div>
       </motion.div>

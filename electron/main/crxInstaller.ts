@@ -248,6 +248,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     return { success: true, extension: extInfo };
   } catch (err: any) {
     console.error('Web Store Install Error:', err);
-    return { error: err.message || 'Bilinmeyen bir hata oluştu.' };
+    return { error: err.message || 'An unknown error occurred.' };
   }
 }

@@ -68,7 +68,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                  {isUpdate ? 'Şifre Güncellensin mi?' : 'Şifre Kaydedilsin mi?'}
+                  {isUpdate ? 'Update Password?' : 'Save Password?'}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate flex items-center gap-1 mt-0.5" title={hostname}>
                   <Globe size={11} className="opacity-70 shrink-0" />
@@ -78,7 +78,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
               <button
                 onClick={onClose}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                title="Kapat"
+                title="Close"
               >
                 <X size={16} />
               </button>
@@ -91,13 +91,13 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
                 <User size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
                 <div className="flex-1 min-w-0">
                   <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                    Kullanıcı Adı / E-Posta
+                    Username / Email
                   </label>
                   <input
                     type="text"
                     value={editedUsername}
                     onChange={(e) => setEditedUsername(e.target.value)}
-                    placeholder="kullanici@ornek.com"
+                    placeholder="user@example.com"
                     className="w-full bg-transparent text-xs font-medium text-slate-900 dark:text-slate-100 outline-none placeholder:text-slate-400"
                   />
                 </div>
@@ -109,7 +109,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
                   <Lock size={14} className="text-slate-400 dark:text-slate-500 shrink-0 ml-1" />
                   <div className="flex-1 min-w-0">
                     <label className="block text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                      Şifre
+                      Password
                     </label>
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -122,7 +122,7 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                    title={showPassword ? "Şifreyi Gizle" : "Şifreyi Göster"}
+                    title={showPassword ? "Hide Password" : "Show Password"}
                   >
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
@@ -136,14 +136,14 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
                 onClick={onClose}
                 className="flex-1 py-2 px-3 rounded-xl border border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 font-medium text-xs hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                <span>Şimdi Değil</span>
+                <span>Not Now</span>
               </button>
               <button
                 onClick={handleSave}
                 className="flex-1 py-2 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Check size={14} />
-                <span>{isUpdate ? 'Güncelle' : 'Kaydet'}</span>
+                <span>{isUpdate ? 'Update' : 'Save'}</span>
               </button>
             </div>
           </div>

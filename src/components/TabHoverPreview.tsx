@@ -195,7 +195,7 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = ({
                   {tab.title || (isNewTab ? 'New Tab Page' : domain)}
                 </span>
                 <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  {tab.isLoading ? 'Sayfa Yükleniyor...' : (isInternal ? 'Nova Sistem Sayfası' : domain || 'Web Sayfası')}
+                  {tab.isLoading ? 'Loading Page...' : (isInternal ? 'Nova System Page' : domain || 'Web Page')}
                 </span>
               </div>
             )}

@@ -709,7 +709,7 @@ class NovaSyncService {
   public async joinSyncChain(syncCode: string): Promise<SyncDataBundle> {
     const normalizedCode = syncCode.trim().toLowerCase();
     if (!normalizedCode || normalizedCode.length < 8) {
-      throw new Error('Geçersiz eşleştirme kodu. Lütfen kodu kontrol edin.');
+      throw new Error('Invalid pairing code. Please verify the code and try again.');
     }
 
     let envelope: EncryptedSyncEnvelope | null = null;
@@ -747,7 +747,7 @@ class NovaSyncService {
       try {
         bundle = await decryptSyncPayload<SyncDataBundle>(envelope, normalizedCode);
       } catch (err: any) {
-        throw new Error('Eşleştirme kodunun şifresi çözülemedi. Kod hatalı veya süresi dolmuş olabilir.');
+        throw new Error('Failed to decrypt pairing code. The code may be incorrect or expired.');
       }
     } else {
       // Initialize an empty paired bundle

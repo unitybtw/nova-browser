@@ -2904,7 +2904,7 @@ function App() {
                 ) : (
                   <PanelRight className="w-8 h-8" />
                 )}
-                <span>{splitDragSide === 'left' ? 'Sol Tarafa Yerleştir (Split Left)' : 'Sağ Tarafa Yerleştir (Split Right)'}</span>
+                <span>{splitDragSide === 'left' ? 'Split Left' : 'Split Right'}</span>
               </div>
             </motion.div>
           )}
@@ -3021,7 +3021,7 @@ function App() {
                   }
                 }}
                 className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Swap Left & Right (Yer Değiştir)"
+                title="Swap Left & Right"
               >
                 <ArrowLeftRight className="w-3.5 h-3.5" />
               </button>
@@ -3030,7 +3030,7 @@ function App() {
               <button
                 onClick={() => handleCloseSplitView()}
                 className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Separate Tabs (Split'i Ayır)"
+                title="Separate Tabs"
               >
                 <Columns2 className="w-3.5 h-3.5" />
               </button>
@@ -3039,7 +3039,7 @@ function App() {
               <button 
                 onClick={() => handleCloseTab(secondaryTab.id)}
                 className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
-                title="Close Tab (Sekmeyi Kapat)"
+                title="Close Tab"
               >
                 <X className="w-3.5 h-3.5" />
               </button>

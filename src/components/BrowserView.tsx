@@ -706,10 +706,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               }
             }
           }
-          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: 'Sayfadaki metinler okunamadı veya çevrilemedi' } }));
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: 'Could not extract or translate page content' } }));
         } catch (err: any) {
           console.error('[BrowserView] Translation execution failed:', err);
-          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: err.message || 'Çeviri başarısız oldu' } }));
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: err.message || 'Translation failed' } }));
         }
       }
     };

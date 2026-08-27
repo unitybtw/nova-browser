@@ -287,7 +287,7 @@ const MemoizedTabItem = React.memo(({
                 onCloseSplit?.(tab.id, splitTab.id);
               }}
               className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer group/unsplit"
-              title="Separate Tabs (Split'i Ayır)"
+              title="Separate Tabs"
             >
               <div className="w-[1px] h-3.5 bg-slate-300/80 dark:bg-slate-600/80 group-hover/unsplit:hidden" />
               <Columns2 className="w-3 h-3 hidden group-hover/unsplit:block text-slate-500 dark:text-slate-300" />
@@ -529,7 +529,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         detail: { tabId: activeTab.id, targetLang: tLang, sourceLang: sLang || 'auto' }
       }));
     } catch (err: any) {
-      setTranslationError(err.message || 'Çeviri başarısız oldu');
+      setTranslationError(err.message || 'Translation failed');
       setIsTranslating(false);
     }
   };
@@ -770,14 +770,13 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 e.preventDefault();
                 e.stopPropagation();
                 setIsPermissionPromptDismissed(prev => !prev);
-              }}
-              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
+              }}              className={`absolute top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer bg-blue-500/15 hover:bg-blue-500/25 border border-blue-500/40 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-lg text-xs font-semibold shadow-xs ${
                 isIncognito ? 'left-28' : 'left-10'
               }`}
-              title="Site İzin İsteği (Tıklayarak pencereyi aç/kapat)"
+              title="Site Permissions (Click to toggle)"
             >
               <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
-              <span className="text-[11px] font-semibold whitespace-nowrap">İzin İsteği</span>
+              <span className="text-[11px] font-semibold whitespace-nowrap">Permissions</span>
             </div>
           )}
 
@@ -827,7 +826,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
               blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
-            placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for Tarkan)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
+            placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for music)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
             className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${
               relevantPermissionRequests.length > 0
                 ? isIncognito ? 'pl-52' : 'pl-34'
@@ -861,7 +860,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
             {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
               <button 
-                type="button"
+                type="button" 
                 onClick={onResetZoom}
                 className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
                 title="Zoom Level (Click to reset 100%)"
@@ -894,7 +893,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' 
                         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'
                   }`}
-                  title="Translate Page / Sayfayı Çevir"
+                  title="Translate Page"
                 >
                   <Languages className="w-3.5 h-3.5" />
                   {activeTab.isTranslated && (

@@ -137,26 +137,26 @@ export interface AIModelOption {
 export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   {
     id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
-    name: "Llama 3.2 3B (Önerilen)",
+    name: "Llama 3.2 3B (Recommended)",
     size: "~1.7 GB",
-    speed: "Hızlı",
-    description: "Dengeli akıl yürütme, Türkçe ve İngilizce akıcı asistan",
+    speed: "Fast",
+    description: "Balanced reasoning, fluent English assistant",
     isDefault: true
   },
   {
     id: "Phi-3.5-vision-instruct-q4f16_1-MLC",
-    name: "Phi 3.5 Vision (Görsel Destekli)",
+    name: "Phi 3.5 Vision (Multimodal)",
     size: "~2.4 GB",
-    speed: "Standart",
-    description: "Görsel ve ekran görüntüsü analizi yapabilen çok modlu model",
+    speed: "Standard",
+    description: "Multimodal model with visual and screenshot analysis",
     vision: true
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-    name: "Qwen 2.5 0.5B (Ultra Hafif)",
+    name: "Qwen 2.5 0.5B (Ultra Light)",
     size: "~350 MB",
-    speed: "Ultra Hızlı",
-    description: "Düşük kaynak tüketen, anında inen en hafif model"
+    speed: "Ultra Fast",
+    description: "Lowest resource usage, instant download"
   }
 ];
 
@@ -176,7 +176,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "Merhaba! Ben Nova Browser yapay zeka asistanıyım. Web sayfalarını gezebilir, arama yapabilir, sayfaları okuyup özetleyebilir veya sorularınızı yanıtlayabilirim. Size nasıl yardımcı olabilirim?"
+      directReply: "Hello! I am Nova Browser's AI assistant. I can browse the web, search Google/YouTube, summarize pages, or answer questions. How can I help you today?"
     };
   }
 
@@ -185,7 +185,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "Nova Browser asistanı olarak sekmeleri yönetebilir, Google ve YouTube'da arama yapabilir, web sayfalarını okuyup özetleyebilir ve sorularınızı yanıtlayabilirim."
+      directReply: "As Nova Browser's AI assistant, I can manage tabs, search the web, read and summarize pages, and answer questions."
     };
   }
 
@@ -194,7 +194,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "Rica ederim! Başka bir işlem yapmak veya sormak istediğiniz bir konu olursa buradayım."
+      directReply: "You're welcome! Let me know if there's anything else you'd like me to do."
     };
   }
 
@@ -216,7 +216,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
       return { 
         name: 'navigate_to_url', 
         arguments: { url: searchUrl },
-        directReply: `YouTube'da "${query}" arandı ve açıldı.`
+        directReply: `Searched for "${query}" on YouTube.`
       };
     }
   }
@@ -236,7 +236,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
       return {
         name: 'navigate_to_url',
         arguments: { url: `https://www.google.com/search?q=${encodeURIComponent(query)}` },
-        directReply: `Google'da "${query}" arandı.`
+        directReply: `Searched for "${query}" on Google.`
       };
     }
   }
@@ -273,7 +273,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
         return { 
           name: 'navigate_to_url', 
           arguments: { url: siteUrl },
-          directReply: `${siteKey.charAt(0).toUpperCase() + siteKey.slice(1)} açıldı.`
+          directReply: `Opened ${siteKey.charAt(0).toUpperCase() + siteKey.slice(1)}.`
         };
       }
     }
@@ -282,15 +282,15 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
   // 4. Direct URL
   if (/^https?:\/\/[^\s]+$/i.test(text) || /^[a-z0-9-]+\.(com|org|net|io|dev|app|edu|gov|tr)(\/[^\s]*)?$/i.test(text)) {
     const u = text.startsWith('http') ? text : 'https://' + text;
-    return { name: 'navigate_to_url', arguments: { url: u }, directReply: `${u} açıldı.` };
+    return { name: 'navigate_to_url', arguments: { url: u }, directReply: `Opened ${u}.` };
   }
 
   // 5. Tab management
   if (/^(yeni sekme|yeni sekme aç|yeni sekme ac|yeni sekme oluştur|open new tab|new tab|create tab)$/i.test(normalized)) {
-    return { name: 'manage_tabs', arguments: { action: 'create' }, directReply: "Yeni sekme açıldı." };
+    return { name: 'manage_tabs', arguments: { action: 'create' }, directReply: "New tab created." };
   }
   if (/^(sekmeyi kapat|bu sekmeyi kapat|close tab|close current tab)$/i.test(normalized)) {
-    return { name: 'manage_tabs', arguments: { action: 'close' }, directReply: "Sekme kapatıldı." };
+    return { name: 'manage_tabs', arguments: { action: 'close' }, directReply: "Tab closed." };
   }
 
   // 6. Page reading
@@ -300,15 +300,15 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
 
   // 7. Scrolling
   if (/^(aşağı kaydır|asagi kaydir|aşağı in|sayfayı aşağı kaydır|scroll down)$/i.test(normalized)) {
-    return { name: 'scroll_page', arguments: { direction: 'down' }, directReply: "Sayfa aşağı kaydırıldı." };
+    return { name: 'scroll_page', arguments: { direction: 'down' }, directReply: "Page scrolled down." };
   }
   if (/^(yukarı kaydır|yukari kaydir|yukarı çık|sayfayı yukarı kaydır|scroll up)$/i.test(normalized)) {
-    return { name: 'scroll_page', arguments: { direction: 'up' }, directReply: "Sayfa yukarı kaydırıldı." };
+    return { name: 'scroll_page', arguments: { direction: 'up' }, directReply: "Page scrolled up." };
   }
 
   // 8. Screenshot
   if (/^(ekran görüntüsü al|ekran goruntusu al|screenshot al|take screenshot|screenshot)$/i.test(normalized)) {
-    return { name: 'take_screenshot', arguments: {}, directReply: "Ekran görüntüsü alındı." };
+    return { name: 'take_screenshot', arguments: {}, directReply: "Screenshot captured." };
   }
 
   return null;
@@ -1755,7 +1755,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       // Images require a vision-capable model — fail fast with a typed,
       // UI-mappable error instead of silently ignoring the images.
       if (images.length > 0 && !this.currentModelSupportsVision()) {
-        const msg = 'Seçili model görsel içerik analizi desteklemiyor. Görüntü ekleyebilmek için ayarlardan "Phi 3.5 Vision (Görsel destekli)" modelini indirip seçin.';
+        const msg = 'Selected model does not support visual content analysis. To analyze images, please download and select "Phi 3.5 Vision (Multimodal)" in Settings.';
         this.emitStatus('error', msg);
         throw new AiError('vision_required', msg);
       }
@@ -1797,14 +1797,14 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         // Direct conversational responses (greetings, identity, capabilities, thanks) bypass tool execution completely
         if (funcName === 'direct_chat' || !funcName) {
-          const directReply = directIntent.directReply || "Merhaba! Size nasıl yardımcı olabilirim?";
+          const directReply = directIntent.directReply || "Hello! How can I help you today?";
           if (onChunk) onChunk(directReply);
           return [...messages, { role: 'assistant', content: directReply }];
         }
 
-        if (onChunk) onChunk(`Islem yapiliyor: ${funcName}...\n\n`);
+        if (onChunk) onChunk(`Executing action: ${funcName}...\n\n`);
 
-        let friendlyResponse = "Islem tamamlandi.";
+        let friendlyResponse = "Action completed.";
         try {
           await this.handleToolCall({
             id: Date.now().toString(),
@@ -1818,22 +1818,22 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             const u = directIntent.arguments.url;
             if (u.includes('youtube.com/results?search_query=')) {
               const q = decodeURIComponent(u.split('search_query=')[1] || '');
-              friendlyResponse = `YouTube'da "${q}" arandi ve acildi.`;
+              friendlyResponse = `Searched for "${q}" on YouTube.`;
             } else if (u.includes('youtube.com')) {
-              friendlyResponse = "YouTube acildi.";
+              friendlyResponse = "YouTube opened.";
             } else if (u.includes('google.com/search')) {
-              friendlyResponse = "Google aramasi yapildi.";
+              friendlyResponse = "Google search performed.";
             } else {
-              friendlyResponse = `${u} sayfasi acildi.`;
+              friendlyResponse = `Opened ${u}.`;
             }
           } else if (funcName === 'manage_tabs') {
-            if (directIntent.arguments.action === 'create') friendlyResponse = "Yeni sekme acildi.";
-            else if (directIntent.arguments.action === 'close') friendlyResponse = "Sekme kapatildi.";
-            else friendlyResponse = "Sekme islemi yapildi.";
+            if (directIntent.arguments.action === 'create') friendlyResponse = "New tab created.";
+            else if (directIntent.arguments.action === 'close') friendlyResponse = "Tab closed.";
+            else friendlyResponse = "Tab action completed.";
           } else if (funcName === 'scroll_page') {
-            friendlyResponse = directIntent.arguments.direction === 'down' ? "Sayfa asagi kaydirildi." : "Sayfa yukari kaydirildi.";
+            friendlyResponse = directIntent.arguments.direction === 'down' ? "Page scrolled down." : "Page scrolled up.";
           } else if (funcName === 'take_screenshot') {
-            friendlyResponse = "Ekran goruntusu alindi.";
+            friendlyResponse = "Screenshot captured.";
           } else if (funcName === 'read_page_content') {
             let pageText = '';
             try {
@@ -1905,7 +1905,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         try {
           turn = await this.generateAgentTurn(windowedMessages);
         } catch (e: any) {
-          finalAnswer = 'Bir hata olustu. Lutfen tekrar deneyin.';
+          finalAnswer = 'An error occurred. Please try again.';
           this.emitStatus('error', e?.message || String(e));
           break;
         }
