@@ -95,23 +95,23 @@ if ((window as any).__novaPreloadInjected) {
     if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
     
     const extensionId = event.data.extensionId;
-    const loadingToast = showNovaToast("Nova Browser'a yükleniyor...", 'info');
+    const loadingToast = showNovaToast("Installing to Nova Browser...", 'info');
       
     ipcRenderer.invoke('install-from-webstore', extensionId)
       .then(result => {
         loadingToast.remove();
         if (result.error) {
-          showNovaToast('Kurulum hatası: ' + result.error, 'error');
+          showNovaToast('Installation error: ' + result.error, 'error');
           window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: result.error }, window.location.origin);
         } else {
-          showNovaToast('Eklenti başarıyla kuruldu!', 'success');
+          showNovaToast('Extension installed successfully!', 'success');
           window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: true }, window.location.origin);
           setTimeout(() => window.location.reload(), 1500);
         }
       })
       .catch(err => {
         loadingToast.remove();
-        showNovaToast('Kurulum hatası: ' + err.message, 'error');
+        showNovaToast('Installation error: ' + err.message, 'error');
         window.postMessage({ type: 'NOVA_INSTALL_RESULT', success: false, error: err.message }, window.location.origin);
       });
   });
@@ -240,10 +240,10 @@ if ((window as any).__novaPreloadInjected) {
       const textWrap = document.createElement('div');
       const title = document.createElement('div');
       title.style.cssText = 'font-weight: 600; font-size: 15px;';
-      title.textContent = "Nova Browser Eklenti Sistemi";
+      title.textContent = "Nova Browser Extension System";
       const subtitle = document.createElement('div');
       subtitle.style.cssText = 'font-size: 13px; opacity: 0.9;';
-      subtitle.textContent = "Bu eklentiyi tek tikla Nova Browser'a kurabilirsiniz.";
+      subtitle.textContent = "Install this extension with 1-click directly into Nova Browser.";
       
       textWrap.appendChild(title);
       textWrap.appendChild(subtitle);
@@ -253,7 +253,7 @@ if ((window as any).__novaPreloadInjected) {
       const btn = document.createElement('button');
       btn.id = 'nova-install-btn';
       btn.style.cssText = "background: white; color: #4f46e5; border: none; padding: 8px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1);";
-      btn.textContent = "Nova'ya Ekle";
+      btn.textContent = "Add to Nova";
 
       banner.appendChild(leftContainer);
       banner.appendChild(btn);

@@ -129,7 +129,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
   try {
     // Extract ID: 32 characters of a-p
     const match = urlOrId.match(/[a-p]{32}/);
-    if (!match) return { error: 'Geçersiz eklenti URL\'si veya ID\'si' };
+    if (!match) return { error: 'Invalid extension URL or ID' };
     const extensionId = match[0];
 
     // 🔒 Security: installs requested from Chrome Web Store page content are not
@@ -165,7 +165,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`Eklenti indirilemedi (HTTP ${res.status}): ${errText.substring(0, 100)}`);
+      throw new Error(`Failed to download extension (HTTP ${res.status}): ${errText.substring(0, 100)}`);
     }
 
     // 🔒 Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
