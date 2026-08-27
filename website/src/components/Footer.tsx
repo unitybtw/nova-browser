@@ -13,9 +13,19 @@ export const Footer: React.FC = () => {
           {/* Brand / Manifesto Column */}
           <div className="col-span-1 md:col-span-6 flex flex-col justify-between">
             <div>
-              <h2 className="font-serif text-3xl sm:text-4xl text-white mb-6 leading-snug">
+              <div className="flex items-center gap-2.5 mb-6">
+                <img
+                  src="/nova-icon-transparent.png"
+                  alt="Nova Logo"
+                  className="w-8 h-8 object-contain"
+                />
+                <span className="font-serif italic text-2xl font-bold tracking-tight text-white">
+                  Nova
+                </span>
+              </div>
+              <h2 className="font-serif text-2xl sm:text-3xl text-neutral-200 mb-4 leading-snug">
                 “The browser is no longer a window.<br />
-                <span className="italic text-indigo-300">It is the engine.</span>”
+                <span className="italic text-indigo-400">It is the engine.</span>”
               </h2>
               <p className="font-mono text-xs text-neutral-400 max-w-md leading-relaxed">
                 Nova is built for a post-cloud web. Local inference, hardened network layer, absolute autonomy.

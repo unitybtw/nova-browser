@@ -5,44 +5,94 @@ import {
   ArrowLeft,
   ArrowRight,
   RotateCw,
-  Cpu,
-  MousePointer2,
+  Plus,
+  X,
+  Sparkles,
   Shield,
+  Languages,
+  BookOpen,
+  Star,
+  Puzzle,
+  Settings,
   Columns,
   Bot,
+  ArrowUpRight,
 } from 'lucide-react';
 
 export const Hero: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'agent' | 'split' | 'privacy'>('agent');
-  const [typedText, setTypedText] = useState('');
-  const fullText =
-    'The shift towards local-first AI architecture fundamentally alters the web landscape. Privacy is no longer a feature, but a cryptographic guarantee.';
+  const [activeTabId, setActiveTabId] = useState<'newtab' | 'agent' | 'split'>('newtab');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAIMode, setIsAIMode] = useState(false);
+  const [translated, setTranslated] = useState(false);
+  const [currentTime, setCurrentTime] = useState('13:22');
 
   useEffect(() => {
-    let index = 0;
-    setTypedText('');
-    const timer = setInterval(() => {
-      if (index <= fullText.length) {
-        setTypedText(fullText.slice(0, index));
-        index++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 25);
-    return () => clearInterval(timer);
-  }, [activeTab]);
+    const updateTime = () => {
+      const d = new Date();
+      setCurrentTime(
+        `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const TABS = [
+    {
+      id: 'newtab' as const,
+      title: 'New Tab',
+      url: 'nova://newtab',
+      icon: '/nova-icon-transparent.png',
+      isCustomIcon: true,
+    },
+    {
+      id: 'agent' as const,
+      title: 'Deep Research Agent',
+      url: 'nova://agent/neural-synthesis',
+      icon: Sparkles,
+      isCustomIcon: false,
+    },
+    {
+      id: 'split' as const,
+      title: 'Split: Docs & Translate',
+      url: 'dual://developer.mozilla.org + github.com',
+      icon: Columns,
+      isCustomIcon: false,
+    },
+  ];
+
+  const SPEED_DIALS = [
+    { name: 'GitHub', url: 'github.com', category: 'Code', icon: '⚡' },
+    { name: 'Claude', url: 'claude.ai', category: 'AI', icon: '✦' },
+    { name: 'ChatGPT', url: 'chatgpt.com', category: 'AI', icon: '🤖' },
+    { name: 'Gemini', url: 'gemini.google.com', category: 'AI', icon: '✨' },
+    { name: 'YouTube', url: 'youtube.com', category: 'Media', icon: '▶' },
+    { name: 'X / Twitter', url: 'x.com', category: 'Social', icon: '𝕏' },
+  ];
 
   return (
-    <section className="relative pt-32 md:pt-40 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
-      {/* Ambient background glows */}
+    <section className="relative pt-28 md:pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+      {/* Ambient Glows */}
       <div className="ambient-glow-primary -top-20 left-[-10%]" />
-      <div className="ambient-glow-primary top-[30%] right-[-10%]" />
+      <div className="ambient-glow-primary top-[35%] right-[-10%]" />
+
+      {/* Product Tag Badge */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#4338ca]/20 bg-[#4338ca]/5 font-mono text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider mb-6"
+      >
+        <span className="w-2 h-2 rounded-full bg-[#4338ca] animate-pulse" />
+        <span>Next-Generation Sovereign Web Browser</span>
+      </motion.div>
 
       {/* Main Headline */}
       <motion.h1
         initial={{ opacity: 0, y: 25 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="font-serif text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.08]"
       >
         Thought at the Speed of{' '}
@@ -56,10 +106,10 @@ export const Hero: React.FC = () => {
         transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
         className="font-sans text-base sm:text-lg md:text-xl text-neutral-600 max-w-2xl mt-6 leading-relaxed"
       >
-        The world’s first browser with an embedded autonomous AI agent, a zero-knowledge privacy vault, and native WebGPU processing. Uncompromised speed. Unprecedented control.
+        Embedded autonomous local AI agent, native 1-click page translation, zero-knowledge privacy vault, and real-time WebGPU shaders. Uncompromised speed. Unprecedented sovereignty.
       </motion.p>
 
-      {/* CTAs */}
+      {/* Action Buttons */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -68,185 +118,325 @@ export const Hero: React.FC = () => {
       >
         <a
           href="#download"
-          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-lg hover:bg-[#4338ca] transition-colors shadow-lg"
+          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-xl hover:shadow-indigo-500/20 active:scale-[0.98]"
         >
           Download for macOS & Windows
         </a>
         <a
-          href="#features"
-          className="px-8 py-4 bg-transparent border border-[#e5e5e5] text-[#171717] rounded-lg hover:bg-white transition-colors"
+          href="https://github.com/unitybtw/nova-browser"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-8 py-4 bg-white border border-[#e5e5e5] text-[#171717] font-semibold rounded-xl hover:bg-neutral-50 transition-colors inline-flex items-center gap-2"
         >
-          View Architecture
+          <span>Star on GitHub</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-neutral-500" />
         </a>
       </motion.div>
 
-      {/* BROWSER MOCKUP CENTERPIECE */}
+      {/* AUTHENTIC NOVA BROWSER LIVE UI CENTERPIECE */}
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1, delay: 0.45, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-6xl mx-auto mt-16 text-left"
+        transition={{ duration: 0.95, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        className="relative w-full max-w-6xl mx-auto mt-14 text-left"
       >
-        {/* Glow behind mockup */}
-        <div className="absolute inset-0 bg-[#4338ca] opacity-10 blur-3xl rounded-2xl pointer-events-none" />
+        {/* Glow Behind Mockup */}
+        <div className="absolute inset-0 bg-[#4338ca] opacity-15 blur-3xl rounded-3xl pointer-events-none" />
 
-        <div className="relative bg-[#0f172a] rounded-2xl overflow-hidden border border-[#1e293b] shadow-2xl flex flex-col min-h-[560px] md:min-h-[640px] z-10">
-          {/* Chrome Titlebar */}
-          <div className="h-12 bg-[#1e293b] border-b border-[#334155] flex items-center px-4 gap-4 select-none">
-            {/* Mac traffic lights */}
-            <div className="flex gap-2">
-              <span className="mac-btn mac-close" />
-              <span className="mac-btn mac-min" />
-              <span className="mac-btn mac-max" />
+        {/* Outer App Frame */}
+        <div className="relative bg-[#090d16] rounded-2xl overflow-hidden border border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.6)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
+          
+          {/* TOP TAB BAR */}
+          <div className="h-11 bg-[#0d1322] border-b border-slate-800/80 flex items-center px-4 gap-3 select-none">
+            {/* macOS Window Controls */}
+            <div className="flex items-center gap-2 pr-2">
+              <span className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] inline-block shadow-xs" />
+              <span className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] inline-block shadow-xs" />
+              <span className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] inline-block shadow-xs" />
             </div>
 
-            {/* Clickable Tabs */}
-            <div className="flex gap-1 ml-4 h-full pt-2">
-              {[
-                { id: 'agent', label: 'Autonomous Agent', icon: Bot },
-                { id: 'split', label: 'Dual Split-View', icon: Columns },
-                { id: 'privacy', label: 'Privacy Shield', icon: Shield },
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
+            {/* Browser Tabs */}
+            <div className="flex items-center gap-1.5 flex-1 overflow-x-auto no-scrollbar pt-1">
+              {TABS.map((tab) => {
+                const isActive = activeTabId === tab.id;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as 'agent' | 'split' | 'privacy')}
-                    className={`px-4 py-2 font-mono text-xs rounded-t-lg flex items-center gap-2 cursor-pointer transition-colors relative ${
+                    onClick={() => setActiveTabId(tab.id)}
+                    className={`group relative h-8 px-3.5 rounded-t-xl flex items-center gap-2 text-xs font-medium cursor-pointer transition-all duration-200 min-w-[140px] max-w-[200px] ${
                       isActive
-                        ? 'bg-[#0f172a] text-slate-100 border-t border-l border-r border-[#334155]'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-[#1e293b]'
+                        ? 'bg-[#121a2f] text-slate-100 border-t border-l border-r border-slate-700/80 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                     }`}
                   >
-                    {React.createElement(tab.icon, { className: 'w-3.5 h-3.5 text-[#818cf8]' })}
-                    <span>{tab.label}</span>
                     {isActive && (
-                      <div className="absolute top-0 left-0 w-full h-[2px] bg-[#4338ca] rounded-t-lg" />
+                      <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400 via-indigo-500 to-cyan-400 rounded-t-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
                     )}
+
+                    {tab.isCustomIcon ? (
+                      <img src={tab.icon as string} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
+                    ) : (
+                      React.createElement(tab.icon as React.ElementType, {
+                        className: `w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`
+                      })
+                    )}
+
+                    <span className="truncate flex-1 text-left text-[11px] font-medium">{tab.title}</span>
+
+                    <span className="p-0.5 rounded-md hover:bg-white/10 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <X className="w-3 h-3" />
+                    </span>
                   </button>
                 );
               })}
+
+              <button
+                onClick={() => setActiveTabId('newtab')}
+                className="p-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors"
+                title="New Tab"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
-          {/* Omnibox Bar */}
-          <div className="h-14 bg-[#0f172a] border-b border-[#1e293b] flex items-center px-4 gap-4 text-slate-400">
-            <div className="flex gap-2">
-              <ArrowLeft className="w-4 h-4 cursor-pointer hover:text-white" />
-              <ArrowRight className="w-4 h-4 cursor-pointer hover:text-white" />
-              <RotateCw className="w-4 h-4 cursor-pointer hover:text-white" />
+          {/* OMNIBOX TOOLBAR */}
+          <div className="h-12 bg-[#121a2f] border-b border-slate-800 flex items-center px-4 gap-3 text-slate-400 select-none">
+            {/* History Nav */}
+            <div className="flex items-center gap-1">
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+                <ArrowLeft className="w-3.5 h-3.5" />
+              </button>
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            <div className="flex-1 bg-[#1e293b] rounded-lg h-9 px-3 flex items-center justify-between border border-[#334155]">
-              <div className="flex items-center gap-2 text-slate-300 font-mono text-xs">
-                <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                <span>
-                  {activeTab === 'agent'
-                    ? 'local://agent/analyze-dom'
-                    : activeTab === 'split'
-                    ? 'dual://docs.rs + github.com'
-                    : 'nova://settings/privacy-shield'}
+            {/* Omnibox Address Input */}
+            <div className="flex-1 bg-[#090d16] rounded-xl h-8 px-3 flex items-center justify-between border border-slate-700/80 focus-within:border-cyan-500 shadow-inner">
+              <div className="flex items-center gap-2 min-w-0 flex-1 text-slate-300 font-mono text-[11px]">
+                <Lock className="w-3 h-3 text-emerald-400 shrink-0" />
+                <span className="truncate text-slate-200">
+                  {TABS.find((t) => t.id === activeTabId)?.url}
                 </span>
               </div>
-              <div className="bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded text-[10px] font-mono font-medium border border-emerald-500/20">
-                0ms CACHED
+
+              {/* Action Icons in URL Bar */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* 1-Click Page Translation Badge */}
+                <button
+                  onClick={() => setTranslated(!translated)}
+                  className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono transition-all cursor-pointer ${
+                    translated
+                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                      : 'hover:bg-white/10 text-slate-400 hover:text-slate-200'
+                  }`}
+                  title="Tek Tıkla Sayfa Çevirisi"
+                >
+                  <Languages className="w-3 h-3" />
+                  <span>{translated ? 'TR' : 'EN'}</span>
+                </button>
+
+                <button className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-slate-200" title="Reader Mode">
+                  <BookOpen className="w-3 h-3" />
+                </button>
+
+                <button className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400" title="Bookmark">
+                  <Star className="w-3 h-3" />
+                </button>
               </div>
+            </div>
+
+            {/* Right Tools Bar */}
+            <div className="flex items-center gap-1">
+              {/* Privacy Shield Pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px]">
+                <Shield className="w-3 h-3" />
+                <span className="hidden sm:inline">Shield Active</span>
+              </div>
+
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                <Puzzle className="w-3.5 h-3.5" />
+              </button>
+              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                <Settings className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
 
-          {/* Viewport Content */}
-          <div className="flex-1 bg-[#0f172a] p-6 sm:p-8 relative overflow-hidden flex flex-col justify-between">
-            {activeTab === 'agent' && (
-              <div className="relative z-10 w-full max-w-4xl mx-auto h-full flex flex-col">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="w-8 h-8 rounded-full bg-[#4338ca]/20 flex items-center justify-center border border-[#4338ca]/50 text-[#818cf8]">
-                    <Cpu className="w-4 h-4" />
+          {/* VIEWPORT CONTENT AREA */}
+          <div className="flex-1 bg-[#090d16] relative overflow-hidden flex flex-col">
+            
+            {/* VIEW 1: AUTHENTIC NOVA NEW TAB PAGE */}
+            {activeTabId === 'newtab' && (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
+                {/* Background Cyber Grid */}
+                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+
+                {/* Nova Logo & Clock */}
+                <div className="relative z-10 flex flex-col items-center text-center mb-8">
+                  <div className="relative w-16 h-16 mb-4 group cursor-pointer">
+                    <div className="absolute inset-0 bg-cyan-500/20 rounded-2xl blur-xl group-hover:bg-cyan-500/40 transition-all" />
+                    <img
+                      src="/nova-icon-transparent.png"
+                      alt="Nova Logo"
+                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] group-hover:scale-105 transition-transform"
+                    />
                   </div>
-                  <h3 className="font-mono text-xs font-semibold text-slate-300 tracking-wider uppercase">
-                    Llama 3.2 3B Local Node Active
-                  </h3>
+
+                  <h2 className="font-mono text-4xl sm:text-5xl font-bold text-white tracking-tight">
+                    {currentTime}
+                  </h2>
+                  <p className="font-mono text-[11px] text-slate-400 uppercase tracking-widest mt-1">
+                    Autonomous Intelligence Active
+                  </p>
                 </div>
 
-                <div className="bg-[#1e293b]/90 backdrop-blur-md rounded-xl p-6 border border-[#334155] flex-1 font-mono text-xs sm:text-sm text-slate-300 shadow-2xl relative overflow-hidden">
-                  {/* Scanning line */}
-                  <div className="absolute left-0 w-full h-[2px] bg-[#4338ca] shadow-[0_0_12px_3px_rgba(67,56,202,0.8)] animate-scan" />
+                {/* AI & Web Search Omnibar */}
+                <div className="relative z-10 w-full max-w-xl mb-8">
+                  <div className="relative flex items-center bg-[#121a2f]/90 backdrop-blur-xl border border-slate-700/80 hover:border-cyan-500/60 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/20 rounded-2xl px-4 py-3 shadow-2xl transition-all">
+                    <button
+                      onClick={() => setIsAIMode(!isAIMode)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold tracking-wider mr-2 cursor-pointer transition-colors ${
+                        isAIMode
+                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xs'
+                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>@ai</span>
+                    </button>
 
-                  <p className="text-slate-500 mb-3">// Analyzing DOM structure securely on-device...</p>
-                  <div className="space-y-2 text-emerald-400 font-mono text-xs sm:text-sm">
-                    <p>&gt; Found 18 semantic tags. Extracted main document payload.</p>
-                    <p>&gt; Bypassed tracking pixels (Blocked 4 requests automatically).</p>
-                    <p>&gt; Synthesizing article executive summary...</p>
+                    <input
+                      type="text"
+                      placeholder={isAIMode ? "Ask Nova Agent anything or give instructions..." : "Search web or type a URL..."}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="bg-transparent flex-1 outline-none text-xs sm:text-sm text-slate-100 placeholder-slate-500 font-sans"
+                    />
+
+                    <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[10px] bg-slate-800/80 px-2 py-1 rounded-lg">
+                      <span>ENTER</span>
+                      <span>↵</span>
+                    </div>
                   </div>
+                </div>
 
-                  <div className="mt-6 p-4 bg-[#0f172a] rounded-lg border border-[#334155] text-indigo-200 leading-relaxed font-mono">
-                    <p>{typedText}</p>
-                    <span className="inline-block w-1.5 h-3.5 bg-indigo-400 ml-1 animate-pulse" />
-                  </div>
+                {/* Speed Dials Grid */}
+                <div className="relative z-10 grid grid-cols-3 sm:grid-cols-6 gap-3 w-full max-w-2xl">
+                  {SPEED_DIALS.map((dial) => (
+                    <div
+                      key={dial.name}
+                      className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[#121a2f]/60 hover:bg-[#121a2f] border border-slate-800 hover:border-slate-700 cursor-pointer transition-all duration-300 group hover:-translate-y-0.5"
+                    >
+                      <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center text-sm font-semibold group-hover:scale-105 transition-transform text-slate-200">
+                        {dial.icon}
+                      </div>
+                      <span className="text-[11px] font-medium text-slate-300 group-hover:text-cyan-400 transition-colors truncate w-full text-center">
+                        {dial.name}
+                      </span>
+                    </div>
+                  ))}
+                </div>
 
-                  {/* Floating AI Cursor */}
-                  <motion.div
-                    animate={{ y: [0, -8, 0], x: [0, 6, 0] }}
-                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-                    className="absolute bottom-6 right-8 flex items-center gap-1.5 pointer-events-none"
-                  >
-                    <MousePointer2 className="w-5 h-5 text-[#818cf8] fill-[#818cf8]" />
-                    <span className="bg-[#4338ca] text-white text-[10px] px-2 py-0.5 rounded font-mono shadow-lg">
-                      Agent Cursor
-                    </span>
-                  </motion.div>
+                {/* System Status Footer */}
+                <div className="relative z-10 mt-8 flex flex-wrap items-center justify-center gap-4 text-[10px] font-mono text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    <span>MCP Bridge: Port 3020 (Online)</span>
+                  </span>
+                  <span>•</span>
+                  <span>WebGPU Acceleration: ON</span>
+                  <span>•</span>
+                  <span>Privacy Shield: 0 Trackers</span>
                 </div>
               </div>
             )}
 
-            {activeTab === 'split' && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-full font-mono text-xs text-slate-300">
-                <div className="p-6 rounded-xl bg-[#1e293b]/70 border border-[#334155] flex flex-col justify-between">
+            {/* VIEW 2: AUTONOMOUS DEEP RESEARCH AGENT */}
+            {activeTabId === 'agent' && (
+              <div className="flex-1 p-6 sm:p-8 flex flex-col font-mono text-xs text-slate-300">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+                  <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+                    <Bot className="w-4 h-4" />
+                    <span>Nova Autonomous Agent // Multi-Step Synthesis</span>
+                  </div>
+                  <span className="bg-cyan-500/10 text-cyan-400 px-2.5 py-0.5 rounded-full text-[10px] border border-cyan-500/20">
+                    Llama 3.2 3B (Local WebGPU)
+                  </span>
+                </div>
+
+                <div className="flex-1 bg-[#121a2f]/80 rounded-xl p-5 border border-slate-800 flex flex-col justify-between shadow-inner">
+                  <div className="space-y-3">
+                    <p className="text-slate-400">// Prompt: "Deep analyze Rust WebAssembly vs C++ compile-time optimizations"</p>
+                    <div className="p-3 bg-[#090d16] rounded-lg border border-slate-800 text-emerald-400 space-y-1.5 text-[11px]">
+                      <p>&gt; [Step 1] Crawled 14 documentation pages on-device in 80ms.</p>
+                      <p>&gt; [Step 2] Executed semantic vector similarity pass via WebGPU shaders.</p>
+                      <p>&gt; [Step 3] Generated zero-knowledge executive briefing without cloud roundtrips.</p>
+                    </div>
+
+                    <div className="p-4 bg-[#090d16]/90 rounded-lg border border-slate-800/80 text-slate-200 text-xs font-sans leading-relaxed">
+                      <h4 className="font-serif text-sm font-bold text-white mb-1.5">Executive Findings:</h4>
+                      <p className="text-slate-300 text-xs leading-relaxed">
+                        Rust’s zero-cost abstraction model combined with LLVM backend optimization produces ~18% smaller WASM binaries with predictable GC-free memory layouts.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 mt-4 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Inference Speed: 62 tokens/sec</span>
+                    <span className="text-cyan-400 font-semibold">Status: Autonomous Task Complete</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VIEW 3: DUAL SPLIT-VIEW & PAGE TRANSLATION */}
+            {activeTabId === 'split' && (
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+                {/* Left Split Pane: English Source */}
+                <div className="p-6 flex flex-col justify-between bg-[#090d16]">
                   <div>
-                    <span className="text-emerald-400 block mb-2">// FRAME A: DOCUMENTATION</span>
-                    <h4 className="font-serif text-lg font-bold text-white mb-2">
-                      Local-First Architecture
-                    </h4>
-                    <p className="text-slate-400 font-sans text-xs leading-relaxed">
-                      Zero reliance on remote server execution. WebGPU shaders accelerate inference directly on consumer GPUs.
+                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-slate-400">
+                      <span>FRAME A: ORIGINAL ENGLISH</span>
+                      <span className="text-slate-500">MDN Web Docs</span>
+                    </div>
+                    <h3 className="font-serif text-lg font-bold text-white mb-2">
+                      WebGPU API Specifications
+                    </h3>
+                    <p className="font-sans text-xs text-slate-400 leading-relaxed">
+                      WebGPU exposes modern graphics hardware capabilities to the web, enabling high-performance compute shaders and direct GPU memory buffer manipulation.
                     </p>
                   </div>
-                  <div className="text-slate-500 text-[11px] pt-4 border-t border-white/5">
-                    Synced scroll active
+                  <div className="pt-4 border-t border-slate-800 text-[10px] font-mono text-slate-500">
+                    Sync Scroll: ENABLED
                   </div>
                 </div>
 
-                <div className="p-6 rounded-xl bg-[#1e293b]/70 border border-[#334155] flex flex-col justify-between">
+                {/* Right Split Pane: 1-Click Turkish Translation */}
+                <div className="p-6 flex flex-col justify-between bg-[#121a2f]/40">
                   <div>
-                    <span className="text-indigo-400 block mb-2">// FRAME B: LIVE REPOSITORY</span>
-                    <h4 className="font-serif text-lg font-bold text-white mb-2">
-                      unitybtw/nova-browser
-                    </h4>
-                    <p className="text-slate-400 font-sans text-xs leading-relaxed">
-                      Complete source code open for security audits, forks, and local developer extensions.
+                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-cyan-400">
+                      <span>FRAME B: TEK TIKLA TÜRKÇE ÇEVİRİ</span>
+                      <span className="bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded text-[10px]">Aktif</span>
+                    </div>
+                    <h3 className="font-serif text-lg font-bold text-cyan-200 mb-2">
+                      WebGPU API Teknik Özellikleri
+                    </h3>
+                    <p className="font-sans text-xs text-slate-300 leading-relaxed">
+                      WebGPU, modern grafik donanımı yeteneklerini web platformuna taşıyarak yüksek performanslı hesaplama gölgelendiricileri ve doğrudan GPU bellek manipülasyonu sağlar.
                     </p>
                   </div>
-                  <div className="text-slate-500 text-[11px] pt-4 border-t border-white/5">
-                    Port 3020 connected
+                  <div className="pt-4 border-t border-slate-800 text-[10px] font-mono text-cyan-400/80">
+                    Gecikme: 120ms // DOM Bütünlüğü Korundu
                   </div>
                 </div>
               </div>
             )}
 
-            {activeTab === 'privacy' && (
-              <div className="p-6 sm:p-8 rounded-xl bg-[#1e293b]/70 border border-[#334155] max-w-2xl mx-auto my-auto text-center font-mono">
-                <Shield className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
-                <h3 className="font-serif text-2xl font-bold text-white mb-2">
-                  Zero-Knowledge Cryptographic Shield
-                </h3>
-                <p className="text-slate-400 text-xs font-sans max-w-md mx-auto mb-6">
-                  All browsing data is encrypted client-side using AES-256-GCM before ever syncing.
-                </p>
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>42 Trackers Eradicated in Current Session</span>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </motion.div>
@@ -255,3 +445,4 @@ export const Hero: React.FC = () => {
 };
 
 export default Hero;
+
