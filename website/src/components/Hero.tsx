@@ -93,10 +93,10 @@ export const Hero: React.FC = () => {
         initial={{ opacity: 0, y: 25 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
-        className="font-serif text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.08]"
+        className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.05]"
       >
         Thought at the Speed of{' '}
-        <span className="italic font-normal text-[#4338ca]">Thought.</span>
+        <span className="bg-gradient-to-r from-[#4338ca] to-cyan-500 bg-clip-text text-transparent">Thought.</span>
       </motion.h1>
 
       {/* Subheading */}
@@ -379,7 +379,7 @@ export const Hero: React.FC = () => {
                     </div>
 
                     <div className="p-4 bg-[#090d16]/90 rounded-lg border border-slate-800/80 text-slate-200 text-xs font-sans leading-relaxed">
-                      <h4 className="font-serif text-sm font-bold text-white mb-1.5">Executive Findings:</h4>
+                      <h4 className="font-display text-sm font-bold text-white mb-1.5">Executive Findings:</h4>
                       <p className="text-slate-300 text-xs leading-relaxed">
                         Rust’s zero-cost abstraction model combined with LLVM backend optimization produces ~18% smaller WASM binaries with predictable GC-free memory layouts.
                       </p>
@@ -404,7 +404,7 @@ export const Hero: React.FC = () => {
                       <span>FRAME A: ORIGINAL ENGLISH</span>
                       <span className="text-slate-500">MDN Web Docs</span>
                     </div>
-                    <h3 className="font-serif text-lg font-bold text-white mb-2">
+                    <h3 className="font-display text-lg font-bold text-white mb-2">
                       WebGPU API Specifications
                     </h3>
                     <p className="font-sans text-xs text-slate-400 leading-relaxed">
@@ -423,7 +423,7 @@ export const Hero: React.FC = () => {
                       <span>FRAME B: TEK TIKLA TÜRKÇE ÇEVİRİ</span>
                       <span className="bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded text-[10px]">Aktif</span>
                     </div>
-                    <h3 className="font-serif text-lg font-bold text-cyan-200 mb-2">
+                    <h3 className="font-display text-lg font-bold text-cyan-200 mb-2">
                       WebGPU API Teknik Özellikleri
                     </h3>
                     <p className="font-sans text-xs text-slate-300 leading-relaxed">

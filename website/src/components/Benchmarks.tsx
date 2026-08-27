@@ -129,8 +129,8 @@ export const Benchmarks: React.FC = () => {
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
             EMPIRICAL VALIDATION
           </span>
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-            Measured <span className="italic">Supremacy</span>.
+          <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
+            Measured <span className="text-[#4338ca]">Supremacy</span>.
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-base leading-relaxed">
@@ -174,7 +174,7 @@ export const Benchmarks: React.FC = () => {
                 <span className="font-mono text-[11px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
                   {currentCategory.subtitle}
                 </span>
-                <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#171717]">
+                <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717]">
                   {currentCategory.title}
                 </h3>
               </div>
@@ -249,7 +249,7 @@ export const Benchmarks: React.FC = () => {
             </span>
 
             <div className="flex items-baseline gap-2 mb-4">
-              <span className="font-serif text-6xl sm:text-7xl font-bold tracking-tight text-white">
+              <span className="font-display text-6xl sm:text-7xl font-extrabold tracking-tight text-white">
                 {currentCategory.highlightNumber}
               </span>
               <span className="font-sans text-2xl font-light text-neutral-400">
@@ -283,7 +283,7 @@ export const Benchmarks: React.FC = () => {
               <span>Interactive Memory Simulator</span>
             </div>
 
-            <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#171717]">
+            <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717]">
               Estimate Your RAM Savings
             </h3>
 
@@ -320,7 +320,7 @@ export const Benchmarks: React.FC = () => {
               <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                 Nova Browser
               </span>
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-[#4338ca] my-2">
+              <div className="font-display text-3xl sm:text-4xl font-extrabold text-[#4338ca] my-2">
                 ~{novaMemoryEst} <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
               </div>
               <span className="font-mono text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded w-fit">
@@ -333,7 +333,7 @@ export const Benchmarks: React.FC = () => {
               <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                 Google Chrome
               </span>
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-neutral-700 my-2">
+              <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 my-2">
                 ~{(chromeMemoryEst / 1024).toFixed(1)} <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
               </div>
               <span className="font-mono text-[10px] text-neutral-400">
@@ -346,7 +346,7 @@ export const Benchmarks: React.FC = () => {
               <span className="font-mono text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
                 Net Memory Saved
               </span>
-              <div className="font-serif text-3xl sm:text-4xl font-bold text-emerald-400 my-2">
+              <div className="font-display text-3xl sm:text-4xl font-extrabold text-emerald-400 my-2">
                 {savedPercentage}%
               </div>
               <span className="font-mono text-[10px] text-neutral-300">

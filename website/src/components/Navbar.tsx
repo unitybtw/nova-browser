@@ -26,7 +26,7 @@ export const Navbar: React.FC = () => {
             alt="Nova Logo"
             className="w-8 h-8 object-contain transition-transform duration-500 group-hover:scale-105"
           />
-          <span className="font-serif italic text-2xl sm:text-3xl font-bold tracking-tight text-[#171717]">
+          <span className="font-display text-2xl sm:text-3xl font-extrabold tracking-tight text-[#171717]">
             Nova
           </span>
         </a>

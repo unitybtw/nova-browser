@@ -59,8 +59,8 @@ export const FeatureBento: React.FC = () => {
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
             ARCHITECTURE MATRIX
           </span>
-          <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-            Engineered for <span className="italic">Autonomy</span>.
+          <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
+            Engineered for <span className="text-[#4338ca]">Autonomy</span>.
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-base leading-relaxed">
@@ -92,7 +92,7 @@ export const FeatureBento: React.FC = () => {
                 </span>
               </div>
 
-              <h3 className="font-serif text-2xl sm:text-3xl font-bold text-[#171717] mb-3 group-hover:text-[#4338ca] transition-colors">
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717] mb-3 group-hover:text-[#4338ca] transition-colors">
                 {mod.title}
               </h3>
               <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-xl">

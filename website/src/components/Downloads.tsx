@@ -8,8 +8,8 @@ export const Downloads: React.FC = () => {
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
           GET STARTED TODAY
         </span>
-        <h2 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-          Download <span className="italic font-normal">Nova Browser</span>.
+        <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
+          Download <span className="text-[#4338ca]">Nova Browser</span>.
         </h2>
         <p className="font-sans text-neutral-600 mt-4 text-base sm:text-lg leading-relaxed">
           Free, open-source, and sovereign forever. Engineered for power users, developers, and researchers.
@@ -30,7 +30,7 @@ export const Downloads: React.FC = () => {
               </span>
             </div>
 
-            <h3 className="font-serif text-2xl font-bold mb-2 text-[#171717]">macOS</h3>
+            <h3 className="font-display text-2xl font-bold mb-2 text-[#171717]">macOS</h3>
             <p className="font-sans text-xs text-neutral-600 mb-8 leading-relaxed">
               Optimized for Apple Silicon (M1/M2/M3/M4) and Intel Macs. Requires macOS 12 Monterey or newer.
             </p>
@@ -59,7 +59,7 @@ export const Downloads: React.FC = () => {
               </span>
             </div>
 
-            <h3 className="font-serif text-2xl font-bold mb-2 text-[#171717]">Windows</h3>
+            <h3 className="font-display text-2xl font-bold mb-2 text-[#171717]">Windows</h3>
             <p className="font-sans text-xs text-neutral-600 mb-8 leading-relaxed">
               Native installer for Windows 10 & 11 (64-bit). Direct hardware WebGPU acceleration support.
             </p>
