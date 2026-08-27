@@ -106,15 +106,20 @@ export const Downloads: React.FC = () => {
             </div>
           </div>
 
-          <a
-            href="https://github.com/unitybtw/nova-browser/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download Setup (.EXE)</span>
-          </a>
+          <div>
+            <a
+              href="https://github.com/unitybtw/nova-browser/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download Setup (.EXE)</span>
+            </a>
+            <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
+              Also available as standalone Portable .exe (no admin rights required)
+            </p>
+          </div>
         </div>
       </div>
 

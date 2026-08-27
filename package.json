@@ -39,10 +39,25 @@
           "arch": [
             "x64"
           ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
         }
       ],
-      "artifactName": "Nova-Browser-Setup.exe",
-      "icon": "build/icon.ico"
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Nova-Browser-${target}.${ext}",
+      "icon": "build/icon.ico",
+      "legalTrademarks": "Nova Browser",
+      "publisherName": "unitybtw"
     },
     "dmg": {
       "title": "Nova Browser Installer",
@@ -86,7 +101,12 @@
     },
     "nsis": {
       "oneClick": false,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "Nova Browser",
+      "deleteAppDataOnUninstall": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico"
     }
