@@ -103,20 +103,48 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* MAMMOTH ANIMATED FOOTER WORDMARK */}
-        <div className="relative pt-8 sm:pt-14 pb-2 overflow-hidden flex flex-col items-center justify-center select-none border-t border-white/5">
+        <div className="relative pt-10 sm:pt-16 pb-4 overflow-hidden flex flex-col items-center justify-center select-none border-t border-white/10">
           {/* Ambient Cyber Aura / Spotlight */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-4xl h-36 bg-gradient-to-r from-indigo-600/20 via-cyan-500/25 to-purple-600/20 blur-[100px] pointer-events-none rounded-full" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-5xl h-44 bg-gradient-to-r from-indigo-600/25 via-cyan-500/30 to-purple-600/25 blur-[110px] pointer-events-none rounded-full" />
 
           <motion.div
-            initial={{ opacity: 0, y: 35 }}
+            initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-            className="w-full text-center relative group cursor-default"
+            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+            className="w-full max-w-6xl mx-auto relative group cursor-default"
           >
-            <span className="font-display font-black text-[12.5vw] uppercase tracking-[-0.055em] leading-[0.82] block w-full whitespace-nowrap bg-gradient-to-b from-white via-neutral-300 to-neutral-700/30 bg-clip-text text-transparent transition-all duration-700 group-hover:from-cyan-300 group-hover:via-indigo-200 group-hover:to-cyan-900 drop-shadow-[0_15px_40px_rgba(0,0,0,0.9)]">
-              NOVABROWSER
-            </span>
+            <svg
+              viewBox="0 0 1200 160"
+              className="w-full h-auto drop-shadow-[0_20px_50px_rgba(0,0,0,0.9)]"
+              preserveAspectRatio="xMidYMid meet"
+            >
+              <defs>
+                <linearGradient id="novaTextGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#FFFFFF" />
+                  <stop offset="50%" stopColor="#D1D5DB" />
+                  <stop offset="100%" stopColor="#374151" stopOpacity="0.5" />
+                </linearGradient>
+                <linearGradient id="novaHoverGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#38bdf8" />
+                  <stop offset="50%" stopColor="#818cf8" />
+                  <stop offset="100%" stopColor="#c084fc" />
+                </linearGradient>
+              </defs>
+              <text
+                x="50%"
+                y="65%"
+                textAnchor="middle"
+                dominantBaseline="middle"
+                className="font-display font-black transition-all duration-700 select-none group-hover:fill-[url(#novaHoverGradient)]"
+                fill="url(#novaTextGradient)"
+                fontSize="150"
+                fontWeight="900"
+                letterSpacing="-0.045em"
+              >
+                NOVABROWSER
+              </text>
+            </svg>
 
             {/* Glowing Accent Shimmer on Hover */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none blur-2xl" />
