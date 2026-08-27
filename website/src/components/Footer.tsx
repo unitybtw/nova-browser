@@ -13,13 +13,13 @@ export const Footer: React.FC = () => {
           {/* Brand / Manifesto Column */}
           <div className="col-span-1 md:col-span-6 flex flex-col justify-between">
             <div>
-              <div className="flex items-center gap-2.5 mb-6">
+              <div className="flex items-center gap-3 mb-6">
                 <img
                   src="/nova-icon-transparent.png"
                   alt="Nova Logo"
-                  className="w-8 h-8 object-contain"
+                  className="w-11 h-11 object-contain drop-shadow-[0_2px_10px_rgba(6,182,212,0.4)]"
                 />
-                <span className="font-serif italic text-2xl font-bold tracking-tight text-white">
+                <span className="font-serif italic text-3xl font-bold tracking-tight text-white">
                   Nova
                 </span>
               </div>

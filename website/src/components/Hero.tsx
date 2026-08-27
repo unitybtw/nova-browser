@@ -278,12 +278,12 @@ export const Hero: React.FC = () => {
 
                 {/* Nova Logo & Clock */}
                 <div className="relative z-10 flex flex-col items-center text-center mb-8">
-                  <div className="relative w-16 h-16 mb-4 group cursor-pointer">
-                    <div className="absolute inset-0 bg-cyan-500/20 rounded-2xl blur-xl group-hover:bg-cyan-500/40 transition-all" />
+                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-4 group cursor-pointer">
+                    <div className="absolute inset-0 bg-cyan-500/25 rounded-3xl blur-2xl group-hover:bg-cyan-500/50 transition-all duration-500" />
                     <img
                       src="/nova-icon-transparent.png"
                       alt="Nova Logo"
-                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(6,182,212,0.6)] group-hover:scale-105 transition-transform"
+                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_25px_rgba(6,182,212,0.7)] group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
 
