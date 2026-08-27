@@ -701,11 +701,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 if (tab?.id) {
                   onUpdateTab(tab.id, { isTranslated: true, translatedLang: targetLang });
                 }
+                window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: true } }));
+                return;
               }
             }
           }
-        } catch (err) {
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: 'Sayfadaki metinler okunamadı veya çevrilemedi' } }));
+        } catch (err: any) {
           console.error('[BrowserView] Translation execution failed:', err);
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false, error: err.message || 'Çeviri başarısız oldu' } }));
         }
       }
     };
@@ -719,8 +723,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           if (tab?.id) {
             onUpdateTab(tab.id, { isTranslated: false, translatedLang: undefined });
           }
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: true } }));
         } catch (err) {
           console.error('[BrowserView] Restore original failed:', err);
+          window.dispatchEvent(new CustomEvent('nova:translate-tab-done', { detail: { tabId: tab?.id, success: false } }));
         }
       }
     };

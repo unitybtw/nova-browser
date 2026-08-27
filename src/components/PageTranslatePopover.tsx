@@ -13,7 +13,6 @@ export interface PageTranslatePopoverProps {
   currentSourceLang?: string;
   currentTargetLang?: string;
   error?: string | null;
-  anchorRect?: { top: number; left: number; width: number; height: number; bottom: number; right: number } | null;
 }
 
 export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
@@ -25,8 +24,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
   isLoading,
   currentSourceLang = 'auto',
   currentTargetLang = 'tr',
-  error,
-  anchorRect
+  error
 }) => {
   const [selectedTargetLang, setSelectedTargetLang] = useState<string>(currentTargetLang);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
@@ -53,10 +51,6 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === selectedTargetLang) || SUPPORTED_LANGUAGES[0];
   const sourceLangObj = SUPPORTED_LANGUAGES.find(l => l.code === currentSourceLang);
 
-  // Position calculation
-  const top = anchorRect ? anchorRect.bottom + 8 : 80;
-  const left = anchorRect ? Math.max(16, Math.min(anchorRect.left + anchorRect.width / 2 - 160, window.innerWidth - 340)) : window.innerWidth - 360;
-
   return (
     <AnimatePresence>
       {isOpen && (
@@ -66,8 +60,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           transition={{ duration: 0.14, ease: 'easeOut' }}
-          className="fixed z-[99999] w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 select-none overflow-hidden"
-          style={{ top, left }}
+          className="absolute top-full right-0 mt-2.5 w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 select-none overflow-hidden z-[99999]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/5">
