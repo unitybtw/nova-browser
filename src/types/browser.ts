@@ -19,6 +19,8 @@ export interface Tab {
   isSuspended?: boolean;
   lastAccessed?: number;
   splitWith?: string;
+  isTranslated?: boolean;
+  translatedLang?: string;
 }
 
 export interface Folder {
@@ -46,6 +48,7 @@ export const defaultSettings = {
   preloadDnsEnabled: true,
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
+  defaultTranslationLanguage: 'tr',
 };
 
 export interface Extension {

@@ -9,6 +9,11 @@ import { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
 import { tabThumbnailCache } from '../services/thumbnailCache';
+import { 
+  getExtractTextNodesScript, 
+  getApplyTranslationScript, 
+  getRestoreOriginalScript 
+} from '../services/translationService';
 
 // Performance: Code-split internal browser pages
 const SettingsPage = React.lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
@@ -304,15 +309,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleStartNavigation = (e: any) => {
       if (e.isMainFrame && tab?.id) {
-        // onUpdateTab shallow-merges updates and treats ANY value difference
-        // as a change (undefined -> 0 included), so unconditionally resetting
-        // blockedAdsCount allocated a fresh tab object on every navigation and
-        // cascaded re-renders through every tabs consumer. Only include the
-        // reset when the counter actually holds blocked ads. Read the live
-        // count via latestTabRef: the captured `tab` goes stale for
-        // blockedAdsCount because this effect doesn't depend on it.
         const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
-        const updates: Partial<Tab> = { isLoading: true };
+        const updates: Partial<Tab> = { 
+          isLoading: true,
+          isTranslated: false,
+          translatedLang: undefined
+        };
         if (currentBlockedAds) {
           updates.blockedAdsCount = 0;
         }
@@ -672,6 +674,65 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       };
     }
   }, [tab?.url, isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab]);
+
+  // Handle Page Translation & Restore events
+  useEffect(() => {
+    const handleTranslateTabEvent = async (e: any) => {
+      const detail = e.detail;
+      if (detail?.tabId === tab?.id && webviewRef.current) {
+        const webview = webviewRef.current;
+        try {
+          // 1. Extract text nodes
+          const extractScript = getExtractTextNodesScript();
+          const extractResult = await webview.executeJavaScript(extractScript);
+          
+          if (extractResult && extractResult.success && Array.isArray(extractResult.texts) && extractResult.texts.length > 0) {
+            // 2. Translate via IPC batch
+            const targetLang = detail.targetLang || 'tr';
+            const sourceLang = detail.sourceLang || 'auto';
+            
+            if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {
+              const response = await (window as any).electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
+              
+              if (response && Array.isArray(response.translations) && response.translations.length > 0) {
+                // 3. Apply translations
+                const applyScript = getApplyTranslationScript(response.translations, targetLang);
+                await webview.executeJavaScript(applyScript);
+                if (tab?.id) {
+                  onUpdateTab(tab.id, { isTranslated: true, translatedLang: targetLang });
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('[BrowserView] Translation execution failed:', err);
+        }
+      }
+    };
+
+    const handleRestoreTabEvent = async (e: any) => {
+      const detail = e.detail;
+      if (detail?.tabId === tab?.id && webviewRef.current) {
+        try {
+          const restoreScript = getRestoreOriginalScript();
+          await webviewRef.current.executeJavaScript(restoreScript);
+          if (tab?.id) {
+            onUpdateTab(tab.id, { isTranslated: false, translatedLang: undefined });
+          }
+        } catch (err) {
+          console.error('[BrowserView] Restore original failed:', err);
+        }
+      }
+    };
+
+    window.addEventListener('nova:translate-tab', handleTranslateTabEvent);
+    window.addEventListener('nova:restore-tab', handleRestoreTabEvent);
+
+    return () => {
+      window.removeEventListener('nova:translate-tab', handleTranslateTabEvent);
+      window.removeEventListener('nova:restore-tab', handleRestoreTabEvent);
+    };
+  }, [tab?.id, onUpdateTab]);
 
   if (!tab) {
     return null;

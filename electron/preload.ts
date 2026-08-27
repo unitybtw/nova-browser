@@ -11,6 +11,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   fetchUnsplashPhotos: (query: string) => ipcRenderer.invoke('fetch-unsplash-photos', query),
   fetchPageHtml: (url: string) => ipcRenderer.invoke('fetch-page-html', url),
   captureFullPage: (wcId: number) => ipcRenderer.invoke('capture-full-page', wcId),
+  // Translation APIs
+  translateTextBatch: (texts: string[], sourceLang?: string, targetLang?: string) => ipcRenderer.invoke('translate-text-batch', { texts, sourceLang, targetLang }),
+  detectLanguage: (sampleText: string) => ipcRenderer.invoke('detect-language', sampleText),
+  onTriggerPageTranslation: (callback: (data: { targetLang?: string; webContentsId?: number }) => void) => {
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on('trigger-page-translation', handler);
+    return () => ipcRenderer.removeListener('trigger-page-translation', handler);
+  },
   // Downloads
   pauseDownload: (id: string) => ipcRenderer.invoke('pause-download', id),
   resumeDownload: (id: string) => ipcRenderer.invoke('resume-download', id),

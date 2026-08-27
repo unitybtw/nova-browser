@@ -1472,6 +1472,7 @@ app.on('web-contents-created', (_event, wc) => {
         back: isTr ? 'Geri' : 'Back',
         forward: isTr ? 'İleri' : 'Forward',
         reload: isTr ? 'Yeniden Yükle' : 'Reload',
+        translatePage: isTr ? 'Sayfayı Türkçeye Çevir' : 'Translate Page',
         savePageAs: isTr ? 'Farklı kaydet...' : 'Save As...',
         print: isTr ? 'Yazdır...' : 'Print...',
         viewSource: isTr ? 'Sayfa kaynağını görüntüle' : 'View Page Source',
@@ -1726,6 +1727,16 @@ app.on('web-contents-created', (_event, wc) => {
             }
           }
         }));
+
+        const activePageUrl = wc.getURL() || '';
+        if (activePageUrl && (activePageUrl.startsWith('http://') || activePageUrl.startsWith('https://'))) {
+          menu.append(new MenuItem({
+            label: labels.translatePage,
+            click: () => {
+              sendToMainWindow('trigger-page-translation', { targetLang: isTr ? 'tr' : 'en', webContentsId: wc.id });
+            }
+          }));
+        }
 
         menu.append(new MenuItem({ type: 'separator' }));
       }
@@ -2086,6 +2097,101 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   }
 
   return { error: 'Too many redirects' };
+});
+
+// Translation Helper Functions
+async function translateTextWithGoogle(text: string, sourceLang: string = 'auto', targetLang: string = 'tr'): Promise<string> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${encodeURIComponent(sourceLang)}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+    }
+  });
+  if (!res.ok) {
+    throw new Error(`Translation failed with status ${res.status}`);
+  }
+  const data = await res.json();
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    return data[0].map((item: any) => item[0] || '').join('');
+  }
+  return text;
+}
+
+async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(sampleText.slice(0, 300))}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && typeof data[2] === 'string') {
+        return data[2]; // e.g. 'en', 'de', 'es', 'fr', 'tr', 'ru', 'ja'
+      }
+    }
+  } catch (err) {
+    console.warn('[Translate] Language detection error:', err);
+  }
+  return 'auto';
+}
+
+// IPC Handlers for One-Click Page Translation
+ipcMain.handle('translate-text-batch', async (event, { texts, sourceLang, targetLang }: { texts: string[]; sourceLang?: string; targetLang?: string }) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: texts || [] };
+  if (!Array.isArray(texts) || texts.length === 0) return { translations: [], success: true };
+
+  const sLang = sourceLang || 'auto';
+  const tLang = targetLang || 'tr';
+
+  try {
+    const DELIMITER = ' |||NV_DIV||| ';
+    const results: string[] = [];
+    let currentBatch: string[] = [];
+    let currentLen = 0;
+
+    for (let i = 0; i < texts.length; i++) {
+      const txt = texts[i] || '';
+      if (currentBatch.length >= 35 || currentLen + txt.length > 2200) {
+        if (currentBatch.length > 0) {
+          const combined = currentBatch.join(DELIMITER);
+          const translatedCombined = await translateTextWithGoogle(combined, sLang, tLang);
+          const split = translatedCombined.split(/\|\|\|NV_DIV\|\|\|/i).map(s => s.trim());
+          
+          for (let j = 0; j < currentBatch.length; j++) {
+            results.push(split[j] !== undefined ? split[j] : currentBatch[j]);
+          }
+        }
+        currentBatch = [txt];
+        currentLen = txt.length;
+      } else {
+        currentBatch.push(txt);
+        currentLen += txt.length;
+      }
+    }
+
+    if (currentBatch.length > 0) {
+      const combined = currentBatch.join(DELIMITER);
+      const translatedCombined = await translateTextWithGoogle(combined, sLang, tLang);
+      const split = translatedCombined.split(/\|\|\|NV_DIV\|\|\|/i).map(s => s.trim());
+      
+      for (let j = 0; j < currentBatch.length; j++) {
+        results.push(split[j] !== undefined ? split[j] : currentBatch[j]);
+      }
+    }
+
+    return { translations: results, success: true };
+  } catch (err: any) {
+    console.error('[Translate] Batch translation error:', err);
+    return { error: err.message || 'Translation failed', translations: texts, success: false };
+  }
+});
+
+ipcMain.handle('detect-language', async (event, sampleText: string) => {
+  if (!isTrustedSender(event)) return 'auto';
+  if (!sampleText || typeof sampleText !== 'string') return 'auto';
+  return await detectLanguageWithGoogle(sampleText);
 });
 
 // Autocomplete Suggestions handler (providers + LRU cache + staggered fallback live in main/suggestions.ts)

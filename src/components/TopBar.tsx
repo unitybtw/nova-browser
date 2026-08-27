@@ -50,13 +50,15 @@ import {
   ChevronRight,
   User,
   Compass,
-  Cloud
+  Cloud,
+  Languages
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { PermissionPromptPopover } from './PermissionPromptPopover';
+import { PageTranslatePopover } from './PageTranslatePopover';
 import { UserSettings } from '../App';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -509,6 +511,74 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
   const [isPermissionPromptDismissed, setIsPermissionPromptDismissed] = useState(false);
 
+  // Translation State
+  const [isTranslateOpen, setIsTranslateOpen] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translationError, setTranslationError] = useState<string | null>(null);
+  const [targetLang, setTargetLang] = useState<string>('tr');
+  const [sourceLang, setSourceLang] = useState<string>('auto');
+  const translateBtnRef = useRef<HTMLButtonElement>(null);
+  const [translateAnchorRect, setTranslateAnchorRect] = useState<any>(null);
+
+  const handleToggleTranslate = () => {
+    if (translateBtnRef.current) {
+      setTranslateAnchorRect(translateBtnRef.current.getBoundingClientRect());
+    }
+    setIsTranslateOpen(!isTranslateOpen);
+  };
+
+  const handleTranslatePage = async (tLang: string, sLang?: string) => {
+    if (!activeTab?.id) return;
+    setIsTranslating(true);
+    setTranslationError(null);
+    setTargetLang(tLang);
+    if (sLang) setSourceLang(sLang);
+    try {
+      window.dispatchEvent(new CustomEvent('nova:translate-tab', {
+        detail: { tabId: activeTab.id, targetLang: tLang, sourceLang: sLang || 'auto' }
+      }));
+      setTimeout(() => {
+        setIsTranslating(false);
+        setIsTranslateOpen(false);
+      }, 1200);
+    } catch (err: any) {
+      setTranslationError(err.message || 'Çeviri başarısız oldu');
+      setIsTranslating(false);
+    }
+  };
+
+  const handleRestoreOriginal = async () => {
+    if (!activeTab?.id) return;
+    setIsTranslating(true);
+    try {
+      window.dispatchEvent(new CustomEvent('nova:restore-tab', {
+        detail: { tabId: activeTab.id }
+      }));
+      setTimeout(() => {
+        setIsTranslating(false);
+        setIsTranslateOpen(false);
+      }, 300);
+    } catch (err: any) {
+      setIsTranslating(false);
+    }
+  };
+
+  // Listen to main process context-menu trigger
+  useEffect(() => {
+    if (typeof (window as any).electronAPI?.onTriggerPageTranslation === 'function') {
+      const unsub = (window as any).electronAPI.onTriggerPageTranslation((data: any) => {
+        if (activeTab?.id) {
+          if (translateBtnRef.current) {
+            setTranslateAnchorRect(translateBtnRef.current.getBoundingClientRect());
+          }
+          setIsTranslateOpen(true);
+          handleTranslatePage(data?.targetLang || 'tr', 'auto');
+        }
+      });
+      return () => unsub?.();
+    }
+  }, [activeTab?.id]);
+
   useEffect(() => {
     if (relevantPermissionRequests.length > 0) {
       setIsPermissionPromptDismissed(false);
@@ -817,6 +887,28 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               </button>
             )}
 
+            {/* Page Translation Button */}
+            {activeTab?.url && (activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://')) && (
+              <button 
+                ref={translateBtnRef}
+                type="button" 
+                onClick={handleToggleTranslate}
+                className={`p-1 rounded-lg transition-colors relative ${
+                  activeTab.isTranslated
+                    ? 'text-cyan-500 bg-cyan-500/15 hover:bg-cyan-500/25'
+                    : isIncognito 
+                      ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' 
+                      : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title="Translate Page / Sayfayı Çevir"
+              >
+                <Languages className="w-3.5 h-3.5" />
+                {activeTab.isTranslated && (
+                  <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-cyan-500 ring-1 ring-white dark:ring-slate-900" />
+                )}
+              </button>
+            )}
+
             <button 
               type="button" 
               onClick={onToggleBookmark}
@@ -827,6 +919,20 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             </button>
           </div>
         </form>
+
+        {/* Page Translate Popover */}
+        <PageTranslatePopover
+          isOpen={isTranslateOpen}
+          onClose={() => setIsTranslateOpen(false)}
+          onTranslate={handleTranslatePage}
+          onRestoreOriginal={handleRestoreOriginal}
+          isTranslated={!!activeTab?.isTranslated}
+          isLoading={isTranslating}
+          currentSourceLang={sourceLang}
+          currentTargetLang={targetLang}
+          error={translationError}
+          anchorRect={translateAnchorRect}
+        />
 
         {/* Search Suggestions Dropdown */}
         <AnimatePresence>

@@ -39,6 +39,7 @@ export interface UserSettings {
   preloadDnsEnabled?: boolean;
   smoothScrollingEnabled?: boolean;
   passwordManagerEnabled?: boolean;
+  defaultTranslationLanguage?: string;
 }
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
