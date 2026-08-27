@@ -2,42 +2,42 @@
 
   <img src="assets/logo.png" alt="Nova Browser Logo" width="140" style="filter: drop-shadow(0 12px 24px rgba(6, 182, 212, 0.3)); margin-bottom: 16px;" />
 
-  # 🚀 Nova Browser
+  # Nova Browser
 
-  **The Next-Gen, AI-Native, Privacy-First Desktop Browser**  
-  *Built with Electron, React, TypeScript & Vite — Featuring Zero-Knowledge Cloud Sync & Autonomous AI Agents*
+  **The Sovereign, AI-Native, Privacy-First Desktop Browser**  
+  *Built with Electron, React, TypeScript & Vite — Featuring On-Device WebGPU Inference, Zero-Knowledge Cloud Sync & Autonomous AI Agents*
 
   <br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Electron](https://img.shields.io/badge/Electron-43.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
+  [![Electron](https://img.shields.io/badge/Electron-33.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
-  [![TailwindCSS](https://img.shields.io/badge/TailwindCSS-4.x-38BDF8?style=for-the-badge&logo=tailwindcss)](https://tailwindcss.com/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
-    <a href="#-key-features">Key Features</a> •
-    <a href="#-nova-sync-zero-knowledge-cloud-sync">Nova Sync</a> •
-    <a href="#-screenshots">Screenshots</a> •
-    <a href="#-quick-start">Quick Start</a> •
-    <a href="#-architecture">Architecture</a> •
-    <a href="#-mcp-ai-agent-guide">AI & MCP</a> •
-    <a href="#-security--privacy">Security</a>
+    <a href="#overview">Overview</a> •
+    <a href="#key-features">Key Features</a> •
+    <a href="#nova-sync">Nova Sync</a> •
+    <a href="#screenshots">Screenshots</a> •
+    <a href="#quick-start">Quick Start</a> •
+    <a href="#architecture">Architecture</a> •
+    <a href="#mcp-model-context-protocol-guide">AI & MCP</a> •
+    <a href="#security--privacy-commitment">Security</a>
   </p>
 
 </div>
 
 ---
 
-## 🌟 Overview
+## Overview
 
-**Nova Browser** is an open-source, high-performance web browser engineered for modern power users, developers, and AI-driven workflows. Combining the speed and rendering engine of Chromium with a refined glassmorphic aesthetic, Nova introduces **native autonomous AI agents via the Model Context Protocol (MCP)**, **zero-knowledge end-to-end encrypted multi-device sync**, **1-click Chrome Web Store extension installs**, and a **dual-view split-screen layout**.
+**Nova Browser** is an open-source, high-performance desktop web browser engineered for power users, developers, and AI-driven workflows. Combining the speed and rendering engine of Chromium with a refined sovereign architecture, Nova introduces **native autonomous AI agents via the Model Context Protocol (MCP)**, **on-device WebGPU inference**, **zero-knowledge end-to-end encrypted multi-device sync**, **1-click Chrome Web Store extension installs**, and a **dual-view split-screen layout**.
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <div align="center">
   <img src="assets/newtab.png" alt="Nova Browser Start Page" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 24px;" />
@@ -52,35 +52,35 @@
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔄 1-Click Nova Cloud Sync (Zero-Knowledge E2EE)
+### 1-Click Nova Cloud Sync (Zero-Knowledge E2EE)
 - **1-Click Device Pairing**: Pair laptops and desktops instantly using a human-friendly pairing code (`nova-xxxx-xxxx-xxxx-xxxx`). No email, passwords, or account registration needed.
 - **End-to-End Encryption (AES-256-GCM)**: All saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted on your device with PBKDF2 (100,000 iterations) and 256-bit AES-GCM before being sent to the cloud.
 - **Realtime WebSocket Sync**: Remote changes propagate seamlessly across your devices in real-time.
 
-### 🤖 AI Agent & Virtual Cursor (MCP Protocol)
+### AI Agent & Virtual Cursor (MCP Protocol)
 - **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Antigravity) to navigate, read pages, click elements, fill forms, and take screenshots.
 - **Glowing AI Cursor Overlay**: Watch autonomous AI subagents interact with live webpages in real-time with an animated glowing cursor.
-- **Built-in Local AI Sidepanel**: Run lightweight local models offline directly in your browser using Web-LLM and WebGPU.
+- **Built-in Local AI Sidepanel**: Run lightweight local models offline directly on your GPU via WebGPU and WebLLM.
 
-### 🧩 1-Click Chrome Web Store Extensions
+### 1-Click Chrome Web Store Extensions
 - **Direct Web Store Installation**: Browse the official Chrome Web Store and install extensions with 1-click via the top banner.
 - **Manual CRX / Unpacked Add-ons**: Load developer extensions or zip packages effortlessly through `nova://extensions`.
 
-### 🌐 Native `nova://` Internal Pages
+### Native `nova://` Internal Pages
 - **`nova://settings`**: Complete preferences, theme toggles, search engine picker, shortcuts, and sync controls.
 - **`nova://history`**: Grouped timeline search, date filtering, and quick item deletion.
 - **`nova://downloads`**: Live progress indicators, pause/resume, folder shortcuts, and file launching.
 - **`nova://passwords`**: Zero-knowledge encrypted password vault with auto-fill and password generator.
 
-### 🪟 Productivity & Multi-Tasking
+### Productivity & Multi-Tasking
 - **Dual-View Split Screen**: Snap two active tabs side-by-side with a drag-to-resize divider.
 - **Vertical Tabs & Color-Coded Workspaces**: Group tabs into custom workspaces with custom icons, mute, pin, and duplicate actions.
-- **Tasks & To-Do Widget**: Built-in glassmorphic checklist on the start page with custom check animations and task filtering.
+- **Tasks & To-Do Widget**: Built-in checklist on the start page with custom check animations and task filtering.
 - **Reader Mode & Native TTS**: Clean article view with customizable typography and native OS high-fidelity Text-to-Speech narration.
 
-### 🛡️ Security & Privacy First
+### Security & Privacy First
 - **Privacy Shield**: Built-in AdBlocker and tracking protection powered by `@cliqz/adblocker-electron`.
 - **Proxy VPN Support**: Toggle proxy servers or custom VPN endpoints for encrypted browsing.
 - **Incognito Mode**: Isolated session tabs that leave no trace in history or local storage.
@@ -88,14 +88,14 @@
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Component | Technology |
 |---|---|
 | **Runtime Shell** | [Electron 33](https://www.electronjs.org/) |
 | **Frontend Framework** | [React 18](https://react.dev/) + [TypeScript](https://www.typescriptlang.org/) |
 | **Bundler & Build Tool** | [Vite 6](https://vitejs.dev/) + [esbuild](https://esbuild.github.io/) |
-| **Styling & Motion** | [TailwindCSS 3](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/) |
+| **Styling & Motion** | [TailwindCSS](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
 | **Cloud Sync & Realtime** | [Supabase](https://supabase.com/) + Web Crypto API (AES-GCM-256) |
 | **AdBlock & Filtering** | [`@cliqz/adblocker-electron`](https://github.com/cliqz-oss/adblocker) |
@@ -103,7 +103,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - [Node.js](https://nodejs.org/) (v18 or higher recommended)
@@ -132,7 +132,7 @@ npm run build
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 Nova Browser employs a secure multi-process Electron architecture with strict context isolation, a React-based renderer, and a dedicated AI integration layer via the Model Context Protocol (MCP).
 
@@ -200,7 +200,7 @@ graph TD
 
 ---
 
-## 🤖 MCP (Model Context Protocol) Guide
+## MCP (Model Context Protocol) Guide
 
 Nova Browser natively exposes an MCP endpoint on port `3020`, enabling AI assistants to browse the web autonomously.
 
@@ -219,9 +219,9 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 
 ---
 
-## 🗺️ Completed Milestones & Roadmap
+## Completed Milestones & Roadmap
 
-- [x] Modern Glassmorphic UI with Vertical Tabs & Workspaces
+- [x] Modern UI with Vertical Tabs & Workspaces
 - [x] Native MCP Autonomous AI Agent Protocol & Virtual Glowing Cursor
 - [x] Zero-Knowledge 1-Click Device Pairing Code Cloud Sync (E2EE)
 - [x] Direct Chrome Web Store 1-Click Extension Installation
@@ -233,7 +233,7 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 
 ---
 
-## 🛡️ Security & Privacy Commitment
+## Security & Privacy Commitment
 
 - **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
@@ -241,7 +241,7 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Feel free to submit a Pull Request or open an Issue on GitHub:
 
@@ -253,12 +253,12 @@ Contributions are welcome! Feel free to submit a Pull Request or open an Issue o
 
 ---
 
-## 📄 License
+## License
 
 Distributed under the **MIT License**. See `LICENSE` for details.
 
 <br/>
 
 <div align="center">
-  <sub>Designed & Developed with ❤️ by the Nova Browser Team</sub>
+  <sub>Designed & Developed by the Nova Browser Team</sub>
 </div>
