@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Bot, Lock, Columns, Shield, Terminal, ArrowUpRight } from 'lucide-react';
-import { SpotlightCard } from './SpotlightCard';
 
 const MODULES = [
   {
@@ -69,7 +68,7 @@ export const FeatureBento: React.FC = () => {
         </p>
       </div>
 
-      {/* Bento Grid with Dynamic Spotlight */}
+      {/* Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {MODULES.map((mod, index) => (
           <motion.div
@@ -78,35 +77,33 @@ export const FeatureBento: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className={mod.span}
+            className={`${mod.span} rounded-2xl bg-white border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between hover:shadow-md hover:border-neutral-400 transition-all duration-200 group relative overflow-hidden`}
           >
-            <SpotlightCard className="h-full flex flex-col justify-between group">
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white transition-colors duration-300">
-                    {React.createElement(mod.icon, { className: 'w-5 h-5' })}
-                  </div>
-                  <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
-                    {mod.tag}
-                  </span>
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white transition-colors duration-300">
+                  {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
-
-                <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717] mb-3 group-hover:text-[#4338ca] transition-colors">
-                  {mod.title}
-                </h3>
-                <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-xl">
-                  {mod.description}
-                </p>
+                <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
+                  {mod.tag}
+                </span>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-[#e5e5e5]/60 flex items-center justify-between font-mono text-xs">
-                <span className="text-neutral-400 font-semibold">// {mod.stats}</span>
-                <div className="flex items-center gap-1 text-[#4338ca] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                  <span>INSPECT</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </div>
+              <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717] mb-3 group-hover:text-[#4338ca] transition-colors">
+                {mod.title}
+              </h3>
+              <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-xl">
+                {mod.description}
+              </p>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-[#e5e5e5]/60 flex items-center justify-between font-mono text-xs">
+              <span className="text-neutral-400 font-semibold">// {mod.stats}</span>
+              <div className="flex items-center gap-1 text-[#4338ca] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                <span>INSPECT</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </div>
-            </SpotlightCard>
+            </div>
           </motion.div>
         ))}
       </div>
