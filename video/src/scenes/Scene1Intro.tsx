@@ -1,5 +1,5 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
 
 export const Scene1Intro: React.FC = () => {
   const frame = useCurrentFrame();
@@ -8,30 +8,34 @@ export const Scene1Intro: React.FC = () => {
   const logoScale = spring({
     frame,
     fps,
-    config: { damping: 14, stiffness: 120, mass: 0.8 },
+    config: { damping: 12, stiffness: 110, mass: 0.8 },
   });
 
-  const logoRotate = interpolate(frame, [0, 180], [0, 10]);
+  const floatY = Math.sin(frame * 0.05) * 8;
+  const ringRotate = (frame * 1.2) % 360;
+  const ringRotateReverse = 360 - ((frame * 0.9) % 360);
 
-  const titleOpacity = interpolate(frame, [15, 35], [0, 1], {
+  const titleOpacity = interpolate(frame, [15, 38], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const titleY = interpolate(frame, [15, 35], [40, 0], {
+  const titleY = interpolate(frame, [15, 38], [40, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const subtitleOpacity = interpolate(frame, [40, 60], [0, 1], {
+  const subtitleOpacity = interpolate(frame, [35, 58], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const badgeOpacity = interpolate(frame, [60, 80], [0, 1], {
+  const badgeOpacity = interpolate(frame, [50, 70], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+
+  const glowPulse = interpolate(Math.sin(frame * 0.08), [-1, 1], [0.65, 1]);
 
   return (
     <div
@@ -47,48 +51,115 @@ export const Scene1Intro: React.FC = () => {
         fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Animated Glowing Badge */}
+      {/* Top Futuristic Tag Pill */}
       <div
         style={{
           opacity: badgeOpacity,
-          transform: 'translateY(-20px)',
-          padding: '8px 24px',
+          transform: 'translateY(-15px)',
+          padding: '10px 28px',
           borderRadius: '9999px',
-          background: 'rgba(6, 182, 212, 0.15)',
-          border: '1px solid rgba(6, 182, 212, 0.4)',
-          backdropFilter: 'blur(16px)',
-          color: '#22d3ee',
-          fontSize: 18,
+          background: 'rgba(6, 182, 212, 0.12)',
+          border: '1px solid rgba(6, 182, 212, 0.5)',
+          backdropFilter: 'blur(20px)',
+          color: '#38bdf8',
+          fontSize: 19,
           fontWeight: 700,
-          letterSpacing: '0.15em',
+          letterSpacing: '0.18em',
           textTransform: 'uppercase',
-          marginBottom: 32,
-          boxShadow: '0 0 30px rgba(6, 182, 212, 0.25)',
+          marginBottom: 36,
+          boxShadow: '0 0 35px rgba(6, 182, 212, 0.3)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 10,
         }}
       >
-        Open Source High-Performance Browser
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            backgroundColor: '#22d3ee',
+            boxShadow: '0 0 12px #22d3ee',
+          }}
+        />
+        Next-Generation Web Browser
       </div>
 
-      {/* Center 3D Glowing Compass / Nova Core Icon */}
+      {/* Hero 3D Logo Container with Holographic Energy Rings & Glass Plate */}
       <div
         style={{
-          transform: `scale(${logoScale}) rotate(${logoRotate}deg)`,
-          width: 140,
-          height: 140,
-          borderRadius: 36,
-          background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)',
+          position: 'relative',
+          width: 250,
+          height: 250,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 20px 60px rgba(6, 182, 212, 0.5), 0 0 100px rgba(59, 130, 246, 0.3)',
-          border: '2px solid rgba(255, 255, 255, 0.3)',
-          marginBottom: 36,
+          marginBottom: 34,
+          transform: `scale(${logoScale}) translateY(${floatY}px)`,
         }}
       >
-        <svg width="74" height="74" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-        </svg>
+        {/* Outer Rotating Cyan Energy Ring */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: -18,
+            borderRadius: '50%',
+            border: '2px dashed rgba(6, 182, 212, 0.65)',
+            transform: `rotate(${ringRotate}deg)`,
+            boxShadow: '0 0 45px rgba(6, 182, 212, 0.3)',
+          }}
+        />
+
+        {/* Inner Counter-Rotating Violet Energy Ring */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: -4,
+            borderRadius: '50%',
+            border: '1.5px solid rgba(168, 85, 247, 0.5)',
+            borderTopColor: 'transparent',
+            borderBottomColor: 'transparent',
+            transform: `rotate(${ringRotateReverse}deg)`,
+          }}
+        />
+
+        {/* Frosted Glass Emblem Plate */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 12,
+            borderRadius: 48,
+            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%)',
+            backdropFilter: 'blur(30px)',
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4)',
+          }}
+        />
+
+        {/* Center Glowing Neon Halo */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 20,
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(6, 182, 212, 0.7) 0%, rgba(59, 130, 246, 0.3) 50%, transparent 80%)',
+            filter: 'blur(35px)',
+            opacity: glowPulse,
+          }}
+        />
+
+        {/* Real Official Nova Logo Image */}
+        <Img
+          src={staticFile('nova-icon-transparent.png')}
+          alt="Nova Logo"
+          style={{
+            width: 160,
+            height: 160,
+            objectFit: 'contain',
+            filter: 'drop-shadow(0 15px 30px rgba(6, 182, 212, 0.7))',
+            zIndex: 2,
+          }}
+        />
       </div>
 
       {/* Main Brand Title */}
@@ -96,34 +167,35 @@ export const Scene1Intro: React.FC = () => {
         style={{
           opacity: titleOpacity,
           transform: `translateY(${titleY}px)`,
-          fontSize: 86,
-          fontWeight: 800,
+          fontSize: 94,
+          fontWeight: 900,
           letterSpacing: '-0.03em',
           margin: 0,
-          background: 'linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)',
+          background: 'linear-gradient(135deg, #ffffff 0%, #a5f3fc 45%, #38bdf8 80%, #818cf8 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
-          textShadow: '0 4px 30px rgba(0,0,0,0.5)',
+          textShadow: '0 10px 40px rgba(6, 182, 212, 0.4)',
         }}
       >
-        Nova Browser
+        NOVA BROWSER
       </h1>
 
-      {/* Tagline */}
+      {/* Subtitle & Value Proposition */}
       <p
         style={{
           opacity: subtitleOpacity,
           fontSize: 32,
-          fontWeight: 400,
+          fontWeight: 500,
           color: '#94a3b8',
-          maxWidth: 900,
-          marginTop: 18,
+          maxWidth: 960,
+          margin: '22px 0 0 0',
           lineHeight: 1.4,
+          letterSpacing: '-0.01em',
         }}
       >
-        Engineered for <span style={{ color: '#38bdf8', fontWeight: 600 }}>Pure Speed</span>,{' '}
-        <span style={{ color: '#a855f7', fontWeight: 600 }}>Local AI</span> &amp;{' '}
-        <span style={{ color: '#10b981', fontWeight: 600 }}>Total Privacy</span>
+        Engineered for <span style={{ color: '#38bdf8', fontWeight: 700 }}>Pure Speed</span>,{' '}
+        <span style={{ color: '#c084fc', fontWeight: 700 }}>Local WebGPU AI</span> &{' '}
+        <span style={{ color: '#34d399', fontWeight: 700 }}>Zero-Telemetry Privacy</span>
       </p>
     </div>
   );

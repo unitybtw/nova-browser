@@ -1,5 +1,5 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
 
 export const Scene3AI: React.FC = () => {
   const frame = useCurrentFrame();
@@ -16,19 +16,19 @@ export const Scene3AI: React.FC = () => {
     extrapolateRight: 'clamp',
   });
 
-  const message2Opacity = interpolate(frame, [45, 60], [0, 1], {
+  const message2Opacity = interpolate(frame, [38, 52], [0, 1], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
   const typedChars = Math.floor(
-    interpolate(frame, [65, 120], [0, 140], {
+    interpolate(frame, [55, 125], [0, 145], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
     })
   );
 
-  const fullAiResponse = "Nova Browser operates directly on your GPU using WebGPU. No data leaves your machine, ensuring 100% privacy with zero latency.";
+  const fullAiResponse = "Nova AI runs locally on your GPU via WebGPU. All your queries stay 100% on your device, with zero cloud latency and no API keys required.";
   const aiText = fullAiResponse.slice(0, typedChars);
 
   return (
@@ -45,113 +45,148 @@ export const Scene3AI: React.FC = () => {
         fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Category Pill */}
+      {/* Category Pill with Nova Icon */}
       <div
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '8px 22px',
+          gap: 12,
+          padding: '8px 24px',
           borderRadius: 9999,
           background: 'rgba(168, 85, 247, 0.15)',
-          border: '1px solid rgba(168, 85, 247, 0.4)',
+          border: '1px solid rgba(168, 85, 247, 0.45)',
           color: '#c084fc',
-          fontSize: 16,
+          fontSize: 17,
           fontWeight: 700,
-          letterSpacing: '0.12em',
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          marginBottom: 20,
+          marginBottom: 16,
+          boxShadow: '0 0 30px rgba(168, 85, 247, 0.3)',
         }}
       >
+        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 22, height: 22 }} />
         <span>Local AI Intelligence</span>
       </div>
 
       <h2
         style={{
-          fontSize: 64,
-          fontWeight: 800,
+          fontSize: 66,
+          fontWeight: 900,
           color: '#ffffff',
           margin: '0 0 36px 0',
           letterSpacing: '-0.02em',
           textAlign: 'center',
+          background: 'linear-gradient(135deg, #ffffff 0%, #e9d5ff 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
         }}
       >
-        Built-in WebGPU AI Assistant
+        On-Device WebGPU AI Copilot
       </h2>
 
       {/* SidePanel Chat Mockup Card */}
       <div
         style={{
           transform: `scale(${chatScale})`,
-          width: 900,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(32px)',
-          border: '1px solid rgba(168, 85, 247, 0.3)',
-          borderRadius: 28,
-          padding: 36,
-          boxShadow: '0 30px 90px rgba(168, 85, 247, 0.25)',
+          width: 960,
+          background: 'rgba(15, 23, 42, 0.88)',
+          backdropFilter: 'blur(35px)',
+          border: '1px solid rgba(168, 85, 247, 0.35)',
+          borderRadius: 30,
+          padding: '36px 42px',
+          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.7), 0 0 60px rgba(168, 85, 247, 0.25)',
           display: 'flex',
           flexDirection: 'column',
-          gap: 20,
+          gap: 22,
         }}
       >
         {/* Chat Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 12px #10b981' }} />
-            <span style={{ color: '#ffffff', fontWeight: 700, fontSize: 18 }}>Nova AI Copilot</span>
-            <span style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#d8b4fe', fontSize: 12, padding: '3px 10px', borderRadius: 9999, fontWeight: 600 }}>Llama-3-8B Local</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)',
+              }}
+            >
+              <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 30, height: 30 }} />
+            </div>
+            <div>
+              <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 20 }}>Nova AI Copilot</div>
+              <div style={{ color: '#a855f7', fontSize: 14, fontWeight: 600 }}>Llama 3.2 · WebGPU Hardware Accelerated</div>
+            </div>
           </div>
-          <span style={{ color: '#94a3b8', fontSize: 14 }}>WebGPU Accelerated (0ms Cloud Latency)</span>
+          <div
+            style={{
+              padding: '6px 16px',
+              borderRadius: 9999,
+              background: 'rgba(34, 197, 94, 0.15)',
+              border: '1px solid rgba(34, 197, 94, 0.4)',
+              color: '#4ade80',
+              fontSize: 13,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} />
+            100% Offline & Private
+          </div>
         </div>
 
-        {/* User Message */}
+        {/* Message 1: User Query */}
         <div
           style={{
             opacity: message1Opacity,
             alignSelf: 'flex-end',
-            maxWidth: '80%',
-            background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
             color: '#ffffff',
             padding: '16px 24px',
             borderRadius: '20px 20px 4px 20px',
-            fontSize: 20,
+            fontSize: 18,
             fontWeight: 500,
+            maxWidth: '80%',
+            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.35)',
           }}
         >
-          How does Nova ensure complete browsing privacy with AI?
+          Can you summarize this tab without sending my data to any cloud servers?
         </div>
 
-        {/* AI Response */}
+        {/* Message 2: Nova AI Streaming Response */}
         <div
           style={{
             opacity: message2Opacity,
             alignSelf: 'flex-start',
-            maxWidth: '88%',
-            background: 'rgba(255, 255, 255, 0.06)',
+            background: 'rgba(255, 255, 255, 0.05)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: '#f1f5f9',
-            padding: '20px 26px',
+            color: '#e2e8f0',
+            padding: '18px 26px',
             borderRadius: '20px 20px 20px 4px',
-            fontSize: 20,
-            lineHeight: 1.5,
+            fontSize: 18,
+            lineHeight: 1.55,
+            maxWidth: '85%',
           }}
         >
-          {aiText}
-          <span style={{ display: 'inline-block', width: 3, height: 20, background: '#a855f7', marginLeft: 6, verticalAlign: 'middle', animation: 'blink 1s infinite' }} />
-        </div>
-
-        {/* Feature Pills */}
-        <div style={{ display: 'flex', gap: 14, marginTop: 12 }}>
-          <div style={{ padding: '8px 16px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', fontSize: 14, fontWeight: 600 }}>
-            Offline Ready
-          </div>
-          <div style={{ padding: '8px 16px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', fontSize: 14, fontWeight: 600 }}>
-            Zero API Keys Required
-          </div>
-          <div style={{ padding: '8px 16px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.05)', color: '#cbd5e1', fontSize: 14, fontWeight: 600 }}>
-            Instant Webpage Summarization
-          </div>
+          <span>{aiText}</span>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 3,
+              height: 20,
+              marginLeft: 4,
+              verticalAlign: 'middle',
+              backgroundColor: '#c084fc',
+              boxShadow: '0 0 10px #c084fc',
+              opacity: (frame % 16 < 8) ? 1 : 0,
+            }}
+          />
         </div>
       </div>
     </div>

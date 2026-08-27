@@ -1,5 +1,5 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig } from 'remotion';
+import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
 
 export const Scene4Privacy: React.FC = () => {
   const frame = useCurrentFrame();
@@ -8,18 +8,18 @@ export const Scene4Privacy: React.FC = () => {
   const shieldScale = spring({
     frame,
     fps,
-    config: { damping: 13, stiffness: 120 },
+    config: { damping: 14, stiffness: 110 },
   });
 
   const blockedCount = Math.floor(
-    interpolate(frame, [10, 70], [0, 48290], {
+    interpolate(frame, [10, 75], [0, 48290], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
     })
   );
 
   const trackerFilterThroughput = Math.floor(
-    interpolate(frame, [15, 80], [0, 1742158], {
+    interpolate(frame, [15, 80], [0, 2016661], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
     })
@@ -44,136 +44,160 @@ export const Scene4Privacy: React.FC = () => {
         style={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '8px 22px',
+          gap: 12,
+          padding: '8px 24px',
           borderRadius: 9999,
           background: 'rgba(16, 185, 129, 0.15)',
-          border: '1px solid rgba(16, 185, 129, 0.4)',
+          border: '1px solid rgba(16, 185, 129, 0.45)',
           color: '#34d399',
-          fontSize: 16,
+          fontSize: 17,
           fontWeight: 700,
-          letterSpacing: '0.12em',
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
-          marginBottom: 20,
+          marginBottom: 16,
+          boxShadow: '0 0 30px rgba(16, 185, 129, 0.3)',
         }}
       >
-        <span>Zero-Knowledge Architecture</span>
+        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 22, height: 22 }} />
+        <span>Zero-Knowledge Privacy</span>
       </div>
 
       <h2
         style={{
-          fontSize: 64,
-          fontWeight: 800,
+          fontSize: 66,
+          fontWeight: 900,
           color: '#ffffff',
-          margin: '0 0 40px 0',
+          margin: '0 0 36px 0',
           letterSpacing: '-0.02em',
           textAlign: 'center',
+          background: 'linear-gradient(135deg, #ffffff 0%, #a7f3d0 100%)',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
         }}
       >
-        Uncompromising Privacy Shield
+        Uncompromising Defense & Cryptography
       </h2>
 
       {/* 3-Column Shield Matrix */}
       <div
         style={{
           transform: `scale(${shieldScale})`,
-          width: 1200,
+          width: 1240,
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: 32,
+          gap: 28,
         }}
       >
-        {/* Card 1 */}
+        {/* Card 1: AdBlock Engine */}
         <div
           style={{
             background: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(30px)',
-            border: '1px solid rgba(16, 185, 129, 0.3)',
-            borderRadius: 24,
-            padding: 36,
+            backdropFilter: 'blur(35px)',
+            border: '1px solid rgba(16, 185, 129, 0.35)',
+            borderRadius: 26,
+            padding: '32px 28px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(16, 185, 129, 0.15)',
           }}
         >
           <div>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-              </svg>
+            <div style={{ color: '#34d399', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Native AdBlock Engine
             </div>
-            <h3 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: '0 0 8px 0' }}>Active AdBlock</h3>
-            <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.5, margin: 0 }}>
-              Built-in network layer rule engine blocks popups, video ads and malicious payloads before download.
-            </p>
+            <div
+              style={{
+                fontSize: 48,
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: '12px 0 6px 0',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {blockedCount.toLocaleString()}
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.4 }}>
+              Trackers, telemetry & cryptominers blocked in real-time
+            </div>
           </div>
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-            <span style={{ color: '#10b981', fontSize: 32, fontWeight: 800 }}>{blockedCount.toLocaleString()}</span>
-            <span style={{ color: '#64748b', fontSize: 14, display: 'block' }}>Trackers Blocked Today</span>
+          <div style={{ marginTop: 24, padding: '10px 14px', background: 'rgba(16, 185, 129, 0.1)', borderRadius: 12, border: '1px solid rgba(16, 185, 129, 0.25)', color: '#34d399', fontSize: 13, fontWeight: 600 }}>
+            0.48 µs / rule check latency
           </div>
         </div>
 
-        {/* Card 2 */}
+        {/* Card 2: Interception Throughput */}
         <div
           style={{
             background: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(30px)',
-            border: '1px solid rgba(6, 182, 212, 0.3)',
-            borderRadius: 24,
-            padding: 36,
+            backdropFilter: 'blur(35px)',
+            border: '1px solid rgba(56, 189, 248, 0.35)',
+            borderRadius: 26,
+            padding: '32px 28px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(56, 189, 248, 0.15)',
           }}
         >
           <div>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(6, 182, 212, 0.15)', border: '1px solid #06b6d4', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-              </svg>
+            <div style={{ color: '#38bdf8', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              Filter Throughput
             </div>
-            <h3 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: '0 0 8px 0' }}>E2EE Device Sync</h3>
-            <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.5, margin: 0 }}>
-              PBKDF2-SHA256 &amp; AES-GCM-256 decentralized pairing chains. Zero telemetry, zero stored passwords.
-            </p>
+            <div
+              style={{
+                fontSize: 48,
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: '12px 0 6px 0',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {trackerFilterThroughput.toLocaleString()}
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.4 }}>
+              Rule classifications per second across all active webviews
+            </div>
           </div>
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-            <span style={{ color: '#06b6d4', fontSize: 32, fontWeight: 800 }}>AES-256</span>
-            <span style={{ color: '#64748b', fontSize: 14, display: 'block' }}>Zero-Knowledge Vault</span>
+          <div style={{ marginTop: 24, padding: '10px 14px', background: 'rgba(56, 189, 248, 0.1)', borderRadius: 12, border: '1px solid rgba(56, 189, 248, 0.25)', color: '#38bdf8', fontSize: 13, fontWeight: 600 }}>
+            Zero main-thread blocking
           </div>
         </div>
 
-        {/* Card 3 */}
+        {/* Card 3: E2EE Sync Chain */}
         <div
           style={{
             background: 'rgba(15, 23, 42, 0.85)',
-            backdropFilter: 'blur(30px)',
-            border: '1px solid rgba(168, 85, 247, 0.3)',
-            borderRadius: 24,
-            padding: 36,
+            backdropFilter: 'blur(35px)',
+            border: '1px solid rgba(168, 85, 247, 0.35)',
+            borderRadius: 26,
+            padding: '32px 28px',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5)',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(168, 85, 247, 0.15)',
           }}
         >
           <div>
-            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(168, 85, 247, 0.15)', border: '1px solid #a855f7', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
-              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#a855f7" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-              </svg>
+            <div style={{ color: '#c084fc', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+              AES-GCM-256 Sync Chain
             </div>
-            <h3 style={{ fontSize: 24, fontWeight: 700, color: '#ffffff', margin: '0 0 8px 0' }}>Security Filter Engine</h3>
-            <p style={{ color: '#94a3b8', fontSize: 16, lineHeight: 1.5, margin: 0 }}>
-              Evaluates incoming domains against 100k+ malicious signatures in 0.58 microseconds per request.
-            </p>
+            <div
+              style={{
+                fontSize: 40,
+                fontWeight: 900,
+                color: '#ffffff',
+                margin: '12px 0 6px 0',
+              }}
+            >
+              End-to-End
+            </div>
+            <div style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.4 }}>
+              Device-to-device encrypted bookmarks, history & workspace sync
+            </div>
           </div>
-          <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-            <span style={{ color: '#a855f7', fontSize: 32, fontWeight: 800 }}>{trackerFilterThroughput.toLocaleString()}</span>
-            <span style={{ color: '#64748b', fontSize: 14, display: 'block' }}>Rule Evaluations / Sec</span>
+          <div style={{ marginTop: 24, padding: '10px 14px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: 12, border: '1px solid rgba(168, 85, 247, 0.25)', color: '#c084fc', fontSize: 13, fontWeight: 600 }}>
+            No plain-text storage on servers
           </div>
         </div>
       </div>
