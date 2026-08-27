@@ -28,12 +28,6 @@
 const path = require('path');
 const fs = require('fs');
 
-// asar usage: package.json "build" has no "asar": false override -> electron-builder
-// default (asar: true) applies, matching previously shipped DMGs.
-// electron-builder defaults to asar; refuse to flip OnlyLoadAppFromAsar if a
-// future config disables it, otherwise the packaged app would not launch.
-const ASAR_ENABLED = context.packager.config.asar !== false;
-
 function getElectronBinaryPath(context) {
   const productName = context.packager.appInfo.productFilename;
   switch (context.electronPlatformName) {
@@ -64,13 +58,14 @@ async function defaultExport(context) {
 
   const { flipFuses, FuseV1Options, FuseVersion } = require('@electron/fuses');
 
-  const enableAsarIntegrity = ASAR_ENABLED && process.env.NOVA_ENABLE_ASAR_INTEGRITY_FUSE === '1';
+  const asarEnabled = context?.packager?.config?.asar !== false;
+  const enableAsarIntegrity = asarEnabled && process.env.NOVA_ENABLE_ASAR_INTEGRITY_FUSE === '1';
 
   const plan = [
     ['RunAsNode', FuseV1Options.RunAsNode, false],
     ['EnableNodeCliInspectArguments', FuseV1Options.EnableNodeCliInspectArguments, false],
     ['EnableCookieEncryption', FuseV1Options.EnableCookieEncryption, true],
-    ['OnlyLoadAppFromAsar', FuseV1Options.OnlyLoadAppFromAsar, ASAR_ENABLED],
+    ['OnlyLoadAppFromAsar', FuseV1Options.OnlyLoadAppFromAsar, asarEnabled],
     ['EnableEmbeddedAsarIntegrityValidation', FuseV1Options.EnableEmbeddedAsarIntegrityValidation, enableAsarIntegrity]
   ];
 
