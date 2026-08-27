@@ -60,7 +60,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
 
   const formatTime = (timestamp: number) => {
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   const handleFaviconError = (id: string) => {

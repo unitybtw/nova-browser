@@ -150,7 +150,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     if (diff < 10) return 'Just now';
     if (diff < 60) return `${diff} seconds ago`;
     if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   };
 
   return (

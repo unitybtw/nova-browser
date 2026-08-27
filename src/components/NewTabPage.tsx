@@ -32,12 +32,12 @@ interface ClockProps {
 
 const getInitialTimeAndGreeting = () => {
   const now = new Date();
-  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const hour = now.getHours();
   let greet = 'Good Evening';
   if (hour < 12) greet = 'Good Morning';
   else if (hour < 18) greet = 'Good Afternoon';
-  const dateStr = now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   return { time, greet, dateStr };
 };
 
@@ -51,12 +51,12 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
     if (!isActive) return;
     const updateTime = () => {
       const now = new Date();
-      setTimeStr(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setTimeStr(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
       const hour = now.getHours();
       if (hour < 12) setGreeting('Good Morning');
       else if (hour < 18) setGreeting('Good Afternoon');
       else setGreeting('Good Evening');
-      setDateStr(now.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' }));
+      setDateStr(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
     };
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);

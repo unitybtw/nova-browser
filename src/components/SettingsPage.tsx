@@ -1043,7 +1043,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             Code: <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{syncStatus.syncCode || 'Active Device'}</span>
                           </p>
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                            Status: <span className="text-emerald-500 font-medium">● Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                            Status: <span className="text-emerald-500 font-medium">● Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                           </p>
                         </div>
                       </div>

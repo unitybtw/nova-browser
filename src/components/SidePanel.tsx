@@ -724,7 +724,7 @@ export const SidePanel = React.memo(({
                         >
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-slate-400 font-medium">Task Summary</span>
-                            <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString()}</span>
+                            <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString('en-US')}</span>
                           </div>
                           <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
                             {t.summary}
