@@ -73,10 +73,6 @@ export const Hero: React.FC = () => {
 
   return (
     <section className="relative pt-28 md:pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
-      {/* Ambient Glows */}
-      <div className="ambient-glow-primary -top-20 left-[-10%]" />
-      <div className="ambient-glow-primary top-[35%] right-[-10%]" />
-
       {/* Product Tag Badge */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -84,7 +80,7 @@ export const Hero: React.FC = () => {
         transition={{ duration: 0.6 }}
         className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#4338ca]/20 bg-[#4338ca]/5 font-mono text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider mb-6"
       >
-        <span className="w-2 h-2 rounded-full bg-[#4338ca] animate-pulse" />
+        <span className="w-2 h-2 rounded-full bg-[#4338ca]" />
         <span>Next-Generation Sovereign Web Browser</span>
       </motion.div>
 
@@ -118,7 +114,7 @@ export const Hero: React.FC = () => {
       >
         <a
           href="#download"
-          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-xl hover:shadow-indigo-500/20 active:scale-[0.98]"
+          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-md active:scale-[0.98]"
         >
           Download for macOS & Windows
         </a>
@@ -140,11 +136,8 @@ export const Hero: React.FC = () => {
         transition={{ duration: 0.95, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="relative w-full max-w-6xl mx-auto mt-14 text-left"
       >
-        {/* Glow Behind Mockup */}
-        <div className="absolute inset-0 bg-[#4338ca] opacity-15 blur-3xl rounded-3xl pointer-events-none" />
-
         {/* Outer App Frame */}
-        <div className="relative bg-[#090d16] rounded-2xl overflow-hidden border border-slate-800 shadow-[0_25px_70px_rgba(0,0,0,0.6)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
+        <div className="relative bg-[#090d16] rounded-2xl overflow-hidden border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
           
           {/* TOP TAB BAR */}
           <div className="h-11 bg-[#0d1322] border-b border-slate-800/80 flex items-center px-4 gap-3 select-none">
@@ -278,12 +271,11 @@ export const Hero: React.FC = () => {
 
                 {/* Nova Logo & Clock */}
                 <div className="relative z-10 flex flex-col items-center text-center mb-8">
-                  <div className="relative w-24 h-24 sm:w-28 sm:h-28 mb-4 group cursor-pointer">
-                    <div className="absolute inset-0 bg-cyan-500/25 rounded-3xl blur-2xl group-hover:bg-cyan-500/50 transition-all duration-500" />
+                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-4 group cursor-pointer">
                     <img
                       src="/nova-logo-tight.png"
                       alt="Nova Logo"
-                      className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_25px_rgba(6,182,212,0.7)] group-hover:scale-105 transition-transform duration-500"
+                      className="w-full h-full object-contain relative z-10 transition-transform duration-300 group-hover:scale-105"
                     />
                   </div>
 
@@ -297,7 +289,7 @@ export const Hero: React.FC = () => {
 
                 {/* AI & Web Search Omnibar */}
                 <div className="relative z-10 w-full max-w-xl mb-8">
-                  <div className="relative flex items-center bg-[#121a2f]/90 backdrop-blur-xl border border-slate-700/80 hover:border-cyan-500/60 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/20 rounded-2xl px-4 py-3 shadow-2xl transition-all">
+                  <div className="relative flex items-center bg-[#10141f] border border-slate-700/90 hover:border-cyan-500/60 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/20 rounded-2xl px-4 py-3 shadow-lg transition-all">
                     <button
                       onClick={() => setIsAIMode(!isAIMode)}
                       className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold tracking-wider mr-2 cursor-pointer transition-colors ${

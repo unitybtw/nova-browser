@@ -164,9 +164,7 @@ export const Benchmarks: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
         
         {/* Left Card: Metric Breakdown & Live Bar Comparison */}
-        <div className="lg:col-span-8 p-8 sm:p-10 rounded-3xl bg-white border border-[#e5e5e5] shadow-xl flex flex-col justify-between relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="lg:col-span-8 p-8 sm:p-10 rounded-3xl bg-white border border-[#e5e5e5] shadow-sm flex flex-col justify-between relative overflow-hidden">
           <div>
             {/* Top Row: Metric Title & Advantage Badge */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -218,7 +216,7 @@ export const Benchmarks: React.FC = () => {
                         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                         className={`h-full rounded-full transition-all ${
                           item.isWinner
-                            ? 'bg-gradient-to-r from-[#4338ca] to-cyan-500 shadow-sm'
+                            ? 'bg-[#4338ca]'
                             : 'bg-neutral-300'
                         }`}
                       />
@@ -236,11 +234,9 @@ export const Benchmarks: React.FC = () => {
         </div>
 
         {/* Right Card: Giant Highlight Key Stat */}
-        <div className="lg:col-span-4 p-8 sm:p-10 rounded-3xl bg-[#171717] text-[#fcfbf9] flex flex-col justify-between relative overflow-hidden shadow-2xl">
-          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/15 to-cyan-500/10 pointer-events-none" />
-
+        <div className="lg:col-span-4 p-8 sm:p-10 rounded-3xl bg-[#171717] text-[#fcfbf9] flex flex-col justify-between relative overflow-hidden shadow-lg border border-neutral-800">
           <div className="relative z-10">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-indigo-400 mb-8 shadow-inner">
+            <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 mb-8">
               <Activity className="w-6 h-6" />
             </div>
 

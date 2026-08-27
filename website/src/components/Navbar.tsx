@@ -24,10 +24,10 @@ export const Navbar: React.FC = () => {
   return (
     <header className="fixed top-4 sm:top-6 left-0 right-0 z-50 px-4 sm:px-6 flex justify-center pointer-events-none">
       <nav
-        className={`pointer-events-auto w-full max-w-5xl rounded-full transition-all duration-500 flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 ${
+        className={`pointer-events-auto w-full max-w-5xl rounded-full transition-all duration-300 flex items-center justify-between px-4 sm:px-6 py-2.5 sm:py-3 bg-white border border-[#e5e5e5] ${
           scrolled
-            ? 'bg-white/85 backdrop-blur-2xl border border-black/10 shadow-[0_12px_40px_rgba(0,0,0,0.1)] py-2 sm:py-2.5'
-            : 'bg-white/70 backdrop-blur-xl border border-black/[0.06] shadow-[0_8px_30px_rgba(0,0,0,0.05)]'
+            ? 'shadow-md border-neutral-300 py-2 sm:py-2.5'
+            : 'shadow-xs'
         }`}
       >
         {/* Brand */}

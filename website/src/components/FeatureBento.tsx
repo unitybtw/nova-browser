@@ -77,11 +77,8 @@ export const FeatureBento: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className={`${mod.span} rounded-2xl bg-white border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between hover:shadow-xl hover:border-[#4338ca]/30 transition-all duration-500 group relative overflow-hidden`}
+            className={`${mod.span} rounded-2xl bg-white border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between hover:shadow-md hover:border-neutral-400 transition-all duration-200 group relative overflow-hidden`}
           >
-            {/* Soft Ambient Glow on Hover */}
-            <div className="absolute -right-16 -top-16 w-48 h-48 bg-indigo-500/5 rounded-full blur-2xl group-hover:bg-indigo-500/15 transition-colors pointer-events-none" />
-
             <div>
               <div className="flex items-center justify-between mb-6">
                 <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white transition-colors duration-300">
