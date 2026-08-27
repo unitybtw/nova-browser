@@ -2,7 +2,7 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
-import Shortcuts from './components/Shortcuts';
+import GithubStats from './components/GithubStats';
 import Benchmarks from './components/Benchmarks';
 import Downloads from './components/Downloads';
 import Faq from './components/Faq';
@@ -16,7 +16,7 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <Shortcuts />
+        <GithubStats />
         <Benchmarks />
         <Downloads />
         <Faq />
