@@ -105,11 +105,19 @@
 
 ## Quick Start
 
-### Prerequisites
+### Option A: Install with Homebrew (macOS Recommended)
+
+```bash
+brew install --cask unitybtw/tap/nova-browser
+```
+
+### Option B: Build from Source
+
+#### Prerequisites
 - [Node.js](https://nodejs.org/) (v18 or higher recommended)
 - `npm` or `yarn`
 
-### 1. Clone the repository
+#### 1. Clone the repository
 ```bash
 git clone https://github.com/unitybtw/nova-browser.git
 cd nova-browser

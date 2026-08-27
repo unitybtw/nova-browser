@@ -6,7 +6,7 @@ export const Downloads: React.FC = () => {
   const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'source'>('brew');
 
   const CLI_COMMANDS = {
-    brew: 'brew install unitybtw/tap/nova-browser',
+    brew: 'brew install --cask unitybtw/tap/nova-browser',
     winget: 'winget install NovaBrowser.Nova',
     source: 'git clone https://github.com/unitybtw/nova-browser.git && cd nova-browser && npm install && npm run dev',
   };
@@ -42,13 +42,13 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.0.7 // UNIVERSAL
+                v1.1.0 // UNIVERSAL
               </span>
             </div>
 
             <h3 className="font-display font-bold text-2xl mb-2 text-[#171717]">macOS</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Native binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel x86 Macs. Requires macOS 12+.
+              Native binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel x86 Macs. Available via Homebrew or direct DMG.
             </p>
 
             {/* Architecture Chips */}
@@ -62,15 +62,20 @@ export const Downloads: React.FC = () => {
             </div>
           </div>
 
-          <a
-            href="https://github.com/unitybtw/nova-browser/releases"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download DMG for Mac</span>
-          </a>
+          <div>
+            <a
+              href="https://github.com/unitybtw/nova-browser/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" />
+              <span>Download DMG for Mac</span>
+            </a>
+            <p className="font-mono text-[11px] text-neutral-500 text-center mt-3">
+              or run <code className="bg-neutral-100 text-[#171717] px-1.5 py-0.5 rounded text-[10px]">brew install --cask unitybtw/tap/nova-browser</code>
+            </p>
+          </div>
         </div>
 
         {/* Windows Card */}
@@ -81,7 +86,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.0.7 // X64
+                v1.1.0 // X64
               </span>
             </div>
 
