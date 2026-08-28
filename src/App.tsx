@@ -523,7 +523,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       customAccentColor: '#3b82f6',
       showBookmarksBar: false,
       showTasksWidget: demoParams.showTasksWidget ?? (demoParams.feature === 'website' ? false : true),
-      useVerticalTabs: demoParams.isDemo ? (demoParams.tabs === 'vertical') : true,
+      useVerticalTabs: demoParams.isDemo
+        ? demoParams.feature === 'website'
+          ? false
+          : demoParams.tabs === 'vertical'
+        : true,
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',
@@ -587,15 +591,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
   }, [settings]);
 
-  // Control native macOS traffic lights (3 dots) visibility when vertical tabs sidebar is collapsed
+  // The marketing demo is rendered inside the website card, not as a native
+  // Electron window. Keep macOS traffic lights out of that embedded viewport.
   useEffect(() => {
+    const setWindowButtonVisibility = (visible: boolean) => {
+      (window as any).electronAPI?.setWindowButtonVisibility?.(visible);
+    };
+
+    if (demoParams.isDemo) {
+      setWindowButtonVisibility(false);
+      return () => setWindowButtonVisibility(true);
+    }
+
     if (!settings.useVerticalTabs) {
-      (window as any).electronAPI?.setWindowButtonVisibility?.(true);
+      setWindowButtonVisibility(true);
       return;
     }
+
     const shouldShowButtons = !isSidebarCollapsed || isHoverRevealing;
-    (window as any).electronAPI?.setWindowButtonVisibility?.(shouldShowButtons);
-  }, [settings.useVerticalTabs, isSidebarCollapsed, isHoverRevealing]);
+    setWindowButtonVisibility(shouldShowButtons);
+  }, [demoParams.isDemo, settings.useVerticalTabs, isSidebarCollapsed, isHoverRevealing]);
 
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
@@ -2711,6 +2726,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onToggleAIAssistant={handleToggleAIAssistant}
               isAIAssistantOpen={isSidePanelOpen}
               windowPlatform={demoWindowPlatform}
+              hideWindowChrome={demoParams.isDemo}
               bookmarks={bookmarks}
               isCollapsed={false}
               onReorderTabs={handleReorderTabs}
@@ -2807,6 +2823,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onToggleAIAssistant={handleToggleAIAssistant}
                   isAIAssistantOpen={isSidePanelOpen}
                   windowPlatform={demoWindowPlatform}
+                  hideWindowChrome={demoParams.isDemo}
                   bookmarks={bookmarks}
                   isCollapsed={true}
                   onReorderTabs={handleReorderTabs}
@@ -2851,6 +2868,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
                 windowPlatform={demoWindowPlatform}
+                hideWindowChrome={demoParams.isDemo}
                 tabStyle={settings.tabStyle}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}

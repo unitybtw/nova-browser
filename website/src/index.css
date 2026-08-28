@@ -182,6 +182,11 @@ section {
 .mac-min { background-color: #ffbd2e; }
 .mac-max { background-color: #27c93f; }
 
+/* The marketing demo is a browser viewport, not an OS window. */
+.browser-demo--no-window-chrome .nova-window-controls {
+  display: none !important;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

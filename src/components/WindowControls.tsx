@@ -9,7 +9,7 @@ interface WindowControlsProps {
 
 /** Decorative controls used only in embedded website demos. */
 export const WindowControls: React.FC<WindowControlsProps> = ({ platform, className = '' }) => (
-  <span className={`pointer-events-none flex shrink-0 select-none items-center ${className}`} aria-hidden="true">
+  <span className={`nova-window-controls pointer-events-none flex shrink-0 select-none items-center ${className}`} aria-hidden="true">
     {platform === 'mac' ? (
       <div className="flex items-center gap-1.5">
         <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57] shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.16)]" />

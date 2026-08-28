@@ -7,7 +7,6 @@ const WEBSITE_DEMO_OPTIONS: BrowserDemoOptions = {
   theme: 'dark',
   tabs: 'horizontal',
   showTasksWidget: false,
-  windowPlatform: 'mac',
 };
 
 /**
@@ -16,7 +15,7 @@ const WEBSITE_DEMO_OPTIONS: BrowserDemoOptions = {
  * and styling source, so visual changes cannot drift between them.
  */
 export const BrowserDemo: React.FC = () => (
-  <div className="browser-demo aspect-[16/10] max-h-[760px] min-h-[520px] w-full overflow-hidden rounded-[18px] border border-slate-700/80 bg-[#151122] shadow-[0_30px_90px_rgba(15,23,42,0.32)]">
+  <div className="browser-demo browser-demo--no-window-chrome aspect-[16/10] max-h-[760px] min-h-[520px] w-full overflow-hidden rounded-[18px] border border-slate-700/80 bg-[#151122] shadow-[0_30px_90px_rgba(15,23,42,0.32)]">
     <App demo={WEBSITE_DEMO_OPTIONS} />
   </div>
 );

@@ -150,6 +150,7 @@ export interface SidebarTabsProps {
   onToggleAIAssistant?: () => void;
   isAIAssistantOpen?: boolean;
   windowPlatform?: WindowPlatform;
+  hideWindowChrome?: boolean;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
@@ -446,6 +447,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onToggleAIAssistant,
   isAIAssistantOpen = false,
   windowPlatform,
+  hideWindowChrome = false,
   bookmarks = [],
   onToggleCollapse,
   isCollapsed = false,
@@ -742,10 +744,14 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           <div className="flex items-center gap-1">
-            <div 
-              className="w-[72px] h-full shrink-0 drag-region" 
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
-            />
+            <div
+              className={`w-[72px] h-full shrink-0 drag-region flex items-center ${hideWindowChrome ? 'hidden' : ''}`}
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            >
+              {!hideWindowChrome && windowPlatform === 'mac' && (
+                <WindowControls platform="mac" className="pl-1" />
+              )}
+            </div>
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
@@ -1040,7 +1046,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
               isWorkspaceDropdownOpen ? 'rotate-180' : ''
             }`} />
-            {windowPlatform && <WindowControls platform={windowPlatform} className="ml-1" />}
           </button>
 
           {/* Workspace Dropdown */}
@@ -1417,6 +1422,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.windowPlatform !== nextProps.windowPlatform) return false;
+  if (prevProps.hideWindowChrome !== nextProps.hideWindowChrome) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
   if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
