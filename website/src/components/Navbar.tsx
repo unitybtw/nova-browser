@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { gsap } from "gsap";
 import { Menu, X, ArrowUpRight } from "lucide-react";
 
@@ -7,6 +7,20 @@ export type PillNavItem = {
   href: string;
   external?: boolean;
 };
+
+const NAV_ITEMS: PillNavItem[] = [
+  { label: "MANIFESTO", href: "#top" },
+  { label: "FEATURES", href: "#features" },
+  { label: "BENCHMARKS", href: "#benchmarks" },
+  { label: "FAQ", href: "#faq" },
+  { label: "SOURCE", href: "https://github.com/unitybtw/nova-browser", external: true }
+];
+
+const BASE_COLOR = "#171717";
+const PILL_COLOR = "#ffffff";
+const PILL_TEXT_COLOR = "#171717";
+const HOVERED_TEXT_COLOR = "#ffffff";
+const EASE = "power3.out";
 
 export const Navbar: React.FC = () => {
   const [activeHref, setActiveHref] = useState("#top");
@@ -17,113 +31,140 @@ export const Navbar: React.FC = () => {
   const activeTweenRefs = useRef<Array<gsap.core.Tween | null>>([]);
   const logoImgRef = useRef<HTMLImageElement | null>(null);
   const logoTweenRef = useRef<gsap.core.Tween | null>(null);
-  const hamburgerRef = useRef<HTMLButtonElement | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const navItemsRef = useRef<HTMLDivElement | null>(null);
   const logoRef = useRef<HTMLAnchorElement | null>(null);
+  const navContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const items: PillNavItem[] = [
-    { label: "MANIFESTO", href: "#top" },
-    { label: "FEATURES", href: "#features" },
-    { label: "BENCHMARKS", href: "#benchmarks" },
-    { label: "FAQ", href: "#faq" },
-    { label: "SOURCE", href: "https://github.com/unitybtw/nova-browser", external: true }
-  ];
-
-  const baseColor = "#171717";
-  const pillColor = "#ffffff";
-  const pillTextColor = "#171717";
-  const hoveredPillTextColor = "#ffffff";
-  const ease = "power3.out";
-
+  // ScrollSpy to automatically update active section on scroll
   useEffect(() => {
-    const layout = () => {
-      circleRefs.current.forEach((circle, index) => {
-        if (!circle?.parentElement) return;
+    const sectionIds = ["top", "features", "benchmarks", "faq"];
+    const handleScroll = () => {
+      const scrollPos = window.scrollY + 200;
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPos >= top && scrollPos < top + height) {
+            setActiveHref(`#${id}`);
+            break;
+          }
+        }
+      }
+    };
 
-        const pill = circle.parentElement as HTMLElement;
-        const rect = pill.getBoundingClientRect();
-        const { width: w, height: h } = rect;
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-        // Calculate the radius for the expanding circle to cover the pill
-        const R = ((w * w) / 4 + h * h) / (2 * h);
-        const D = Math.ceil(2 * R) + 2;
-        const delta = Math.ceil(R - Math.sqrt(Math.max(0, R * R - (w * w) / 4))) + 1;
-        const originY = D - delta;
+  // Close mobile menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        isMobileMenuOpen &&
+        navContainerRef.current &&
+        !navContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isMobileMenuOpen]);
 
-        circle.style.width = `${D}px`;
-        circle.style.height = `${D}px`;
-        circle.style.bottom = `-${delta}px`;
+  // Layout and GSAP timeline calculation
+  const updateLayout = useCallback(() => {
+    circleRefs.current.forEach((circle, index) => {
+      if (!circle?.parentElement) return;
 
-        gsap.set(circle, {
+      const pill = circle.parentElement as HTMLElement;
+      const rect = pill.getBoundingClientRect();
+      const { width: w, height: h } = rect;
+
+      // Guard against zero or NaN dimensions
+      if (!w || !h || isNaN(w) || isNaN(h)) return;
+
+      // Calculate the radius for the expanding circle to cover the pill
+      const R = ((w * w) / 4 + h * h) / (2 * h);
+      const D = Math.ceil(2 * R) + 2;
+      const delta = Math.ceil(R - Math.sqrt(Math.max(0, R * R - (w * w) / 4))) + 1;
+      const originY = D - delta;
+
+      circle.style.width = `${D}px`;
+      circle.style.height = `${D}px`;
+      circle.style.bottom = `-${delta}px`;
+
+      gsap.set(circle, {
+        xPercent: -50,
+        scale: 0,
+        transformOrigin: `50% ${originY}px`
+      });
+
+      const label = pill.querySelector<HTMLElement>(".pill-label");
+      const hoverLabel = pill.querySelector<HTMLElement>(".pill-label-hover");
+
+      if (label) gsap.set(label, { y: 0 });
+      if (hoverLabel) gsap.set(hoverLabel, { y: h + 10, opacity: 0 });
+
+      tlRefs.current[index]?.kill();
+      const tl = gsap.timeline({ paused: true });
+
+      tl.to(
+        circle,
+        {
+          scale: 1.25,
           xPercent: -50,
-          scale: 0,
-          transformOrigin: `50% ${originY}px`
-        });
+          duration: 0.65,
+          ease: EASE,
+          overwrite: "auto"
+        },
+        0
+      );
 
-        const label = pill.querySelector<HTMLElement>(".pill-label");
-        const white = pill.querySelector<HTMLElement>(".pill-label-hover");
-
-        if (label) gsap.set(label, { y: 0 });
-        if (white) gsap.set(white, { y: h + 12, opacity: 0 });
-
-        tlRefs.current[index]?.kill();
-        const tl = gsap.timeline({ paused: true });
-
+      if (label) {
         tl.to(
-          circle,
+          label,
           {
-            scale: 1.25,
-            xPercent: -50,
-            duration: 0.7,
-            ease,
+            y: -(h + 8),
+            duration: 0.5,
+            ease: EASE,
             overwrite: "auto"
           },
           0
         );
+      }
 
-        if (label) {
-          tl.to(
-            label,
-            {
-              y: -(h + 8),
-              duration: 0.55,
-              ease,
-              overwrite: "auto"
-            },
-            0
-          );
-        }
+      if (hoverLabel) {
+        gsap.set(hoverLabel, { y: Math.ceil(h + 12), opacity: 0 });
+        tl.to(
+          hoverLabel,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.5,
+            ease: EASE,
+            overwrite: "auto"
+          },
+          0
+        );
+      }
 
-        if (white) {
-          gsap.set(white, { y: Math.ceil(h + 16), opacity: 0 });
-          tl.to(
-            white,
-            {
-              y: 0,
-              opacity: 1,
-              duration: 0.55,
-              ease,
-              overwrite: "auto"
-            },
-            0
-          );
-        }
+      tlRefs.current[index] = tl;
+    });
+  }, []);
 
-        tlRefs.current[index] = tl;
-      });
-    };
+  useEffect(() => {
+    updateLayout();
 
-    layout();
-
-    const onResize = () => layout();
+    const onResize = () => updateLayout();
     window.addEventListener("resize", onResize);
 
     if (document.fonts) {
-      document.fonts.ready.then(layout).catch(() => {});
+      document.fonts.ready.then(updateLayout).catch(() => {});
     }
 
-    // Initial load animation
+    // Initial mount animations
     const logo = logoRef.current;
     const navItems = navItemsRef.current;
 
@@ -132,26 +173,26 @@ export const Navbar: React.FC = () => {
       gsap.to(logo, {
         scale: 1,
         opacity: 1,
-        duration: 0.8,
+        duration: 0.75,
         ease: "back.out(1.7)"
       });
     }
 
     if (navItems) {
       const listItems = navItems.querySelectorAll("li");
-      gsap.set(listItems, { opacity: 0, x: -20 });
+      gsap.set(listItems, { opacity: 0, y: -10 });
       gsap.to(listItems, {
         opacity: 1,
-        x: 0,
-        duration: 0.6,
-        stagger: 0.06,
+        y: 0,
+        duration: 0.55,
+        stagger: 0.05,
         ease: "power2.out",
-        delay: 0.2
+        delay: 0.15
       });
     }
 
     return () => window.removeEventListener("resize", onResize);
-  }, [items, ease]);
+  }, [updateLayout]);
 
   const handleEnter = (i: number) => {
     const tl = tlRefs.current[i];
@@ -159,7 +200,7 @@ export const Navbar: React.FC = () => {
     activeTweenRefs.current[i]?.kill();
     activeTweenRefs.current[i] = tl.tweenTo(tl.duration(), {
       duration: 0.35,
-      ease,
+      ease: EASE,
       overwrite: "auto"
     });
   };
@@ -170,7 +211,7 @@ export const Navbar: React.FC = () => {
     activeTweenRefs.current[i]?.kill();
     activeTweenRefs.current[i] = tl.tweenTo(0, {
       duration: 0.3,
-      ease,
+      ease: EASE,
       overwrite: "auto"
     });
   };
@@ -195,18 +236,18 @@ export const Navbar: React.FC = () => {
     const menu = mobileMenuRef.current;
     if (menu) {
       if (newState) {
-        gsap.set(menu, { display: "block", opacity: 0, y: -20 });
+        gsap.set(menu, { display: "block", opacity: 0, y: -15 });
         gsap.to(menu, {
           opacity: 1,
           y: 0,
-          duration: 0.4,
+          duration: 0.35,
           ease: "power3.out"
         });
       } else {
         gsap.to(menu, {
           opacity: 0,
-          y: -20,
-          duration: 0.3,
+          y: -15,
+          duration: 0.25,
           ease: "power3.in",
           onComplete: () => {
             gsap.set(menu, { display: "none" });
@@ -218,12 +259,12 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="fixed top-4 sm:top-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
-      <div className="relative z-[1000] w-full max-w-4xl mx-auto pointer-events-auto">
+      <div ref={navContainerRef} className="relative z-[1000] w-full max-w-4xl mx-auto pointer-events-auto">
         <nav
           className="w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none"
-          aria-label="Primary"
+          aria-label="Primary Navigation"
         >
-          {/* Separate Island 1: Logo Pill */}
+          {/* Island 1: Logo Pill */}
           <a
             ref={logoRef}
             href="#top"
@@ -232,7 +273,7 @@ export const Navbar: React.FC = () => {
             style={{
               width: "48px",
               height: "48px",
-              background: baseColor
+              background: BASE_COLOR
             }}
             title="Nova Browser"
           >
@@ -244,13 +285,13 @@ export const Navbar: React.FC = () => {
             />
           </a>
 
-          {/* Separate Island 2: Desktop Menu Pill Container */}
+          {/* Island 2: Desktop Menu Pill Container */}
           <div
             ref={navItemsRef}
             className="hidden md:flex items-center rounded-full px-1.5 shadow-md border border-black/5"
             style={{
               height: "48px",
-              background: baseColor
+              background: BASE_COLOR
             }}
           >
             <ul
@@ -258,7 +299,7 @@ export const Navbar: React.FC = () => {
               className="list-none flex items-stretch m-0 p-0 h-full"
               style={{ gap: "6px" }}
             >
-              {items.map((item, i) => {
+              {NAV_ITEMS.map((item, i) => {
                 const isActive = activeHref === item.href;
 
                 return (
@@ -273,24 +314,24 @@ export const Navbar: React.FC = () => {
                       onMouseLeave={() => handleLeave(i)}
                       className="relative overflow-hidden inline-flex items-center justify-center h-[36px] self-center px-5 no-underline rounded-full box-border font-mono text-xs uppercase tracking-wider font-semibold cursor-pointer transition-colors duration-200 hover:z-10 select-none"
                       style={{
-                        background: pillColor,
-                        color: pillTextColor
+                        background: PILL_COLOR,
+                        color: PILL_TEXT_COLOR
                       }}
                     >
-                      {/* GSAP Rising Circle */}
+                      {/* GSAP Expanding Rising Circle */}
                       <span
                         ref={el => {
                           circleRefs.current[i] = el;
                         }}
                         className="hover-circle absolute left-1/2 bottom-0 rounded-full z-[1] block pointer-events-none"
                         style={{
-                          background: baseColor,
+                          background: BASE_COLOR,
                           willChange: "transform"
                         }}
                         aria-hidden="true"
                       />
 
-                      {/* Dual-Text Vertical Stack Animation */}
+                      {/* Dual-Text Stack Animation */}
                       <span className="label-stack relative inline-block leading-none z-[2] overflow-hidden py-1">
                         <span
                           className="pill-label relative z-[2] inline-block"
@@ -301,7 +342,7 @@ export const Navbar: React.FC = () => {
                         <span
                           className="pill-label-hover absolute left-0 top-1 z-[3] inline-block w-full text-center"
                           style={{
-                            color: hoveredPillTextColor,
+                            color: HOVERED_TEXT_COLOR,
                             willChange: "transform, opacity"
                           }}
                           aria-hidden="true"
@@ -310,11 +351,10 @@ export const Navbar: React.FC = () => {
                         </span>
                       </span>
 
-                      {/* Active indicator dot */}
+                      {/* Active indicator pill dot */}
                       {isActive && (
                         <span
-                          className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-1 h-1 rounded-full z-[4]"
-                          style={{ background: baseColor }}
+                          className="absolute left-1/2 bottom-1 -translate-x-1/2 w-1.5 h-1.5 rounded-full z-[4] bg-[#4338ca]"
                           aria-hidden="true"
                         />
                       )}
@@ -325,22 +365,21 @@ export const Navbar: React.FC = () => {
             </ul>
           </div>
 
-          {/* Separate Island 3: Get Nova CTA Pill */}
+          {/* Island 3: Get Nova CTA Pill */}
           <a
             href="#download"
             className="hidden md:flex items-center justify-center rounded-full px-6 font-mono text-xs uppercase tracking-wider font-bold text-white transition-transform duration-300 hover:scale-105 active:scale-95 shadow-md gap-1.5"
             style={{
               height: "48px",
-              background: baseColor
+              background: BASE_COLOR
             }}
           >
             <span>Get Nova</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </a>
 
-          {/* Mobile Hamburger */}
+          {/* Mobile Hamburger Button */}
           <button
-            ref={hamburgerRef}
             onClick={toggleMobileMenu}
             aria-label="Toggle menu"
             aria-expanded={isMobileMenuOpen}
@@ -348,7 +387,7 @@ export const Navbar: React.FC = () => {
             style={{
               width: "48px",
               height: "48px",
-              background: baseColor
+              background: BASE_COLOR
             }}
           >
             {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -360,11 +399,11 @@ export const Navbar: React.FC = () => {
           ref={mobileMenuRef}
           className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl overflow-hidden shadow-2xl z-[999] hidden border border-white/10"
           style={{
-            background: baseColor
+            background: BASE_COLOR
           }}
         >
           <ul className="list-none m-0 p-2 flex flex-col gap-1">
-            {items.map(item => {
+            {NAV_ITEMS.map(item => {
               const isActive = activeHref === item.href;
               return (
                 <li key={item.href}>
