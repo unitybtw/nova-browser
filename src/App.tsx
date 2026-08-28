@@ -186,6 +186,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false }
         ];
       }
+      if (demoParams.feature === 'website') {
+        return [
+          { id: '1', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '3', url: 'https://react.dev', title: 'React Documentation', isLoading: false, canGoBack: false, canGoForward: false }
+        ];
+      }
       if (demoParams.feature === 'vertical_tabs') {
         return [
           { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', isLoading: false },
@@ -374,9 +381,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     });
   }, []);
 
-  // Automated Real Browser Demo Showcase for Website
+  // The standalone demo URL can run the animated showcase. Embedded demos
+  // (the marketing website passes demo options directly) must stay stable so
+  // visitors can interact with the real browser UI without tabs changing
+  // underneath them.
   useEffect(() => {
-    if (!demoParams.isDemo) return;
+    if (!demoParams.isDemo || demoOptions) return;
 
     let cycle = 0;
     const runCycle = () => {

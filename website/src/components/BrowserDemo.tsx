@@ -12,9 +12,9 @@ export const BrowserDemo: React.FC = () => {
       <BrowserApp
         demo={{
           isDemo: true,
-          feature: 'vertical_tabs',
+          feature: 'website',
           theme: 'light',
-          tabs: 'vertical',
+          tabs: 'horizontal',
           bg: 'default',
         }}
       />
