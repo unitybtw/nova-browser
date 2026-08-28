@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, HelpCircle } from 'lucide-react';
 
 interface FaqItem {
@@ -49,6 +49,7 @@ const FAQS: FaqItem[] = [
 
 export const Faq: React.FC = () => {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
+  const prefersReducedMotion = useReducedMotion();
 
   const toggleItem = (idx: number) => {
     setOpenIndex(openIndex === idx ? null : idx);
@@ -56,6 +57,7 @@ export const Faq: React.FC = () => {
 
   return (
     <section id="faq" className="mx-auto max-w-5xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24">
+      <div className="editorial-rail" aria-hidden="true"><span>06</span><i /></div>
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
@@ -88,13 +90,16 @@ export const Faq: React.FC = () => {
                 aria-controls={`faq-panel-${idx}`}
                 className="flex w-full items-center justify-between gap-3 p-4 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] sm:gap-4 sm:p-6"
               >
-                <div className="flex items-center gap-3">
-                  <HelpCircle className={`w-4 h-4 shrink-0 transition-colors ${isOpen ? 'text-[#4338ca]' : 'text-neutral-400'}`} />
-                  <span className="font-display font-bold text-sm leading-snug text-[#171717] sm:text-base">
+                <div className="flex min-w-0 items-center gap-3">
+                  <HelpCircle aria-hidden="true" className={`w-4 h-4 shrink-0 transition-colors ${isOpen ? 'text-[#4338ca]' : 'text-neutral-400'}`} />
+                  <span className="min-w-0 font-display font-bold text-sm leading-snug text-[#171717] sm:text-base">
                     {faq.question}
                   </span>
                 </div>
-                <div className={`p-1.5 rounded-lg bg-neutral-100 transition-transform duration-300 shrink-0 ${isOpen ? 'rotate-180 bg-indigo-50 text-[#4338ca]' : 'text-neutral-500'}`}>
+                <span className={`hidden shrink-0 rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.12em] sm:inline-flex ${isOpen ? 'border-indigo-100 bg-indigo-50 text-[#4338ca]' : 'border-neutral-200 bg-neutral-50 text-neutral-400'}`}>
+                  {faq.category}
+                </span>
+                <div className={`p-1.5 rounded-lg bg-neutral-100 shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-300'} ${isOpen ? 'rotate-180 bg-indigo-50 text-[#4338ca]' : 'text-neutral-500'}`}>
                   <ChevronDown className="w-4 h-4" />
                 </div>
               </button>
@@ -105,10 +110,10 @@ export const Faq: React.FC = () => {
                     id={`faq-panel-${idx}`}
                     role="region"
                     aria-labelledby={`faq-trigger-${idx}`}
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    initial={prefersReducedMotion ? false : { height: 0, opacity: 0 }}
+                    animate={prefersReducedMotion ? undefined : { height: 'auto', opacity: 1 }}
+                    exit={prefersReducedMotion ? undefined : { height: 0, opacity: 0 }}
+                    transition={prefersReducedMotion ? undefined : { duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                   >
                     <div className="px-6 pb-6 pt-0 font-sans text-sm text-neutral-600 leading-relaxed border-t border-neutral-100 mt-2">
                       <p className="pt-4">{faq.answer}</p>

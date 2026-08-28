@@ -7,10 +7,12 @@ import Benchmarks from './components/Benchmarks';
 import Downloads from './components/Downloads';
 import Faq from './components/Faq';
 import Footer from './components/Footer';
+import ScrollProgress from './components/ScrollProgress';
 
 export default function App() {
   return (
-    <div id="top" className="min-h-screen bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
+    <div id="top" className="relative min-h-screen overflow-x-hidden bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
+      <ScrollProgress />
       <a
         href="#main-content"
         className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-[#171717] px-4 py-2 text-sm font-semibold text-white focus:not-sr-only"

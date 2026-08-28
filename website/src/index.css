@@ -68,8 +68,67 @@ body {
   background-color: #fcfbf9;
 }
 
+#top > main,
+#top > footer {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-scroll-line > span {
+  animation: scroll-cue 2.4s ease-in-out infinite;
+}
+
+@keyframes scroll-cue {
+  0% { transform: translateY(-125%); opacity: 0; }
+  20% { opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(190%); opacity: 0; }
+}
+
 section {
+  position: relative;
   scroll-margin-top: 7rem;
+}
+
+.editorial-rail {
+  position: absolute;
+  top: 2.25rem;
+  left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: rgba(67, 56, 202, 0.58);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  pointer-events: none;
+}
+
+.editorial-rail i {
+  display: block;
+  width: 2.5rem;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(67, 56, 202, 0.5), transparent);
+}
+
+.community-section > *:not(.editorial-rail) {
+  opacity: 0;
+  transform: translateY(22px);
+}
+
+.community-section.is-visible > *:not(.editorial-rail) {
+  animation: community-reveal 800ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.community-section.is-visible > *:nth-child(2) { animation-delay: 80ms; }
+.community-section.is-visible > *:nth-child(3) { animation-delay: 180ms; }
+.community-section.is-visible > *:nth-child(4) { animation-delay: 280ms; }
+.community-section.is-visible > *:nth-child(5) { animation-delay: 380ms; }
+
+@keyframes community-reveal {
+  from { opacity: 0; transform: translateY(22px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .luxury-card {
@@ -78,6 +137,26 @@ section {
   overflow: hidden;
   transform: translateZ(0);
   transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 350ms cubic-bezier(0.22, 1, 0.36, 1), border-color 250ms ease;
+}
+
+.luxury-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 12% 0%, rgba(129, 140, 248, 0.13), transparent 32%);
+  transition: opacity 350ms ease;
+}
+
+.luxury-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.luxury-card:hover::after {
+  opacity: 1;
 }
 
 .luxury-card:hover {
@@ -94,13 +173,43 @@ section {
   transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 250ms ease, background-color 250ms ease;
 }
 
+.luxury-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: translateX(-120%) skewX(-18deg);
+  width: 62%;
+  background: linear-gradient(100deg, transparent, rgba(255,255,255,0.24), transparent);
+  transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.luxury-button:hover::before,
+.luxury-button:focus-visible::before {
+  transform: translateX(210%) skewX(-18deg);
+}
+
 .luxury-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 28px rgba(67, 56, 202, 0.18);
 }
 
+.editorial-rail + div {
+  position: relative;
+}
 
-/* Hairline border */
+@media (max-width: 640px) {
+  .editorial-rail {
+    top: 1.5rem;
+    left: 1rem;
+    font-size: 0.55rem;
+  }
+
+  .editorial-rail i {
+    width: 1.75rem;
+  }
+}
+
 .hairline-border {
   border: 1px solid #e5e5e5;
 }
@@ -167,92 +276,176 @@ section {
   animation: border-shimmer 4s ease infinite;
 }
 
-/* The real browser is embedded inside the marketing page. Keep its chrome
-   independent from the site's layout and never let the optional task card
-   cover the new-tab content in this compact presentation. */
 .browser-demo-showcase {
-  pointer-events: none;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
-  transform: translateZ(0);
-  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 700ms cubic-bezier(0.22, 1, 0.36, 1), border-color 500ms ease;
+  isolation: isolate;
+  perspective: 1400px;
+  border-radius: clamp(1.5rem, 3vw, 2.5rem);
+  padding: clamp(0.35rem, 1vw, 0.75rem);
+  background: linear-gradient(135deg, rgba(255,255,255,0.78), rgba(224,231,255,0.45) 45%, rgba(255,255,255,0.72));
+  box-shadow: 0 40px 90px rgba(49, 46, 129, 0.16), 0 12px 30px rgba(15, 23, 42, 0.12), inset 0 1px 0 rgba(255,255,255,0.9);
 }
 
-.browser-demo-showcase:hover {
-  transform: translateY(-5px);
-  border-color: rgba(99, 102, 241, 0.32);
-  box-shadow: 0 34px 90px rgba(67, 56, 202, 0.16);
+.browser-demo-showcase::before,
+.browser-demo-showcase::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: -1;
+  border-radius: inherit;
 }
 
 .browser-demo-showcase::before {
-  position: absolute;
+  inset: 7% 10% -8%;
+  background: linear-gradient(120deg, rgba(67, 56, 202, 0.24), rgba(34, 211, 238, 0.16));
+  filter: blur(45px);
+  opacity: 0.75;
+}
+
+.browser-demo-showcase::after {
   inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  content: '';
-  opacity: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55), inset 0 0 80px rgba(99, 102, 241, 0.08);
-  transition: opacity 500ms ease;
+  border: 1px solid rgba(255,255,255,0.76);
+  box-shadow: inset 0 0 0 1px rgba(67, 56, 202, 0.08);
 }
 
-.browser-demo-showcase:hover::before {
-  opacity: 1;
+.browser-demo-viewport {
+  border-radius: clamp(1.15rem, 2.5vw, 2rem);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.14), inset 0 1px 0 rgba(255,255,255,0.65);
+  transform: rotateX(var(--demo-tilt-x, 0.8deg)) rotateY(var(--demo-tilt-y, 0deg)) translateZ(0);
+  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 500ms ease;
 }
 
-.browser-demo-showcase * {
-  pointer-events: none !important;
-}
-
-.browser-demo-showcase .browser-demo {
-  cursor: default;
-}
-
-.browser-demo {
-  position: relative;
-  isolation: isolate;
-  contain: layout paint;
-}
-
-.browser-demo .nova-tasks-widget {
-  display: none !important;
-}
-
-.browser-demo .nova-omnibox-form {
-  position: relative !important;
-}
-
-.browser-demo .nova-omnibox-actions {
-  position: absolute !important;
-  top: 0 !important;
-  right: 0.5rem !important;
-  bottom: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.25rem !important;
-  z-index: 10 !important;
+.browser-demo-showcase.is-tilting .browser-demo-viewport {
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.18), inset 0 1px 0 rgba(255,255,255,0.75);
 }
 
 .browser-demo-scene {
-  animation: browser-demo-scene-in 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  animation: browser-scene-in 850ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes browser-demo-scene-in {
-  from {
-    opacity: 0;
-    transform: translateY(10px) scale(0.995);
+.browser-demo-hud {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 350ms ease, transform 350ms ease;
+}
+
+.browser-demo-showcase:hover .browser-demo-hud,
+.browser-demo-showcase:focus-within .browser-demo-hud {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.browser-demo-status,
+.browser-demo-scenes {
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+@keyframes browser-scene-in {
+  from { opacity: 0; transform: scale(1.012) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@media (max-width: 640px) {
+  .browser-demo-showcase {
+    min-height: 430px;
+    height: clamp(430px, 78vh, 620px);
+    border-radius: 1.35rem;
+    padding: 0.35rem;
   }
-  to {
+
+  .browser-demo-hud {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
+    padding: 0.75rem;
+  }
+
+  .browser-demo-status {
+    font-size: 8px;
+    padding: 0.35rem 0.6rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .browser-demo-scene {
-    animation: none;
+  .community-section > * {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
   }
+
+  .ambient-orb,
+  .browser-demo-scene,
+  .hero-scroll-line > span {
+    animation: none !important;
+  }
+
+  .browser-demo-showcase.is-tilting .browser-demo-viewport,
+  .browser-demo-viewport {
+    transform: none;
+    transition: none;
+  }
+
+  .browser-demo-hud {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Keep the embedded real browser's global rules scoped to its own viewport. */
+.browser-demo {
+  position: relative;
+  isolation: isolate;
+  contain: layout paint;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  user-select: none;
+}
+
+.browser-demo h1,
+.browser-demo h2,
+.browser-demo h3,
+.browser-demo h4,
+.browser-demo h5,
+.browser-demo h6,
+.browser-demo .font-serif {
+  font-family: 'Lora', serif;
+}
+
+.browser-demo button {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.browser-demo button:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.browser-demo ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.browser-demo ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.browser-demo ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.browser-demo ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.browser-demo .dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.browser-demo .dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .scrollbar-none {

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useInView } from 'framer-motion';
 import {
   Github,
   Star,
@@ -24,6 +25,8 @@ export const GithubStats: React.FC = () => {
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [hoveredPoint, setHoveredPoint] = useState<{ date: string; stars: number; index: number } | null>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const isSectionInView = useInView(sectionRef, { once: true, amount: 0.12 });
 
   const fetchRepo = useCallback(async () => {
     activeRequestRef.current?.abort();
@@ -120,7 +123,12 @@ export const GithubStats: React.FC = () => {
     ` L ${getCoordinates(0, points[0].stars).x},${svgHeight - paddingY} Z`;
 
   return (
-    <section id="community" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24">
+    <section
+      ref={sectionRef}
+      id="community"
+      className={`community-section mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24${isSectionInView ? ' is-visible' : ''}`}
+    >
+      <div className="editorial-rail" aria-hidden="true"><span>03</span><i /></div>
       {/* Section Header */}
       <div className="mb-10 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-6">
         <div>
@@ -145,8 +153,7 @@ export const GithubStats: React.FC = () => {
 
       {/* KPI Stats Grid */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
-        {/* Metric 1: Stars */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               STARS
@@ -166,7 +173,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 2: Forks */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               FORKS
@@ -186,7 +193,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 3: License */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LICENSE
@@ -206,7 +213,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 4: Latest Sync */}
-        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LAST UPDATE
@@ -228,7 +235,7 @@ export const GithubStats: React.FC = () => {
 
       {repoStatus === 'live' ? (
         /* LIVE INTERACTIVE STAR GROWTH CHART */
-        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#e5e5e5] shadow-xs mb-8">
+        <div className="luxury-card mb-8 rounded-3xl border border-[#e5e5e5] bg-white/90 p-6 shadow-xs backdrop-blur-sm sm:p-8">
         {/* Chart Header & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-neutral-100">
           <div>
@@ -239,14 +246,20 @@ export const GithubStats: React.FC = () => {
             <h3 className="font-display font-bold text-xl text-[#171717]">
               Star Velocity & Milestone Curve
             </h3>
+            <p className="mt-1 max-w-lg text-xs leading-relaxed text-neutral-500">
+              An illustrative trend based on the repository's current public star count—not a historical audit log.
+            </p>
           </div>
 
           {/* Timeframe Filter Buttons */}
-          <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl w-fit">
-            {(['7d', '30d', 'all'] as const).map((t) => (
+          <div className="flex items-center gap-1.5 p-1 bg-neutral-100 rounded-xl w-fit" role="group" aria-label="Chart timeframe">
+            {(['7d', '30d', 'all'] as const).map((t) => {
+              const timeframeLabel = t === '7d' ? '7 days' : t === '30d' ? '30 days' : 'All time';
+              return (
               <button
                 key={t}
                 type="button"
+                aria-label={`Show ${timeframeLabel}`}
                 aria-pressed={timeframe === t}
                 onClick={() => {
                   setTimeframe(t);
@@ -258,9 +271,10 @@ export const GithubStats: React.FC = () => {
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                {t.toUpperCase()}
+                {timeframeLabel}
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 
@@ -406,28 +420,27 @@ export const GithubStats: React.FC = () => {
         </div>
       )}
 
-      {/* GitHub Call to Action Bar */}
-      <div className="p-6 sm:p-8 rounded-2xl bg-neutral-900 text-[#fcfbf9] flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Github className="w-5 h-5 text-white" />
-            <h4 className="font-display font-bold text-lg text-white">
+      <div className="luxury-card relative flex flex-col items-center justify-between gap-6 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#171717] via-[#171717] to-[#24213f] p-6 text-[#fcfbf9] sm:flex-row sm:p-8">
+        <div className="relative z-10">
+          <div className="mb-1 flex items-center gap-2">
+            <Github aria-hidden="true" className="h-5 w-5 text-white" />
+            <h4 className="font-display text-lg font-bold text-white">
               unitybtw/nova-browser
             </h4>
           </div>
-          <p className="font-sans text-xs text-neutral-400">
+          <p className="max-w-xl font-sans text-xs text-neutral-400">
             Star the repository on GitHub to follow latest releases and support autonomous browser computing.
           </p>
         </div>
 
-        <div className="flex items-center gap-3 w-full sm:w-auto">
+        <div className="relative z-10 flex w-full items-center gap-3 sm:w-auto">
           <a
             href="https://github.com/unitybtw/nova-browser"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-white text-[#171717] font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors shadow-sm active:scale-95"
+            className="luxury-button inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-[#171717] shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#171717] sm:flex-initial"
           >
-            <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+            <Star aria-hidden="true" className="h-4 w-4 fill-amber-500 text-amber-500" />
             <span>Star on GitHub</span>
           </a>
 
@@ -435,9 +448,9 @@ export const GithubStats: React.FC = () => {
             href="https://github.com/unitybtw/nova-browser/fork"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex-1 sm:flex-initial px-6 py-3 rounded-xl bg-neutral-800 text-neutral-200 border border-neutral-700 font-mono text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-neutral-700 transition-colors active:scale-95"
+            className="luxury-button inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-5 py-3 font-mono text-xs font-bold uppercase tracking-wider text-neutral-200 hover:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#171717] sm:flex-initial"
           >
-            <GitFork className="w-4 h-4" />
+            <GitFork aria-hidden="true" className="h-4 w-4" />
             <span>Fork</span>
           </a>
         </div>

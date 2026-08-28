@@ -1,10 +1,12 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { Github, ArrowUp } from 'lucide-react';
 
 export const Footer: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
   };
 
   return (
@@ -109,10 +111,10 @@ export const Footer: React.FC = () => {
       {/* FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK */}
       <div className="w-full pt-4 pb-0 overflow-hidden select-none border-t border-white/5">
         <motion.div
-          initial={{ opacity: 0, y: 25 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
+          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+          transition={prefersReducedMotion ? undefined : { duration: 1, ease: [0.22, 1, 0.36, 1] }}
           className="w-full block leading-none"
         >
           <svg
@@ -121,10 +123,10 @@ export const Footer: React.FC = () => {
             preserveAspectRatio="none"
           >
             <defs>
-              <linearGradient id="novaCleanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <linearGradient id="novaCleanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                 <stop offset="0%" stopColor="#FFFFFF" />
-                <stop offset="65%" stopColor="#CBD5E1" />
-                <stop offset="100%" stopColor="#1E293B" stopOpacity="0.2" />
+                <stop offset="48%" stopColor="#A5B4FC" />
+                <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.32" />
               </linearGradient>
             </defs>
             <text

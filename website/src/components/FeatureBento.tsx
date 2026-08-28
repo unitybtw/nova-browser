@@ -1,6 +1,6 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Bot, Lock, Columns, Shield, Terminal, ArrowUpRight } from 'lucide-react';
+import { motion, useReducedMotion } from 'framer-motion';
+import { Bot, Lock, Columns, Shield, Terminal } from 'lucide-react';
 
 const MODULES = [
   {
@@ -51,8 +51,11 @@ const MODULES = [
 ];
 
 export const FeatureBento: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <section id="features" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
+      <div className="editorial-rail" aria-hidden="true"><span>02</span><i /></div>
       {/* Section Header */}
       <div className="mb-12 flex flex-col gap-5 sm:mb-16 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
@@ -73,10 +76,10 @@ export const FeatureBento: React.FC = () => {
         {MODULES.map((mod, index) => (
           <motion.div
             key={mod.id}
-            initial={{ opacity: 0, y: 30 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
+            whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+            transition={prefersReducedMotion ? undefined : { duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
             className={`luxury-card ${mod.span} rounded-2xl bg-white/85 border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden backdrop-blur-sm`}
           >
             <div>
@@ -97,11 +100,10 @@ export const FeatureBento: React.FC = () => {
               </p>
             </div>
 
-            <div className="mt-8 pt-6 border-t border-[#e5e5e5]/60 flex items-center justify-between font-mono text-xs">
-              <span className="text-neutral-400 font-semibold">// {mod.stats}</span>
+            <div className="mt-8 flex items-center justify-between border-t border-[#e5e5e5]/60 pt-6 font-mono text-xs">
+              <span className="font-semibold text-neutral-400">// MODULE {String(index + 1).padStart(2, '0')}</span>
               <div className="flex items-center gap-1 text-[#4338ca] font-bold">
-                <span>READY TO EXPLORE</span>
-                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>{mod.stats}</span>
               </div>
             </div>
           </motion.div>

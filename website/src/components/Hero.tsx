@@ -1,9 +1,18 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
 import BrowserDemo from './BrowserDemo';
 
+const HERO_CAPABILITIES = [
+  { label: 'On-device AI', detail: 'Local inference, no cloud hop', color: 'bg-indigo-500' },
+  { label: 'Native privacy shield', detail: 'Trackers blocked before DOM load', color: 'bg-emerald-500' },
+  { label: 'Workspace engine', detail: 'Split views, vertical tabs, instant focus', color: 'bg-cyan-500' },
+  { label: 'Open architecture', detail: 'MIT licensed and auditable', color: 'bg-amber-500' },
+];
+
 export const Hero: React.FC = () => {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <section className="relative isolate pt-28 sm:pt-32 md:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
@@ -11,8 +20,8 @@ export const Hero: React.FC = () => {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: -10 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
         className="inline-flex items-center gap-2 rounded-full border border-[#4338ca]/20 bg-white/75 px-3.5 py-1.5 font-mono text-[10px] sm:text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider shadow-sm backdrop-blur"
       >
@@ -23,8 +32,8 @@ export const Hero: React.FC = () => {
       </motion.div>
 
       <motion.h1
-        initial={{ opacity: 0, y: 25 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="mt-7 max-w-5xl font-display text-[clamp(3rem,8vw,7.5rem)] font-black leading-[0.98] tracking-[-0.055em] text-[#171717]"
       >
@@ -33,8 +42,8 @@ export const Hero: React.FC = () => {
       </motion.h1>
 
       <motion.p
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.85, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
         className="mt-6 max-w-2xl text-base sm:text-lg md:text-xl text-[#525252] font-sans leading-relaxed"
       >
@@ -42,8 +51,8 @@ export const Hero: React.FC = () => {
       </motion.p>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.85, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className="mt-9 flex w-full max-w-xl flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4 select-none"
       >
@@ -68,25 +77,42 @@ export const Hero: React.FC = () => {
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.85, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-500"
+        className="mt-7 flex flex-wrap items-center justify-center gap-2.5 sm:mt-6 select-none"
       >
-        <span>MIT licensed</span>
-        <span className="h-1 w-1 rounded-full bg-neutral-300" aria-hidden="true" />
-        <span>No telemetry</span>
-        <span className="h-1 w-1 rounded-full bg-neutral-300" aria-hidden="true" />
-        <span>Runs locally</span>
+        {HERO_CAPABILITIES.map((item) => (
+          <div
+            key={item.label}
+            className="inline-flex items-center gap-2 rounded-full border border-neutral-200/80 bg-white/70 px-3.5 py-1.5 shadow-xs backdrop-blur-sm"
+          >
+            <span className={`h-1.5 w-1.5 rounded-full ${item.color}`} aria-hidden="true" />
+            <span className="font-display text-xs font-bold text-[#171717]">{item.label}</span>
+            <span className="font-mono text-[10px] text-neutral-400">· {item.detail}</span>
+          </div>
+        ))}
       </motion.div>
 
       <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 40 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.95, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
         className="relative mt-12 w-full max-w-6xl mx-auto text-left"
       >
         <BrowserDemo />
+      </motion.div>
+
+      <motion.div
+        initial={prefersReducedMotion ? false : { opacity: 0 }}
+        animate={prefersReducedMotion ? undefined : { opacity: 1 }}
+        transition={{ duration: 0.8, delay: 1.05 }}
+        className="mt-8 flex items-center gap-3 text-neutral-400"
+      >
+        <span className="font-mono text-[9px] font-bold uppercase tracking-[0.22em]">Scroll to explore</span>
+        <span className="hero-scroll-line relative h-8 w-px overflow-hidden bg-neutral-200" aria-hidden="true">
+          <span className="absolute left-0 top-0 h-3/5 w-full bg-gradient-to-b from-[#4338ca] to-cyan-400" />
+        </span>
       </motion.div>
     </section>
   );

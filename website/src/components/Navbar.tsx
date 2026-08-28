@@ -11,6 +11,7 @@ export type PillNavItem = {
 const NAV_ITEMS: PillNavItem[] = [
   { label: "MANIFESTO", href: "#top" },
   { label: "FEATURES", href: "#features" },
+  { label: "COMMUNITY", href: "#community" },
   { label: "BENCHMARKS", href: "#benchmarks" },
   { label: "FAQ", href: "#faq" },
   { label: "SOURCE", href: "https://github.com/unitybtw/nova-browser", external: true }
@@ -298,7 +299,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <header className="fixed top-4 sm:top-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
-      <div ref={navContainerRef} className="relative z-[1000] w-full max-w-4xl mx-auto pointer-events-auto">
+      <div ref={navContainerRef} className="relative z-[1000] w-full max-w-5xl mx-auto pointer-events-auto">
         <nav
           className="w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none"
           aria-label="Primary Navigation"
@@ -349,7 +350,7 @@ export const Navbar: React.FC = () => {
                       target={item.external ? "_blank" : undefined}
                       rel={item.external ? "noopener noreferrer" : undefined}
                       onClick={() => !item.external && setActiveHref(item.href)}
-                      aria-current={isActive ? 'page' : undefined}
+                      aria-current={isActive ? 'location' : undefined}
                       onMouseEnter={() => handleEnter(i)}
                       onMouseLeave={() => handleLeave(i)}
                       className="relative inline-flex h-[36px] self-center items-center justify-center overflow-hidden rounded-full px-5 font-mono text-xs font-semibold uppercase tracking-wider no-underline transition-colors duration-200 hover:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#171717] select-none"
@@ -441,8 +442,9 @@ export const Navbar: React.FC = () => {
         <div
           id={mobileMenuId}
           ref={mobileMenuRef}
-          role="region"
+          role="navigation"
           aria-label="Mobile navigation"
+          aria-hidden={!isMobileMenuOpen}
           className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl overflow-hidden shadow-2xl z-[999] hidden border border-white/10"
           style={{
             background: BASE_COLOR
@@ -461,6 +463,7 @@ export const Navbar: React.FC = () => {
                       if (!item.external) setActiveHref(item.href);
                       closeMobileMenu();
                     }}
+                    aria-current={isActive ? 'location' : undefined}
                     className={`block py-3 px-6 text-xs font-mono font-semibold uppercase tracking-widest rounded-xl transition-all ${
                       isActive
                         ? "bg-white text-[#171717]"
