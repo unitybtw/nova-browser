@@ -139,8 +139,28 @@ const getDemoParams = () => {
   };
 };
 
-function App() {
-  const demoParams = useMemo(() => getDemoParams(), []);
+export interface BrowserDemoOptions {
+  isDemo?: boolean;
+  feature?: string;
+  bg?: string;
+  theme?: 'dark' | 'light';
+  tabs?: string;
+}
+
+function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
+  const demoParams = useMemo(() => {
+    const queryParams = getDemoParams();
+    if (!demoOptions) return queryParams;
+    return {
+      ...queryParams,
+      ...demoOptions,
+      isDemo: demoOptions.isDemo ?? queryParams.isDemo,
+      feature: demoOptions.feature ?? queryParams.feature,
+      bg: demoOptions.bg ?? queryParams.bg,
+      theme: demoOptions.theme ?? queryParams.theme,
+      tabs: demoOptions.tabs ?? queryParams.tabs,
+    };
+  }, [demoOptions]);
 
   // Sync theme dynamically when running in an embedded demo iframe
   useEffect(() => {
