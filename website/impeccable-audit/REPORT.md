@@ -12,7 +12,7 @@
 | Dimension | Score | Result |
 |---|---:|---|
 | Accessibility | 3/4 | BrowserDemo controls now have names, states, Arrow/Home/End keyboard tab navigation, focus rings, and larger hit areas. A real screen-reader pass remains. |
-| Performance | 3/4 | Below-fold sections are split and deferred; main JS is 463.33 kB minified / 149.60 kB gzip. Real-device Core Web Vitals remain unmeasured. |
+| Performance | 3/4 | Below-fold sections are split and deferred; main JS is 461.03 kB minified / 149.00 kB gzip. Real-device Core Web Vitals remain unmeasured. |
 | Theming | 3/4 | Semantic canvas, surface, text, accent, border, focus, and terminal tokens now exist and are used by the page shell/shared CSS. Some component classes remain arbitrary. |
 | Responsive Design | 3/4 | Main layouts are responsive and BrowserDemo controls have mobile-sized hit areas. Real 320/375/768/1024px visual checks remain. |
 | Implementation Integrity | 4/4 | Nova-specific product narrative and browser-demo language are coherent; generic font/gradient detector findings were removed. |
@@ -34,7 +34,7 @@
 - Converted `GithubStats`, `Benchmarks`, `Downloads`, and `Faq` to lazy-loaded chunks.
 - Added an `IntersectionObserver` gate with a `1200px` preload margin so deferred sections do not initialize at first paint.
 - Preserved hash navigation: `#community`, `#benchmarks`, `#download`, and `#faq` trigger loading; `DeferredContentReady` scrolls after all deferred sections resolve so the target exists in the DOM.
-- Main JS changed from the baseline `521.08 kB` minified / `162.43 kB` gzip to `463.33 kB` minified / `149.60 kB` gzip.
+- Main JS changed from the baseline `521.08 kB` minified / `162.43 kB` gzip to `461.03 kB` minified / `149.00 kB` gzip.
 
 ### Visual quality and consistency
 
@@ -68,7 +68,7 @@ The previous findings were resolved as follows:
 ## Verification Log
 
 - `cd website && npm run build` — **passed** (`tsc -b` + Vite build).
-- Final main JS chunk — `463.33 kB` minified / `149.60 kB` gzip.
+- Final main JS chunk — `461.03 kB` minified / `149.00 kB` gzip.
 - Lazy chunks produced for `GithubStats`, `Benchmarks`, `Downloads`, and `Faq`.
 - `node .github/skills/impeccable/scripts/detect.mjs --json website` — **0 findings**, with regex fallback warning.
 - `git diff --check -- website/index.html website/src website/impeccable-audit` — **passed**.
@@ -86,12 +86,10 @@ The previous findings were resolved as follows:
 
 ## Files Changed
 
-- `website/index.html`
-- `website/src/App.tsx`
 - `website/src/components/BrowserDemo.tsx`
-- `website/src/components/Faq.tsx`
-- `website/src/components/Footer.tsx`
+- `website/src/components/FeatureBento.tsx`
 - `website/src/components/Hero.tsx`
+- `website/src/components/Navbar.tsx`
 - `website/src/index.css`
 
 No commit was created.

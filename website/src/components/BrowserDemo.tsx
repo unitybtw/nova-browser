@@ -104,7 +104,7 @@ export const BrowserDemo: React.FC = () => {
   };
 
   return (
-    <div className="w-full select-none rounded-2xl border border-slate-200/90 bg-slate-100/90 p-1.5 shadow-[0_24px_80px_rgba(15,23,42,0.12)] sm:p-2">
+    <div className="browser-demo w-full select-none overflow-hidden rounded-[14px] border border-slate-300 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
       {/* Window Chrome Header */}
       <div className="flex h-10 w-full items-center justify-between px-3">
         {/* macOS Traffic Lights */}
@@ -129,7 +129,7 @@ export const BrowserDemo: React.FC = () => {
       </div>
 
       {/* Main Browser Window Body */}
-      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-hidden bg-white">
         {/* Horizontal Tab Bar */}
         <div
           role="tablist"
@@ -180,7 +180,7 @@ export const BrowserDemo: React.FC = () => {
                     document.getElementById(`browser-tab-${nextTab.id}`)?.focus();
                   }}
                   className="relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-t-lg px-3 pr-11 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-inset"
-              >
+                >
                 {/* Active Top Accent Line */}
                 {isActive && (
                   <span className="absolute inset-x-0 top-0 h-[2px] rounded-t-lg bg-[#4338ca]" />

@@ -84,7 +84,7 @@ export const FeatureBento: React.FC = () => {
           >
             <div>
               <div className="flex items-center justify-between mb-6">
-                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 group-hover:bg-[#4338ca] group-hover:text-white group-hover:shadow-[0_10px_24px_rgba(67,56,202,0.22)]">
+                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-200 group-hover:border-[#4338ca]/20 group-hover:bg-[#4338ca] group-hover:text-white">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
                 <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">

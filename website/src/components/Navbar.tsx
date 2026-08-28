@@ -309,7 +309,7 @@ export const Navbar: React.FC = () => {
             ref={logoRef}
             href="#top"
             onMouseEnter={handleLogoEnter}
-            className="flex-shrink-0 flex items-center justify-center rounded-full overflow-hidden transition-transform duration-300 hover:scale-105 active:scale-95 shadow-md"
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full shadow-md transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
             style={{
               width: "48px",
               height: "48px",
@@ -409,7 +409,7 @@ export const Navbar: React.FC = () => {
           {/* Island 3: Get Nova CTA Pill */}
           <a
             href="#download"
-            className="hidden md:flex items-center justify-center rounded-full px-6 font-mono text-xs uppercase tracking-wider font-bold text-white transition-transform duration-300 hover:scale-105 active:scale-95 shadow-md gap-1.5"
+            className="hidden items-center justify-center gap-1.5 rounded-full px-6 font-mono text-xs font-bold uppercase tracking-wider text-white shadow-md transition-colors duration-200 hover:bg-[#2a14b4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 md:flex"
             style={{
               height: "48px",
               background: BASE_COLOR
@@ -427,7 +427,7 @@ export const Navbar: React.FC = () => {
             aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMobileMenuOpen}
             aria-controls={mobileMenuId}
-            className="md:hidden flex items-center justify-center rounded-full transition-transform active:scale-90 shadow-md text-white"
+            className="flex items-center justify-center rounded-full text-white shadow-md transition-colors duration-200 hover:bg-[#2a14b4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 md:hidden"
             style={{
               width: "48px",
               height: "48px",

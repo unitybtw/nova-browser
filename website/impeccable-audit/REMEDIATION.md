@@ -20,7 +20,11 @@
 - Converted `GithubStats`, `Benchmarks`, `Downloads`, and `Faq` to lazy-loaded chunks.
 - Added an `IntersectionObserver` gate with a `1200px` preload margin so deferred sections do not initialize at first paint.
 - Preserved hash navigation: links to `#community`, `#benchmarks`, `#download`, and `#faq` trigger loading; `DeferredContentReady` scrolls after all lazy sections resolve, so the target exists before the post-load scroll runs.
-- Main JS changed from the baseline `521.08 kB` minified / `162.43 kB` gzip to `463.33 kB` minified / `149.60 kB` gzip.
+- Converted BrowserDemo from a padded gray card-inside-card treatment to one browser frame: one border, one shadow, one chrome header, and one continuous viewport surface.
+- Distilled Hero to its essential hierarchy: headline, supporting copy, two CTAs, and the browser demo. Removed the redundant capability pills, glow backdrop, and scroll-cue decoration.
+- Reduced shared card/button polish to restrained border, color, and shadow feedback; removed decorative radial glows, shine sweeps, and lift effects.
+- Calmed Navbar logo and CTA interactions and simplified FeatureBento icon hover feedback to color/background changes.
+- Main JS changed from the baseline `521.08 kB` minified / `162.43 kB` gzip to `461.03 kB` minified / `149.00 kB` gzip.
 
 ### Visual quality, motion, and detector findings
 
