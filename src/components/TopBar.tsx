@@ -1366,6 +1366,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  const isWindows = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('win');
+
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
 
   const currentUrl = activeTab?.url || '';
@@ -1407,6 +1410,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           transition={{ duration: 0.2 }}
           className="flex items-end px-2 pt-2.5 gap-1"
         >
+          {/* macOS Traffic Lights Spacer: 78px so native traffic lights never collide with Workspace or Tabs */}
+          {isMac && (
+            <div 
+              className="w-[78px] h-full shrink-0 select-none drag-region" 
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            />
+          )}
+
           {/* Workspace Selector */}
           {workspaces && activeWorkspace && onSelectWorkspace && (
             <div className="relative no-drag mb-1">
@@ -1585,6 +1596,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
         </div>
+
+        {/* Spacer for Windows controls */}
+        {isWindows && (
+          <div 
+            className="w-[140px] shrink-0 select-none drag-region" 
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+          />
+        )}
       </motion.div>
       )}
       </AnimatePresence>

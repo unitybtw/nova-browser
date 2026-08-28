@@ -260,6 +260,7 @@ function createWindow() {
         height: 44
       }
     } : {}),
+    trafficLightPosition: { x: 14, y: 14 },
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
@@ -270,12 +271,6 @@ function createWindow() {
       sandbox: true
     }
   });
-
-  // The renderer owns the browser chrome; do not show a second native macOS
-  // window-control layer above it.
-  if (process.platform === 'darwin') {
-    mainWindow.setWindowButtonVisibility(false);
-  }
 
   // ⚡ Perf: don't paint a blank window while content loads — show once the
   // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
