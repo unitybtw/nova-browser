@@ -2,594 +2,240 @@ import React, { useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
-  RotateCw,
+  Check,
+  ChevronDown,
+  Compass,
+  Download,
+  Globe,
   Home,
   Lock,
-  Star,
-  Sparkles,
-  ShieldCheck,
-  Puzzle,
-  Settings,
+  Menu,
+  Moon,
   Plus,
-  X,
+  RotateCw,
   Search,
-  Mic,
-  CornerDownLeft,
-  Globe,
+  Settings,
+  Shield,
+  Sparkles,
+  Star,
   Terminal,
-  Code2,
-  GitFork,
-  Bot,
-  Cpu,
-  Layers,
-  CheckCircle2
+  X,
+  Zap,
 } from 'lucide-react';
 
-interface TabItem {
+interface DemoTab {
   id: string;
   title: string;
   url: string;
-  icon: 'nova' | 'github' | 'react' | 'ai';
+  kind: 'newtab' | 'github' | 'react' | 'ai';
 }
 
-const INITIAL_TABS: TabItem[] = [
-  { id: 'newtab', title: 'New Tab', url: 'nova://newtab', icon: 'nova' },
-  { id: 'github', title: 'Nova Browser - GitHub', url: 'https://github.com/unitybtw/nova-browser', icon: 'github' },
-  { id: 'react', title: 'React Documentation', url: 'https://react.dev', icon: 'react' },
+const INITIAL_TABS: DemoTab[] = [
+  { id: 'newtab', title: 'New Tab', url: 'nova://newtab', kind: 'newtab' },
+  { id: 'github', title: 'Nova Browser - GitHub', url: 'github.com/unitybtw/nova-browser', kind: 'github' },
+  { id: 'react', title: 'React 19 Docs', url: 'react.dev/reference/react', kind: 'react' },
 ];
 
-const SPEED_DIALS = [
-  { title: 'GitHub', domain: 'github.com/unitybtw', color: '#24292e', icon: 'github', targetTab: 'github' },
-  { title: 'Local AI', domain: 'nova://ai-assistant', color: '#4338ca', icon: 'ai', targetTab: 'ai' },
-  { title: 'React 19', domain: 'react.dev', color: '#087ea4', icon: 'globe', targetTab: 'react' },
-  { title: 'MCP Bridge', domain: 'localhost:3020', color: '#0ea5e9', icon: 'terminal', targetTab: 'ai' },
-  { title: 'Claude AI', domain: 'claude.ai', color: '#d97706', icon: 'ai', targetTab: 'ai' },
-  { title: 'Gemini', domain: 'gemini.google.com', color: '#10a37f', icon: 'ai', targetTab: 'ai' },
+const FAVORITES = [
+  { label: 'GitHub', color: '#24292e', icon: 'GH', tab: 'github' },
+  { label: 'React', color: '#087ea4', icon: '⚛', tab: 'react' },
+  { label: 'Local AI', color: '#6366f1', icon: '✦', tab: 'ai' },
+  { label: 'MCP', color: '#0891b2', icon: '⌘', tab: 'ai' },
 ];
+
+function TabIcon({ tab, className = 'h-3.5 w-3.5' }: { tab: DemoTab; className?: string }) {
+  if (tab.kind === 'newtab') return <Compass className={`${className} text-cyan-400`} />;
+  if (tab.kind === 'ai') return <Sparkles className={`${className} text-cyan-400`} />;
+  if (tab.kind === 'github') return <span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-slate-700 text-[8px] font-black text-white">GH</span>;
+  return <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] text-cyan-300">⚛</span>;
+}
 
 export const BrowserDemo: React.FC = () => {
-  const [tabs, setTabs] = useState<TabItem[]>(INITIAL_TABS);
-  const [activeTabId, setActiveTabId] = useState<string>('newtab');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isAiMode, setIsAiMode] = useState(false);
+  const [tabs, setTabs] = useState<DemoTab[]>(INITIAL_TABS);
+  const [activeTabId, setActiveTabId] = useState('newtab');
+  const [query, setQuery] = useState('');
   const [isBookmarked, setIsBookmarked] = useState(false);
-  const [isShieldActive, setIsShieldActive] = useState(true);
-  const [aiPrompt, setAiPrompt] = useState('Explain how WebGPU on-device inference works in Nova Browser');
+  const [isShieldOn, setIsShieldOn] = useState(true);
+  const [isSpaceOpen, setIsSpaceOpen] = useState(false);
 
-  const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0] || INITIAL_TABS[0];
+  const activeTab = tabs.find((tab) => tab.id === activeTabId) || tabs[0];
 
-  const handleOpenAiTab = (prompt?: string) => {
-    if (prompt) setAiPrompt(prompt);
-    if (!tabs.some((t) => t.id === 'ai')) {
-      setTabs([...tabs, { id: 'ai', title: 'Nova Local AI Copilot', url: 'nova://ai', icon: 'ai' }]);
-    }
-    setActiveTabId('ai');
-  };
-
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = searchQuery.trim();
-    if (!query) return;
-
-    if (isAiMode || query.startsWith('@ai')) {
-      const cleanPrompt = query.replace(/^@ai\s*/i, '');
-      handleOpenAiTab(cleanPrompt || 'Summarize this page');
-      setSearchQuery('');
-      setIsAiMode(false);
+  const openTab = (kind: DemoTab['kind'], title: string, url: string) => {
+    const existing = tabs.find((tab) => tab.kind === kind);
+    if (existing) {
+      setActiveTabId(existing.id);
       return;
     }
+    const next = { id: `${kind}-${Date.now()}`, title, url, kind };
+    setTabs((current) => [...current, next]);
+    setActiveTabId(next.id);
+  };
 
-    if (query.toLowerCase().includes('github')) {
-      setActiveTabId('github');
-    } else if (query.toLowerCase().includes('react')) {
-      setActiveTabId('react');
+  const submitSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    const value = query.trim();
+    if (!value) return;
+    if (value.toLowerCase().includes('react')) {
+      openTab('react', 'React 19 Docs', 'react.dev/reference/react');
+    } else if (value.toLowerCase().includes('github')) {
+      openTab('github', 'Nova Browser - GitHub', 'github.com/unitybtw/nova-browser');
     } else {
-      handleOpenAiTab(`Search query: ${query}`);
+      openTab('ai', 'Nova Local AI Copilot', 'nova://ai');
     }
-    setSearchQuery('');
+    setQuery('');
   };
 
-  const handleCloseTab = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
+  const closeTab = (id: string, event?: React.MouseEvent) => {
+    event?.stopPropagation();
     if (tabs.length === 1) return;
-    const remaining = tabs.filter((t) => t.id !== id);
+    const remaining = tabs.filter((tab) => tab.id !== id);
     setTabs(remaining);
-    if (activeTabId === id) {
-      setActiveTabId(remaining[remaining.length - 1].id);
-    }
-  };
-
-  const handleAddTab = () => {
-    setActiveTabId('newtab');
+    if (activeTabId === id) setActiveTabId(remaining[remaining.length - 1].id);
   };
 
   return (
-    <div className="browser-demo w-full select-none overflow-hidden rounded-[14px] border border-slate-300 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-      {/* Window Chrome Header */}
-      <div className="flex h-10 w-full items-center justify-between px-3">
-        {/* macOS Traffic Lights */}
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full bg-[#ff5f57] shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.15)]" />
-          <span className="h-3 w-3 rounded-full bg-[#febc2e] shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.15)]" />
-          <span className="h-3 w-3 rounded-full bg-[#28c840] shadow-[inset_0_0_0_0.5px_rgba(0,0,0,0.15)]" />
+    <div className="browser-demo w-full overflow-hidden rounded-[18px] border border-slate-700/80 bg-[#151122] text-slate-200 shadow-[0_30px_90px_rgba(15,23,42,0.32)]">
+      <div className="flex h-[30px] items-center border-b border-white/[0.06] bg-[#110d1c] px-3">
+        <div className="flex items-center gap-1.5">
+          <span className="mac-btn mac-close" />
+          <span className="mac-btn mac-min" />
+          <span className="mac-btn mac-max" />
         </div>
-
-        {/* Center Window Title */}
-        <div className="font-sans text-xs font-semibold tracking-wide text-slate-500">
+        <div className="mx-auto flex items-center gap-2 font-mono text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,.8)]" />
           Nova Browser
         </div>
-
-        {/* Right Window Status Badge */}
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 font-mono text-[10px] font-bold text-emerald-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            LIVE
-          </span>
-        </div>
+        <span className="font-mono text-[9px] text-slate-600">LOCAL // 01</span>
       </div>
 
-      {/* Main Browser Window Body */}
-      <div className="overflow-hidden bg-white">
-        {/* Horizontal Tab Bar */}
-        <div
-          role="tablist"
-          aria-label="Browser tabs"
-          className="flex items-center gap-1.5 border-b border-slate-200/80 bg-slate-100/80 px-2 pt-2 overflow-x-auto scrollbar-none"
-        >
-          {tabs.map((tab) => {
-            const isActive = tab.id === activeTabId;
-            return (
-              <div
-                key={tab.id}
-                role="presentation"
-                className={`group relative flex min-h-11 max-w-[220px] min-w-[130px] items-center rounded-t-lg transition-all ${
-                  isActive
-                    ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/60'
-                    : 'text-slate-500 hover:bg-slate-200/60 hover:text-slate-800'
-                }`}
-              >
-                <div
-                  role="tab"
-                  aria-selected={isActive}
-                  aria-controls="browser-panel"
-                  id={`browser-tab-${tab.id}`}
-                  tabIndex={isActive ? 0 : -1}
-                  onClick={() => setActiveTabId(tab.id)}
-                  onKeyDown={(event) => {
-                    const tabIndex = tabs.findIndex((item) => item.id === tab.id);
-                    let nextTabIndex: number | null = null;
-
-                    if (event.key === 'ArrowRight') {
-                      nextTabIndex = (tabIndex + 1) % tabs.length;
-                    } else if (event.key === 'ArrowLeft') {
-                      nextTabIndex = (tabIndex - 1 + tabs.length) % tabs.length;
-                    } else if (event.key === 'Home') {
-                      nextTabIndex = 0;
-                    } else if (event.key === 'End') {
-                      nextTabIndex = tabs.length - 1;
-                    } else if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setActiveTabId(tab.id);
-                      return;
-                    }
-
-                    if (nextTabIndex === null) return;
-                    event.preventDefault();
-                    const nextTab = tabs[nextTabIndex];
-                    setActiveTabId(nextTab.id);
-                    document.getElementById(`browser-tab-${nextTab.id}`)?.focus();
-                  }}
-                  className="relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-t-lg px-3 pr-11 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-inset"
-                >
-                {/* Active Top Accent Line */}
-                {isActive && (
-                  <span className="absolute inset-x-0 top-0 h-[2px] rounded-t-lg bg-[#4338ca]" />
-                )}
-
-                {/* Tab Icon */}
-                {tab.icon === 'nova' && (
-                  <img src="/nova-logo-tight.png" alt="Nova" className="h-4 w-4 shrink-0 object-contain" />
-                )}
-                {tab.icon === 'github' && (
-                  <Code2 className="h-4 w-4 shrink-0 text-slate-700" />
-                )}
-                {tab.icon === 'react' && (
-                  <Globe className="h-4 w-4 shrink-0 text-cyan-600" />
-                )}
-                {tab.icon === 'ai' && (
-                  <Sparkles className="h-4 w-4 shrink-0 text-indigo-600" />
-                )}
-
-                {/* Tab Title */}
-                <span className="truncate text-left text-xs font-medium">{tab.title}</span>
-
-              </div>
-
-              {tabs.length > 1 && (
-                <button
-                  type="button"
-                  onClick={(event) => handleCloseTab(tab.id, event)}
-                  className="absolute right-1 flex h-9 w-9 shrink-0 items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-                  aria-label={`Close ${tab.title} tab`}
-                >
-                  <X className="h-3 w-3" aria-hidden="true" />
-                </button>
-              )}
-            </div>
-            );
-          })}
-
-          {/* New Tab Button */}
-          <button
-            type="button"
-            onClick={handleAddTab}
-            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-            aria-label="Open new tab"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Omnibox & Navigation Bar */}
-        <div className="flex h-11 items-center gap-2 border-b border-slate-200/80 bg-white px-3">
-          {/* Navigation Controls */}
-          <div className="flex items-center gap-1 text-slate-500">
-            <button
-              type="button"
-              onClick={() => setActiveTabId('newtab')}
-              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-              aria-label="Back to home"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-              aria-label="Forward"
-              disabled
-            >
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {}}
-              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-              aria-label="Reload page"
-            >
-              <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTabId('newtab')}
-              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-              aria-label="Home"
-            >
-              <Home className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>
-          </div>
-
-          {/* Omnibox Address Input */}
-          <form
-            onSubmit={handleSearchSubmit}
-            className="flex flex-1 items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 px-3 py-1.5 text-xs text-slate-700 transition-all focus-within:border-[#4338ca] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#4338ca]/20"
-          >
-            <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+      <div className="flex h-[560px] min-h-0">
+        <aside className="flex w-[222px] shrink-0 flex-col border-r border-white/[0.08] bg-[#151122] px-3 py-3">
+          <form onSubmit={submitSearch} className="relative mb-3">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-500" />
             <input
-              id="browser-address"
-              aria-label="Current page address"
-              type="text"
-              value={activeTab.url}
-              readOnly
-              className="w-full bg-transparent font-mono text-[11px] text-slate-700 outline-none select-all"
+              aria-label="Search or type a URL"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search or type URL"
+              className="h-8 w-full rounded-xl border border-white/[0.09] bg-white/[0.06] pl-8 pr-2 text-[11px] text-slate-200 outline-none placeholder:text-slate-500 focus:border-cyan-500/60 focus:bg-white/[0.09]"
             />
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="rounded bg-slate-200/60 px-1.5 py-0.5 font-mono text-[9px] font-bold text-slate-600">
-                TR/EN
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsBookmarked(!isBookmarked)}
-                className={`flex min-h-11 min-w-11 items-center justify-center rounded p-0.5 transition-colors hover:text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${isBookmarked ? 'text-amber-500' : 'text-slate-400'}`}
-                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark current tab'}
-                aria-pressed={isBookmarked}
-              >
-                <Star className="h-3.5 w-3.5" fill={isBookmarked ? 'currentColor' : 'none'} />
-              </button>
-            </div>
           </form>
 
-          {/* Right Action Toolbar */}
-          <div className="flex items-center gap-1.5">
-            {/* AI Assistant Pill */}
-            <button
-              type="button"
-              onClick={() => handleOpenAiTab()}
-              aria-label="Open Nova AI assistant"
-              aria-pressed={activeTabId === 'ai'}
-              className={`flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
-                activeTabId === 'ai'
-                  ? 'bg-[#4338ca] text-white border-[#4338ca]'
-                  : 'bg-indigo-50 border-indigo-200/80 text-[#4338ca] hover:bg-indigo-100'
-              }`}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Nova AI</span>
-            </button>
-
-            {/* Privacy Shield Badge */}
-            <button
-              type="button"
-              onClick={() => setIsShieldActive(!isShieldActive)}
-              aria-label={isShieldActive ? 'Pause Privacy Shield' : 'Enable Privacy Shield'}
-              aria-pressed={isShieldActive}
-              className={`flex min-h-11 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
-                isShieldActive
-                  ? 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
-                  : 'bg-slate-100 border-slate-200 text-slate-500'
-              }`}
-            >
-              <ShieldCheck className={`h-3.5 w-3.5 ${isShieldActive ? 'text-emerald-600' : 'text-slate-400'}`} />
-              <span className="hidden sm:inline">{isShieldActive ? 'Shield' : 'Paused'}</span>
-            </button>
-
-            {/* Extensions & Settings */}
-            <button
-              type="button"
-              onClick={() => handleOpenAiTab('List installed extensions and MCP servers')}
-              aria-label="Open extensions"
-              className="flex h-11 w-11 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-            >
-              <Puzzle className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleOpenAiTab('Open browser settings and performance preferences')}
-              aria-label="Open browser settings"
-              className="flex h-11 w-11 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-            >
-              <Settings className="h-3.5 w-3.5" />
-            </button>
+          <div className="mb-3 grid grid-cols-2 gap-1.5">
+            {FAVORITES.map((favorite) => (
+              <button
+                key={favorite.label}
+                type="button"
+                onClick={() => openTab(favorite.tab as DemoTab['kind'], favorite.label, favorite.tab === 'github' ? 'github.com/unitybtw/nova-browser' : favorite.tab === 'react' ? 'react.dev' : 'nova://ai')}
+                className="flex h-8 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.045] text-[10px] text-slate-400 transition hover:border-cyan-400/30 hover:bg-white/[0.09] hover:text-white"
+              >
+                <span className="flex h-4 w-4 items-center justify-center rounded-md text-[8px] font-bold text-white" style={{ backgroundColor: favorite.color }}>
+                  {favorite.icon}
+                </span>
+                {favorite.label}
+              </button>
+            ))}
           </div>
-        </div>
 
-        {/* Viewport Content Area */}
-        <div
-          id="browser-panel"
-          role="tabpanel"
-          aria-labelledby={`browser-tab-${activeTabId}`}
-          className="h-[460px] w-full overflow-y-auto bg-slate-50/50 sm:h-[520px]"
-        >
-          {/* TAB 1: NEW TAB PAGE */}
-          {activeTabId === 'newtab' && (
-            <div className="flex min-h-full flex-col items-center justify-between p-6 text-center sm:p-10">
-              {/* Header / Clock */}
-              <div className="mt-2 sm:mt-6">
-                <div className="font-display text-5xl sm:text-6xl font-extrabold tracking-tight text-slate-900">
-                  13:37
-                </div>
-                <div className="mt-1 font-mono text-xs font-semibold uppercase tracking-wider text-slate-500">
-                  Good Afternoon, Explorer
-                </div>
+          <div className="relative mb-2">
+            <button type="button" onClick={() => setIsSpaceOpen(!isSpaceOpen)} className="flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-[11px] font-semibold text-slate-300 transition hover:bg-white/[0.06]">
+              <span className="flex h-4 w-4 items-center justify-center rounded-md bg-violet-500 text-[9px] font-bold text-white">P</span>
+              <span className="flex-1 truncate">Personal</span>
+              <ChevronDown className={`h-3 w-3 text-slate-500 transition ${isSpaceOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isSpaceOpen && (
+              <div className="absolute left-0 right-0 top-9 z-20 rounded-xl border border-white/10 bg-[#211b35] p-1.5 shadow-2xl">
+                <button type="button" onClick={() => setIsSpaceOpen(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] text-white hover:bg-white/10"><Check className="h-3 w-3 text-cyan-400" /> Personal</button>
+                <button type="button" onClick={() => setIsSpaceOpen(false)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[10px] text-slate-400 hover:bg-white/10"><Plus className="h-3 w-3" /> Manage spaces</button>
               </div>
+            )}
+          </div>
 
-              {/* Central Search Box */}
-              <div className="my-6 w-full max-w-xl">
-                <form
-                  onSubmit={handleSearchSubmit}
-                  className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] ring-1 ring-slate-100 focus-within:border-[#4338ca] focus-within:ring-2 focus-within:ring-[#4338ca]/20"
+          <button type="button" onClick={() => setActiveTabId('newtab')} className="mb-2 flex h-8 w-full items-center gap-2 rounded-xl px-2 text-left text-[11px] text-slate-400 transition hover:bg-white/[0.06] hover:text-white">
+            <Plus className="h-3.5 w-3.5 text-slate-500" />
+            <span className="flex-1">New Tab</span>
+            <span className="font-mono text-[9px] text-slate-600">⌘T</span>
+          </button>
+
+          <div className="mb-2 flex items-center gap-2 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-slate-600">
+            <span className="h-px flex-1 bg-white/[0.08]" />
+            Open tabs
+            <span className="h-px flex-1 bg-white/[0.08]" />
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pr-0.5">
+            {tabs.map((tab) => {
+              const active = tab.id === activeTabId;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTabId(tab.id)}
+                  className={`group flex h-8 w-full items-center gap-2 rounded-xl border px-2 text-left text-[11px] transition ${active ? 'border-white/10 bg-white/[0.11] font-medium text-white shadow-sm' : 'border-transparent text-slate-400 hover:bg-white/[0.06] hover:text-slate-200'}`}
                 >
-                  <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                  <input
-                    id="browser-search"
-                    aria-label="Search or ask Nova AI"
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search or ask Nova AI with @ai..."
-                    className="min-w-0 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsAiMode(!isAiMode)}
-                    aria-label="Toggle Nova AI search mode"
-                    aria-pressed={isAiMode}
-                    className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
-                      isAiMode
-                        ? 'bg-[#4338ca] text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    @ai
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Voice search"
-                    className="flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-                  >
-                    <Mic className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="submit"
-                    aria-label="Submit search"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-[#4338ca] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
-                  >
-                    <CornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
+                  <TabIcon tab={tab} />
+                  <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+                  <span onClick={(event) => closeTab(tab.id, event)} className={`rounded p-0.5 text-slate-600 hover:bg-red-500/20 hover:text-red-400 ${active ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                    <X className="h-3 w-3" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 border-t border-white/[0.08] pt-3">
+            <button type="button" onClick={() => setIsShieldOn(!isShieldOn)} className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left text-[10px] text-slate-400 hover:bg-white/[0.06] hover:text-white">
+              <Shield className={`h-3.5 w-3.5 ${isShieldOn ? 'text-cyan-400' : 'text-slate-600'}`} />
+              <span className="flex-1">Privacy Shield</span>
+              <span className={`h-1.5 w-1.5 rounded-full ${isShieldOn ? 'bg-cyan-400' : 'bg-slate-600'}`} />
+            </button>
+            <div className="mt-1 flex items-center gap-1 px-2 font-mono text-[9px] text-slate-600">
+              <Zap className="h-3 w-3 text-cyan-500" />
+              42 trackers blocked
+            </div>
+            <div className="mt-2 flex items-center justify-between px-2 text-slate-500">
+              <button type="button" className="rounded-lg p-1.5 hover:bg-white/[0.08] hover:text-white" aria-label="Settings"><Settings className="h-3.5 w-3.5" /></button>
+              <button type="button" className="rounded-lg p-1.5 hover:bg-white/[0.08] hover:text-white" aria-label="Downloads"><Download className="h-3.5 w-3.5" /></button>
+              <button type="button" className="rounded-lg p-1.5 hover:bg-white/[0.08] hover:text-white" aria-label="Theme"><Moon className="h-3.5 w-3.5" /></button>
+              <button type="button" className="rounded-lg p-1.5 hover:bg-white/[0.08] hover:text-white" aria-label="Menu"><Menu className="h-3.5 w-3.5" /></button>
+            </div>
+          </div>
+        </aside>
+
+        <main className="flex min-w-0 flex-1 flex-col bg-[#0f0c18]">
+          <div className="flex h-[43px] items-center gap-2 border-b border-white/[0.08] bg-[#171225] px-3">
+            <button type="button" className="rounded-lg p-1.5 text-slate-500 hover:bg-white/[0.08] hover:text-white"><ArrowLeft className="h-3.5 w-3.5" /></button>
+            <button type="button" className="rounded-lg p-1.5 text-slate-600 hover:bg-white/[0.08] hover:text-white"><ArrowRight className="h-3.5 w-3.5" /></button>
+            <button type="button" className="rounded-lg p-1.5 text-slate-500 hover:bg-white/[0.08] hover:text-white"><RotateCw className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setActiveTabId('newtab')} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/[0.08] hover:text-white"><Home className="h-3.5 w-3.5" /></button>
+            <form onSubmit={submitSearch} className="flex h-7 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/[0.1] bg-white/[0.055] px-3 focus-within:border-cyan-500/60 focus-within:bg-white/[0.08]">
+              <Lock className="h-3 w-3 shrink-0 text-emerald-400" />
+              <input aria-label="Current page address" value={query || activeTab.url} onChange={(event) => setQuery(event.target.value)} className="min-w-0 flex-1 bg-transparent font-mono text-[10px] text-slate-300 outline-none" />
+              <button type="button" onClick={() => setIsBookmarked(!isBookmarked)} className={`rounded p-1 ${isBookmarked ? 'text-amber-400' : 'text-slate-500 hover:text-slate-200'}`}><Star className="h-3 w-3" fill={isBookmarked ? 'currentColor' : 'none'} /></button>
+            </form>
+            <button type="button" onClick={() => openTab('ai', 'Nova Local AI Copilot', 'nova://ai')} className="flex items-center gap-1.5 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-2.5 py-1 text-[10px] font-semibold text-cyan-300 hover:bg-cyan-400/20"><Sparkles className="h-3 w-3" /> AI</button>
+            <button type="button" className="rounded-lg p-1.5 text-slate-500 hover:bg-white/[0.08] hover:text-white"><Terminal className="h-3.5 w-3.5" /></button>
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {activeTab.kind === 'newtab' && (
+              <div className="flex h-full flex-col items-center justify-center px-8 text-center">
+                <div className="mb-8 flex items-center gap-2 text-cyan-300"><span className="flex h-8 w-8 items-center justify-center rounded-xl bg-cyan-400/10"><Compass className="h-4 w-4" /></span><span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em]">Nova workspace</span></div>
+                <div className="font-mono text-5xl font-light tracking-[-0.08em] text-white">13:37</div>
+                <p className="mt-2 text-[11px] text-slate-500">Good afternoon, Explorer</p>
+                <form onSubmit={submitSearch} className="mt-8 flex w-full max-w-md items-center gap-2 rounded-2xl border border-white/[0.1] bg-white/[0.055] p-2 shadow-2xl focus-within:border-cyan-400/50">
+                  <Search className="ml-2 h-4 w-4 text-slate-500" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search or ask Nova AI..." className="min-w-0 flex-1 bg-transparent px-1 text-xs text-white outline-none placeholder:text-slate-600" /><button type="submit" className="rounded-xl bg-cyan-500 px-3 py-2 font-mono text-[10px] font-bold text-slate-950 hover:bg-cyan-400">GO</button>
                 </form>
-              </div>
-
-              {/* Speed Dial Grid */}
-              <div className="w-full max-w-2xl">
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6 sm:gap-4">
-                  {SPEED_DIALS.map((dial) => (
-                    <button
-                      key={dial.title}
-                      type="button"
-                      onClick={() => {
-                        if (dial.targetTab === 'ai') {
-                          handleOpenAiTab(`Explore ${dial.title} integration`);
-                        } else {
-                          setActiveTabId(dial.targetTab);
-                        }
-                      }}
-                      className="group flex flex-col items-center gap-2 rounded-xl border border-slate-200/80 bg-white p-3 shadow-xs transition-all hover:-translate-y-1 hover:border-slate-300 hover:shadow-md cursor-pointer"
-                    >
-                      <div
-                        className="flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-xs"
-                        style={{ backgroundColor: dial.color }}
-                      >
-                        {dial.icon === 'github' && <Code2 className="h-5 w-5" />}
-                        {dial.icon === 'ai' && <Sparkles className="h-5 w-5" />}
-                        {dial.icon === 'globe' && <Globe className="h-5 w-5" />}
-                        {dial.icon === 'terminal' && <Terminal className="h-5 w-5" />}
-                      </div>
-                      <span className="truncate text-xs font-semibold text-slate-700 group-hover:text-[#4338ca]">
-                        {dial.title}
-                      </span>
-                    </button>
-                  ))}
+                <div className="mt-8 grid grid-cols-4 gap-2">
+                  {FAVORITES.map((favorite) => <button type="button" key={favorite.label} onClick={() => openTab(favorite.tab as DemoTab['kind'], favorite.label, favorite.tab === 'github' ? 'github.com/unitybtw/nova-browser' : favorite.tab === 'react' ? 'react.dev' : 'nova://ai')} className="flex w-20 flex-col items-center gap-2 rounded-xl border border-white/[0.08] bg-white/[0.035] p-3 text-[10px] text-slate-500 hover:border-cyan-400/30 hover:text-white"><span className="flex h-7 w-7 items-center justify-center rounded-lg text-xs text-white" style={{ backgroundColor: favorite.color }}>{favorite.icon}</span>{favorite.label}</button>)}
                 </div>
               </div>
-
-              {/* Bottom System Status */}
-              <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-slate-200/60 pt-4 font-mono text-[11px] text-slate-500">
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-indigo-500" />
-                  WebGPU Local AI: Ready (Llama 3.2 3B)
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-cyan-500" />
-                  MCP Bridge: Port 3020 Connected
-                </span>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  Privacy Shield: 42 Trackers Blocked
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: GITHUB REPO VIEW */}
-          {activeTabId === 'github' && (
-            <div className="min-h-full bg-white p-6 sm:p-8 text-left">
-              <div className="flex flex-col gap-4 border-b border-slate-200 pb-5 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-                    <span>unitybtw</span>
-                    <span>/</span>
-                    <span className="text-slate-900 font-bold text-base">nova-browser</span>
-                    <span className="rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-mono text-slate-600">Public</span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-500">The open-source sovereign AI desktop browser for the local-first web.</p>
-                </div>
-                <div className="flex items-center gap-2 font-mono text-xs">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-bold text-slate-700">
-                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-500" />
-                    <span>Star 1,420</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 font-bold text-slate-700">
-                    <GitFork className="h-3.5 w-3.5 text-slate-500" />
-                    <span>Fork 194</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* Code Snippet */}
-              <div className="mt-6 rounded-xl border border-slate-200 bg-slate-900 p-4 font-mono text-xs text-slate-200 shadow-inner">
-                <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-2 text-[11px] text-slate-400">
-                  <span>electron/main.ts (On-Device AI Engine & MCP Router)</span>
-                  <span className="text-emerald-400">0.04ms startup</span>
-                </div>
-                <pre className="overflow-x-auto text-[11px] leading-relaxed text-slate-300">
-{`import { initializeMCPServer, executeLocalInference } from './agent';
-
-export async function handleLocalAgentRequest(prompt: string) {
-  // 100% On-Device WebGPU execution without cloud latency or data logging
-  const mcpSession = await initializeMCPServer({ port: 3020 });
-  return await executeLocalInference({
-    model: 'Llama-3.2-3B-Instruct',
-    prompt,
-    context: window.currentTabContext
-  });
-}`}
-                </pre>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: REACT DOCUMENTATION VIEW */}
-          {activeTabId === 'react' && (
-            <div className="min-h-full bg-white p-6 sm:p-8 text-left">
-              <div className="border-b border-slate-200 pb-4">
-                <span className="font-mono text-xs font-bold text-cyan-600 uppercase tracking-wider">Reference</span>
-                <h2 className="mt-1 text-2xl font-extrabold text-slate-900">React 19 Documentation</h2>
-                <p className="mt-1 text-xs text-slate-500">Learn how Actions, Server Components, and useOptimistic work in React 19.</p>
-              </div>
-
-              <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="font-bold text-slate-900 text-sm">Actions & Form States</h3>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    React 19 includes native support for async transitions in form actions, automatically handling pending states, errors, and optimistic UI updates.
-                  </p>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <h3 className="font-bold text-slate-900 text-sm">use(Promise) & Resource Loading</h3>
-                  <p className="mt-1 text-xs text-slate-600 leading-relaxed">
-                    The use API allows reading the value of resources like Promises or context directly inside components with full Suspense support.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: NOVA AI COPILOT VIEW */}
-          {activeTabId === 'ai' && (
-            <div className="min-h-full bg-white p-6 sm:p-8 text-left">
-              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
-                    <Bot className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-900 text-sm">Nova Local Copilot</h3>
-                    <p className="text-[11px] font-mono text-emerald-600">WebGPU Neural Engine // Zero Cloud Transmission</p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 font-mono text-[10px] font-bold text-indigo-700">
-                  Llama-3.2-3B // 64 tok/s
-                </span>
-              </div>
-
-              <div className="mt-6 space-y-4">
-                {/* User Message */}
-                <div className="flex justify-end">
-                  <div className="max-w-md rounded-2xl bg-[#171717] px-4 py-2.5 text-xs text-white shadow-xs">
-                    {aiPrompt}
-                  </div>
-                </div>
-
-                {/* AI Response Card */}
-                <div className="flex justify-start">
-                  <div className="max-w-lg rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-800 shadow-xs space-y-2.5">
-                    <div className="flex items-center gap-2 font-mono text-[10px] text-indigo-600 font-bold">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Executed on Apple Metal / Vulkan GPU (0.00s network delay)</span>
-                    </div>
-                    <p className="leading-relaxed">
-                      Nova executes quantized WebLLM neural weights directly in the client shader pipeline. Your tabs, passwords, and search sessions are never sent to external servers or telemetry endpoints.
-                    </p>
-                    <div className="flex flex-wrap gap-2 pt-1 font-mono text-[10px]">
-                      <span className="rounded bg-white border border-slate-200 px-2 py-1 text-slate-600">Model: Llama-3.2-3B-Q4F16</span>
-                      <span className="rounded bg-white border border-slate-200 px-2 py-1 text-slate-600">VRAM: 1.8 GB</span>
-                      <span className="rounded bg-emerald-50 border border-emerald-200 px-2 py-1 text-emerald-700">Audit: 100% Private</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+            {activeTab.kind === 'github' && <div className="h-full overflow-auto bg-[#11101a] p-8 text-left"><div className="flex items-center gap-2 text-xs text-slate-500"><span>unitybtw</span><span>/</span><strong className="text-white">nova-browser</strong><span className="rounded-full border border-white/10 px-2 py-0.5 text-[9px]">Public</span></div><h2 className="mt-5 text-2xl font-semibold tracking-tight text-white">The sovereign browser for the local-first web.</h2><p className="mt-2 max-w-xl text-xs leading-relaxed text-slate-500">On-device AI, native tracker blocking, and developer-grade workspaces without sending your thinking to the cloud.</p><div className="mt-8 rounded-xl border border-white/10 bg-[#090a10] p-4 font-mono text-[10px] leading-6 text-slate-400"><span className="text-cyan-400">const</span> nova = <span className="text-violet-300">await</span> createLocalBrowser();<br /><span className="text-slate-600">// WebGPU inference. Zero cloud transmission.</span><br />nova.privacyShield.enable();</div></div>}
+            {activeTab.kind === 'react' && <div className="h-full overflow-auto bg-[#11101a] p-8 text-left"><span className="font-mono text-[10px] uppercase tracking-[0.2em] text-cyan-400">Reference</span><h2 className="mt-3 text-2xl font-semibold text-white">React 19 Documentation</h2><p className="mt-2 max-w-lg text-xs leading-relaxed text-slate-500">Actions, Server Components, and the latest patterns for building resilient interfaces.</p><div className="mt-8 grid gap-3 sm:grid-cols-2"><div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h3 className="text-xs font-semibold text-white">Actions & form states</h3><p className="mt-2 text-[11px] leading-relaxed text-slate-500">Async transitions, pending states, and optimistic updates built into the platform.</p></div><div className="rounded-xl border border-white/10 bg-white/[0.035] p-4"><h3 className="text-xs font-semibold text-white">use(Promise)</h3><p className="mt-2 text-[11px] leading-relaxed text-slate-500">Read resources directly inside components with full Suspense support.</p></div></div></div>}
+            {activeTab.kind === 'ai' && <div className="h-full overflow-auto bg-[#11101a] p-8 text-left"><div className="flex items-center gap-3 border-b border-white/10 pb-5"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10 text-cyan-300"><Sparkles className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold text-white">Nova Local Copilot</h2><p className="mt-1 font-mono text-[9px] text-emerald-400">WEBGPU // ZERO CLOUD TRANSMISSION</p></div></div><div className="mt-7 ml-auto max-w-sm rounded-2xl bg-cyan-500 px-4 py-3 text-xs text-slate-950">Explain how WebGPU on-device inference works in Nova Browser.</div><div className="mt-4 max-w-lg rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-xs leading-relaxed text-slate-300"><p className="mb-3 font-mono text-[9px] font-bold text-cyan-400">LOCAL MODEL // 64 TOK/S</p>Nova executes quantized WebLLM neural weights directly in the client shader pipeline. Your tabs, passwords, and search sessions never leave the device.</div></div>}
+          </div>
+        </main>
       </div>
     </div>
   );

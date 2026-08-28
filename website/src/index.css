@@ -260,7 +260,7 @@ section {
 .browser-demo h5,
 .browser-demo h6,
 .browser-demo .font-serif {
-  font-family: 'Lora', serif;
+  font-family: inherit;
 }
 
 .browser-demo button {
