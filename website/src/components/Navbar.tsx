@@ -25,6 +25,7 @@ const EASE = "power3.out";
 export const Navbar: React.FC = () => {
   const [activeHref, setActiveHref] = useState("#top");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
   const circleRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const tlRefs = useRef<Array<gsap.core.Timeline | null>>([]);
@@ -35,11 +36,20 @@ export const Navbar: React.FC = () => {
   const navItemsRef = useRef<HTMLDivElement | null>(null);
   const logoRef = useRef<HTMLAnchorElement | null>(null);
   const navContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuId = "nova-mobile-menu";
+  const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // ScrollSpy to automatically update active section on scroll
   useEffect(() => {
-    const sectionIds = ["top", "features", "benchmarks", "faq"];
+    const sectionIds = ["features", "community", "benchmarks", "download", "faq"];
     const handleScroll = () => {
+      setIsScrolled(window.scrollY > 24);
+
+      if (window.scrollY < 240) {
+        setActiveHref("#top");
+        return;
+      }
+
       const scrollPos = window.scrollY + 200;
       for (const id of sectionIds) {
         const el = document.getElementById(id);
@@ -54,11 +64,20 @@ export const Navbar: React.FC = () => {
       }
     };
 
+    handleScroll();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  // Close mobile menu when clicking outside
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    if (mobileMenuRef.current) {
+      gsap.killTweensOf(mobileMenuRef.current);
+      gsap.set(mobileMenuRef.current, { display: "none", opacity: 0, y: -15 });
+    }
+  }, []);
+
+  // Close mobile menu when clicking outside.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -66,12 +85,41 @@ export const Navbar: React.FC = () => {
         navContainerRef.current &&
         !navContainerRef.current.contains(e.target as Node)
       ) {
-        setIsMobileMenuOpen(false);
+        closeMobileMenu();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isMobileMenuOpen]);
+  }, [closeMobileMenu, isMobileMenuOpen]);
+
+  // Keep keyboard users and small screens from getting trapped behind the menu.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const restoreMenuState = () => {
+      if (mediaQuery.matches) closeMobileMenu();
+    };
+
+    mediaQuery.addEventListener("change", restoreMenuState);
+    if (!isMobileMenuOpen) {
+      return () => mediaQuery.removeEventListener("change", restoreMenuState);
+    }
+
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileMenu();
+        mobileMenuButtonRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      mediaQuery.removeEventListener("change", restoreMenuState);
+    };
+  }, [closeMobileMenu, isMobileMenuOpen]);
 
   // Layout and GSAP timeline calculation
   const updateLayout = useCallback(() => {
@@ -230,30 +278,22 @@ export const Navbar: React.FC = () => {
   };
 
   const toggleMobileMenu = () => {
-    const newState = !isMobileMenuOpen;
-    setIsMobileMenuOpen(newState);
+    if (isMobileMenuOpen) {
+      closeMobileMenu();
+      return;
+    }
 
+    setIsMobileMenuOpen(true);
     const menu = mobileMenuRef.current;
     if (menu) {
-      if (newState) {
-        gsap.set(menu, { display: "block", opacity: 0, y: -15 });
-        gsap.to(menu, {
-          opacity: 1,
-          y: 0,
-          duration: 0.35,
-          ease: "power3.out"
-        });
-      } else {
-        gsap.to(menu, {
-          opacity: 0,
-          y: -15,
-          duration: 0.25,
-          ease: "power3.in",
-          onComplete: () => {
-            gsap.set(menu, { display: "none" });
-          }
-        });
-      }
+      gsap.killTweensOf(menu);
+      gsap.set(menu, { display: "block", opacity: 0, y: -15 });
+      gsap.to(menu, {
+        opacity: 1,
+        y: 0,
+        duration: 0.35,
+        ease: "power3.out"
+      });
     }
   };
 
@@ -261,7 +301,7 @@ export const Navbar: React.FC = () => {
     <header className="fixed top-4 sm:top-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
       <div ref={navContainerRef} className="relative z-[1000] w-full max-w-4xl mx-auto pointer-events-auto">
         <nav
-          className="w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none"
+          className={`w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none rounded-full transition-all duration-300 ${isScrolled ? 'bg-white/85 shadow-lg ring-1 ring-black/5 backdrop-blur-xl' : ''}`}
           aria-label="Primary Navigation"
         >
           {/* Island 1: Logo Pill */}
@@ -310,9 +350,10 @@ export const Navbar: React.FC = () => {
                       target={item.external ? "_blank" : undefined}
                       rel={item.external ? "noopener noreferrer" : undefined}
                       onClick={() => !item.external && setActiveHref(item.href)}
+                      aria-current={isActive ? 'page' : undefined}
                       onMouseEnter={() => handleEnter(i)}
                       onMouseLeave={() => handleLeave(i)}
-                      className="relative overflow-hidden inline-flex items-center justify-center h-[36px] self-center px-5 no-underline rounded-full box-border font-mono text-xs uppercase tracking-wider font-semibold cursor-pointer transition-colors duration-200 hover:z-10 select-none"
+                      className="relative inline-flex h-[36px] self-center items-center justify-center overflow-hidden rounded-full px-5 font-mono text-xs font-semibold uppercase tracking-wider no-underline transition-colors duration-200 hover:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#171717] select-none"
                       style={{
                         background: PILL_COLOR,
                         color: PILL_TEXT_COLOR
@@ -380,9 +421,12 @@ export const Navbar: React.FC = () => {
 
           {/* Mobile Hamburger Button */}
           <button
+            ref={mobileMenuButtonRef}
+            type="button"
             onClick={toggleMobileMenu}
-            aria-label="Toggle menu"
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
             aria-expanded={isMobileMenuOpen}
+            aria-controls={mobileMenuId}
             className="md:hidden flex items-center justify-center rounded-full transition-transform active:scale-90 shadow-md text-white"
             style={{
               width: "48px",
@@ -396,7 +440,10 @@ export const Navbar: React.FC = () => {
 
         {/* Mobile Menu Dropdown */}
         <div
+          id={mobileMenuId}
           ref={mobileMenuRef}
+          role="region"
+          aria-label="Mobile navigation"
           className="md:hidden absolute top-full left-4 right-4 mt-2 rounded-2xl overflow-hidden shadow-2xl z-[999] hidden border border-white/10"
           style={{
             background: BASE_COLOR
@@ -413,7 +460,7 @@ export const Navbar: React.FC = () => {
                     rel={item.external ? "noopener noreferrer" : undefined}
                     onClick={() => {
                       if (!item.external) setActiveHref(item.href);
-                      toggleMobileMenu();
+                      closeMobileMenu();
                     }}
                     className={`block py-3 px-6 text-xs font-mono font-semibold uppercase tracking-widest rounded-xl transition-all ${
                       isActive
@@ -429,7 +476,7 @@ export const Navbar: React.FC = () => {
             <li className="pt-1 mt-1 border-t border-white/10">
               <a
                 href="#download"
-                onClick={() => toggleMobileMenu()}
+                onClick={closeMobileMenu}
                 className="flex items-center justify-between py-3 px-6 text-xs font-mono font-bold uppercase tracking-widest bg-white text-[#171717] rounded-xl"
               >
                 <span>Get Nova</span>

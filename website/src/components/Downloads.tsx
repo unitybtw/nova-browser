@@ -3,6 +3,7 @@ import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check }
 
 export const Downloads: React.FC = () => {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
   const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'source'>('brew');
 
   const CLI_COMMANDS = {
@@ -11,16 +12,22 @@ export const Downloads: React.FC = () => {
     source: 'git clone https://github.com/unitybtw/nova-browser.git && cd nova-browser && npm install && npm run dev',
   };
 
-  const handleCopy = (tab: 'brew' | 'winget' | 'source') => {
-    navigator.clipboard.writeText(CLI_COMMANDS[tab]);
-    setCopiedTab(tab);
-    setTimeout(() => setCopiedTab(null), 2000);
+  const handleCopy = async (tab: 'brew' | 'winget' | 'source') => {
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(CLI_COMMANDS[tab]);
+      setCopiedTab(tab);
+      setTimeout(() => setCopiedTab(null), 2000);
+    } catch {
+      setCopyError('Copy failed. Select the command manually instead.');
+      setTimeout(() => setCopyError(null), 4000);
+    }
   };
 
   return (
-    <section id="download" className="py-32 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
+    <section id="download" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
-      <div className="text-center max-w-2xl mx-auto mb-16">
+      <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
           GET STARTED TODAY
         </span>
@@ -35,9 +42,9 @@ export const Downloads: React.FC = () => {
       {/* Download Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
         {/* macOS Card */}
-        <div className="p-8 sm:p-10 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs hover:border-neutral-400 transition-colors flex flex-col justify-between group">
+        <div className="group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-8 lg:p-10">
           <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
                 <Apple className="w-6 h-6" />
               </div>
@@ -52,7 +59,7 @@ export const Downloads: React.FC = () => {
             </p>
 
             {/* Architecture Chips */}
-            <div className="flex items-center gap-2 mb-8">
+            <div className="flex flex-wrap items-center gap-2 mb-8">
               <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2.5 py-1 rounded-lg">
                 Apple Silicon (ARM64)
               </span>
@@ -67,9 +74,9 @@ export const Downloads: React.FC = () => {
               href="https://github.com/unitybtw/nova-browser/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-4 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4" aria-hidden="true" />
               <span>Download DMG for Mac</span>
             </a>
             <p className="font-mono text-[11px] text-neutral-500 text-center mt-3">
@@ -79,9 +86,9 @@ export const Downloads: React.FC = () => {
         </div>
 
         {/* Windows Card */}
-        <div className="p-8 sm:p-10 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs hover:border-neutral-400 transition-colors flex flex-col justify-between group">
+        <div className="group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-8 lg:p-10">
           <div>
-            <div className="flex items-center justify-between mb-6">
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
                 <Monitor className="w-6 h-6" />
               </div>
@@ -96,7 +103,7 @@ export const Downloads: React.FC = () => {
             </p>
 
             {/* Architecture Chips */}
-            <div className="flex items-center gap-2 mb-8">
+            <div className="flex flex-wrap items-center gap-2 mb-8">
               <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2.5 py-1 rounded-lg">
                 Windows 10 / 11 (64-bit)
               </span>
@@ -111,9 +118,9 @@ export const Downloads: React.FC = () => {
               href="https://github.com/unitybtw/nova-browser/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full py-4 px-6 rounded-xl bg-[#171717] text-[#fcfbf9] font-mono text-xs font-bold tracking-wider uppercase inline-flex items-center justify-center gap-2 hover:bg-[#4338ca] transition-colors shadow-sm active:scale-[0.98]"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-4 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
             >
-              <Download className="w-4 h-4" />
+              <Download className="w-4 h-4" aria-hidden="true" />
               <span>Download Setup (.EXE)</span>
             </a>
             <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
@@ -174,6 +181,9 @@ export const Downloads: React.FC = () => {
             )}
           </button>
         </div>
+        <p aria-live="polite" className="mt-3 min-h-4 text-center font-mono text-[10px] text-neutral-400">
+          {copyError || (copiedTab === activeCliTab ? 'Command copied to clipboard.' : 'Select the command or copy it with one click.')}
+        </p>
       </div>
 
       {/* Verification badges */}

@@ -55,9 +55,9 @@ export const Faq: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="py-24 px-6 max-w-5xl mx-auto border-t border-[#e5e5e5]">
+    <section id="faq" className="mx-auto max-w-5xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24">
       {/* Section Header */}
-      <div className="text-center max-w-2xl mx-auto mb-16">
+      <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
           TRANSPARENCY & FREQUENTLY ASKED QUESTIONS
         </span>
@@ -81,13 +81,16 @@ export const Faq: React.FC = () => {
               }`}
             >
               <button
+                type="button"
+                id={`faq-trigger-${idx}`}
                 onClick={() => toggleItem(idx)}
                 aria-expanded={isOpen}
-                className="w-full p-6 text-left flex items-center justify-between gap-4 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+                aria-controls={`faq-panel-${idx}`}
+                className="flex w-full items-center justify-between gap-3 p-4 text-left cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] sm:gap-4 sm:p-6"
               >
                 <div className="flex items-center gap-3">
                   <HelpCircle className={`w-4 h-4 shrink-0 transition-colors ${isOpen ? 'text-[#4338ca]' : 'text-neutral-400'}`} />
-                  <span className="font-display font-bold text-base sm:text-lg text-[#171717]">
+                  <span className="font-display font-bold text-sm leading-snug text-[#171717] sm:text-base">
                     {faq.question}
                   </span>
                 </div>
@@ -99,6 +102,9 @@ export const Faq: React.FC = () => {
               <AnimatePresence initial={false}>
                 {isOpen && (
                   <motion.div
+                    id={`faq-panel-${idx}`}
+                    role="region"
+                    aria-labelledby={`faq-trigger-${idx}`}
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}

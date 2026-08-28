@@ -5,67 +5,88 @@ import BrowserDemo from './BrowserDemo';
 
 export const Hero: React.FC = () => {
   return (
-    <section className="relative pt-28 md:pt-36 pb-20 px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+    <section className="relative isolate pt-28 sm:pt-32 md:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
+        <div className="absolute left-1/2 top-[-280px] h-[620px] w-[min(900px,90vw)] -translate-x-1/2 rounded-full bg-indigo-200/35 blur-3xl" />
+        <div className="absolute left-[12%] top-40 h-32 w-32 rounded-full bg-cyan-200/25 blur-3xl" />
+      </div>
+
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#4338ca]/20 bg-[#4338ca]/5 font-mono text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider mb-6"
+        className="inline-flex items-center gap-2 rounded-full border border-[#4338ca]/20 bg-white/75 px-3.5 py-1.5 font-mono text-[10px] sm:text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider shadow-sm backdrop-blur"
       >
-        <span className="w-2 h-2 rounded-full bg-[#4338ca]" />
-        <span>Next-Generation Sovereign Web Browser</span>
+        <span className="relative flex h-2 w-2" aria-hidden="true">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4338ca]/60" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4338ca]" />
+        </span>
+        <span>Open-source browser for the local-first web</span>
       </motion.div>
 
       <motion.h1
         initial={{ opacity: 0, y: 25 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
-        className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.05]"
+        className="mt-7 max-w-5xl font-display text-[clamp(3rem,8vw,7.5rem)] font-black leading-[0.98] tracking-[-0.055em] text-[#171717]"
       >
         Thought at the Speed of{' '}
-        <span className="bg-gradient-to-r from-[#4338ca] to-cyan-500 bg-clip-text text-transparent">Thought.</span>
+        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-500 to-cyan-500 bg-clip-text text-transparent">Thought.</span>
       </motion.h1>
 
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.85, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-6 text-lg sm:text-xl text-[#525252] max-w-2xl font-sans font-normal leading-relaxed"
+        className="mt-6 max-w-2xl text-base sm:text-lg md:text-xl text-[#525252] font-sans leading-relaxed"
       >
-        On-device WebGPU AI, Model Context Protocol server, native ad blocking, and sub-millisecond tab allocation built on Electron & Chromium.
+        A fast, private desktop browser with on-device AI, native tracker blocking, and developer-grade workspaces—without sending your thinking to the cloud.
       </motion.p>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.85, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-10 flex flex-wrap items-center justify-center gap-4 select-none"
+        className="mt-9 flex w-full max-w-xl flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4 select-none"
       >
         <a
           href="#download"
-          className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#171717] text-white font-mono text-sm uppercase tracking-wider font-semibold shadow-lg hover:bg-black hover:scale-105 active:scale-95 transition-all duration-200"
+          className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full bg-[#171717] px-7 py-3.5 text-white font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-[0_12px_30px_rgba(23,23,23,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#4338ca] hover:shadow-[0_16px_34px_rgba(67,56,202,0.25)] active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
         >
-          <Download className="w-4 h-4" />
-          <span>Download for macOS & Windows</span>
+          <Download className="w-4 h-4" aria-hidden="true" />
+          <span>Download Nova</span>
         </a>
 
         <a
           href="https://github.com/unitybtw/nova-browser"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white border border-[#e5e5e5] text-[#171717] font-mono text-sm uppercase tracking-wider font-semibold hover:border-black hover:bg-neutral-50 transition-all duration-200 shadow-sm"
+          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#d9d9df] bg-white/80 px-6 py-3.5 text-[#171717] font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#4338ca]/40 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
         >
-          <Github className="w-4 h-4" />
-          <span>Star on GitHub</span>
-          <ArrowUpRight className="w-3.5 h-3.5 text-[#737373]" />
+          <Github className="w-4 h-4" aria-hidden="true" />
+          <span>Explore the source</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-[#737373]" aria-hidden="true" />
         </a>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.85, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] sm:text-[11px] uppercase tracking-wider text-neutral-500"
+      >
+        <span>MIT licensed</span>
+        <span className="h-1 w-1 rounded-full bg-neutral-300" aria-hidden="true" />
+        <span>No telemetry</span>
+        <span className="h-1 w-1 rounded-full bg-neutral-300" aria-hidden="true" />
+        <span>Runs locally</span>
       </motion.div>
 
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.95, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className="relative w-full max-w-6xl mx-auto mt-14 text-left"
+        transition={{ duration: 0.95, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
+        className="relative mt-12 w-full max-w-6xl mx-auto text-left"
       >
         <BrowserDemo />
       </motion.div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Github,
   Star,
@@ -14,64 +14,79 @@ interface RepoData {
   watchers: number;
   openIssues: number;
   updatedAt: string;
-  isLive: boolean;
 }
 
+type RepoStatus = 'loading' | 'live' | 'error';
+
 export const GithubStats: React.FC = () => {
-  const [repoData, setRepoData] = useState<RepoData>({
-    stars: 1,
-    forks: 0,
-    watchers: 1,
-    openIssues: 0,
-    updatedAt: 'Just now',
-    isLive: false,
-  });
+  const [repoData, setRepoData] = useState<RepoData | null>(null);
+  const [repoStatus, setRepoStatus] = useState<RepoStatus>('loading');
   const [timeframe, setTimeframe] = useState<'7d' | '30d' | 'all'>('30d');
   const [hoveredPoint, setHoveredPoint] = useState<{ date: string; stars: number; index: number } | null>(null);
+  const activeRequestRef = useRef<AbortController | null>(null);
+
+  const fetchRepo = useCallback(async () => {
+    activeRequestRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestRef.current = controller;
+    setRepoStatus('loading');
+    try {
+      const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser', {
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`GitHub API returned ${res.status}`);
+      const json = await res.json();
+      if (controller.signal.aborted) return;
+      setRepoData({
+        stars: json.stargazers_count ?? 0,
+        forks: json.forks_count ?? 0,
+        watchers: json.subscribers_count ?? 0,
+        openIssues: json.open_issues_count ?? 0,
+        updatedAt: json.updated_at ? new Date(json.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Unknown',
+      });
+      setRepoStatus('live');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (!controller.signal.aborted) {
+        setRepoData(null);
+        setRepoStatus('error');
+      }
+    } finally {
+      if (activeRequestRef.current === controller) {
+        activeRequestRef.current = null;
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchRepo = async () => {
-      try {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser');
-        if (res.ok) {
-          const json = await res.json();
-          setRepoData({
-            stars: json.stargazers_count ?? 1,
-            forks: json.forks_count ?? 0,
-            watchers: json.subscribers_count ?? 1,
-            openIssues: json.open_issues_count ?? 0,
-            updatedAt: json.updated_at ? new Date(json.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Today',
-            isLive: true,
-          });
-        }
-      } catch {
-        // Fallback gracefully to default state
-      }
+    void fetchRepo();
+    return () => {
+      activeRequestRef.current?.abort();
+      activeRequestRef.current = null;
     };
-    fetchRepo();
-  }, []);
+  }, [fetchRepo]);
 
   // Simulated Star Growth Trajectory Data based on selected timeframe
   const CHART_DATA = {
     '7d': [
-      { date: 'Day 1', stars: Math.max(1, repoData.stars - 6) },
-      { date: 'Day 2', stars: Math.max(1, repoData.stars - 5) },
-      { date: 'Day 3', stars: Math.max(1, repoData.stars - 4) },
-      { date: 'Day 4', stars: Math.max(1, repoData.stars - 3) },
-      { date: 'Day 5', stars: Math.max(1, repoData.stars - 2) },
-      { date: 'Day 6', stars: Math.max(1, repoData.stars - 1) },
-      { date: 'Today', stars: repoData.stars },
+      { date: 'Day 1', stars: Math.max(1, (repoData?.stars ?? 0) - 6) },
+      { date: 'Day 2', stars: Math.max(1, (repoData?.stars ?? 0) - 5) },
+      { date: 'Day 3', stars: Math.max(1, (repoData?.stars ?? 0) - 4) },
+      { date: 'Day 4', stars: Math.max(1, (repoData?.stars ?? 0) - 3) },
+      { date: 'Day 5', stars: Math.max(1, (repoData?.stars ?? 0) - 2) },
+      { date: 'Day 6', stars: Math.max(1, (repoData?.stars ?? 0) - 1) },
+      { date: 'Today', stars: repoData?.stars ?? 0 },
     ],
     '30d': [
-      { date: 'Week 1', stars: Math.max(1, Math.floor(repoData.stars * 0.2)) },
-      { date: 'Week 2', stars: Math.max(1, Math.floor(repoData.stars * 0.45)) },
-      { date: 'Week 3', stars: Math.max(1, Math.floor(repoData.stars * 0.75)) },
-      { date: 'Week 4', stars: repoData.stars },
+      { date: 'Week 1', stars: Math.max(1, Math.floor((repoData?.stars ?? 0) * 0.2)) },
+      { date: 'Week 2', stars: Math.max(1, Math.floor((repoData?.stars ?? 0) * 0.45)) },
+      { date: 'Week 3', stars: Math.max(1, Math.floor((repoData?.stars ?? 0) * 0.75)) },
+      { date: 'Week 4', stars: repoData?.stars ?? 0 },
     ],
     'all': [
       { date: 'Jul 2026', stars: 1 },
-      { date: 'Aug 2026 (v1.0.0)', stars: Math.max(1, Math.floor(repoData.stars * 0.5)) },
-      { date: 'Current (v1.0.7)', stars: repoData.stars },
+      { date: 'Aug 2026 (v1.0.0)', stars: Math.max(1, Math.floor((repoData?.stars ?? 0) * 0.5)) },
+      { date: 'Current', stars: repoData?.stars ?? 0 },
     ],
   };
 
@@ -105,14 +120,14 @@ export const GithubStats: React.FC = () => {
     ` L ${getCoordinates(0, points[0].stars).x},${svgHeight - paddingY} Z`;
 
   return (
-    <section id="community" className="py-24 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
+    <section id="community" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24">
       {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+      <div className="mb-10 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-6">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+            <span className={`h-2 w-2 rounded-full ${repoStatus === 'live' ? 'bg-emerald-500 animate-ping' : repoStatus === 'loading' ? 'bg-amber-400 animate-pulse' : 'bg-neutral-300'}`} aria-hidden="true" />
             <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-              LIVE GITHUB TELEMETRY
+              {repoStatus === 'live' ? 'LIVE PUBLIC REPOSITORY DATA' : repoStatus === 'loading' ? 'CONNECTING TO PUBLIC API' : 'PUBLIC API UNAVAILABLE'}
             </span>
           </div>
           <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-[#171717] tracking-tight">
@@ -120,14 +135,18 @@ export const GithubStats: React.FC = () => {
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-sm leading-relaxed">
-          Real-time repository metrics and community star growth trajectory streamed directly from the GitHub API.
+          {repoStatus === 'live'
+            ? 'Live repository metrics are read from the public GitHub API. The trend line is an illustrative view based on the current star count, not a historical audit log.'
+            : repoStatus === 'loading'
+              ? 'Connecting to the public GitHub API. Metrics will appear here when the repository responds.'
+              : 'Public GitHub metrics are temporarily unavailable. Open the repository below to view the latest information.'}
         </p>
       </div>
 
       {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+      <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
         {/* Metric 1: Stars */}
-        <div className="p-6 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               STARS
@@ -138,16 +157,16 @@ export const GithubStats: React.FC = () => {
           </div>
           <div>
             <div className="font-display font-black text-3xl sm:text-4xl text-[#171717]">
-              {repoData.stars}
+              {repoData?.stars ?? '—'}
             </div>
-            <span className="font-mono text-[10px] text-emerald-600 font-semibold mt-1 inline-block">
-              {repoData.isLive ? 'Live Synchronized' : 'Public Repo'}
+            <span className={`font-mono text-[10px] font-semibold mt-1 inline-block ${repoStatus === 'live' ? 'text-emerald-600' : 'text-neutral-400'}`}>
+              {repoStatus === 'live' ? 'Public API synchronized' : repoStatus === 'loading' ? 'Loading public data…' : 'Data unavailable'}
             </span>
           </div>
         </div>
 
         {/* Metric 2: Forks */}
-        <div className="p-6 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               FORKS
@@ -158,7 +177,7 @@ export const GithubStats: React.FC = () => {
           </div>
           <div>
             <div className="font-display font-black text-3xl sm:text-4xl text-[#171717]">
-              {repoData.forks}
+              {repoData?.forks ?? '—'}
             </div>
             <span className="font-mono text-[10px] text-neutral-400 mt-1 inline-block">
               Community Forks
@@ -167,7 +186,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 3: License */}
-        <div className="p-6 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LICENSE
@@ -187,7 +206,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 4: Latest Sync */}
-        <div className="p-6 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between">
+        <div className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LAST UPDATE
@@ -198,7 +217,7 @@ export const GithubStats: React.FC = () => {
           </div>
           <div>
             <div className="font-display font-bold text-lg sm:text-xl text-[#171717] truncate">
-              {repoData.updatedAt}
+              {repoData?.updatedAt ?? '—'}
             </div>
             <span className="font-mono text-[10px] text-neutral-400 mt-1 inline-block">
               Active Commits
@@ -207,14 +226,15 @@ export const GithubStats: React.FC = () => {
         </div>
       </div>
 
-      {/* LIVE INTERACTIVE STAR GROWTH CHART */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#e5e5e5] shadow-xs mb-8">
+      {repoStatus === 'live' ? (
+        /* LIVE INTERACTIVE STAR GROWTH CHART */
+        <div className="p-6 sm:p-8 rounded-3xl bg-white border border-[#e5e5e5] shadow-xs mb-8">
         {/* Chart Header & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-neutral-100">
           <div>
             <div className="flex items-center gap-2 text-[#4338ca] font-mono text-xs font-bold uppercase tracking-wider mb-1">
               <TrendingUp className="w-4 h-4" />
-              <span>Repository Stargazers Trajectory</span>
+              <span>Star velocity overview</span>
             </div>
             <h3 className="font-display font-bold text-xl text-[#171717]">
               Star Velocity & Milestone Curve
@@ -255,6 +275,9 @@ export const GithubStats: React.FC = () => {
               <span className="text-amber-400 font-bold">{hoveredPoint.stars} Stars</span>
             </div>
           )}
+          <p aria-live="polite" className="sr-only">
+            {hoveredPoint ? `${hoveredPoint.date}: ${hoveredPoint.stars} stars` : ''}
+          </p>
 
           <svg
             viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -302,21 +325,38 @@ export const GithubStats: React.FC = () => {
             {points.map((p, idx) => {
               const { x, y } = getCoordinates(idx, p.stars);
               const isHovered = hoveredPoint?.index === idx;
+              const selectPoint = () => setHoveredPoint({ date: p.date, stars: p.stars, index: idx });
               return (
-                <g key={idx} className="cursor-pointer">
+                <g
+                  key={idx}
+                  className="cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${p.date}: ${p.stars} stars`}
+                  onMouseEnter={selectPoint}
+                  onFocus={selectPoint}
+                  onBlur={() => setHoveredPoint(null)}
+                  onPointerDown={selectPoint}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      selectPoint();
+                    }
+                  }}
+                >
                   <circle
                     cx={x}
                     cy={y}
                     r={isHovered ? 6 : 4}
                     className="fill-white stroke-[#4338ca] stroke-2 transition-all"
                   />
-                  {/* Invisible Tap Area */}
+                  {/* Larger hit area for pointer and touch users */}
                   <circle
                     cx={x}
                     cy={y}
                     r={18}
                     className="fill-transparent"
-                    onMouseEnter={() => setHoveredPoint({ date: p.date, stars: p.stars, index: idx })}
+                    aria-hidden="true"
                   />
                 </g>
               );
@@ -331,6 +371,40 @@ export const GithubStats: React.FC = () => {
           </div>
         </div>
       </div>
+      ) : (
+        <div className="mb-8 flex min-h-[280px] flex-col items-center justify-center rounded-3xl border border-dashed border-neutral-300 bg-neutral-50 p-8 text-center">
+          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-[#4338ca]">
+            <Activity className="h-6 w-6" aria-hidden="true" />
+          </div>
+          <h3 className="font-display text-xl font-bold text-[#171717]">
+            {repoStatus === 'loading' ? 'Loading public repository data…' : 'Repository data is unavailable'}
+          </h3>
+          <p className="mt-2 max-w-md text-sm leading-relaxed text-neutral-600">
+            {repoStatus === 'loading'
+              ? 'Fetching the latest public metrics from GitHub.'
+              : 'GitHub could not be reached right now. The live chart is hidden so we do not show estimated history as verified data.'}
+          </p>
+          {repoStatus === 'error' && (
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => void fetchRepo()}
+                className="inline-flex min-h-10 items-center rounded-xl bg-[#171717] px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+              >
+                Try again
+              </button>
+              <a
+                href="https://github.com/unitybtw/nova-browser"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 items-center rounded-xl border border-neutral-300 bg-white px-4 py-2 font-mono text-xs font-bold uppercase tracking-wider text-[#171717] transition-colors hover:border-[#4338ca] hover:text-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+              >
+                Open repository
+              </a>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* GitHub Call to Action Bar */}
       <div className="p-6 sm:p-8 rounded-2xl bg-neutral-900 text-[#fcfbf9] flex flex-col sm:flex-row items-center justify-between gap-6">

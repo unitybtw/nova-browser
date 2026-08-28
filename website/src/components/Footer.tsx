@@ -50,7 +50,7 @@ export const Footer: React.FC = () => {
                     href="https://github.com/unitybtw/nova-browser"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-indigo-300 transition-colors flex items-center gap-1.5"
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
                     <Github className="w-3.5 h-3.5" />
                     <span>GitHub Repository</span>
@@ -61,7 +61,7 @@ export const Footer: React.FC = () => {
                     href="https://github.com/unitybtw/nova-browser/releases"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-indigo-300 transition-colors"
+                    className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
                     Releases & Changelog
                   </a>
@@ -71,7 +71,7 @@ export const Footer: React.FC = () => {
                     href="https://github.com/unitybtw/nova-browser/issues"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-indigo-300 transition-colors"
+                    className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
                     Security Audit & Issues
                   </a>
@@ -81,7 +81,7 @@ export const Footer: React.FC = () => {
                     href="https://github.com/unitybtw/nova-browser/blob/main/LICENSE"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="hover:text-indigo-300 transition-colors"
+                    className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
                     MIT License
                   </a>
@@ -98,7 +98,7 @@ export const Footer: React.FC = () => {
             type="button"
             onClick={scrollToTop}
             aria-label="Back to top"
-            className="inline-flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12] cursor-pointer"
           >
             <span>BACK TO TOP</span>
             <ArrowUp className="w-3.5 h-3.5" />

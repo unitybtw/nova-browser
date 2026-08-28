@@ -24,7 +24,33 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
   background-color: #fcfbf9;
+}
+
+::selection {
+  background: rgba(67, 56, 202, 0.18);
+  color: #171717;
+}
+
+:where(a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid #4338ca;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 body {
@@ -129,4 +155,34 @@ body {
   align-items: center !important;
   gap: 0.25rem !important;
   z-index: 10 !important;
+}
+
+.browser-demo-scene {
+  animation: browser-demo-scene-in 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes browser-demo-scene-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.995);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .browser-demo-scene {
+    animation: none;
+  }
+}
+
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }

@@ -52,9 +52,9 @@ const MODULES = [
 
 export const FeatureBento: React.FC = () => {
   return (
-    <section id="features" className="py-32 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
+    <section id="features" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+      <div className="mb-12 flex flex-col gap-5 sm:mb-16 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
             ARCHITECTURE MATRIX
@@ -99,9 +99,9 @@ export const FeatureBento: React.FC = () => {
 
             <div className="mt-8 pt-6 border-t border-[#e5e5e5]/60 flex items-center justify-between font-mono text-xs">
               <span className="text-neutral-400 font-semibold">// {mod.stats}</span>
-              <div className="flex items-center gap-1 text-[#4338ca] font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                <span>INSPECT</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
+              <div className="flex items-center gap-1 text-[#4338ca] font-bold">
+                <span>READY TO EXPLORE</span>
+                <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
               </div>
             </div>
           </motion.div>

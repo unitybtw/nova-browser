@@ -183,9 +183,9 @@ export const Benchmarks: React.FC = () => {
   const savedPercentage = Math.round((savedMemoryEst / chromeMemoryEst) * 100);
 
   return (
-    <section id="benchmarks" className="py-32 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
+    <section id="benchmarks" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
+      <div className="mb-8 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
             EMPIRICAL VALIDATION & COMPARISON
@@ -196,12 +196,12 @@ export const Benchmarks: React.FC = () => {
         </div>
 
         {/* View Mode Toggle Switcher */}
-        <div className="flex items-center gap-1.5 p-1.5 bg-neutral-100 rounded-2xl border border-neutral-200 w-fit">
+        <div className="flex w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 scrollbar-none md:w-fit">
           <button
             type="button"
             onClick={() => setViewMode('benchmarks')}
             aria-pressed={viewMode === 'benchmarks'}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[11px] font-semibold cursor-pointer transition-all duration-200 sm:px-4 sm:text-xs ${
               viewMode === 'benchmarks'
                 ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
                 : 'text-neutral-600 hover:text-neutral-900'
@@ -228,9 +228,9 @@ export const Benchmarks: React.FC = () => {
 
       {/* VIEW 1: INTERACTIVE BENCHMARKS & SLIDER */}
       {viewMode === 'benchmarks' && (
-        <div>
-          {/* CATEGORY SWITCHER TABS */}
-          <div className="flex flex-wrap gap-2 mb-10 p-1.5 bg-neutral-100 rounded-2xl border border-neutral-200 w-fit">
+        <div aria-live="polite">
+          {/* CATEGORY SWITCHER */}
+          <div aria-label="Benchmark categories" className="mb-10 flex w-full gap-2 overflow-x-auto rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 scrollbar-none sm:w-fit">
             {CATEGORIES.map((cat) => {
               const isActive = selectedCategory === cat.id;
               const Icon = cat.icon;
@@ -240,13 +240,13 @@ export const Benchmarks: React.FC = () => {
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
                   aria-pressed={isActive}
-                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
+                  className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 font-mono text-[11px] font-semibold cursor-pointer transition-all duration-200 sm:px-4 sm:text-xs ${
                     isActive
                       ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
                       : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60'
                   }`}
                 >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-400' : 'text-neutral-500'}`} />
+                  <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-400' : 'text-neutral-500'}`} aria-hidden="true" />
                   <span>{cat.title}</span>
                 </button>
               );
@@ -256,7 +256,7 @@ export const Benchmarks: React.FC = () => {
           {/* MAIN BENCHMARK VISUALIZER STAGE */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
             {/* Left Card: Metric Breakdown & Live Bar Comparison */}
-            <div className="lg:col-span-8 p-8 sm:p-10 rounded-3xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between relative overflow-hidden">
+            <div className="lg:col-span-8 rounded-3xl border border-[#e5e5e5] bg-white p-5 shadow-xs sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
@@ -328,7 +328,7 @@ export const Benchmarks: React.FC = () => {
             </div>
 
             {/* Right Card: Giant Key Stat */}
-            <div className="lg:col-span-4 p-8 sm:p-10 rounded-3xl bg-[#171717] text-[#fcfbf9] flex flex-col justify-between relative overflow-hidden shadow-sm border border-neutral-800">
+            <div className="lg:col-span-4 rounded-3xl border border-neutral-800 bg-[#171717] p-5 text-[#fcfbf9] shadow-sm sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
               <div>
                 <div className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 mb-8">
                   <Activity className="w-6 h-6" />
@@ -348,7 +348,7 @@ export const Benchmarks: React.FC = () => {
                 </div>
 
                 <p className="font-sans text-xs text-neutral-300 leading-relaxed">
-                  Measured baseline under isolated test suites. 0% telemetry transmission ensures raw CPU cycles remain dedicated to execution.
+                  Local test baselines vary by hardware, workload, and model. Nova keeps browser AI and privacy processing on-device instead of sending user context to analytics services.
                 </p>
               </div>
 

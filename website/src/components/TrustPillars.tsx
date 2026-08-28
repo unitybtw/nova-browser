@@ -39,8 +39,15 @@ const PILLARS = [
 
 export const TrustPillars: React.FC = () => {
   return (
-    <section className="py-20 px-6 max-w-7xl mx-auto border-t border-[#e5e5e5]">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <section className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 lg:py-24">
+      <div className="mb-10 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4338ca]">Built on your side</span>
+          <h2 className="mt-3 max-w-xl font-display text-3xl font-extrabold tracking-tight text-[#171717] sm:text-4xl">Privacy is the product.</h2>
+        </div>
+        <p className="max-w-md text-sm leading-relaxed text-neutral-600 sm:text-right">A browser should make your device more capable—not make your personal context someone else’s dataset.</p>
+      </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         {PILLARS.map((item, idx) => {
           const Icon = item.icon;
           return (
@@ -50,14 +57,14 @@ export const TrustPillars: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="p-6 sm:p-7 rounded-2xl bg-white border border-[#e5e5e5] shadow-xs flex flex-col justify-between hover:border-neutral-400 transition-colors"
+              className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-7"
             >
               <div>
-                <div className="flex items-center justify-between mb-5">
+              <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 mb-5">
                   <div className="p-2.5 rounded-xl bg-neutral-100 text-[#4338ca] border border-neutral-200/60">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                  <span className="max-w-[58%] text-right font-mono text-[10px] font-bold uppercase tracking-wider text-neutral-400">
                     {item.tag}
                   </span>
                 </div>
