@@ -132,6 +132,44 @@ body {
 /* The real browser is embedded inside the marketing page. Keep its chrome
    independent from the site's layout and never let the optional task card
    cover the new-tab content in this compact presentation. */
+.browser-demo-showcase {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.browser-demo-showcase * {
+  pointer-events: none !important;
+}
+
+.browser-demo-showcase .browser-demo {
+  cursor: default;
+}
+
+.browser-window-dot {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 9999px;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12);
+}
+
+.browser-window-button {
+  display: inline-flex;
+  width: 42px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-family: Arial, sans-serif;
+  font-weight: 400;
+}
+
+.browser-window-close {
+  color: #64748b;
+}
+
 .browser-demo {
   position: relative;
   isolation: isolate;

@@ -3125,7 +3125,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <React.Suspense fallback={null}>
           <SidePanel 
             isOpen={isSidePanelOpen} 
-            onClose={handleCloseSidePanel} 
+            onClose={handleCloseSidePanel}
+            isDemo={demoParams.isDemo && demoParams.feature === 'ai'}
           />
         </React.Suspense>
       </main>

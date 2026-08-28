@@ -12,6 +12,7 @@ import { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
+  isDemo?: boolean;
 }
 
 /** Image waiting to be sent with the next chat turn (data URL form). */
@@ -61,14 +62,15 @@ const readFileAsText = (file: File): Promise<string> =>
 
 export const SidePanel = React.memo(({ 
   isOpen, 
-  onClose
+  onClose,
+  isDemo: demoMode = false,
 }: SidePanelProps) => {
-  const isDemo = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true';
+  const isDemo = demoMode || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true');
   const [messages, setMessages] = useState<ChatCompletionMessageParam[]>(() => {
     if (isDemo) {
       return [
-        { role: 'user', content: 'Can you summarize what makes Nova Browser special?' },
-        { role: 'assistant', content: '**Nova Browser** is an AI-native sovereign web browser:\n\n- **Autonomous Agents**: Full browser control with visual glowing cursor.\n- **Zero-Knowledge Sync**: AES-256-GCM encrypted 1-click device pairing.\n- **Privacy Shield**: Native ad & tracker blocker.\n- **Dual-View Split Screen** and customizable workspaces.' }
+        { role: 'user', content: 'Summarize this page locally. What should I know?' },
+        { role: 'assistant', content: '**Here is the local summary.**\n\nNova Browser keeps the current page context on your device while Nova AI extracts the key points.\n\n- **Local WebGPU inference** — no cloud model request.\n- **Current-tab context** — summarize without leaving the browser.\n- **Private by design** — your prompt and page context stay local.' }
       ];
     }
     return [];
