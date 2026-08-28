@@ -2,6 +2,7 @@ import React from 'react';
 import { Composition } from 'remotion';
 import { NovaPromo } from './NovaPromo';
 import { NovaShorts } from './NovaShorts';
+import { NovaBrowserAd, NovaBrowserAdShorts } from './NovaBrowserAd';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -26,6 +27,28 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
         defaultProps={{}}
+      />
+
+      {/* Browser-first landscape product advertisement (15s, 60fps) */}
+      <Composition
+        id="NovaBrowserAd"
+        component={NovaBrowserAd}
+        durationInFrames={900}
+        fps={60}
+        width={1920}
+        height={1080}
+        defaultProps={{ format: 'landscape' }}
+      />
+
+      {/* Browser-first vertical advertisement for Shorts / Reels (15s, 60fps) */}
+      <Composition
+        id="NovaBrowserAdShorts"
+        component={NovaBrowserAdShorts}
+        durationInFrames={900}
+        fps={60}
+        width={1080}
+        height={1920}
+        defaultProps={{ format: 'vertical' }}
       />
     </>
   );

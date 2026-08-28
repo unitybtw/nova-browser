@@ -25,7 +25,6 @@ const EASE = "power3.out";
 export const Navbar: React.FC = () => {
   const [activeHref, setActiveHref] = useState("#top");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
 
   const circleRefs = useRef<Array<HTMLSpanElement | null>>([]);
   const tlRefs = useRef<Array<gsap.core.Timeline | null>>([]);
@@ -43,8 +42,6 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     const sectionIds = ["features", "community", "benchmarks", "download", "faq"];
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 24);
-
       if (window.scrollY < 240) {
         setActiveHref("#top");
         return;
@@ -301,7 +298,7 @@ export const Navbar: React.FC = () => {
     <header className="fixed top-4 sm:top-6 left-0 right-0 z-50 px-4 flex justify-center pointer-events-none">
       <div ref={navContainerRef} className="relative z-[1000] w-full max-w-4xl mx-auto pointer-events-auto">
         <nav
-          className={`w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none rounded-full transition-all duration-300 ${isScrolled ? 'bg-white/85 shadow-lg ring-1 ring-black/5 backdrop-blur-xl' : ''}`}
+          className="w-full flex items-center justify-between md:justify-center p-2 gap-3 sm:gap-4 select-none"
           aria-label="Primary Navigation"
         >
           {/* Island 1: Logo Pill */}
