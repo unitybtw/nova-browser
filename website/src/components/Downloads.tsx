@@ -6,15 +6,16 @@ export const Downloads: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'source'>('brew');
+  const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'linux' | 'source'>('brew');
 
   const CLI_COMMANDS = {
     brew: 'brew install --cask unitybtw/tap/nova-browser',
     winget: 'winget install NovaBrowser.Nova',
+    linux: 'curl -fsSL https://raw.githubusercontent.com/unitybtw/nova-browser/main/install.sh | bash',
     source: 'git clone https://github.com/unitybtw/nova-browser.git && cd nova-browser && npm install && npm run dev',
   };
 
-  const handleCopy = async (tab: 'brew' | 'winget' | 'source') => {
+  const handleCopy = async (tab: 'brew' | 'winget' | 'linux' | 'source') => {
     setCopyError(null);
     try {
       await navigator.clipboard.writeText(CLI_COMMANDS[tab]);
@@ -43,14 +44,14 @@ export const Downloads: React.FC = () => {
       </div>
 
       {/* Download Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mb-12">
         {/* macOS Card */}
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-8 lg:p-10"
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
         >
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -62,17 +63,17 @@ export const Downloads: React.FC = () => {
               </span>
             </div>
 
-            <h3 className="font-display font-bold text-2xl mb-2 text-[#171717]">macOS</h3>
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">macOS</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Native binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel x86 Macs. Available via Homebrew or direct DMG.
+              Native binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel x86 Macs with Metal GPU acceleration.
             </p>
 
             {/* Architecture Chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-8">
-              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2.5 py-1 rounded-lg">
+            <div className="flex flex-wrap items-center gap-1.5 mb-8">
+              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2 py-0.5 rounded-md">
                 Apple Silicon (ARM64)
               </span>
-              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg">
+              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
                 Intel (x64)
               </span>
             </div>
@@ -83,13 +84,13 @@ export const Downloads: React.FC = () => {
               href="https://github.com/unitybtw/nova-browser/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-4 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
             >
               <Download className="w-4 h-4" aria-hidden="true" />
-              <span>Download DMG for Mac</span>
+              <span>Download DMG</span>
             </a>
-            <p className="font-mono text-[11px] text-neutral-500 text-center mt-3">
-              or run <code className="bg-neutral-100 text-[#171717] px-1.5 py-0.5 rounded text-[10px]">brew install --cask unitybtw/tap/nova-browser</code>
+            <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
+              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">brew install --cask nova-browser</code>
             </p>
           </div>
         </motion.div>
@@ -100,7 +101,7 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-8 lg:p-10"
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
         >
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -112,17 +113,17 @@ export const Downloads: React.FC = () => {
               </span>
             </div>
 
-            <h3 className="font-display font-bold text-2xl mb-2 text-[#171717]">Windows</h3>
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">Windows</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
               Standalone installer for Windows 10 & 11 (64-bit) with direct DirectX 12 & WebGPU hardware bindings.
             </p>
 
             {/* Architecture Chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-8">
-              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2.5 py-1 rounded-lg">
+            <div className="flex flex-wrap items-center gap-1.5 mb-8">
+              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2 py-0.5 rounded-md">
                 Windows 10 / 11 (64-bit)
               </span>
-              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2.5 py-1 rounded-lg">
+              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
                 Vulkan / DX12
               </span>
             </div>
@@ -133,13 +134,63 @@ export const Downloads: React.FC = () => {
               href="https://github.com/unitybtw/nova-browser/releases"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-6 py-4 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
             >
               <Download className="w-4 h-4" aria-hidden="true" />
               <span>Download Setup (.EXE)</span>
             </a>
             <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
-              Also available as standalone Portable .exe (no admin rights required)
+              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">winget install NovaBrowser.Nova</code>
+            </p>
+          </div>
+        </motion.div>
+
+        {/* Linux Card */}
+        <motion.div
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 24 }}
+          whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.2 }}
+          transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
+        >
+          <div>
+            <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
+                <Terminal className="w-6 h-6" />
+              </div>
+              <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+                v1.1.0 // LINUX
+              </span>
+            </div>
+
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">Linux</h3>
+            <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
+              Universal AppImage, Debian/Ubuntu (.deb), and Arch AUR builds with Wayland & Vulkan acceleration.
+            </p>
+
+            {/* Architecture Chips */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-8">
+              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2 py-0.5 rounded-md">
+                AppImage / .deb
+              </span>
+              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
+                Wayland & X11
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <a
+              href="https://github.com/unitybtw/nova-browser/releases"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
+            >
+              <Download className="w-4 h-4" aria-hidden="true" />
+              <span>Download AppImage / .deb</span>
+            </a>
+            <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
+              AUR: <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">yay -S nova-browser-bin</code>
             </p>
           </div>
         </motion.div>
@@ -164,7 +215,7 @@ export const Downloads: React.FC = () => {
 
           {/* CLI Tabs */}
           <div role="tablist" aria-label="Installation methods" className="flex items-center gap-1.5 p-1 bg-neutral-800 rounded-lg">
-            {(['brew', 'winget', 'source'] as const).map((tab) => (
+            {(['brew', 'winget', 'linux', 'source'] as const).map((tab) => (
               <button
                 key={tab}
                 id={`install-tab-${tab}`}
@@ -175,7 +226,7 @@ export const Downloads: React.FC = () => {
                 type="button"
                 onClick={() => setActiveCliTab(tab)}
                 onKeyDown={(event) => {
-                  const methods = ['brew', 'winget', 'source'] as const;
+                  const methods = ['brew', 'winget', 'linux', 'source'] as const;
                   const currentIndex = methods.indexOf(tab);
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
