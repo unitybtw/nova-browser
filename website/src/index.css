@@ -60,30 +60,12 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
-  overscroll-behavior-x: none;
 }
 
-/* A quiet, continuous visual system for the marketing page. */
 #top {
   position: relative;
   isolation: isolate;
-  background-image:
-    radial-gradient(circle at 50% -10%, rgba(99, 102, 241, 0.09), transparent 34rem),
-    linear-gradient(rgba(23, 23, 23, 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 23, 23, 0.018) 1px, transparent 1px);
-  background-size: auto, 44px 44px, 44px 44px;
-  background-position: center, center top, center top;
-}
-
-#top::after {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  content: '';
-  opacity: 0.22;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.22'/%3E%3C/svg%3E");
-  mix-blend-mode: multiply;
+  background-color: #fcfbf9;
 }
 
 section {
@@ -95,28 +77,13 @@ section {
   isolation: isolate;
   overflow: hidden;
   transform: translateZ(0);
-  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 500ms cubic-bezier(0.22, 1, 0.36, 1), border-color 350ms ease;
-}
-
-.luxury-card::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  content: '';
-  opacity: 0;
-  background: radial-gradient(circle at 20% 0%, rgba(99, 102, 241, 0.13), transparent 42%);
-  transition: opacity 500ms ease;
+  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 350ms cubic-bezier(0.22, 1, 0.36, 1), border-color 250ms ease;
 }
 
 .luxury-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-4px);
   border-color: rgba(99, 102, 241, 0.28);
-  box-shadow: 0 22px 55px rgba(67, 56, 202, 0.11);
-}
-
-.luxury-card:hover::before {
-  opacity: 1;
+  box-shadow: 0 16px 36px rgba(67, 56, 202, 0.08);
 }
 
 .luxury-button {
@@ -124,65 +91,12 @@ section {
   isolation: isolate;
   overflow: hidden;
   transform: translateZ(0);
-  transition: transform 350ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 350ms ease, background-color 350ms ease;
-}
-
-.luxury-button::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  content: '';
-  transform: translateX(-105%);
-  background: linear-gradient(110deg, transparent 20%, rgba(255, 255, 255, 0.22) 50%, transparent 80%);
-  transition: transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 250ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 250ms ease, background-color 250ms ease;
 }
 
 .luxury-button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 18px 38px rgba(67, 56, 202, 0.2);
-}
-
-.luxury-button:hover::before {
-  transform: translateX(105%);
-}
-
-.gradient-text-shimmer {
-  background-size: 220% auto;
-  animation: gradient-text-shimmer 6s ease-in-out infinite;
-}
-
-@keyframes gradient-text-shimmer {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-.hero-orb {
-  animation: hero-orb-drift 12s ease-in-out infinite;
-  will-change: transform;
-}
-
-@keyframes hero-orb-drift {
-  0%, 100% { transform: translate3d(-50%, 0, 0) scale(1); }
-  50% { transform: translate3d(-50%, 18px, 0) scale(1.06); }
-}
-
-@keyframes shimmer-line {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(120%); }
-}
-
-.shimmer-line {
-  position: relative;
-  overflow: hidden;
-}
-
-.shimmer-line::after {
-  position: absolute;
-  inset: 0 auto 0 -35%;
-  width: 35%;
-  content: '';
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  animation: shimmer-line 3.8s ease-in-out infinite;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(67, 56, 202, 0.18);
 }
 
 

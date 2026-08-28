@@ -7,9 +7,7 @@ export const Hero: React.FC = () => {
   return (
     <section className="relative isolate pt-28 sm:pt-32 md:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
-        <div className="hero-orb absolute left-1/2 top-[-280px] h-[620px] w-[min(900px,90vw)] -translate-x-1/2 rounded-full bg-indigo-200/35 blur-3xl" />
-        <div className="absolute left-[12%] top-40 h-32 w-32 animate-glow-pulse rounded-full bg-cyan-200/25 blur-3xl" />
-        <div className="absolute right-[10%] top-56 h-24 w-24 animate-glow-pulse rounded-full bg-fuchsia-200/20 blur-3xl [animation-delay:1.5s]" />
+        <div className="absolute left-1/2 top-[-240px] h-[500px] w-[min(800px,85vw)] -translate-x-1/2 rounded-full bg-indigo-100/40 blur-3xl" />
       </div>
 
       <motion.div
@@ -19,7 +17,6 @@ export const Hero: React.FC = () => {
         className="inline-flex items-center gap-2 rounded-full border border-[#4338ca]/20 bg-white/75 px-3.5 py-1.5 font-mono text-[10px] sm:text-[11px] font-semibold text-[#4338ca] uppercase tracking-wider shadow-sm backdrop-blur"
       >
         <span className="relative flex h-2 w-2" aria-hidden="true">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4338ca]/60" />
           <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4338ca]" />
         </span>
         <span>Open-source browser for the local-first web</span>
@@ -32,7 +29,7 @@ export const Hero: React.FC = () => {
         className="mt-7 max-w-5xl font-display text-[clamp(3rem,8vw,7.5rem)] font-black leading-[0.98] tracking-[-0.055em] text-[#171717]"
       >
         Thought at the Speed of{' '}
-        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-500 to-cyan-500 bg-clip-text text-transparent gradient-text-shimmer">Thought.</span>
+        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-600 to-cyan-600 bg-clip-text text-transparent">Thought.</span>
       </motion.h1>
 
       <motion.p
