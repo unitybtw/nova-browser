@@ -2940,6 +2940,7 @@ function App() {
               >
                 <BrowserView 
                   tab={tab} 
+                  onNavigate={handleNavigate}
                   onUpdateTab={handleUpdateTab}
                   onNewTab={handleNewTab}
                   onFoundInPage={handleFoundInPage}
@@ -3046,6 +3047,7 @@ function App() {
             </div>
             <BrowserView 
               tab={secondaryTab}
+              onNavigate={handleNavigate}
               onUpdateTab={handleUpdateTab}
               onNewTab={handleNewTab}
               onFoundInPage={handleFoundInPage}

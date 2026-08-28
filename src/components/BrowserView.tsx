@@ -717,38 +717,37 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   useEffect(() => {
     if (!tab?.url || isNewTab || isSettingsTab || isHistoryTab || isDownloadsTab) return;
-    if (tab.url === lastLoadedUrl.current) return;
     
+    const targetUrl = tab.url;
     const wv = webviewRef.current as any;
     if (!wv) return;
 
     // Check if the webview is already at this URL to prevent duplicate navigation/refresh
     try {
       const currentWvUrl = wv.getURL?.();
-      if (currentWvUrl && (currentWvUrl === tab.url || currentWvUrl.replace(/\/$/, '') === tab.url.replace(/\/$/, ''))) {
-        lastLoadedUrl.current = tab.url;
+      if (currentWvUrl && (currentWvUrl === targetUrl || currentWvUrl.replace(/\/$/, '') === targetUrl.replace(/\/$/, ''))) {
+        lastLoadedUrl.current = targetUrl;
         return;
       }
     } catch (e) {}
 
-    lastLoadedUrl.current = tab.url;
+    lastLoadedUrl.current = targetUrl;
     
-    if (isWebviewReady.current && wv.loadURL) {
-      wv.loadURL(tab.url).catch((err: any) => {
+    if (isWebviewReady.current && typeof wv.loadURL === 'function') {
+      wv.loadURL(targetUrl).catch((err: any) => {
         if (err?.code !== 'ERR_ABORTED') console.error('loadURL failed:', err);
       });
     } else {
-      // If the webview was just created but the user navigated immediately, wait for dom-ready before calling loadURL!
       const pendingLoad = () => {
         wv.removeEventListener('dom-ready', pendingLoad);
-        if (tab?.url) {
-          try {
-            const currentWvUrl = wv.getURL?.();
-            if (currentWvUrl && (currentWvUrl === tab.url || currentWvUrl.replace(/\/$/, '') === tab.url.replace(/\/$/, ''))) {
-              return;
-            }
-          } catch (e) {}
-          if (wv.loadURL) wv.loadURL(tab.url).catch(() => {});
+        try {
+          const currentWvUrl = wv.getURL?.();
+          if (currentWvUrl && (currentWvUrl === targetUrl || currentWvUrl.replace(/\/$/, '') === targetUrl.replace(/\/$/, ''))) {
+            return;
+          }
+        } catch (e) {}
+        if (typeof wv.loadURL === 'function') {
+          wv.loadURL(targetUrl).catch(() => {});
         }
       };
       wv.addEventListener('dom-ready', pendingLoad);
@@ -956,7 +955,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito ? 'incognito' : undefined}
-            src={initialUrlRef.current}
+            src={getSafeUrl(tab.url)}
             className="w-full h-full border-none bg-white"
             allowpopups={"true" as any}
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
