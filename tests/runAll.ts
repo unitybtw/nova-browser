@@ -16,4 +16,5 @@ import './challenger_m4_bundle_empirical';
 import './securityHardening.test';
 import './page_translation.test';
 import './security_regression_audit.test';
+import './ssrf_ip_policy.test';
 import './benchmark_suite';

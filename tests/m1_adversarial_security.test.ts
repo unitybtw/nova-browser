@@ -511,7 +511,7 @@ function simulateIsTrustedSender(
 ): boolean {
   if (!mainWindowObj || mainWindowObj.isDestroyed()) return false;
   if (event.sender.id !== mainWindowObj.webContents.id) return false;
-  if (event.senderFrame && mainWindowObj.webContents.mainFrame && event.senderFrame !== mainWindowObj.webContents.mainFrame) {
+  if (!event.senderFrame || !mainWindowObj.webContents.mainFrame || event.senderFrame !== mainWindowObj.webContents.mainFrame) {
     return false;
   }
   return true;
@@ -540,6 +540,12 @@ const trustedSenderVectors = [
     win: mockMainWindow,
     event: { sender: { id: 100 }, senderFrame: mockMainFrame },
     expected: true
+  },
+  {
+    desc: 'IPC without senderFrame',
+    win: mockMainWindow,
+    event: { sender: { id: 100 } },
+    expected: false
   },
   {
     desc: 'Sender from untrusted webview guest webContents (id 105 != 100)',

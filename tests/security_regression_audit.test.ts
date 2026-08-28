@@ -94,11 +94,7 @@ async function runSecurityRegressionAuditSuite() {
   function isTrustedSender(win: MockBrowserWindow | null, event: MockIpcEvent): boolean {
     if (!win || win.isDestroyed()) return false;
     if (event.sender.id !== win.webContents.id) return false;
-    if (
-      event.senderFrame &&
-      win.webContents.mainFrame &&
-      event.senderFrame !== win.webContents.mainFrame
-    ) {
+    if (!event.senderFrame || !win.webContents.mainFrame || event.senderFrame !== win.webContents.mainFrame) {
       return false;
     }
     return true;
@@ -112,6 +108,16 @@ async function runSecurityRegressionAuditSuite() {
     'Main window main frame IPC allowed by isTrustedSender',
     r1_1_1 === true,
     `Expected true, got ${r1_1_1}`
+  );
+
+  // R1.1.1b: Missing frame metadata is ambiguous and must be rejected.
+  const missingFrameEvt: MockIpcEvent = { sender: { id: 100 } };
+  const r1_1_1b = isTrustedSender(mockMainWindow, missingFrameEvt);
+  record(
+    'R1-IPC-Sender',
+    'IPC without senderFrame rejected by isTrustedSender',
+    r1_1_1b === false,
+    `Expected false, got ${r1_1_1b}`
   );
 
   // R1.1.2: Hostile subframe iframe rejected

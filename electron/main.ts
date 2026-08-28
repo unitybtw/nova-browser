@@ -15,6 +15,7 @@ import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { initializeBlocklist, startPeriodicRefresh, getCurrentBlocklist } from './main/blocklist.js';
+import { isPrivateIP } from './main/ipAddress.js';
 
 // Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
 // We still spoof User-Agent in onBeforeSendHeaders only for Chrome Web Store domains.
@@ -113,7 +114,9 @@ const PHISHING_KEYWORDS = [
 function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
   if (event.sender.id !== mainWindow.webContents.id) return false;
-  if (event.senderFrame && mainWindow.webContents.mainFrame && event.senderFrame !== mainWindow.webContents.mainFrame) {
+  // Electron supplies senderFrame for renderer IPC. Treat a missing frame as
+  // untrusted instead of accepting an ambiguous sender context.
+  if (!event.senderFrame || !mainWindow.webContents.mainFrame || event.senderFrame !== mainWindow.webContents.mainFrame) {
     return false;
   }
   return true;
@@ -1183,13 +1186,16 @@ app.on('web-contents-created', (_event, contents) => {
       (contents as any).removeListener('audio-state-changed', audioListener);
     });
     contents.on('will-navigate', (e, navigationUrl) => {
-      // 0. Prevent dangerous protocols & local file access on webviews
-      const dangerousProtocols = ['file:', 'javascript:', 'data:', 'vbscript:', 'chrome:', 'edge:', 'about:config'];
+      // 0. Prevent dangerous protocols, local file access, and internal
+      // about: pages from being loaded inside untrusted webviews.
       try {
         const parsed = new URL(navigationUrl);
-        if (dangerousProtocols.includes(parsed.protocol) || (!['http:', 'https:', 'about:'].includes(parsed.protocol))) {
+        const allowedProtocols = ['http:', 'https:'];
+        const isAllowedAboutBlank = parsed.protocol === 'about:' && parsed.pathname === 'blank';
+        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank) ||
+            parsed.username || parsed.password) {
           e.preventDefault();
-          console.warn('Blocked navigation to forbidden protocol:', navigationUrl);
+          console.warn('Blocked navigation to forbidden protocol or credential-bearing URL:', navigationUrl);
           return;
         }
       } catch {
@@ -2058,34 +2064,41 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   return true;
 });
 
-// VULN-18: Helper to check if an IP is in a private/reserved range
-function isPrivateIP(ip: string): boolean {
-  if (!ip) return true;
-  // IPv4-mapped IPv6
-  if (ip.startsWith('::ffff:')) {
-    return isPrivateIP(ip.substring(7));
-  }
-  // IPv4 private & reserved ranges
-  if (/^127\./.test(ip)) return true; // Loopback
-  if (/^10\./.test(ip)) return true; // Class A private
-  if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(ip)) return true; // Class B private
-  if (/^192\.168\./.test(ip)) return true; // Class C private
-  if (/^169\.254\./.test(ip)) return true; // Link-local / Cloud Metadata
-  if (/^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(ip)) return true; // CGNAT RFC 6598
-  if (/^0\./.test(ip) || ip === '0.0.0.0') return true;
-  if (/^192\.0\.2\./.test(ip) || /^198\.51\.100\./.test(ip) || /^203\.0\.113\./.test(ip)) return true; // Documentation RFC 5737
-  if (/^192\.0\.0\./.test(ip) || /^192\.88\.99\./.test(ip)) return true; // IETF Protocol Assignments / 6to4 relay
-  if (/^198\.(1[89])\./.test(ip)) return true; // Benchmarking RFC 2544
-  if (/^(22[4-9]|23[0-9])\./.test(ip)) return true; // Multicast RFC 5771
-  if (/^(24[0-9]|25[0-5])\./.test(ip)) return true; // Reserved / Broadcast
-  if (/^255\.255\.255\.255$/.test(ip)) return true;
-  // IPv6 loopback / local / documentation
-  if (ip === '::1' || ip === '::' || ip === '0:0:0:0:0:0:0:1' || ip === '0:0:0:0:0:0:0:0') return true;
-  if (/^(fe80|fc00|fd00|2001:db8):/i.test(ip)) return true;
-  return false;
-}
-
 const dnsLookup = promisify(dns.lookup);
+
+async function validatePreviewUrl(rawUrl: string): Promise<URL | { error: string }> {
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(rawUrl);
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
+    }
+    if (parsedUrl.username || parsedUrl.password) {
+      return { error: 'URLs with embedded credentials are not allowed.' };
+    }
+  } catch {
+    return { error: 'Invalid URL format' };
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+    return { error: 'Requests to local hostnames are blocked.' };
+  }
+
+  try {
+    const addresses = await dnsLookup(hostname, { all: true }) as any;
+    const addrList = Array.isArray(addresses) ? addresses : [addresses];
+    if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address))) {
+      return { error: 'Requests to private/internal IP addresses are blocked.' };
+    }
+  } catch {
+    return { error: 'DNS resolution failed.' };
+  }
+
+  const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
+  if (port === '3020') return { error: 'Requests to MCP server port are blocked.' };
+  return parsedUrl;
+}
 
 const MAX_PREVIEW_HTML_BYTES = 5 * 1024 * 1024;
 
@@ -2161,35 +2174,12 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   const MAX_REDIRECTS = 3;
   
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-    let parsedUrl: URL;
-    try {
-      parsedUrl = new URL(currentUrl);
-      if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
-        return { error: 'Only HTTP/HTTPS protocols are allowed for this operation.' };
-      }
-    } catch (err) {
-      return { error: 'Invalid URL format' };
-    }
-
-    try {
-      const hostname = parsedUrl.hostname.toLowerCase();
-      if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
-        return { error: 'Requests to local hostnames are blocked.' };
-      }
-      const addresses = await dnsLookup(hostname, { all: true }) as any;
-      const addrList = Array.isArray(addresses) ? addresses : [addresses];
-      for (const entry of addrList) {
-        if (isPrivateIP(entry.address)) {
-          return { error: 'Requests to private/internal IP addresses are blocked.' };
-        }
-      }
-      const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
-      if (port === '3020') {
-        return { error: 'Requests to MCP server port are blocked.' };
-      }
-    } catch (err: any) {
-      return { error: 'DNS resolution failed: ' + err.message };
-    }
+    // Validate every hop. Redirects can cross from a public host to localhost,
+    // a private IP, a mapped IPv4 address, or the local MCP port.
+    const validated = await validatePreviewUrl(currentUrl);
+    if (!(validated instanceof URL)) return validated;
+    const parsedUrl = validated;
+    currentUrl = parsedUrl.href;
 
     try {
       const res = await fetch(currentUrl, {

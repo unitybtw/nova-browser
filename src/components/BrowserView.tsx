@@ -137,7 +137,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   useEffect(() => {
     const webview = webviewRef.current;
-    if (!webview || !tab?.id) return;
+    if (!webview || !tab?.id || tab.isSuspended) return;
 
     const handleDomReady = async () => {
       let wcId = undefined;
@@ -667,7 +667,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('ipc-message', handleIpcMessage);
       webview.removeEventListener('console-message', handleConsoleMessage);
     };
-  }, [tab?.id, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
+  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;

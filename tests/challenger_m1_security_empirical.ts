@@ -89,11 +89,7 @@ async function runChallenger2EmpiricalTests() {
   ): boolean {
     if (!win || win.isDestroyed()) return false;
     if (event.sender.id !== win.webContents.id) return false;
-    if (
-      event.senderFrame &&
-      win.webContents.mainFrame &&
-      event.senderFrame !== win.webContents.mainFrame
-    ) {
+    if (!event.senderFrame || !win.webContents.mainFrame || event.senderFrame !== win.webContents.mainFrame) {
       return false;
     }
     return true;
@@ -110,6 +106,16 @@ async function runChallenger2EmpiricalTests() {
     'Main window main frame IPC allowed',
     res1_1 === true,
     `Expected true, got ${res1_1}`
+  );
+
+  // Scenario 1.1b: Ambiguous IPC without a senderFrame is rejected.
+  const missingFrameEvent: MockIpcEvent = { sender: { id: 1 } };
+  const res1_1b = isTrustedSenderImpl(mockMainWindow, missingFrameEvent);
+  record(
+    'isTrustedSender',
+    'IPC without senderFrame rejected',
+    res1_1b === false,
+    `Missing senderFrame rejected cleanly (got ${res1_1b})`
   );
 
   // Scenario 1.2: Hostile IPC from embedded subframe (iframe) inside main window
