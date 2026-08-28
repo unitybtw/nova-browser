@@ -121,8 +121,6 @@
     "pack:mac": "npm run build && electron-builder --mac",
     "dev:website": "npm --prefix website run dev",
     "build:website": "npm --prefix website run build",
-    "dev:v2": "npm --prefix site-v2 run dev",
-    "build:v2": "npm --prefix site-v2 run build",
     "video:preview": "remotion preview video/src/index.ts",
     "video:render": "remotion render video/src/index.ts NovaPromo video/out/nova-promo.mp4",
     "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
