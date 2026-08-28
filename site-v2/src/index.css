@@ -1,0 +1,133 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg-base: #0d0f17;
+  --color-bg-surface: #141724;
+  --color-bg-card: #1a1e2f;
+  --color-border-dim: #252a3f;
+  --color-border-bright: #3d4466;
+
+  --color-cobalt: #4f46e5;
+  --color-cobalt-glow: #6366f1;
+  --color-emerald-verified: #10b981;
+  --color-cyan-tensor: #06b6d4;
+
+  --font-display: 'Plus Jakarta Sans', 'Space Grotesk', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+html, body {
+  overflow-x: clip;
+  background-color: #0d0f17;
+  color: #f1f3f9;
+  font-family: var(--font-sans);
+  scroll-behavior: smooth;
+  scroll-padding-top: 6rem;
+}
+
+/* Impeccable Rule: Typography Purity — Roman Headings Only */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-style: normal;
+  letter-spacing: -0.03em;
+  font-weight: 800;
+}
+
+/* Measure limit for comfortable readability */
+p {
+  max-width: 68ch;
+}
+
+/* Single-elevation clean surface */
+.surface-panel {
+  background-color: #141724;
+  border: 1px solid #252a3f;
+  border-radius: 1rem;
+  transition: border-color 200ms ease, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.surface-panel:hover {
+  border-color: #3d4466;
+}
+
+/* Primary Action Button — 44px min height, unmistakable click target */
+.action-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.75rem 1.75rem;
+  border-radius: 0.75rem;
+  background-color: #4f46e5;
+  color: #ffffff;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.action-btn-primary:hover {
+  background-color: #4338ca;
+  transform: translateY(-1px);
+}
+
+.action-btn-primary:active {
+  transform: scale(0.98);
+}
+
+.action-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.75rem;
+  background-color: #1a1e2f;
+  color: #e2e8f0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid #252a3f;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.action-btn-secondary:hover {
+  background-color: #252a3f;
+  border-color: #3d4466;
+  color: #ffffff;
+}
+
+.action-btn-secondary:active {
+  transform: scale(0.98);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0d0f17;
+}
+::-webkit-scrollbar-thumb {
+  background: #252a3f;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3d4466;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
