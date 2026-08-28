@@ -131,19 +131,55 @@ export const BrowserDemo: React.FC = () => {
       {/* Main Browser Window Body */}
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {/* Horizontal Tab Bar */}
-        <div className="flex items-center gap-1.5 border-b border-slate-200/80 bg-slate-100/80 px-2 pt-2 overflow-x-auto scrollbar-none">
+        <div
+          role="tablist"
+          aria-label="Browser tabs"
+          className="flex items-center gap-1.5 border-b border-slate-200/80 bg-slate-100/80 px-2 pt-2 overflow-x-auto scrollbar-none"
+        >
           {tabs.map((tab) => {
             const isActive = tab.id === activeTabId;
             return (
-              <button
+              <div
                 key={tab.id}
-                type="button"
-                onClick={() => setActiveTabId(tab.id)}
-                className={`group relative flex h-9 max-w-[220px] min-w-[130px] items-center gap-2 rounded-t-lg px-3 text-xs font-medium transition-all ${
+                role="presentation"
+                className={`group relative flex min-h-11 max-w-[220px] min-w-[130px] items-center rounded-t-lg transition-all ${
                   isActive
                     ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/60'
                     : 'text-slate-500 hover:bg-slate-200/60 hover:text-slate-800'
                 }`}
+              >
+                <div
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls="browser-panel"
+                  id={`browser-tab-${tab.id}`}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setActiveTabId(tab.id)}
+                  onKeyDown={(event) => {
+                    const tabIndex = tabs.findIndex((item) => item.id === tab.id);
+                    let nextTabIndex: number | null = null;
+
+                    if (event.key === 'ArrowRight') {
+                      nextTabIndex = (tabIndex + 1) % tabs.length;
+                    } else if (event.key === 'ArrowLeft') {
+                      nextTabIndex = (tabIndex - 1 + tabs.length) % tabs.length;
+                    } else if (event.key === 'Home') {
+                      nextTabIndex = 0;
+                    } else if (event.key === 'End') {
+                      nextTabIndex = tabs.length - 1;
+                    } else if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      setActiveTabId(tab.id);
+                      return;
+                    }
+
+                    if (nextTabIndex === null) return;
+                    event.preventDefault();
+                    const nextTab = tabs[nextTabIndex];
+                    setActiveTabId(nextTab.id);
+                    document.getElementById(`browser-tab-${nextTab.id}`)?.focus();
+                  }}
+                  className="relative flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-t-lg px-3 pr-11 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-inset"
               >
                 {/* Active Top Accent Line */}
                 {isActive && (
@@ -167,17 +203,19 @@ export const BrowserDemo: React.FC = () => {
                 {/* Tab Title */}
                 <span className="truncate text-left text-xs font-medium">{tab.title}</span>
 
-                {/* Close Button */}
-                {tabs.length > 1 && (
-                  <span
-                    onClick={(e) => handleCloseTab(tab.id, e)}
-                    className="ml-auto rounded p-0.5 opacity-0 group-hover:opacity-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-opacity"
-                    title="Close tab"
-                  >
-                    <X className="h-3 w-3" />
-                  </span>
-                )}
-              </button>
+              </div>
+
+              {tabs.length > 1 && (
+                <button
+                  type="button"
+                  onClick={(event) => handleCloseTab(tab.id, event)}
+                  className="absolute right-1 flex h-9 w-9 shrink-0 items-center justify-center rounded opacity-0 group-hover:opacity-100 hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-opacity focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+                  aria-label={`Close ${tab.title} tab`}
+                >
+                  <X className="h-3 w-3" aria-hidden="true" />
+                </button>
+              )}
+            </div>
             );
           })}
 
@@ -185,8 +223,8 @@ export const BrowserDemo: React.FC = () => {
           <button
             type="button"
             onClick={handleAddTab}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800"
-            title="New Tab"
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+            aria-label="Open new tab"
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -199,33 +237,34 @@ export const BrowserDemo: React.FC = () => {
             <button
               type="button"
               onClick={() => setActiveTabId('newtab')}
-              className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
-              title="Back to Home"
+              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+              aria-label="Back to home"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               type="button"
-              className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors text-slate-300"
+              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+              aria-label="Forward"
               disabled
             >
-              <ArrowRight className="h-4 w-4" />
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={() => {}}
-              className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
-              title="Reload page"
+              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+              aria-label="Reload page"
             >
-              <RotateCw className="h-3.5 w-3.5" />
+              <RotateCw className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
             <button
               type="button"
               onClick={() => setActiveTabId('newtab')}
-              className="flex h-7 w-7 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors"
-              title="Home"
+              className="flex h-11 w-11 items-center justify-center rounded hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+              aria-label="Home"
             >
-              <Home className="h-3.5 w-3.5" />
+              <Home className="h-3.5 w-3.5" aria-hidden="true" />
             </button>
           </div>
 
@@ -236,6 +275,8 @@ export const BrowserDemo: React.FC = () => {
           >
             <Lock className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
             <input
+              id="browser-address"
+              aria-label="Current page address"
               type="text"
               value={activeTab.url}
               readOnly
@@ -248,8 +289,9 @@ export const BrowserDemo: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsBookmarked(!isBookmarked)}
-                className={`rounded p-0.5 transition-colors hover:text-amber-500 ${isBookmarked ? 'text-amber-500' : 'text-slate-400'}`}
-                title="Bookmark tab"
+                className={`flex min-h-11 min-w-11 items-center justify-center rounded p-0.5 transition-colors hover:text-amber-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${isBookmarked ? 'text-amber-500' : 'text-slate-400'}`}
+                aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark current tab'}
+                aria-pressed={isBookmarked}
               >
                 <Star className="h-3.5 w-3.5" fill={isBookmarked ? 'currentColor' : 'none'} />
               </button>
@@ -262,7 +304,9 @@ export const BrowserDemo: React.FC = () => {
             <button
               type="button"
               onClick={() => handleOpenAiTab()}
-              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              aria-label="Open Nova AI assistant"
+              aria-pressed={activeTabId === 'ai'}
+              className={`flex min-h-11 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
                 activeTabId === 'ai'
                   ? 'bg-[#4338ca] text-white border-[#4338ca]'
                   : 'bg-indigo-50 border-indigo-200/80 text-[#4338ca] hover:bg-indigo-100'
@@ -276,12 +320,13 @@ export const BrowserDemo: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsShieldActive(!isShieldActive)}
-              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+              aria-label={isShieldActive ? 'Pause Privacy Shield' : 'Enable Privacy Shield'}
+              aria-pressed={isShieldActive}
+              className={`flex min-h-11 items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
                 isShieldActive
                   ? 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
                   : 'bg-slate-100 border-slate-200 text-slate-500'
               }`}
-              title="Toggle Privacy Shield"
             >
               <ShieldCheck className={`h-3.5 w-3.5 ${isShieldActive ? 'text-emerald-600' : 'text-slate-400'}`} />
               <span className="hidden sm:inline">{isShieldActive ? 'Shield' : 'Paused'}</span>
@@ -291,16 +336,16 @@ export const BrowserDemo: React.FC = () => {
             <button
               type="button"
               onClick={() => handleOpenAiTab('List installed extensions and MCP servers')}
-              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-              title="Extensions"
+              aria-label="Open extensions"
+              className="flex h-11 w-11 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
             >
               <Puzzle className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={() => handleOpenAiTab('Open browser settings and performance preferences')}
-              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
-              title="Settings"
+              aria-label="Open browser settings"
+              className="flex h-11 w-11 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
             >
               <Settings className="h-3.5 w-3.5" />
             </button>
@@ -308,7 +353,12 @@ export const BrowserDemo: React.FC = () => {
         </div>
 
         {/* Viewport Content Area */}
-        <div className="h-[460px] sm:h-[520px] w-full overflow-y-auto bg-slate-50/50">
+        <div
+          id="browser-panel"
+          role="tabpanel"
+          aria-labelledby={`browser-tab-${activeTabId}`}
+          className="h-[460px] w-full overflow-y-auto bg-slate-50/50 sm:h-[520px]"
+        >
           {/* TAB 1: NEW TAB PAGE */}
           {activeTabId === 'newtab' && (
             <div className="flex min-h-full flex-col items-center justify-between p-6 text-center sm:p-10">
@@ -330,16 +380,20 @@ export const BrowserDemo: React.FC = () => {
                 >
                   <Search className="h-4 w-4 shrink-0 text-slate-400" />
                   <input
+                    id="browser-search"
+                    aria-label="Search or ask Nova AI"
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search or ask Nova AI with @ai..."
-                    className="w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
+                    className="min-w-0 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400"
                   />
                   <button
                     type="button"
                     onClick={() => setIsAiMode(!isAiMode)}
-                    className={`rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase transition-colors ${
+                    aria-label="Toggle Nova AI search mode"
+                    aria-pressed={isAiMode}
+                    className={`flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
                       isAiMode
                         ? 'bg-[#4338ca] text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -347,14 +401,19 @@ export const BrowserDemo: React.FC = () => {
                   >
                     @ai
                   </button>
-                  <button type="button" className="text-slate-400 hover:text-slate-600">
-                    <Mic className="h-4 w-4" />
+                  <button
+                    type="button"
+                    aria-label="Voice search"
+                    className="flex min-h-11 min-w-11 items-center justify-center rounded text-slate-400 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+                  >
+                    <Mic className="h-4 w-4" aria-hidden="true" />
                   </button>
                   <button
                     type="submit"
-                    className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-[#4338ca] transition-colors"
+                    aria-label="Submit search"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-[#4338ca] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
                   >
-                    <CornerDownLeft className="h-3.5 w-3.5" />
+                    <CornerDownLeft className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </form>
               </div>

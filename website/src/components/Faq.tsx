@@ -96,11 +96,11 @@ export const Faq: React.FC = () => {
                     {faq.question}
                   </span>
                 </div>
-                <span className={`hidden shrink-0 rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.12em] sm:inline-flex ${isOpen ? 'border-indigo-100 bg-indigo-50 text-[#4338ca]' : 'border-neutral-200 bg-neutral-50 text-neutral-400'}`}>
+                <span className={`hidden shrink-0 rounded-full border px-2.5 py-1 font-mono text-[9px] font-bold tracking-[0.12em] sm:inline-flex ${isOpen ? 'border-indigo-100 bg-indigo-50 text-[#4338ca]' : 'border-neutral-200 bg-neutral-50 text-[#525252]'}`}>
                   {faq.category}
                 </span>
-                <div className={`p-1.5 rounded-lg bg-neutral-100 shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-300'} ${isOpen ? 'rotate-180 bg-indigo-50 text-[#4338ca]' : 'text-neutral-500'}`}>
-                  <ChevronDown className="w-4 h-4" />
+                <div className={`p-1.5 rounded-lg bg-neutral-100 shrink-0 ${prefersReducedMotion ? '' : 'transition-transform duration-300'} ${isOpen ? 'rotate-180 bg-indigo-50 text-[#4338ca]' : 'text-[#525252]'}`}>
+                  <ChevronDown aria-hidden="true" className="w-4 h-4" />
                 </div>
               </button>
 

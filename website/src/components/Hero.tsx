@@ -38,7 +38,7 @@ export const Hero: React.FC = () => {
         className="mt-7 max-w-5xl font-display text-[clamp(3rem,8vw,7.5rem)] font-black leading-[0.98] tracking-[-0.055em] text-[#171717]"
       >
         Thought at the Speed of{' '}
-        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-600 to-cyan-600 bg-clip-text text-transparent">Thought.</span>
+        <span className="text-[#4338ca]">Thought.</span>
       </motion.h1>
 
       <motion.p

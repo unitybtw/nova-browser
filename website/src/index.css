@@ -9,9 +9,9 @@
   --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
   --color-accent-text: var(--nova-accent-text, #ffffff);
 
-  --font-serif: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-display: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
 
   --color-cream: #fcfbf9;
@@ -22,19 +22,34 @@
   --color-surface-container: #efeeec;
 }
 
+:root {
+  --nova-canvas: #fcfbf9;
+  --nova-surface: #ffffff;
+  --nova-text: #171717;
+  --nova-accent: #4338ca;
+  --nova-border: #e5e5e5;
+  --nova-focus: #4338ca;
+  --nova-terminal: #0c0d12;
+}
+
+.nova-page {
+  background-color: var(--nova-canvas);
+  color: var(--nova-text);
+}
+
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 6rem;
-  background-color: #fcfbf9;
+  background-color: var(--nova-canvas);
 }
 
 ::selection {
   background: rgba(67, 56, 202, 0.18);
-  color: #171717;
+  color: var(--nova-text);
 }
 
 :where(a, button, input, select, textarea, [role="button"]):focus-visible {
-  outline: 2px solid #4338ca;
+  outline: 2px solid var(--nova-focus);
   outline-offset: 3px;
 }
 
@@ -43,20 +58,19 @@ html {
     scroll-behavior: auto;
   }
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
+  .hero-scroll-line > span,
+  .animate-spin-slow,
+  .animate-glow-pulse,
+  .animate-blink-cursor,
+  .animate-border-shimmer {
+    animation: none !important;
   }
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #fcfbf9;
-  color: #171717;
+  background-color: var(--nova-canvas);
+  color: var(--nova-text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   overflow-x: hidden;
@@ -65,7 +79,7 @@ body {
 #top {
   position: relative;
   isolation: isolate;
-  background-color: #fcfbf9;
+  background-color: var(--nova-canvas);
 }
 
 #top > main,
@@ -211,7 +225,7 @@ section {
 }
 
 .hairline-border {
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--nova-border);
 }
 
 /* Mac traffic lights */
@@ -230,7 +244,7 @@ section {
   width: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #fcfbf9;
+  background: var(--nova-canvas);
 }
 ::-webkit-scrollbar-thumb {
   background: #d4d4d8;
@@ -296,7 +310,7 @@ section {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   user-select: none;
 }
 

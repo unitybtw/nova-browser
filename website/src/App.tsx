@@ -1,17 +1,105 @@
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
-import GithubStats from './components/GithubStats';
-import Benchmarks from './components/Benchmarks';
-import Downloads from './components/Downloads';
-import Faq from './components/Faq';
 import Footer from './components/Footer';
 import ScrollProgress from './components/ScrollProgress';
 
+const GithubStats = lazy(() => import('./components/GithubStats'));
+const Benchmarks = lazy(() => import('./components/Benchmarks'));
+const Downloads = lazy(() => import('./components/Downloads'));
+const Faq = lazy(() => import('./components/Faq'));
+const DEFERRED_SECTION_IDS = new Set(['community', 'benchmarks', 'download', 'faq']);
+
+function DeferredContentReady() {
+  useEffect(() => {
+    const hashTarget = window.location.hash.slice(1);
+    if (!DEFERRED_SECTION_IDS.has(hashTarget)) return;
+
+    requestAnimationFrame(() => {
+      document.getElementById(hashTarget)?.scrollIntoView({ block: 'start' });
+    });
+  }, []);
+
+  return null;
+}
+
+function DeferredContent() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto min-h-[32rem] max-w-7xl" aria-hidden="true" />
+      }
+    >
+      <GithubStats />
+      <Benchmarks />
+      <Downloads />
+      <Faq />
+      <DeferredContentReady />
+    </Suspense>
+  );
+}
+
+function DeferredSections() {
+  const deferredSectionsRef = useRef<HTMLDivElement>(null);
+  const [shouldLoad, setShouldLoad] = useState(false);
+
+  useEffect(() => {
+    const loadSections = () => setShouldLoad(true);
+
+    if (DEFERRED_SECTION_IDS.has(window.location.hash.slice(1))) {
+      loadSections();
+    }
+
+    const handleHashChange = () => {
+      const hashTarget = window.location.hash.slice(1);
+      if (!DEFERRED_SECTION_IDS.has(hashTarget)) return;
+
+      loadSections();
+      requestAnimationFrame(() => {
+        document.getElementById(hashTarget)?.scrollIntoView({ block: 'start' });
+      });
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
+    const deferredSections = deferredSectionsRef.current;
+    if (!deferredSections || !('IntersectionObserver' in window)) {
+      loadSections();
+      return () => window.removeEventListener('hashchange', handleHashChange);
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadSections();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '1200px 0px' },
+    );
+    observer.observe(deferredSections);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, []);
+
+  return (
+    <div ref={deferredSectionsRef}>
+      {shouldLoad ? (
+        <DeferredContent />
+      ) : (
+        <div className="mx-auto min-h-[32rem] max-w-7xl" aria-hidden="true" />
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <div id="top" className="relative min-h-screen overflow-x-hidden bg-[#fcfbf9] text-[#171717] selection:bg-[#4338ca] selection:text-white">
+    <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
       <ScrollProgress />
       <a
         href="#main-content"
@@ -24,10 +112,7 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <GithubStats />
-        <Benchmarks />
-        <Downloads />
-        <Faq />
+        <DeferredSections />
       </main>
       <Footer />
     </div>

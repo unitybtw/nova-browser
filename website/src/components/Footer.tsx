@@ -138,7 +138,7 @@ export const Footer: React.FC = () => {
               fontSize="125"
               fontWeight="900"
               letterSpacing="-0.04em"
-              style={{ fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif" }}
+              style={{ fontFamily: "'IBM Plex Sans', system-ui, sans-serif" }}
               textLength="1000"
               lengthAdjust="spacingAndGlyphs"
               className="select-none"
