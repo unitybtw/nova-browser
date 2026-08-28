@@ -49,6 +49,7 @@ import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
+import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from './utils/verticalTabs';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -206,10 +207,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
       if (demoParams.feature === 'vertical_tabs') {
         return [
-          { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', isLoading: false },
-          { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', isLoading: false },
+          { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', folderId: 'f1', isLoading: false },
+          { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', folderId: 'f1', isLoading: false },
           { id: '3', url: 'https://spotify.com', title: 'Spotify Web (Playing)', isMuted: false, workspaceId: 'default', isLoading: false },
-          { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', isLoading: false }
+          { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', folderId: 'f2', isLoading: false }
         ];
       }
       if (demoParams.feature === 'split') {
@@ -275,8 +276,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [folders, setFolders] = useState<Folder[]>(() => {
     if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
       return [
-        { id: 'f1', name: 'Frontend Stack', color: '#3b82f6', isOpen: true, tabIds: ['1', '2'] },
-        { id: 'f2', name: 'Research Papers', color: '#a855f7', isOpen: false, tabIds: ['4'] }
+        { id: 'f1', name: 'Frontend Stack', isExpanded: true, workspaceId: 'default' },
+        { id: 'f2', name: 'Research Papers', isExpanded: false, workspaceId: 'default' }
       ];
     }
     const saved = localStorage.getItem('folders_session');
@@ -324,6 +325,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       localStorage.setItem('active_workspace_session', activeWorkspaceId);
     } catch (e) {}
   }, [workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (workspaces.length === 0) return;
+    if (!workspaces.some(workspace => workspace.id === activeWorkspaceId)) {
+      setActiveWorkspaceId(workspaces[0].id);
+    }
+  }, [workspaces, activeWorkspaceId]);
+
+  useEffect(() => {
+    const visibleWorkspaceTabs = tabs.filter(tab =>
+      (tab.workspaceId || 'default') === activeWorkspaceId
+    );
+    if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
+      setActiveTabId(visibleWorkspaceTabs[0].id);
+    }
+  }, [tabs, activeTabId, activeWorkspaceId]);
+
+  useEffect(() => {
+    setTabs(prevTabs => repairTabFolderAssignments(prevTabs, folders));
+  }, [folders]);
 
   // AI Assistant State
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => {
@@ -1044,17 +1065,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
-    if (draggedId === targetId) return;
-    setTabs(prevTabs => {
-      const draggedIdx = prevTabs.findIndex(t => t.id === draggedId);
-      const targetIdx = prevTabs.findIndex(t => t.id === targetId);
-      if (draggedIdx === -1 || targetIdx === -1) return prevTabs;
-
-      const newTabs = [...prevTabs];
-      const [removed] = newTabs.splice(draggedIdx, 1);
-      newTabs.splice(targetIdx, 0, removed);
-      return newTabs;
-    });
+    const nextTabs = reorderTabsWithinGroup(tabsRef.current, draggedId, targetId);
+    if (nextTabs !== tabsRef.current) setTabs(nextTabs);
   }, []);
 
   const handleReorderFullList = useCallback((reorderedWorkspaceTabs: Tab[]) => {
@@ -1347,8 +1359,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   const handleMoveTabToFolder = useCallback((tabId: string, folderId?: string) => {
-    setTabs(prev => prev.map(t => t.id === tabId ? { ...t, folderId } : t));
-  }, []);
+    const targetTab = tabsRef.current.find(tab => tab.id === tabId);
+    if (!targetTab) return;
+
+    if (!canMoveTabToFolder(targetTab, folderId, folders)) return;
+
+    setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, folderId } : tab));
+  }, [folders]);
 
   const handleNewTab = useCallback((url?: string | any) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
@@ -1508,42 +1525,48 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     const isInternalPage = !!newTitle;
 
-    setTabs(prev => {
-      if (prev.length === 0) {
-        const newTabId = Date.now().toString();
-        setActiveTabId(newTabId);
-        return [{
-          id: newTabId,
-          url,
-          title: newTitle || 'New Tab',
-          isLoading: !isInternalPage,
-          canGoBack: false,
-          canGoForward: false
-        }];
-      }
+    // All side effects (active-tab selection, webview reload) are computed from
+    // tabsRef OUTSIDE the setState updater so the updater stays pure
+    // (StrictMode double-invokes updater functions; calling setActiveTabId
+    // inside one is a render-phase update anti-pattern).
+    const prev = tabsRef.current;
 
-      const activeTab = prev.find(t => t.id === activeTabId) || prev[0];
-      const targetId = activeTab ? activeTab.id : prev[0].id;
-      if (targetId !== activeTabId) {
-        setActiveTabId(targetId);
-      }
-
-      if (activeTab && activeTab.url === url) {
-        // URL is exactly the same, force a reload if it's a webview
-        if (!isInternalPage) {
-          const webview = document.querySelector(`webview[data-tab-id="${targetId}"]`) as any;
-          if (webview) webview.reload();
-        }
-        return prev.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t);
-      }
-      
-      return prev.map(t => t.id === targetId ? {
-        ...t,
+    if (prev.length === 0) {
+      const newTabId = Date.now().toString();
+      setTabs([{
+        id: newTabId,
         url,
+        title: newTitle || 'New Tab',
         isLoading: !isInternalPage,
-        ...(newTitle ? { title: newTitle } : {})
-      } : t);
-    });
+        canGoBack: false,
+        canGoForward: false
+      }]);
+      setActiveTabId(newTabId);
+      return;
+    }
+
+    const activeTab = prev.find(t => t.id === activeTabId) || prev[0];
+    const targetId = activeTab ? activeTab.id : prev[0].id;
+    if (targetId !== activeTabId) {
+      setActiveTabId(targetId);
+    }
+
+    if (activeTab && activeTab.url === url) {
+      // URL is exactly the same, force a reload if it's a webview
+      if (!isInternalPage) {
+        const webview = document.querySelector(`webview[data-tab-id="${targetId}"]`) as any;
+        if (webview) webview.reload();
+      }
+      setTabs(p => p.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t));
+      return;
+    }
+
+    setTabs(p => p.map(t => t.id === targetId ? {
+      ...t,
+      url,
+      isLoading: !isInternalPage,
+      ...(newTitle ? { title: newTitle } : {})
+    } : t));
   }, [activeTabId]);
 
   // Latest-data & latest-handler refs: let the MCP/AI-context effect below keep
@@ -2626,7 +2649,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const workspaceTabs = useMemo(() => tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default')), [tabs, activeWorkspaceId]);
 
-  const sortedTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id)), [tabs]);
+  // Numeric-aware compare: tab ids are timestamp strings, so a plain
+  // localeCompare would sort "10" before "9" and scramble render order.
+  const sortedTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })), [tabs]);
 
   if (showOnboarding) {
     return (

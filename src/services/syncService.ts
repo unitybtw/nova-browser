@@ -422,6 +422,9 @@ class NovaSyncService {
   }
 
   private loadSession() {
+    // Guard: Web Storage is unavailable in non-browser contexts (unit tests,
+    // SSR). aiMemory uses the same pattern — skip session restore silently.
+    if (typeof localStorage === 'undefined') return;
     try {
       const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
       const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);

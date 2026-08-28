@@ -236,6 +236,16 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       transition={{ duration: 0.12, ease: 'easeOut' }}
       key={tab.id}
       onClick={() => onSelectTab(tab.id)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelectTab(tab.id);
+        }
+      }}
+      role="tab"
+      tabIndex={0}
+      aria-selected={isActive}
+      aria-label={tab.title || tab.url || 'Untitled tab'}
       onContextMenu={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1107,10 +1117,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
+            e.stopPropagation();
             const tabId = e.dataTransfer.getData('text/plain');
-            if (tabId && (e.target as HTMLElement).tagName === 'DIV' && (e.target === e.currentTarget)) {
-              onMoveTabToFolder?.(tabId, undefined);
-            }
+            if (tabId) onMoveTabToFolder?.(tabId, undefined);
           }}
         >
           <AnimatePresence>
@@ -1128,10 +1137,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 >
                   <div
                     onClick={() => onToggleFolder?.(folder.id)}
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-slate-200/60', 'dark:bg-white/10'); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onToggleFolder?.(folder.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={folder.isExpanded}
+                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('bg-slate-200/60', 'dark:bg-white/10'); }}
                     onDragLeave={(e) => e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10')}
                     onDrop={(e) => {
                       e.preventDefault();
+                      e.stopPropagation();
                       e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10');
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
@@ -1164,14 +1183,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                             const renderedSplitIds = new Set<string>();
                             return folderTabs.filter(tab => {
                               if (tab.splitWith) {
-                                if (renderedSplitIds.has(tab.id)) return false;
                                 const other = tabs.find(t => t.id === tab.splitWith);
-                                if (other) renderedSplitIds.add(other.id);
+                                if (!other || other.folderId !== folder.id) return true;
+                                if (renderedSplitIds.has(tab.id)) return false;
+                                renderedSplitIds.add(other.id);
                                 return true;
                               }
                               return true;
                             }).map(tab => {
-                              const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+                              const splitTab = tab.splitWith
+                                ? tabs.find(t => t.id === tab.splitWith && t.folderId === folder.id)
+                                : null;
                               const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
                               return (
                                 <SidebarTabItem
@@ -1211,14 +1233,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               const renderedSplitIds = new Set<string>();
               return tabs.filter(t => !t.folderId).filter(tab => {
                 if (tab.splitWith) {
-                  if (renderedSplitIds.has(tab.id)) return false;
                   const other = tabs.find(t => t.id === tab.splitWith);
-                  if (other) renderedSplitIds.add(other.id);
+                  if (!other || other.folderId) return true;
+                  if (renderedSplitIds.has(tab.id)) return false;
+                  renderedSplitIds.add(other.id);
                   return true;
                 }
                 return true;
               }).map(tab => {
-                const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+                const splitTab = tab.splitWith
+                  ? tabs.find(t => t.id === tab.splitWith && !t.folderId)
+                  : null;
                 const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
                 return (
                   <SidebarTabItem

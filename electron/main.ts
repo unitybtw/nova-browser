@@ -14,7 +14,7 @@ import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } fro
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
-import { initializeBlocklist, startPeriodicRefresh, getCurrentBlocklist } from './main/blocklist.js';
+import { initializeBlocklist, startPeriodicRefresh } from './main/blocklist.js';
 import { isPrivateIP } from './main/ipAddress.js';
 
 // Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
@@ -233,8 +233,11 @@ ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
             // Send batched counts as a single IPC message
             const batch = Object.fromEntries(pendingAdBlocks);
             mainWindow.webContents.send('ad-blocked-batch', batch);
+            pendingAdBlocks.clear();
           }
-          pendingAdBlocks.clear();
+          // Window temporarily unavailable (destroyed/recreating): keep the
+          // pending counts so they are delivered with the next flush instead
+          // of silently dropping the user's blocked-ads counters.
         }, 2000);
       }
     }
@@ -496,8 +499,8 @@ function setupApplicationMenu() {
     try {
       app.setAboutPanelOptions({
         applicationName: 'Nova Browser',
-        applicationVersion: '1.0.7',
-        version: '1.0.7',
+        applicationVersion: '1.1.0',
+        version: '1.1.0',
         copyright: 'Copyright © 2026 Nova Browser. All rights reserved.',
         credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
         website: 'https://github.com/unitybtw/nova-browser'

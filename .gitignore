@@ -22,6 +22,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Test / benchmark artifacts
+benchmark-results.json
+
 # Operating System & IDE Debris
 .DS_Store
 **/.DS_Store

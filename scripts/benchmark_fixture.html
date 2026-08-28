@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nova Browser Performance Fixture</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; margin: 2rem; }
+    #status { color: #475569; }
+  </style>
+</head>
+<body>
+  <h1>Browser performance fixture</h1>
+  <p id="status">Running benchmark…</p>
+  <div id="work-area"></div>
+  <script>
+    (() => {
+      const marks = {};
+      const mark = (name) => { marks[name] = performance.now(); };
+
+      const jsStart = performance.now();
+      let checksum = 0;
+      for (let round = 0; round < 8; round++) {
+        for (let i = 1; i <= 250000; i++) {
+          checksum = (checksum + Math.imul(i, round + 3)) >>> 0;
+          checksum = (checksum ^ (checksum >>> 13)) >>> 0;
+        }
+      }
+      const jsMs = performance.now() - jsStart;
+
+      const domStart = performance.now();
+      const workArea = document.getElementById('work-area');
+      const fragment = document.createDocumentFragment();
+      for (let i = 0; i < 5000; i++) {
+        const node = document.createElement('span');
+        node.textContent = `node-${i}`;
+        node.className = i % 2 ? 'odd' : 'even';
+        fragment.appendChild(node);
+      }
+      workArea.appendChild(fragment);
+      const domMs = performance.now() - domStart;
+
+      const canvasStart = performance.now();
+      const canvas = document.createElement('canvas');
+      canvas.width = 1200;
+      canvas.height = 800;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        for (let i = 0; i < 4000; i++) {
+          ctx.fillStyle = `hsl(${i % 360} 70% 50%)`;
+          ctx.fillRect((i * 17) % 1200, (i * 31) % 800, 4, 4);
+        }
+      }
+      const canvasMs = performance.now() - canvasStart;
+
+      const nav = performance.getEntriesByType('navigation')[0];
+      const memory = performance.memory ? {
+        usedJSHeapSize: performance.memory.usedJSHeapSize,
+        totalJSHeapSize: performance.memory.totalJSHeapSize,
+        jsHeapSizeLimit: performance.memory.jsHeapSizeLimit
+      } : null;
+
+      window.__novaBrowserBenchmark = {
+        checksum,
+        jsMs,
+        domMs,
+        canvasMs,
+        nodeCount: workArea ? workArea.childElementCount * 1 : 0,
+        navigation: nav ? {
+          dnsMs: nav.domainLookupEnd - nav.domainLookupStart,
+          connectMs: nav.connectEnd - nav.connectStart,
+          responseMs: nav.responseEnd - nav.requestStart,
+          domContentLoadedMs: nav.domContentLoadedEventEnd,
+          loadEventMs: nav.loadEventEnd,
+          durationMs: nav.duration
+        } : null,
+        memory,
+        userAgent: navigator.userAgent,
+        capturedAt: new Date().toISOString()
+      };
+      document.getElementById('status').textContent = 'Benchmark complete';
+    })();
+  </script>
+</body>
+</html>

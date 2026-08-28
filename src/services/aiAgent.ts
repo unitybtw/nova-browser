@@ -1054,7 +1054,10 @@ CRITICAL RULES:
       args = {};
     }
 
-    console.log(`[AI Agent] Executing ${functionName} with args:`, args);
+    // 🔒 Security: never log tool args — they can carry form field values,
+    // search queries and other user-typed data that would leak into terminal
+    // logs. Log only the tool name.
+    console.log(`[AI Agent] Executing tool: ${functionName}`);
 
     if (!this.actionContext) {
       return JSON.stringify({ error: "Action context not set. Browser APIs unavailable." });
@@ -1437,7 +1440,6 @@ CRITICAL RULES:
       else if (functionName === "search_history") {
         const { query } = args;
         const results = this.actionContext.onSearchHistory(query as string || "");
-        console.log(`[AI Agent] Searching history for: ${query}`);
         result = { success: true, results, hint: "Here are the top matches from history and bookmarks. If you find the link you need, you can navigate_to_url." };
       }
 
