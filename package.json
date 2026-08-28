@@ -123,7 +123,7 @@
     "build:website": "npm --prefix website run build",
     "video:preview": "remotion preview video/src/index.ts",
     "video:render": "remotion render video/src/index.ts NovaPromo video/out/nova-promo.mp4",
-      "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
+    "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
     "video:render:browser": "remotion render video/src/index.ts NovaBrowserAd video/out/nova-browser-ad.mp4",
     "video:render:browser:shorts": "remotion render video/src/index.ts NovaBrowserAdShorts video/out/nova-browser-ad-shorts.mp4",
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
