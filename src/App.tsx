@@ -48,6 +48,7 @@ import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
+import type { WindowPlatform } from './components/WindowControls';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -133,6 +134,7 @@ type DemoParams = {
   theme: 'dark' | 'light';
   tabs: string;
   showTasksWidget?: boolean;
+  windowPlatform?: WindowPlatform;
 };
 
 // Demo mode query parameter inspection
@@ -155,6 +157,7 @@ export interface BrowserDemoOptions {
   theme?: 'dark' | 'light';
   tabs?: string;
   showTasksWidget?: boolean;
+  windowPlatform?: WindowPlatform;
 }
 
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
@@ -2624,6 +2627,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
+  const demoWindowPlatform = demoParams.isDemo ? demoParams.windowPlatform : undefined;
 
   // Compute second tab for split view (if available)
   const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
@@ -2706,6 +2710,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onOpenExtensions={handleOpenExtensions}
               onToggleAIAssistant={handleToggleAIAssistant}
               isAIAssistantOpen={isSidePanelOpen}
+              windowPlatform={demoWindowPlatform}
               bookmarks={bookmarks}
               isCollapsed={false}
               onReorderTabs={handleReorderTabs}
@@ -2801,6 +2806,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onOpenExtensions={handleOpenExtensions}
                   onToggleAIAssistant={handleToggleAIAssistant}
                   isAIAssistantOpen={isSidePanelOpen}
+                  windowPlatform={demoWindowPlatform}
                   bookmarks={bookmarks}
                   isCollapsed={true}
                   onReorderTabs={handleReorderTabs}
@@ -2844,6 +2850,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 useVerticalTabs={settings.useVerticalTabs}
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
+                windowPlatform={demoWindowPlatform}
                 tabStyle={settings.tabStyle}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}

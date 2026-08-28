@@ -42,7 +42,9 @@ export const Navbar: React.FC = () => {
   useEffect(() => {
     const sectionIds = ["features", "community", "benchmarks", "download", "faq"];
     const handleScroll = () => {
-      if (window.scrollY < 240) {
+      const scrollY = window.scrollY;
+
+      if (scrollY < 240) {
         setActiveHref("#top");
         return;
       }

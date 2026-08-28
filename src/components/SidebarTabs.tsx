@@ -39,6 +39,7 @@ import {
 } from 'lucide-react';
 import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
+import WindowControls, { WindowPlatform } from './WindowControls';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
@@ -147,6 +148,7 @@ export interface SidebarTabsProps {
   onOpenExtensions?: () => void;
   onToggleAIAssistant?: () => void;
   isAIAssistantOpen?: boolean;
+  windowPlatform?: WindowPlatform;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
@@ -442,6 +444,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenExtensions,
   onToggleAIAssistant,
   isAIAssistantOpen = false,
+  windowPlatform,
   bookmarks = [],
   onToggleCollapse,
   isCollapsed = false,
@@ -1022,6 +1025,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 opacity-60 group-hover:opacity-100 ${
               isWorkspaceDropdownOpen ? 'rotate-180' : ''
             }`} />
+            {windowPlatform && <WindowControls platform={windowPlatform} className="ml-1" />}
           </button>
 
           {/* Workspace Dropdown */}
@@ -1397,6 +1401,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
+  if (prevProps.windowPlatform !== nextProps.windowPlatform) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
   if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;

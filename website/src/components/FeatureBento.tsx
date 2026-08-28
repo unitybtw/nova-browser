@@ -77,11 +77,11 @@ export const FeatureBento: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
-            className={`${mod.span} rounded-2xl bg-white border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between hover:shadow-md hover:border-neutral-400 transition-all duration-200 group relative overflow-hidden`}
+            className={`luxury-card ${mod.span} rounded-2xl bg-white/85 border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden backdrop-blur-sm`}
           >
             <div>
               <div className="flex items-center justify-between mb-6">
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] group-hover:bg-[#4338ca] group-hover:text-white transition-colors duration-300">
+                  <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-[#4338ca] transition-all duration-500 group-hover:rotate-6 group-hover:scale-110 group-hover:bg-[#4338ca] group-hover:text-white group-hover:shadow-[0_10px_24px_rgba(67,56,202,0.22)]">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
                 <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">

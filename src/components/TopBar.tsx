@@ -54,6 +54,7 @@ import {
   Languages
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
+import WindowControls, { WindowPlatform } from './WindowControls';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
@@ -120,6 +121,7 @@ interface TopBarProps {
   isVpnEnabled?: boolean;
   onToggleVpn?: () => void;
   onToggleAIAssistant: () => void;
+  windowPlatform?: WindowPlatform;
   activeDownloadsCount?: number;
   downloads?: any[];
   onClearDownloads?: () => void;
@@ -1119,6 +1121,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   isVpnEnabled = false,
   onToggleVpn,
   onToggleAIAssistant,
+  windowPlatform,
   showBookmarksBar = false,
   onToggleReaderMode,
   onOpenExtensions,
@@ -1459,6 +1462,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               </AnimatePresence>
             </div>
           )}
+          {windowPlatform && <WindowControls platform={windowPlatform} className="mb-1 ml-1" />}
 
         {/* Tabs */}
         <div className="flex-1 relative flex items-center min-w-0">
@@ -2061,6 +2065,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;
+  if (prevProps.windowPlatform !== nextProps.windowPlatform) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.showBookmarksBar !== nextProps.showBookmarksBar) return false;
   if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;

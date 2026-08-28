@@ -42,7 +42,7 @@ export const Downloads: React.FC = () => {
       {/* Download Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto mb-12">
         {/* macOS Card */}
-        <div className="group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-8 lg:p-10">
+        <div className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-8 lg:p-10">
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
@@ -86,7 +86,7 @@ export const Downloads: React.FC = () => {
         </div>
 
         {/* Windows Card */}
-        <div className="group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-8 lg:p-10">
+        <div className="luxury-card group flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-8 lg:p-10">
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">

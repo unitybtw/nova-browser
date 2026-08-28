@@ -7,8 +7,9 @@ export const Hero: React.FC = () => {
   return (
     <section className="relative isolate pt-28 sm:pt-32 md:pt-40 pb-16 sm:pb-20 px-4 sm:px-6 max-w-7xl mx-auto flex flex-col items-center text-center">
       <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[620px] overflow-hidden [mask-image:linear-gradient(to_bottom,black,transparent)]" aria-hidden="true">
-        <div className="absolute left-1/2 top-[-280px] h-[620px] w-[min(900px,90vw)] -translate-x-1/2 rounded-full bg-indigo-200/35 blur-3xl" />
-        <div className="absolute left-[12%] top-40 h-32 w-32 rounded-full bg-cyan-200/25 blur-3xl" />
+        <div className="hero-orb absolute left-1/2 top-[-280px] h-[620px] w-[min(900px,90vw)] -translate-x-1/2 rounded-full bg-indigo-200/35 blur-3xl" />
+        <div className="absolute left-[12%] top-40 h-32 w-32 animate-glow-pulse rounded-full bg-cyan-200/25 blur-3xl" />
+        <div className="absolute right-[10%] top-56 h-24 w-24 animate-glow-pulse rounded-full bg-fuchsia-200/20 blur-3xl [animation-delay:1.5s]" />
       </div>
 
       <motion.div
@@ -31,7 +32,7 @@ export const Hero: React.FC = () => {
         className="mt-7 max-w-5xl font-display text-[clamp(3rem,8vw,7.5rem)] font-black leading-[0.98] tracking-[-0.055em] text-[#171717]"
       >
         Thought at the Speed of{' '}
-        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-500 to-cyan-500 bg-clip-text text-transparent">Thought.</span>
+        <span className="bg-gradient-to-r from-[#4338ca] via-indigo-500 to-cyan-500 bg-clip-text text-transparent gradient-text-shimmer">Thought.</span>
       </motion.h1>
 
       <motion.p
@@ -51,7 +52,7 @@ export const Hero: React.FC = () => {
       >
         <a
           href="#download"
-          className="inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full bg-[#171717] px-7 py-3.5 text-white font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-[0_12px_30px_rgba(23,23,23,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#4338ca] hover:shadow-[0_16px_34px_rgba(67,56,202,0.25)] active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+          className="luxury-button inline-flex min-h-12 items-center justify-center gap-2.5 rounded-full bg-[#171717] px-7 py-3.5 text-white font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-[0_12px_30px_rgba(23,23,23,0.18)] hover:bg-[#4338ca] active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
         >
           <Download className="w-4 h-4" aria-hidden="true" />
           <span>Download Nova</span>
@@ -61,7 +62,7 @@ export const Hero: React.FC = () => {
           href="https://github.com/unitybtw/nova-browser"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#d9d9df] bg-white/80 px-6 py-3.5 text-[#171717] font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#4338ca]/40 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+          className="luxury-button inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#d9d9df] bg-white/80 px-6 py-3.5 text-[#171717] font-mono text-xs sm:text-sm uppercase tracking-wider font-semibold shadow-sm hover:border-[#4338ca]/40 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
         >
           <Github className="w-4 h-4" aria-hidden="true" />
           <span>Explore the source</span>

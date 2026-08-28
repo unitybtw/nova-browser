@@ -76,7 +76,7 @@ export const Faq: React.FC = () => {
           return (
             <div
               key={faq.question}
-              className={`rounded-2xl border transition-all duration-200 overflow-hidden bg-white ${
+              className={`luxury-card rounded-2xl border transition-all duration-300 overflow-hidden bg-white/85 backdrop-blur-sm ${
                 isOpen ? 'border-[#4338ca]/40 shadow-sm' : 'border-[#e5e5e5] hover:border-neutral-300'
               }`}
             >

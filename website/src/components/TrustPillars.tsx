@@ -57,7 +57,7 @@ export const TrustPillars: React.FC = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white p-5 shadow-xs transition-colors hover:border-neutral-400 sm:p-7"
+              className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
             >
               <div>
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 mb-5">
