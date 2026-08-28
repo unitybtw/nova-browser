@@ -846,9 +846,15 @@ app.whenReady().then(async () => {
   // Origin -> (Permission -> Boolean)
   const rememberedPermissions = new Map<string, Map<string, boolean>>();
 
-  ipcMain.handle('permission-response', async (_event, { requestId, allow, remember }: { requestId: string; allow: boolean; remember?: boolean }) => {
+  ipcMain.handle('permission-response', async (_event, payload: unknown) => {
     // 🔒 Security: only the trusted main window may resolve permission requests
     if (!isTrustedSender(_event)) return { success: false, error: 'Unauthorized' };
+    if (!payload || typeof payload !== 'object') return { success: false, error: 'Invalid payload' };
+    const { requestId, allow, remember } = payload as Record<string, unknown>;
+    if (typeof requestId !== 'string' || requestId.length < 1 || requestId.length > 128 ||
+        typeof allow !== 'boolean' || (remember !== undefined && typeof remember !== 'boolean')) {
+      return { success: false, error: 'Invalid permission response' };
+    }
     const pending = pendingPermissions.get(requestId);
     if (pending) {
       clearTimeout(pending.timeoutId);
@@ -2091,6 +2097,71 @@ function isPrivateIP(ip: string): boolean {
 
 const dnsLookup = promisify(dns.lookup);
 
+const MAX_PREVIEW_HTML_BYTES = 5 * 1024 * 1024;
+
+// Read a response body with a hard byte limit even when the server omits
+// Content-Length. This keeps the SSRF-protected preview endpoint bounded for
+// chunked/streaming responses as well as normal buffered responses.
+async function readResponseTextWithLimit(response: any, maxBytes: number): Promise<string> {
+  const body = response?.body;
+  if (body && typeof body.on === 'function') {
+    return await new Promise<string>((resolve, reject) => {
+      const chunks: Buffer[] = [];
+      let received = 0;
+      let settled = false;
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        try { body.destroy?.(); } catch (_) {}
+        reject(error);
+      };
+      body.on('data', (chunk: Buffer | string) => {
+        const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+        received += buffer.length;
+        if (received > maxBytes) {
+          fail(new Error(`Response body exceeds ${maxBytes} byte size limit`));
+          return;
+        }
+        chunks.push(buffer);
+      });
+      body.on('end', () => {
+        if (settled) return;
+        settled = true;
+        resolve(Buffer.concat(chunks).toString('utf8'));
+      });
+      body.on('error', (error: Error) => fail(error));
+    });
+  }
+
+  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    const chunks: Buffer[] = [];
+    let received = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const buffer = Buffer.from(value);
+        received += buffer.length;
+        if (received > maxBytes) {
+          try { await reader.cancel(); } catch (_) {}
+          throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
+        }
+        chunks.push(buffer);
+      }
+      return Buffer.concat(chunks).toString('utf8');
+    } finally {
+      try { reader.releaseLock?.(); } catch (_) {}
+    }
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > maxBytes) {
+    throw new Error(`Response body exceeds ${maxBytes} byte size limit`);
+  }
+  return Buffer.from(arrayBuffer).toString('utf8');
+}
+
 // IPC Handler to fetch raw HTML (Bypasses CORS for Link Preview with SSRF protection)
 ipcMain.handle('fetch-page-html', async (event, url: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
@@ -2149,13 +2220,10 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
 
       if (res.ok) {
         const contentLength = res.headers.get('content-length');
-        if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
+        if (contentLength && parseInt(contentLength, 10) > MAX_PREVIEW_HTML_BYTES) {
           return { error: 'Response body exceeds 5MB size limit' };
         }
-        let html = await res.text();
-        if (html.length > 5 * 1024 * 1024) {
-          html = html.substring(0, 5 * 1024 * 1024);
-        }
+        let html = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
         html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
@@ -2227,12 +2295,38 @@ function unescapeHtmlForTranslation(str: string): string {
 }
 
 // IPC Handlers for One-Click Page Translation
-ipcMain.handle('translate-text-batch', async (event, { texts, sourceLang, targetLang }: { texts: string[]; sourceLang?: string; targetLang?: string }) => {
-  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: texts || [] };
-  if (!Array.isArray(texts) || texts.length === 0) return { translations: [], success: true };
+const MAX_TRANSLATION_ITEMS = 500;
+const MAX_TRANSLATION_TEXT_CHARS = 4000;
+const MAX_TRANSLATION_TOTAL_CHARS = 100_000;
 
-  const sLang = sourceLang || 'auto';
-  const tLang = targetLang || 'tr';
+ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
+  const input = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const rawTexts = Array.isArray(input.texts) ? input.texts : [];
+  const safeTexts: string[] = [];
+  let remainingChars = MAX_TRANSLATION_TOTAL_CHARS;
+
+  for (const rawText of rawTexts.slice(0, MAX_TRANSLATION_ITEMS)) {
+    if (typeof rawText !== 'string' || remainingChars <= 0) {
+      safeTexts.push('');
+      continue;
+    }
+    const text = rawText.slice(0, Math.min(MAX_TRANSLATION_TEXT_CHARS, remainingChars));
+    safeTexts.push(text);
+    remainingChars -= text.length;
+  }
+
+  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: safeTexts };
+  if (safeTexts.length === 0) return { translations: [], success: true };
+
+  const validLanguage = (value: unknown, fallback: string): string => {
+    if (typeof value !== 'string' || !/^[a-zA-Z]{2,12}(?:[-_][a-zA-Z0-9]{2,12})?$/.test(value)) {
+      return fallback;
+    }
+    return value;
+  };
+  const sLang = validLanguage(input.sourceLang, 'auto');
+  const tLang = validLanguage(input.targetLang, 'tr');
+  const texts = safeTexts;
 
   try {
     const results: string[] = [...texts];
@@ -2562,7 +2656,18 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     } catch {
       return { error: 'Invalid file URL.' };
     }
-  } else if (!url.startsWith('chrome-extension://')) {
+  } else if (url.startsWith('chrome-extension://')) {
+    try {
+      const parsedExtensionUrl = new URL(url);
+      const extensionId = parsedExtensionUrl.hostname;
+      if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) ||
+          !loadedExtensions.some(extension => extension.id === extensionId)) {
+        return { error: 'Blocked: extension is not installed.' };
+      }
+    } catch {
+      return { error: 'Invalid extension URL.' };
+    }
+  } else {
     return { error: 'Blocked: only chrome-extension:// and local extension file:// URLs are allowed.' };
   }
 
@@ -2943,8 +3048,30 @@ ipcMain.handle('install-from-webstore', (event, urlOrId: string) => installFromW
 // Show extension permission review dialog before installation
 ipcMain.handle('review-extension-permissions', async (event, extensionId: string, extractPath: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
+    return { error: 'Invalid extension ID format' };
+  }
+  if (typeof extractPath !== 'string' || !extractPath.trim()) {
+    return { error: 'Invalid extension path' };
+  }
+
+  const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+  const resolvedExtractPath = path.resolve(extractPath.trim());
+  if (!resolvedExtractPath.startsWith(extensionsBaseDir + path.sep)) {
+    return { error: 'Extension permission path is outside the extensions directory' };
+  }
+  try {
+    const realBase = fs.realpathSync(extensionsBaseDir);
+    const realExtract = fs.realpathSync(resolvedExtractPath);
+    if (!realExtract.startsWith(realBase + path.sep) ||
+        path.basename(realExtract) !== extensionId) {
+      return { error: 'Invalid extension permission path' };
+    }
+  } catch {
+    return { error: 'Extension permission path does not exist' };
+  }
   
-  const permissions = await parseExtensionPermissions(extractPath);
+  const permissions = await parseExtensionPermissions(resolvedExtractPath);
   
   // Combine all permissions for display
   const allPermissions = [

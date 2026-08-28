@@ -558,34 +558,17 @@ async function runSecurityRegressionAuditSuite() {
     `Tested ${encodedEvasionVectors.length} obfuscated evasion vectors; all rejected.`
   );
 
-  // R2.5: data: URL payload filtering (block non-raster, permit raster images)
-  const nonRasterDataUrls = [
+  // R2.5: data: URLs are never valid navigation targets. Raster data URLs may
+  // be rendered by dedicated image-only sinks (such as favicon handling), but
+  // must not be accepted by the shared navigation allowlist.
+  const dataUrls = [
     'data:text/html,<script>alert(1)</script>',
     'data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==',
     'data:image/svg+xml;utf8,<svg onload="alert(1)"/>',
     'data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+PC9zdmc+',
     'data:application/xhtml+xml,<html xmlns="http://www.w3.org/1999/xhtml"><script>alert(1)</script></html>',
     'data:text/plain;base64,SGVsbG8gV29ybGQ=',
-    'data:application/javascript,alert(1)'
-  ];
-
-  let nonRasterBlocked = true;
-  for (const url of nonRasterDataUrls) {
-    const isSafe = isSafeNavigationUrl(url);
-    if (isSafe !== false) {
-      nonRasterBlocked = false;
-      record('R2-Data-URL-Security', `Non-raster data URL: ${url.substring(0, 35)}...`, false, `Expected false, got ${isSafe}`);
-    }
-  }
-
-  record(
-    'R2-Data-URL-Security',
-    'isSafeNavigationUrl blocks non-raster data: payloads (HTML, SVG, XML, JS)',
-    nonRasterBlocked,
-    `Tested ${nonRasterDataUrls.length} non-raster data: payloads; all blocked.`
-  );
-
-  const rasterDataUrls = [
+    'data:application/javascript,alert(1)',
     'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
     'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=',
     'data:image/webp;base64,UklGRkAAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAIAAAAAAFZQOCAYAAAAMAEAnQEqAQABAAFAJiWkAANwAP79NvgA',
@@ -594,20 +577,20 @@ async function runSecurityRegressionAuditSuite() {
     'data:image/ico;base64,AAABAAEAICAAAAEAIACoEAAAFgAAACgAAAAgAAAAQAAAAAEAIAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAA'
   ];
 
-  let rasterPermitted = true;
-  for (const url of rasterDataUrls) {
+  let dataUrlsBlocked = true;
+  for (const url of dataUrls) {
     const isSafe = isSafeNavigationUrl(url);
-    if (isSafe !== true) {
-      rasterPermitted = false;
-      record('R2-Data-URL-Security', `Raster data URL: ${url.substring(0, 25)}...`, false, `Expected true, got ${isSafe}`);
+    if (isSafe !== false) {
+      dataUrlsBlocked = false;
+      record('R2-Data-URL-Security', `Data URL: ${url.substring(0, 35)}...`, false, `Expected false, got ${isSafe}`);
     }
   }
 
   record(
     'R2-Data-URL-Security',
-    'isSafeNavigationUrl permits valid raster image data: URLs (PNG, JPEG, WEBP, GIF, BMP, ICO)',
-    rasterPermitted,
-    `Tested ${rasterDataUrls.length} raster data: image formats; all permitted.`
+    'isSafeNavigationUrl blocks all data: URLs, including raster images',
+    dataUrlsBlocked,
+    `Tested ${dataUrls.length} data: URLs; all rejected as navigation targets.`
   );
 
   // =========================================================================

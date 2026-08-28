@@ -18,6 +18,7 @@ import {
 import { SettingsPage } from './SettingsPage';
 import { HistoryPage } from './HistoryPage';
 import { DownloadsPage } from './DownloadsPage';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
 const NOOP = () => {};
 
@@ -76,7 +77,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 }) => {
   const webviewRef = useRef<any>(null);
 
-  const getSafeUrl = (u?: string) => (u && u.startsWith('nova://')) ? 'about:blank' : (u || 'about:blank');
+  const getSafeUrl = (u?: string) => {
+    if (!u || u.startsWith('nova://')) return 'about:blank';
+    return isSafeNavigationUrl(u) ? u : 'about:blank';
+  };
   const initialUrlRef = useRef<string>(getSafeUrl(tab?.url));
   const lastLoadedUrl = useRef<string>(tab?.url || '');
   const isWebviewReady = useRef<boolean>(false);
@@ -342,72 +346,62 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
     };
 
+    const isSafeWebviewUrl = (candidate: unknown): candidate is string =>
+      typeof candidate === 'string' && isSafeNavigationUrl(candidate);
+
     const handleWillNavigate = (e: any) => {
-      if (e?.url && tab?.id) {
-        lastLoadedUrl.current = e.url;
-        onUpdateTab(tab.id, {
-          url: e.url,
-          isLoading: true
-        });
-      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, {
+        url: e.url,
+        isLoading: true
+      });
     };
 
     const handleRedirectNavigation = (e: any) => {
-      if (e?.url && tab?.id && e.isMainFrame !== false) {
-        lastLoadedUrl.current = e.url;
-        onUpdateTab(tab.id, {
-          url: e.url
-        });
-      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, { url: e.url });
     };
 
     const handleLoadCommit = (e: any) => {
-      if (e?.url && tab?.id && e.isMainFrame !== false && e.url !== 'about:blank') {
-        lastLoadedUrl.current = e.url;
-        onUpdateTab(tab.id, {
-          url: e.url
-        });
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(e?.url) || !tab?.id) return;
+      lastLoadedUrl.current = e.url;
+      onUpdateTab(tab.id, { url: e.url });
+    };
+
+    const syncSafeCurrentUrl = (updates: Partial<Tab>) => {
+      let currentUrl = '';
+      try {
+        currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+      } catch (_) {}
+      if (isSafeWebviewUrl(currentUrl) && currentUrl !== 'about:blank') {
+        lastLoadedUrl.current = currentUrl;
+        updates.url = currentUrl;
       }
+      return updates;
     };
 
     const handleFinishLoad = (e: any) => {
-      if (tab?.id && (e?.isMainFrame !== false)) {
-        let currentUrl = '';
-        try {
-          currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-        } catch (_) {}
-
-        const updates: Partial<Tab> = {
+      if (tab?.id && e?.isMainFrame !== false) {
+        const updates = syncSafeCurrentUrl({
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
           title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
-        };
-        if (currentUrl && currentUrl !== 'about:blank') {
-          lastLoadedUrl.current = currentUrl;
-          updates.url = currentUrl;
-        }
+        });
         onUpdateTab(tab.id, updates);
       }
     };
 
     const handleStopLoading = () => {
       if (tab?.id) {
-        let currentUrl = '';
-        try {
-          currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-        } catch (_) {}
-
-        const updates: Partial<Tab> = {
+        const updates = syncSafeCurrentUrl({
           isLoading: false,
           canGoBack: webview.canGoBack?.() || false,
           canGoForward: webview.canGoForward?.() || false,
           title: webview.getTitle?.() || latestTabRef.current?.title || latestTabRef.current?.url || ''
-        };
-        if (currentUrl && currentUrl !== 'about:blank') {
-          lastLoadedUrl.current = currentUrl;
-          updates.url = currentUrl;
-        }
+        });
         onUpdateTab(tab.id, updates);
       }
     };
@@ -424,15 +418,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (!targetUrl && typeof webview.getURL === 'function') {
         try { targetUrl = webview.getURL(); } catch (_) {}
       }
-      if (targetUrl && tab?.id) {
-        lastLoadedUrl.current = targetUrl;
-        onUpdateTab(tab.id, {
-          url: targetUrl,
-          isLoading: false,
-          canGoBack: webview.canGoBack?.() || false,
-          canGoForward: webview.canGoForward?.() || false
-        });
-      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(targetUrl) || !tab?.id) return;
+      lastLoadedUrl.current = targetUrl;
+      onUpdateTab(tab.id, {
+        url: targetUrl,
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false
+      });
     };
 
     const handleNavigateInPage = (e: any) => {
@@ -440,15 +433,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (!targetUrl && typeof webview.getURL === 'function') {
         try { targetUrl = webview.getURL(); } catch (_) {}
       }
-      if (targetUrl && tab?.id) {
-        lastLoadedUrl.current = targetUrl;
-        onUpdateTab(tab.id, {
-          url: targetUrl,
-          isLoading: false,
-          canGoBack: webview.canGoBack?.() || false,
-          canGoForward: webview.canGoForward?.() || false
-        });
-      }
+      if (e?.isMainFrame === false || !isSafeWebviewUrl(targetUrl) || !tab?.id) return;
+      lastLoadedUrl.current = targetUrl;
+      onUpdateTab(tab.id, {
+        url: targetUrl,
+        isLoading: false,
+        canGoBack: webview.canGoBack?.() || false,
+        canGoForward: webview.canGoForward?.() || false
+      });
     };
 
     const handleTitleUpdate = (e: any) => {

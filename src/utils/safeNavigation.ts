@@ -30,13 +30,18 @@ export function isSafeNavigationUrl(url: string): boolean {
 
   const decodedNormalized = sanitize(decoded);
 
-  // Block dangerous schemes outright
+  // Navigation is intentionally stricter than image rendering. Data URLs are
+  // never navigable here, including raster images; callers that render an
+  // image (for example a favicon) must use their own image-only validator.
   const blockedSchemes = [
     'javascript:',
+    'data:',
     'vbscript:',
     'file:',
     'blob:',
-    'view-source:'
+    'view-source:',
+    'chrome:',
+    'edge:'
   ];
 
   for (const scheme of blockedSchemes) {
@@ -45,13 +50,22 @@ export function isSafeNavigationUrl(url: string): boolean {
     }
   }
 
-  // data: URLs - strictly restrict to permitted raster image MIME types (base64 encoded).
-  // Everything else (text/html, application/xhtml+xml, text/xml, image/svg+xml which can carry scripts)
-  // is blocked.
-  const dataRasterRegex = /^data:image\/(png|jpeg|jpg|gif|webp|bmp|ico);base64,/i;
-  if (rawNormalized.startsWith('data:') || decodedNormalized.startsWith('data:')) {
-    return dataRasterRegex.test(rawNormalized) || dataRasterRegex.test(decodedNormalized);
+  // Only the browser's known internal pages and network URLs are navigable.
+  // Unknown about: pages must not become a protocol bypass (for example
+  // about:config or about:srcdoc).
+  const protocolMatch = decodedNormalized.match(/^([a-z][a-z0-9+.-]*):/i);
+  if (!protocolMatch) return true;
+
+  const protocol = `${protocolMatch[1].toLowerCase()}:`;
+  if (protocol === 'http:' || protocol === 'https:') return true;
+  if (protocol === 'nova:') {
+    return ['nova://newtab', 'nova://settings', 'nova://history', 'nova://downloads']
+      .some(page => decodedNormalized === page);
+  }
+  if (protocol === 'about:') {
+    return ['about:blank', 'about:settings', 'about:history', 'about:downloads', 'about:newtab']
+      .some(page => decodedNormalized === page);
   }
 
-  return true;
+  return false;
 }

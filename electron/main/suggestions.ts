@@ -51,12 +51,15 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
   ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, clientLocale?: string) => {
     if (!isTrustedSender(event)) return [];
     if (!query || typeof query !== 'string') return [];
-    const cleanQ = query.trim();
+    const cleanQ = query.trim().slice(0, 512);
     if (!cleanQ) return [];
 
-    const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(clientLocale);
+    const allowedEngines = new Set(['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'yahoo']);
+    const cleanEngine = typeof engine === 'string' && allowedEngines.has(engine) ? engine : 'default';
+    const boundedLocale = typeof clientLocale === 'string' ? clientLocale.slice(0, 32) : undefined;
+    const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(boundedLocale);
     const normalizedKey = cleanQ.normalize('NFC').toLowerCase();
-    const cacheKey = `${normalizedKey}_${engine || 'default'}_${lang}_${country}`;
+    const cacheKey = `${normalizedKey}_${cleanEngine}_${lang}_${country}`;
 
     const cachedList = getSuggestionsFromCache(cacheKey);
     if (cachedList !== null) {
@@ -167,11 +170,11 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
     };
 
     let providers = [fetchGoogle, fetchDuckDuckGo, fetchBing];
-    if (engine === 'duckduckgo') {
+    if (cleanEngine === 'duckduckgo') {
       providers = [fetchDuckDuckGo, fetchGoogle, fetchBing];
-    } else if (engine === 'bing') {
+    } else if (cleanEngine === 'bing') {
       providers = [fetchBing, fetchGoogle, fetchDuckDuckGo];
-    } else if (engine === 'brave') {
+    } else if (cleanEngine === 'brave') {
       providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
     }
 

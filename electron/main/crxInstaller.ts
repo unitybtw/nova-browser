@@ -254,6 +254,10 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
   }
 
   try {
+    if (typeof urlOrId !== 'string' || urlOrId.length > 256) {
+      return { error: 'Invalid extension URL or ID' };
+    }
+
     // Extract ID: 32 characters of a-p
     const match = urlOrId.match(/[a-p]{32}/);
     if (!match) return { error: 'Invalid extension URL or ID' };
