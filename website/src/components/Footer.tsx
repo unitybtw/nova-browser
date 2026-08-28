@@ -95,7 +95,9 @@ export const Footer: React.FC = () => {
         <div className="pt-8 pb-10 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-neutral-400">
           <div>ALL RIGHTS RESERVED // SOVEREIGN COMPUTING</div>
           <button
+            type="button"
             onClick={scrollToTop}
+            aria-label="Back to top"
             className="inline-flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
           >
             <span>BACK TO TOP</span>

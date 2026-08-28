@@ -198,7 +198,9 @@ export const Benchmarks: React.FC = () => {
         {/* View Mode Toggle Switcher */}
         <div className="flex items-center gap-1.5 p-1.5 bg-neutral-100 rounded-2xl border border-neutral-200 w-fit">
           <button
+            type="button"
             onClick={() => setViewMode('benchmarks')}
+            aria-pressed={viewMode === 'benchmarks'}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
               viewMode === 'benchmarks'
                 ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
@@ -209,7 +211,9 @@ export const Benchmarks: React.FC = () => {
             <span>Interactive Benchmarks</span>
           </button>
           <button
+            type="button"
             onClick={() => setViewMode('matrix')}
+            aria-pressed={viewMode === 'matrix'}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
               viewMode === 'matrix'
                 ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
@@ -233,7 +237,9 @@ export const Benchmarks: React.FC = () => {
               return (
                 <button
                   key={cat.id}
+                  type="button"
                   onClick={() => setSelectedCategory(cat.id)}
+                  aria-pressed={isActive}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
                     isActive
                       ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
@@ -274,7 +280,12 @@ export const Benchmarks: React.FC = () => {
                 {/* COMPARATIVE PROGRESS BARS */}
                 <div className="space-y-4 pt-2">
                   {currentCategory.competitors.map((item) => {
-                    const percent = Math.min(100, Math.max(12, Math.round((item.value / currentCategory.maxValue) * 100)));
+                    // Normalize the visual score so "lower is better" metrics still
+                    // show the strongest result with the longest bar.
+                    const rawPercent = currentCategory.lowerIsBetter
+                      ? ((currentCategory.maxValue - item.value) / currentCategory.maxValue) * 100
+                      : (item.value / currentCategory.maxValue) * 100;
+                    const percent = Math.min(100, Math.max(12, Math.round(rawPercent)));
                     return (
                       <div key={item.name} className="space-y-1.5">
                         <div className="flex items-center justify-between text-xs font-mono">
@@ -375,6 +386,7 @@ export const Benchmarks: React.FC = () => {
                   </div>
                   <input
                     type="range"
+                    aria-label="Number of open tabs"
                     min={5}
                     max={100}
                     step={5}

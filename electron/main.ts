@@ -368,7 +368,7 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
       
       responseHeaders['Content-Security-Policy'] = [
         isDev
-          ? `default-src 'self'; script-src 'self' ${nonceAttr} 'unsafe-inline' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
+          ? `default-src 'self'; script-src 'self' ${nonceAttr} 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
           : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
       ];
       

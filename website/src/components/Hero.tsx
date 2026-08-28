@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Lock,
   ArrowLeft,
   ArrowRight,
   RotateCw,
+  Home,
   Plus,
   X,
   Sparkles,
@@ -22,20 +23,21 @@ import {
   Play,
   Cpu,
   Terminal,
-} from 'lucide-react';
+  Search
+} from "lucide-react";
 
 export const Hero: React.FC = () => {
-  const [activeTabId, setActiveTabId] = useState<'newtab' | 'agent' | 'split'>('newtab');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTabId, setActiveTabId] = useState<"newtab" | "agent" | "split">("newtab");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isAIMode, setIsAIMode] = useState(false);
   const [translated, setTranslated] = useState(false);
-  const [currentTime, setCurrentTime] = useState('13:22');
+  const [currentTime, setCurrentTime] = useState("13:22");
 
   useEffect(() => {
     const updateTime = () => {
       const d = new Date();
       setCurrentTime(
-        `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+        `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
       );
     };
     updateTime();
@@ -45,35 +47,35 @@ export const Hero: React.FC = () => {
 
   const TABS = [
     {
-      id: 'newtab' as const,
-      title: 'New Tab',
-      url: 'nova://newtab',
-      icon: '/nova-logo-tight.png',
+      id: "newtab" as const,
+      title: "New Tab",
+      url: "nova://newtab",
+      icon: "/nova-logo-tight.png",
       isCustomIcon: true,
     },
     {
-      id: 'agent' as const,
-      title: 'Deep Research Agent',
-      url: 'nova://agent/neural-synthesis',
+      id: "agent" as const,
+      title: "Deep Research Agent",
+      url: "nova://agent/neural-synthesis",
       icon: Sparkles,
       isCustomIcon: false,
     },
     {
-      id: 'split' as const,
-      title: 'Split: Docs & Translate',
-      url: 'dual://developer.mozilla.org + github.com',
+      id: "split" as const,
+      title: "Split: Docs & Translate",
+      url: "dual://developer.mozilla.org + github.com",
       icon: Columns,
       isCustomIcon: false,
     },
   ];
 
   const SPEED_DIALS = [
-    { name: 'GitHub', url: 'github.com', category: 'Code', icon: Github },
-    { name: 'Claude', url: 'claude.ai', category: 'AI', icon: Bot },
-    { name: 'ChatGPT', url: 'chatgpt.com', category: 'AI', icon: Sparkles },
-    { name: 'Gemini', url: 'gemini.google.com', category: 'AI', icon: Cpu },
-    { name: 'YouTube', url: 'youtube.com', category: 'Media', icon: Play },
-    { name: 'MCP Bridge', url: 'localhost:3020', category: 'Bridge', icon: Terminal },
+    { name: "GitHub", url: "github.com", category: "Code", icon: Github },
+    { name: "Claude", url: "claude.ai", category: "AI", icon: Bot },
+    { name: "ChatGPT", url: "chatgpt.com", category: "AI", icon: Sparkles },
+    { name: "Gemini", url: "gemini.google.com", category: "AI", icon: Cpu },
+    { name: "YouTube", url: "youtube.com", category: "Media", icon: Play },
+    { name: "MCP Bridge", url: "localhost:3020", category: "Bridge", icon: Terminal },
   ];
 
   return (
@@ -96,46 +98,48 @@ export const Hero: React.FC = () => {
         transition={{ duration: 0.85, ease: [0.22, 1, 0.36, 1] }}
         className="font-display font-black text-5xl sm:text-7xl lg:text-8xl tracking-tight text-[#171717] max-w-5xl leading-[1.05]"
       >
-        Thought at the Speed of{' '}
+        Thought at the Speed of{" "}
         <span className="bg-gradient-to-r from-[#4338ca] to-cyan-500 bg-clip-text text-transparent">Thought.</span>
       </motion.h1>
 
-      {/* Subheading */}
+      {/* Subtitle */}
       <motion.p
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
-        className="font-sans text-base sm:text-lg md:text-xl text-neutral-600 max-w-2xl mt-6 leading-relaxed"
+        transition={{ duration: 0.85, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-6 text-lg sm:text-xl text-[#525252] max-w-2xl font-sans font-normal leading-relaxed"
       >
-        Embedded autonomous local AI agent, native 1-click page translation, zero-knowledge privacy vault, and real-time WebGPU shaders. Uncompromised speed. Unprecedented sovereignty.
+        On-device WebGPU AI, Model Context Protocol server, native ad blocking, and sub-millisecond tab allocation built on Electron & Chromium.
       </motion.p>
 
-      {/* Action Buttons */}
+      {/* CTA Buttons */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8, delay: 0.3, ease: [0.22, 1, 0.36, 1] }}
-        className="pt-8 flex gap-4 flex-wrap justify-center font-mono text-xs uppercase tracking-wider"
+        transition={{ duration: 0.85, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-10 flex flex-wrap items-center justify-center gap-4 select-none"
       >
         <a
           href="#download"
-          className="px-8 py-4 bg-[#171717] text-[#fcfbf9] font-semibold rounded-xl hover:bg-[#4338ca] transition-all shadow-md active:scale-[0.98] inline-flex items-center gap-2"
+          className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#171717] text-white font-mono text-sm uppercase tracking-wider font-semibold shadow-lg hover:bg-black hover:scale-105 active:scale-95 transition-all duration-200"
         >
           <Download className="w-4 h-4" />
           <span>Download for macOS & Windows</span>
         </a>
+
         <a
           href="https://github.com/unitybtw/nova-browser"
           target="_blank"
           rel="noopener noreferrer"
-          className="px-8 py-4 bg-white border border-[#e5e5e5] text-[#171717] font-semibold rounded-xl hover:bg-neutral-50 transition-colors inline-flex items-center gap-2"
+          className="inline-flex items-center gap-2 px-6 py-3.5 rounded-full bg-white border border-[#e5e5e5] text-[#171717] font-mono text-sm uppercase tracking-wider font-semibold hover:border-black hover:bg-neutral-50 transition-all duration-200 shadow-sm"
         >
+          <Github className="w-4 h-4" />
           <span>Star on GitHub</span>
-          <ArrowUpRight className="w-3.5 h-3.5 text-neutral-500" />
+          <ArrowUpRight className="w-3.5 h-3.5 text-[#737373]" />
         </a>
       </motion.div>
 
-      {/* AUTHENTIC NOVA BROWSER LIVE UI CENTERPIECE */}
+      {/* 1:1 AUTHENTIC NOVA BROWSER UI SHOWCASE (LIGHT THEME) */}
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
@@ -143,15 +147,21 @@ export const Hero: React.FC = () => {
         className="relative w-full max-w-6xl mx-auto mt-14 text-left"
       >
         {/* Outer App Frame */}
-        <div className="relative bg-[#090d16] rounded-2xl overflow-hidden border border-slate-800 shadow-[0_20px_60px_rgba(0,0,0,0.5)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
+        <div className="relative bg-white rounded-2xl overflow-hidden border border-slate-200/90 shadow-[0_25px_70px_rgba(0,0,0,0.12)] flex flex-col min-h-[580px] md:min-h-[640px] z-10 font-sans">
           
-          {/* TOP TAB BAR */}
-          <div className="h-11 bg-[#0d1322] border-b border-slate-800/80 flex items-center px-4 gap-3 select-none">
+          {/* ROW 1: TOP TAB BAR */}
+          <div className="h-11 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-3 select-none">
             {/* macOS Window Controls */}
             <div className="flex items-center gap-2 pr-2">
               <span className="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e] inline-block shadow-xs" />
               <span className="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123] inline-block shadow-xs" />
               <span className="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29] inline-block shadow-xs" />
+            </div>
+
+            {/* Workspace Indicator Pill */}
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold bg-slate-200/70 text-slate-700 mr-1">
+              <div className="w-2 h-2 rounded-full bg-slate-500" />
+              <span>Default</span>
             </div>
 
             {/* Browser Tabs */}
@@ -164,25 +174,25 @@ export const Hero: React.FC = () => {
                     onClick={() => setActiveTabId(tab.id)}
                     className={`group relative h-8 px-3.5 rounded-t-xl flex items-center gap-2 text-xs font-medium cursor-pointer transition-all duration-200 min-w-[140px] max-w-[200px] ${
                       isActive
-                        ? 'bg-[#121a2f] text-slate-100 border-t border-l border-r border-slate-700/80 shadow-md'
-                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                        ? "bg-white text-slate-900 border-t border-l border-r border-slate-200 shadow-xs"
+                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
                     }`}
                   >
                     {isActive && (
-                      <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400 via-indigo-500 to-cyan-400 rounded-t-full shadow-[0_0_8px_rgba(6,182,212,0.8)]" />
+                      <div className="absolute -top-[1px] left-0 right-0 h-[2px] bg-blue-500 rounded-t-full shadow-[0_0_6px_rgba(59,130,246,0.6)]" />
                     )}
 
                     {tab.isCustomIcon ? (
                       <img src={tab.icon as string} alt="" className="w-3.5 h-3.5 object-contain shrink-0" />
                     ) : (
                       React.createElement(tab.icon as React.ElementType, {
-                        className: `w-3.5 h-3.5 shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`
+                        className: `w-3.5 h-3.5 shrink-0 ${isActive ? "text-blue-600" : "text-slate-500"}`
                       })
                     )}
 
                     <span className="truncate flex-1 text-left text-[11px] font-medium">{tab.title}</span>
 
-                    <span className="p-0.5 rounded-md hover:bg-white/10 text-slate-500 hover:text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="p-0.5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity">
                       <X className="w-3 h-3" />
                     </span>
                   </button>
@@ -190,35 +200,40 @@ export const Hero: React.FC = () => {
               })}
 
               <button
-                onClick={() => setActiveTabId('newtab')}
-                className="p-1 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-slate-800/60 transition-colors"
-                title="New Tab"
+                onClick={() => setActiveTabId("newtab")}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/70 transition-colors cursor-pointer"
+                title="New Tab (⌘T)"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* OMNIBOX TOOLBAR */}
-          <div className="h-12 bg-[#121a2f] border-b border-slate-800 flex items-center px-4 gap-3 text-slate-400 select-none">
+          {/* ROW 2: OMNIBOX TOOLBAR */}
+          <div className="h-12 bg-white border-b border-slate-200 flex items-center px-4 gap-3 text-slate-600 select-none">
             {/* History Nav */}
             <div className="flex items-center gap-1">
-              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+              <button type="button" aria-label="Go back" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors">
                 <ArrowLeft className="w-3.5 h-3.5" />
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+              <button type="button" aria-label="Go forward" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors">
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors">
+              <button type="button" aria-label="Reload page" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors">
                 <RotateCw className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" onClick={() => setActiveTabId("newtab")} aria-label="Home page" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900 transition-colors ml-0.5">
+                <Home className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Omnibox Address Input */}
-            <div className="flex-1 bg-[#090d16] rounded-xl h-8 px-3 flex items-center justify-between border border-slate-700/80 focus-within:border-cyan-500 shadow-inner">
-              <div className="flex items-center gap-2 min-w-0 flex-1 text-slate-300 font-mono text-[11px]">
-                <Lock className="w-3 h-3 text-emerald-400 shrink-0" />
-                <span className="truncate text-slate-200">
+            <div className="flex-1 bg-slate-100 rounded-xl h-8 px-3 flex items-center justify-between border border-slate-200/80 focus-within:border-blue-500 shadow-xs">
+              <div className="flex items-center gap-2 min-w-0 flex-1 text-slate-700 font-mono text-[11px]">
+                <div className="flex items-center justify-center p-0.5 rounded bg-emerald-500/10 text-emerald-600">
+                  <Lock className="w-3 h-3" />
+                </div>
+                <span className="truncate text-slate-800">
                   {TABS.find((t) => t.id === activeTabId)?.url}
                 </span>
               </div>
@@ -230,20 +245,20 @@ export const Hero: React.FC = () => {
                   onClick={() => setTranslated(!translated)}
                   className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono transition-all cursor-pointer ${
                     translated
-                      ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
-                      : 'hover:bg-white/10 text-slate-400 hover:text-slate-200'
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "bg-white hover:bg-slate-200/80 text-slate-600 border border-slate-200"
                   }`}
                   title="Tek Tıkla Sayfa Çevirisi"
                 >
                   <Languages className="w-3 h-3" />
-                  <span>{translated ? 'TR' : 'EN'}</span>
+                  <span>{translated ? "TR" : "EN"}</span>
                 </button>
 
-                <button className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-slate-200" title="Reader Mode">
+                <button className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-slate-800" title="Reader Mode">
                   <BookOpen className="w-3 h-3" />
                 </button>
 
-                <button className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-cyan-400" title="Bookmark">
+                <button className="p-1 rounded-md hover:bg-slate-200 text-slate-500 hover:text-blue-600" title="Bookmark">
                   <Star className="w-3 h-3" />
                 </button>
               </div>
@@ -251,57 +266,71 @@ export const Hero: React.FC = () => {
 
             {/* Right Tools Bar */}
             <div className="flex items-center gap-1">
+              {/* AI Copilot Pill */}
+              <button 
+                onClick={() => setActiveTabId("agent")}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 border border-cyan-500/20 font-semibold text-xs transition-colors shadow-xs cursor-pointer"
+                title="Nova AI Copilot"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-cyan-500" />
+                <span>AI</span>
+              </button>
+
+              <div className="w-px h-4 bg-slate-200 mx-0.5" />
+
               {/* Privacy Shield Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[10px]">
-                <Shield className="w-3 h-3" />
-                <span className="hidden sm:inline">Shield Active</span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 font-mono text-[10px]">
+                <Shield className="w-3 h-3 text-emerald-600" />
+                <span className="hidden sm:inline font-semibold">Shield Active</span>
               </div>
 
-              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+              <button type="button" aria-label="Downloads" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900">
+                <Download className="w-3.5 h-3.5" />
+              </button>
+              <button type="button" aria-label="Open extensions" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900">
                 <Puzzle className="w-3.5 h-3.5" />
               </button>
-              <button className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+              <button type="button" aria-label="Open settings" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-slate-900">
                 <Settings className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
           {/* VIEWPORT CONTENT AREA */}
-          <div className="flex-1 bg-[#090d16] relative overflow-hidden flex flex-col">
+          <div className="flex-1 bg-gradient-to-b from-slate-50/80 via-white to-slate-100/60 relative overflow-hidden flex flex-col">
             
-            {/* VIEW 1: AUTHENTIC NOVA NEW TAB PAGE */}
-            {activeTabId === 'newtab' && (
+            {/* VIEW 1: AUTHENTIC NOVA NEW TAB PAGE IN LIGHT THEME */}
+            {activeTabId === "newtab" && (
               <div className="flex-1 flex flex-col items-center justify-center p-8 relative">
-                {/* Background Cyber Grid */}
-                <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
+                {/* Background Subtle Cyber Grid */}
+                <div className="absolute inset-0 bg-[radial-gradient(#cbd5e1_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
 
                 {/* Nova Logo & Clock */}
                 <div className="relative z-10 flex flex-col items-center text-center mb-8">
-                  <div className="relative w-20 h-20 sm:w-24 sm:h-24 mb-4 group cursor-pointer">
-                    <img
-                      src="/nova-logo-tight.png"
-                      alt="Nova Logo"
-                      className="w-full h-full object-contain relative z-10 transition-transform duration-300 group-hover:scale-105"
-                    />
+                  {/* Date Badge */}
+                  <div className="flex items-center gap-1.5 mb-2 px-3.5 py-1 rounded-full bg-slate-900/5 backdrop-blur-xl border border-slate-900/10 text-xs font-semibold tracking-wider text-slate-700 shadow-xs">
+                    <span>Friday, August 28</span>
                   </div>
 
-                  <h2 className="font-mono text-4xl sm:text-5xl font-bold text-white tracking-tight">
+                  <h2 className="text-6xl sm:text-7xl font-extralight tracking-tight text-slate-900 font-sans tabular-nums drop-shadow-xs">
                     {currentTime}
                   </h2>
-                  <p className="font-mono text-[11px] text-slate-400 uppercase tracking-widest mt-1">
-                    Autonomous Intelligence Active
+                  <p className="text-xl text-slate-600 font-light tracking-wide mt-1">
+                    Good Afternoon
                   </p>
                 </div>
 
                 {/* AI & Web Search Omnibar */}
                 <div className="relative z-10 w-full max-w-xl mb-8">
-                  <div className="relative flex items-center bg-[#10141f] border border-slate-700/90 hover:border-cyan-500/60 focus-within:border-cyan-400 focus-within:ring-2 focus-within:ring-cyan-500/20 rounded-2xl px-4 py-3 shadow-lg transition-all">
+                  <div className="relative flex items-center bg-white border border-slate-200/90 hover:border-blue-500/60 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-2xl px-4 py-3 shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all">
+                    <Search className="w-4 h-4 text-cyan-500 mr-2 shrink-0" />
+
                     <button
                       onClick={() => setIsAIMode(!isAIMode)}
                       className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold tracking-wider mr-2 cursor-pointer transition-colors ${
                         isAIMode
-                          ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xs'
-                          : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                          ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
                       <Sparkles className="w-3 h-3" />
@@ -310,13 +339,14 @@ export const Hero: React.FC = () => {
 
                     <input
                       type="text"
+                      aria-label={isAIMode ? "Ask Nova Agent" : "Search the web or enter a URL"}
                       placeholder={isAIMode ? "Ask Nova Agent anything or give instructions..." : "Search web or type a URL..."}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="bg-transparent flex-1 outline-none text-xs sm:text-sm text-slate-100 placeholder-slate-500 font-sans"
+                      className="bg-transparent flex-1 outline-none text-xs sm:text-sm text-slate-800 placeholder-slate-400 font-sans"
                     />
 
-                    <div className="flex items-center gap-1.5 text-slate-500 font-mono text-[10px] bg-slate-800/80 px-2 py-1 rounded-lg">
+                    <div className="flex items-center gap-1.5 text-slate-400 font-mono text-[10px] bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
                       <span>ENTER</span>
                       <span>↵</span>
                     </div>
@@ -330,12 +360,12 @@ export const Hero: React.FC = () => {
                     return (
                       <div
                         key={dial.name}
-                        className="flex flex-col items-center gap-2 p-3 rounded-xl bg-[#10141f] hover:bg-[#161c2c] border border-slate-800 hover:border-slate-700 cursor-pointer transition-all duration-200 group"
+                        className="flex flex-col items-center gap-2 p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs hover:shadow-md cursor-pointer transition-all duration-200 group"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-slate-800/80 flex items-center justify-center group-hover:scale-105 transition-transform">
-                          <Icon className="w-4 h-4 text-slate-300 group-hover:text-cyan-400 transition-colors" />
+                        <div className="w-10 h-10 rounded-xl bg-slate-100 group-hover:bg-blue-50 transition-colors flex items-center justify-center">
+                          <Icon className="w-4 h-4 text-slate-600 group-hover:text-blue-600 transition-colors" />
                         </div>
-                        <span className="text-[11px] font-medium text-slate-300 group-hover:text-cyan-400 transition-colors truncate w-full text-center">
+                        <span className="text-[11px] font-semibold text-slate-700 group-hover:text-blue-600 transition-colors truncate w-full text-center">
                           {dial.name}
                         </span>
                       </div>
@@ -345,8 +375,8 @@ export const Hero: React.FC = () => {
 
                 {/* System Status Footer */}
                 <div className="relative z-10 mt-8 flex flex-wrap items-center justify-center gap-4 text-[10px] font-mono text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  <span className="flex items-center gap-1.5 font-medium text-slate-600">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     <span>MCP Bridge: Port 3020 (Online)</span>
                   </span>
                   <span>•</span>
@@ -358,80 +388,80 @@ export const Hero: React.FC = () => {
             )}
 
             {/* VIEW 2: AUTONOMOUS DEEP RESEARCH AGENT */}
-            {activeTabId === 'agent' && (
-              <div className="flex-1 p-6 sm:p-8 flex flex-col font-mono text-xs text-slate-300">
-                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
-                  <div className="flex items-center gap-2 text-cyan-400 font-semibold">
+            {activeTabId === "agent" && (
+              <div className="flex-1 p-6 sm:p-8 flex flex-col font-mono text-xs text-slate-700 bg-white">
+                <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-200">
+                  <div className="flex items-center gap-2 text-blue-600 font-semibold">
                     <Bot className="w-4 h-4" />
                     <span>Nova Autonomous Agent // Multi-Step Synthesis</span>
                   </div>
-                  <span className="bg-cyan-500/10 text-cyan-400 px-2.5 py-0.5 rounded-full text-[10px] border border-cyan-500/20">
+                  <span className="bg-blue-50 text-blue-600 px-2.5 py-0.5 rounded-full text-[10px] border border-blue-200 font-medium">
                     Llama 3.2 3B (Local WebGPU)
                   </span>
                 </div>
 
-                <div className="flex-1 bg-[#121a2f]/80 rounded-xl p-5 border border-slate-800 flex flex-col justify-between shadow-inner">
+                <div className="flex-1 bg-slate-50 rounded-xl p-5 border border-slate-200 flex flex-col justify-between shadow-xs">
                   <div className="space-y-3">
-                    <p className="text-slate-400">// Prompt: "Deep analyze Rust WebAssembly vs C++ compile-time optimizations"</p>
-                    <div className="p-3 bg-[#090d16] rounded-lg border border-slate-800 text-emerald-400 space-y-1.5 text-[11px]">
+                    <p className="text-slate-600">// Prompt: "Deep analyze Rust WebAssembly vs C++ compile-time optimizations"</p>
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 text-emerald-700 space-y-1.5 text-[11px] shadow-xs">
                       <p>&gt; [Step 1] Crawled 14 documentation pages on-device in 80ms.</p>
                       <p>&gt; [Step 2] Executed semantic vector similarity pass via WebGPU shaders.</p>
                       <p>&gt; [Step 3] Generated zero-knowledge executive briefing without cloud roundtrips.</p>
                     </div>
 
-                    <div className="p-4 bg-[#090d16]/90 rounded-lg border border-slate-800/80 text-slate-200 text-xs font-sans leading-relaxed">
-                      <h4 className="font-display text-sm font-bold text-white mb-1.5">Executive Findings:</h4>
-                      <p className="text-slate-300 text-xs leading-relaxed">
+                    <div className="p-4 bg-white rounded-lg border border-slate-200 text-slate-800 text-xs font-sans leading-relaxed shadow-xs">
+                      <h4 className="font-display text-sm font-bold text-slate-900 mb-1.5">Executive Findings:</h4>
+                      <p className="text-slate-600 text-xs leading-relaxed">
                         Rust’s zero-cost abstraction model combined with LLVM backend optimization produces ~18% smaller WASM binaries with predictable GC-free memory layouts.
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-4 mt-4 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-500">
+                  <div className="pt-4 mt-4 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-500">
                     <span>Inference Speed: 62 tokens/sec</span>
-                    <span className="text-cyan-400 font-semibold">Status: Autonomous Task Complete</span>
+                    <span className="text-blue-600 font-semibold">Status: Autonomous Task Complete</span>
                   </div>
                 </div>
               </div>
             )}
 
             {/* VIEW 3: DUAL SPLIT-VIEW & PAGE TRANSLATION */}
-            {activeTabId === 'split' && (
-              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-800">
+            {activeTabId === "split" && (
+              <div className="flex-1 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 bg-white">
                 {/* Left Split Pane: English Source */}
-                <div className="p-6 flex flex-col justify-between bg-[#090d16]">
+                <div className="p-6 flex flex-col justify-between bg-white">
                   <div>
-                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-slate-400">
+                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-slate-500">
                       <span>FRAME A: ORIGINAL ENGLISH</span>
-                      <span className="text-slate-500">MDN Web Docs</span>
+                      <span className="text-slate-400 font-semibold">MDN Web Docs</span>
                     </div>
-                    <h3 className="font-display text-lg font-bold text-white mb-2">
+                    <h3 className="font-display text-lg font-bold text-slate-900 mb-2">
                       WebGPU API Specifications
                     </h3>
-                    <p className="font-sans text-xs text-slate-400 leading-relaxed">
+                    <p className="font-sans text-xs text-slate-600 leading-relaxed">
                       WebGPU exposes modern graphics hardware capabilities to the web, enabling high-performance compute shaders and direct GPU memory buffer manipulation.
                     </p>
                   </div>
-                  <div className="pt-4 border-t border-slate-800 text-[10px] font-mono text-slate-500">
+                  <div className="pt-4 border-t border-slate-100 text-[10px] font-mono text-slate-400">
                     Sync Scroll: ENABLED
                   </div>
                 </div>
 
                 {/* Right Split Pane: 1-Click Turkish Translation */}
-                <div className="p-6 flex flex-col justify-between bg-[#121a2f]/40">
+                <div className="p-6 flex flex-col justify-between bg-blue-50/30">
                   <div>
-                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-cyan-400">
+                    <div className="flex items-center justify-between mb-3 text-[11px] font-mono text-blue-600 font-semibold">
                       <span>FRAME B: TEK TIKLA TÜRKÇE ÇEVİRİ</span>
-                      <span className="bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded text-[10px]">Aktif</span>
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px]">Aktif</span>
                     </div>
-                    <h3 className="font-display text-lg font-bold text-cyan-200 mb-2">
+                    <h3 className="font-display text-lg font-bold text-slate-900 mb-2">
                       WebGPU API Teknik Özellikleri
                     </h3>
-                    <p className="font-sans text-xs text-slate-300 leading-relaxed">
+                    <p className="font-sans text-xs text-slate-700 leading-relaxed">
                       WebGPU, modern grafik donanımı yeteneklerini web platformuna taşıyarak yüksek performanslı hesaplama gölgelendiricileri ve doğrudan GPU bellek manipülasyonu sağlar.
                     </p>
                   </div>
-                  <div className="pt-4 border-t border-slate-800 text-[10px] font-mono text-cyan-400/80">
+                  <div className="pt-4 border-t border-blue-100 text-[10px] font-mono text-blue-600">
                     Gecikme: 120ms // DOM Bütünlüğü Korundu
                   </div>
                 </div>
@@ -446,4 +476,3 @@ export const Hero: React.FC = () => {
 };
 
 export default Hero;
-

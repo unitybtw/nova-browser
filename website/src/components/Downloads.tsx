@@ -136,7 +136,10 @@ export const Downloads: React.FC = () => {
             {(['brew', 'winget', 'source'] as const).map((tab) => (
               <button
                 key={tab}
+                type="button"
                 onClick={() => setActiveCliTab(tab)}
+                aria-pressed={activeCliTab === tab}
+                aria-label={`Show ${tab.toUpperCase()} installation command`}
                 className={`px-3 py-1 rounded-md font-mono text-[11px] font-semibold transition-colors cursor-pointer ${
                   activeCliTab === tab
                     ? 'bg-[#171717] text-white shadow-xs'
@@ -153,7 +156,9 @@ export const Downloads: React.FC = () => {
         <div className="flex items-center justify-between gap-4 p-3.5 bg-black/60 rounded-xl border border-neutral-800 font-mono text-xs text-emerald-400 overflow-x-auto">
           <span className="select-all">$ {CLI_COMMANDS[activeCliTab]}</span>
           <button
+            type="button"
             onClick={() => handleCopy(activeCliTab)}
+            aria-label={`Copy ${activeCliTab.toUpperCase()} installation command`}
             className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-[11px] font-mono flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
           >
             {copiedTab === activeCliTab ? (

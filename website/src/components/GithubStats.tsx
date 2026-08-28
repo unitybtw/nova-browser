@@ -226,6 +226,8 @@ export const GithubStats: React.FC = () => {
             {(['7d', '30d', 'all'] as const).map((t) => (
               <button
                 key={t}
+                type="button"
+                aria-pressed={timeframe === t}
                 onClick={() => {
                   setTimeframe(t);
                   setHoveredPoint(null);
