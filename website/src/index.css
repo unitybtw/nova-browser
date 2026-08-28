@@ -171,22 +171,6 @@ section {
   border: 1px solid var(--nova-border);
 }
 
-/* Mac traffic lights */
-.mac-btn {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-}
-.mac-close { background-color: #ff5f56; }
-.mac-min { background-color: #ffbd2e; }
-.mac-max { background-color: #27c93f; }
-
-/* The marketing demo is a browser viewport, not an OS window. */
-.browser-demo--no-window-chrome .nova-window-controls {
-  display: none !important;
-}
-
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

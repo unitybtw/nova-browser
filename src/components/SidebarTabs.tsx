@@ -37,9 +37,8 @@ import {
   Cloud,
   Sparkles
 } from 'lucide-react';
-import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
+import { Tab, Bookmark, Workspace, Folder } from '../types/browser';
 import { UserSettings } from '../App';
-import WindowControls, { WindowPlatform } from './WindowControls';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -149,8 +148,6 @@ export interface SidebarTabsProps {
   onOpenExtensions?: () => void;
   onToggleAIAssistant?: () => void;
   isAIAssistantOpen?: boolean;
-  windowPlatform?: WindowPlatform;
-  hideWindowChrome?: boolean;
   bookmarks?: Bookmark[];
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
@@ -446,8 +443,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenExtensions,
   onToggleAIAssistant,
   isAIAssistantOpen = false,
-  windowPlatform,
-  hideWindowChrome = false,
   bookmarks = [],
   onToggleCollapse,
   isCollapsed = false,
@@ -744,14 +739,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           <div className="flex items-center gap-1">
-            <div
-              className={`w-[72px] h-full shrink-0 drag-region flex items-center ${hideWindowChrome ? 'hidden' : ''}`}
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
-            >
-              {!hideWindowChrome && windowPlatform === 'mac' && (
-                <WindowControls platform="mac" className="pl-1" />
-              )}
-            </div>
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
@@ -1421,8 +1408,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
-  if (prevProps.windowPlatform !== nextProps.windowPlatform) return false;
-  if (prevProps.hideWindowChrome !== nextProps.hideWindowChrome) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
   if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;

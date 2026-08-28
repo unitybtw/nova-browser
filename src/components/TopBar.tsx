@@ -54,7 +54,6 @@ import {
   Languages
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
-import WindowControls, { WindowPlatform } from './WindowControls';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
@@ -121,8 +120,6 @@ interface TopBarProps {
   isVpnEnabled?: boolean;
   onToggleVpn?: () => void;
   onToggleAIAssistant: () => void;
-  windowPlatform?: WindowPlatform;
-  hideWindowChrome?: boolean;
   activeDownloadsCount?: number;
   downloads?: any[];
   onClearDownloads?: () => void;
@@ -1122,8 +1119,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   isVpnEnabled = false,
   onToggleVpn,
   onToggleAIAssistant,
-  windowPlatform,
-  hideWindowChrome = false,
   showBookmarksBar = false,
   onToggleReaderMode,
   onOpenExtensions,
@@ -1371,20 +1366,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
-  const isMac = useMemo(() => {
-    if (windowPlatform === 'mac') return true;
-    if (windowPlatform === 'windows') return false;
-    if (typeof navigator === 'undefined') return false;
-    return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-  }, [windowPlatform]);
-
-  const isWindows = useMemo(() => {
-    if (windowPlatform === 'windows') return true;
-    if (windowPlatform === 'mac') return false;
-    if (typeof navigator === 'undefined') return false;
-    return navigator.userAgent.toLowerCase().includes('win');
-  }, [windowPlatform]);
-
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
 
   const currentUrl = activeTab?.url || '';
@@ -1426,15 +1407,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           transition={{ duration: 0.2 }}
           className="flex items-end px-2 pt-2.5 gap-1"
         >
-          {/* macOS Traffic Lights Spacer: 76px on left so native or mock traffic lights never collide with Workspace or Tabs */}
-          {!hideWindowChrome && isMac && (
-            <div className="w-[76px] h-full flex items-center pl-2 shrink-0 select-none drag-region">
-              {windowPlatform === 'mac' && <WindowControls platform="mac" />}
-            </div>
-          )}
-          
           {/* Workspace Selector */}
-          {workspaces && activeWorkspace && onSelectWorkspace && !hideWindowChrome && (
+          {workspaces && activeWorkspace && onSelectWorkspace && (
             <div className="relative no-drag mb-1">
               <button
                 onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
@@ -1611,13 +1585,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
         </div>
-        
-        {/* Spacer / Controls for Windows */}
-        {!hideWindowChrome && isWindows && (
-          <div className="w-[140px] shrink-0 flex items-center justify-end pr-2 drag-region">
-            {windowPlatform === 'windows' && <WindowControls platform="windows" />}
-          </div>
-        )}
       </motion.div>
       )}
       </AnimatePresence>
@@ -2087,8 +2054,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.activeTabId !== nextProps.activeTabId) return false;
   if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
   if (prevProps.activeDownloadsCount !== nextProps.activeDownloadsCount) return false;
-  if (prevProps.windowPlatform !== nextProps.windowPlatform) return false;
-  if (prevProps.hideWindowChrome !== nextProps.hideWindowChrome) return false;
   if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
   if (prevProps.showBookmarksBar !== nextProps.showBookmarksBar) return false;
   if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;

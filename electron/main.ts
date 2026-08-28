@@ -260,7 +260,6 @@ function createWindow() {
         height: 44
       }
     } : {}),
-    trafficLightPosition: { x: 14, y: 14 },
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {
@@ -271,6 +270,12 @@ function createWindow() {
       sandbox: true
     }
   });
+
+  // The renderer owns the browser chrome; do not show a second native macOS
+  // window-control layer above it.
+  if (process.platform === 'darwin') {
+    mainWindow.setWindowButtonVisibility(false);
+  }
 
   // ⚡ Perf: don't paint a blank window while content loads — show once the
   // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
@@ -1284,16 +1289,6 @@ ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
 ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
   if (!isTrustedSender(event)) return;
   isDoNotTrackEnabled = Boolean(enabled);
-});
-
-// Dynamic window traffic light visibility on macOS
-ipcMain.handle('set-window-button-visibility', (event, visible: boolean) => {
-  if (!isTrustedSender(event)) return;
-  if (mainWindow && !mainWindow.isDestroyed() && process.platform === 'darwin') {
-    try {
-      mainWindow.setWindowButtonVisibility(Boolean(visible));
-    } catch (_) {}
-  }
 });
 
 // Daily 4K Ultra HD Wallpaper Engine (Bing 4K UHD Archive + 4K Desktop Masterpieces)

@@ -48,7 +48,6 @@ import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
-import type { WindowPlatform } from './components/WindowControls';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -134,7 +133,6 @@ type DemoParams = {
   theme: 'dark' | 'light';
   tabs: string;
   showTasksWidget?: boolean;
-  windowPlatform?: WindowPlatform;
 };
 
 // Demo mode query parameter inspection
@@ -157,7 +155,6 @@ export interface BrowserDemoOptions {
   theme?: 'dark' | 'light';
   tabs?: string;
   showTasksWidget?: boolean;
-  windowPlatform?: WindowPlatform;
 }
 
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
@@ -590,27 +587,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
     }
   }, [settings]);
-
-  // The marketing demo is rendered inside the website card, not as a native
-  // Electron window. Keep macOS traffic lights out of that embedded viewport.
-  useEffect(() => {
-    const setWindowButtonVisibility = (visible: boolean) => {
-      (window as any).electronAPI?.setWindowButtonVisibility?.(visible);
-    };
-
-    if (demoParams.isDemo) {
-      setWindowButtonVisibility(false);
-      return () => setWindowButtonVisibility(true);
-    }
-
-    if (!settings.useVerticalTabs) {
-      setWindowButtonVisibility(true);
-      return;
-    }
-
-    const shouldShowButtons = !isSidebarCollapsed || isHoverRevealing;
-    setWindowButtonVisibility(shouldShowButtons);
-  }, [demoParams.isDemo, settings.useVerticalTabs, isSidebarCollapsed, isHoverRevealing]);
 
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
@@ -2642,7 +2618,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
-  const demoWindowPlatform = demoParams.isDemo ? demoParams.windowPlatform : undefined;
+  const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
+  const useVerticalTabs = isWebsiteDemo ? false : settings.useVerticalTabs;
 
   // Compute second tab for split view (if available)
   const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
@@ -2670,7 +2647,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
       <AnimatePresence initial={false}>
-        {settings.useVerticalTabs && !isSidebarCollapsed && (
+        {useVerticalTabs && !isSidebarCollapsed && (
           <motion.div 
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 240, opacity: 1 }}
@@ -2725,8 +2702,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onOpenExtensions={handleOpenExtensions}
               onToggleAIAssistant={handleToggleAIAssistant}
               isAIAssistantOpen={isSidePanelOpen}
-              windowPlatform={demoWindowPlatform}
-              hideWindowChrome={demoParams.isDemo}
               bookmarks={bookmarks}
               isCollapsed={false}
               onReorderTabs={handleReorderTabs}
@@ -2737,7 +2712,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       </AnimatePresence>
 
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
-      {settings.useVerticalTabs && isSidebarCollapsed && (
+      {useVerticalTabs && isSidebarCollapsed && (
         <>
           {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
           <div 
@@ -2822,8 +2797,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onOpenExtensions={handleOpenExtensions}
                   onToggleAIAssistant={handleToggleAIAssistant}
                   isAIAssistantOpen={isSidePanelOpen}
-                  windowPlatform={demoWindowPlatform}
-                  hideWindowChrome={demoParams.isDemo}
                   bookmarks={bookmarks}
                   isCollapsed={true}
                   onReorderTabs={handleReorderTabs}
@@ -2836,8 +2809,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       )}
 
       {/* Main Viewport Card with fluid margin & border radius transition */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${settings.useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-        settings.useVerticalTabs 
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
             : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5' 
@@ -2845,7 +2818,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
         <AnimatePresence initial={false}>
-          {!settings.useVerticalTabs && (
+          {!useVerticalTabs && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -2864,11 +2837,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 downloads={downloads}
                 onClearDownloads={handleClearDownloads}
                 showBookmarksBar={settings.showBookmarksBar}
-                useVerticalTabs={settings.useVerticalTabs}
+                useVerticalTabs={useVerticalTabs}
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
-                windowPlatform={demoWindowPlatform}
-                hideWindowChrome={demoParams.isDemo}
                 tabStyle={settings.tabStyle}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}
