@@ -165,8 +165,11 @@ let mcpServer: BrowserMCPServer | null = null;
 let currentWhitelistFilters: any[] = [];
 
 function updateAdblockWhitelist(whitelist: string[]) {
-  if (!blocker) return;
-  const newFilters = whitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
+  if (!blocker || !Array.isArray(whitelist)) return;
+  const cleanWhitelist = whitelist
+    .filter(host => typeof host === 'string' && /^[a-zA-Z0-9.-]+$/.test(host.trim()))
+    .map(host => host.trim().toLowerCase());
+  const newFilters = cleanWhitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
   
   blocker.update({
     newNetworkFilters: newFilters as any[],
@@ -204,7 +207,8 @@ ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
 
   // Activate blocking immediately if the engine finished loading after window creation
   if (isPrivacyShieldEnabled) {
-    try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking:', e); }
+    try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking in default session:', e); }
+    try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable adblocking in incognito session:', e); }
   }
 
   // Batch ad-blocked notifications to avoid IPC flooding (can be 50-100+ per page)
@@ -291,96 +295,105 @@ function createWindow() {
   // Webviews do not receive a global preload. The narrowly-scoped Web Store
   // preload is assigned during attachment after the destination is validated.
 
-  // Apply AdBlocker to session
+  // Apply AdBlocker to sessions (default and incognito)
   if (isPrivacyShieldEnabled && blocker) {
-    blocker.enableBlockingInSession(session.defaultSession);
+    try { blocker.enableBlockingInSession(session.defaultSession); } catch(e) {}
+    try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
   } else if (blocker) {
     try { blocker.disableBlockingInSession(session.defaultSession); } catch(e) {}
+    try { blocker.disableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
   }
 
-// Privacy Shield: Inject Do Not Track & Global Privacy Control headers
-session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
-  const requestHeaders = { ...details.requestHeaders };
-  
-  if (details.url.includes('chrome.google.com') || details.url.includes('chromewebstore.google.com')) {
-    requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"';
-    requestHeaders['sec-ch-ua-mobile'] = '?0';
-    requestHeaders['sec-ch-ua-platform'] = '"macOS"';
-    requestHeaders['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  // Privacy Shield: Reusable helper to attach privacy and security headers to a session
+  function applyPrivacyHeadersToSession(targetSession: Electron.Session) {
+    // Inject Do Not Track, Global Privacy Control & Chrome Web Store spoofing headers
+    targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
+      const requestHeaders = { ...details.requestHeaders };
+      
+      if (details.url.includes('chrome.google.com') || details.url.includes('chromewebstore.google.com')) {
+        requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"';
+        requestHeaders['sec-ch-ua-mobile'] = '?0';
+        requestHeaders['sec-ch-ua-platform'] = '"macOS"';
+        requestHeaders['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+      }
+
+      if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
+        requestHeaders['DNT'] = '1';
+        requestHeaders['Sec-GPC'] = '1';
+      }
+      callback({ requestHeaders });
+    });
+
+    // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP + X-Content-Type-Options
+    targetSession.webRequest.onHeadersReceived((details, callback) => {
+      let isDevLocalhost = false;
+      let isAppFile = false;
+      try {
+        const parsed = new URL(details.url);
+        // Security: dev-server COOP/COEP headers and dev CSP only apply in
+        // unpackaged dev builds; a packaged app must never trust localhost:5173.
+        if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
+          isDevLocalhost = true;
+        }
+        if (parsed.protocol === 'file:') {
+          isAppFile = true;
+        }
+      } catch {}
+
+      // Perf: remote traffic only ever gets X-Content-Type-Options here (and
+      // only when Privacy Shield is on) - skip cloning every response header and
+      // building the map entirely when nothing would be added anyway.
+      if (!isDevLocalhost && !isAppFile && !isPrivacyShieldEnabled) {
+        callback({});
+        return;
+      }
+
+      const responseHeaders: Record<string, string[]> = {};
+      if (details.responseHeaders) {
+        for (const [key, value] of Object.entries(details.responseHeaders)) {
+          if (value) {
+            responseHeaders[key] = Array.isArray(value) ? value : [value];
+          }
+        }
+      }
+
+      if (isDevLocalhost) {
+        responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
+        responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
+      }
+
+      // VULN-16: Add Content Security Policy for the app's own pages
+      if (isAppFile || isDevLocalhost) {
+        const isDev = isDevLocalhost || !app.isPackaged;
+        
+        // Generate a cryptographically secure nonce for this request
+        const nonce = crypto.randomBytes(16).toString('base64');
+        const nonceAttr = `'nonce-${nonce}'`;
+        
+        responseHeaders['Content-Security-Policy'] = [
+          isDev
+            ? `default-src 'self'; script-src 'self' ${nonceAttr} 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
+        ];
+        
+        // Store nonce for potential use in preload/renderer (e.g., for inline scripts)
+        responseHeaders['X-Content-Security-Policy-Nonce'] = [nonce];
+      }
+
+      if (isPrivacyShieldEnabled) {
+        responseHeaders['X-Content-Type-Options'] = ['nosniff'];
+      }
+      callback({ responseHeaders });
+    });
   }
 
-  if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
-    requestHeaders['DNT'] = '1';
-    requestHeaders['Sec-GPC'] = '1';
-  }
-  callback({ requestHeaders });
-});
+  // Apply privacy and security headers across both standard and incognito sessions
+  applyPrivacyHeadersToSession(session.defaultSession);
+  applyPrivacyHeadersToSession(session.fromPartition('incognito'));
 
   // Downloads Manager: Handle file downloads via Electron IPC
   registerDownloadsManager(session.defaultSession);
   registerDownloadsManager(session.fromPartition('incognito'));
-
-  // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    let isDevLocalhost = false;
-    let isAppFile = false;
-    try {
-      const parsed = new URL(details.url);
-      // 🔒 Security: dev-server COOP/COEP headers and dev CSP only apply in
-      // unpackaged dev builds; a packaged app must never trust localhost:5173.
-      if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
-        isDevLocalhost = true;
-      }
-      if (parsed.protocol === 'file:') {
-        isAppFile = true;
-      }
-    } catch {}
-
-    // ⚡ Perf: remote traffic only ever gets X-Content-Type-Options here (and
-    // only when Privacy Shield is on) — skip cloning every response header and
-    // building the map entirely when nothing would be added anyway.
-    if (!isDevLocalhost && !isAppFile && !isPrivacyShieldEnabled) {
-      callback({});
-      return;
-    }
-
-    const responseHeaders: Record<string, string[]> = {};
-    if (details.responseHeaders) {
-      for (const [key, value] of Object.entries(details.responseHeaders)) {
-        if (value) {
-          responseHeaders[key] = Array.isArray(value) ? value : [value];
-        }
-      }
-    }
-
-    if (isDevLocalhost) {
-      responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
-      responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
-    }
-
-    // VULN-16: Add Content Security Policy for the app's own pages
-    if (isAppFile || isDevLocalhost) {
-      const isDev = isDevLocalhost || !app.isPackaged;
-      
-      // Generate a cryptographically secure nonce for this request
-      const nonce = crypto.randomBytes(16).toString('base64');
-      const nonceAttr = `'nonce-${nonce}'`;
-      
-      responseHeaders['Content-Security-Policy'] = [
-        isDev
-          ? `default-src 'self'; script-src 'self' ${nonceAttr} 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
-          : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
-      ];
-      
-      // Store nonce for potential use in preload/renderer (e.g., for inline scripts)
-      responseHeaders['X-Content-Security-Policy-Nonce'] = [nonce];
-    }
-
-    if (isPrivacyShieldEnabled) {
-      responseHeaders['X-Content-Type-Options'] = ['nosniff'];
-    }
-    callback({ responseHeaders });
-  });
 
   const devUrl = 'http://localhost:5173';
   const distHtmlPath = path.join(__dirname, '../dist/index.html');
@@ -1252,9 +1265,11 @@ ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
   isPrivacyShieldEnabled = Boolean(enabled);
   if (blocker) {
     if (isPrivacyShieldEnabled) {
-      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable ad blocking in session:', e); }
+      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable ad blocking in default session:', e); }
+      try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable ad blocking in incognito session:', e); }
     } else {
       try { blocker.disableBlockingInSession(session.defaultSession); } catch(e) {}
+      try { blocker.disableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
     }
   }
   return isPrivacyShieldEnabled;
@@ -1343,6 +1358,7 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
 
 // Legacy alias for compatibility
 ipcMain.handle('fetch-unsplash-photos', async (event, query: string) => {
+  if (!isTrustedSender(event)) return [];
   return [];
 });
 
@@ -1393,6 +1409,7 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
     }
 
     let dataUrl = null;
+    let metricsOverridden = false;
     try {
       const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
       const width = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
@@ -1406,6 +1423,7 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
         deviceScaleFactor: 1,
         screenOrientation: { angle: 0, type: 'portraitPrimary' }
       });
+      metricsOverridden = true;
 
       // Wait a moment for the page to layout and paint the newly exposed areas
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -1423,17 +1441,21 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
         }
       });
 
-      // Restore original device metrics
-      await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
-
       if (response && (response as any).data) {
         dataUrl = `data:image/png;base64,${(response as any).data}`;
       }
     } catch (err) {
       console.error('Screenshot CDP command failed:', err);
     } finally {
-      if (attached) {
-        wc.debugger.detach();
+      if (metricsOverridden && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
+        try {
+          await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
+        } catch (_) {}
+      }
+      if (attached && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
+        try {
+          wc.debugger.detach();
+        } catch (_) {}
       }
     }
     
@@ -2354,18 +2376,54 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   const win = BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No window available' };
-  // VULN-15: Validate that folderPath is within userData/extensions and has no traversal
+
+  if (!folderPath || typeof folderPath !== 'string' || !folderPath.trim()) {
+    return { error: 'Invalid extension folder path.' };
+  }
+
+  // Guard against directory traversal
   if (folderPath.includes('..')) {
     return { error: 'Invalid extension path: path traversal detected.' };
   }
-  const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
-  const resolvedFolder = path.resolve(folderPath);
-  if (!resolvedFolder.startsWith(extensionsDir + path.sep) && resolvedFolder !== extensionsDir) {
-    return { error: 'Extension must be within the app extensions directory.' };
+
+  const resolvedFolder = path.resolve(folderPath.trim());
+  if (!fs.existsSync(resolvedFolder)) {
+    return { error: 'Extension directory does not exist.' };
   }
+
   try {
-    const extInfo = await win.webContents.session.loadExtension(resolvedFolder);
-    loadedExtensions.push(extInfo);
+    const stat = fs.statSync(resolvedFolder);
+    if (!stat.isDirectory()) {
+      return { error: 'Selected path is not a directory.' };
+    }
+  } catch {
+    return { error: 'Unable to access extension directory.' };
+  }
+
+  const manifestPath = path.join(resolvedFolder, 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return { error: 'No manifest.json found in the selected folder.' };
+  }
+
+  try {
+    const targetSession = win.webContents?.session || session.defaultSession;
+    const extInfo = await targetSession.loadExtension(resolvedFolder);
+
+    const disabledIds = getDisabledExtensionIds();
+    if (disabledIds.includes(extInfo.id)) {
+      setDisabledExtensionIds(disabledIds.filter(id => id !== extInfo.id));
+    }
+
+    if (!loadedExtensions.some(e => e.id === extInfo.id)) {
+      loadedExtensions.push(extInfo);
+    }
+
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (!w.isDestroyed()) {
+        w.webContents.send('extension-changed');
+      }
+    }
+
     return { success: true, extension: extInfo };
   } catch (err) {
     console.error('Failed to load extension', err);
@@ -2383,16 +2441,18 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
   const disabledIds = getDisabledExtensionIds();
   const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
   const extPath = path.resolve(path.join(extensionsBaseDir, extensionId));
+  const foundExt = loadedExtensions.find(e => e.id === extensionId);
+  const targetExtPath = (foundExt?.path && fs.existsSync(foundExt.path)) ? foundExt.path : extPath;
 
   try {
     if (enabled) {
       const newDisabled = disabledIds.filter(id => id !== extensionId);
       setDisabledExtensionIds(newDisabled);
       
-      if (fs.existsSync(extPath)) {
+      if (fs.existsSync(targetExtPath)) {
         const isLoaded = loadedExtensions.some(e => e.id === extensionId);
         if (!isLoaded) {
-          const extInfo = await session.defaultSession.loadExtension(extPath);
+          const extInfo = await session.defaultSession.loadExtension(targetExtPath);
           loadedExtensions.push(extInfo);
         }
       }

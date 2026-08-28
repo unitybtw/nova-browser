@@ -459,12 +459,30 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleFaviconUpdate = (e: any) => {
       if (e.favicons && e.favicons.length > 0 && tab?.id) {
-        onUpdateTab(tab.id, { favicon: e.favicons[0] });
+        // Security: only allow https:// favicons or safe data:image/ URIs.
+        // Reject javascript:, data:text/, vbscript:, file: and other dangerous sources.
+        const raw = e.favicons[0] as string;
+        const isSafe =
+          (typeof raw === 'string') &&
+          (raw.startsWith('https://') ||
+            raw.startsWith('http://') ||
+            /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,/.test(raw));
+        if (isSafe) {
+          onUpdateTab(tab.id, { favicon: raw });
+        }
       }
     };
 
     const handleNewWindow = (e: any) => {
       if (e.url) {
+        // Security: only allow safe HTTP/HTTPS URLs from new-window events.
+        // Reject javascript:, data:, vbscript:, file: and other dangerous protocols.
+        try {
+          const parsed = new URL(e.url);
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
+        } catch {
+          return;
+        }
         if (onNewTab) {
           onNewTab(e.url);
         } else if (onNavigate) {

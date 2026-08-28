@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../App';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -144,7 +145,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       const saved = localStorage.getItem('nova_speed_dials');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.filter(d => d && typeof d.url === 'string' && isSafeNavigationUrl(d.url));
+        }
       }
     } catch (e) {}
     return DEFAULT_SPEED_DIALS;
@@ -310,11 +313,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const handleAddSpeedDial = () => {
     if (!editingDial.name || !editingDial.url) return;
     let url = editingDial.url.trim();
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!/^https?:\/\//i.test(url)) {
       url = 'https://' + url;
     }
+    if (!isSafeNavigationUrl(url)) return;
     try {
-      const domain = new URL(url).hostname;
+      const parsed = new URL(url);
+      const domain = parsed.hostname;
+      if (!domain) return;
       if (editingDial.index !== null) {
         const updated = [...speedDials];
         updated[editingDial.index] = { name: editingDial.name, url, domain };
@@ -322,7 +328,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       } else {
         setSpeedDials([...speedDials, { name: editingDial.name, url, domain }]);
       }
-    } catch(e) {}
+    } catch(e) {
+      return;
+    }
 
     setIsEditModalOpen(false);
     setEditingDial({ name: '', url: '', index: null });

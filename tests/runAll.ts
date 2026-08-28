@@ -15,4 +15,5 @@ import './main_process_runtime_verification';
 import './challenger_m4_bundle_empirical';
 import './securityHardening.test';
 import './page_translation.test';
+import './security_regression_audit.test';
 import './benchmark_suite';

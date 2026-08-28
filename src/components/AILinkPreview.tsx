@@ -229,33 +229,6 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
     return () => { isCancelled = true; };
   }, [url, isOpen]);
 
-  useEffect(() => {
-    if (!data?.summary) {
-      setDisplayedSummary('');
-      return;
-    }
-
-    if (!data.isAiGenerated) {
-      setDisplayedSummary(data.summary);
-      return;
-    }
-
-    let i = 0;
-    setDisplayedSummary('');
-    const fullText = data.summary;
-    const timer = setInterval(() => {
-      i += 3;
-      if (i >= fullText.length) {
-        setDisplayedSummary(fullText);
-        clearInterval(timer);
-      } else {
-        setDisplayedSummary(fullText.substring(0, i));
-      }
-    }, 15);
-
-    return () => clearInterval(timer);
-  }, [data]);
-
   let domainName = '';
   try {
     domainName = new URL(url).hostname.replace(/^www\./, '');

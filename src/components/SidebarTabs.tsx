@@ -41,6 +41,7 @@ import { Tab, Workspace, Folder, Bookmark } from '../types/browser';
 import { UserSettings } from '../App';
 import WindowControls, { WindowPlatform } from './WindowControls';
 import { formatSearchUrl } from '../utils/searchEngine';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
@@ -487,7 +488,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       const saved = localStorage.getItem('nova_top_favorites');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(f => f && typeof f.url === 'string' && isSafeNavigationUrl(f.url));
+        }
       }
     } catch (_) {}
     return DEFAULT_FAVORITE_APPS;
@@ -498,9 +501,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const [newFavUrl, setNewFavUrl] = useState('');
 
   const saveFavorites = (newFavs: FavoriteApp[]) => {
-    setFavorites(newFavs);
+    const safeFavs = newFavs.filter(f => f && typeof f.url === 'string' && isSafeNavigationUrl(f.url));
+    setFavorites(safeFavs);
     try {
-      localStorage.setItem('nova_top_favorites', JSON.stringify(newFavs));
+      localStorage.setItem('nova_top_favorites', JSON.stringify(safeFavs));
     } catch (_) {}
   };
 
@@ -509,8 +513,19 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     if (!newFavName.trim() || !newFavUrl.trim()) return;
 
     let finalUrl = newFavUrl.trim();
-    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+    if (!/^https?:\/\//i.test(finalUrl)) {
       finalUrl = 'https://' + finalUrl;
+    }
+
+    if (!isSafeNavigationUrl(finalUrl)) {
+      return;
+    }
+
+    try {
+      const parsed = new URL(finalUrl);
+      if (!parsed.hostname) return;
+    } catch (_) {
+      return;
     }
 
     let iconType: FavoriteApp['iconType'] = 'custom';
@@ -621,8 +636,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     const url = formatSearchUrl(targetValue, searchEngine || 'google');
     if (onNavigate) {
       onNavigate(url);
-    } else {
-      // Fallback
+    } else if (onNewTab) {
+      onNewTab(url);
     }
     setSearchValue('');
     setShowSuggestions(false);

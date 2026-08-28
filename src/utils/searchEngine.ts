@@ -4,6 +4,12 @@ export function isValidUrlOrDomain(input: string): boolean {
   const trimmed = input.trim();
   if (!trimmed) return false;
 
+  // Security: reject all dangerous and non-navigable protocols immediately,
+  // before any other pattern matching. This prevents javascript:3000 or
+  // data:text/html from being treated as a valid "domain:port" URL.
+  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'blob:', 'chrome:', 'edge:', 'about:config'];
+  if (dangerousProtocols.some(p => trimmed.toLowerCase().startsWith(p))) return false;
+
   // Query with spaces is a search query (e.g. "google.com is down", "node.js tutorial")
   if (/\s/.test(trimmed)) return false;
 
@@ -12,8 +18,8 @@ export function isValidUrlOrDomain(input: string): boolean {
     return true;
   }
 
-  // Explicit protocols
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+  // Explicit protocols (case-insensitive)
+  if (/^https?:\/\//i.test(trimmed)) {
     return true;
   }
 
@@ -65,14 +71,23 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
   const trimmed = query.trim();
   if (!trimmed) return '';
 
+  // Security: reject all dangerous and non-navigable protocols immediately.
+  // Prevents javascript:alert(1) from being navigated to if it somehow reaches here.
+  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'blob:', 'chrome:', 'edge:'];
+  if (dangerousProtocols.some(p => trimmed.toLowerCase().startsWith(p))) {
+    // Treat as a search query instead of navigating to dangerous URL
+    const q = encodeURIComponent(trimmed);
+    return `https://www.google.com/search?q=${q}`;
+  }
+
   // Safe internal browser schemes
   const safeInternalSchemes = ['nova://', 'about:'];
   if (safeInternalSchemes.some(scheme => trimmed.toLowerCase().startsWith(scheme))) {
     return trimmed;
   }
 
-  // Already has HTTP or HTTPS protocol
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+  // Already has HTTP or HTTPS protocol (case-insensitive)
+  if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
 
