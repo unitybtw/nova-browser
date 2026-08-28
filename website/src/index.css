@@ -1,6 +1,14 @@
 @import 'tailwindcss';
+@source "../../src";
+@custom-variant dark (&:is(.dark *));
 
 @theme {
+  --color-accent: var(--nova-accent, var(--color-blue-500));
+  --color-accent-hover: var(--nova-accent-hover, var(--color-blue-600));
+  --color-accent-light: var(--nova-accent-light, var(--color-blue-100));
+  --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
+  --color-accent-text: var(--nova-accent-text, #ffffff);
+
   --font-serif: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-display: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -93,4 +101,32 @@ body {
 .animate-border-shimmer {
   background-size: 200% 200%;
   animation: border-shimmer 4s ease infinite;
+}
+
+/* The real browser is embedded inside the marketing page. Keep its chrome
+   independent from the site's layout and never let the optional task card
+   cover the new-tab content in this compact presentation. */
+.browser-demo {
+  position: relative;
+  isolation: isolate;
+  contain: layout paint;
+}
+
+.browser-demo .nova-tasks-widget {
+  display: none !important;
+}
+
+.browser-demo .nova-omnibox-form {
+  position: relative !important;
+}
+
+.browser-demo .nova-omnibox-actions {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0.5rem !important;
+  bottom: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.25rem !important;
+  z-index: 10 !important;
 }

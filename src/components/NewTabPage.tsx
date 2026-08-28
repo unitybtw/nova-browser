@@ -930,7 +930,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
-        className="absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
+        className="nova-tasks-widget absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
         style={{ maxHeight: '380px' }}
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">

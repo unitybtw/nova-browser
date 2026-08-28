@@ -126,9 +126,18 @@ type AppEventHandlers = {
   handleGoForward: () => void;
 };
 
+type DemoParams = {
+  isDemo: boolean;
+  feature: string;
+  bg: string;
+  theme: 'dark' | 'light';
+  tabs: string;
+  showTasksWidget?: boolean;
+};
+
 // Demo mode query parameter inspection
-const getDemoParams = () => {
-  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark' as const, tabs: 'horizontal' };
+const getDemoParams = (): DemoParams => {
+  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark', tabs: 'horizontal' };
   const params = new URLSearchParams(window.location.search);
   return {
     isDemo: params.get('demo') === 'true',
@@ -145,6 +154,7 @@ export interface BrowserDemoOptions {
   bg?: string;
   theme?: 'dark' | 'light';
   tabs?: string;
+  showTasksWidget?: boolean;
 }
 
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
@@ -159,6 +169,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       bg: demoOptions.bg ?? queryParams.bg,
       theme: demoOptions.theme ?? queryParams.theme,
       tabs: demoOptions.tabs ?? queryParams.tabs,
+      showTasksWidget: demoOptions.showTasksWidget ?? queryParams.showTasksWidget,
     };
   }, [demoOptions]);
 
@@ -508,6 +519,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       accentColor: 'blue',
       customAccentColor: '#3b82f6',
       showBookmarksBar: false,
+      showTasksWidget: demoParams.showTasksWidget ?? (demoParams.feature === 'website' ? false : true),
       useVerticalTabs: demoParams.isDemo ? (demoParams.tabs === 'vertical') : true,
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
@@ -2977,7 +2989,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   searchEngine={settings.searchEngine}
                   privacyShield={settings.privacyShield}
                   newTabBackground={settings.newTabBackground}
-                  settings={settings}
+                  disableTasksWidget={demoParams.feature === 'website'}
+                  settings={{
+                    ...settings,
+                    showTasksWidget: demoParams.feature === 'website' ? false : settings.showTasksWidget,
+                  }}
                   onUpdateSettings={handleUpdateSettings}
                   onExportData={handleExportData}
                   onImportData={handleImportData}
@@ -3084,7 +3100,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               searchEngine={settings.searchEngine}
               privacyShield={settings.privacyShield}
               newTabBackground={settings.newTabBackground}
-              settings={settings}
+              disableTasksWidget={demoParams.feature === 'website'}
+              settings={{
+                ...settings,
+                showTasksWidget: demoParams.feature === 'website' ? false : settings.showTasksWidget,
+              }}
               onUpdateSettings={handleUpdateSettings}
               onExportData={handleExportData}
               onImportData={handleImportData}

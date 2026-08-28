@@ -703,7 +703,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   return (
     <div className="flex-1 flex w-full mx-1 duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
       <div className="w-full relative">
-        <form onSubmit={handleSearchSubmit} className="relative group w-full">
+        <form
+          onSubmit={handleSearchSubmit}
+          className="nova-omnibox-form relative group w-full"
+          style={{ position: 'relative' }}
+        >
           <div 
             ref={siteInfoBtnRef}
             onClick={(e) => {
@@ -857,7 +861,19 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               )}
             </div>
           )}
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 z-10">
+          <div
+            className="nova-omnibox-actions absolute inset-y-0 right-2 flex items-center gap-1 z-10"
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: '0.5rem',
+              bottom: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.25rem',
+              zIndex: 10,
+            }}
+          >
             {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
               <button 
                 type="button" 

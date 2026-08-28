@@ -37,6 +37,7 @@ interface BrowserViewProps {
   searchEngine?: UserSettings['searchEngine'];
   privacyShield: boolean;
   newTabBackground?: string;
+  disableTasksWidget?: boolean;
   settings: UserSettings;
   onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
   history?: HistoryItem[];
@@ -61,6 +62,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   searchEngine = 'google',
   privacyShield = true,
   newTabBackground = 'default',
+  disableTasksWidget = false,
   settings,
   onUpdateSettings,
   history = [],
@@ -874,7 +876,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         privacyShield={privacyShield}
         newTabBackground={newTabBackground}
         backgroundCustomUrl={settings.backgroundCustomUrl}
-        showTasksWidget={settings.showTasksWidget}
+        showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
         isIncognito={isIncognito}
         theme={settings.theme}
         energySaverMode={settings.energySaverMode}
@@ -1181,6 +1183,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.newTabBackground !== nextProps.newTabBackground) return false;
+  if (prevProps.disableTasksWidget !== nextProps.disableTasksWidget) return false;
 
   // Tab properties comparison
   if (prevProps.tab?.id !== nextProps.tab?.id) return false;
