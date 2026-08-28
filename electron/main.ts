@@ -1943,7 +1943,15 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
       const raw = fs.readFileSync(keyPath);
       // VULN-06: Handle encrypted vs unencrypted data
       if (safeStorage.isEncryptionAvailable()) {
-        return safeStorage.decryptString(raw);
+        try {
+          return safeStorage.decryptString(raw);
+        } catch (_) {
+          const str = raw.toString('utf-8');
+          if (str.startsWith('[UNENCRYPTED]')) {
+            return str.slice('[UNENCRYPTED]'.length);
+          }
+          return null;
+        }
       } else {
         const str = raw.toString('utf-8');
         console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Reading key "${key}" as unencrypted.`);
