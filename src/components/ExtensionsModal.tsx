@@ -1,8 +1,14 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play } from 'lucide-react';
+import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+
+interface ExtensionPermission {
+  name: string;
+  description: string;
+  isHostPermission: boolean;
+}
 
 interface ExtensionsModalProps {
   isOpen: boolean;
@@ -13,6 +19,13 @@ interface ExtensionsModalProps {
   onRemoveExtension?: (id: string) => void;
   onManageExtensions?: () => void;
   onOpenUrl?: (url: string) => void;
+  // Permission review dialog
+  pendingPermissionReview?: {
+    extensionId: string;
+    extensionName: string;
+    permissions: ExtensionPermission[];
+  } | null;
+  onPermissionReviewResponse?: (allowed: boolean) => void;
 }
 
 export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
@@ -23,7 +36,9 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onToggleExtension,
   onRemoveExtension,
   onManageExtensions,
-  onOpenUrl
+  onOpenUrl,
+  pendingPermissionReview,
+  onPermissionReviewResponse
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
@@ -80,20 +95,158 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
     }
   };
 
+  // Permission Review Dialog Component
+  const PermissionReviewDialog: React.FC<{
+    extensionId: string;
+    extensionName: string;
+    permissions: ExtensionPermission[];
+    onConfirm: (allowed: boolean) => void;
+  }> = ({ extensionId, extensionName, permissions, onConfirm }) => {
+    const [rememberDecision, setRememberDecision] = useState(false);
+
+    const handleConfirm = useCallback((allowed: boolean) => {
+      onConfirm(allowed);
+    }, [onConfirm]);
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
+      >
+        <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-amber-50/80 dark:bg-amber-900/30 backdrop-blur-md">
+          <div className="flex items-center gap-2.5 text-slate-800 dark:text-slate-100">
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Shield className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold">Review Permissions</h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">Extension requests access to the following</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 max-h-[60vh] overflow-y-auto">
+          <div className="mb-4 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-white/10">
+            <div className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 mb-2">
+              <Puzzle className="w-4 h-4 text-cyan-500" />
+              <span className="font-medium">{extensionName}</span>
+              <span className="text-[10px] text-slate-400 font-mono">({extensionId})</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              This extension is requesting permission to access certain data and features. 
+              Please review the permissions below before installing.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {permissions.map((perm, index) => (
+              <div
+                key={index}
+                className="flex items-start gap-3 p-3 rounded-xl bg-slate-50/50 dark:bg-white/[0.02] border border-slate-100/50 dark:border-white/5"
+              >
+                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mt-0.5">
+                  {perm.isHostPermission ? (
+                    <AlertTriangle className="w-4 h-4" />
+                  ) : (
+                    <CheckCircle className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    {perm.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {perm.description}
+                  </p>
+                  {perm.isHostPermission && (
+                    <span className="inline-block mt-1.5 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 rounded-full">
+                      Host Permission
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {permissions.length === 0 && (
+            <div className="py-8 px-6 flex flex-col items-center justify-center text-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-3">
+                <CheckCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-slate-800 dark:text-slate-200 font-medium mb-1">No special permissions required</h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
+                This extension doesn't request any additional permissions beyond basic functionality.
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30 flex flex-col gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={rememberDecision}
+              onChange={(e) => setRememberDecision(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+            />
+            <span className="text-xs text-slate-600 dark:text-slate-400">
+              Remember this decision for future installations
+            </span>
+          </label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleConfirm(false)}
+              className="flex-1 py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 rounded-xl text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" /> Cancel
+            </button>
+            <button
+              onClick={() => handleConfirm(true)}
+              className="flex-1 py-2 px-3 bg-cyan-500 hover:bg-cyan-600 text-white border border-cyan-500 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+            >
+              <CheckCircle className="w-3.5 h-3.5" /> Allow & Install
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md" onClick={onClose}>
-          <motion.div
-            ref={containerRef}
-            onClick={(e) => e.stopPropagation()}
-            tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
-          >
+          {pendingPermissionReview && onPermissionReviewResponse ? (
+            // Permission Review Dialog
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              className="w-full max-w-lg"
+            >
+              <PermissionReviewDialog
+                extensionId={pendingPermissionReview.extensionId}
+                extensionName={pendingPermissionReview.extensionName}
+                permissions={pendingPermissionReview.permissions}
+                onConfirm={onPermissionReviewResponse}
+              />
+            </motion.div>
+          ) : (
+            // Regular Extensions Modal
+            <motion.div
+              ref={containerRef}
+              onClick={(e) => e.stopPropagation()}
+              tabIndex={-1}
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              className="w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
+            >
             <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-md">
               <div className="flex items-center gap-2.5 text-slate-800 dark:text-slate-100">
                 <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
@@ -209,6 +362,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               </button>
             </div>
           </motion.div>
+          )}
         </div>
       )}
     </AnimatePresence>

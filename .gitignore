@@ -37,8 +37,7 @@ Thumbs.db
 .superdesign/
 .agents/
 design-system/
-docs/
-AI_SUMMARY.md
-PRODUCT.md
-PROJECT.md
-ai-instructions.md
+# Security & Private Signing Keys
+electron/keys/*private*.pem
+*.pem.private
+*.private.key

@@ -7,6 +7,133 @@ import unzip from 'unzip-crx-3';
 import JSZip from 'jszip';
 
 /**
+ * Extension permission information extracted from manifest.json
+ */
+export interface ExtensionPermissions {
+  permissions: string[];
+  optionalPermissions: string[];
+  hostPermissions: string[];
+}
+
+/**
+ * Parse extension manifest.json for permissions
+ * @param extractPath - Path to the extracted extension directory
+ * @returns ExtensionPermissions object containing all permission types
+ */
+export async function parseExtensionPermissions(extractPath: string): Promise<ExtensionPermissions> {
+  const manifestPath = path.join(extractPath, 'manifest.json');
+  
+  if (!fs.existsSync(manifestPath)) {
+    return { permissions: [], optionalPermissions: [], hostPermissions: [] };
+  }
+  
+  try {
+    const manifestContent = fs.readFileSync(manifestPath, 'utf-8');
+    const manifest = JSON.parse(manifestContent);
+    
+    return {
+      permissions: manifest.permissions || [],
+      optionalPermissions: manifest.optional_permissions || [],
+      hostPermissions: manifest.host_permissions || []
+    };
+  } catch (err) {
+    console.error('Failed to parse extension manifest:', err);
+    return { permissions: [], optionalPermissions: [], hostPermissions: [] };
+  }
+}
+
+/**
+ * Format permission strings for user-friendly display
+ * @param permissions - Array of permission strings from manifest
+ * @returns Array of human-readable permission descriptions
+ */
+export function formatPermissionsForDisplay(permissions: string[]): string[] {
+  const permissionDescriptions: Record<string, string> = {
+    // Standard permissions
+    'activeTab': 'Access the currently active tab when you click the extension',
+    'alarms': 'Schedule code to run at specific times or intervals',
+    'background': 'Run in the background even when the browser is closed',
+    'bookmarks': 'Read and modify your bookmarks',
+    'browsingData': 'Clear your browsing data (history, cookies, cache)',
+    'certificateProvider': 'Provide client certificates for authentication',
+    'clipboardRead': 'Read data from your clipboard',
+    'clipboardWrite': 'Write data to your clipboard',
+    'contentSettings': 'Change website settings (cookies, JavaScript, plugins)',
+    'contextMenus': 'Add items to the right-click context menu',
+    'cookies': 'Read and modify cookies on websites you visit',
+    'debugger': 'Attach a debugger to web pages',
+    'declarativeContent': 'Take actions based on page content without injecting scripts',
+    'declarativeNetRequest': 'Block or modify network requests',
+    'declarativeNetRequestFeedback': 'Get feedback on blocked/modified network requests',
+    'desktopCapture': 'Capture the content of your screen, windows, or tabs',
+    'documentScan': 'Access document scanners',
+    'downloads': 'Manage your downloads (start, pause, cancel, remove)',
+    'downloads.open': 'Open downloaded files',
+    'downloads.shelf': 'Show downloads on the download shelf',
+    'enterprise.deviceAttributes': 'Read device attributes (managed environments)',
+    'enterprise.hardwarePlatform': 'Read hardware platform info (managed environments)',
+    'enterprise.networkingAttributes': 'Read network attributes (managed environments)',
+    'enterprise.platformKeys': 'Generate and manage platform keys (managed environments)',
+    'fileBrowserHandler': 'Handle file browser actions',
+    'fileSystem': 'Access files and directories on your device',
+    'fileSystem.write': 'Write to files and directories on your device',
+    'fileSystem.directory': 'Access directories on your device',
+    'fontSettings': 'Read and modify font settings',
+    'gcm': 'Use Google Cloud Messaging for push notifications',
+    'geolocation': 'Access your physical location',
+    'history': 'Read and modify your browsing history',
+    'identity': 'Access your email address and identity',
+    'idle': 'Detect when the machine is idle',
+    'management': 'Manage your installed extensions, apps, and themes',
+    'nativeMessaging': 'Communicate with native applications on your device',
+    'notifications': 'Show desktop notifications',
+    'pageCapture': 'Save web pages as MHTML files',
+    'platformKeys': 'Access platform-level cryptographic keys',
+    'power': 'Prevent the system from sleeping',
+    'printerProvider': 'Provide printing capabilities',
+    'printing': 'Submit print jobs and manage printers',
+    'printingMetrics': 'Access printing metrics',
+    'privacy': 'Read and modify privacy-related settings',
+    'processes': 'View and manage browser processes',
+    'proxy': 'Manage proxy settings',
+    'scripting': 'Execute scripts in web pages',
+    'search': 'Manage search engines and perform searches',
+    'sessions': 'Manage browsing sessions',
+    'sidePanel': 'Show a side panel in the browser',
+    'storage': 'Store data on your device',
+    'system.cpu': 'Access CPU information',
+    'system.display': 'Access display information',
+    'system.memory': 'Access memory information',
+    'system.storage': 'Access storage information',
+    'tabCapture': 'Capture the content of tabs (audio/video)',
+    'tabGroups': 'Manage tab groups',
+    'tabs': 'Access your tabs (URLs, titles, favicons)',
+    'topSites': 'Access your most visited sites',
+    'tts': 'Use text-to-speech',
+    'ttsEngine': 'Implement a text-to-speech engine',
+    'unlimitedStorage': 'Store unlimited data on your device',
+    'vpnProvider': 'Provide VPN service',
+    'wallpaper': 'Set wallpaper (Chrome OS)',
+    'webNavigation': 'Track navigation events (page loads, redirects)',
+    'webRequest': 'Observe and analyze network requests',
+    'webRequestBlocking': 'Block, redirect, or modify network requests',
+    'webRequestFilterResponse': 'Filter response data from network requests',
+    'webAuthn': 'Use Web Authentication API (passkeys)',
+    'windows': 'Manage browser windows (create, move, resize, close)',
+    
+    // Host permissions (patterns)
+  };
+  
+  return permissions.map(perm => {
+    // Check for host permission patterns (e.g., "*://*.example.com/*")
+    if (perm.includes('://') || perm.startsWith('<all_urls>')) {
+      return `Access your data on ${perm.replace('<all_urls>', 'all websites')}`;
+    }
+    return permissionDescriptions[perm] || perm;
+  });
+}
+
+/**
  * State owned by main.ts's extensions domain, injected so this module stays
  * free of shared mutable state. main.ts (the composition root) passes it on
  * every call alongside the IPC event.
@@ -215,6 +342,43 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       } catch (err) {
         fs.rmSync(extractPath, { recursive: true, force: true });
         throw err;
+      }
+    }
+
+    // 🔒 Security: Show permission review dialog before installing
+    // This is done via IPC to the renderer which shows a native dialog
+    const permissions = await parseExtensionPermissions(extractPath);
+    const allPermissions = [
+      ...permissions.permissions,
+      ...permissions.optionalPermissions,
+      ...permissions.hostPermissions
+    ];
+    
+    if (allPermissions.length > 0) {
+      const formattedPermissions = formatPermissionsForDisplay(allPermissions);
+      const parentWin = getMainWindow();
+      
+      const confirmOptions: Electron.MessageBoxOptions = {
+        type: 'question',
+        buttons: ['Cancel', 'Install'],
+        defaultId: 0,
+        cancelId: 0,
+        title: 'Review Extension Permissions',
+        message: `Extension "${extensionId}" requests the following permissions:`,
+        detail: formattedPermissions.join('\n\n'),
+        checkboxLabel: 'Remember this decision',
+        checkboxChecked: false
+      };
+      
+      const { response } = parentWin
+        ? await dialog.showMessageBox(parentWin, confirmOptions)
+        : await dialog.showMessageBox(confirmOptions);
+      
+      if (response !== 1) {
+        // Clean up extracted files if user cancels
+        try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (e) {}
+        try { fs.unlinkSync(crxFilePath); } catch (e) {}
+        return { error: 'Installation cancelled by user.' };
       }
     }
 

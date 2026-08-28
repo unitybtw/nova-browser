@@ -93,6 +93,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
   secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
+  // Password Manager: fire-and-forget send channel (not invoke)
+  savePassword: (data: { hostname: string; username: string; password: string }) => ipcRenderer.send('save-password', data),
   storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
   // VPN
@@ -131,6 +133,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openExtensionPopup: (url: string, bounds: any, activeTabInfo?: any) => ipcRenderer.invoke('open-extension-popup', url, bounds, activeTabInfo),
   selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
   installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
+  reviewExtensionPermissions: (extensionId: string, extractPath: string) => ipcRenderer.invoke('review-extension-permissions', extensionId, extractPath),
   onExtensionInstalledSilently: (callback: (event: any, data: any) => void) => {
     const handler = (_event: any, data: any) => callback(null, data);
     ipcRenderer.on('extension-installed-silently', handler);

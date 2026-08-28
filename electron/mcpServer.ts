@@ -320,24 +320,54 @@ export class BrowserMCPServer {
   private token: string;
   private disabledTools: Set<string> = new Set(DEFAULT_DISABLED_TOOLS);
   private tokenFilePath: string = '';
+  private actualPort: number = 0;
+  private portFilePath: string = '';
 
-  constructor(private port: number = 3020) {
+  constructor(private requestedPort: number = 3020) {
     // ⚡ Perf: express/express-rate-limit are NOT required here — they are
     // dynamically imported in start() so the main bundle doesn't pay their
     // parse/require cost on every launch when the MCP server never starts.
     // Set token file path in app userData
     try {
       this.tokenFilePath = path.join(electronApp.getPath('userData'), 'nova-mcp-token');
+      this.portFilePath = path.join(electronApp.getPath('userData'), 'nova-mcp-port');
       if (process.env.MCP_TOKEN) {
         this.token = process.env.MCP_TOKEN;
       } else {
         this.token = this.loadOrGenerateToken();
+      }
+      if (process.env.MCP_PORT) {
+        const parsed = parseInt(process.env.MCP_PORT, 10);
+        if (!isNaN(parsed) && parsed > 0 && parsed < 65536) {
+          this.requestedPort = parsed;
+        }
       }
     } catch {
       this.token = process.env.MCP_TOKEN || randomUUID();
     }
     // Restore persisted per-tool enable/disable settings (safe: internal try/catch)
     this.loadToolSettings();
+  }
+
+  private loadPersistedPort(): void {
+    try {
+      if (fs.existsSync(this.portFilePath)) {
+        const savedPort = parseInt(fs.readFileSync(this.portFilePath, 'utf-8'), 10);
+        if (!isNaN(savedPort) && savedPort > 0 && savedPort < 65536) {
+          this.requestedPort = savedPort;
+        }
+      }
+    } catch (e) {
+      console.warn('[MCP Server] Error reading persisted port:', e);
+    }
+  }
+
+  private savePersistedPort(port: number): void {
+    try {
+      fs.writeFileSync(this.portFilePath, String(port), 'utf-8');
+    } catch (e) {
+      console.warn('[MCP Server] Error saving persisted port:', e);
+    }
   }
 
   private loadOrGenerateToken(): string {
@@ -494,7 +524,8 @@ export class BrowserMCPServer {
     // 🔒 Security: Prevent DNS rebinding attacks by strictly validating the Host header
     app.use((req, res, next) => {
       const host = req.headers.host || '';
-      const allowedHosts = [`localhost:${this.port}`, `127.0.0.1:${this.port}`, 'localhost', '127.0.0.1'];
+      const port = this.actualPort || this.requestedPort;
+      const allowedHosts = [`localhost:${port}`, `127.0.0.1:${port}`, 'localhost', '127.0.0.1'];
       if (!allowedHosts.includes(host)) {
         return res.status(403).json({ error: 'Forbidden: Invalid Host header' });
       }
@@ -537,7 +568,7 @@ export class BrowserMCPServer {
           status: 'ok',
           server: 'nova-browser-mcp',
           version: '2.0.0',
-          port: this.port,
+          port: this.actualPort || this.requestedPort,
           connected_clients: this.clients.size,
           clients: this.getConnectedClientsInfo(),
           tools_count: TOOLS.length,
@@ -741,17 +772,43 @@ export class BrowserMCPServer {
 
     return new Promise((resolve, reject) => {
       try {
-        // SECURITY NOTE: Fixed port 3020 is used for backward compatibility with existing
-        // integrations. A dynamic or configurable port would reduce predictability for attackers.
-        this.server = app.listen(this.port, '127.0.0.1', () => {
-          console.log(`[MCP Server] ✓ Running at http://localhost:${this.port}`);
-          console.log(`[MCP Server] SSE endpoint: http://localhost:${this.port}/sse`);
-          console.log(`[MCP Server] Health: http://localhost:${this.port}/health`);
+        // Use requestedPort (0 = random ephemeral port assigned by OS)
+        this.server = app.listen(this.requestedPort, '127.0.0.1', () => {
+          // Capture the actual port assigned by the OS
+          const address = this.server.address();
+          if (address && typeof address === 'object') {
+            this.actualPort = address.port;
+            // Persist the actual port for client reconnection
+            this.savePersistedPort(this.actualPort);
+          }
+          console.log(`[MCP Server] ✓ Running at http://localhost:${this.actualPort}`);
+          console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
+          console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
           console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
           resolve();
         });
 
         this.server.on('error', (err: any) => {
+          if (err.code === 'EADDRINUSE' && this.requestedPort !== 0) {
+            console.warn(`[MCP Server] Port ${this.requestedPort} is in use, falling back to random available port...`);
+            try {
+              this.server = app.listen(0, '127.0.0.1', () => {
+                const address = this.server.address();
+                if (address && typeof address === 'object') {
+                  this.actualPort = address.port;
+                  this.savePersistedPort(this.actualPort);
+                }
+                console.log(`[MCP Server] ✓ Running on fallback port http://localhost:${this.actualPort}`);
+                console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
+                console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
+                console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
+                resolve();
+              });
+              return;
+            } catch (fallbackErr) {
+              console.error('[MCP Server] Fallback bind failed:', fallbackErr);
+            }
+          }
           console.error('[MCP Server] Failed to start:', err);
           // Clear the handle so isRunning() returns false and the server can be restarted
           this.server = null;
@@ -778,5 +835,13 @@ export class BrowserMCPServer {
 
   public isRunning() {
     return !!this.server;
+  }
+
+  public getPort(): number {
+    return this.actualPort || this.requestedPort;
+  }
+
+  public getRequestedPort(): number {
+    return this.requestedPort;
   }
 }

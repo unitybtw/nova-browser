@@ -70,6 +70,21 @@ export interface AIActionContext {
 
 export type InitProgressHandler = (progress: number, text: string) => void;
 
+/**
+ * Escapes a string for safe interpolation into a JavaScript template literal.
+ * JSON.stringify() escapes for JSON but not for JS template literals (backticks, ${}).
+ * This ensures the string can be safely embedded in a backtick-delimited template.
+ */
+function escapeForJSTemplate(str: string): string {
+  return str
+    .replace(/\\/g, '\\\\')      // Backslash must be first
+    .replace(/`/g, '\\`')        // Escape backticks
+    .replace(/\$/g, '\\$')       // Escape $ (prevents ${} interpolation)
+    .replace(/\n/g, '\\n')       // Escape newlines
+    .replace(/\r/g, '\\r')       // Escape carriage returns
+    .replace(/\t/g, '\\t');      // Escape tabs
+}
+
 // Shared DOM scanning script — extracted to avoid duplicating 40 lines in every tool call
 const DOM_SCAN_SCRIPT = `(() => {
   const allInteractive = document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])');
@@ -1147,15 +1162,20 @@ CRITICAL RULES:
       else if (functionName === "click_element") {
         const { ai_id, fallback_text } = args;
         const colorHex = this.getThemeColor();
+        // Escape all user-controlled values for safe JS template literal interpolation
+        const safeAiId = escapeForJSTemplate(JSON.stringify(ai_id));
+        const safeFallbackText = escapeForJSTemplate(JSON.stringify(fallback_text ?? ''));
+        const safeFallbackTextLower = escapeForJSTemplate(JSON.stringify((fallback_text ?? '').toLowerCase()));
+        const safeColorHex = escapeForJSTemplate(colorHex);
         const script = `(async () => {
           let el = null;
-          if (${JSON.stringify(ai_id)}) {
-            el = document.querySelector('[data-ai-id="' + ${JSON.stringify(ai_id)} + '"]');
+          if (${safeAiId}) {
+            el = document.querySelector('[data-ai-id="' + ${safeAiId} + '"]');
           }
-          if (!el && ${JSON.stringify(fallback_text ?? '')}) {
+          if (!el && ${safeFallbackText}) {
             const allEls = document.querySelectorAll('a, button, [role="button"], input[type="submit"], label');
             for (const candidate of allEls) {
-              if (candidate.textContent?.trim().toLowerCase().includes(${JSON.stringify((fallback_text ?? '').toLowerCase())})) {
+              if (candidate.textContent?.trim().toLowerCase().includes(${safeFallbackTextLower})) {
                 el = candidate;
                 break;
               }
@@ -1169,7 +1189,7 @@ CRITICAL RULES:
               const rect = el.getBoundingClientRect();
               const centerX = rect.left + rect.width / 2;
               const centerY = rect.top + rect.height / 2;
-              const color = '${colorHex}';
+              const color = '${safeColorHex}';
               
               // 1. Setup Cursor
               const cursor = document.createElement('div');
@@ -1240,7 +1260,7 @@ CRITICAL RULES:
             el.click();
             return { success: true, clicked: el.tagName + (el.id ? '#' + el.id : '') };
           }
-          return { error: 'Element not found', tried: { ai_id: ${JSON.stringify(ai_id)}, fallback_text: ${JSON.stringify(fallback_text)} } };
+          return { error: 'Element not found', tried: { ai_id: ${safeAiId}, fallback_text: ${safeFallbackText} } };
         })();`;
         const res = await this.actionContext.onExecuteScript(script);
         if (res.error) return JSON.stringify(res);
@@ -1252,9 +1272,14 @@ CRITICAL RULES:
       else if (functionName === "fill_input") {
         const { ai_id, value, submit } = args;
         const colorHex = this.getThemeColor();
+        // Escape all user-controlled values for safe JS template literal interpolation
+        const safeAiId = escapeForJSTemplate(JSON.stringify(ai_id));
+        const safeValue = escapeForJSTemplate(JSON.stringify(value));
+        const safeSubmit = escapeForJSTemplate(JSON.stringify(submit ?? false));
+        const safeColorHex = escapeForJSTemplate(colorHex);
         const script = `(async () => {
-          const el = document.querySelector('[data-ai-id="' + ${JSON.stringify(ai_id)} + '"]');
-          if (!el) return { error: 'Input not found for ID: ' + ${JSON.stringify(ai_id)} };
+          const el = document.querySelector('[data-ai-id="' + ${safeAiId} + '"]');
+          if (!el) return { error: 'Input not found for ID: ' + ${safeAiId} };
           
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           await new Promise(r => setTimeout(r, 400));
@@ -1263,7 +1288,7 @@ CRITICAL RULES:
             const rect = el.getBoundingClientRect();
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            const color = '${colorHex}';
+            const color = '${safeColorHex}';
             
             // Highlight Box
             const highlight = document.createElement('div');
@@ -1340,7 +1365,7 @@ CRITICAL RULES:
             typeBox.style.transform = 'translateY(0)';
             
             // Typewriter effect
-            const textToType = ${JSON.stringify(value)};
+            const textToType = ${safeValue};
             const spanText = document.getElementById('ai-typing-text');
             el.focus();
             el.value = '';
@@ -1361,10 +1386,10 @@ CRITICAL RULES:
             setTimeout(() => { typeBox.remove(); cursor.remove(); highlight.remove(); }, 300);
           } catch(e) {}
           
-          el.setAttribute('value', ${JSON.stringify(value)});
+          el.setAttribute('value', ${safeValue});
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
-          if (${JSON.stringify(submit ?? false)}) {
+          if (${safeSubmit}) {
             el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
             el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
             const form = el.closest('form');

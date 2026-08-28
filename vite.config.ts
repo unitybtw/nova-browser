@@ -74,7 +74,8 @@ export default defineConfig({
           'vendor-react': ['react', 'react-dom'],
           'vendor-ui': ['framer-motion', 'lucide-react'],
           'vendor-markdown': ['react-markdown', 'remark-gfm', 'dompurify'],
-          'vendor-supabase': ['@supabase/supabase-js']
+          'vendor-supabase': ['@supabase/supabase-js'],
+          'vendor-readability': ['@mozilla/readability']
         }
       }
     }

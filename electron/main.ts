@@ -6,13 +6,15 @@ import dns from 'dns';
 import { promisify } from 'util';
 import fs from 'fs';
 import child_process from 'child_process';
+import crypto from 'crypto';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
-import { installFromWebstore } from './main/crxInstaller.js';
+import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
+import { initializeBlocklist, startPeriodicRefresh, getCurrentBlocklist } from './main/blocklist.js';
 
 // Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
 // We still spoof User-Agent in onBeforeSendHeaders only for Chrome Web Store domains.
@@ -79,22 +81,17 @@ if (!app.isPackaged) {
 let mainWindow: BrowserWindow | null = null;
 let blockedDomains: string[] = [];
 
-// Phishing blocklist loader: packaged builds ship the file via extraResources
-// (Contents/Resources/), while dev builds read it from the repo layout.
-const blocklistPaths = [
-  path.join(process.resourcesPath, 'blocked-domains.json'), // packaged (extraResources)
-  path.join(__dirname, '..', 'electron', 'blocked-domains.json'), // dev
-  path.join(process.cwd(), 'electron', 'blocked-domains.json') // dev fallback
-];
-
-for (const blocklistPath of blocklistPaths) {
-  try {
-    if (!fs.existsSync(blocklistPath)) continue;
-    blockedDomains = JSON.parse(fs.readFileSync(blocklistPath, 'utf8'));
-    break;
-  } catch (err) {
-    console.error('Failed to load blocked domains:', err);
-  }
+// Initialize blocklist asynchronously (will be populated in app.whenReady)
+// The initializeBlocklist function handles: local cache -> packaged fallback -> remote refresh
+async function loadInitialBlocklist(): Promise<void> {
+  blockedDomains = await initializeBlocklist();
+  console.log(`[Main] Initial blocklist loaded: ${blockedDomains.length} domains`);
+  
+  // Start periodic refresh (daily)
+  startPeriodicRefresh((updatedDomains) => {
+    blockedDomains = updatedDomains;
+    console.log(`[Main] Blocklist updated via periodic refresh: ${blockedDomains.length} domains`);
+  });
 }
 
 // Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
@@ -364,11 +361,19 @@ session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
     // VULN-16: Add Content Security Policy for the app's own pages
     if (isAppFile || isDevLocalhost) {
       const isDev = isDevLocalhost || !app.isPackaged;
+      
+      // Generate a cryptographically secure nonce for this request
+      const nonce = crypto.randomBytes(16).toString('base64');
+      const nonceAttr = `'nonce-${nonce}'`;
+      
       responseHeaders['Content-Security-Policy'] = [
         isDev
-          ? "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:;"
-          : "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:;"
+          ? `default-src 'self'; script-src 'self' ${nonceAttr} 'unsafe-inline' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
+          : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
       ];
+      
+      // Store nonce for potential use in preload/renderer (e.g., for inline scripts)
+      responseHeaders['X-Content-Security-Policy-Nonce'] = [nonce];
     }
 
     if (isPrivacyShieldEnabled) {
@@ -809,6 +814,9 @@ app.whenReady().then(async () => {
   createWindow();
   setupApplicationMenu();
 
+  // Initialize phishing blocklist with auto-refresh
+  await loadInitialBlocklist();
+
   // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
   interface PendingPermission {
     requestId: string;
@@ -951,21 +959,23 @@ app.whenReady().then(async () => {
   applyStrictSecurityToSession(session.defaultSession);
   applyStrictSecurityToSession(session.fromPartition('incognito'));
 
-  // Initialize and auto-start MCP Server
+  // Initialize and auto-start MCP Server (default port 3020 with fallback)
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
   // ⚡ Perf: don't block startup (extension loading below) on the MCP bind.
   // Fire-and-forget keeps the rest of the startup order deterministic; a bind
   // failure is logged but must not stall first paint.
-  mcpServer.start().then(() => {
-    console.log('[MCP] Server started on port 3020');
+  const serverInstance = mcpServer;
+  serverInstance.start().then(() => {
+    const actualPort = serverInstance.getPort();
+    console.log(`[MCP] Server started on port ${actualPort}`);
     // The renderer fetches MCP status once on mount, which can race this
     // async bind — push the corrected state so the UI pill never sticks
     // at OFFLINE while the server is actually listening.
-    sendToMainWindow('mcp-status-changed', true);
+    sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
   }).catch((err) => {
     console.error('[MCP] Failed to start server:', err);
-    sendToMainWindow('mcp-status-changed', false);
+    sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
   });
 
   // Auto Updater Configuration
@@ -1789,7 +1799,8 @@ ipcMain.handle('start-mcp-server', async (event) => {
       console.error('[MCP] Failed to start server:', err);
       return false;
     }
-    sendToMainWindow('mcp-status-changed', true);
+    const actualPort = mcpServer.getPort();
+    sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
     return true;
   }
   return false;
@@ -1799,7 +1810,7 @@ ipcMain.handle('stop-mcp-server', (event) => {
   if (!isTrustedSender(event)) return false;
   if (mcpServer && mcpServer.isRunning()) {
     mcpServer.stop();
-    sendToMainWindow('mcp-status-changed', false);
+    sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
     return true;
   }
   return false;
@@ -1825,11 +1836,11 @@ ipcMain.handle('set-mcp-tool-enabled', (event, toolName: string, enabled: boolea
 });
 
 ipcMain.handle('get-mcp-status', (event) => {
-  if (!isTrustedSender(event)) return { running: false, port: 3020, clients: [], clientCount: 0 };
-  if (!mcpServer) return { running: false, port: 3020, clients: [], clientCount: 0 };
+  if (!isTrustedSender(event)) return { running: false, port: 0, clients: [], clientCount: 0 };
+  if (!mcpServer) return { running: false, port: 0, clients: [], clientCount: 0 };
   return {
     running: mcpServer.isRunning(),
-    port: 3020,
+    port: mcpServer.getPort(),
     clientCount: mcpServer.getClientCount(),
     clients: mcpServer.getConnectedClientsInfo()
   };
@@ -1879,6 +1890,19 @@ ipcMain.handle('purge-system-memory', async (event) => {
   } catch (err) {
     console.error('Error purging system memory:', err);
     return false;
+  }
+});
+
+// Password Manager: save-password channel (fire-and-forget, validated with isTrustedSender)
+ipcMain.on('save-password', (event, data: { hostname: string; username: string; password: string }) => {
+  if (!isTrustedSender(event)) return;
+  if (!data || typeof data !== 'object') return;
+  const { hostname, username, password } = data;
+  if (!hostname || !username || !password) return;
+  // Call the existing handlePasswordDetected logic from the renderer side
+  // We'll emit an event to the main window to trigger the password prompt
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('password-form-submitted', { hostname, username, password });
   }
 });
 
@@ -2847,6 +2871,46 @@ ipcMain.handle('install-from-webstore', (event, urlOrId: string) => installFromW
   getDisabledExtensionIds,
   setDisabledExtensionIds
 }, event, urlOrId));
+
+// Show extension permission review dialog before installation
+ipcMain.handle('review-extension-permissions', async (event, extensionId: string, extractPath: string) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  
+  const permissions = await parseExtensionPermissions(extractPath);
+  
+  // Combine all permissions for display
+  const allPermissions = [
+    ...permissions.permissions,
+    ...permissions.optionalPermissions,
+    ...permissions.hostPermissions
+  ];
+  
+  const formattedPermissions = formatPermissionsForDisplay(allPermissions);
+  
+  const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+  
+  const confirmOptions: Electron.MessageBoxOptions = {
+    type: 'question',
+    buttons: ['Cancel', 'Install'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Review Extension Permissions',
+    message: `Extension "${extensionId}" requests the following permissions:`,
+    detail: formattedPermissions.join('\n\n'),
+    checkboxLabel: 'Remember this decision',
+    checkboxChecked: false
+  };
+  
+  const { response, checkboxChecked } = parentWin
+    ? await dialog.showMessageBox(parentWin, confirmOptions)
+    : await dialog.showMessageBox(confirmOptions);
+  
+  if (response !== 1) {
+    return { allowed: false, cancelled: true };
+  }
+  
+  return { allowed: true, remember: checkboxChecked };
+});
 
 // --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
 let activeTtsProcess: child_process.ChildProcess | null = null;

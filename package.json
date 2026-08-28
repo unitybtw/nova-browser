@@ -124,7 +124,9 @@
     "video:preview": "remotion preview video/src/index.ts",
     "video:render": "remotion render video/src/index.ts NovaPromo video/out/nova-promo.mp4",
     "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
-    "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
+    "dev": "npm run build:electron && concurrently \"vite\" \"electron .\"",
+    "blocklist:generate-keys": "tsx electron/main/generate-keys.ts",
+    "blocklist:sign": "tsx electron/main/sign-blocklist.ts"
   },
   "dependencies": {
     "@cliqz/adblocker-electron": "^1.34.0",

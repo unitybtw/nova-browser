@@ -226,15 +226,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
                 
                 if (foundUser && activePwd.value) {
-                  // SECURITY NOTE: This console.log IS the transport channel for the
-                  // captured credential (piped to the renderer via the 'console-message'
-                  // event), so the payload necessarily contains the password. It must
-                  // not be duplicated or logged anywhere else.
-                  console.log('NOVA_SAVE_PW::' + JSON.stringify({
-                    hostname: window.location.hostname,
-                    username: foundUser,
-                    password: activePwd.value
-                  }));
+                  try {
+                    console.log('NOVA_SAVE_PW::' + JSON.stringify({
+                      hostname: window.location.hostname,
+                      username: foundUser,
+                      password: activePwd.value
+                    }));
+                  } catch(e) {}
                 }
               };
 
@@ -560,7 +558,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
         try {
           const data = JSON.parse(e.message.substring(14));
-          if (data && data.hostname && data.username && data.password) {
+          if (data.hostname && data.username && data.password) {
             handlePasswordDetected(data.hostname, data.username, data.password);
           }
         } catch (_) {}
@@ -568,16 +566,20 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
         try {
           const data = JSON.parse(e.message.substring(17));
-          if (typeof data.url === 'string' && (data.url.startsWith('http://') || data.url.startsWith('https://'))) {
-            // Speed Booster: DNS prefetch and preconnect socket on hover
+          if (typeof data.url === 'string' && data.url.startsWith('https://')) {
+            // Security: Only allow HTTPS origins for DNS prefetch/preconnect.
+            // HTTP origins are blocked to prevent DNS leaks to attacker-controlled domains.
+            // preconnect is used instead of dns-prefetch as it's HTTPS-only and provides
+            // stronger security guarantees (includes TLS handshake).
             if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
               try {
                 const origin = new URL(data.url).origin;
                 if (origin && !origin.startsWith('null') && !dnsPrefetchedOrigins.has(origin)) {
                   dnsPrefetchedOrigins.add(origin);
                   const hint = document.createElement('link');
-                  hint.rel = 'dns-prefetch';
+                  hint.rel = 'preconnect';
                   hint.href = origin;
+                  hint.crossOrigin = 'anonymous';
                   document.head.appendChild(hint);
                 }
               } catch (_) {}
