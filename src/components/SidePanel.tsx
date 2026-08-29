@@ -13,6 +13,8 @@ interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
   isDemo?: boolean;
+  pendingActions?: Array<{ id: number; text: string }>;
+  onPendingActionConsumed?: (id: number) => void;
 }
 
 /** Image waiting to be sent with the next chat turn (data URL form). */
@@ -64,6 +66,8 @@ export const SidePanel = React.memo(({
   isOpen, 
   onClose,
   isDemo: demoMode = false,
+  pendingActions = [],
+  onPendingActionConsumed,
 }: SidePanelProps) => {
   const isDemo = demoMode || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true');
   const [messages, setMessages] = useState<ChatCompletionMessageParam[]>(() => {
@@ -100,6 +104,10 @@ export const SidePanel = React.memo(({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<ChatCompletionMessageParam[]>(messages);
+  messagesRef.current = messages;
+  const requestIdRef = useRef(0);
+  const isSubmittingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentIdRef = useRef(0);
@@ -325,7 +333,16 @@ export const SidePanel = React.memo(({
         setProgressText(text);
       });
       setIsReady(true);
-      setMessages([{ role: 'assistant', content: 'Hello! I am ready to control your browser, analyze pages, or answer your questions. What would you like me to do?' }]);
+      // Do not wipe an existing conversation when initialization is triggered
+      // automatically by the first message.
+      if (messagesRef.current.length === 0) {
+        const welcome: ChatCompletionMessageParam[] = [{
+          role: 'assistant',
+          content: 'Hello! I am ready to control your browser, analyze pages, or answer your questions. What would you like me to do?'
+        }];
+        messagesRef.current = welcome;
+        setMessages(welcome);
+      }
     } catch (err: any) {
       console.error(err);
       setInitError('Failed to initialize AI engine. Please try again.');
@@ -348,6 +365,7 @@ export const SidePanel = React.memo(({
         await (window as any).electronAPI.clearAiModelsCache();
       }
       setMessages([{ role: 'assistant', content: 'AI model cache and temporary files were successfully deleted from your computer.' }]);
+      messagesRef.current = [{ role: 'assistant', content: 'AI model cache and temporary files were successfully deleted from your computer.' }];
       setIsReady(false);
     } catch (e) {
       console.error(e);
@@ -355,14 +373,18 @@ export const SidePanel = React.memo(({
   };
 
   const handleAIAction = async (text: string, attachments?: ChatAttachments) => {
+    const normalizedText = typeof text === 'string' ? text.trim() : '';
     const hasAttachments = Boolean(
       attachments && ((attachments.images?.length ?? 0) > 0 || (attachments.files?.length ?? 0) > 0)
     );
-    if ((!text.trim() && !hasAttachments) || isLoading) return;
+    if ((!normalizedText && !hasAttachments) || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
+    const requestId = ++requestIdRef.current;
 
     // Attachment-only turns still need visible content in the user bubble
-    let userContent = text;
-    if (!userContent.trim() && hasAttachments) {
+    let userContent = normalizedText;
+    if (!userContent && hasAttachments) {
       const kinds = [
         ...((attachments!.images?.length ?? 0) > 0 ? ['image'] : []),
         ...((attachments!.files?.length ?? 0) > 0 ? ['file'] : []),
@@ -371,7 +393,8 @@ export const SidePanel = React.memo(({
     }
 
     const userMsg: ChatCompletionMessageParam = { role: 'user', content: userContent };
-    const newMessages = [...messages, userMsg];
+    const newMessages = [...messagesRef.current, userMsg];
+    messagesRef.current = newMessages;
     setMessages(newMessages);
     setIsLoading(true);
     setStreamingText('');
@@ -381,8 +404,11 @@ export const SidePanel = React.memo(({
         await handleInit();
       }
 
+      if (requestId !== requestIdRef.current) return;
       if (!aiAgent.isReady()) {
-        setMessages([...newMessages, { role: 'assistant', content: 'AI engine not initialized. Please click the "Start AI" button.' }]);
+        const fallbackMessages = [...newMessages, { role: 'assistant', content: 'AI engine is not initialized. Click "Start AI" and try again.' } as ChatCompletionMessageParam];
+        messagesRef.current = fallbackMessages;
+        setMessages(fallbackMessages);
         return;
       }
 
@@ -391,6 +417,7 @@ export const SidePanel = React.memo(({
       const THROTTLE_MS = 80; // Only update UI max ~12 times a second to prevent React freezing
 
       const updatedMessages = await aiAgent.chat(newMessages, (chunk) => {
+        if (requestId !== requestIdRef.current) return;
         streamedSoFar += chunk;
         const now = performance.now();
         if (now - lastRenderTime > THROTTLE_MS) {
@@ -399,8 +426,11 @@ export const SidePanel = React.memo(({
         }
       }, attachments);
 
+      if (requestId !== requestIdRef.current) return;
+      const cleanMessages = updatedMessages.filter(m => m.role !== 'tool');
+      messagesRef.current = cleanMessages;
       setStreamingText('');
-      setMessages(updatedMessages.filter(m => m.role !== 'tool'));
+      setMessages(cleanMessages);
       setMemories(aiMemory.getMemories());
       // Chips are cleared only on success so a failed turn can be retried
       if (attachments) {
@@ -408,13 +438,14 @@ export const SidePanel = React.memo(({
         setPendingFiles([]);
       }
     } catch (err: any) {
+      if (requestId !== requestIdRef.current) return;
       console.error('[AI Chat Error]', err);
       const rawMsg = err?.message ?? err?.toString() ?? '';
       let errMsg: string;
       if (err instanceof AiError && err.code === 'vision_required') {
         errMsg = 'Images could not be processed: selected model does not support visual content. Select "Phi 3.5 Vision" from the model list to analyze images.';
       } else if (rawMsg.includes('Engine not initialized')) {
-        errMsg = 'AI engine is not loaded yet. Please click the "Start AI" button first.';
+        errMsg = 'AI engine is not loaded yet. Click "Start AI" and try again.';
       } else if (rawMsg.includes('ContentTypeError')) {
         errMsg = 'Message format error occurred. Please reset the chat and try again.';
       } else if (rawMsg) {
@@ -422,9 +453,14 @@ export const SidePanel = React.memo(({
       } else {
         errMsg = 'An unknown error occurred. Check the console.';
       }
-      setMessages([...newMessages, { role: 'assistant', content: errMsg }]);
+      const errorMessages = [...newMessages, { role: 'assistant', content: errMsg } as ChatCompletionMessageParam];
+      messagesRef.current = errorMessages;
+      setMessages(errorMessages);
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        isSubmittingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 
@@ -440,6 +476,8 @@ export const SidePanel = React.memo(({
   };
 
   const handleStop = useCallback(() => {
+    requestIdRef.current += 1;
+    isSubmittingRef.current = false;
     aiAgent.interrupt();
     tts.stop();
     orchestrator.clearQueue();
@@ -447,43 +485,28 @@ export const SidePanel = React.memo(({
     setStreamingText('');
   }, []);
 
+  const handleResetChat = useCallback(() => {
+    requestIdRef.current += 1;
+    isSubmittingRef.current = false;
+    aiAgent.interrupt();
+    const resetMessages: ChatCompletionMessageParam[] = [{ role: 'assistant', content: 'Chat reset. How can I help you?' }];
+    messagesRef.current = resetMessages;
+    setMessages(resetMessages);
+    setStreamingText('');
+    setIsLoading(false);
+  }, []);
+
   const handleAIActionRef = useRef(handleAIAction);
   handleAIActionRef.current = handleAIAction;
 
-  const isOpenRef = useRef(isOpen);
-  isOpenRef.current = isOpen;
-
-  // Tracks the deferred quick-action dispatch so it can be cancelled if the
-  // panel unmounts within the 300ms window (prevents a post-unmount setState).
-  const quickActionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  // App owns the quick-action queue so actions are not lost while this lazy
+  // panel is mounting. Consume each queued item exactly once when idle.
   useEffect(() => {
-    const handleQuickAction = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const actionText = customEvent.detail;
-      if (actionText) {
-        if (!isOpenRef.current) {
-          // Tell App.tsx to open SidePanel via a new event, or we need App.tsx to listen and open it!
-          window.dispatchEvent(new CustomEvent('open-ai-sidepanel'));
-        }
-        if (quickActionTimerRef.current !== null) {
-          clearTimeout(quickActionTimerRef.current);
-        }
-        quickActionTimerRef.current = setTimeout(() => {
-          quickActionTimerRef.current = null;
-          handleAIActionRef.current(actionText);
-        }, 300);
-      }
-    };
-    window.addEventListener('ai-quick-action', handleQuickAction);
-    return () => {
-      window.removeEventListener('ai-quick-action', handleQuickAction);
-      if (quickActionTimerRef.current !== null) {
-        clearTimeout(quickActionTimerRef.current);
-        quickActionTimerRef.current = null;
-      }
-    };
-  }, []);
+    const action = pendingActions[0];
+    if (!action || isLoading || isSubmittingRef.current) return;
+    onPendingActionConsumed?.(action.id);
+    handleAIActionRef.current(action.text);
+  }, [pendingActions[0]?.id, isLoading, onPendingActionConsumed]);
 
   // Whether the selected model can ingest image content parts (drives the
   // inline hint under pending image chips; sending is never blocked here —
@@ -570,7 +593,7 @@ export const SidePanel = React.memo(({
               </button>
               {isReady && messages.length > 0 && !isLoading && (
                 <button
-                  onClick={() => setMessages([{ role: 'assistant', content: 'Chat reset. How can I help you?' }])}
+                  onClick={handleResetChat}
                   className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
                   title="Reset Chat"
                 >
@@ -1125,7 +1148,9 @@ export const SidePanel = React.memo(({
                                       setProgressText(text);
                                     });
                                     setIsReady(true);
-                                    setMessages(prev => [...prev, { role: 'assistant', content: `AI model switched to **${m.name}** and ready.` }]);
+                                    const modelReadyMessages = [...messagesRef.current, { role: 'assistant', content: `AI model switched to **${m.name}** and ready.` } as ChatCompletionMessageParam];
+                                    messagesRef.current = modelReadyMessages;
+                                    setMessages(modelReadyMessages);
                                   } catch (err: any) {
                                     setInitError('Failed to load model: ' + (err?.message || 'Error'));
                                   } finally {

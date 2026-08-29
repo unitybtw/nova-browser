@@ -104,6 +104,16 @@ const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
 
 const EMPTY_ARRAY: any[] = [];
 
+const normalizeAIActionPayload = (detail: unknown): string => {
+  if (typeof detail === 'string') return detail.trim();
+  if (!detail || typeof detail !== 'object') return '';
+  const payload = detail as Record<string, unknown>;
+  for (const key of ['action', 'prompt', 'text', 'query']) {
+    if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key].trim();
+  }
+  return '';
+};
+
 // Bag of latest event handler identities for mount-time IPC listeners.
 // Listeners registered once with [] deps would otherwise capture stale
 // mount-time closures; they read handlersRef.current instead (see below).
@@ -351,6 +361,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => {
     return demoParams.isDemo && demoParams.feature === 'ai';
   });
+  const [pendingAIActions, setPendingAIActions] = useState<Array<{ id: number; text: string }>>([]);
+  const pendingAIActionIdRef = useRef(0);
+  const queueAIAction = useCallback((detail: unknown) => {
+    const text = normalizeAIActionPayload(detail);
+    if (!text) return;
+    setPendingAIActions(current => [
+      ...current,
+      { id: ++pendingAIActionIdRef.current, text }
+    ]);
+    setIsSidePanelOpen(true);
+  }, []);
+  const consumeAIAction = useCallback((id: number) => {
+    setPendingAIActions(current => current.filter(action => action.id !== id));
+  }, []);
 
   const [isReaderModeOpen, setIsReaderModeOpen] = useState(false);
   const [isFindInPageOpen, setIsFindInPageOpen] = useState(false);
@@ -1316,11 +1340,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     if ((window as any).electronAPI?.onQuickAIAction) {
       cleanupQuickAI = (window as any).electronAPI.onQuickAIAction((_event: any, text: string) => {
-        setIsSidePanelOpen(true);
-        window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: { action: `Explain or summarize this selection:\n\n"${text}"` } }));
+        queueAIAction(`Explain or summarize this selection:\n\n"${typeof text === 'string' ? text : ''}"`);
       });
     }
 
+    const handleQuickAIAction = (event: Event) => {
+      queueAIAction((event as CustomEvent).detail);
+    };
     let cleanupExtInstall: (() => void) | void;
     if ((window as any).electronAPI?.onExtensionInstalledSilently) {
       cleanupExtInstall = (window as any).electronAPI.onExtensionInstalledSilently((_event: any, data: any) => {
@@ -1334,6 +1360,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const handleOpenWorkspaceManager = () => setIsWorkspaceManagerOpen(true);
     const handleOpenAccountModal = () => setIsAccountModalOpen(true);
     
+    window.addEventListener('ai-quick-action', handleQuickAIAction);
     window.addEventListener('open-ai-sidepanel', handleOpenSidePanel);
     window.addEventListener('open-workspace-manager', handleOpenWorkspaceManager);
     window.addEventListener('open-account-modal', handleOpenAccountModal);
@@ -1344,6 +1371,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       if (typeof cleanupNewIncognitoTab === 'function') cleanupNewIncognitoTab();
       if (typeof cleanupQuickAI === 'function') cleanupQuickAI();
       if (typeof cleanupExtInstall === 'function') cleanupExtInstall();
+      window.removeEventListener('ai-quick-action', handleQuickAIAction);
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
       window.removeEventListener('open-workspace-manager', handleOpenWorkspaceManager);
       window.removeEventListener('open-account-modal', handleOpenAccountModal);
@@ -3165,6 +3193,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           <SidePanel 
             isOpen={isSidePanelOpen} 
             onClose={handleCloseSidePanel}
+            pendingActions={pendingAIActions}
+            onPendingActionConsumed={consumeAIAction}
             isDemo={demoParams.isDemo && demoParams.feature === 'ai'}
           />
         </React.Suspense>

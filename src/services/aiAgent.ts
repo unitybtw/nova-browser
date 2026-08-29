@@ -216,7 +216,6 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
   // 1. YouTube Compound Searches (e.g. "youtube aç ve enes batur kanalını aç", "youtube'da tarkan aç", "youtube enes batur izle")
   const ytCompoundMatch = 
     normalized.match(/^youtube(?:'da|\s+da)?\s+(?:aç|ac|a git|'a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:kanalını\s*aç|kanalini\s*ac|kanalını|kanalini|videosunu\s*aç|videosunu\s*ac|videosu|videosunu|şarkısını\s*aç|şarkısını|izle|dinle|ara|aç|ac)?$/i) ||
-    normalized.match(/^(?:bana\s+)?(.+?)\s*(?:kanalını\s*aç|kanalini\s*ac|knalını\s*aç|knalini\s*ac|videosunu\s*aç|videosunu\s*ac|videosunu|izle)$/i) ||
     normalized.match(/^youtube\s+(.+)$/i);
 
   if (ytCompoundMatch && ytCompoundMatch[1]) {
@@ -435,6 +434,11 @@ class AIAgent {
   private actionContext: AIActionContext | null = null;
   private isInitializing = false;
   private isInterrupted = false;
+  private operationGeneration = 0;
+
+  private isOperationActive(generation: number): boolean {
+    return generation === this.operationGeneration && !this.isInterrupted;
+  }
 
   // --- Status emitter (FIX 6) ---
   private statusSubscribers: Set<AgentStatusCallback> = new Set();
@@ -468,6 +472,7 @@ class AIAgent {
 
   public interrupt() {
     this.isInterrupted = true;
+    this.operationGeneration++;
     if (this.engine) {
       try {
         this.engine.interruptGenerate();
@@ -1000,7 +1005,10 @@ CRITICAL RULES:
    * start — otherwise the previous document could still report 'complete'.
    * Remains interruptible: bails out as soon as this.isInterrupted flips.
    */
-  private async waitForPageLoadSettled(): Promise<void> {
+  private async waitForPageLoadSettled(generation?: number): Promise<void> {
+    const isActive = () => generation === undefined
+      ? !this.isInterrupted
+      : this.isOperationActive(generation);
     const POLL_INTERVAL_MS = 150;
     const MAX_WAIT_MS = 6000;
     const MIN_SETTLE_MS = 300;
@@ -1015,7 +1023,7 @@ CRITICAL RULES:
     const deadline = Date.now() + MAX_WAIT_MS;
     let consecutiveErrors = 0;
     while (Date.now() < deadline) {
-      if (this.isInterrupted) return;
+      if (!isActive()) return;
       try {
         const readyState = await this.actionContext?.onExecuteScript(`document.readyState`);
         if (readyState === 'complete') return;
@@ -1030,7 +1038,10 @@ CRITICAL RULES:
     }
   }
 
-  public async handleToolCall(toolCall: any): Promise<string> {
+  public async handleToolCall(toolCall: any, generation?: number): Promise<string> {
+    if (generation !== undefined && !this.isOperationActive(generation)) {
+      return JSON.stringify({ error: "Action cancelled." });
+    }
     if (!toolCall || !toolCall.function || typeof toolCall.function.name !== 'string') {
       return JSON.stringify({ error: "Invalid tool call format" });
     }
@@ -1088,6 +1099,10 @@ CRITICAL RULES:
       if (!approved) {
         return JSON.stringify({ error: "User denied the action." });
       }
+      if (generation !== undefined && !this.isOperationActive(generation)) {
+        orchestrator.updateActionState(actionId, 'denied');
+        return JSON.stringify({ error: "Action cancelled." });
+      }
 
       orchestrator.updateActionState(actionId, 'executing');
 
@@ -1111,7 +1126,7 @@ CRITICAL RULES:
         }
 
         this.actionContext.onNavigate(url);
-        await this.waitForPageLoadSettled();
+        await this.waitForPageLoadSettled(generation);
 
         result = {
           success: true,
@@ -1517,7 +1532,8 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
               if (resolved && resolved.ai_id) {
                 await this.handleToolCall(
-                  { id: Math.random().toString(), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ ai_id: resolved.ai_id, value: cmd.value }) } }
+                  { id: Math.random().toString(), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ ai_id: resolved.ai_id, value: cmd.value }) } },
+                  generation
                 );
               } else {
                 // Surface a clear error instead of silently skipping the field
@@ -1712,8 +1728,14 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
    * (response_format json_object + schema); if WebLLM rejects response_format
    * on this model/runtime, falls back to the legacy free-text ReAct path.
    */
-  private async generateAgentTurn(windowedMessages: ChatCompletionMessageParam[]): Promise<{ text: string; constrained: boolean }> {
-    if (this.isInterrupted) {
+  private async generateAgentTurn(
+    windowedMessages: ChatCompletionMessageParam[],
+    generation?: number
+  ): Promise<{ text: string; constrained: boolean }> {
+    const isActive = () => generation === undefined
+      ? !this.isInterrupted
+      : this.isOperationActive(generation);
+    if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
     this.emitStatus('thinking');
@@ -1726,7 +1748,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           stream: false,
           response_format: { type: "json_object", schema: this.getToolCallSchemaString() }
         } as any);
-        if (this.isInterrupted) {
+        if (!isActive()) {
           return { text: 'Islem durduruldu.', constrained: false };
         }
         const text = reply.choices[0]?.message?.content || '';
@@ -1737,14 +1759,14 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         // legacy path below rather than burning a corrective round-trip.
         console.warn('[AI Agent] Constrained decoding returned empty output; using legacy path.');
       } catch (e) {
-        if (this.isInterrupted) {
+        if (!isActive()) {
           return { text: 'Islem durduruldu.', constrained: false };
         }
         console.warn('[AI Agent] Constrained decoding failed; falling back to free-text:', e);
         this.constrainedUnsupported = true;
       }
     }
-    if (this.isInterrupted) {
+    if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
     const reply = await this.engine!.chat.completions.create({
@@ -1753,7 +1775,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       max_tokens: AGENT_MAX_TOKENS,
       stream: false
     });
-    if (this.isInterrupted) {
+    if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
     return { text: reply.choices[0]?.message?.content || '', constrained: false };
@@ -1766,6 +1788,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
   ): Promise<ChatCompletionMessageParam[]> {
     if (!this.engine) throw new Error("Engine not initialized");
     this.isInterrupted = false;
+    const generation = ++this.operationGeneration;
 
     try {
       // ---------------------------------------------------------------
@@ -1833,13 +1856,20 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         let friendlyResponse = "Action completed.";
         try {
-          await this.handleToolCall({
+          const toolResult = await this.handleToolCall({
             id: Date.now().toString(),
             type: "function",
             function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
-          });
-
-          if (directIntent.directReply) {
+          }, generation);
+          let parsedToolResult: any = toolResult;
+          try {
+            parsedToolResult = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
+          } catch {}
+          if (parsedToolResult?.error) {
+            friendlyResponse = parsedToolResult.error === 'Action cancelled.'
+              ? 'İşlem durduruldu.'
+              : `İşlem tamamlanamadı: ${parsedToolResult.error}`;
+          } else if (directIntent.directReply) {
             friendlyResponse = directIntent.directReply;
           } else if (funcName === 'navigate_to_url') {
             const u = directIntent.arguments.url;
@@ -1910,7 +1940,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         await new Promise(r => setTimeout(r, 40));
         loopCount++;
 
-        if (this.isInterrupted) {
+        if (!this.isOperationActive(generation)) {
           finalAnswer = 'Islem durduruldu.';
           break;
         }
@@ -1930,7 +1960,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         let turn: { text: string; constrained: boolean };
         try {
-          turn = await this.generateAgentTurn(windowedMessages);
+          turn = await this.generateAgentTurn(windowedMessages, generation);
         } catch (e: any) {
           finalAnswer = 'An error occurred. Please try again.';
           this.emitStatus('error', e?.message || String(e));
@@ -1972,7 +2002,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
               id: Date.now().toString(),
               type: 'function',
               function: { name, arguments: JSON.stringify(args) }
-            });
+            }, generation);
           } catch (err: any) {
             toolResult = JSON.stringify({ error: err.message || String(err) });
           }
