@@ -5,6 +5,7 @@ import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
 import Footer from './components/Footer';
+import CinematicLogoIntro from './components/CinematicLogoIntro';
 
 const GithubStats = lazy(() => import('./components/GithubStats'));
 const Benchmarks = lazy(() => import('./components/Benchmarks'));
@@ -120,6 +121,9 @@ export default function App() {
       className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white bg-[#0c0d12]"
       style={{ overflowAnchor: 'none' }}
     >
+      {/* Cinematic Sovereign Netflix-style Opening Intro */}
+      <CinematicLogoIntro />
+
       {/* Floating Centered Kinetic SlideTabs Navbar */}
       <Navbar visible={showNav} />
 
