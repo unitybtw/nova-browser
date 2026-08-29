@@ -44,7 +44,6 @@ export const Downloads: React.FC = () => {
 
   return (
     <section id="download" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
-      <div className="editorial-rail" aria-hidden="true"><span>05</span><i /></div>
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">

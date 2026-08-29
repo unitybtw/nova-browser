@@ -12,11 +12,11 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="w-full pt-16 pb-0 bg-[#0c0d12] text-[#fcfbf9] font-sans mt-24 rounded-t-3xl border-t border-white/10 relative overflow-hidden">
-      {/* Constrained Content Container */}
-      <div className="max-w-7xl mx-auto px-6 sm:px-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12 pb-16 border-b border-white/10">
+      {/* Centered & Balanced Content Container */}
+      <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-12 relative z-10">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 pb-14 border-b border-white/10 items-start">
           {/* Brand / Manifesto Column */}
-          <div className="col-span-1 md:col-span-7 flex flex-col justify-between">
+          <div className="col-span-1 md:col-span-7 lg:col-span-7 flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-3 mb-6">
                 <img
@@ -32,30 +32,30 @@ export const Footer: React.FC = () => {
                 “The browser is no longer a window.<br />
                 <span className="text-indigo-400">It is the engine.</span>”
               </h2>
-              <p className="font-mono text-xs text-neutral-400 max-w-md leading-relaxed">
+              <p className="font-mono text-xs text-neutral-400 max-w-lg leading-relaxed">
                 Nova is built for a post-cloud web. Local inference, hardened network layer, absolute autonomy.
               </p>
             </div>
-            <div className="mt-10 font-mono text-xs text-neutral-500">
+            <div className="mt-8 font-mono text-xs text-neutral-500">
               © {new Date().getFullYear()} Nova Browser. Open Source Under MIT.
             </div>
           </div>
 
           {/* Links Column */}
-          <div className="col-span-1 md:col-span-5 flex flex-col justify-between">
-            <div>
-              <h4 className="font-mono text-[11px] text-neutral-400 mb-6 tracking-widest uppercase font-semibold">
+          <div className="col-span-1 md:col-span-5 lg:col-span-5 flex flex-col md:items-end justify-between">
+            <div className="w-full md:max-w-xs">
+              <h4 className="font-mono text-[11px] text-neutral-400 mb-5 tracking-widest uppercase font-semibold">
                 RESOURCES & REPOSITORY
               </h4>
-              <ul className="space-y-3.5 font-mono text-xs text-neutral-300">
+              <ul className="space-y-3 font-mono text-xs text-neutral-300">
                 <li>
                   <a
                     href="https://github.com/unitybtw/nova-browser"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
+                    className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    <Github className="w-3.5 h-3.5" />
+                    <Github className="w-4 h-4" />
                     <span>GitHub Repository</span>
                   </a>
                 </li>
@@ -95,7 +95,7 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Row: Copyright & Navigation */}
-        <div className="pt-8 pb-10 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-neutral-400">
+        <div className="pt-6 pb-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-neutral-400">
           <div>ALL RIGHTS RESERVED // SOVEREIGN COMPUTING</div>
           <button
             type="button"

@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, Lock, Cpu, Code2 } from 'lucide-react';
+import { BlurRevealCard } from './blurreveal/BlurRevealCard';
 
 const PILLARS = [
   {
@@ -42,7 +43,6 @@ export const TrustPillars: React.FC = () => {
 
   return (
     <section className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 lg:py-24">
-      <div className="editorial-rail" aria-hidden="true"><span>01</span><i /></div>
       <div className="mb-10 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4338ca]">Built on your side</span>
@@ -88,6 +88,17 @@ export const TrustPillars: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Sovereign Manifesto Blur-Reveal Showcase */}
+      <motion.div
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
+        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={prefersReducedMotion ? undefined : { duration: 0.8, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-8 sm:mt-10 w-full overflow-hidden rounded-2xl border border-neutral-800/80 bg-[#0d0f15] shadow-2xl"
+      >
+        <BlurRevealCard className="aspect-[16/5] sm:aspect-[21/6] w-full" />
+      </motion.div>
     </section>
   );
 };

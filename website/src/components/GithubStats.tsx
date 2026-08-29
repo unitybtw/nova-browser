@@ -128,7 +128,6 @@ export const GithubStats: React.FC = () => {
       id="community"
       className={`community-section mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-24${isSectionInView ? ' is-visible' : ''}`}
     >
-      <div className="editorial-rail" aria-hidden="true"><span>03</span><i /></div>
       {/* Section Header */}
       <div className="mb-10 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-6">
         <div>
