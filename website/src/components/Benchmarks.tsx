@@ -486,91 +486,204 @@ export const Benchmarks: React.FC = () => {
           </AnimatePresence>
 
           {/* INTERACTIVE RAM SAVINGS SIMULATOR SLIDER */}
-          <div className="mb-3 mt-2">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">3. Try the simulator</p>
-            <p className="mt-1 text-xs text-neutral-500">Adjust the number of open tabs to see the estimated memory difference.</p>
+          <div className="mb-3 mt-4">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#4338ca]">3. Live Hibernation Simulator</p>
+            <p className="mt-1 text-xs text-neutral-500">Benchmark your real-world browsing workload against traditional browser process architecture.</p>
           </div>
-          <div className="luxury-card p-8 sm:p-10 rounded-3xl bg-neutral-50/90 border border-[#e5e5e5] shadow-xs backdrop-blur-sm">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+
+          <div className="luxury-card p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-white via-neutral-50/90 to-indigo-50/20 border border-[#e0e0e8] shadow-md backdrop-blur-sm relative overflow-hidden">
+            {/* Background Ambient Glow */}
+            <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
+
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 lg:gap-12">
               {/* Slider Control Column */}
-              <div className="lg:max-w-md space-y-4">
+              <div className="lg:max-w-md w-full space-y-5">
                 <div className="flex items-center gap-2 text-[#4338ca] font-mono text-xs font-bold uppercase tracking-wider">
                   <Sliders className="w-4 h-4" />
                   <span>Interactive Memory Simulator</span>
                 </div>
 
-                <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717]">
-                  Estimate Your RAM Savings
-                </h3>
+                <div>
+                  <h3 className="font-display text-2xl sm:text-3xl font-extrabold text-[#171717] tracking-tight">
+                    Estimate Your RAM Savings
+                  </h3>
+                  <p className="font-sans text-xs sm:text-sm text-neutral-600 leading-relaxed mt-2">
+                    Drag the slider to see how Nova’s automatic background DOM unmounting slashes memory pressure as your tab workload expands.
+                  </p>
+                </div>
 
-                <p className="font-sans text-xs sm:text-sm text-neutral-600 leading-relaxed">
-                  Adjust the slider to see how Nova’s automatic hibernation engine cuts RAM footprint as your active tab count grows.
-                </p>
+                {/* Preset Quick-Buttons */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { count: 10, label: '10 Tabs' },
+                    { count: 25, label: '25 Tabs' },
+                    { count: 50, label: '50 Tabs' },
+                    { count: 100, label: '100 Tabs' },
+                  ].map((preset) => (
+                    <button
+                      key={preset.count}
+                      type="button"
+                      onClick={() => setTabCount(preset.count)}
+                      className={`px-3 py-1.5 rounded-full font-mono text-[11px] font-semibold transition-all duration-200 cursor-pointer ${
+                        tabCount === preset.count
+                          ? 'bg-[#4338ca] text-white shadow-xs scale-105'
+                          : 'bg-white border border-neutral-200 text-neutral-600 hover:border-neutral-400 hover:text-neutral-900'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
 
+                {/* Custom Interactive Slider Component */}
                 <div className="pt-2">
-                  <div className="flex justify-between font-mono text-xs font-bold text-neutral-700 mb-2">
-                    <span>Tab Load: {tabCount} Open Tabs</span>
-                    <span className="text-[#4338ca]">{tabCount >= 50 ? 'Heavy Multitasking' : 'Normal Browsing'}</span>
+                  <div className="flex justify-between font-mono text-xs font-bold text-neutral-800 mb-2.5">
+                    <span className="flex items-center gap-2">
+                      <span>Active Tab Load:</span>
+                      <span className="text-[#4338ca] bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md font-bold">
+                        {tabCount} Tabs
+                      </span>
+                    </span>
+                    <span className="text-[#4338ca] font-medium">
+                      {tabCount >= 60 ? 'Extreme Multitasking' : tabCount >= 30 ? 'Heavy Workflow' : 'Normal Browsing'}
+                    </span>
                   </div>
-                  <input
-                    type="range"
-                    aria-label="Number of open tabs"
-                    min={5}
-                    max={100}
-                    step={5}
-                    value={tabCount}
-                    aria-valuetext={`${tabCount} open tabs; estimated Nova memory ${novaMemoryEst} megabytes versus Chrome ${chromeMemoryEst} megabytes`}
-                    onChange={(e) => setTabCount(parseInt(e.target.value, 10))}
-                    className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-[#4338ca]"
-                  />
-                  <div className="flex justify-between font-mono text-[10px] text-neutral-400 mt-1">
-                    <span>5 Tabs</span>
-                    <span>50 Tabs</span>
-                    <span>100 Tabs</span>
+
+                  <div className="relative flex items-center">
+                    <input
+                      type="range"
+                      aria-label="Number of open tabs"
+                      min={5}
+                      max={100}
+                      step={5}
+                      value={tabCount}
+                      aria-valuetext={`${tabCount} open tabs; estimated Nova memory ${novaMemoryEst} megabytes versus Chrome ${chromeMemoryEst} megabytes`}
+                      onChange={(e) => setTabCount(parseInt(e.target.value, 10))}
+                      className="w-full h-3 bg-neutral-200 rounded-full appearance-none cursor-pointer accent-[#4338ca] transition-all focus:outline-none focus:ring-2 focus:ring-[#4338ca]/30"
+                      style={{
+                        background: `linear-gradient(to right, #4338ca 0%, #6366f1 ${((tabCount - 5) / 95) * 100}%, #e5e5e5 ${((tabCount - 5) / 95) * 100}%, #e5e5e5 100%)`
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex justify-between font-mono text-[10px] text-neutral-400 mt-2 font-medium">
+                    <span>5 Tabs (Light)</span>
+                    <span>50 Tabs (Dev)</span>
+                    <span>100 Tabs (Extreme)</span>
                   </div>
                 </div>
               </div>
 
-              {/* Results Comparison Grid */}
+              {/* Dynamic Comparison Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:w-3/5">
-                {/* Nova Result */}
-                <div className="p-6 rounded-2xl bg-white border border-[#4338ca]/30 shadow-xs flex flex-col justify-between">
-                  <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
-                    Nova Browser
-                  </span>
-                  <div className="font-display text-3xl sm:text-4xl font-extrabold text-[#4338ca] my-2">
-                    ~{novaMemoryEst} <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
+                {/* 1. Nova Browser Result */}
+                <motion.div
+                  key={`nova-${tabCount}`}
+                  initial={{ scale: 0.98, opacity: 0.9 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-6 rounded-2xl bg-white border-2 border-[#4338ca]/40 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:border-[#4338ca] transition-colors"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] font-bold text-[#4338ca] uppercase tracking-wider">
+                      Nova Browser
+                    </span>
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   </div>
-                  <span className="font-mono text-[10px] text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded w-fit">
-                    Hibernated
-                  </span>
-                </div>
 
-                {/* Standard Chrome Result */}
-                <div className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-xs flex flex-col justify-between">
+                  <div className="my-3">
+                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-[#4338ca] tracking-tight">
+                      ~{novaMemoryEst} <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
+                    </div>
+                    {/* Visual Meter Bar */}
+                    <div className="w-full bg-neutral-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                      <div
+                        className="bg-[#4338ca] h-full rounded-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (novaMemoryEst / chromeMemoryEst) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                      Hibernated
+                    </span>
+                    <span className="font-mono text-[10px] text-neutral-400">
+                      DOM unmounted
+                    </span>
+                  </div>
+                </motion.div>
+
+                {/* 2. Standard Chrome Result */}
+                <motion.div
+                  key={`chrome-${tabCount}`}
+                  initial={{ scale: 0.98, opacity: 0.9 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-xs flex flex-col justify-between relative overflow-hidden hover:border-neutral-300 transition-colors"
+                >
                   <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
                     Google Chrome
                   </span>
-                  <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 my-2">
-                    ~{(chromeMemoryEst / 1024).toFixed(1)} <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
-                  </div>
-                  <span className="font-mono text-[10px] text-neutral-400">
-                    ({chromeMemoryEst} MB)
-                  </span>
-                </div>
 
-                {/* Net Savings Result */}
-                <div className="p-6 rounded-2xl bg-[#171717] text-white shadow-md flex flex-col justify-between">
-                  <span className="font-mono text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
-                    Net Memory Saved
-                  </span>
-                  <div className="font-display text-3xl sm:text-4xl font-extrabold text-emerald-400 my-2">
-                    {savedPercentage}%
+                  <div className="my-3">
+                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 tracking-tight">
+                      ~{(chromeMemoryEst / 1024).toFixed(1)} <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
+                    </div>
+                    {/* Visual Meter Bar */}
+                    <div className="w-full bg-neutral-100 rounded-full h-1.5 mt-2 overflow-hidden">
+                      <div className="bg-amber-500 h-full rounded-full transition-all duration-300 w-full" />
+                    </div>
                   </div>
-                  <span className="font-mono text-[10px] text-neutral-300">
-                    ~{(savedMemoryEst / 1024).toFixed(1)} GB Free RAM
-                  </span>
-                </div>
+
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full font-medium">
+                      ({chromeMemoryEst} MB)
+                    </span>
+                    <span className="font-mono text-[10px] text-amber-600 font-semibold">
+                      Full process load
+                    </span>
+                  </div>
+                </motion.div>
+
+                {/* 3. Net Savings Result (Obsidian Card) */}
+                <motion.div
+                  key={`saved-${tabCount}`}
+                  initial={{ scale: 0.98, opacity: 0.9 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ duration: 0.2 }}
+                  className="p-6 rounded-2xl bg-[#0c0d12] text-white shadow-xl flex flex-col justify-between relative overflow-hidden border border-white/10"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
+                      Net Memory Saved
+                    </span>
+                    <Zap className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+
+                  <div className="my-3">
+                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight flex items-baseline gap-1">
+                      {savedPercentage}%
+                      <span className="text-xs font-mono font-normal text-neutral-400 uppercase">Less RAM</span>
+                    </div>
+                    {/* Visual Saving Meter */}
+                    <div className="w-full bg-white/10 rounded-full h-1.5 mt-2 overflow-hidden">
+                      <div
+                        className="bg-emerald-400 h-full rounded-full transition-all duration-300"
+                        style={{ width: `${savedPercentage}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between font-mono text-[10px]">
+                    <span className="text-emerald-300 font-bold">
+                      ~{(savedMemoryEst / 1024).toFixed(1)} GB Freed
+                    </span>
+                    <span className="text-neutral-400">
+                      for IDE & Apps
+                    </span>
+                  </div>
+                </motion.div>
               </div>
             </div>
           </div>
