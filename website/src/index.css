@@ -38,7 +38,6 @@
 }
 
 html {
-  scroll-padding-top: 6rem;
   background-color: var(--nova-canvas);
 }
 
@@ -88,7 +87,6 @@ body {
 
 section {
   position: relative;
-  scroll-margin-top: 7rem;
 }
 
 .community-section > * {

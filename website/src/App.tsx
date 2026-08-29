@@ -59,7 +59,7 @@ function DeferredSections() {
           observer.disconnect();
         }
       },
-      { rootMargin: '800px 0px' },
+      { rootMargin: '200px 0px' },
     );
     observer.observe(deferredSections);
 
@@ -84,23 +84,37 @@ export default function App() {
   const [showNavbar, setShowNavbar] = useState(false);
 
   useEffect(() => {
-    // Prevent browser auto-scroll jump on refresh so page stays at top
+    // Lock scroll to top once synchronously on mount.
+    // The <head> script already set scrollRestoration=manual and scrollTo(0,0),
+    // this is a safety net for the React hydration frame.
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
     }
 
-    const resetTop = () => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    // Single rAF scroll-lock — runs after the first paint, before user sees anything.
+    // Do NOT chain multiple timeouts; they fight each other and cause visible jumps.
+    const rafId = requestAnimationFrame(() => {
+      if (window.scrollY !== 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      }
+      // Only strip hash if it does NOT refer to a real section (prevents removing
+      // intentional deep links while still killing stale restoration hashes).
       if (window.location.hash) {
-        window.history.replaceState(null, '', window.location.pathname);
+        const targetId = window.location.hash.slice(1);
+        const el = document.getElementById(targetId);
+        if (!el) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      }
+    });
+
+    // Restore-scroll guard on bfcache hits (back-forward navigation).
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
       }
     };
-
-    resetTop();
-    requestAnimationFrame(resetTop);
-    const t1 = setTimeout(resetTop, 60);
-    const t2 = setTimeout(resetTop, 250);
-    window.addEventListener('pageshow', resetTop);
+    window.addEventListener('pageshow', onPageShow);
 
     const handleScroll = () => {
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
@@ -110,9 +124,8 @@ export default function App() {
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      window.removeEventListener('pageshow', resetTop);
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
