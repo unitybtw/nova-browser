@@ -125,6 +125,21 @@ section {
   position: relative;
 }
 
+/* Performance Optimization: Content Visibility for Below-the-Fold Sections */
+#community,
+#benchmarks,
+#download,
+#faq {
+  content-visibility: auto;
+  contain-intrinsic-size: 1px 750px;
+}
+
+[data-canvas-card],
+canvas {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
 .community-section > * {
   opacity: 0;
   transform: translateY(22px);

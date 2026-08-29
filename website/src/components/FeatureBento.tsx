@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Bot, Lock, Columns, Shield, Terminal, Sparkles } from 'lucide-react';
+import { Bot, Lock, Columns, Shield, Terminal } from 'lucide-react';
 import { CodeTrailCard } from './codetrail/CodeTrailCard';
 import { TextRevealCard } from './textreveal/TextRevealCard';
 
@@ -14,7 +14,6 @@ const MODULES = [
     icon: Bot,
     stats: '60+ TOKENS / SEC',
     hasVisual: true,
-    visualType: 'codetrail',
   },
   {
     id: 'vault',
@@ -55,17 +54,6 @@ const MODULES = [
     icon: Terminal,
     stats: 'LOCALHOST ONLY',
     hasVisual: false,
-  },
-  {
-    id: 'typography',
-    span: 'lg:col-span-12',
-    title: 'Reactive Surface & Ambient Shaders',
-    tag: 'DYNAMIC FRACTAL BLOOM',
-    description: 'Corner typography blooming through GPU noise fields with cursor parallax and multi-tap un-blurring.',
-    icon: Sparkles,
-    stats: '60 FPS WEBGPU',
-    hasVisual: true,
-    visualType: 'textreveal',
   },
 ];
 
@@ -117,15 +105,9 @@ export const FeatureBento: React.FC = () => {
                 {mod.description}
               </p>
 
-              {mod.hasVisual && mod.visualType === 'codetrail' && (
+              {mod.hasVisual && (
                 <div className="mt-6 w-full overflow-hidden rounded-xl border border-neutral-800/80 bg-[#0d0f15] shadow-lg">
                   <CodeTrailCard className="aspect-[16/8] sm:aspect-[21/9] w-full" />
-                </div>
-              )}
-
-              {mod.hasVisual && mod.visualType === 'textreveal' && (
-                <div className="mt-6 w-full overflow-hidden rounded-xl border border-[#e5e5e5] bg-[#fcfbf9] shadow-sm">
-                  <TextRevealCard className="aspect-[16/7] sm:aspect-[21/8] w-full" />
                 </div>
               )}
             </div>
@@ -139,6 +121,17 @@ export const FeatureBento: React.FC = () => {
           </motion.div>
         ))}
       </div>
+
+      {/* Standalone Sovereign Reactive Typography Showcase */}
+      <motion.div
+        initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
+        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={prefersReducedMotion ? undefined : { duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-6 w-full shadow-xs"
+      >
+        <TextRevealCard className="aspect-[16/7] sm:aspect-[21/8] w-full shadow-sm" />
+      </motion.div>
     </section>
   );
 };
