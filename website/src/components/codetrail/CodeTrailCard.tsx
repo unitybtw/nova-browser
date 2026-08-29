@@ -127,7 +127,6 @@ export const CodeTrailCard: React.FC<CodeTrailCardProps> = ({
 
         const pr = presence(r.slot, ROWS);
         el.style.opacity = pr.toFixed(3);
-        el.style.filter = `saturate(${(0.5 + pr * 0.5).toFixed(3)})`;
         el.style.zIndex = String(ROWS - r.slot);
       }
 
