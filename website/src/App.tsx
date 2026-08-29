@@ -25,27 +25,30 @@ export default function App() {
       history.scrollRestoration = 'manual';
     }
 
-    // Single rAF scroll-lock — safety net for the React hydration frame.
-    const rafId = requestAnimationFrame(() => {
-      if (window.scrollY !== 0) {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-      }
-      if (window.location.hash) {
-        const targetId = window.location.hash.slice(1);
-        const el = document.getElementById(targetId);
-        if (!el) {
-          window.history.replaceState(null, '', window.location.pathname);
+    if (window.location.hash) {
+      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    }
+
+    // Force top position immediately on mount
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+
+    // Multi-frame lock covering React hydration and WebGL canvas init
+    const rafId1 = requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      const rafId2 = requestAnimationFrame(() => {
+        if (window.scrollY !== 0) {
+          window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
         }
-      }
+      });
+      return () => cancelAnimationFrame(rafId2);
     });
 
     // bfcache guard
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) {
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-      }
+    const onPageShow = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     };
     window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('load', onPageShow);
 
     const handleScroll = () => {
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
@@ -60,9 +63,10 @@ export default function App() {
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
-      cancelAnimationFrame(rafId);
+      cancelAnimationFrame(rafId1);
       document.documentElement.classList.remove('in-manifesto');
       window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('load', onPageShow);
       window.removeEventListener('scroll', handleScroll);
     };
   }, []);
