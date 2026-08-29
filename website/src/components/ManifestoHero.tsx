@@ -23,6 +23,12 @@ export const ManifestoHero: React.FC = () => {
         <StampTypeCard className="h-full w-full" />
       </div>
 
+      {/* Bottom atmospheric gradient fade transitioning into page content */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-44 bg-gradient-to-b from-transparent via-[#171717]/70 to-[#171717]"
+        aria-hidden="true"
+      />
+
       {/* Floating Animated Scroll Down Arrow Only */}
       <motion.button
         type="button"

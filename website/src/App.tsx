@@ -140,6 +140,14 @@ export default function App() {
       {/* 00 Fullscreen Kinetic Manifesto Hero Opening */}
       <ManifestoHero />
 
+      {/* Seamless Atmosphere Color Transition Seam: Dark Manifesto -> Light Canvas */}
+      <div
+        className="relative w-full h-24 sm:h-36 -mt-1 pointer-events-none z-10 overflow-hidden bg-gradient-to-b from-[#171717] via-[#1a1c26] to-[#fcfbf9]"
+        aria-hidden="true"
+      >
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-500/05 to-transparent" />
+      </div>
+
       {/* Main Website Flow */}
       <main id="main-content">
         <Hero />
