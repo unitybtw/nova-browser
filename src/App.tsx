@@ -810,7 +810,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       // VULN-26 FIX: Validate hex color to prevent CSS injection
       const isValidHex = /^#[0-9a-fA-F]{3,8}$/.test(settings.customAccentColor);
       const hex = isValidHex ? settings.customAccentColor : '#3b82f6';
-      accentStyleEl.innerHTML = `
+      accentStyleEl.textContent = `
         :root {
           --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
           --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
@@ -843,7 +843,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       
       // If it's standard blue, we can either clear or just set it
       if (settings.accentColor === 'blue') {
-        accentStyleEl.innerHTML = `
+        accentStyleEl.textContent = `
           :root {
             --nova-accent: ${hex};
             --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
@@ -853,7 +853,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           }
         `;
       } else {
-        accentStyleEl.innerHTML = `
+        accentStyleEl.textContent = `
           :root {
             --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
             --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
@@ -2303,9 +2303,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
-        if (data.bookmarks && Array.isArray(data.bookmarks)) setBookmarks(data.bookmarks);
-        if (data.history && Array.isArray(data.history)) setHistory(data.history);
-        if (data.settings && typeof data.settings === 'object') setSettings(prev => ({ ...prev, ...data.settings }));
+        if (data.bookmarks && Array.isArray(data.bookmarks)) {
+          const sanitizedBookmarks = data.bookmarks.filter((b: any) =>
+            b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
+          );
+          setBookmarks(sanitizedBookmarks);
+        }
+        if (data.history && Array.isArray(data.history)) {
+          const sanitizedHistory = data.history.filter((h: any) =>
+            h && typeof h === 'object' && typeof h.url === 'string' && isSafeNavigationUrl(h.url)
+          );
+          setHistory(sanitizedHistory);
+        }
+        if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
+          setSettings(prev => ({ ...prev, ...data.settings }));
+        }
       } catch (err) {
         console.error('Backup import error:', err);
       }

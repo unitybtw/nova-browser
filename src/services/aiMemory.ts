@@ -85,8 +85,16 @@ class AIMemoryService {
     try {
       const persistable = this.memories.filter(m => this.isPersistable(m));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
-    } catch (e) {
-      console.error('Failed to save AI memories', e);
+    } catch (e: any) {
+      console.warn('Failed to save AI memories, attempting quota recovery trim...', e);
+      try {
+        // Drop oldest 50% on quota pressure
+        this.memories = this.memories.slice(Math.floor(this.memories.length / 2));
+        const persistable = this.memories.filter(m => this.isPersistable(m));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistable));
+      } catch (retryErr) {
+        console.error('AI memories save recovery failed:', retryErr);
+      }
     }
   }
 
@@ -94,8 +102,15 @@ class AIMemoryService {
     if (typeof localStorage === 'undefined') return;
     try {
       localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(this.taskHistory));
-    } catch (e) {
-      console.error('Failed to save task history', e);
+    } catch (e: any) {
+      console.warn('Failed to save task history, attempting quota recovery trim...', e);
+      try {
+        // Drop oldest 50% on quota pressure
+        this.taskHistory = this.taskHistory.slice(0, Math.floor(this.taskHistory.length / 2));
+        localStorage.setItem(TASK_STORAGE_KEY, JSON.stringify(this.taskHistory));
+      } catch (retryErr) {
+        console.error('Task history save recovery failed:', retryErr);
+      }
     }
   }
 
