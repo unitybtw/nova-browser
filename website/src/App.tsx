@@ -5,7 +5,6 @@ import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
 import Footer from './components/Footer';
-import ScrollProgress from './components/ScrollProgress';
 
 const GithubStats = lazy(() => import('./components/GithubStats'));
 const Benchmarks = lazy(() => import('./components/Benchmarks'));
@@ -132,8 +131,6 @@ export default function App() {
 
   return (
     <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
-      <ScrollProgress />
-
       {/* Floating Left-Side Sovereign Navigation Dock - Slides in when scrolling past Manifesto */}
       <Navbar visible={showNavbar} />
 
