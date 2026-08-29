@@ -217,40 +217,40 @@ Nova Browser employs a multi-process Electron architecture with context isolatio
 ```mermaid
 graph TD
     subgraph Electron["Electron (Main Process)"]
-        main["main.ts<br/>App Lifecycle & IPC Dispatcher"]
-        mcp["BrowserMCPServer (Port 3020)<br/>& mcpBridge.ts"]
-        adblock["AdBlocker & Privacy Shield<br/>Rust Filter + O(1) Blocklist Engine"]
-        security["Security Engine<br/>SSRF / Private IP & Phishing Defense"]
-        crx["crxInstaller.ts<br/>Chrome Web Store & Zip-Slip Protection"]
-        downloads["downloads.ts<br/>Background Downloads Manager"]
-        keychain["safeStorage Engine<br/>OS Keychain Encrypted Store"]
-        tts["Native OS TTS Engine<br/>macOS `say` & Windows SAPI"]
+        main["main.ts - App Lifecycle & IPC Dispatcher"]
+        mcp["BrowserMCPServer (Port 3020) & mcpBridge.ts"]
+        adblock["AdBlocker & Privacy Shield (Rust Filter)"]
+        security["Security Engine (SSRF & Phishing Defense)"]
+        crx["crxInstaller.ts (Chrome Web Store Engine)"]
+        downloads["downloads.ts (Downloads Manager)"]
+        keychain["safeStorage Engine (OS Keychain Store)"]
+        tts["Native OS TTS Engine (OS Speech API)"]
     end
 
     subgraph Preload["Context Bridge (Preload Security)"]
-        api["preload.ts (window.electronAPI)<br/>Validated IPC with isTrustedSender"]
-        webstore["webstore-preload.ts<br/>1-Click Chrome Web Store Bridge"]
+        api["preload.ts (window.electronAPI)"]
+        webstore["webstore-preload.ts (Web Store Bridge)"]
     end
 
     subgraph Renderer["React 18 + TypeScript (Renderer Process)"]
-        app["App.tsx<br/>Tab & State Management"]
+        app["App.tsx - Tab & State Management"]
         
         subgraph AISubsystem["AI & Neural Subsystem"]
-            agent["aiAgent.ts<br/>ReAct Engine & Natural Language Intent"]
-            memory["aiMemory.ts<br/>Persistent Info Vault & Task History"]
-            preview["AILinkPreview.tsx<br/>Hover Preview with LRU Cache"]
-            worker["workers/aiWorker.ts<br/>WebLLM / WebGPU Isolated Neural Runtime"]
-            translate["translationService.ts<br/>18-Language Offline DOM Translator"]
-            sidepanel["SidePanel.tsx<br/>AI Assistant & Memory Vault UI"]
+            agent["aiAgent.ts - ReAct Engine & Intent Parser"]
+            memory["aiMemory.ts - Persistent Info Vault"]
+            preview["AILinkPreview.tsx - Hover Preview"]
+            worker["workers/aiWorker.ts - WebLLM Neural Runtime"]
+            translate["translationService.ts - Offline DOM Translator"]
+            sidepanel["SidePanel.tsx - AI Assistant UI"]
         end
 
         subgraph CoreWorkspaces["Workspaces & Vertical Tabs"]
-            vtabs["verticalTabs.ts<br/>Folder Groups & Tab Hibernation Engine"]
-            thumb["thumbnailCache.ts<br/>Viewport Snapshots"]
-            sync["syncService.ts<br/>AES-256-GCM E2EE Cloud Sync Engine"]
+            vtabs["verticalTabs.ts - Tab Hibernation Engine"]
+            thumb["thumbnailCache.ts - Viewport Snapshots"]
+            sync["syncService.ts - E2EE Cloud Sync Engine"]
         end
 
-        subgraph InternalPages["nova:// Internal Pages"]
+        subgraph InternalPages["Internal Pages"]
             settings["SettingsPage.tsx (nova://settings)"]
             history["HistoryPage.tsx (nova://history)"]
             newtab["NewTabPage.tsx (nova://newtab)"]
@@ -259,15 +259,15 @@ graph TD
             extModal["ExtensionsModal.tsx (nova://extensions)"]
         end
         
-        webview["&lt;webview&gt;<br/>External Webpages (Sandboxed)"]
+        webview["Webview Host - Sandboxed Webpages"]
     end
 
     subgraph Cloud["Cloud Infrastructure"]
-        supabase[("Supabase Realtime Vault<br/>Zero-Knowledge Encrypted Blobs")]
+        supabase["Supabase Realtime Vault - Encrypted Blobs"]
     end
 
     subgraph External["External AI Agents (MCP Clients)"]
-        claude["Claude Desktop / Cursor / Antigravity / Custom Agents"]
+        claude["Claude Desktop / Cursor / Antigravity"]
     end
 
     main <-->|Secure IPC| api
@@ -282,7 +282,7 @@ graph TD
     agent --> preview
     agent --> translate
     
-    sync <-->|Realtime WebSocket (Encrypted)| supabase
+    sync <-->|Realtime Encrypted WebSocket| supabase
     
     main --> adblock
     main --> security
@@ -291,8 +291,8 @@ graph TD
     main --> keychain
     main --> tts
     
-    claude <-->|JSON-RPC over SSE / Stdio| mcp
-    mcp <-->|DOM Manipulation & Screenshots| webview
+    claude <-->|JSON-RPC over SSE or Stdio| mcp
+    mcp <-->|DOM Control & Screenshots| webview
     
     style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
     style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
