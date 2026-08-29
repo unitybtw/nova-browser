@@ -359,7 +359,21 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                       href={item.href}
                       target={item.external ? "_blank" : undefined}
                       rel={item.external ? "noopener noreferrer" : undefined}
-                      onClick={() => !item.external && setActiveHref(item.href)}
+                      onClick={(e) => {
+                        if (!item.external) {
+                          e.preventDefault();
+                          setActiveHref(item.href);
+                          const targetId = item.href.slice(1);
+                          if (targetId === 'top' || targetId === 'manifesto') {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          } else {
+                            const el = document.getElementById(targetId);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }
+                        }
+                      }}
                       aria-current={isActive ? 'location' : undefined}
                       onMouseEnter={() => handleEnter(i)}
                       onMouseLeave={() => handleLeave(i)}
@@ -469,9 +483,23 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                     href={item.href}
                     target={item.external ? "_blank" : undefined}
                     rel={item.external ? "noopener noreferrer" : undefined}
-                    onClick={() => {
-                      if (!item.external) setActiveHref(item.href);
-                      closeMobileMenu();
+                    onClick={(e) => {
+                      if (!item.external) {
+                        e.preventDefault();
+                        setActiveHref(item.href);
+                        closeMobileMenu();
+                        const targetId = item.href.slice(1);
+                        if (targetId === 'top' || targetId === 'manifesto') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                          const el = document.getElementById(targetId);
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }
+                      } else {
+                        closeMobileMenu();
+                      }
                     }}
                     aria-current={isActive ? 'location' : undefined}
                     className={`block py-3 px-6 text-xs font-mono font-semibold uppercase tracking-widest rounded-xl transition-all ${

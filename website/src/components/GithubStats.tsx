@@ -345,7 +345,6 @@ export const GithubStats: React.FC = () => {
                   key={idx}
                   className="cursor-pointer"
                   role="button"
-                  tabIndex={0}
                   aria-label={`${p.date}: ${p.stars} stars`}
                   onMouseEnter={selectPoint}
                   onFocus={selectPoint}
