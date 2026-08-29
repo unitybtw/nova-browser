@@ -1,122 +1,107 @@
-import React, { useEffect, useState } from "react";
-
-export type Stop = { offset: number; color: string };
-
-// Nova Browser's Sovereign Cyber-Aurora Palette
-export const NOVA_STOPS: Stop[] = [
-  { offset: 0, color: "#0c0d12" }, // Deep Void Black
-  { offset: 0.18, color: "#1e1b4b" }, // Midnight Indigo
-  { offset: 0.34, color: "#4338ca" }, // Sovereign Indigo
-  { offset: 0.50, color: "#0078bf" }, // Cobalt Cyan
-  { offset: 0.66, color: "#38bdf8" }, // Electric Sky
-  { offset: 0.80, color: "#818cf8" }, // Ethereal Periwinkle
-  { offset: 0.92, color: "#a855f7" }, // Neural Violet
-  { offset: 1, color: "#38bdf800" }, // Transparent Bloom Fade
-];
-
-export const CLASSIC_DIA_STOPS: Stop[] = [
-  { offset: 0, color: "#340B05" },
-  { offset: 0.1827, color: "#0358F7" },
-  { offset: 0.2837, color: "#5092C7" },
-  { offset: 0.4135, color: "#E1ECFE" },
-  { offset: 0.5866, color: "#FFD400" },
-  { offset: 0.6827, color: "#FA3D1D" },
-  { offset: 0.8029, color: "#FD02F5" },
-  { offset: 1, color: "#FFC0FD00" },
-];
-
-const VBW = 1271;
-const VBH = 599;
-
-function bellHeights(n: number, peak: number, valley: number): number[] {
-  const out: number[] = [];
-  const mid = (n - 1) / 2;
-  for (let i = 0; i < n; i++) {
-    const t = mid === 0 ? 0 : Math.abs(i - mid) / mid;
-    const eased = 1 - Math.pow(t, 1.24);
-    out.push(peak * VBH * (valley + (1 - valley) * eased));
-  }
-  return out;
-}
+import React from "react";
+import { motion, useReducedMotion } from "framer-motion";
 
 export interface DiaGradientProps {
-  bars?: number;
-  blur?: number;
-  peak?: number;
-  valley?: number;
-  stops?: Stop[];
-  riseMs?: number;
   className?: string;
+  intensity?: number;
 }
 
 export const DiaGradient: React.FC<DiaGradientProps> = ({
-  bars = 11,
-  blur = 20,
-  peak = 0.98,
-  valley = 0.48,
-  stops = NOVA_STOPS,
-  riseMs = 1100,
   className = "",
+  intensity = 1.0,
 }) => {
-  const [shown, setShown] = useState(false);
-
-  useEffect(() => {
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) {
-      setShown(true);
-      return;
-    }
-    const id = requestAnimationFrame(() =>
-      requestAnimationFrame(() => setShown(true)),
-    );
-    return () => cancelAnimationFrame(id);
-  }, []);
-
-  const heights = bellHeights(bars, peak, valley);
-  const colW = VBW / bars;
+  const prefersReducedMotion = useReducedMotion();
 
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none select-none ${className}`}
-      style={{
-        height: "100%",
-        width: "100%",
-        transformOrigin: "bottom",
-        transform: shown ? "scaleY(1)" : "scaleY(0)",
-        transition: `transform ${riseMs}ms cubic-bezier(0.16, 1, 0.3, 1)`,
-        willChange: "transform",
-      }}
+      className={`relative w-full h-full overflow-hidden bg-[#0c0d12] pointer-events-none select-none ${className}`}
     >
-      <svg
-        style={{ height: "100%", width: "100%" }}
-        viewBox={`0 0 ${VBW} ${VBH}`}
-        preserveAspectRatio="none"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <defs>
-          <linearGradient id="nova-dia-grad" x1="0" y1="1" x2="0" y2="0">
-            {stops.map((s, i) => (
-              <stop key={i} offset={s.offset} stopColor={s.color} />
-            ))}
-          </linearGradient>
-          <filter id="nova-dia-blur" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation={blur} />
-          </filter>
-        </defs>
-        {heights.map((h, i) => (
-          <g key={i} filter="url(#nova-dia-blur)">
-            <rect
-              x={i * colW}
-              y={VBH - h}
-              width={colW * 1.25}
-              height={h}
-              fill="url(#nova-dia-grad)"
-            />
-          </g>
-        ))}
-      </svg>
+      {/* 1. Base Dark Void Horizon with deep Indigo/Cyan Ambient Glow */}
+      <div
+        className="absolute inset-0 opacity-80"
+        style={{
+          background: "radial-gradient(ellipse 90% 100% at 50% 100%, rgba(67, 56, 202, 0.45) 0%, rgba(30, 27, 75, 0.3) 40%, rgba(12, 13, 18, 0) 100%)",
+        }}
+      />
+
+      {/* 2. Primary Luminous Aurora Wave (Electric Indigo & Sky Cyan) */}
+      <motion.div
+        animate={
+          prefersReducedMotion
+            ? undefined
+            : {
+                scaleY: [0.85, 1.15, 0.9, 1.1, 0.85],
+                scaleX: [0.95, 1.05, 0.98, 1.03, 0.95],
+                x: ["-3%", "3%", "-2%", "2%", "-3%"],
+                opacity: [0.75 * intensity, 0.95 * intensity, 0.7 * intensity, 0.9 * intensity, 0.75 * intensity],
+              }
+        }
+        transition={{
+          duration: 10,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-x-[-10%] bottom-0 h-[140%] origin-bottom blur-2xl will-change-transform"
+        style={{
+          background: "radial-gradient(ellipse 65% 90% at 50% 100%, rgba(0, 194, 255, 0.6) 0%, rgba(67, 56, 202, 0.5) 35%, rgba(129, 140, 248, 0.25) 60%, transparent 85%)",
+          transform: "translateZ(0)",
+        }}
+      />
+
+      {/* 3. Secondary Chromatic Wave (Deep Violet & Azure Ribbon - Counter oscillating) */}
+      <motion.div
+        animate={
+          prefersReducedMotion
+            ? undefined
+            : {
+                scaleY: [1.1, 0.8, 1.15, 0.85, 1.1],
+                scaleX: [1.03, 0.94, 1.05, 0.96, 1.03],
+                x: ["4%", "-4%", "3%", "-2%", "4%"],
+                opacity: [0.65 * intensity, 0.85 * intensity, 0.6 * intensity, 0.8 * intensity, 0.65 * intensity],
+              }
+        }
+        transition={{
+          duration: 13,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-x-[-15%] bottom-0 h-[120%] origin-bottom blur-3xl will-change-transform"
+        style={{
+          background: "radial-gradient(ellipse 70% 80% at 45% 100%, rgba(168, 85, 247, 0.5) 0%, rgba(56, 189, 248, 0.4) 40%, rgba(30, 27, 75, 0.3) 70%, transparent 90%)",
+          transform: "translateZ(0)",
+        }}
+      />
+
+      {/* 4. Horizon Core High-Intensity Light Flare */}
+      <motion.div
+        animate={
+          prefersReducedMotion
+            ? undefined
+            : {
+                opacity: [0.6, 0.9, 0.55, 0.85, 0.6],
+                scaleY: [0.9, 1.1, 0.95, 1.05, 0.9],
+              }
+        }
+        transition={{
+          duration: 7,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="absolute inset-x-0 bottom-0 h-16 sm:h-24 blur-xl origin-bottom will-change-transform"
+        style={{
+          background: "radial-gradient(ellipse 80% 100% at 50% 100%, rgba(255, 255, 255, 0.4) 0%, rgba(129, 140, 248, 0.5) 30%, rgba(67, 56, 202, 0.3) 60%, transparent 90%)",
+          transform: "translateZ(0)",
+        }}
+      />
+
+      {/* 5. Seamless Bottom & Edge Vignette matching Deep Obsidian #0c0d12 */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "linear-gradient(to bottom, rgba(12, 13, 18, 0.85) 0%, transparent 35%, transparent 70%, rgba(12, 13, 18, 0.95) 100%)",
+        }}
+      />
     </div>
   );
 };

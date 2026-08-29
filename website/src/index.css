@@ -39,7 +39,7 @@ html, body {
 }
 
 .nova-page {
-  background-color: var(--nova-canvas);
+  background-color: #0c0d12;
   color: var(--nova-text);
   overflow-anchor: none;
 }

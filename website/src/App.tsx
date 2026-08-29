@@ -70,7 +70,7 @@ export default function App() {
   return (
     <div
       id="top"
-      className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white"
+      className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white bg-[#0c0d12]"
       style={{ overflowAnchor: 'none' }}
     >
       <Navbar visible={showNavbar} />
@@ -83,9 +83,8 @@ export default function App() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-500/05 to-transparent" />
       </div>
 
-      {/* overflow-anchor: none on main prevents Chrome scroll anchoring from
-          shifting the viewport when deferred sections load below the fold. */}
-      <main id="main-content" style={{ overflowAnchor: 'none' }}>
+      {/* Main Light Canvas Section */}
+      <main id="main-content" className="relative z-10 bg-[#fcfbf9] pb-6" style={{ overflowAnchor: 'none' }}>
         <Hero />
         <TrustPillars />
         <FeatureBento />
@@ -102,6 +101,8 @@ export default function App() {
           <Faq />
         </Suspense>
       </main>
+
+      {/* Deep Obsidian Sovereign Footer */}
       <Footer />
     </div>
   );

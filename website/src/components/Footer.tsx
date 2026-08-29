@@ -11,28 +11,28 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="w-full pt-16 pb-0 bg-[#0c0d12] text-[#fcfbf9] font-sans mt-24 rounded-t-3xl border-t border-white/10 relative overflow-hidden">
+    <footer className="relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-[max(2rem,env(safe-area-inset-bottom,0px))]">
       {/* Centered & Balanced Content Container */}
-      <div className="max-w-6xl mx-auto px-6 sm:px-10 lg:px-12 relative z-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-10 lg:gap-16 pb-14 border-b border-white/10 items-start">
+      <div className="relative z-10 mx-auto max-w-6xl px-6 sm:px-10 lg:px-12">
+        <div className="grid grid-cols-1 items-start gap-10 border-b border-white/10 pb-14 md:grid-cols-12 lg:gap-16">
           {/* Brand / Manifesto Column */}
-          <div className="col-span-1 md:col-span-7 lg:col-span-7 flex flex-col justify-between">
+          <div className="col-span-1 flex flex-col justify-between md:col-span-7 lg:col-span-7">
             <div>
-              <div className="flex items-center gap-3 mb-6">
+              <div className="mb-6 flex items-center gap-3">
                 <img
                   src="/nova-logo-tight.png"
                   alt="Nova Logo"
-                  className="w-9 h-9 object-contain"
+                  className="h-9 w-9 object-contain"
                 />
                 <span className="font-display text-3xl font-extrabold tracking-tight text-white">
                   Nova
                 </span>
               </div>
-              <h2 className="font-display font-extrabold text-2xl sm:text-3xl text-neutral-200 mb-4 leading-snug tracking-tight">
+              <h2 className="mb-4 font-display text-2xl font-extrabold leading-snug tracking-tight text-neutral-200 sm:text-3xl">
                 “The browser is no longer a window.<br />
                 <span className="text-indigo-400">It is the engine.</span>”
               </h2>
-              <p className="font-mono text-xs text-neutral-400 max-w-lg leading-relaxed">
+              <p className="max-w-lg font-mono text-xs leading-relaxed text-neutral-400">
                 Nova is built for a post-cloud web. Local inference, hardened network layer, absolute autonomy.
               </p>
             </div>
@@ -42,9 +42,9 @@ export const Footer: React.FC = () => {
           </div>
 
           {/* Links Column */}
-          <div className="col-span-1 md:col-span-5 lg:col-span-5 flex flex-col md:items-end justify-between">
+          <div className="col-span-1 flex flex-col justify-between md:col-span-5 md:items-end lg:col-span-5">
             <div className="w-full md:max-w-xs">
-              <h4 className="font-mono text-[11px] text-neutral-400 mb-5 tracking-widest uppercase font-semibold">
+              <h4 className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
                 RESOURCES & REPOSITORY
               </h4>
               <ul className="space-y-3 font-mono text-xs text-neutral-300">
@@ -55,7 +55,7 @@ export const Footer: React.FC = () => {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    <Github className="w-4 h-4" />
+                    <Github className="h-4 w-4" />
                     <span>GitHub Repository</span>
                   </a>
                 </li>
@@ -95,32 +95,32 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Row: Copyright & Navigation */}
-        <div className="pt-6 pb-8 flex flex-col sm:flex-row items-center justify-between gap-4 font-mono text-xs text-neutral-400">
+        <div className="flex flex-col items-center justify-between gap-4 pt-6 pb-8 font-mono text-xs text-neutral-400 sm:flex-row">
           <div>ALL RIGHTS RESERVED // SOVEREIGN COMPUTING</div>
           <button
             type="button"
             onClick={scrollToTop}
             aria-label="Back to top"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12] cursor-pointer"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
           >
             <span>BACK TO TOP</span>
-            <ArrowUp className="w-3.5 h-3.5" />
+            <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
       {/* 1. FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK */}
-      <div className="w-full pt-10 pb-4 overflow-hidden select-none border-t border-white/5 bg-[#0a0a0e]">
+      <div className="relative w-full overflow-hidden select-none bg-[#0c0d12] pt-8 pb-2">
         <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={prefersReducedMotion ? undefined : { duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full block leading-none"
+          transition={prefersReducedMotion ? undefined : { duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="block w-full leading-none"
         >
           <svg
             viewBox="0 0 1000 115"
-            className="w-full h-auto block select-none"
+            className="block h-auto w-full select-none"
             preserveAspectRatio="none"
           >
             <defs>
@@ -150,16 +150,9 @@ export const Footer: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* 2. RISING AURORA GRADIENT FLOOR (AFTER/BENEATH THE WATERMARK) */}
-      <div className="w-full h-28 sm:h-44 md:h-56 overflow-hidden pointer-events-none select-none bg-[#0a0a0e] relative">
-        <DiaGradient
-          bars={13}
-          blur={22}
-          peak={0.98}
-          valley={0.46}
-          riseMs={1200}
-          className="h-full w-full opacity-90"
-        />
+      {/* 2. SILKY-SMOOTH LIVING CYBER-AURORA BEAM FLOOR (100% UNIFIED OBSIDIAN #0c0d12) */}
+      <div className="relative h-28 w-full overflow-hidden pointer-events-none select-none bg-[#0c0d12] sm:h-40 md:h-52">
+        <DiaGradient className="h-full w-full" />
       </div>
     </footer>
   );
