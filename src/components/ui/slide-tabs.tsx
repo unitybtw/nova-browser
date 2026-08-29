@@ -2,16 +2,14 @@ import React, { useRef, useState, useEffect } from "react";
 import { motion } from "framer-motion";
 
 export interface SlideTabsProps {
-  items?: string[];
-  selectedIndex?: number;
-  onSelect?: (index: number) => void;
+  tabs?: { label: string; href?: string; onClick?: () => void }[] | string[];
+  onTabChange?: (tab: string, index: number) => void;
   className?: string;
 }
 
 export const SlideTabs: React.FC<SlideTabsProps> = ({
-  items = ["Home", "Pricing", "Features", "Docs", "Blog"],
-  selectedIndex: controlledSelected,
-  onSelect,
+  tabs = ["Home", "Pricing", "Features", "Docs", "Blog"],
+  onTabChange,
   className = "",
 }) => {
   const [position, setPosition] = useState({
@@ -19,10 +17,14 @@ export const SlideTabs: React.FC<SlideTabsProps> = ({
     width: 0,
     opacity: 0,
   });
-  const [internalSelected, setInternalSelected] = useState(0);
-  const selected = controlledSelected !== undefined ? controlledSelected : internalSelected;
+  // State to track the currently selected tab, defaulting to the first tab (index 0)
+  const [selected, setSelected] = useState(0);
   const tabsRef = useRef<(HTMLLIElement | null)[]>([]);
 
+  const tabList = tabs.map((t) => (typeof t === "string" ? { label: t } : t));
+
+  // This effect runs when the component mounts or when the selected tab changes.
+  // It calculates the position of the selected tab and sets the cursor.
   useEffect(() => {
     const selectedTab = tabsRef.current[selected];
     if (selectedTab) {
@@ -33,9 +35,9 @@ export const SlideTabs: React.FC<SlideTabsProps> = ({
         opacity: 1,
       });
     }
-  }, [selected, items]);
+  }, [selected, tabs]);
 
-  const resetCursorToSelected = () => {
+  const resetCursor = () => {
     const selectedTab = tabsRef.current[selected];
     if (selectedTab) {
       const { width } = selectedTab.getBoundingClientRect();
@@ -49,22 +51,24 @@ export const SlideTabs: React.FC<SlideTabsProps> = ({
 
   return (
     <ul
-      onMouseLeave={resetCursorToSelected}
+      onMouseLeave={resetCursor}
       className={`relative mx-auto flex w-fit items-center rounded-full border-2 border-black bg-white p-1 dark:border-white dark:bg-neutral-800 ${className}`}
     >
-      {items.map((tab, i) => (
+      {tabList.map((tab, i) => (
         <Tab
-          key={tab}
+          key={tab.label}
           ref={(el) => {
             tabsRef.current[i] = el;
           }}
           setPosition={setPosition}
           onClick={() => {
-            setInternalSelected(i);
-            onSelect?.(i);
+            setSelected(i);
+            tab.onClick?.();
+            onTabChange?.(tab.label, i);
           }}
+          href={tab.href}
         >
-          {tab}
+          {tab.label}
         </Tab>
       ))}
 
@@ -78,11 +82,19 @@ interface TabProps {
   setPosition: React.Dispatch<
     React.SetStateAction<{ left: number; width: number; opacity: number }>
   >;
-  onClick?: () => void;
+  onClick: () => void;
+  href?: string;
 }
 
+// The Tab component is wrapped in forwardRef to accept a ref from its parent.
 const Tab = React.forwardRef<HTMLLIElement, TabProps>(
-  ({ children, setPosition, onClick }, ref) => {
+  ({ children, setPosition, onClick, href }, ref) => {
+    const content = (
+      <span className="relative z-10 block px-3 py-1.5 text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-base select-none">
+        {children}
+      </span>
+    );
+
     return (
       <li
         ref={ref}
@@ -90,15 +102,22 @@ const Tab = React.forwardRef<HTMLLIElement, TabProps>(
         onMouseEnter={() => {
           if (!ref || typeof ref === "function" || !ref.current) return;
           const { width } = ref.current.getBoundingClientRect();
+
           setPosition({
             left: ref.current.offsetLeft,
             width,
             opacity: 1,
           });
         }}
-        className="relative z-10 block cursor-pointer px-3 py-1.5 font-mono text-xs uppercase text-white mix-blend-difference md:px-5 md:py-3 md:text-sm select-none"
+        className="relative z-10 block cursor-pointer"
       >
-        {children}
+        {href ? (
+          <a href={href} className="block no-underline">
+            {content}
+          </a>
+        ) : (
+          content
+        )}
       </li>
     );
   }
@@ -107,7 +126,11 @@ const Tab = React.forwardRef<HTMLLIElement, TabProps>(
 Tab.displayName = "Tab";
 
 interface CursorProps {
-  position: { left: number; width: number; opacity: number };
+  position: {
+    left: number;
+    width: number;
+    opacity: number;
+  };
 }
 
 const Cursor: React.FC<CursorProps> = ({ position }) => {
@@ -121,7 +144,7 @@ const Cursor: React.FC<CursorProps> = ({ position }) => {
         stiffness: 400,
         damping: 30,
       }}
-      className="absolute z-0 h-7 rounded-full bg-black dark:bg-white md:h-10"
+      className="absolute z-0 h-7 rounded-full bg-black dark:bg-white md:h-12 pointer-events-none"
     />
   );
 };
