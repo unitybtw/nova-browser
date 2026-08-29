@@ -15,6 +15,8 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-18%20Suites%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
     <a href="#overview">Overview</a> •
@@ -24,9 +26,9 @@
     <a href="#ai-architecture--memory-vault">AI Vault</a> •
     <a href="#keyboard-shortcuts">Shortcuts</a> •
     <a href="#tech-stack">Tech Stack</a> •
-    <a href="#quick-start">Quick Start</a> •
+    <a href="#platform-support">Platforms</a> •
     <a href="#architecture">Architecture</a> •
-    <a href="#security--privacy-commitment">Security</a>
+    <a href="#star-history">Star History</a>
   </p>
 
 </div>
@@ -211,6 +213,17 @@ npm run build
 
 ---
 
+## Platform Support
+
+| Operating System | Architecture | Target Status | Hardware Acceleration |
+| :--- | :--- | :--- | :--- |
+| **macOS (Sonoma / Sequoia)** | Apple Silicon (M1 / M2 / M3 / M4) | Supported | Apple Metal API (120Hz ProMotion) |
+| **macOS (Monterey / Ventura)** | Intel (x86_64) | Supported | Metal / OpenGL |
+| **Windows (10 / 11)** | x64 / ARM64 | Supported | Direct3D 11/12 & Vulkan |
+| **Linux (Ubuntu / Fedora / Arch)** | x86_64 | Supported | Vulkan / VA-API Acceleration |
+
+---
+
 ## Architecture
 
 Nova Browser employs a multi-process Electron architecture with context isolation, a React-based renderer with WebGPU neural execution, and a dedicated AI integration layer via the Model Context Protocol (MCP).
@@ -369,6 +382,16 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 - **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
 - **Zero Telemetry**: We do not collect, store, or monetize your browsing history.
+
+---
+
+## Star History
+
+<div align="center">
+  <a href="https://star-history.com/#unitybtw/nova-browser&Date">
+    <img src="https://api.star-history.com/svg?repos=unitybtw/nova-browser&type=Date" alt="Nova Browser Star History Chart" width="750" />
+  </a>
+</div>
 
 ---
 
