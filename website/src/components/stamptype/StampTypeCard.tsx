@@ -48,7 +48,7 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
         onScreen = es[0]?.isIntersecting ?? false;
         sync();
       },
-      { threshold: 0.15 },
+      { threshold: 0.1 },
     );
     io.observe(canvas);
 
@@ -61,7 +61,7 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
     let rt = 0;
     const onResize = () => {
       window.clearTimeout(rt);
-      rt = window.setTimeout(() => engine?.resize(), 120);
+      rt = window.setTimeout(() => engine?.resize(), 60);
     };
     window.addEventListener("resize", onResize);
 
@@ -81,7 +81,7 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
       role="img"
       aria-label="A looping kinetic-type poster for Nova Browser: lines of type on flat highlight bars fly in, park to be read, and scatter off with solid print-like residue across dynamic color worlds."
       style={{ backgroundColor: WORLDS[0].bg }}
-      className={`relative mx-auto aspect-[1344/620] w-full select-none overflow-hidden rounded-2xl border border-neutral-800 shadow-2xl transition-all ${className}`}
+      className={`relative w-full h-full select-none overflow-hidden ${className}`}
     >
       <canvas ref={canvasRef} className="h-full w-full block" />
     </div>
