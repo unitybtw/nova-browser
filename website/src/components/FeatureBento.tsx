@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Bot, Lock, Columns, Shield, Terminal } from 'lucide-react';
+import { CodeTrailCard } from './codetrail/CodeTrailCard';
 
 const MODULES = [
   {
@@ -8,9 +9,10 @@ const MODULES = [
     span: 'lg:col-span-8',
     title: 'Autonomous Local AI Agent',
     tag: 'WEBGPU NEURAL RUNTIME',
-    description: 'On-device neural inference with Llama 3.2 3B & Phi 3.5 Vision. Deep DOM parsing and form execution with 0% cloud data transmission.',
+    description: 'On-device neural inference with Llama 3.2 3B & Phi 3.5 Vision. Deep DOM parsing, shader execution, and intelligent code synthesis with 0% cloud transmission.',
     icon: Bot,
     stats: '60+ TOKENS / SEC',
+    hasVisual: true,
   },
   {
     id: 'vault',
@@ -20,6 +22,7 @@ const MODULES = [
     description: 'Client-side PBKDF2 key derivation. Your open tabs, history, and passwords sync without servers having decryption keys.',
     icon: Lock,
     stats: 'END-TO-END',
+    hasVisual: false,
   },
   {
     id: 'split',
@@ -29,6 +32,7 @@ const MODULES = [
     description: 'Work simultaneously across two independent webview sessions with synchronized scrolling and frame dragging.',
     icon: Columns,
     stats: 'SYNCHRONIZED',
+    hasVisual: false,
   },
   {
     id: 'privacy',
@@ -38,6 +42,7 @@ const MODULES = [
     description: 'Intercepts advertising beacons and tracking payloads at the network level before DOM parsing ever starts.',
     icon: Shield,
     stats: '0ms BLOCK RATE',
+    hasVisual: false,
   },
   {
     id: 'mcp',
@@ -47,6 +52,7 @@ const MODULES = [
     description: 'Built-in Model Context Protocol server running locally to bridge terminal commands, scripts, and local LLMs.',
     icon: Terminal,
     stats: 'LOCALHOST ONLY',
+    hasVisual: false,
   },
 ];
 
@@ -84,7 +90,7 @@ export const FeatureBento: React.FC = () => {
           >
             <div>
               <div className="flex items-center justify-between mb-6">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-200 group-hover:border-[#4338ca]/20 group-hover:bg-[#4338ca] group-hover:text-white">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-200 group-hover:border-[#4338ca]/20 group-hover:bg-[#4338ca] group-hover:text-white">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
                 <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
@@ -98,6 +104,12 @@ export const FeatureBento: React.FC = () => {
               <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-xl">
                 {mod.description}
               </p>
+
+              {mod.hasVisual && (
+                <div className="mt-6 w-full overflow-hidden rounded-xl border border-neutral-800/80 bg-[#0d0f15] shadow-lg">
+                  <CodeTrailCard className="aspect-[16/8] sm:aspect-[21/9] w-full" />
+                </div>
+              )}
             </div>
 
             <div className="mt-8 flex items-center justify-between border-t border-[#e5e5e5]/60 pt-6 font-mono text-xs">
