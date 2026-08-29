@@ -37,7 +37,6 @@ function DeferredContent() {
       <Benchmarks />
       <Downloads />
       <Faq />
-      <DeferredContentReady />
     </Suspense>
   );
 }
@@ -49,17 +48,13 @@ function DeferredSections() {
   useEffect(() => {
     const loadSections = () => setShouldLoad(true);
 
-    if (DEFERRED_SECTION_IDS.has(window.location.hash.slice(1))) {
-      loadSections();
-    }
-
     const handleHashChange = () => {
       const hashTarget = window.location.hash.slice(1);
       if (!DEFERRED_SECTION_IDS.has(hashTarget)) return;
 
       loadSections();
       requestAnimationFrame(() => {
-        document.getElementById(hashTarget)?.scrollIntoView({ block: 'start' });
+        document.getElementById(hashTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     };
     window.addEventListener('hashchange', handleHashChange);
@@ -77,7 +72,7 @@ function DeferredSections() {
           observer.disconnect();
         }
       },
-      { rootMargin: '1200px 0px' },
+      { rootMargin: '800px 0px' },
     );
     observer.observe(deferredSections);
 
@@ -102,8 +97,18 @@ export default function App() {
   const [showNavbar, setShowNavbar] = useState(false);
 
   useEffect(() => {
+    // Prevent browser auto-scroll jump on refresh so page stays at top
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+
+    // If there's no specific hash target, ensure we start at the top
+    if (!window.location.hash || window.location.hash === '#top' || window.location.hash === '#manifesto') {
+      window.scrollTo(0, 0);
+    }
+
     const handleScroll = () => {
-      const isPastManifesto = window.scrollY > 240;
+      const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
       setShowNavbar(isPastManifesto);
     };
 
