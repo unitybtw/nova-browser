@@ -11,11 +11,11 @@ export const Footer: React.FC = () => {
 
   return (
     <footer className="relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-0">
-      {/* Centered & Balanced Content Container */}
-      <div className="relative z-10 mx-auto max-w-6xl px-6 sm:px-10 lg:px-12">
+      {/* Full-width Left-Right Aligned Content Container */}
+      <div className="relative z-10 mx-auto w-full px-6 sm:px-10 lg:px-16">
         <div className="grid grid-cols-1 items-start gap-10 border-b border-white/10 pb-14 md:grid-cols-12 lg:gap-16">
-          {/* Brand / Manifesto Column */}
-          <div className="col-span-1 flex flex-col justify-between md:col-span-7 lg:col-span-7">
+          {/* Brand / Manifesto Column (Aligned Far Left) */}
+          <div className="col-span-1 flex flex-col justify-between md:col-span-7 lg:col-span-7 text-left">
             <div>
               <div className="mb-6 flex items-center gap-3">
                 <img
@@ -40,14 +40,14 @@ export const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Links Column */}
+          {/* Links Column (Aligned Far Right) */}
           <div className="col-span-1 flex flex-col justify-between md:col-span-5 md:items-end lg:col-span-5">
-            <div className="w-full md:max-w-xs">
+            <div className="w-full md:max-w-xs md:text-right">
               <h4 className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
                 RESOURCES & REPOSITORY
               </h4>
               <ul className="space-y-3 font-mono text-xs text-neutral-300">
-                <li>
+                <li className="flex md:justify-end">
                   <a
                     href="https://github.com/unitybtw/nova-browser"
                     target="_blank"
@@ -58,7 +58,7 @@ export const Footer: React.FC = () => {
                     <span>GitHub Repository</span>
                   </a>
                 </li>
-                <li>
+                <li className="flex md:justify-end">
                   <a
                     href="https://github.com/unitybtw/nova-browser/releases"
                     target="_blank"
@@ -68,7 +68,7 @@ export const Footer: React.FC = () => {
                     Releases & Changelog
                   </a>
                 </li>
-                <li>
+                <li className="flex md:justify-end">
                   <a
                     href="https://github.com/unitybtw/nova-browser/issues"
                     target="_blank"
@@ -78,7 +78,7 @@ export const Footer: React.FC = () => {
                     Security Audit & Issues
                   </a>
                 </li>
-                <li>
+                <li className="flex md:justify-end">
                   <a
                     href="https://github.com/unitybtw/nova-browser/blob/main/LICENSE"
                     target="_blank"
