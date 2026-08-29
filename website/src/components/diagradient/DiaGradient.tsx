@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from "react";
 
-type Stop = { offset: number; color: string };
+export type Stop = { offset: number; color: string };
 
-const DIA_STOPS: Stop[] = [
+// Nova Browser's Sovereign Cyber-Aurora Palette
+export const NOVA_STOPS: Stop[] = [
+  { offset: 0, color: "#0c0d12" }, // Deep Void Black
+  { offset: 0.18, color: "#1e1b4b" }, // Midnight Indigo
+  { offset: 0.34, color: "#4338ca" }, // Sovereign Indigo
+  { offset: 0.50, color: "#0078bf" }, // Cobalt Cyan
+  { offset: 0.66, color: "#38bdf8" }, // Electric Sky
+  { offset: 0.80, color: "#818cf8" }, // Ethereal Periwinkle
+  { offset: 0.92, color: "#a855f7" }, // Neural Violet
+  { offset: 1, color: "#38bdf800" }, // Transparent Bloom Fade
+];
+
+export const CLASSIC_DIA_STOPS: Stop[] = [
   { offset: 0, color: "#340B05" },
   { offset: 0.1827, color: "#0358F7" },
   { offset: 0.2837, color: "#5092C7" },
@@ -38,11 +50,11 @@ export interface DiaGradientProps {
 }
 
 export const DiaGradient: React.FC<DiaGradientProps> = ({
-  bars = 9,
-  blur = 18,
+  bars = 11,
+  blur = 20,
   peak = 0.98,
-  valley = 0.55,
-  stops = DIA_STOPS,
+  valley = 0.48,
+  stops = NOVA_STOPS,
   riseMs = 1100,
   className = "",
 }) => {
@@ -84,23 +96,23 @@ export const DiaGradient: React.FC<DiaGradientProps> = ({
         xmlns="http://www.w3.org/2000/svg"
       >
         <defs>
-          <linearGradient id="dia-grad-standalone" x1="0" y1="1" x2="0" y2="0">
+          <linearGradient id="nova-dia-grad" x1="0" y1="1" x2="0" y2="0">
             {stops.map((s, i) => (
               <stop key={i} offset={s.offset} stopColor={s.color} />
             ))}
           </linearGradient>
-          <filter id="dia-blur-standalone" x="-50%" y="-50%" width="200%" height="200%">
+          <filter id="nova-dia-blur" x="-50%" y="-50%" width="200%" height="200%">
             <feGaussianBlur stdDeviation={blur} />
           </filter>
         </defs>
         {heights.map((h, i) => (
-          <g key={i} filter="url(#dia-blur-standalone)">
+          <g key={i} filter="url(#nova-dia-blur)">
             <rect
               x={i * colW}
               y={VBH - h}
-              width={colW * 1.23}
+              width={colW * 1.25}
               height={h}
-              fill="url(#dia-grad-standalone)"
+              fill="url(#nova-dia-grad)"
             />
           </g>
         ))}

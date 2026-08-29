@@ -109,20 +109,14 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      {/* FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK WITH RISING DIA AURORA GRADIENT */}
-      <div className="relative w-full pt-12 pb-0 overflow-hidden select-none border-t border-white/5 bg-[#0a0a0e]">
-        {/* Dia Browser Signature Rising Rainbow Gradient Stage */}
-        <div className="absolute inset-x-0 bottom-0 h-[220px] sm:h-[320px] md:h-[380px] w-full pointer-events-none z-0 opacity-90 mix-blend-screen overflow-hidden">
-          <DiaGradient bars={11} blur={22} peak={0.98} valley={0.48} riseMs={1200} />
-        </div>
-
-        {/* Giant Watermark Typography */}
+      {/* 1. FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK */}
+      <div className="w-full pt-10 pb-4 overflow-hidden select-none border-t border-white/5 bg-[#0a0a0e]">
         <motion.div
-          initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
+          initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={prefersReducedMotion ? undefined : { duration: 1, ease: [0.22, 1, 0.36, 1] }}
-          className="relative z-10 w-full block leading-none"
+          transition={prefersReducedMotion ? undefined : { duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+          className="w-full block leading-none"
         >
           <svg
             viewBox="0 0 1000 115"
@@ -154,6 +148,18 @@ export const Footer: React.FC = () => {
             </text>
           </svg>
         </motion.div>
+      </div>
+
+      {/* 2. RISING AURORA GRADIENT FLOOR (AFTER/BENEATH THE WATERMARK) */}
+      <div className="w-full h-28 sm:h-44 md:h-56 overflow-hidden pointer-events-none select-none bg-[#0a0a0e] relative">
+        <DiaGradient
+          bars={13}
+          blur={22}
+          peak={0.98}
+          valley={0.46}
+          riseMs={1200}
+          className="h-full w-full opacity-90"
+        />
       </div>
     </footer>
   );
