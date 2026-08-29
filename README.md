@@ -28,7 +28,7 @@
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#platform-support">Platforms</a> •
     <a href="#architecture">Architecture</a> •
-    <a href="#star-history">Star History</a>
+    <a href="#security--privacy-commitment">Security</a>
   </p>
 
 </div>
@@ -382,16 +382,6 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 - **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
 - **Zero Telemetry**: We do not collect, store, or monetize your browsing history.
-
----
-
-## Star History
-
-<div align="center">
-  <a href="https://star-history.com/#unitybtw/nova-browser&Date">
-    <img src="https://api.star-history.com/svg?repos=unitybtw/nova-browser&type=Date" alt="Nova Browser Star History Chart" width="750" />
-  </a>
-</div>
 
 ---
 
