@@ -272,6 +272,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // in dev, so any side effect inside them would run twice).
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
+  const activeSplitTabIdRef = useRef<string | null>(null);
 
   const [folders, setFolders] = useState<Folder[]>(() => {
     if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
@@ -958,6 +959,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const partner = tabs.find(t => t.id === activeTab.splitWith);
     return partner ? partner.id : null;
   }, [activeTab, tabs]);
+  activeSplitTabIdRef.current = splitTabId;
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
@@ -995,15 +997,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     if (!settings.tabHibernationEnabled) return;
     const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
-    
+
     const interval = setInterval(() => {
       const now = Date.now();
+      const activeId = activeTabIdRef.current;
+      const splitId = activeSplitTabIdRef.current;
       setTabs(prevTabs => {
         let changed = false;
         const updated = prevTabs.map(tab => {
           if (
-            tab.id === activeTabId ||
-            (splitTabId && tab.id === splitTabId) ||
+            tab.id === activeId ||
+            (splitId && tab.id === splitId) ||
             tab.isPinned ||
             tab.isPlayingAudio ||
             tab.isSuspended ||
@@ -1023,7 +1027,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }, 30000); // Check every 30s
 
     return () => clearInterval(interval);
-  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, activeTabId, splitTabId]);
+  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
 
   // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
   // All side effects (closed-tabs stack, active-tab selection, incognito session
@@ -1975,32 +1979,31 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   const handleUpdateTab = useCallback((id: string, updates: Partial<Tab>) => {
+    const current = tabsRef.current.find(t => t.id === id);
+    if (!current) return;
+
+    // Read the current tab once. Webview events often repeat the same payload;
+    // avoid scheduling a React update when every field already matches.
+    const hasChanges = Object.entries(updates).some(([key, value]) => (current as any)[key] !== value);
+    if (!hasChanges) return;
+
     // Pure tabs update only — no side effects inside the updater (StrictMode-safe)
     setTabs(prev => {
       let changed = false;
       const updated = prev.map(t => {
-        if (t.id === id) {
-          // Only apply updates if there are actual changes
-          const hasChanges = Object.entries(updates).some(([k, v]) => (t as any)[k] !== v);
-          if (!hasChanges) return t;
-          changed = true;
-          return { ...t, ...updates };
-        }
-        return t;
+        if (t.id !== id) return t;
+        const actualChanges = Object.entries(updates).some(([key, value]) => (t as any)[key] !== value);
+        if (!actualChanges) return t;
+        changed = true;
+        return { ...t, ...updates };
       });
-      // Identity guard: when nothing actually changed, return prev so React
-      // bails out instead of re-rendering the whole App subtree off a fresh
-      // array allocation (webview events fire constantly on background tabs).
+      // Identity guard: when a newer queued update already applied the same
+      // values, return prev so React skips the App subtree render.
       return changed ? updated : prev;
     });
 
     // History recording is derived from the pre-update tab state OUTSIDE the
     // tabs updater so setHistory is never called from within another updater.
-    const current = tabsRef.current.find(t => t.id === id);
-    if (!current) return;
-    const hasChanges = Object.entries(updates).some(([k, v]) => (current as any)[k] !== v);
-    if (!hasChanges) return;
-
     const updated = { ...current, ...updates };
 
     // Add to history if title or url loaded and not blank/newtab AND NOT INCOGNITO
@@ -2656,6 +2659,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
   const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
   const useVerticalTabs = isWebsiteDemo ? false : settings.useVerticalTabs;
+  // Keep the settings object identity stable between unrelated App renders so
+  // memoized BrowserViews do not re-render just because tab/sidebar state changed.
+  const browserViewSettings = useMemo(() => ({
+    ...settings,
+    showTasksWidget: isWebsiteDemo ? false : settings.showTasksWidget,
+  }), [settings, isWebsiteDemo]);
 
   // Compute second tab for split view (if available)
   const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
@@ -2664,6 +2673,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Numeric-aware compare: tab ids are timestamp strings, so a plain
   // localeCompare would sort "10" before "9" and scramble render order.
+  // Keep all BrowserViews mounted so switching workspaces preserves native
+  // webview state, scroll position, and page sessions.
   const sortedTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })), [tabs]);
 
   if (showOnboarding) {
@@ -3024,10 +3035,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   privacyShield={settings.privacyShield}
                   newTabBackground={settings.newTabBackground}
                   disableTasksWidget={demoParams.feature === 'website'}
-                  settings={{
-                    ...settings,
-                    showTasksWidget: demoParams.feature === 'website' ? false : settings.showTasksWidget,
-                  }}
+                  settings={browserViewSettings}
                   onUpdateSettings={handleUpdateSettings}
                   onExportData={handleExportData}
                   onImportData={handleImportData}
@@ -3135,10 +3143,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               privacyShield={settings.privacyShield}
               newTabBackground={settings.newTabBackground}
               disableTasksWidget={demoParams.feature === 'website'}
-              settings={{
-                ...settings,
-                showTasksWidget: demoParams.feature === 'website' ? false : settings.showTasksWidget,
-              }}
+              settings={browserViewSettings}
               onUpdateSettings={handleUpdateSettings}
               onExportData={handleExportData}
               onImportData={handleImportData}

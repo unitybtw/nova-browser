@@ -22,6 +22,47 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
 const NOOP = () => {};
 
+const getLinkPreviewScript = () => `
+  (function() {
+    if (window.__nova_hover_injected) return;
+    window.__nova_hover_injected = true;
+    let hoverTimer = null;
+    let currentLink = null;
+
+    document.addEventListener('mouseover', (e) => {
+      const a = e.target.closest('a');
+      if (a && a.href && a.href.startsWith('http')) {
+        if (currentLink === a) return;
+        currentLink = a;
+        clearTimeout(hoverTimer);
+        hoverTimer = setTimeout(() => {
+          const rect = a.getBoundingClientRect();
+          console.log('NOVA_LINK_HOVER::' + JSON.stringify({
+            url: a.href,
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          }));
+        }, 1500);
+      }
+    });
+
+    document.addEventListener('mouseout', (e) => {
+      const a = e.target.closest('a');
+      if (a) {
+        clearTimeout(hoverTimer);
+        if (currentLink === a) currentLink = null;
+        console.log('NOVA_LINK_HOVER_OUT::');
+      }
+    });
+
+    document.addEventListener('click', () => {
+      clearTimeout(hoverTimer);
+      currentLink = null;
+      console.log('NOVA_LINK_HOVER_OUT::');
+    });
+  })();
+`;
+
 // Origins already hinted via <link rel="dns-prefetch">. Deduping by origin keeps
 // document.head bounded (growth is capped by the number of distinct origins visited).
 const dnsPrefetchedOrigins = new Set<string>();
@@ -129,6 +170,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   // stale closure captures.
   const latestSettingsRef = useRef(settings);
   latestSettingsRef.current = settings;
+  const latestIsActiveRef = useRef(isActive);
+  latestIsActiveRef.current = isActive;
 
   useEffect(() => {
     latestTabRef.current = tab;
@@ -259,52 +302,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         } catch (e) {}
       }
 
-      // 2. AI Link Preview injection — independent of the password manager setting
-      // (the script self-gates on aiLinkPreviewEnabled)
-      try {
-        const linkPreviewScript = `
-          (function() {
-            if (!${Boolean(latestSettingsRef.current.aiLinkPreviewEnabled ?? true)}) return;
-            if (window.__nova_hover_injected) return;
-            window.__nova_hover_injected = true;
-            let hoverTimer = null;
-            let currentLink = null;
-            
-            document.addEventListener('mouseover', (e) => {
-              const a = e.target.closest('a');
-              if (a && a.href && a.href.startsWith('http')) {
-                if (currentLink === a) return;
-                currentLink = a;
-                clearTimeout(hoverTimer);
-                hoverTimer = setTimeout(() => {
-                  const rect = a.getBoundingClientRect();
-                  console.log('NOVA_LINK_HOVER::' + JSON.stringify({
-                    url: a.href,
-                    x: rect.left + rect.width / 2,
-                    y: rect.top + rect.height / 2
-                  }));
-                }, 1500);
-              }
-            });
-            
-            document.addEventListener('mouseout', (e) => {
-              const a = e.target.closest('a');
-              if (a) {
-                clearTimeout(hoverTimer);
-                if (currentLink === a) currentLink = null;
-                console.log('NOVA_LINK_HOVER_OUT::');
-              }
-            });
-            
-            document.addEventListener('click', () => {
-              clearTimeout(hoverTimer);
-              currentLink = null;
-              console.log('NOVA_LINK_HOVER_OUT::');
-            });
-          })();
-        `;
-        webview.executeJavaScript(linkPreviewScript).catch(() => {});
-      } catch (e) {}
+      // 2. AI Link Preview injection — only active when the feature is enabled
+      // and this tab is visible. Inactive tabs do not need hover listeners.
+      if (latestSettingsRef.current.aiLinkPreviewEnabled !== false && latestIsActiveRef.current) {
+        webview.executeJavaScript(getLinkPreviewScript()).catch(() => {});
+      }
 
       // 3. Mute state must always be applied, regardless of feature gates
       if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
@@ -682,16 +684,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   // Capture thumbnail when switching away from this tab (stored in memory cache).
   const activeSinceRef = useRef(0);
+  const lastThumbnailCaptureAtRef = useRef(0);
   useEffect(() => {
     if (isActive) {
       activeSinceRef.current = Date.now();
       return;
     }
     const MIN_ACTIVE_MS_BEFORE_CAPTURE = 600;
+    const THUMBNAIL_CAPTURE_THROTTLE_MS = 2500;
+    const now = Date.now();
     const wasContinuouslyActive =
       activeSinceRef.current > 0 &&
-      Date.now() - activeSinceRef.current >= MIN_ACTIVE_MS_BEFORE_CAPTURE;
-    if (wasContinuouslyActive && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
+      now - activeSinceRef.current >= MIN_ACTIVE_MS_BEFORE_CAPTURE;
+    const canCapture = now - lastThumbnailCaptureAtRef.current >= THUMBNAIL_CAPTURE_THROTTLE_MS;
+    if (wasContinuouslyActive && canCapture && webviewRef.current && !isNewTab && tab?.id && (window as any).electronAPI?.captureTabThumbnail) {
+      lastThumbnailCaptureAtRef.current = now;
       const capture = async () => {
         try {
           const wcId = webviewRef.current.getWebContentsId();
@@ -704,6 +711,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       capture();
     }
   }, [isActive, isNewTab, tab?.id]);
+
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (!webview || !isActive || tab?.isSuspended || isNewTab || isSettingsTab ||
+        isHistoryTab || isDownloadsTab || settings.aiLinkPreviewEnabled === false ||
+        !isWebviewReady.current) return;
+
+    webview.executeJavaScript(getLinkPreviewScript()).catch(() => {});
+  }, [isActive, isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, settings.aiLinkPreviewEnabled, tab?.id, tab?.isSuspended]);
 
   // Immediately clear loading state for internal React pages since they don't use webview
   useEffect(() => {

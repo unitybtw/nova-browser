@@ -59,8 +59,20 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
       else setGreeting('Good Evening');
       setDateStr(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
     };
-    const interval = setInterval(updateTime, 1000);
-    return () => clearInterval(interval);
+    updateTime();
+    // The UI displays minute precision; polling once per second only caused
+    // unnecessary React renders and locale formatting work.
+    const now = new Date();
+    const delayToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+    let interval: ReturnType<typeof setInterval> | undefined;
+    const firstTick = setTimeout(() => {
+      updateTime();
+      interval = setInterval(updateTime, 60_000);
+    }, Math.max(250, delayToNextMinute));
+    return () => {
+      clearTimeout(firstTick);
+      if (interval) clearInterval(interval);
+    };
   }, [isActive]);
 
   return (

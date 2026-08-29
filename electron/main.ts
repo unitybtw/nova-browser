@@ -81,17 +81,37 @@ if (!app.isPackaged) {
 
 let mainWindow: BrowserWindow | null = null;
 let blockedDomains: string[] = [];
+let blockedDomainSet = new Set<string>();
+
+function setBlockedDomains(domains: string[]): void {
+  blockedDomains = domains;
+  blockedDomainSet = new Set(
+    domains
+      .filter((domain): domain is string => typeof domain === 'string')
+      .map(domain => domain.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
 
 // Initialize blocklist asynchronously (will be populated in app.whenReady)
 // The initializeBlocklist function handles: local cache -> packaged fallback -> remote refresh
-async function loadInitialBlocklist(): Promise<void> {
-  blockedDomains = await initializeBlocklist();
-  console.log(`[Main] Initial blocklist loaded: ${blockedDomains.length} domains`);
-  
-  // Start periodic refresh (daily)
-  startPeriodicRefresh((updatedDomains) => {
-    blockedDomains = updatedDomains;
-    console.log(`[Main] Blocklist updated via periodic refresh: ${blockedDomains.length} domains`);
+function loadInitialBlocklist(): void {
+  // Do not make app startup wait for blocklist I/O. The packaged/local list is
+  // loaded immediately, while the rest of the main-process setup can continue.
+  void initializeBlocklist().then((domains) => {
+    setBlockedDomains(domains);
+    console.log(`[Main] Initial blocklist loaded: ${blockedDomains.length} domains`);
+
+    // Start periodic refresh (daily) after the first usable list is available.
+    startPeriodicRefresh((updatedDomains) => {
+      setBlockedDomains(updatedDomains);
+      console.log(`[Main] Blocklist updated via periodic refresh: ${blockedDomains.length} domains`);
+    });
+  }).catch((error) => {
+    console.error('[Main] Blocklist initialization failed:', error);
+    startPeriodicRefresh((updatedDomains) => {
+      setBlockedDomains(updatedDomains);
+    });
   });
 }
 
@@ -163,8 +183,14 @@ function isPhishing(urlStr: string) {
     const hostname = url.hostname.toLowerCase();
     
     if (PHISHING_KEYWORDS.some(kw => hostname.includes(kw))) return true;
-    if (blockedDomains.some(blocked => hostname === blocked || hostname.endsWith('.' + blocked))) return true;
-    
+
+    // Check the hostname and each parent domain against a Set instead of
+    // scanning the full blocklist for every navigation.
+    const labels = hostname.split('.');
+    for (let i = 0; i < labels.length; i++) {
+      if (blockedDomainSet.has(labels.slice(i).join('.'))) return true;
+    }
+
     return false;
   } catch {
     return false;
@@ -844,8 +870,9 @@ app.whenReady().then(async () => {
   createWindow();
   setupApplicationMenu();
 
-  // Initialize phishing blocklist with auto-refresh
-  await loadInitialBlocklist();
+  // Initialize phishing blocklist with auto-refresh in the background. The
+  // local/packaged list is loaded asynchronously and never delays app setup.
+  loadInitialBlocklist();
 
   // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
   interface PendingPermission {
