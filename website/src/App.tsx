@@ -1,6 +1,5 @@
-import { lazy, Suspense, useEffect, useState, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import ManifestoHero from './components/ManifestoHero';
-import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
@@ -18,7 +17,6 @@ function SectionPlaceholder({ height }: { height: string }) {
 }
 
 export default function App() {
-  const [showNavbar, setShowNavbar] = useState(false);
   const userInteractedRef = useRef(false);
 
   useEffect(() => {
@@ -75,7 +73,6 @@ export default function App() {
       }
 
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
-      setShowNavbar(isPastManifesto);
       if (isPastManifesto) {
         document.documentElement.classList.remove('in-manifesto');
       } else {
@@ -120,7 +117,6 @@ export default function App() {
       className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white bg-[#0c0d12]"
       style={{ overflowAnchor: 'none' }}
     >
-      <Navbar visible={showNavbar} />
       <ManifestoHero />
 
       <div
