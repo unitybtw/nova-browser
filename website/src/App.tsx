@@ -91,12 +91,15 @@ export default function App() {
 
     const resetTop = () => {
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-      if (window.location.hash && window.location.hash !== '#top') {
+      if (window.location.hash) {
         window.history.replaceState(null, '', window.location.pathname);
       }
     };
 
     resetTop();
+    requestAnimationFrame(resetTop);
+    const t1 = setTimeout(resetTop, 60);
+    const t2 = setTimeout(resetTop, 250);
     window.addEventListener('pageshow', resetTop);
 
     const handleScroll = () => {
@@ -107,6 +110,8 @@ export default function App() {
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
       window.removeEventListener('pageshow', resetTop);
       window.removeEventListener('scroll', handleScroll);
     };
@@ -115,12 +120,6 @@ export default function App() {
   return (
     <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
       <ScrollProgress />
-      <a
-        href="#main-content"
-        className="sr-only fixed left-4 top-4 z-[100] rounded-lg bg-[#171717] px-4 py-2 text-sm font-semibold text-white focus:not-sr-only"
-      >
-        Skip to content
-      </a>
 
       {/* Floating Animated Navbar - Hidden on Manifesto, Slides down on scroll */}
       <div

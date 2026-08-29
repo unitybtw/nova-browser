@@ -14,6 +14,14 @@
     <meta name="theme-color" content="#fcfbf9" />
     <link rel="canonical" href="https://nova-browser.org/" />
 
+    <!-- Synchronously lock scroll position to (0,0) before initial DOM render -->
+    <script>
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      window.scrollTo(0, 0);
+    </script>
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://nova-browser.org/" />
