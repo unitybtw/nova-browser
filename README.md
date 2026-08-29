@@ -19,10 +19,11 @@
   <p align="center">
     <a href="#overview">Overview</a> •
     <a href="#performance-benchmarks--browser-comparison">Benchmarks</a> •
-    <a href="#key-features">Key Features</a> •
-    <a href="#ai-architecture--memory-vault">AI & MCP</a> •
-    <a href="#keyboard-shortcuts">Shortcuts</a> •
     <a href="#screenshots">Screenshots</a> •
+    <a href="#key-features">Key Features</a> •
+    <a href="#ai-architecture--memory-vault">AI Vault</a> •
+    <a href="#keyboard-shortcuts">Shortcuts</a> •
+    <a href="#tech-stack">Tech Stack</a> •
     <a href="#quick-start">Quick Start</a> •
     <a href="#architecture">Architecture</a> •
     <a href="#security--privacy-commitment">Security</a>
