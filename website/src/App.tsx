@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState, useRef } from 'react';
 import ManifestoHero from './components/ManifestoHero';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -19,6 +19,7 @@ function SectionPlaceholder({ height }: { height: string }) {
 
 export default function App() {
   const [showNavbar, setShowNavbar] = useState(false);
+  const userInteractedRef = useRef(false);
 
   useEffect(() => {
     if ('scrollRestoration' in history) {
@@ -32,19 +33,33 @@ export default function App() {
     // Force top position immediately on mount
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
 
+    // Track real user physical gestures (mouse wheel, touch swipe, keyboard arrow)
+    const onUserGesture = () => {
+      userInteractedRef.current = true;
+    };
+
+    window.addEventListener('wheel', onUserGesture, { passive: true });
+    window.addEventListener('touchstart', onUserGesture, { passive: true });
+    window.addEventListener('touchmove', onUserGesture, { passive: true });
+    window.addEventListener('keydown', onUserGesture, { passive: true });
+    window.addEventListener('pointerdown', onUserGesture, { passive: true });
+
     // Multi-frame lock covering React hydration and WebGL canvas init
     const rafId1 = requestAnimationFrame(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      if (!userInteractedRef.current) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      }
       const rafId2 = requestAnimationFrame(() => {
-        if (window.scrollY !== 0) {
+        if (!userInteractedRef.current && window.scrollY !== 0) {
           window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
         }
       });
       return () => cancelAnimationFrame(rafId2);
     });
 
-    // bfcache guard
+    // bfcache & page show guard
     const onPageShow = () => {
+      userInteractedRef.current = false;
       window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
     };
     window.addEventListener('pageshow', onPageShow);
@@ -52,6 +67,13 @@ export default function App() {
 
     let scrollTicking = false;
     const updateScrollState = () => {
+      // If browser tried to teleport down before any physical user gesture, snap back to Manifesto
+      if (!userInteractedRef.current && window.scrollY > 0) {
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+        scrollTicking = false;
+        return;
+      }
+
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
       setShowNavbar(isPastManifesto);
       if (isPastManifesto) {
@@ -71,9 +93,21 @@ export default function App() {
 
     updateScrollState();
     window.addEventListener('scroll', handleScroll, { passive: true });
+
+    // After 1.2s, release any remaining gesture constraints
+    const unlockTimer = setTimeout(() => {
+      userInteractedRef.current = true;
+    }, 1200);
+
     return () => {
       cancelAnimationFrame(rafId1);
+      clearTimeout(unlockTimer);
       document.documentElement.classList.remove('in-manifesto');
+      window.removeEventListener('wheel', onUserGesture);
+      window.removeEventListener('touchstart', onUserGesture);
+      window.removeEventListener('touchmove', onUserGesture);
+      window.removeEventListener('keydown', onUserGesture);
+      window.removeEventListener('pointerdown', onUserGesture);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('load', onPageShow);
       window.removeEventListener('scroll', handleScroll);

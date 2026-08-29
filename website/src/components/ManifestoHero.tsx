@@ -7,6 +7,7 @@ export const ManifestoHero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const handleScrollDown = () => {
+    window.dispatchEvent(new Event('wheel'));
     const mainEl = document.getElementById('main-content');
     if (mainEl) {
       mainEl.scrollIntoView({ behavior: 'smooth' });
@@ -16,7 +17,7 @@ export const ManifestoHero: React.FC = () => {
   return (
     <section
       id="manifesto"
-      className="relative h-screen w-full overflow-hidden bg-[#171717]"
+      className="relative min-h-screen min-h-[100dvh] h-screen h-[100dvh] w-full overflow-hidden bg-[#171717]"
     >
       {/* Full-bleed Edge-to-Edge Kinetic Typography Canvas */}
       <div className="absolute inset-0 h-full w-full">
