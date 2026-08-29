@@ -35,18 +35,6 @@ export const Hero: React.FC = () => {
         style={{ willChange: 'opacity, transform', transform: 'translate3d(0,0,0)' }}
       />
 
-      {/* 1. Sovereign Badge with live pulsing radar ring */}
-      <motion.div
-        {...fadeUp(0)}
-        className="group mb-7 inline-flex items-center gap-2.5 rounded-full border border-neutral-300/90 bg-white/95 px-4 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-[#4338ca] shadow-sm backdrop-blur-md transition-all duration-300 hover:border-[#4338ca]/40 hover:shadow-md cursor-default"
-      >
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4338ca] opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4338ca]" />
-        </span>
-        <span>Sovereign Desktop Architecture</span>
-      </motion.div>
-
       {/* 2. Kinetic Headline with Shimmering Indigo Accent */}
       <motion.h1
         {...fadeUp(0.08)}
