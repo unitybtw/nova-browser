@@ -272,8 +272,10 @@ export class StampType {
     if (!ctx) return;
     this.drawnTick = tick;
     const { W, H } = this;
-    const k = H / REF;
-    const ox = (W - H) / 2;
+    const padding = W < 640 ? 0.88 : 0.94;
+    const k = Math.min((W * padding) / REF, (H * 0.88) / REF);
+    const ox = (W - REF * k) / 2;
+    const oy = (H - REF * k) / 2;
     const n = this.worlds.length;
 
     const wi = Math.floor(tick / PASS_PITCH) % n;
@@ -287,7 +289,7 @@ export class StampType {
     ctx.fillStyle = this.worlds[fieldWorld].bg;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.setTransform(this.dpr * k, 0, 0, this.dpr * k, this.dpr * ox, 0);
+    ctx.setTransform(this.dpr * k, 0, 0, this.dpr * k, this.dpr * ox, this.dpr * oy);
 
     if (overlapping) this.stamps(ctx, prev, prevF);
     this.stamps(ctx, wi, f);

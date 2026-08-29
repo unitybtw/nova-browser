@@ -102,9 +102,10 @@ export default function App() {
       history.scrollRestoration = 'manual';
     }
 
-    // If there's no specific hash target, ensure we start at the top
-    if (!window.location.hash || window.location.hash === '#top' || window.location.hash === '#manifesto') {
-      window.scrollTo(0, 0);
+    // Always ensure page opens at the very top (Manifesto)
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+    if (window.location.hash && window.location.hash !== '#top') {
+      window.history.replaceState(null, '', window.location.pathname);
     }
 
     const handleScroll = () => {
