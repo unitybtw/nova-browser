@@ -3,6 +3,7 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
+import KineticShowcase from './components/KineticShowcase';
 import Footer from './components/Footer';
 import ScrollProgress from './components/ScrollProgress';
 
@@ -112,6 +113,7 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
+        <KineticShowcase />
         <DeferredSections />
       </main>
       <Footer />
