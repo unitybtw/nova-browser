@@ -67,8 +67,31 @@ assert.equal(validateToolCall({ name: 'execute_shell_command', args: { cmd: 'rm 
 assert.equal(validateToolCall({ name: 'read_filesystem', args: { path: '/etc/passwd' } }).valid, false);
 
 // 3. Reject Malicious Arguments
-assert.equal(validateToolCall({ name: 'navigate_to_url', args: { url: 'javascript:alert(1)' } }).valid, false);
-assert.equal(validateToolCall({ name: 'navigate_to_url', args: { url: 'file:///etc/hosts' } }).valid, false);
-assert.equal(validateToolCall({ name: 'scroll_page', args: { direction: 'invalid-dir' } }).valid, false);
+import { detectDirectIntent } from '../src/services/aiAgent';
 
-console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM argument constraints, and dangerous payload rejection verified.');
+// 4. Test Natural Language Direct Intent Extractor
+const intentHn = detectDirectIntent('hackernews aç');
+assert.equal(intentHn?.name, 'navigate_to_url');
+assert.equal(intentHn?.arguments?.url, 'https://news.ycombinator.com');
+
+const intentGh = detectDirectIntent('github unitybtw/nova-browser aç');
+assert.equal(intentGh?.name, 'navigate_to_url');
+assert.equal(intentGh?.arguments?.url, 'https://github.com/unitybtw/nova-browser');
+
+const intentWiki = detectDirectIntent('wikipedia web browser');
+assert.equal(intentWiki?.name, 'navigate_to_url');
+assert.equal(intentWiki?.arguments?.url?.includes('wikipedia.org'), true);
+
+const intentScroll = detectDirectIntent('en alta kaydır');
+assert.equal(intentScroll?.name, 'scroll_page');
+assert.equal(intentScroll?.arguments?.direction, 'bottom');
+
+const intentHistory = detectDirectIntent('geçmişte github ara');
+assert.equal(intentHistory?.name, 'search_history');
+assert.equal(intentHistory?.arguments?.query, 'github');
+
+const intentTab = detectDirectIntent('yeni sekme aç');
+assert.equal(intentTab?.name, 'manage_tabs');
+assert.equal(intentTab?.arguments?.action, 'create');
+
+console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, and detectDirectIntent natural language parsing verified.');

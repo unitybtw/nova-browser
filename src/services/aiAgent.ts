@@ -175,23 +175,32 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   }
 ];
 
-// Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
-export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string } | null {
-  if (!userText || typeof userText !== 'string') return null;
-  const text = userText.trim().toLowerCase();
+function isTurkishText(str: string): boolean {
+  return /[ığüşöçİĞÜŞÖÇ]|(\b(aç|ac|git|ara|sekme|kapat|sayfa|özetle|ozetle|bul|yardım|yardim|merhaba|selam|teşekkür|tesekkur|ekran|kaydır|kaydir|geçmiş|gecmis)\b)/i.test(str);
+}
 
-  // Normalize Turkish characters and typos (e.g. "knalını" -> "kanalını", "enese" -> "enes", "baturru" -> "batur")
-  const normalized = text
+// Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
+export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string; isSummary?: boolean } | null {
+  if (!userText || typeof userText !== 'string') return null;
+  const text = userText.trim();
+  const lower = text.toLowerCase();
+  const isTr = isTurkishText(text);
+
+  // Normalize Turkish characters and common typos
+  const normalized = lower
     .replace(/\bknalını\b|\bknalini\b|\bknalı\b|\bknali\b/g, 'kanalını')
     .replace(/\byotube\b|\byoutbe\b|\byutube\b/g, 'youtube')
-    .replace(/\bgogle\b|\bgoole\b/g, 'google');
+    .replace(/\bgogle\b|\bgoole\b/g, 'google')
+    .replace(/\bhackernews\b|\bhacker\s+news\b|\bhn\b/g, 'hackernews');
 
   // 0. Conversational greetings and friendly chat (Zero-latency instant reply, zero tool hallucination)
   if (/^(selam|selamlar|slm|merhaba|merhabalar|mrb|hey|hi|hello|günaydın|gunaydin|iyi günler|iyi gunler|iyi akşamlar|iyi aksamlar|nasılsın|nasilsin|naber|ne haber|nbr|sa|as)$/i.test(normalized)) {
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "Hello! I am Nova Browser's AI assistant. I can browse the web, search Google/YouTube, summarize pages, or answer questions. How can I help you today?"
+      directReply: isTr
+        ? "Merhaba! Ben Nova Browser yapay zeka asistanıyım. Web'de gezinebilir, Google/YouTube'da arama yapabilir, sayfaları özetleyebilir veya sekmeleri yönetebilirim. Sana nasıl yardımcı olabilirim?"
+        : "Hello! I am Nova Browser's AI assistant. I can browse the web, search Google/YouTube, summarize pages, or manage tabs. How can I help you today?"
     };
   }
 
@@ -200,7 +209,9 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "As Nova Browser's AI assistant, I can manage tabs, search the web, read and summarize pages, and answer questions."
+      directReply: isTr
+        ? "Nova Browser AI asistanı olarak sekmeleri ve pencereleri yönetebilir, Google/YouTube/GitHub aramaları yapabilir, sayfaları okuyup özetleyebilir ve formları doldurabilirim."
+        : "As Nova Browser's AI assistant, I can manage tabs and workspaces, search Google/YouTube/GitHub, read and summarize pages, and assist with browser actions."
     };
   }
 
@@ -209,7 +220,9 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     return {
       name: 'direct_chat',
       arguments: {},
-      directReply: "You're welcome! Let me know if there's anything else you'd like me to do."
+      directReply: isTr
+        ? "Rica ederim! Başka yardımcı olabileceğim bir işlem var mı?"
+        : "You're welcome! Let me know if there's anything else you'd like me to do."
     };
   }
 
@@ -230,12 +243,61 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
       return { 
         name: 'navigate_to_url', 
         arguments: { url: searchUrl },
-        directReply: `Searched for "${query}" on YouTube.`
+        directReply: isTr ? `YouTube'da "${query}" arandı.` : `Searched for "${query}" on YouTube.`
       };
     }
   }
 
-  // 2. Google Search Compound (e.g. "google'da hava durumu ara", "google aç ve hava durumu ara", "istanbul hava durumu ara")
+  // 2. GitHub Search or Direct Repository (e.g. "github unitybtw/nova-browser aç", "github'da react ara")
+  const githubRepoMatch = normalized.match(/^github(?:'da|\s+da)?\s+(?:aç|ac|a git|git)?\s*([a-z0-9_.-]+\/[a-z0-9_.-]+)(?:\s*(?:reposunu|reposu|projesini)?\s*(?:aç|ac|git)?)?$/i);
+  if (githubRepoMatch && githubRepoMatch[1]) {
+    const repo = githubRepoMatch[1];
+    return {
+      name: 'navigate_to_url',
+      arguments: { url: `https://github.com/${repo}` },
+      directReply: isTr ? `GitHub'da ${repo} deposu açıldı.` : `Opened GitHub repository ${repo}.`
+    };
+  }
+
+  const githubSearchMatch = normalized.match(/^github(?:'da|\s+da)?\s+(?:aç|ac|a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|aç|ac)?$/i);
+  if (githubSearchMatch && githubSearchMatch[1]) {
+    let query = githubSearchMatch[1].replace(/^(aç|ac|ve|git)\s+/gi, '').replace(/\s+(ara|bul|aç|ac)$/gi, '').trim();
+    if (query && query !== 'github' && query !== 'aç' && query !== 'ac') {
+      return {
+        name: 'navigate_to_url',
+        arguments: { url: `https://github.com/search?q=${encodeURIComponent(query)}` },
+        directReply: isTr ? `GitHub'da "${query}" arandı.` : `Searched for "${query}" on GitHub.`
+      };
+    }
+  }
+
+  // 3. DuckDuckGo Search (e.g. "duckduckgo'da webgpu ara", "duckduckgo webgpu benchmarks")
+  const ddgMatch = normalized.match(/^(?:duckduckgo|ddg)(?:'da|\s+da)?\s+(?:aç|ac|a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|aç|ac)?$/i);
+  if (ddgMatch && ddgMatch[1]) {
+    let query = ddgMatch[1].replace(/^(aç|ac|ve|git)\s+/gi, '').replace(/\s+(ara|bul|aç|ac)$/gi, '').trim();
+    if (query && query !== 'duckduckgo' && query !== 'ddg' && query !== 'aç') {
+      return {
+        name: 'navigate_to_url',
+        arguments: { url: `https://duckduckgo.com/?q=${encodeURIComponent(query)}` },
+        directReply: isTr ? `DuckDuckGo'da "${query}" arandı.` : `Searched for "${query}" on DuckDuckGo.`
+      };
+    }
+  }
+
+  // 4. Wikipedia Search (e.g. "wikipedia'da web browser ara", "wikipedia electron framework")
+  const wikiMatch = normalized.match(/^wikipedia(?:'da|\s+da)?\s+(?:aç|ac|a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|maddesini\s*aç|aç|ac)?$/i);
+  if (wikiMatch && wikiMatch[1]) {
+    let query = wikiMatch[1].replace(/^(aç|ac|ve|git)\s+/gi, '').replace(/\s+(ara|bul|aç|ac|maddesini)$/gi, '').trim();
+    if (query && query !== 'wikipedia' && query !== 'aç') {
+      return {
+        name: 'navigate_to_url',
+        arguments: { url: `https://en.wikipedia.org/wiki/Special:Search?search=${encodeURIComponent(query)}` },
+        directReply: isTr ? `Wikipedia'da "${query}" arandı.` : `Searched for "${query}" on Wikipedia.`
+      };
+    }
+  }
+
+  // 5. Google Search Compound (e.g. "google'da hava durumu ara", "google aç ve hava durumu ara", "istanbul hava durumu ara")
   const googleCompoundMatch = 
     normalized.match(/^google(?:'da|\s+da)?\s+(?:aç|ac|a git|'a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|bak|aç|ac)?$/i) ||
     normalized.match(/^(?:google'da\s+ara|ara|search for|search|bana ara)\s*[:\s]\s*(.+)$/i) ||
@@ -250,13 +312,14 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
       return {
         name: 'navigate_to_url',
         arguments: { url: `https://www.google.com/search?q=${encodeURIComponent(query)}` },
-        directReply: `Searched for "${query}" on Google.`
+        directReply: isTr ? `Google'da "${query}" arandı.` : `Searched for "${query}" on Google.`
       };
     }
   }
 
-  // 3. Direct site opening
+  // 6. Direct site opening
   const sites: Record<string, string> = {
+    'hackernews': 'https://news.ycombinator.com',
     'youtube': 'https://youtube.com',
     'google': 'https://google.com',
     'github': 'https://github.com',
@@ -264,6 +327,11 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     'x': 'https://x.com',
     'reddit': 'https://reddit.com',
     'wikipedia': 'https://wikipedia.org',
+    'duckduckgo': 'https://duckduckgo.com',
+    'stackoverflow': 'https://stackoverflow.com',
+    'arxiv': 'https://arxiv.org',
+    'medium': 'https://medium.com',
+    'linkedin': 'https://linkedin.com',
     'instagram': 'https://instagram.com',
     'facebook': 'https://facebook.com',
     'amazon': 'https://amazon.com',
@@ -273,56 +341,85 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     'hepsiburada': 'https://hepsiburada.com',
     'ekşi': 'https://eksisozluk.com',
     'eksisozluk': 'https://eksisozluk.com',
-    'haberler': 'https://news.google.com'
+    'haberler': 'https://news.google.com',
+    'chatgpt': 'https://chatgpt.com'
   };
 
   for (const [siteKey, siteUrl] of Object.entries(sites)) {
     const patterns = [
       new RegExp(`^${siteKey}(\\s*(aç|git|e git|a git|'a git|'e git|'a gir|'e gir|gir|ac))?$`, 'i'),
       new RegExp(`^(open|go to|visit|launch)\\s+${siteKey}$`, 'i'),
-      new RegExp(`^${siteKey}\\.com(\\s*(aç|ac))?$`, 'i')
+      new RegExp(`^${siteKey}\\.com(\\s*(aç|ac))?$`, 'i'),
+      new RegExp(`^${siteKey}\\.org(\\s*(aç|ac))?$`, 'i')
     ];
     for (const pat of patterns) {
       if (pat.test(normalized)) {
+        const displayName = siteKey === 'hackernews' ? 'Hacker News' : siteKey.charAt(0).toUpperCase() + siteKey.slice(1);
         return { 
           name: 'navigate_to_url', 
           arguments: { url: siteUrl },
-          directReply: `Opened ${siteKey.charAt(0).toUpperCase() + siteKey.slice(1)}.`
+          directReply: isTr ? `${displayName} açıldı.` : `Opened ${displayName}.`
         };
       }
     }
   }
 
-  // 4. Direct URL
+  // 7. Direct URL
   if (/^https?:\/\/[^\s]+$/i.test(text) || /^[a-z0-9-]+\.(com|org|net|io|dev|app|edu|gov|tr)(\/[^\s]*)?$/i.test(text)) {
     const u = text.startsWith('http') ? text : 'https://' + text;
-    return { name: 'navigate_to_url', arguments: { url: u }, directReply: `Opened ${u}.` };
+    return { name: 'navigate_to_url', arguments: { url: u }, directReply: isTr ? `${u} açıldı.` : `Opened ${u}.` };
   }
 
-  // 5. Tab management
+  // 8. History & Bookmarks Search (e.g. "geçmişte github ara", "search history for react")
+  const historySearchMatch = normalized.match(/^(?:geçmişte|geçmişimde|gecmiste|gecmisimde|yer\s*imlerimde|history|bookmarks)\s+(?:ara|bul|search\s*for|search)?\s*[:\s]?\s*(.+)$/i);
+  if (historySearchMatch && historySearchMatch[1]) {
+    const q = historySearchMatch[1]
+      .replace(/^(?:ara|bul|search\s*for|search)\s+/gi, '')
+      .replace(/\s+(?:ara|bul|search|araştır|arastir)$/gi, '')
+      .trim();
+    if (q) {
+      return {
+        name: 'search_history',
+        arguments: { query: q },
+        directReply: isTr ? `Geçmişte ve yer imlerinde "${q}" arandı.` : `Searched history for "${q}".`
+      };
+    }
+  }
+
+  // 9. Tab management
   if (/^(yeni sekme|yeni sekme aç|yeni sekme ac|yeni sekme oluştur|open new tab|new tab|create tab)$/i.test(normalized)) {
-    return { name: 'manage_tabs', arguments: { action: 'create' }, directReply: "New tab created." };
+    return { name: 'manage_tabs', arguments: { action: 'create' }, directReply: isTr ? "Yeni sekme açıldı." : "New tab created." };
   }
   if (/^(sekmeyi kapat|bu sekmeyi kapat|close tab|close current tab)$/i.test(normalized)) {
-    return { name: 'manage_tabs', arguments: { action: 'close' }, directReply: "Tab closed." };
+    return { name: 'manage_tabs', arguments: { action: 'close' }, directReply: isTr ? "Sekme kapatıldı." : "Tab closed." };
+  }
+  if (/^(sekmeleri listele|açık sekmeler|acik sekmeler|açık sekmeleri göster|list tabs|show tabs)$/i.test(normalized)) {
+    return { name: 'manage_tabs', arguments: { action: 'list' } };
   }
 
-  // 6. Page reading
-  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|read page|read this page|summarize page)$/i.test(normalized)) {
-    return { name: 'read_page_content', arguments: {} };
+  // 10. Page reading and summarization
+  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|sayfayi ozetle|özetle|ozetle|bu sayfayı özetle|read page|read this page|summarize page|summarize this page)$/i.test(normalized)) {
+    const isSummary = /özet|ozet|summar/i.test(normalized);
+    return { name: 'read_page_content', arguments: {}, isSummary };
   }
 
-  // 7. Scrolling
+  // 11. Scrolling
+  if (/^(en alta kaydır|en alta in|sayfanın sonuna in|scroll to bottom)$/i.test(normalized)) {
+    return { name: 'scroll_page', arguments: { direction: 'bottom' }, directReply: isTr ? "Sayfanın en altına kaydırıldı." : "Scrolled to page bottom." };
+  }
+  if (/^(en üste kaydır|en uste kaydir|sayfanın başına dön|scroll to top)$/i.test(normalized)) {
+    return { name: 'scroll_page', arguments: { direction: 'top' }, directReply: isTr ? "Sayfanın en başına kaydırıldı." : "Scrolled to page top." };
+  }
   if (/^(aşağı kaydır|asagi kaydir|aşağı in|sayfayı aşağı kaydır|scroll down)$/i.test(normalized)) {
-    return { name: 'scroll_page', arguments: { direction: 'down' }, directReply: "Page scrolled down." };
+    return { name: 'scroll_page', arguments: { direction: 'down' }, directReply: isTr ? "Sayfa aşağı kaydırıldı." : "Page scrolled down." };
   }
   if (/^(yukarı kaydır|yukari kaydir|yukarı çık|sayfayı yukarı kaydır|scroll up)$/i.test(normalized)) {
-    return { name: 'scroll_page', arguments: { direction: 'up' }, directReply: "Page scrolled up." };
+    return { name: 'scroll_page', arguments: { direction: 'up' }, directReply: isTr ? "Sayfa yukarı kaydırıldı." : "Page scrolled up." };
   }
 
-  // 8. Screenshot
+  // 12. Screenshot
   if (/^(ekran görüntüsü al|ekran goruntusu al|screenshot al|take screenshot|screenshot)$/i.test(normalized)) {
-    return { name: 'take_screenshot', arguments: {}, directReply: "Screenshot captured." };
+    return { name: 'take_screenshot', arguments: {}, directReply: isTr ? "Ekran görüntüsü alındı." : "Screenshot captured." };
   }
 
   return null;
@@ -1869,36 +1966,91 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             friendlyResponse = parsedToolResult.error === 'Action cancelled.'
               ? 'İşlem durduruldu.'
               : `İşlem tamamlanamadı: ${parsedToolResult.error}`;
-          } else if (directIntent.directReply) {
+          } else {
+            const isTr = isTurkishText(userQuery);
+          if (directIntent.directReply && funcName !== 'search_history' && funcName !== 'manage_tabs' && funcName !== 'read_page_content') {
             friendlyResponse = directIntent.directReply;
+          } else if (funcName === 'search_history') {
+            const results = Array.isArray(parsedToolResult?.results) ? parsedToolResult.results : [];
+            if (results.length === 0) {
+              friendlyResponse = isTr ? 'Geçmişte veya yer imlerinde eşleşen sonuç bulunamadı.' : 'No matching results found in history or bookmarks.';
+            } else {
+              const items = results.slice(0, 6).map((r: any) => `- [${r.title || r.url}](${r.url})`).join('\n');
+              friendlyResponse = (isTr ? 'Bulunan geçmiş ve yer imi sonuçları:\n\n' : 'Matching history and bookmarks:\n\n') + items;
+            }
+          } else if (funcName === 'manage_tabs') {
+            if (directIntent.arguments.action === 'list') {
+              const tabs = Array.isArray(parsedToolResult?.tabs) ? parsedToolResult.tabs : [];
+              if (tabs.length === 0) {
+                friendlyResponse = isTr ? 'Açık sekme bulunamadı.' : 'No open tabs found.';
+              } else {
+                const items = tabs.map((t: any, i: number) => `${i + 1}. [${t.title || t.url}](${t.url})`).join('\n');
+                friendlyResponse = (isTr ? 'Açık sekmeler:\n\n' : 'Open tabs:\n\n') + items;
+              }
+            } else if (directIntent.arguments.action === 'create') {
+              friendlyResponse = isTr ? 'Yeni sekme oluşturuldu.' : 'New tab created.';
+            } else if (directIntent.arguments.action === 'close') {
+              friendlyResponse = isTr ? 'Sekme kapatıldı.' : 'Tab closed.';
+            } else {
+              friendlyResponse = isTr ? 'Sekme işlemi tamamlandı.' : 'Tab action completed.';
+            }
           } else if (funcName === 'navigate_to_url') {
             const u = directIntent.arguments.url;
             if (u.includes('youtube.com/results?search_query=')) {
               const q = decodeURIComponent(u.split('search_query=')[1] || '');
-              friendlyResponse = `Searched for "${q}" on YouTube.`;
+              friendlyResponse = isTr ? `YouTube'da "${q}" arandı.` : `Searched for "${q}" on YouTube.`;
             } else if (u.includes('youtube.com')) {
-              friendlyResponse = "YouTube opened.";
+              friendlyResponse = isTr ? "YouTube açıldı." : "YouTube opened.";
             } else if (u.includes('google.com/search')) {
-              friendlyResponse = "Google search performed.";
+              const q = decodeURIComponent(u.split('q=')[1]?.split('&')[0] || '');
+              friendlyResponse = isTr ? `Google'da "${q}" arandı.` : `Searched for "${q}" on Google.`;
+            } else if (u.includes('duckduckgo.com/?q=')) {
+              const q = decodeURIComponent(u.split('q=')[1]?.split('&')[0] || '');
+              friendlyResponse = isTr ? `DuckDuckGo'da "${q}" arandı.` : `Searched for "${q}" on DuckDuckGo.`;
+            } else if (u.includes('wikipedia.org/wiki/Special:Search?search=')) {
+              const q = decodeURIComponent(u.split('search=')[1]?.split('&')[0] || '');
+              friendlyResponse = isTr ? `Wikipedia'da "${q}" arandı.` : `Searched for "${q}" on Wikipedia.`;
             } else {
-              friendlyResponse = `Opened ${u}.`;
+              friendlyResponse = isTr ? `${u} açıldı.` : `Opened ${u}.`;
             }
-          } else if (funcName === 'manage_tabs') {
-            if (directIntent.arguments.action === 'create') friendlyResponse = "New tab created.";
-            else if (directIntent.arguments.action === 'close') friendlyResponse = "Tab closed.";
-            else friendlyResponse = "Tab action completed.";
           } else if (funcName === 'scroll_page') {
-            friendlyResponse = directIntent.arguments.direction === 'down' ? "Page scrolled down." : "Page scrolled up.";
+            const dir = directIntent.arguments.direction;
+            if (dir === 'bottom') friendlyResponse = isTr ? "Sayfanın en altına kaydırıldı." : "Scrolled to bottom.";
+            else if (dir === 'top') friendlyResponse = isTr ? "Sayfanın en başına kaydırıldı." : "Scrolled to top.";
+            else friendlyResponse = dir === 'down' ? (isTr ? "Sayfa aşağı kaydırıldı." : "Page scrolled down.") : (isTr ? "Sayfa yukarı kaydırıldı." : "Page scrolled up.");
           } else if (funcName === 'take_screenshot') {
-            friendlyResponse = "Screenshot captured.";
+            friendlyResponse = isTr ? "Ekran görüntüsü alındı." : "Screenshot captured.";
           } else if (funcName === 'read_page_content') {
             let pageText = '';
             try {
               pageText = await this.actionContext?.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getDirectIntentPageChars()})`) || '';
             } catch {}
-            friendlyResponse = `Sayfa icerigi:\n\n${pageText || 'Sayfada metin bulunamadi.'}`;
+
+            if (!pageText.trim()) {
+              friendlyResponse = isTr ? 'Sayfada okunabilecek metin bulunamadı.' : 'No readable text found on the page.';
+            } else if (directIntent.isSummary && this.engine) {
+              try {
+                this.emitStatus('thinking');
+                const summaryPrompt = isTr
+                  ? `Aşağıdaki web sayfası içeriğini 3-4 maddede Türkçe olarak net, öz ve anlaşılır şekilde özetle:\n\n${pageText}`
+                  : `Provide a concise 3-4 bullet executive summary with key takeaways from the following web page:\n\n${pageText}`;
+                
+                const completion = await this.engine.chat.completions.create({
+                  messages: [{ role: 'user', content: summaryPrompt }],
+                  temperature: 0.2,
+                  max_tokens: SUMMARIZE_MAX_TOKENS,
+                  stream: false
+                });
+                friendlyResponse = completion.choices[0]?.message?.content || pageText.substring(0, 400);
+              } catch {
+                friendlyResponse = (isTr ? 'Sayfa Özeti:\n\n' : 'Page Summary:\n\n') + pageText.substring(0, 500) + '...';
+              }
+            } else {
+              friendlyResponse = (isTr ? 'Sayfa İçeriği:\n\n' : 'Page Content:\n\n') + pageText.substring(0, 600) + (pageText.length > 600 ? '...' : '');
+            }
           }
-        } catch (e: any) {
+        }
+      } catch (e: any) {
           friendlyResponse = `Islem basarisiz: ${e.message || String(e)}`;
           this.emitStatus('error', friendlyResponse);
         }
