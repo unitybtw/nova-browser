@@ -39,14 +39,14 @@
 
 /* Custom Sovereign Cyber-Luxury Scrollbar */
 html {
-  background-color: var(--nova-canvas);
+  background-color: #171717;
   scrollbar-width: thin;
-  scrollbar-color: #4338ca transparent;
+  scrollbar-color: #6366f1 transparent;
 }
 
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -54,22 +54,22 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #4338ca 0%, #1e1b4b 100%);
+  background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
   border-radius: 9999px;
-  border: 2px solid var(--nova-canvas);
+  border: 2px solid transparent;
   background-clip: padding-box;
   transition: background 200ms ease, box-shadow 200ms ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #6366f1 0%, #4338ca 100%);
-  border: 2px solid var(--nova-canvas);
+  background: linear-gradient(180deg, #818cf8 0%, #6366f1 100%);
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 ::-webkit-scrollbar-thumb:active {
-  background: #2a14b4;
-  border: 2px solid var(--nova-canvas);
+  background: #3730a3;
+  border: 2px solid transparent;
   background-clip: padding-box;
 }
 

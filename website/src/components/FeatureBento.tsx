@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Bot, Lock, Columns, Shield, Terminal } from 'lucide-react';
+import { Bot, Lock, Columns, Shield, Terminal, Sparkles } from 'lucide-react';
 import { CodeTrailCard } from './codetrail/CodeTrailCard';
+import { TextRevealCard } from './textreveal/TextRevealCard';
 
 const MODULES = [
   {
@@ -13,6 +14,7 @@ const MODULES = [
     icon: Bot,
     stats: '60+ TOKENS / SEC',
     hasVisual: true,
+    visualType: 'codetrail',
   },
   {
     id: 'vault',
@@ -54,6 +56,17 @@ const MODULES = [
     stats: 'LOCALHOST ONLY',
     hasVisual: false,
   },
+  {
+    id: 'typography',
+    span: 'lg:col-span-12',
+    title: 'Reactive Surface & Ambient Shaders',
+    tag: 'DYNAMIC FRACTAL BLOOM',
+    description: 'Corner typography blooming through GPU noise fields with cursor parallax and multi-tap un-blurring.',
+    icon: Sparkles,
+    stats: '60 FPS WEBGPU',
+    hasVisual: true,
+    visualType: 'textreveal',
+  },
 ];
 
 export const FeatureBento: React.FC = () => {
@@ -72,7 +85,7 @@ export const FeatureBento: React.FC = () => {
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-base leading-relaxed">
-          Five modular architectural pillars built without compromise for sovereign computing.
+          Modular architectural pillars built without compromise for sovereign computing.
         </p>
       </div>
 
@@ -84,7 +97,7 @@ export const FeatureBento: React.FC = () => {
             initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
             whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={prefersReducedMotion ? undefined : { duration: 0.7, delay: index * 0.1, ease: [0.22, 1, 0.36, 1] }}
+            transition={prefersReducedMotion ? undefined : { duration: 0.7, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
             className={`luxury-card ${mod.span} rounded-2xl bg-white/85 border border-[#e5e5e5] p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden backdrop-blur-sm`}
           >
             <div>
@@ -100,19 +113,25 @@ export const FeatureBento: React.FC = () => {
               <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717] mb-3 group-hover:text-[#4338ca] transition-colors">
                 {mod.title}
               </h3>
-              <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-xl">
+              <p className="font-sans text-sm text-neutral-600 leading-relaxed max-w-2xl">
                 {mod.description}
               </p>
 
-              {mod.hasVisual && (
+              {mod.hasVisual && mod.visualType === 'codetrail' && (
                 <div className="mt-6 w-full overflow-hidden rounded-xl border border-neutral-800/80 bg-[#0d0f15] shadow-lg">
                   <CodeTrailCard className="aspect-[16/8] sm:aspect-[21/9] w-full" />
+                </div>
+              )}
+
+              {mod.hasVisual && mod.visualType === 'textreveal' && (
+                <div className="mt-6 w-full overflow-hidden rounded-xl border border-[#e5e5e5] bg-[#fcfbf9] shadow-sm">
+                  <TextRevealCard className="aspect-[16/7] sm:aspect-[21/8] w-full" />
                 </div>
               )}
             </div>
 
             <div className="mt-8 flex items-center justify-between border-t border-[#e5e5e5]/60 pt-6 font-mono text-xs">
-              <span className="font-semibold text-neutral-400">// MODULE {String(index + 1).padStart(2, '0')}</span>
+              <span className="font-semibold text-neutral-400">// SOVEREIGN ARCHITECTURE</span>
               <div className="flex items-center gap-1 text-[#4338ca] font-bold">
                 <span>{mod.stats}</span>
               </div>
