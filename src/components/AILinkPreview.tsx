@@ -20,8 +20,30 @@ interface PreviewData {
   isAiGenerated: boolean;
 }
 
-// In-Memory LRU Cache for Instant Previews
+// In-memory LRU cache for instant previews. Keep the bound small enough to
+// avoid retaining page summaries and OG image URLs for every URL visited.
+const PREVIEW_CACHE_MAX_ENTRIES = 100;
 const previewCache = new Map<string, PreviewData>();
+
+function getCachedPreview(url: string): PreviewData | undefined {
+  const cached = previewCache.get(url);
+  if (!cached) return undefined;
+
+  // Map preserves insertion order, so reinsert the entry to mark it as used.
+  previewCache.delete(url);
+  previewCache.set(url, cached);
+  return cached;
+}
+
+function setCachedPreview(url: string, preview: PreviewData): void {
+  previewCache.delete(url);
+  previewCache.set(url, preview);
+  while (previewCache.size > PREVIEW_CACHE_MAX_ENTRIES) {
+    const oldestKey = previewCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    previewCache.delete(oldestKey);
+  }
+}
 
 // Helper to extract clean, complete sentences from text
 function extractCompleteSentences(text: string, maxChars = 280): string {
@@ -83,7 +105,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
     }
 
     // If loaded from cache, show immediately without waiting for typewriter
-    if (previewCache.has(url)) {
+    if (getCachedPreview(url)) {
       setDisplayedSummary(data.summary);
       return;
     }
@@ -109,8 +131,8 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
     if (!isOpen || !url) return;
     
     // Check cache first
-    if (previewCache.has(url)) {
-      const cached = previewCache.get(url)!;
+    const cached = getCachedPreview(url);
+    if (cached) {
       setData(cached);
       setDisplayedSummary(cached.summary);
       setIsLoading(false);
@@ -211,7 +233,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           readingTimeMinutes,
           isAiGenerated
         };
-        previewCache.set(url, previewResult);
+        setCachedPreview(url, previewResult);
         setData(previewResult);
       } catch (err: any) {
         if (!isCancelled) {

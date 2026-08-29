@@ -421,6 +421,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (!demoParams.isDemo || demoOptions) return;
 
     let cycle = 0;
+    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+    const schedule = (callback: () => void, delay: number) => {
+      const timer = setTimeout(() => {
+        pendingTimers.delete(timer);
+        callback();
+      }, delay);
+      pendingTimers.add(timer);
+    };
+
     const runCycle = () => {
       if (cycle === 0) {
         // Scene 1: arXiv AI Research + AI Sidepanel + Glowing Cursor
@@ -431,13 +440,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setActiveTabId('1');
         setIsSidePanelOpen(true);
 
-        setTimeout(() => {
+        schedule(() => {
           window.dispatchEvent(new CustomEvent('ai-cursor', {
             detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'move' }
           }));
         }, 800);
 
-        setTimeout(() => {
+        schedule(() => {
           window.dispatchEvent(new CustomEvent('ai-cursor', {
             detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'click' }
           }));
@@ -447,13 +456,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setIsSidePanelOpen(false);
         setActiveTabId('2');
 
-        setTimeout(() => {
+        schedule(() => {
           window.dispatchEvent(new CustomEvent('ai-cursor', {
             detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'move' }
           }));
         }, 800);
 
-        setTimeout(() => {
+        schedule(() => {
           window.dispatchEvent(new CustomEvent('ai-cursor', {
             detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'click' }
           }));
@@ -474,7 +483,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     runCycle();
     const interval = setInterval(runCycle, 6500);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      pendingTimers.forEach(timer => clearTimeout(timer));
+      pendingTimers.clear();
+    };
   }, [demoParams.isDemo]);
 
   // Load extensions on mount

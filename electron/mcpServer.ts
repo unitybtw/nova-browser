@@ -315,8 +315,6 @@ export class BrowserMCPServer {
   private server: any;
   private mainWindow: BrowserWindow | null = null;
   private clients: Map<string, SseClient> = new Map();
-  private requestCounter = 0;
-  private pendingRequests: Map<string, { resolve: Function; reject: Function }> = new Map();
   private token: string;
   private disabledTools: Set<string> = new Set(DEFAULT_DISABLED_TOOLS);
   private tokenFilePath: string = '';

@@ -279,8 +279,29 @@ if ((window as any).__novaPreloadInjected) {
     }
   };
 
-  window.addEventListener('DOMContentLoaded', injectNovaBanner);
-  setInterval(injectNovaBanner, 500);
+  // SPA navigation can replace the detail page without firing DOMContentLoaded.
+  // Observe DOM changes instead of polling the entire document every 500ms.
+  let bannerUpdateQueued = false;
+  const scheduleBannerUpdate = () => {
+    if (bannerUpdateQueued) return;
+    bannerUpdateQueued = true;
+    queueMicrotask(() => {
+      bannerUpdateQueued = false;
+      injectNovaBanner();
+    });
+  };
+
+  const startBannerObserver = () => {
+    scheduleBannerUpdate();
+    const observer = new MutationObserver(scheduleBannerUpdate);
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', startBannerObserver, { once: true });
+  } else {
+    startBannerObserver();
+  }
 }
 
 // Password Manager Form & Submission Detection

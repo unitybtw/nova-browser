@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
-import BrowserDemo from './BrowserDemo';
+
+const BrowserDemo = lazy(() => import('./BrowserDemo'));
 
 export const Hero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -59,7 +60,16 @@ export const Hero: React.FC = () => {
         transition={{ duration: 0.95, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
         className="relative mt-12 w-full max-w-6xl text-left"
       >
-        <BrowserDemo />
+        <Suspense
+          fallback={
+            <div
+              className="browser-demo aspect-[16/10] max-h-[760px] min-h-[520px] w-full overflow-hidden rounded-[18px] border border-slate-700/80 bg-[#151122] shadow-[0_30px_90px_rgba(15,23,42,0.32)]"
+              aria-label="Nova Browser demo loading"
+            />
+          }
+        >
+          <BrowserDemo />
+        </Suspense>
       </motion.div>
     </section>
   );

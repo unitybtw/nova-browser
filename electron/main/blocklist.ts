@@ -270,8 +270,20 @@ export async function initializeBlocklist(): Promise<string[]> {
  * Start periodic blocklist refresh timer
  */
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let refreshInFlight: Promise<string[] | null> | null = null;
 let currentBlocklist: string[] = [];
 let onBlocklistUpdated: ((domains: string[]) => void) | null = null;
+
+// A slow network or retry cycle must not allow periodic ticks to overlap and
+// multiply memory, network, and signature-verification work.
+function refreshBlocklistOnce(): Promise<string[] | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = refreshBlocklist().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
 
 export function startPeriodicRefresh(callback?: (domains: string[]) => void): void {
   if (refreshTimer) {
@@ -284,7 +296,7 @@ export function startPeriodicRefresh(callback?: (domains: string[]) => void): vo
   }
   
   // Initial refresh (async, non-blocking)
-  refreshBlocklist().then(domains => {
+  refreshBlocklistOnce().then(domains => {
     if (domains) {
       currentBlocklist = domains;
       onBlocklistUpdated?.(domains);
@@ -296,7 +308,7 @@ export function startPeriodicRefresh(callback?: (domains: string[]) => void): vo
   // Periodic refresh
   refreshTimer = setInterval(async () => {
     console.log('[Blocklist] Periodic refresh triggered');
-    const domains = await refreshBlocklist();
+    const domains = await refreshBlocklistOnce();
     if (domains) {
       currentBlocklist = domains;
       onBlocklistUpdated?.(domains);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check } from 'lucide-react';
 
@@ -7,6 +7,21 @@ export const Downloads: React.FC = () => {
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'linux' | 'source'>('brew');
+  const notificationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => {
+      notificationTimersRef.current.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
+
+  const scheduleNotificationReset = (callback: () => void, delay: number) => {
+    const timer = setTimeout(() => {
+      notificationTimersRef.current = notificationTimersRef.current.filter(item => item !== timer);
+      callback();
+    }, delay);
+    notificationTimersRef.current.push(timer);
+  };
 
   const CLI_COMMANDS = {
     brew: 'brew install --cask unitybtw/tap/nova-browser',
@@ -20,10 +35,10 @@ export const Downloads: React.FC = () => {
     try {
       await navigator.clipboard.writeText(CLI_COMMANDS[tab]);
       setCopiedTab(tab);
-      setTimeout(() => setCopiedTab(null), 2000);
+      scheduleNotificationReset(() => setCopiedTab(null), 2000);
     } catch {
       setCopyError('Copy failed. Select the command manually instead.');
-      setTimeout(() => setCopyError(null), 4000);
+      scheduleNotificationReset(() => setCopyError(null), 4000);
     }
   };
 
