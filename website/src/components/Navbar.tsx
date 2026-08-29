@@ -1,106 +1,68 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Shield,
-  Lock,
-  Plus,
-  X,
-  ArrowUpRight,
-  Download,
-  Github,
-  Terminal,
-  Layers,
-  Globe,
-  Cpu,
-  HelpCircle,
-  Sparkles,
-  LayoutGrid,
-  ChevronRight
-} from "lucide-react";
+import { gsap } from "gsap";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 
-export type ChromeTabItem = {
-  id: string;
+export type PillNavItem = {
   label: string;
-  url: string;
   href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  tagline: string;
   external?: boolean;
 };
 
-const TABS: ChromeTabItem[] = [
-  {
-    id: "top",
-    label: "Manifesto",
-    url: "nova://manifesto",
-    href: "#top",
-    icon: Terminal,
-    tagline: "Kinetic typography declaration of sovereign computing."
-  },
-  {
-    id: "features",
-    label: "Features",
-    url: "nova://features",
-    href: "#features",
-    icon: Layers,
-    tagline: "5 sovereign architectural modules & on-device AI."
-  },
-  {
-    id: "community",
-    label: "Community",
-    url: "nova://community",
-    href: "#community",
-    icon: Globe,
-    tagline: "Global open-source telemetry & GitHub activity."
-  },
-  {
-    id: "benchmarks",
-    label: "Benchmarks",
-    url: "nova://benchmarks",
-    href: "#benchmarks",
-    icon: Cpu,
-    tagline: "0.2ms cold start & local GPU neural runtime speeds."
-  },
-  {
-    id: "faq",
-    label: "FAQ",
-    url: "nova://faq",
-    href: "#faq",
-    icon: HelpCircle,
-    tagline: "Technical architecture, privacy guarantees, and usage."
-  }
+const NAV_ITEMS: PillNavItem[] = [
+  { label: "MANIFESTO", href: "#top" },
+  { label: "FEATURES", href: "#features" },
+  { label: "COMMUNITY", href: "#community" },
+  { label: "BENCHMARKS", href: "#benchmarks" },
+  { label: "FAQ", href: "#faq" },
+  { label: "SOURCE", href: "https://github.com/unitybtw/nova-browser", external: true }
 ];
+
+const BASE_COLOR = "#171717";
+const PILL_COLOR = "#ffffff";
+const PILL_TEXT_COLOR = "#171717";
+const HOVERED_TEXT_COLOR = "#ffffff";
+const EASE = "power3.out";
 
 export interface NavbarProps {
   visible?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
-  const [activeTabId, setActiveTabId] = useState<string>("top");
-  const [isTabSwitcherOpen, setIsTabSwitcherOpen] = useState(false);
-  const [isOmniboxFocused, setIsOmniboxFocused] = useState(false);
+  const [activeHref, setActiveHref] = useState("#top");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const circleRefs = useRef<Array<HTMLSpanElement | null>>([]);
+  const tlRefs = useRef<Array<gsap.core.Timeline | null>>([]);
+  const activeTweenRefs = useRef<Array<gsap.core.Tween | null>>([]);
+  const logoImgRef = useRef<HTMLImageElement | null>(null);
+  const logoTweenRef = useRef<gsap.core.Tween | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
+  const navItemsRef = useRef<HTMLDivElement | null>(null);
+  const logoRef = useRef<HTMLAnchorElement | null>(null);
   const navContainerRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuId = "nova-mobile-menu";
+  const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // ScrollSpy to automatically update active section on scroll
   useEffect(() => {
-    const sectionIds = ["faq", "benchmarks", "community", "features", "top"];
+    const sectionIds = ["features", "community", "benchmarks", "download", "faq"];
     const handleScroll = () => {
       const scrollY = window.scrollY;
 
       if (scrollY < 240) {
-        setActiveTabId("top");
+        setActiveHref("#top");
         return;
       }
 
-      const scrollPos = scrollY + 280;
+      const scrollPos = window.scrollY + 200;
       for (const id of sectionIds) {
         const el = document.getElementById(id);
         if (el) {
           const top = el.offsetTop;
           const height = el.offsetHeight;
           if (scrollPos >= top && scrollPos < top + height) {
-            setActiveTabId(id);
-            return;
+            setActiveHref(`#${id}`);
+            break;
           }
         }
       }
@@ -111,303 +73,460 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  const closeTabSwitcher = useCallback(() => {
-    setIsTabSwitcherOpen(false);
+  const closeMobileMenu = useCallback(() => {
+    setIsMobileMenuOpen(false);
+    if (mobileMenuRef.current) {
+      gsap.killTweensOf(mobileMenuRef.current);
+      gsap.set(mobileMenuRef.current, { display: "none", opacity: 0, y: -15 });
+    }
   }, []);
 
-  // Close tab switcher on outside click
+  // Close mobile menu when clicking outside.
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        isTabSwitcherOpen &&
+        isMobileMenuOpen &&
         navContainerRef.current &&
         !navContainerRef.current.contains(e.target as Node)
       ) {
-        closeTabSwitcher();
+        closeMobileMenu();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [closeTabSwitcher, isTabSwitcherOpen]);
+  }, [closeMobileMenu, isMobileMenuOpen]);
 
-  const activeTab = TABS.find((t) => t.id === activeTabId) || TABS[0];
+  // Keep keyboard users and small screens from getting trapped behind the menu.
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const restoreMenuState = () => {
+      if (mediaQuery.matches) closeMobileMenu();
+    };
 
-  const handleTabClick = (href: string, id: string) => {
-    setActiveTabId(id);
-    closeTabSwitcher();
-    if (href.startsWith("#")) {
-      const targetId = href.slice(1);
-      const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
+    mediaQuery.addEventListener("change", restoreMenuState);
+    if (!isMobileMenuOpen) {
+      return () => mediaQuery.removeEventListener("change", restoreMenuState);
+    }
+
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileMenu();
+        mobileMenuButtonRef.current?.focus();
       }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
+      mediaQuery.removeEventListener("change", restoreMenuState);
+    };
+  }, [closeMobileMenu, isMobileMenuOpen]);
+
+  // Layout and GSAP timeline calculation
+  const updateLayout = useCallback(() => {
+    circleRefs.current.forEach((circle, index) => {
+      if (!circle?.parentElement) return;
+
+      const pill = circle.parentElement as HTMLElement;
+      const rect = pill.getBoundingClientRect();
+      const { width: w, height: h } = rect;
+
+      // Guard against zero or NaN dimensions
+      if (!w || !h || isNaN(w) || isNaN(h)) return;
+
+      // Calculate the radius for the expanding circle to cover the pill
+      const R = ((w * w) / 4 + h * h) / (2 * h);
+      const D = Math.ceil(2 * R) + 2;
+      const delta = Math.ceil(R - Math.sqrt(Math.max(0, R * R - (w * w) / 4))) + 1;
+      const originY = D - delta;
+
+      circle.style.width = `${D}px`;
+      circle.style.height = `${D}px`;
+      circle.style.bottom = `-${delta}px`;
+
+      gsap.set(circle, {
+        xPercent: -50,
+        scale: 0,
+        transformOrigin: `50% ${originY}px`
+      });
+
+      const label = pill.querySelector<HTMLElement>(".pill-label");
+      const hoverLabel = pill.querySelector<HTMLElement>(".pill-label-hover");
+
+      if (label) gsap.set(label, { y: 0 });
+      if (hoverLabel) gsap.set(hoverLabel, { y: h + 10, opacity: 0 });
+
+      tlRefs.current[index]?.kill();
+      const tl = gsap.timeline({ paused: true });
+
+      tl.to(
+        circle,
+        {
+          scale: 1.25,
+          xPercent: -50,
+          duration: 0.65,
+          ease: EASE,
+          overwrite: "auto"
+        },
+        0
+      );
+
+      if (label) {
+        tl.to(
+          label,
+          {
+            y: -(h + 8),
+            duration: 0.5,
+            ease: EASE,
+            overwrite: "auto"
+          },
+          0
+        );
+      }
+
+      if (hoverLabel) {
+        gsap.set(hoverLabel, { y: Math.ceil(h + 12), opacity: 0 });
+        tl.to(
+          hoverLabel,
+          {
+            y: 0,
+            opacity: 1,
+            duration: 0.5,
+            ease: EASE,
+            overwrite: "auto"
+          },
+          0
+        );
+      }
+
+      tlRefs.current[index] = tl;
+    });
+  }, []);
+
+  useEffect(() => {
+    updateLayout();
+
+    const onResize = () => updateLayout();
+    window.addEventListener("resize", onResize);
+
+    if (document.fonts) {
+      document.fonts.ready.then(updateLayout).catch(() => {});
+    }
+
+    // Initial mount animations
+    const logo = logoRef.current;
+    const navItems = navItemsRef.current;
+
+    if (logo) {
+      gsap.set(logo, { scale: 0, opacity: 0 });
+      gsap.to(logo, {
+        scale: 1,
+        opacity: 1,
+        duration: 0.75,
+        ease: "back.out(1.7)"
+      });
+    }
+
+    if (navItems) {
+      const listItems = navItems.querySelectorAll("li");
+      gsap.set(listItems, { opacity: 0, y: -10 });
+      gsap.to(listItems, {
+        opacity: 1,
+        y: 0,
+        duration: 0.55,
+        stagger: 0.05,
+        ease: "power2.out",
+        delay: 0.15
+      });
+    }
+
+    return () => window.removeEventListener("resize", onResize);
+  }, [updateLayout]);
+
+  const handleEnter = (i: number) => {
+    const tl = tlRefs.current[i];
+    if (!tl) return;
+    activeTweenRefs.current[i]?.kill();
+    activeTweenRefs.current[i] = tl.tweenTo(tl.duration(), {
+      duration: 0.35,
+      ease: EASE,
+      overwrite: "auto"
+    });
+  };
+
+  const handleLeave = (i: number) => {
+    const tl = tlRefs.current[i];
+    if (!tl) return;
+    activeTweenRefs.current[i]?.kill();
+    activeTweenRefs.current[i] = tl.tweenTo(0, {
+      duration: 0.3,
+      ease: EASE,
+      overwrite: "auto"
+    });
+  };
+
+  const handleLogoEnter = () => {
+    const img = logoImgRef.current;
+    if (!img) return;
+    logoTweenRef.current?.kill();
+    logoTweenRef.current = gsap.to(img, {
+      rotate: 360,
+      duration: 0.8,
+      ease: "elastic.out(1, 0.5)",
+      overwrite: "auto",
+      onComplete: () => gsap.set(img, { rotate: 0 })
+    });
+  };
+
+  const toggleMobileMenu = () => {
+    if (isMobileMenuOpen) {
+      closeMobileMenu();
+      return;
+    }
+
+    setIsMobileMenuOpen(true);
+    const menu = mobileMenuRef.current;
+    if (menu) {
+      gsap.killTweensOf(menu);
+      gsap.set(menu, { display: "block", opacity: 0, y: -15 });
+      gsap.to(menu, {
+        opacity: 1,
+        y: 0,
+        duration: 0.35,
+        ease: "power3.out"
+      });
     }
   };
 
   return (
-    <motion.header
-      initial={false}
-      animate={{
-        y: visible ? 0 : -100,
-        opacity: visible ? 1 : 0,
-      }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-      className="fixed top-3 inset-x-0 z-50 flex justify-center px-2.5 sm:px-6 pointer-events-none"
+    <header
+      className={`fixed top-4 sm:top-6 left-4 sm:left-6 lg:left-8 z-50 flex items-center justify-start pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+        visible
+          ? "translate-x-0 opacity-100"
+          : "-translate-x-full opacity-0"
+      }`}
     >
-      <div
-        ref={navContainerRef}
-        className="pointer-events-auto w-full max-w-4xl rounded-xl border border-neutral-800/90 bg-[#121217]/95 shadow-[0_16px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl transition-all"
-        style={{ transform: "translateZ(0)" }}
-      >
-        {/* Top Browser Tabstrip */}
-        <div className="flex items-center justify-between border-b border-neutral-800/80 px-2.5 py-1.5 sm:px-3">
-          {/* macOS Window Controls (Traffic Lights) + Brand */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="flex items-center gap-1.5 pl-1 pr-1">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]/90 transition-transform hover:scale-125" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]/90 transition-transform hover:scale-125" />
-              <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]/90 transition-transform hover:scale-125" />
-            </div>
+      <div ref={navContainerRef} className="relative z-[1000] pointer-events-auto">
+        <nav
+          className="flex items-center justify-start p-0 gap-3 sm:gap-4 select-none"
+          aria-label="Primary Navigation"
+        >
+          {/* Island 1: Logo Pill */}
+          <a
+            ref={logoRef}
+            href="#top"
+            onMouseEnter={handleLogoEnter}
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-full shadow-md transition-opacity duration-200 hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+            style={{
+              width: "48px",
+              height: "48px",
+              background: BASE_COLOR
+            }}
+            title="Nova Browser"
+          >
+            <img
+              ref={logoImgRef}
+              src="/nova-logo-tight.png"
+              alt="Nova Logo"
+              className="w-7 h-7 object-contain pointer-events-none"
+            />
+          </a>
 
-            <a
-              href="#top"
-              onClick={(e) => {
-                e.preventDefault();
-                handleTabClick("#top", "top");
-              }}
-              className="flex items-center gap-1.5 rounded-md px-1.5 py-0.5 font-mono text-[11px] font-bold tracking-wider text-neutral-300 transition-colors hover:text-white"
+          {/* Island 2: Desktop Menu Pill Container */}
+          <div
+            ref={navItemsRef}
+            className="hidden md:flex items-center rounded-full px-1.5 shadow-md border border-black/5"
+            style={{
+              height: "48px",
+              background: BASE_COLOR
+            }}
+          >
+            <ul
+              role="menubar"
+              className="list-none flex items-stretch m-0 p-0 h-full"
+              style={{ gap: "6px" }}
             >
-              <img
-                src="/icons/icon-192x192.png"
-                alt="Nova Logo"
-                className="h-3.5 w-3.5 rounded object-cover"
-                onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).style.display = "none";
-                }}
-              />
-              <span className="hidden sm:inline">NOVA</span>
-            </a>
+              {NAV_ITEMS.map((item, i) => {
+                const isActive = activeHref === item.href;
+
+                return (
+                  <li key={item.href} role="none" className="flex items-center">
+                    <a
+                      role="menuitem"
+                      href={item.href}
+                      target={item.external ? "_blank" : undefined}
+                      rel={item.external ? "noopener noreferrer" : undefined}
+                      onClick={(e) => {
+                        if (!item.external) {
+                          e.preventDefault();
+                          setActiveHref(item.href);
+                          const targetId = item.href.slice(1);
+                          if (targetId === 'top' || targetId === 'manifesto') {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          } else {
+                            const el = document.getElementById(targetId);
+                            if (el) {
+                              el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }
+                        }
+                      }}
+                      aria-current={isActive ? 'location' : undefined}
+                      onMouseEnter={() => handleEnter(i)}
+                      onMouseLeave={() => handleLeave(i)}
+                      className="relative inline-flex h-[36px] self-center items-center justify-center overflow-hidden rounded-full px-5 font-mono text-xs font-semibold uppercase tracking-wider no-underline transition-colors duration-200 hover:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/80 focus-visible:ring-offset-2 focus-visible:ring-offset-[#171717] select-none"
+                      style={{
+                        background: PILL_COLOR,
+                        color: PILL_TEXT_COLOR
+                      }}
+                    >
+                      {/* GSAP Expanding Rising Circle */}
+                      <span
+                        ref={el => {
+                          circleRefs.current[i] = el;
+                        }}
+                        className="hover-circle absolute left-1/2 bottom-0 rounded-full z-[1] block pointer-events-none"
+                        style={{
+                          background: BASE_COLOR,
+                          willChange: "transform"
+                        }}
+                        aria-hidden="true"
+                      />
+
+                      {/* Dual-Text Stack Animation */}
+                      <span className="label-stack relative inline-block leading-none z-[2] overflow-hidden py-1">
+                        <span
+                          className="pill-label relative z-[2] inline-block"
+                          style={{ willChange: "transform" }}
+                        >
+                          {item.label}
+                        </span>
+                        <span
+                          className="pill-label-hover absolute left-0 top-1 z-[3] inline-block w-full text-center"
+                          style={{
+                            color: HOVERED_TEXT_COLOR,
+                            willChange: "transform, opacity"
+                          }}
+                          aria-hidden="true"
+                        >
+                          {item.label}
+                        </span>
+                      </span>
+
+                      {/* Active indicator pill dot */}
+                      {isActive && (
+                        <span
+                          className="absolute left-1/2 bottom-1 -translate-x-1/2 w-1.5 h-1.5 rounded-full z-[4] bg-[#4338ca]"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
 
-          {/* Desktop Chrome Tabs (Hidden on small mobile screens) */}
-          <div className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar max-w-[560px]">
-            {TABS.map((tab) => {
-              const isActive = activeTabId === tab.id;
-              const Icon = tab.icon;
+          {/* Island 3: Get Nova CTA Pill */}
+          <a
+            href="#download"
+            className="hidden items-center justify-center gap-1.5 rounded-full px-6 font-mono text-xs font-bold uppercase tracking-wider text-white shadow-md transition-colors duration-200 hover:bg-[#2a14b4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 md:flex"
+            style={{
+              height: "48px",
+              background: BASE_COLOR
+            }}
+          >
+            <span>Get Nova</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </a>
+
+          {/* Mobile Hamburger Button */}
+          <button
+            ref={mobileMenuButtonRef}
+            type="button"
+            onClick={toggleMobileMenu}
+            aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls={mobileMenuId}
+            className="flex items-center justify-center rounded-full text-white shadow-md transition-colors duration-200 hover:bg-[#2a14b4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 md:hidden"
+            style={{
+              width: "48px",
+              height: "48px",
+              background: BASE_COLOR
+            }}
+          >
+            {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </nav>
+
+        {/* Mobile Menu Dropdown */}
+        <div
+          id={mobileMenuId}
+          ref={mobileMenuRef}
+          role="navigation"
+          aria-label="Mobile navigation"
+          aria-hidden={!isMobileMenuOpen}
+          className="md:hidden absolute top-full left-0 mt-2 rounded-2xl overflow-hidden shadow-2xl z-[999] hidden border border-white/10 w-64"
+          style={{
+            background: BASE_COLOR
+          }}
+        >
+          <ul className="list-none m-0 p-2 flex flex-col gap-1">
+            {NAV_ITEMS.map(item => {
+              const isActive = activeHref === item.href;
               return (
-                <button
-                  key={tab.id}
-                  onClick={() => handleTabClick(tab.href, tab.id)}
-                  type="button"
-                  className={`group relative flex items-center gap-2 rounded-t-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-[#1e1e26] text-white shadow-xs border-t-2 border-[#6366f1]"
-                      : "text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-200"
-                  }`}
-                >
-                  <Icon
-                    className={`h-3.5 w-3.5 transition-colors ${
-                      isActive ? "text-[#818cf8]" : "text-neutral-500 group-hover:text-neutral-300"
+                <li key={item.href}>
+                  <a
+                    href={item.href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noopener noreferrer" : undefined}
+                    onClick={(e) => {
+                      if (!item.external) {
+                        e.preventDefault();
+                        setActiveHref(item.href);
+                        closeMobileMenu();
+                        const targetId = item.href.slice(1);
+                        if (targetId === 'top' || targetId === 'manifesto') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                          const el = document.getElementById(targetId);
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }
+                      } else {
+                        closeMobileMenu();
+                      }
+                    }}
+                    aria-current={isActive ? 'location' : undefined}
+                    className={`block py-3 px-6 text-xs font-mono font-semibold uppercase tracking-widest rounded-xl transition-all ${
+                      isActive
+                        ? "bg-white text-[#171717]"
+                        : "text-white/80 hover:bg-white/10 hover:text-white"
                     }`}
-                  />
-                  <span>{tab.label}</span>
-                  {isActive ? (
-                    <span className="ml-1 h-1.5 w-1.5 rounded-full bg-[#6366f1]" />
-                  ) : (
-                    <span className="opacity-0 group-hover:opacity-100 transition-opacity text-neutral-500 hover:text-white text-[10px] leading-none ml-1">
-                      <X className="h-2.5 w-2.5" />
-                    </span>
-                  )}
-                </button>
+                  >
+                    {item.label}
+                  </a>
+                </li>
               );
             })}
-
-            {/* Browser New Tab Button (+) */}
-            <a
-              href="#download"
-              onClick={(e) => {
-                e.preventDefault();
-                handleTabClick("#download", "download");
-              }}
-              title="New Tab / Download Nova"
-              className="flex h-7 w-7 items-center justify-center rounded-md text-neutral-400 hover:bg-neutral-800/80 hover:text-white transition-colors"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </a>
-          </div>
-
-          {/* Mobile Active Tab Pill / Switcher Trigger */}
-          <div className="flex md:hidden items-center gap-2">
-            <button
-              onClick={() => setIsTabSwitcherOpen(!isTabSwitcherOpen)}
-              type="button"
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-700 bg-neutral-800/80 px-2.5 py-1 text-xs font-medium text-white shadow-xs"
-            >
-              <activeTab.icon className="h-3 w-3 text-[#818cf8]" />
-              <span className="max-w-[90px] truncate">{activeTab.label}</span>
-              <span className="rounded bg-neutral-700 px-1 py-0.2 text-[9px] font-mono text-neutral-300">
-                {TABS.length}
-              </span>
-            </button>
-          </div>
-
-          {/* Right Action Icons */}
-          <div className="flex items-center gap-1.5">
-            <a
-              href="https://github.com/unitybtw/nova-browser"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:inline-flex h-7 items-center gap-1 rounded-md border border-neutral-700/80 bg-neutral-800/50 px-2 text-[11px] font-mono text-neutral-300 hover:bg-neutral-800 hover:text-white transition-colors"
-              title="View on GitHub"
-            >
-              <Github className="h-3 w-3" />
-              <span>GitHub</span>
-              <ArrowUpRight className="h-2.5 w-2.5 text-neutral-500" />
-            </a>
-
-            <a
-              href="#download"
-              onClick={(e) => {
-                e.preventDefault();
-                handleTabClick("#download", "download");
-              }}
-              className="inline-flex h-7 items-center gap-1.5 rounded-md bg-[#6366f1] px-2.5 text-[11px] font-mono font-semibold text-white shadow-xs hover:bg-[#4f46e5] active:scale-95 transition-all"
-            >
-              <Download className="h-3 w-3" />
-              <span>Get Nova</span>
-            </a>
-
-            {/* Mobile Menu Toggle Button */}
-            <button
-              onClick={() => setIsTabSwitcherOpen(!isTabSwitcherOpen)}
-              type="button"
-              className="md:hidden flex h-7 w-7 items-center justify-center rounded-md border border-neutral-700 bg-neutral-800 text-neutral-300 hover:text-white"
-              aria-label="Toggle tab switcher"
-            >
-              {isTabSwitcherOpen ? <X className="h-3.5 w-3.5" /> : <LayoutGrid className="h-3.5 w-3.5" />}
-            </button>
-          </div>
+            <li className="pt-1 mt-1 border-t border-white/10">
+              <a
+                href="#download"
+                onClick={closeMobileMenu}
+                className="flex items-center justify-between py-3 px-6 text-xs font-mono font-bold uppercase tracking-widest bg-white text-[#171717] rounded-xl"
+              >
+                <span>Get Nova</span>
+                <ArrowUpRight className="w-4 h-4" />
+              </a>
+            </li>
+          </ul>
         </div>
-
-        {/* Bottom Omnibox Address Status Bar */}
-        <div className="flex items-center justify-between px-3 py-1 bg-[#0d0d12]/80 rounded-b-xl border-t border-neutral-800/50">
-          <div className="flex items-center gap-2 w-full max-w-xl">
-            {/* Security Lock Badge */}
-            <div className="flex items-center gap-1 rounded px-1.5 py-0.5 bg-neutral-900 border border-neutral-800 text-emerald-400 text-[10px] font-mono">
-              <Shield className="h-2.5 w-2.5" />
-              <Lock className="h-2.5 w-2.5" />
-              <span className="hidden sm:inline">Secure</span>
-            </div>
-
-            {/* Interactive / Dynamic Omnibox URL pill */}
-            <div
-              onMouseEnter={() => setIsOmniboxFocused(true)}
-              onMouseLeave={() => setIsOmniboxFocused(false)}
-              className="flex items-center gap-1.5 flex-1 rounded bg-neutral-900/90 border border-neutral-800/80 px-2.5 py-0.5 font-mono text-[11px] text-neutral-300 shadow-inner"
-            >
-              <span className="text-[#818cf8] font-semibold select-none">nova://</span>
-              <span className="text-white font-medium">{activeTab.url.replace("nova://", "")}</span>
-              {isOmniboxFocused && (
-                <span className="ml-auto hidden sm:inline text-[9px] text-neutral-500">
-                  press Enter to navigate
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Right Status Indicator */}
-          <div className="hidden sm:flex items-center gap-2 pl-3 text-[10px] font-mono text-neutral-400">
-            <span className="flex items-center gap-1 text-emerald-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Local AI Hardened</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Mobile Tab Switcher Drawer */}
-        <AnimatePresence>
-          {isTabSwitcherOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="md:hidden border-t border-neutral-800 bg-[#121217] p-3 overflow-hidden rounded-b-xl"
-            >
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-400">
-                  Open Tabs ({TABS.length})
-                </span>
-                <span className="font-mono text-[10px] text-emerald-400 flex items-center gap-1">
-                  <Sparkles className="h-2.5 w-2.5" />
-                  Sovereign Session
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                {TABS.map((tab) => {
-                  const isActive = activeTabId === tab.id;
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => handleTabClick(tab.href, tab.id)}
-                      type="button"
-                      className={`flex items-center justify-between rounded-lg border p-2.5 text-left transition-all ${
-                        isActive
-                          ? "border-[#6366f1] bg-[#1e1e28] text-white shadow-xs"
-                          : "border-neutral-800 bg-neutral-900/60 text-neutral-300 hover:bg-neutral-800 hover:text-white"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <div
-                          className={`flex h-7 w-7 items-center justify-center rounded-md ${
-                            isActive ? "bg-[#6366f1]/20 text-[#818cf8]" : "bg-neutral-800 text-neutral-400"
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-semibold">{tab.label}</span>
-                            <span className="font-mono text-[10px] text-neutral-500">{tab.url}</span>
-                          </div>
-                          <p className="text-[11px] text-neutral-400 line-clamp-1">{tab.tagline}</p>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-neutral-500" />
-                    </button>
-                  );
-                })}
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-neutral-800 flex items-center justify-between">
-                <a
-                  href="https://github.com/unitybtw/nova-browser"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white font-mono"
-                >
-                  <Github className="h-3.5 w-3.5" />
-                  <span>GitHub Repository</span>
-                </a>
-                <a
-                  href="#download"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleTabClick("#download", "download");
-                  }}
-                  className="flex items-center gap-1.5 text-xs text-[#818cf8] font-semibold font-mono"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Download Desktop App</span>
-                </a>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
-    </motion.header>
+    </header>
   );
 };
 
