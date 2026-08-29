@@ -9,16 +9,15 @@ export const Hero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-28 text-center sm:px-6 sm:pb-20 sm:pt-32 md:pt-40">
-      {/* Top Tag */}
+    <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-24 text-center sm:px-6 sm:pb-20 sm:pt-28 md:pt-36">
+      {/* Top Compact Kinetic Typography Poster */}
       <motion.div
         initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-6 inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/80 px-4 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4338ca] shadow-xs backdrop-blur-md"
+        className="mb-6 w-full max-w-[340px] sm:max-w-[400px] overflow-hidden rounded-2xl border border-neutral-200/90 bg-neutral-900 p-1 shadow-md hover:shadow-lg transition-shadow"
       >
-        <span className="h-2 w-2 rounded-full bg-[#4338ca] animate-pulse" />
-        <span>Sovereign Desktop Architecture</span>
+        <StampTypeCard className="aspect-[16/7] rounded-xl border-none shadow-none" />
       </motion.div>
 
       <motion.h1
@@ -40,21 +39,11 @@ export const Hero: React.FC = () => {
         A fast, private desktop browser with on-device AI, native tracker blocking, and developer-grade workspaces—without sending your thinking to the cloud.
       </motion.p>
 
-      {/* Kinetic Typography Stamp Poster */}
-      <motion.div
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
-        animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.9, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-10 w-full max-w-4xl overflow-hidden rounded-3xl border border-neutral-200/80 bg-neutral-900 p-2 sm:p-3 shadow-2xl"
-      >
-        <StampTypeCard />
-      </motion.div>
-
       <motion.div
         initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.85, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-10 flex w-full max-w-xl select-none flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4"
+        transition={{ duration: 0.85, delay: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className="mt-9 flex w-full max-w-xl select-none flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4"
       >
         <a
           href="#download"
@@ -80,7 +69,7 @@ export const Hero: React.FC = () => {
         initial={prefersReducedMotion ? false : { opacity: 0, y: 40 }}
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.95, delay: 0.48, ease: [0.22, 1, 0.36, 1] }}
-        className="relative mt-16 w-full max-w-6xl text-left"
+        className="relative mt-12 w-full max-w-6xl text-left"
       >
         <Suspense
           fallback={
