@@ -1,11 +1,23 @@
 import React, { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
+import type { BezierDefinition } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
 
 const BrowserDemo = lazy(() => import('./BrowserDemo'));
 
+const EASE: BezierDefinition = [0.16, 1, 0.3, 1];
+
 export const Hero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
+
+  const fadeUp = (delay: number) =>
+    prefersReducedMotion
+      ? {}
+      : {
+          initial: { opacity: 0, y: 24 },
+          animate: { opacity: 1, y: 0 },
+          transition: { duration: 0.65, delay, ease: EASE },
+        };
 
   return (
     <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-20 text-center sm:px-6 sm:pb-24 sm:pt-28 md:pt-36">
@@ -15,47 +27,35 @@ export const Hero: React.FC = () => {
         aria-hidden="true"
       />
 
-      {/* Top Tag - Floating Reveal */}
+      {/* Top Tag */}
       <motion.div
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp(0)}
         className="mb-6 inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/90 px-4 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4338ca] shadow-xs backdrop-blur-md"
       >
         <span className="h-2 w-2 rounded-full bg-[#4338ca] animate-pulse" />
         <span>Sovereign Desktop Architecture</span>
       </motion.div>
 
-      {/* Main Headline - Gliding Floating Entrance */}
+      {/* Main Headline */}
       <motion.h1
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
-        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
-        transition={{ duration: 0.65, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp(0.08)}
         className="max-w-5xl font-display text-[clamp(3rem,8vw,6rem)] font-black leading-[0.98] tracking-[-0.04em] text-[#171717]"
       >
         Thought at the Speed of{' '}
         <span className="text-[#4338ca]">Thought.</span>
       </motion.h1>
 
-      {/* Subtitle - Gentle Silk Float */}
+      {/* Subtitle */}
       <motion.p
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
-        transition={{ duration: 0.65, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp(0.16)}
         className="mt-6 max-w-2xl font-sans text-base leading-relaxed text-[#525252] sm:text-lg md:text-xl"
       >
         A fast, private desktop browser with on-device AI, native tracker blocking, and developer-grade workspaces—without sending your thinking to the cloud.
       </motion.p>
 
-      {/* Call to Actions - Floating Buttons */}
+      {/* Call to Actions */}
       <motion.div
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 20 }}
-        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.1 }}
-        transition={{ duration: 0.6, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp(0.22)}
         className="mt-9 flex w-full max-w-xl select-none flex-col items-stretch justify-center gap-3 sm:w-auto sm:flex-row sm:items-center sm:gap-4"
       >
         <a
@@ -78,12 +78,9 @@ export const Hero: React.FC = () => {
         </a>
       </motion.div>
 
-      {/* Interactive Browser Demo - 100% GPU-Accelerated Float without Filter Overhead */}
+      {/* Interactive Browser Demo */}
       <motion.div
-        initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
-        whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
-        viewport={{ once: true, amount: 0.05 }}
-        transition={{ duration: 0.75, delay: 0.28, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeUp(0.28)}
         className="relative mt-12 w-full max-w-6xl text-left"
         style={{ transform: 'translateZ(0)' }}
       >
@@ -103,3 +100,4 @@ export const Hero: React.FC = () => {
 };
 
 export default Hero;
+

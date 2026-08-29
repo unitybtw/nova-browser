@@ -88,7 +88,11 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <Suspense fallback={null}>
+        <Suspense
+          fallback={
+            <div className="min-h-[3200px]" aria-hidden="true" />
+          }
+        >
           <GithubStats />
           <Benchmarks />
           <Downloads />
