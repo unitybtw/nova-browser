@@ -92,6 +92,7 @@ export const SidePanel = React.memo(({
   const [tasks, setTasks] = useState<TaskSummary[]>([]);
   const [vaultTab, setVaultTab] = useState<'memory' | 'tasks'>('memory');
   const [newFact, setNewFact] = useState('');
+  const [newCategory, setNewCategory] = useState<'preference' | 'fact' | 'instruction'>('preference');
   const [initError, setInitError] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
@@ -659,22 +660,45 @@ export const SidePanel = React.memo(({
                     <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                       <Brain className="w-4 h-4 text-accent" /> AI Memory Vault
                     </h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">What the AI has learned and done</p>
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Persistent user preferences and task history</p>
                   </div>
+                  {((vaultTab === 'memory' && memories.length > 0) || (vaultTab === 'tasks' && tasks.length > 0)) && (
+                    <button
+                      onClick={() => {
+                        if (vaultTab === 'memory') {
+                          aiMemory.clearAllMemories();
+                          setMemories([]);
+                        } else {
+                          aiMemory.clearAllTasks();
+                          setTasks([]);
+                        }
+                      }}
+                      className="text-[10px] px-2 py-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors font-medium flex items-center gap-1"
+                      title={vaultTab === 'memory' ? "Clear all memories" : "Clear all tasks"}
+                    >
+                      <Trash2 className="w-3 h-3" /> Clear All
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg mb-4">
                   <button
-                    onClick={() => setVaultTab('memory')}
+                    onClick={() => {
+                      setVaultTab('memory');
+                      setMemories(aiMemory.getMemories());
+                    }}
                     className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'memory' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
-                    Persistent Info
+                    Persistent Info ({memories.length})
                   </button>
                   <button
-                    onClick={() => setVaultTab('tasks')}
+                    onClick={() => {
+                      setVaultTab('tasks');
+                      setTasks(aiMemory.getTaskHistory());
+                    }}
                     className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                   >
-                    Task History
+                    Task History ({tasks.length})
                   </button>
                 </div>
 
@@ -684,76 +708,119 @@ export const SidePanel = React.memo(({
                       onSubmit={(e) => {
                         e.preventDefault();
                         if (!newFact.trim()) return;
-                        aiMemory.addMemory(newFact.trim());
+                        aiMemory.addMemory(newFact.trim(), newCategory, false);
                         setMemories(aiMemory.getMemories());
                         setNewFact('');
                       }}
-                      className="flex gap-2 mb-4"
-              >
-                <input
-                  type="text"
-                  value={newFact}
-                  onChange={(e) => setNewFact(e.target.value)}
-                  placeholder="Add memory info (e.g. 'Keep answers short')"
-                  className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-xs font-medium transition-all"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </form>
-
-              {/* Memory List */}
-              <div className="flex-1 space-y-2 overflow-y-auto">
-                {memories.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-slate-400">
-                    No saved memories yet. The AI will automatically learn as you converse.
-                  </div>
-                ) : (
-                  memories.map((m) => (
-                    <div 
-                      key={m.id}
-                      className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex items-start justify-between gap-2 shadow-2xs group"
+                      className="flex flex-col gap-2 mb-4"
                     >
-                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
-                        {m.fact}
-                      </p>
-                      <button
-                        onClick={() => {
-                          aiMemory.deleteMemory(m.id);
-                          setMemories(aiMemory.getMemories());
-                        }}
-                        className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        title="Delete this memory"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newFact}
+                          onChange={(e) => setNewFact(e.target.value)}
+                          placeholder="Add memory info (e.g. 'Keep answers short')"
+                          className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent"
+                        />
+                        <button
+                          type="submit"
+                          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-xs font-medium transition-all flex items-center justify-center"
+                          title="Save memory"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400">Category:</span>
+                        {(['preference', 'fact', 'instruction'] as const).map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            onClick={() => setNewCategory(cat)}
+                            className={`text-[10px] capitalize px-2 py-0.5 rounded-md transition-colors ${
+                              newCategory === cat
+                                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
+                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                            }`}
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
+                    </form>
+
+                    {/* Memory List */}
+                    <div className="flex-1 space-y-2 overflow-y-auto">
+                      {memories.length === 0 ? (
+                        <div className="text-center py-8 text-xs text-slate-400">
+                          No saved memories yet. The AI will automatically learn as you converse.
+                        </div>
+                      ) : (
+                        memories.map((m) => (
+                          <div 
+                            key={m.id}
+                            className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex items-start justify-between gap-2 shadow-2xs group"
+                          >
+                            <div className="flex flex-col gap-1 flex-1">
+                              <span className={`self-start text-[9px] uppercase px-1.5 py-0.5 rounded-md font-semibold tracking-wider ${
+                                m.category === 'preference'
+                                  ? 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800'
+                                  : m.category === 'instruction'
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
+                                  : 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800'
+                              }`}>
+                                {m.category}
+                              </span>
+                              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                {m.fact}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                aiMemory.deleteMemory(m.id);
+                                setMemories(aiMemory.getMemories());
+                              }}
+                              className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Delete this memory"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  ))
-                )}
-              </div>
-            </>
-          ) : (
+                  </>
+                ) : (
                   <div className="flex-1 space-y-2 overflow-y-auto">
                     {tasks.length === 0 ? (
                       <div className="text-center py-8 text-xs text-slate-400">
-                        No completed task history yet.
+                        No completed task history yet. As the AI browses and executes actions, tasks will appear here.
                       </div>
                     ) : (
                       tasks.map((t) => (
                         <div 
                           key={t.id}
-                          className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs group flex flex-col gap-1"
+                          className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs group flex items-start justify-between gap-2"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-slate-400 font-medium">Task Summary</span>
-                            <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString('en-US')}</span>
+                          <div className="flex flex-col gap-1 flex-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[10px] text-slate-400 font-medium">Task Record</span>
+                              <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </div>
+                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                              {t.summary}
+                            </p>
                           </div>
-                          <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed flex-1">
-                            {t.summary}
-                          </p>
+                          <button
+                            onClick={() => {
+                              aiMemory.deleteTask(t.id);
+                              setTasks(aiMemory.getTaskHistory());
+                            }}
+                            className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity self-center"
+                            title="Delete task record"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       ))
                     )}

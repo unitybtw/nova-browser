@@ -43,4 +43,18 @@ const context = aiMemory.getFormattedMemoryPrompt();
 assert.equal(typeof context, 'string');
 assert.equal(context.includes('User prefers dark theme'), true);
 
-console.log('[PASS] [AI Memory Security] Session isolation, prompt injection prevention, and persistence rules verified.');
+// 5. Automatic User Fact Extraction
+const extracted = aiMemory.extractAndSaveUserFacts('Benim adım Sirac ve her zaman Türkçe cevap ver');
+assert.equal(Boolean(extracted), true);
+assert.equal(aiMemory.getMemories().some(m => m.fact.includes('Sirac')), true);
+
+// 6. Task Deletion & Clear
+const currentTaskCount = aiMemory.getTaskHistory().length;
+aiMemory.deleteTask(task.id);
+assert.equal(aiMemory.getTaskHistory().length, currentTaskCount - 1);
+
+aiMemory.addTaskSummary('Sample task');
+aiMemory.clearAllTasks();
+assert.equal(aiMemory.getTaskHistory().length, 0);
+
+console.log('[PASS] [AI Memory Security] Session isolation, task history lifecycle, and persistent auto-learning verified.');

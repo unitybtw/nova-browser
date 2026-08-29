@@ -1937,6 +1937,9 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       // ---------------------------------------------------------------
       const lastUserMsg = [...augmentedMessages].reverse().find(m => m.role === 'user');
       const userQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+      if (userQuery) {
+        aiMemory.extractAndSaveUserFacts(userQuery);
+      }
       const directIntent = hasAttachments ? null : detectDirectIntent(userQuery);
 
       if (directIntent) {
@@ -2057,6 +2060,12 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         if (onChunk) {
           onChunk(friendlyResponse);
+        }
+
+        // Record completed task summary in persistent task history
+        if (funcName !== 'direct_chat' && !friendlyResponse.startsWith('Islem basarisiz')) {
+          const taskSummary = userQuery.length > 60 ? userQuery.substring(0, 60) + '...' : userQuery;
+          aiMemory.addTaskSummary(taskSummary);
         }
 
         // Return ONLY clean user messages + single clean assistant response
@@ -2231,6 +2240,12 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           onChunk((i === 0 ? '' : ' ') + words[i]);
           await new Promise(r => setTimeout(r, 12));
         }
+      }
+
+      // Record task summary in persistent task history
+      if (userQuery && userQuery.trim() && finalAnswer && !finalAnswer.includes('error occurred') && !finalAnswer.includes('Islem durduruldu')) {
+        const taskSummary = userQuery.length > 60 ? userQuery.substring(0, 60) + '...' : userQuery;
+        aiMemory.addTaskSummary(taskSummary);
       }
 
       // Return ONLY the original messages + single clean assistant response

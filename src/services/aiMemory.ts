@@ -147,6 +147,16 @@ class AIMemoryService {
     return task;
   }
 
+  public deleteTask(id: string): void {
+    this.taskHistory = this.taskHistory.filter(t => t.id !== id);
+    this.saveTaskHistory();
+  }
+
+  public clearAllTasks(): void {
+    this.taskHistory = [];
+    this.saveTaskHistory();
+  }
+
   public deleteMemory(id: string): void {
     this.memories = this.memories.filter(m => m.id !== id);
     this.saveMemories();
@@ -157,15 +167,49 @@ class AIMemoryService {
     this.saveMemories();
   }
 
+  /**
+   * Auto-extracts durable user facts, names, and preferences from conversational turns.
+   */
+  public extractAndSaveUserFacts(userQuery: string): MemoryItem | null {
+    if (!userQuery || typeof userQuery !== 'string') return null;
+    const text = userQuery.trim();
+
+    // 1. Name declarations
+    const nameMatch = text.match(/(?:benim\s+adım|adım|ismim|my\s+name\s+is|call\s+me)\s+([A-Za-zÇçĞğİıÖöŞşÜü]{2,25})/i);
+    if (nameMatch && nameMatch[1]) {
+      const name = nameMatch[1].trim();
+      const forbidden = ['bir', 'bu', 've', 'ile', 'the', 'a', 'an', 'what', 'who'];
+      if (!forbidden.includes(name.toLowerCase())) {
+        return this.addMemory(`User's name is ${name}`, 'fact', false);
+      }
+    }
+
+    // 2. Preferences (e.g. "I prefer dark mode", "Yanıtları kısa tut", "Her zaman Türkçe yanıt ver")
+    if (/(?:yanıtları\s+kısa\s+tut|kısa\s+cevap\s+ver|keep\s+(?:answers|responses)\s+short)/i.test(text)) {
+      return this.addMemory('Keep answers concise and short', 'preference', false);
+    }
+    if (/(?:her\s+zaman\s+türkçe|türkçe\s+cevap\s+ver|always\s+reply\s+in\s+turkish)/i.test(text)) {
+      return this.addMemory('Always reply in Turkish', 'preference', false);
+    }
+    if (/(?:always\s+reply\s+in\s+english|ingilizce\s+cevap\s+ver)/i.test(text)) {
+      return this.addMemory('Always reply in English', 'preference', false);
+    }
+    if (/(?:karanlık\s+tema\s+tercih|koyu\s+tema\s+tercih|i\s+prefer\s+dark\s+theme|prefer\s+dark\s+mode)/i.test(text)) {
+      return this.addMemory('User prefers dark theme', 'preference', false);
+    }
+
+    return null;
+  }
+
   public getFormattedMemoryPrompt(): string {
     let prompt = '';
     if (this.memories.length > 0) {
-      const factsList = this.memories.map(m => `- ${m.fact}`).join('\n');
+      const factsList = this.memories.map(m => `- [${m.category.toUpperCase()}] ${m.fact}`).join('\n');
       prompt += `\n\n[USER MEMORY VAULT]\nHere are things you remember about the user from past interactions:\n${factsList}\nUse these to personalize your responses and behavior automatically.\n`;
     }
     
     if (this.taskHistory.length > 0) {
-      const recentTasks = this.taskHistory.slice(0, 3).map(t => `- ${t.summary}`).join('\n');
+      const recentTasks = this.taskHistory.slice(0, 4).map(t => `- ${t.summary}`).join('\n');
       prompt += `\n\n[RECENT TASKS]\nYou recently completed these tasks. Do not repeat them unless asked:\n${recentTasks}\n`;
     }
     
