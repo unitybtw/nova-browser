@@ -13,19 +13,6 @@ const Downloads = lazy(() => import('./components/Downloads'));
 const Faq = lazy(() => import('./components/Faq'));
 const DEFERRED_SECTION_IDS = new Set(['community', 'benchmarks', 'download', 'faq']);
 
-function DeferredContentReady() {
-  useEffect(() => {
-    const hashTarget = window.location.hash.slice(1);
-    if (!DEFERRED_SECTION_IDS.has(hashTarget)) return;
-
-    requestAnimationFrame(() => {
-      document.getElementById(hashTarget)?.scrollIntoView({ block: 'start' });
-    });
-  }, []);
-
-  return null;
-}
-
 function DeferredContent() {
   return (
     <Suspense
@@ -102,11 +89,15 @@ export default function App() {
       history.scrollRestoration = 'manual';
     }
 
-    // Always ensure page opens at the very top (Manifesto)
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
-    if (window.location.hash && window.location.hash !== '#top') {
-      window.history.replaceState(null, '', window.location.pathname);
-    }
+    const resetTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
+      if (window.location.hash && window.location.hash !== '#top') {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
+    };
+
+    resetTop();
+    window.addEventListener('pageshow', resetTop);
 
     const handleScroll = () => {
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
@@ -115,7 +106,10 @@ export default function App() {
 
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('pageshow', resetTop);
+      window.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
   return (
@@ -143,7 +137,7 @@ export default function App() {
       <ManifestoHero />
 
       {/* Main Website Flow */}
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content">
         <Hero />
         <TrustPillars />
         <FeatureBento />
