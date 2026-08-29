@@ -212,69 +212,119 @@ npm run build
 
 ## Architecture
 
-Nova Browser employs a secure multi-process Electron architecture with strict context isolation, a React-based renderer, and a dedicated AI integration layer via the Model Context Protocol (MCP).
+Nova Browser employs a multi-process Electron architecture with context isolation, a React-based renderer with WebGPU neural execution, and a dedicated AI integration layer via the Model Context Protocol (MCP).
 
 ```mermaid
 graph TD
     subgraph Electron["Electron (Main Process)"]
-        main[main.ts<br/>App Lifecycle & IPC]
-        mcp[BrowserMCPServer<br/>Local Port: 3020]
-        adblock[AdBlocker Engine]
-        downloads[Downloads Manager]
-        tts[Native OS TTS Engine]
+        main["main.ts<br/>App Lifecycle & IPC Dispatcher"]
+        mcp["BrowserMCPServer (Port 3020)<br/>& mcpBridge.ts"]
+        adblock["AdBlocker & Privacy Shield<br/>Rust Filter + O(1) Blocklist Engine"]
+        security["Security Engine<br/>SSRF / Private IP & Phishing Defense"]
+        crx["crxInstaller.ts<br/>Chrome Web Store & Zip-Slip Protection"]
+        downloads["downloads.ts<br/>Background Downloads Manager"]
+        keychain["safeStorage Engine<br/>OS Keychain Encrypted Store"]
+        tts["Native OS TTS Engine<br/>macOS `say` & Windows SAPI"]
     end
 
-    subgraph Preload["Context Bridge (Preload)"]
-        api[window.electronAPI]
-        webstore[webstore-preload.ts]
+    subgraph Preload["Context Bridge (Preload Security)"]
+        api["preload.ts (window.electronAPI)<br/>Validated IPC with isTrustedSender"]
+        webstore["webstore-preload.ts<br/>1-Click Chrome Web Store Bridge"]
     end
 
-    subgraph Renderer["React (Renderer Process)"]
-        app[App.tsx<br/>Tab & State Management]
-        sync[syncService.ts<br/>AES-256 E2EE Engine]
+    subgraph Renderer["React 18 + TypeScript (Renderer Process)"]
+        app["App.tsx<br/>Tab & State Management"]
         
-        subgraph InternalPages["nova:// Pages"]
-            settings[SettingsPage.tsx]
-            history[HistoryPage.tsx]
-            newtab[NewTabPage.tsx]
-            reader[ReaderMode.tsx]
+        subgraph AISubsystem["AI & Neural Subsystem"]
+            agent["aiAgent.ts<br/>ReAct Engine & Natural Language Intent"]
+            memory["aiMemory.ts<br/>Persistent Info Vault & Task History"]
+            preview["AILinkPreview.tsx<br/>Hover Preview with LRU Cache"]
+            worker["workers/aiWorker.ts<br/>WebLLM / WebGPU Isolated Neural Runtime"]
+            translate["translationService.ts<br/>18-Language Offline DOM Translator"]
+            sidepanel["SidePanel.tsx<br/>AI Assistant & Memory Vault UI"]
+        end
+
+        subgraph CoreWorkspaces["Workspaces & Vertical Tabs"]
+            vtabs["verticalTabs.ts<br/>Folder Groups & Tab Hibernation Engine"]
+            thumb["thumbnailCache.ts<br/>Viewport Snapshots"]
+            sync["syncService.ts<br/>AES-256-GCM E2EE Cloud Sync Engine"]
+        end
+
+        subgraph InternalPages["nova:// Internal Pages"]
+            settings["SettingsPage.tsx (nova://settings)"]
+            history["HistoryPage.tsx (nova://history)"]
+            newtab["NewTabPage.tsx (nova://newtab)"]
+            reader["ReaderMode.tsx (nova://reader)"]
+            downloadsPage["DownloadsPage.tsx (nova://downloads)"]
+            extModal["ExtensionsModal.tsx (nova://extensions)"]
         end
         
-        webview["&lt;webview&gt;<br/>External Webpages"]
-        ai[SidePanel.tsx / Web-LLM]
+        webview["&lt;webview&gt;<br/>External Webpages (Sandboxed)"]
     end
 
     subgraph Cloud["Cloud Infrastructure"]
-        supabase[(Supabase Realtime Vault)]
+        supabase[("Supabase Realtime Vault<br/>Zero-Knowledge Encrypted Blobs")]
     end
 
-    subgraph External["AI Assistants"]
-        claude[Claude Desktop / Cursor / Antigravity]
+    subgraph External["External AI Agents (MCP Clients)"]
+        claude["Claude Desktop / Cursor / Antigravity / Custom Agents"]
     end
 
-    main <-->|IPC Comm| api
+    main <-->|Secure IPC| api
     api <-->|Method Calls| app
-    app --> settings
-    app --> history
-    app --> newtab
-    app --> reader
+    app --> InternalPages
     app --> webview
-    app --> ai
-    app <--> sync
-    sync <-->|Realtime WebSocket| supabase
+    app --> AISubsystem
+    app --> CoreWorkspaces
+    
+    agent <-->|Off-thread Inference| worker
+    agent <-->|Read & Write| memory
+    agent --> preview
+    agent --> translate
+    
+    sync <-->|Realtime WebSocket (Encrypted)| supabase
+    
     main --> adblock
+    main --> security
+    main --> crx
     main --> downloads
+    main --> keychain
     main --> tts
     
-    claude <-->|JSON-RPC / SSE| mcp
-    mcp <-->|DOM Manipulation<br/>click, type, screenshot| webview
+    claude <-->|JSON-RPC over SSE / Stdio| mcp
+    mcp <-->|DOM Manipulation & Screenshots| webview
     
     style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
     style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
     style Renderer fill:#0f172a,stroke:#61DAFB,stroke-width:2px,color:#fff
+    style AISubsystem fill:#1e1b4b,stroke:#818cf8,stroke-width:1.5px,color:#fff
+    style CoreWorkspaces fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style InternalPages fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#fff
     style Cloud fill:#042f2e,stroke:#059669,stroke-width:2px,color:#fff
     style External fill:#172554,stroke:#3b82f6,stroke-width:2px,color:#fff
 ```
+
+### Architectural Subsystem Breakdown
+
+1. **Main Process Security Shell (`electron/main.ts`)**:
+   - **Process Sandboxing**: Sandboxed webviews with `contextIsolation: true`, `nodeIntegration: false`, and strict `isTrustedSender` senderFrame verification on every IPC channel.
+   - **Privacy Shield & AdBlock**: Kernel-level network interception via `@cliqz/adblocker-electron` and $O(1)$ Hash Set phishing blocklists with automatic SSRF/Private IP filtering.
+   - **Chrome Web Store Engine (`crxInstaller.ts`)**: Direct CRX package retrieval, zip-slip path traversal neutralization, and permission review gate before installation.
+   - **Native Hardware & OS Integration**: macOS Metal / Windows GPU flags, native OS Text-to-Speech synthesis, and `safeStorage` OS keychain password encryption.
+
+2. **Decoupled AI & Neural Runtime (`src/services/aiAgent.ts`, `src/workers/aiWorker.ts`)**:
+   - **WebGPU Neural Execution**: Runs local LLMs (Llama 3.2, Qwen 2.5, Phi 3.5 Vision, DeepSeek R1) inside an isolated Web Worker (`aiWorker.ts`), completely decoupled from the main UI bundle (0 KB initial startup load).
+   - **Natural Language Intent Engine**: Instant natural language parsing for direct browser navigation, history searching, tab management, and 3-bullet page summaries without burning LLM generation tokens.
+   - **Autonomous ReAct Agent & MCP Server**: Local Model Context Protocol server (Port 3020) enabling external AI clients (Claude Desktop, Cursor, Antigravity) to navigate, query, click, and inspect live DOM trees.
+   - **Memory Vault (`aiMemory.ts`)**: Persistent preference extraction, category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`), and automatic chronological task history tracking with storage quota recovery.
+
+3. **Client-Side E2EE Sync Engine (`src/services/syncService.ts`)**:
+   - **Zero-Knowledge Cryptography**: All passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (100,000 iterations) and 256-bit AES-GCM before transmission.
+   - **1-Click Device Pairing**: Human-readable pairing codes (`nova-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without accounts or central servers.
+
+4. **Performance & Tab Virtualization (`src/utils/verticalTabs.ts`, `src/components/BrowserView.tsx`)**:
+   - **Tab Hibernation Engine**: Dormant background tabs (>10 min idle) automatically unmount their active webview rendering pipelines while preserving navigation state, keeping 50+ tabs under 600 MB RAM.
+   - **Dual-View Split Screen**: Synchronized parallel browsing with drag-to-resize divider and independent scrolling contexts.
 
 ---
 
