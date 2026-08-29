@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import IntroSplash from './components/IntroSplash';
+import ManifestoHero from './components/ManifestoHero';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
@@ -99,9 +99,21 @@ function DeferredSections() {
 }
 
 export default function App() {
+  const [showNavbar, setShowNavbar] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const isPastManifesto = window.scrollY > 240;
+      setShowNavbar(isPastManifesto);
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
-      <IntroSplash />
       <ScrollProgress />
       <a
         href="#main-content"
@@ -109,7 +121,22 @@ export default function App() {
       >
         Skip to content
       </a>
-      <Navbar />
+
+      {/* Floating Animated Navbar - Hidden on Manifesto, Slides down on scroll */}
+      <div
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          showNavbar
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : '-translate-y-full opacity-0 pointer-events-none'
+        }`}
+      >
+        <Navbar />
+      </div>
+
+      {/* 00 Fullscreen Kinetic Manifesto Hero Opening */}
+      <ManifestoHero />
+
+      {/* Main Website Flow */}
       <main id="main-content" tabIndex={-1}>
         <Hero />
         <TrustPillars />
