@@ -50,7 +50,8 @@ export default function App() {
     window.addEventListener('pageshow', onPageShow);
     window.addEventListener('load', onPageShow);
 
-    const handleScroll = () => {
+    let scrollTicking = false;
+    const updateScrollState = () => {
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
       setShowNavbar(isPastManifesto);
       if (isPastManifesto) {
@@ -58,9 +59,17 @@ export default function App() {
       } else {
         document.documentElement.classList.add('in-manifesto');
       }
+      scrollTicking = false;
     };
 
-    handleScroll();
+    const handleScroll = () => {
+      if (!scrollTicking) {
+        scrollTicking = true;
+        requestAnimationFrame(updateScrollState);
+      }
+    };
+
+    updateScrollState();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       cancelAnimationFrame(rafId1);

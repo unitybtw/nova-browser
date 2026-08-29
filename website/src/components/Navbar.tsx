@@ -43,18 +43,21 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
   const mobileMenuId = "nova-mobile-menu";
   const mobileMenuButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  // ScrollSpy to automatically update active section on scroll
+  // ScrollSpy to automatically update active section on scroll (120 FPS rAF throttled)
   useEffect(() => {
     const sectionIds = ["features", "community", "benchmarks", "download", "faq"];
-    const handleScroll = () => {
+    let ticking = false;
+
+    const updateActiveSection = () => {
       const scrollY = window.scrollY;
 
       if (scrollY < 240) {
         setActiveHref("#top");
+        ticking = false;
         return;
       }
 
-      const scrollPos = window.scrollY + 200;
+      const scrollPos = scrollY + 200;
       for (const id of sectionIds) {
         const el = document.getElementById(id);
         if (el) {
@@ -66,9 +69,17 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           }
         }
       }
+      ticking = false;
     };
 
-    handleScroll();
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(updateActiveSection);
+      }
+    };
+
+    updateActiveSection();
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
