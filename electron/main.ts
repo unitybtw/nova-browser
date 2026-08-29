@@ -132,7 +132,18 @@ function isTrustedAppOrigin(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return false;
   try {
     const parsed = new URL(urlStr);
-    if (parsed.protocol === 'nova:' || parsed.protocol === 'devtools:') return true;
+    // Internal tab URLs are rendered by the trusted React shell, not loaded by
+    // the privileged main window. Never treat arbitrary nova:/devtools: URLs as
+    // an app origin; doing so would let a crafted URL inherit app privileges.
+    if (parsed.protocol === 'nova:') {
+      const allowedHost = ['newtab', 'settings', 'history', 'downloads'].includes(parsed.hostname);
+      const allowedSettingsHash = parsed.hostname === 'settings' &&
+        (!parsed.hash || ['#extensions', '#mcp'].includes(parsed.hash));
+      return allowedHost && !parsed.pathname && !parsed.search &&
+        !parsed.username && !parsed.password &&
+        (parsed.hostname !== 'settings' ? !parsed.hash : allowedSettingsHash);
+    }
+    if (parsed.protocol === 'devtools:') return false;
     // 🔒 Security: The Vite dev server is only trusted in unpackaged dev builds.
     if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
@@ -885,9 +896,11 @@ app.whenReady().then(async () => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
       
-      // Auto-allow internal app pages
+      // Internal app pages must never receive browser permissions. They do not
+      // need camera, location, clipboard, or other website capabilities, and
+      // auto-allowing here would turn a renderer compromise into a silent grant.
       if (isTrustedAppOrigin(url)) {
-        return callback(true);
+        return callback(false);
       }
 
       let origin = '';
@@ -964,11 +977,12 @@ app.whenReady().then(async () => {
     });
 
     targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-      // If it's a silent check from the browser itself, allow it
+      // Internal pages are not permission principals. Keep all app-origin
+      // permission checks denied unless a future capability explicitly needs it.
       if (isTrustedAppOrigin(requestingOrigin)) {
-        return true; 
+        return false;
       }
-      
+
       // For external websites, check if permission was previously remembered
       if (requestingOrigin && rememberedPermissions.has(requestingOrigin)) {
         const originPerms = rememberedPermissions.get(requestingOrigin)!;
@@ -1241,6 +1255,40 @@ app.on('web-contents-created', (_event, contents) => {
           });
         }
       } catch {}
+    });
+
+    // Redirects do not reliably pass through the renderer's navigation
+    // listeners. Apply the same protocol, credential, phishing, and HTTPS
+    // downgrade policy at the main-process boundary as well.
+    contents.on('will-redirect', (e, redirectUrl) => {
+      let parsed: URL;
+      try {
+        parsed = new URL(redirectUrl);
+      } catch {
+        e.preventDefault();
+        return;
+      }
+
+      if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password) {
+        e.preventDefault();
+        console.warn('Blocked redirect to forbidden protocol or credential-bearing URL:', redirectUrl);
+        return;
+      }
+      if (isPhishing(redirectUrl)) {
+        e.preventDefault();
+        sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
+        return;
+      }
+
+      if (parsed.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+        if (upgradedUrls.has(redirectUrl)) return;
+        e.preventDefault();
+        addUpgradedUrl(redirectUrl);
+        const httpsUrl = redirectUrl.replace(/^http:/i, 'https:');
+        contents.loadURL(httpsUrl).catch((err: any) => {
+          console.warn('HTTPS redirect upgrade failed; refusing HTTP:', redirectUrl, err?.message || err);
+        });
+      }
     });
   }
 });
@@ -2480,6 +2528,38 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   const manifestPath = path.join(resolvedFolder, 'manifest.json');
   if (!fs.existsSync(manifestPath)) {
     return { error: 'No manifest.json found in the selected folder.' };
+  }
+
+  let manifest: any;
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  } catch {
+    return { error: 'Extension manifest.json is invalid.' };
+  }
+
+  const asStringArray = (value: unknown): string[] => (
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 512) : []
+  );
+  const extensionPermissions = [
+    ...asStringArray(manifest.permissions),
+    ...asStringArray(manifest.optional_permissions),
+    ...asStringArray(manifest.host_permissions)
+  ];
+  const formattedPermissions = formatPermissionsForDisplay(extensionPermissions);
+  const { response } = await dialog.showMessageBox(win, {
+    type: 'question',
+    buttons: ['Cancel', 'Install'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Review Extension Permissions',
+    message: `Extension "${String(manifest.name || 'Unpacked extension').slice(0, 120)}" requests the following permissions:`,
+    detail: formattedPermissions.length > 0
+      ? formattedPermissions.join('\\n\\n')
+      : 'This extension does not declare browser permissions.',
+    noLink: true
+  });
+  if (response !== 1) {
+    return { error: 'Extension installation cancelled by user.' };
   }
 
   try {

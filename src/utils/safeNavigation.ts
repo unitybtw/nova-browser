@@ -1,70 +1,79 @@
 /**
- * Shared URL validation for every navigation entry point (handleNavigate,
- * handleNewTab, handleNewIncognitoTab, AI/MCP-driven navigation).
+ * Shared URL validation for every navigation entry point.
  *
- * Security: blocks dangerous schemes and payloads before they reach a
- * webview. All entry points MUST route through this single helper so the
- * blocklist can't be bypassed by calling a less-defended handler.
+ * Navigation is intentionally strict: only HTTP(S) URLs and the browser's
+ * exact internal pages are accepted. Callers that accept user text must run it
+ * through the search formatter before calling this helper.
  */
 export function isSafeNavigationUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
 
-  // Helper to sanitize C0 control characters (0x00-0x1F, 0x7F) and whitespace
-  const sanitize = (str: string) => str.trim().replace(/[\x00-\x1f\x7f]/g, '').toLowerCase();
+  // Do not normalize control characters into a different URL. A URL containing
+  // them must be rejected rather than having its security-relevant prefix
+  // silently changed.
+  if (/[^\x20-\x7e\u00a0-\uffff]/.test(url)) return false;
 
-  const rawNormalized = sanitize(url);
+  const candidate = url.trim();
+  if (!candidate || candidate !== url) return false;
 
-  // Attempt URL decoding iteratively to prevent percent-encoded evasion (e.g. %6a%61%76%61%73%63%72%69%70%74%3a)
-  let decoded = url;
+  // Decode only for scheme inspection so encoded dangerous schemes cannot
+  // bypass the checks below. Malformed encoding is not a valid navigation URL.
+  let decoded = candidate;
   try {
-    let prev = '';
-    let iterations = 0;
-    while (decoded !== prev && iterations < 3) {
-      prev = decoded;
-      decoded = decodeURIComponent(decoded);
-      iterations++;
+    for (let i = 0; i < 3; i++) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
     }
-  } catch (_) {
-    // Malformed percent encoding - proceed with best-effort decoded string
+  } catch {
+    return false;
   }
 
-  const decodedNormalized = sanitize(decoded);
-
-  // Navigation is intentionally stricter than image rendering. Data URLs are
-  // never navigable here, including raster images; callers that render an
-  // image (for example a favicon) must use their own image-only validator.
+  const normalized = decoded.toLowerCase();
   const blockedSchemes = [
-    'javascript:',
-    'data:',
-    'vbscript:',
-    'file:',
-    'blob:',
-    'view-source:',
-    'chrome:',
-    'edge:'
+    'javascript:', 'data:', 'vbscript:', 'file:', 'blob:',
+    'view-source:', 'chrome:', 'edge:', 'devtools:'
   ];
+  if (blockedSchemes.some(scheme => normalized.startsWith(scheme))) return false;
 
-  for (const scheme of blockedSchemes) {
-    if (rawNormalized.startsWith(scheme) || decodedNormalized.startsWith(scheme)) {
+  const protocolMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/);
+  if (!protocolMatch) return false;
+
+  const protocol = `${protocolMatch[1]}:`;
+  if (protocol === 'http:' || protocol === 'https:') {
+    try {
+      const parsed = new URL(candidate);
+      return Boolean(parsed.hostname) && !parsed.username && !parsed.password;
+    } catch {
       return false;
     }
   }
 
-  // Only the browser's known internal pages and network URLs are navigable.
-  // Unknown about: pages must not become a protocol bypass (for example
-  // about:config or about:srcdoc).
-  const protocolMatch = decodedNormalized.match(/^([a-z][a-z0-9+.-]*):/i);
-  if (!protocolMatch) return true;
-
-  const protocol = `${protocolMatch[1].toLowerCase()}:`;
-  if (protocol === 'http:' || protocol === 'https:') return true;
   if (protocol === 'nova:') {
-    return ['nova://newtab', 'nova://settings', 'nova://history', 'nova://downloads']
-      .some(page => decodedNormalized === page);
+    try {
+      const parsed = new URL(candidate);
+      if (!['newtab', 'settings', 'history', 'downloads'].includes(parsed.hostname) ||
+          parsed.pathname || parsed.search || parsed.username || parsed.password) {
+        return false;
+      }
+      // Settings uses fragments for its internal sections (for example
+      // #extensions and #mcp). Fragments never leave the trusted app shell.
+      return parsed.hostname !== 'settings' ? !parsed.hash : (
+        !parsed.hash || ['#extensions', '#mcp'].includes(parsed.hash)
+      );
+    } catch {
+      return false;
+    }
   }
+
   if (protocol === 'about:') {
-    return ['about:blank', 'about:settings', 'about:history', 'about:downloads', 'about:newtab']
-      .some(page => decodedNormalized === page);
+    return [
+      'about:blank',
+      'about:settings',
+      'about:history',
+      'about:downloads',
+      'about:newtab'
+    ].includes(normalized);
   }
 
   return false;

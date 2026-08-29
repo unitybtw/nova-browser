@@ -31,10 +31,14 @@ export async function parseExtensionPermissions(extractPath: string): Promise<Ex
     const manifestContent = fs.readFileSync(manifestPath, 'utf-8');
     const manifest = JSON.parse(manifestContent);
     
+    const asStringArray = (value: unknown): string[] => (
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length <= 512) : []
+    );
+
     return {
-      permissions: manifest.permissions || [],
-      optionalPermissions: manifest.optional_permissions || [],
-      hostPermissions: manifest.host_permissions || []
+      permissions: asStringArray(manifest.permissions),
+      optionalPermissions: asStringArray(manifest.optional_permissions),
+      hostPermissions: asStringArray(manifest.host_permissions)
     };
   } catch (err) {
     console.error('Failed to parse extension manifest:', err);
@@ -248,7 +252,13 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
   // 🔒 Security: Allow only trusted main window OR Chrome Web Store origin
   const senderUrl = event.sender?.getURL() || '';
   const isFromMainWindow = isTrustedSender(event);
-  const isFromWebstore = senderUrl.startsWith('https://chromewebstore.google.com/') || senderUrl.startsWith('https://chrome.google.com/webstore/');
+  let isFromWebstore = false;
+  try {
+    const sender = new URL(senderUrl);
+    isFromWebstore = sender.protocol === 'https:' &&
+      ((sender.hostname === 'chromewebstore.google.com') ||
+       (sender.hostname === 'chrome.google.com' && sender.pathname.startsWith('/webstore/')));
+  } catch (_) {}
   if (!isFromMainWindow && !isFromWebstore) {
     return { error: 'Unauthorized: install-from-webstore can only be called from Chrome Web Store or Nova main window.' };
   }

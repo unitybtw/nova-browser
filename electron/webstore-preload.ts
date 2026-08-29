@@ -92,9 +92,15 @@ if ((window as any).__novaPreloadInjected) {
   window.addEventListener('message', (event) => {
     const host = window.location.hostname.toLowerCase();
     if (host !== 'chromewebstore.google.com' && host !== 'chrome.google.com') return;
-    if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
+    if (event.source !== window ||
+        (event.origin !== 'https://chromewebstore.google.com' && event.origin !== 'https://chrome.google.com') ||
+        !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
     
     const extensionId = event.data.extensionId;
+    if (typeof extensionId !== 'string' || !/^[a-p]{32}$/.test(extensionId)) {
+      showNovaToast('Invalid extension identifier.', 'error');
+      return;
+    }
     const loadingToast = showNovaToast("Installing to Nova Browser...", 'info');
       
     ipcRenderer.invoke('install-from-webstore', extensionId)
