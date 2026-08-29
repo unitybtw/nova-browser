@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
   HardDrive,
@@ -188,6 +188,58 @@ const MATRIX_FEATURES = [
     isNovaLeader: true,
   },
 ];
+
+// 120 FPS High-Performance Smooth Number Counter
+const AnimatedCounter: React.FC<{
+  value: number;
+  decimals?: number;
+  prefix?: string;
+  suffix?: string;
+  className?: string;
+}> = ({ value, decimals = 0, prefix = '', suffix = '', className = '' }) => {
+  const [displayValue, setDisplayValue] = useState(value);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (prefersReducedMotion) {
+      setDisplayValue(value);
+      return;
+    }
+
+    let start = displayValue;
+    const end = value;
+    if (Math.abs(start - end) < 0.01) return;
+
+    const startTime = performance.now();
+    const duration = 220; // ms
+
+    let rafId: number;
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = start + (end - start) * ease;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        setDisplayValue(end);
+      }
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [value, prefersReducedMotion]);
+
+  const formatted = decimals > 0 ? displayValue.toFixed(decimals) : Math.round(displayValue).toString();
+
+  return (
+    <span className={className}>
+      {prefix}{formatted}{suffix}
+    </span>
+  );
+};
 
 export const Benchmarks: React.FC = () => {
   const [viewMode, setViewMode] = useState<'benchmarks' | 'matrix'>('benchmarks');
@@ -537,11 +589,11 @@ export const Benchmarks: React.FC = () => {
 
                 {/* Custom Interactive Slider Component */}
                 <div className="pt-2">
-                  <div className="flex justify-between font-mono text-xs font-bold text-neutral-800 mb-2.5">
+                  <div className="flex justify-between font-mono text-xs font-bold text-neutral-800 mb-6">
                     <span className="flex items-center gap-2">
                       <span>Active Tab Load:</span>
-                      <span className="text-[#4338ca] bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-md font-bold">
-                        {tabCount} Tabs
+                      <span className="text-[#4338ca] bg-indigo-50 border border-indigo-200/60 px-2.5 py-0.5 rounded-md font-bold inline-flex items-center">
+                        <AnimatedCounter value={tabCount} suffix=" Tabs" />
                       </span>
                     </span>
                     <span className="text-[#4338ca] font-medium">
@@ -549,7 +601,19 @@ export const Benchmarks: React.FC = () => {
                     </span>
                   </div>
 
-                  <div className="relative flex items-center">
+                  {/* Relative Slider Container with Floating Kinetic Tooltip */}
+                  <div className="relative flex items-center pt-2 pb-1">
+                    {/* Floating Tooltip following slider position */}
+                    <div
+                      className="absolute -top-7 -translate-x-1/2 pointer-events-none transition-all duration-75 ease-out z-10"
+                      style={{ left: `${((tabCount - 5) / 95) * 100}%` }}
+                    >
+                      <div className="bg-[#4338ca] text-white font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap relative">
+                        <AnimatedCounter value={tabCount} suffix=" Tabs" />
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-0.5 border-4 border-transparent border-t-[#4338ca]" />
+                      </div>
+                    </div>
+
                     <input
                       type="range"
                       aria-label="Number of open tabs"
@@ -577,11 +641,7 @@ export const Benchmarks: React.FC = () => {
               {/* Dynamic Comparison Cards Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:w-3/5">
                 {/* 1. Nova Browser Result */}
-                <motion.div
-                  key={`nova-${tabCount}`}
-                  initial={{ scale: 0.98, opacity: 0.9 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
+                <div
                   className="p-6 rounded-2xl bg-white border-2 border-[#4338ca]/40 shadow-sm flex flex-col justify-between relative overflow-hidden group hover:border-[#4338ca] transition-colors"
                 >
                   <div className="flex items-center justify-between">
@@ -592,8 +652,10 @@ export const Benchmarks: React.FC = () => {
                   </div>
 
                   <div className="my-3">
-                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-[#4338ca] tracking-tight">
-                      ~{novaMemoryEst} <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
+                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-[#4338ca] tracking-tight flex items-baseline gap-1">
+                      <span>~</span>
+                      <AnimatedCounter value={novaMemoryEst} />
+                      <span className="text-sm font-sans font-normal text-neutral-500">MB</span>
                     </div>
                     {/* Visual Meter Bar */}
                     <div className="w-full bg-neutral-100 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -612,14 +674,10 @@ export const Benchmarks: React.FC = () => {
                       DOM unmounted
                     </span>
                   </div>
-                </motion.div>
+                </div>
 
                 {/* 2. Standard Chrome Result */}
-                <motion.div
-                  key={`chrome-${tabCount}`}
-                  initial={{ scale: 0.98, opacity: 0.9 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
+                <div
                   className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-xs flex flex-col justify-between relative overflow-hidden hover:border-neutral-300 transition-colors"
                 >
                   <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
@@ -627,8 +685,10 @@ export const Benchmarks: React.FC = () => {
                   </span>
 
                   <div className="my-3">
-                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 tracking-tight">
-                      ~{(chromeMemoryEst / 1024).toFixed(1)} <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
+                    <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 tracking-tight flex items-baseline gap-1">
+                      <span>~</span>
+                      <AnimatedCounter value={chromeMemoryEst / 1024} decimals={1} />
+                      <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
                     </div>
                     {/* Visual Meter Bar */}
                     <div className="w-full bg-neutral-100 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -638,20 +698,16 @@ export const Benchmarks: React.FC = () => {
 
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] text-neutral-500 bg-neutral-100 px-2 py-0.5 rounded-full font-medium">
-                      ({chromeMemoryEst} MB)
+                      (<AnimatedCounter value={chromeMemoryEst} suffix=" MB" />)
                     </span>
                     <span className="font-mono text-[10px] text-amber-600 font-semibold">
                       Full process load
                     </span>
                   </div>
-                </motion.div>
+                </div>
 
                 {/* 3. Net Savings Result (Obsidian Card) */}
-                <motion.div
-                  key={`saved-${tabCount}`}
-                  initial={{ scale: 0.98, opacity: 0.9 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ duration: 0.2 }}
+                <div
                   className="p-6 rounded-2xl bg-[#0c0d12] text-white shadow-xl flex flex-col justify-between relative overflow-hidden border border-white/10"
                 >
                   <div className="flex items-center justify-between">
@@ -663,7 +719,7 @@ export const Benchmarks: React.FC = () => {
 
                   <div className="my-3">
                     <div className="font-display text-3xl sm:text-4xl font-extrabold text-emerald-400 tracking-tight flex items-baseline gap-1">
-                      {savedPercentage}%
+                      <AnimatedCounter value={savedPercentage} suffix="%" />
                       <span className="text-xs font-mono font-normal text-neutral-400 uppercase">Less RAM</span>
                     </div>
                     {/* Visual Saving Meter */}
@@ -676,14 +732,15 @@ export const Benchmarks: React.FC = () => {
                   </div>
 
                   <div className="flex items-center justify-between font-mono text-[10px]">
-                    <span className="text-emerald-300 font-bold">
-                      ~{(savedMemoryEst / 1024).toFixed(1)} GB Freed
+                    <span className="text-emerald-300 font-bold flex items-center">
+                      <span>~</span>
+                      <AnimatedCounter value={savedMemoryEst / 1024} decimals={1} suffix=" GB Freed" />
                     </span>
                     <span className="text-neutral-400">
                       for IDE & Apps
                     </span>
                   </div>
-                </motion.div>
+                </div>
               </div>
             </div>
           </div>
