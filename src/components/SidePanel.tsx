@@ -527,17 +527,14 @@ export const SidePanel = React.memo(({
           classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
         };
       case 'thinking':
-        return {
-          icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
-          label: 'Thinking…',
-          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
-        };
+        // Thinking state is cleanly rendered inside the message stream typing bubble
+        return null;
       case 'acting':
         return {
-          icon: <Wrench className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
+          icon: <Wrench className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 animate-bounce" />,
           label: 'Executing action',
           detail: agentStatus.detail,
-          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
+          classes: 'bg-cyan-50/80 dark:bg-cyan-950/30 border-cyan-300 dark:border-cyan-500/30 text-cyan-700 dark:text-cyan-300',
         };
       case 'waiting_approval':
         return {
@@ -972,47 +969,36 @@ export const SidePanel = React.memo(({
                 {isLoading && streamingText ? (
                   <motion.div
                     key="streaming"
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="flex flex-col gap-1.5 items-start"
                   >
                     <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
                       <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Nova Assistant is responding...</span>
+                      <span>Nova Asistan</span>
                     </div>
-                    <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-cyan-500/30 dark:border-cyan-500/30 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5">
+                    <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
                     </div>
                   </motion.div>
                 ) : isLoading ? (
                   <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="flex flex-col gap-2 p-3 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl"
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex flex-col gap-1.5 items-start"
                   >
-                    <div className="flex items-center gap-2 text-slate-600 dark:text-slate-300 text-xs font-medium">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400" />
-                      <span>AI is thinking and analyzing the page...</span>
+                    <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
+                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
+                      <span>Nova Asistan</span>
                     </div>
-                    
-                    {queuedActions.filter(a => a.state === 'executing').map(action => (
-                      <motion.div
-                        key={action.id}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex flex-col gap-1.5 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[11px] font-mono font-semibold text-cyan-600 dark:text-cyan-400">
-                            {action.toolName}
-                          </span>
-                          <span className="text-[10px] text-slate-400">Executing</span>
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-500 dark:text-slate-400 break-all bg-slate-50 dark:bg-slate-800/60 p-1.5 rounded-lg">
-                          {JSON.stringify(action.args)}
-                        </div>
-                      </motion.div>
-                    ))}
+                    <div className="rounded-2xl px-4 py-3 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-tl-xs shadow-2xs flex items-center gap-2.5">
+                      <div className="flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      </div>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Düşünüyor...</span>
+                    </div>
                   </motion.div>
                 ) : null}
 
