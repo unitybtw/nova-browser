@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import ManifestoHero from './components/ManifestoHero';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -11,25 +11,25 @@ const Benchmarks = lazy(() => import('./components/Benchmarks'));
 const Downloads = lazy(() => import('./components/Downloads'));
 const Faq = lazy(() => import('./components/Faq'));
 
+// Height-stable placeholder — overflowAnchor:'none' stops Chrome scroll anchoring
+// from adjusting viewport position when deferred content loads and replaces this div.
+function SectionPlaceholder({ height }: { height: string }) {
+  return <div style={{ minHeight: height, overflowAnchor: 'none' }} aria-hidden="true" />;
+}
+
 export default function App() {
   const [showNavbar, setShowNavbar] = useState(false);
 
   useEffect(() => {
-    // Lock scroll to top once synchronously on mount.
-    // The <head> script already set scrollRestoration=manual and scrollTo(0,0),
-    // this is a safety net for the React hydration frame.
     if ('scrollRestoration' in history) {
       history.scrollRestoration = 'manual';
     }
 
-    // Single rAF scroll-lock — runs after the first paint, before user sees anything.
-    // Do NOT chain multiple timeouts; they fight each other and cause visible jumps.
+    // Single rAF scroll-lock — safety net for the React hydration frame.
     const rafId = requestAnimationFrame(() => {
       if (window.scrollY !== 0) {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
       }
-      // Only strip hash if it does NOT refer to a real section (prevents removing
-      // intentional deep links while still killing stale restoration hashes).
       if (window.location.hash) {
         const targetId = window.location.hash.slice(1);
         const el = document.getElementById(targetId);
@@ -39,7 +39,7 @@ export default function App() {
       }
     });
 
-    // Restore-scroll guard on bfcache hits (back-forward navigation).
+    // bfcache guard
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
@@ -68,14 +68,14 @@ export default function App() {
   }, []);
 
   return (
-    <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
-      {/* Floating Left-Side Sovereign Navigation Dock - Slides in when scrolling past Manifesto */}
+    <div
+      id="top"
+      className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white"
+      style={{ overflowAnchor: 'none' }}
+    >
       <Navbar visible={showNavbar} />
-
-      {/* 00 Fullscreen Kinetic Manifesto Hero Opening */}
       <ManifestoHero />
 
-      {/* Seamless Atmosphere Color Transition Seam: Dark Manifesto -> Light Canvas */}
       <div
         className="relative w-full h-24 sm:h-36 -mt-1 pointer-events-none z-10 overflow-hidden bg-gradient-to-b from-[#171717] via-[#1a1c26] to-[#fcfbf9]"
         aria-hidden="true"
@@ -83,19 +83,22 @@ export default function App() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-500/05 to-transparent" />
       </div>
 
-      {/* Main Website Flow */}
-      <main id="main-content">
+      {/* overflow-anchor: none on main prevents Chrome scroll anchoring from
+          shifting the viewport when deferred sections load below the fold. */}
+      <main id="main-content" style={{ overflowAnchor: 'none' }}>
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <Suspense
-          fallback={
-            <div className="min-h-[3200px]" aria-hidden="true" />
-          }
-        >
+        <Suspense fallback={<SectionPlaceholder height="700px" />}>
           <GithubStats />
+        </Suspense>
+        <Suspense fallback={<SectionPlaceholder height="600px" />}>
           <Benchmarks />
+        </Suspense>
+        <Suspense fallback={<SectionPlaceholder height="500px" />}>
           <Downloads />
+        </Suspense>
+        <Suspense fallback={<SectionPlaceholder height="600px" />}>
           <Faq />
         </Suspense>
       </main>

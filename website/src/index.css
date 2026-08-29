@@ -32,9 +32,16 @@
   --nova-terminal: #0c0d12;
 }
 
+/* Globally disable Chrome's scroll anchoring — prevents the viewport from
+   jumping when deferred sections load and change the page height below the fold. */
+html, body {
+  overflow-anchor: none;
+}
+
 .nova-page {
   background-color: var(--nova-canvas);
   color: var(--nova-text);
+  overflow-anchor: none;
 }
 
 /* Custom Sovereign Cyber-Luxury Scrollbar */
