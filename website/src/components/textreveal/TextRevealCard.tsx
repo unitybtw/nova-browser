@@ -280,8 +280,8 @@ export const TextRevealCard: React.FC<TextRevealCardProps> = ({ className = "" }
       ref={hostRef}
       role="img"
       aria-label="Two text blocks in opposite corners materializing through a soft cloudy WebGL mask reveal."
-      className={`relative select-none overflow-hidden rounded-2xl border ${className}`}
-      style={{ backgroundColor: BG, borderColor: EDGE }}
+      className={`relative select-none overflow-hidden rounded-2xl ${className}`}
+      style={{ backgroundColor: BG }}
     >
       <div
         className="pointer-events-none absolute"

@@ -128,9 +128,9 @@ export const FeatureBento: React.FC = () => {
         whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={prefersReducedMotion ? undefined : { duration: 0.8, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-6 w-full shadow-xs"
+        className="mt-6 w-full"
       >
-        <TextRevealCard className="aspect-[16/7] sm:aspect-[21/8] w-full shadow-sm" />
+        <TextRevealCard className="aspect-[16/7] sm:aspect-[21/8] w-full" />
       </motion.div>
     </section>
   );

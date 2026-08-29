@@ -10,74 +10,6 @@ const GithubStats = lazy(() => import('./components/GithubStats'));
 const Benchmarks = lazy(() => import('./components/Benchmarks'));
 const Downloads = lazy(() => import('./components/Downloads'));
 const Faq = lazy(() => import('./components/Faq'));
-const DEFERRED_SECTION_IDS = new Set(['community', 'benchmarks', 'download', 'faq']);
-
-function DeferredContent() {
-  return (
-    <Suspense
-      fallback={
-        <div className="mx-auto min-h-[32rem] max-w-7xl" aria-hidden="true" />
-      }
-    >
-      <GithubStats />
-      <Benchmarks />
-      <Downloads />
-      <Faq />
-    </Suspense>
-  );
-}
-
-function DeferredSections() {
-  const deferredSectionsRef = useRef<HTMLDivElement>(null);
-  const [shouldLoad, setShouldLoad] = useState(false);
-
-  useEffect(() => {
-    const loadSections = () => setShouldLoad(true);
-
-    const handleHashChange = () => {
-      const hashTarget = window.location.hash.slice(1);
-      if (!DEFERRED_SECTION_IDS.has(hashTarget)) return;
-
-      loadSections();
-      requestAnimationFrame(() => {
-        document.getElementById(hashTarget)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      });
-    };
-    window.addEventListener('hashchange', handleHashChange);
-
-    const deferredSections = deferredSectionsRef.current;
-    if (!deferredSections || !('IntersectionObserver' in window)) {
-      loadSections();
-      return () => window.removeEventListener('hashchange', handleHashChange);
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          loadSections();
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '200px 0px' },
-    );
-    observer.observe(deferredSections);
-
-    return () => {
-      observer.disconnect();
-      window.removeEventListener('hashchange', handleHashChange);
-    };
-  }, []);
-
-  return (
-    <div ref={deferredSectionsRef}>
-      {shouldLoad ? (
-        <DeferredContent />
-      ) : (
-        <div className="mx-auto min-h-[32rem] max-w-7xl" aria-hidden="true" />
-      )}
-    </div>
-  );
-}
 
 export default function App() {
   const [showNavbar, setShowNavbar] = useState(false);
@@ -118,12 +50,18 @@ export default function App() {
     const handleScroll = () => {
       const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
       setShowNavbar(isPastManifesto);
+      if (isPastManifesto) {
+        document.documentElement.classList.remove('in-manifesto');
+      } else {
+        document.documentElement.classList.add('in-manifesto');
+      }
     };
 
     handleScroll();
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       cancelAnimationFrame(rafId);
+      document.documentElement.classList.remove('in-manifesto');
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('scroll', handleScroll);
     };
@@ -150,7 +88,12 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <DeferredSections />
+        <Suspense fallback={null}>
+          <GithubStats />
+          <Benchmarks />
+          <Downloads />
+          <Faq />
+        </Suspense>
       </main>
       <Footer />
     </div>

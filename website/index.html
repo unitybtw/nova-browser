@@ -14,34 +14,12 @@
     <meta name="theme-color" content="#fcfbf9" />
     <link rel="canonical" href="https://nova-browser.org/" />
 
-    <!-- Synchronously lock scroll position to (0,0) before any DOM render -->
+    <!-- Synchronously reset scroll position to (0,0) before DOM render -->
     <script>
-      (function () {
-        if ('scrollRestoration' in history) {
-          history.scrollRestoration = 'manual';
-        }
-        // Immediately reset
-        window.scrollTo(0, 0);
-
-        // Block any CSS/browser-triggered scroll during the initial load phase
-        var locked = true;
-        var onScroll = function () {
-          if (locked) window.scrollTo(0, 0);
-        };
-        window.addEventListener('scroll', onScroll, { passive: false, capture: true });
-
-        // Release the lock after the first user interaction or after 1.2s
-        var release = function () {
-          locked = false;
-          window.removeEventListener('scroll', onScroll, { capture: true });
-        };
-        document.addEventListener('DOMContentLoaded', function () {
-          // Give React time to render and settle before releasing the lock
-          setTimeout(release, 600);
-        });
-        // Fallback release
-        setTimeout(release, 1200);
-      })();
+      if ('scrollRestoration' in history) {
+        history.scrollRestoration = 'manual';
+      }
+      window.scrollTo(0, 0);
     </script>
 
     <!-- Open Graph / Facebook -->
