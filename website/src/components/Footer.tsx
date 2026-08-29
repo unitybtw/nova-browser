@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Github, ArrowUp } from 'lucide-react';
-import { DiaGradient } from './diagradient/DiaGradient';
 
 export const Footer: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -11,7 +10,7 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-[max(2rem,env(safe-area-inset-bottom,0px))]">
+    <footer className="relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-0">
       {/* Centered & Balanced Content Container */}
       <div className="relative z-10 mx-auto max-w-6xl px-6 sm:px-10 lg:px-12">
         <div className="grid grid-cols-1 items-start gap-10 border-b border-white/10 pb-14 md:grid-cols-12 lg:gap-16">
@@ -95,7 +94,7 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Bottom Row: Copyright & Navigation */}
-        <div className="flex flex-col items-center justify-between gap-4 pt-6 pb-8 font-mono text-xs text-neutral-400 sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-4 pt-6 pb-6 font-mono text-xs text-neutral-400 sm:flex-row">
           <div>ALL RIGHTS RESERVED // SOVEREIGN COMPUTING</div>
           <button
             type="button"
@@ -109,8 +108,8 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      {/* 1. FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK */}
-      <div className="relative w-full overflow-hidden select-none bg-[#0c0d12] pt-8 pb-2">
+      {/* FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK SITTING FLUSH AT THE VERY BOTTOM */}
+      <div className="relative w-full overflow-hidden select-none bg-[#0c0d12] pt-4 pb-0 -mb-1.5 leading-none">
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
@@ -119,8 +118,8 @@ export const Footer: React.FC = () => {
           className="block w-full leading-none"
         >
           <svg
-            viewBox="0 0 1000 115"
-            className="block h-auto w-full select-none"
+            viewBox="0 0 1000 95"
+            className="block h-auto w-full select-none -mb-1 align-bottom"
             preserveAspectRatio="none"
           >
             <defs>
@@ -132,7 +131,7 @@ export const Footer: React.FC = () => {
             </defs>
             <text
               x="500"
-              y="94"
+              y="92"
               textAnchor="middle"
               dominantBaseline="auto"
               fill="url(#novaCleanGradient)"
@@ -148,11 +147,6 @@ export const Footer: React.FC = () => {
             </text>
           </svg>
         </motion.div>
-      </div>
-
-      {/* 2. SILKY-SMOOTH LIVING CYBER-AURORA BEAM FLOOR (100% UNIFIED OBSIDIAN #0c0d12) */}
-      <div className="relative h-28 w-full overflow-hidden pointer-events-none select-none bg-[#0c0d12] sm:h-40 md:h-52">
-        <DiaGradient className="h-full w-full" />
       </div>
     </footer>
   );
