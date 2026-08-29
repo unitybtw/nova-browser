@@ -1,7 +1,6 @@
 import React, { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
-import { StampTypeCard } from './stamptype/StampTypeCard';
 
 const BrowserDemo = lazy(() => import('./BrowserDemo'));
 
@@ -9,15 +8,16 @@ export const Hero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-24 text-center sm:px-6 sm:pb-20 sm:pt-28 md:pt-36">
-      {/* Top Compact Kinetic Typography Poster */}
+    <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-28 text-center sm:px-6 sm:pb-20 sm:pt-32 md:pt-40">
+      {/* Top Tag */}
       <motion.div
         initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-6 w-full max-w-[340px] sm:max-w-[400px] overflow-hidden rounded-2xl border border-neutral-200/90 bg-neutral-900 p-1 shadow-md hover:shadow-lg transition-shadow"
+        className="mb-6 inline-flex items-center gap-2 rounded-full border border-neutral-300/80 bg-white/80 px-4 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#4338ca] shadow-xs backdrop-blur-md"
       >
-        <StampTypeCard className="aspect-[16/7] rounded-xl border-none shadow-none" />
+        <span className="h-2 w-2 rounded-full bg-[#4338ca] animate-pulse" />
+        <span>Sovereign Desktop Architecture</span>
       </motion.div>
 
       <motion.h1

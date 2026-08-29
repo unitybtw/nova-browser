@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import IntroSplash from './components/IntroSplash';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
@@ -100,6 +101,7 @@ function DeferredSections() {
 export default function App() {
   return (
     <div id="top" className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white">
+      <IntroSplash />
       <ScrollProgress />
       <a
         href="#main-content"
