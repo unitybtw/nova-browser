@@ -1,6 +1,7 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Github, ArrowUp } from 'lucide-react';
+import { DiaGradient } from './DiaGradient';
 
 export const Footer: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -108,14 +109,20 @@ export const Footer: React.FC = () => {
         </div>
       </div>
 
-      {/* FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK */}
-      <div className="w-full pt-4 pb-0 overflow-hidden select-none border-t border-white/5">
+      {/* FULL-WIDTH EDGE-TO-EDGE GIANT NOVABROWSER WATERMARK WITH RISING AURORA GRADIENT */}
+      <div className="relative w-full pt-8 pb-0 overflow-hidden select-none border-t border-white/5 bg-[#0a0a0e]">
+        {/* Dia-style Rising Aurora Gradient Floor Glow */}
+        <div className="absolute inset-x-0 bottom-0 h-[175%] w-full pointer-events-none z-0 opacity-80 sm:opacity-90 mix-blend-screen overflow-hidden">
+          <DiaGradient bars={13} blur={26} peak={0.98} valley={0.45} riseMs={1300} />
+        </div>
+
+        {/* Giant Watermark Typography */}
         <motion.div
           initial={prefersReducedMotion ? false : { opacity: 0, y: 25 }}
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={prefersReducedMotion ? undefined : { duration: 1, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full block leading-none"
+          className="relative z-10 w-full block leading-none"
         >
           <svg
             viewBox="0 0 1000 115"
@@ -124,9 +131,9 @@ export const Footer: React.FC = () => {
           >
             <defs>
               <linearGradient id="novaCleanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#FFFFFF" />
-                <stop offset="48%" stopColor="#A5B4FC" />
-                <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.32" />
+                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
+                <stop offset="48%" stopColor="#E0E7FF" stopOpacity="0.85" />
+                <stop offset="100%" stopColor="#C7D2FE" stopOpacity="0.55" />
               </linearGradient>
             </defs>
             <text
