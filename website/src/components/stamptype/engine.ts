@@ -91,7 +91,10 @@ export class StampType {
     this.lines = this.worlds.map((w) =>
       w.lines.map((text, i) => ({ text, track: i })),
     );
-    if (this.ok) this.resize();
+    if (this.ok) {
+      this.resize();
+      this.renderStill();
+    }
   }
 
   setFont(family: string) {
@@ -110,7 +113,7 @@ export class StampType {
     this.canvas.width = Math.round(r.width * this.dpr);
     this.canvas.height = Math.round(r.height * this.dpr);
     this.drawnTick = -1;
-    if (!this.running) this.draw(this.stillTick());
+    if (!this.running) this.renderStill();
   }
 
   start() {
@@ -118,6 +121,9 @@ export class StampType {
     if (this.W <= 0 || this.H <= 0) this.resize();
     this.running = true;
     this.last = performance.now();
+    if (this.acc === 0) {
+      this.acc = (PARK_IN + 10) * TICK_MS;
+    }
     const cycle = PASS_PITCH * this.worlds.length;
     const loop = (now: number) => {
       if (!this.running) return;

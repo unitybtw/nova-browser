@@ -43,9 +43,8 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
     // Instantiate engine immediately and start
     engine = new StampType(canvas);
     if (engine.ok) {
-      if (reduced) {
-        engine.renderStill();
-      } else {
+      engine.renderStill();
+      if (!reduced) {
         engine.start();
       }
     }
