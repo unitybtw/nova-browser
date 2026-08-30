@@ -20,57 +20,80 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     let engine: StampType | null = null;
-    let onScreen = false;
-    let hidden = false;
+    let isVisible = true;
 
-    const sync = () => {
-      if (!engine || reduced) return;
-      if (onScreen && !hidden) engine.start();
-      else engine.stop();
+    const checkAndSync = () => {
+      if (!engine) return;
+      if (reduced) {
+        engine.renderStill();
+        return;
+      }
+
+      const hidden = document.hidden;
+      const rect = canvas.getBoundingClientRect();
+      const inView = rect.bottom > 0 && rect.top < window.innerHeight;
+
+      if (inView && !hidden) {
+        engine.start();
+      } else {
+        engine.stop();
+      }
     };
 
-    const raf = requestAnimationFrame(() => {
-      if (!canvasRef.current) return;
-      engine = new StampType(canvas);
-      if (!engine.ok) return;
-      if (reduced) engine.renderStill();
-      else sync();
-
-      if (document.fonts?.load) {
-        document.fonts
-          .load(`700 1em "IBM Plex Sans"`)
-          .then(() => engine?.setFont(`"IBM Plex Sans", sans-serif`), () => {});
+    // Instantiate engine immediately and start
+    engine = new StampType(canvas);
+    if (engine.ok) {
+      if (reduced) {
+        engine.renderStill();
+      } else {
+        engine.start();
       }
-    });
+    }
 
+    // Font loading observer to re-measure and re-render
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        engine?.setFont(`"IBM Plex Sans", sans-serif`);
+        checkAndSync();
+      }, () => {});
+    }
+
+    // IntersectionObserver for viewport entry/exit
     const io = new IntersectionObserver(
-      (es) => {
-        onScreen = es[0]?.isIntersecting ?? false;
-        sync();
+      (entries) => {
+        const entry = entries[0];
+        isVisible = entry?.isIntersecting ?? true;
+        if (!engine || reduced) return;
+        if (isVisible && !document.hidden) {
+          engine.start();
+        } else {
+          engine.stop();
+        }
       },
-      { threshold: 0.1 },
+      { threshold: [0, 0.05, 0.1] },
     );
     io.observe(canvas);
 
-    const onVis = () => {
-      hidden = document.hidden;
-      sync();
-    };
-    document.addEventListener("visibilitychange", onVis);
+    // ResizeObserver to detect layout / container changes
+    const ro = new ResizeObserver(() => {
+      if (engine) {
+        engine.resize();
+        checkAndSync();
+      }
+    });
+    ro.observe(canvas);
 
-    let rt = 0;
-    const onResize = () => {
-      window.clearTimeout(rt);
-      rt = window.setTimeout(() => engine?.resize(), 60);
-    };
-    window.addEventListener("resize", onResize);
+    const onVis = () => checkAndSync();
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", onVis);
+    window.addEventListener("pageshow", onVis);
 
     return () => {
-      cancelAnimationFrame(raf);
       io.disconnect();
+      ro.disconnect();
       document.removeEventListener("visibilitychange", onVis);
-      window.removeEventListener("resize", onResize);
-      window.clearTimeout(rt);
+      window.removeEventListener("focus", onVis);
+      window.removeEventListener("pageshow", onVis);
       engine?.destroy();
     };
   }, []);

@@ -115,6 +115,7 @@ export class StampType {
 
   start() {
     if (this.running || !this.ok) return;
+    if (this.W <= 0 || this.H <= 0) this.resize();
     this.running = true;
     this.last = performance.now();
     const cycle = PASS_PITCH * this.worlds.length;
@@ -270,6 +271,10 @@ export class StampType {
   private draw(tick: number) {
     const ctx = this.ctx;
     if (!ctx) return;
+    if (this.W <= 0 || this.H <= 0) {
+      this.resize();
+      if (this.W <= 0 || this.H <= 0) return;
+    }
     this.drawnTick = tick;
     const { W, H } = this;
     const padding = W < 640 ? 0.88 : 0.94;
