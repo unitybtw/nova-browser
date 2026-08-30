@@ -27,13 +27,29 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
   useEffect(() => {
     const selectedTab = tabsRef.current[selected];
     if (selectedTab) {
-      const { width } = selectedTab.getBoundingClientRect();
       setPosition({
         left: selectedTab.offsetLeft,
-        width,
+        width: selectedTab.offsetWidth,
         opacity: 1,
       });
+      selectedTab.scrollIntoView?.({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
+  }, [selected]);
+
+  // Recalculate on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      const selectedTab = tabsRef.current[selected];
+      if (selectedTab) {
+        setPosition({
+          left: selectedTab.offsetLeft,
+          width: selectedTab.offsetWidth,
+          opacity: 1,
+        });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [selected]);
 
   // ScrollSpy to update active tab when scrolling through sections
@@ -90,24 +106,23 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
   return (
     <header
-      className={`fixed top-4 sm:top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      className={`fixed top-3 sm:top-6 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] max-w-full px-2 ${
         visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
       }`}
     >
-      <div className="pointer-events-auto">
+      <div className="pointer-events-auto max-w-[calc(100vw-1rem)] overflow-x-auto scrollbar-none rounded-full">
         <ul
           onMouseLeave={() => {
             const selectedTab = tabsRef.current[selected];
             if (selectedTab) {
-              const { width } = selectedTab.getBoundingClientRect();
               setPosition({
                 left: selectedTab.offsetLeft,
-                width,
+                width: selectedTab.offsetWidth,
                 opacity: 1,
               });
             }
           }}
-          className="relative mx-auto flex w-fit items-center rounded-full border-2 border-black bg-white p-1 shadow-2xl dark:border-white dark:bg-neutral-800"
+          className="relative mx-auto flex w-max items-center rounded-full border-2 border-black bg-white p-0.5 sm:p-1 shadow-2xl dark:border-white dark:bg-neutral-800"
         >
           {NAV_TABS.map((tab, i) => (
             <Tab
@@ -143,16 +158,23 @@ const Tab = React.forwardRef<HTMLLIElement, TabProps>(
       <li
         ref={ref}
         onClick={onClick}
-        onMouseEnter={() => {
+        onTouchStart={() => {
           if (!ref || typeof ref === 'function' || !ref.current) return;
-          const { width } = ref.current.getBoundingClientRect();
           setPosition({
             left: ref.current.offsetLeft,
-            width,
+            width: ref.current.offsetWidth,
             opacity: 1,
           });
         }}
-        className="relative z-10 block cursor-pointer px-3 py-1.5 font-mono text-xs font-semibold uppercase tracking-wider text-white mix-blend-difference select-none sm:px-4 sm:py-2 md:text-sm"
+        onMouseEnter={() => {
+          if (!ref || typeof ref === 'function' || !ref.current) return;
+          setPosition({
+            left: ref.current.offsetLeft,
+            width: ref.current.offsetWidth,
+            opacity: 1,
+          });
+        }}
+        className="relative z-10 block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference select-none whitespace-nowrap sm:px-4 sm:py-2 sm:text-xs sm:tracking-wider md:text-sm"
       >
         {children}
       </li>
@@ -177,7 +199,7 @@ const Cursor: React.FC<CursorProps> = ({ position }) => {
         stiffness: 450,
         damping: 32,
       }}
-      className="absolute z-0 h-7 rounded-full bg-black dark:bg-white sm:h-9 md:h-9 pointer-events-none"
+      className="absolute z-0 h-6.5 top-0.5 rounded-full bg-black dark:bg-white sm:h-8.5 sm:top-1 md:h-9 pointer-events-none"
     />
   );
 };
