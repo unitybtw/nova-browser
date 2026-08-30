@@ -1,18 +1,11 @@
 import React, { lazy, Suspense } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { BezierDefinition } from 'framer-motion';
-import { ArrowUpRight, Download, Github, Shield, Cpu, Zap, Lock } from 'lucide-react';
+import { ArrowUpRight, Download, Github } from 'lucide-react';
 
 const BrowserDemo = lazy(() => import('./BrowserDemo'));
 
 const EASE: BezierDefinition = [0.16, 1, 0.3, 1];
-
-const CAPABILITIES = [
-  { icon: Cpu, label: '100% On-Device WebGPU' },
-  { icon: Shield, label: 'Zero Telemetry & Pings' },
-  { icon: Zap, label: 'Sub-Millisecond IPC' },
-  { icon: Lock, label: 'AES-256-GCM Vault' },
-];
 
 export const Hero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -77,25 +70,6 @@ export const Hero: React.FC = () => {
           <span>Explore the source</span>
           <ArrowUpRight className="h-3.5 w-3.5 text-[#737373] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
         </a>
-      </motion.div>
-
-      {/* 5. Zero-Lag Capability Badges */}
-      <motion.div
-        {...fadeUp(0.26)}
-        className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3"
-      >
-        {CAPABILITIES.map((cap) => {
-          const Icon = cap.icon;
-          return (
-            <div
-              key={cap.label}
-              className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200/80 bg-white/70 px-3 py-1 font-mono text-[11px] font-medium text-neutral-600 shadow-2xs backdrop-blur-xs transition-colors hover:border-[#4338ca]/30 hover:text-[#4338ca]"
-            >
-              <Icon className="h-3.5 w-3.5 text-[#4338ca]" />
-              <span>{cap.label}</span>
-            </div>
-          );
-        })}
       </motion.div>
 
       {/* 6. Interactive Browser Demo with Ambient Backlight Glow */}
