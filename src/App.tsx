@@ -583,7 +583,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         ? demoParams.feature === 'website'
           ? false
           : demoParams.tabs === 'vertical'
-        : true,
+        : false,
       mcpServerEnabled: false,
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
       backgroundCustomUrl: '',

@@ -39,7 +39,7 @@ export interface Workspace {
 
 export const defaultSettings = {
   showBookmarksBar: true,
-  useVerticalTabs: true,
+  useVerticalTabs: false,
   mcpServerEnabled: false,
   tabHibernationEnabled: true,
   hibernationTimeoutMinutes: 10,
