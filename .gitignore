@@ -40,6 +40,8 @@ Thumbs.db
 .superdesign/
 .agents/
 design-system/
+graphify-out/
+
 # Security & Private Signing Keys
 electron/keys/*private*.pem
 *.pem.private
