@@ -237,7 +237,7 @@ const MemoizedTabItem = React.memo(({
         <div className="flex w-full items-center h-full gap-0.5">
           {/* Primary Tab Half */}
           <div 
-            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer group/split-left relative ${
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-left relative ${
               activeTabId === tab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
@@ -296,7 +296,7 @@ const MemoizedTabItem = React.memo(({
 
           {/* Secondary Tab Half */}
           <div 
-            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-all cursor-pointer group/split-right relative ${
+            className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
@@ -726,7 +726,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               (() => {
                 const sec = getUrlSecurityInfo(activeTab?.url || '');
                 return (
-                  <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-all hover:scale-105 active:scale-95 ${sec.bgColor} ${sec.color}`} title={`${sec.tooltip} (Click for site info & permissions)`}>
+                  <div className={`flex items-center justify-center gap-1.5 px-2 py-0.5 rounded-md transition-[background-color,color,box-shadow,transform] hover:scale-105 active:scale-95 ${sec.bgColor} ${sec.color}`} title={`${sec.tooltip} (Click for site info & permissions)`}>
                     {sec.level === 'internal' && (
                       (activeTab?.url === 'nova://settings' || activeTab?.url?.includes('settings')) ? <Settings className="w-3.5 h-3.5" /> :
                       (activeTab?.url === 'nova://history' || activeTab?.url?.includes('history')) ? <Clock className="w-3.5 h-3.5" /> :

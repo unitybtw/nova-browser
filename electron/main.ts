@@ -58,6 +58,14 @@ if (process.platform === 'darwin') {
   // Windows / Linux GPU flags
   app.commandLine.appendSwitch('ignore-gpu-blocklist');
   app.commandLine.appendSwitch('enable-zero-copy');
+  // Windows-only fluidity fix: Chromium's native window occlusion calculation
+  // has known frame-pacing bugs under Electron — a visible window can be
+  // reported occluded while overlapped, stalling the compositor and causing
+  // micro-stutter during scrolling/animations. Electron windows must always
+  // be treated as visible.
+  if (process.platform === 'win32') {
+    app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+  }
   app.commandLine.appendSwitch('enable-features', [
     'CanvasOopRasterization',
     'SmoothScrolling',

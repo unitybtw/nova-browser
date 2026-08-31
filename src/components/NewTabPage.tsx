@@ -537,12 +537,18 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
-      {/* Vibrant Gradient Background */}
+      {/* Vibrant Gradient Background.
+          PERF: the drift animation must run on the COMPOSITOR (transform) —
+          the previous backgroundPosition keyframes repainted this entire
+          oversized blurred layer every frame. The extra full-screen
+          backdrop-blur-[50px] overlay was also removed: the element's own
+          blur-3xl filter already provides the soft look, and stacking a
+          backdrop filter over an animated layer doubles GPU cost per frame. */}
       {newTabBackground === 'gradient' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div 
             animate={isActive ? { 
-              backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+              x: ['0%', '25%', '0%'],
             } : false}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
             className="absolute -inset-[50%] blur-3xl opacity-80"
@@ -551,10 +557,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 ? 'linear-gradient(120deg, #1e1b4b, #0f172a, #3b0764, #022c22, #1e1b4b)'
                 : 'linear-gradient(120deg, #dbeafe, #fce7f3, #e0e7ff, #ccfbf1, #dbeafe)',
               backgroundSize: '300% 300%',
-              willChange: 'background-position',
+              willChange: 'transform',
             }}
           />
-          <div className={`absolute inset-0 backdrop-blur-[50px] ${isDarkTheme ? 'bg-[#0B0F19]/60' : 'bg-white/50'}`}></div>
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[#0B0F19]/60' : 'bg-white/50'}`}></div>
         </div>
       )}
 

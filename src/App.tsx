@@ -2819,7 +2819,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onClick={handleExpandSidebar}
               onMouseEnter={handleHoverSidebarOpen}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 backdrop-blur-md transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
+              className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
               title="Expand Sidebar (⌘S)"
             >
               <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
@@ -2837,7 +2837,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 backdrop-blur-md border-r border-slate-200 dark:border-white/10"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -2897,8 +2897,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         </>
       )}
 
-      {/* Main Viewport Card with fluid margin & border radius transition */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      {/* Main Viewport Card with fluid margin & border radius transition.
+          PERF: transition is scoped to the properties that actually change on
+          sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
+          the compositor watch every property of this full-size container. */}
+      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
@@ -3137,7 +3140,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {/* Secondary View (Split Screen) */}
         {secondaryTab && (
           <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none">
-            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 backdrop-blur-md px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
               <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
                 {secondaryTab.title || secondaryTab.url}
               </span>
