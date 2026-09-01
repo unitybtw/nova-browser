@@ -53,10 +53,7 @@
           ]
         }
       ],
-      "requestedExecutionLevel": "asInvoker",
-      "artifactName": "Nova-Browser-${target}.${ext}",
-      "icon": "build/icon.ico",
-      "legalTrademarks": "Nova Browser"
+      "icon": "build/icon.ico"
     },
     "dmg": {
       "title": "Nova Browser Installer",
@@ -107,7 +104,8 @@
       "shortcutName": "Nova Browser",
       "deleteAppDataOnUninstall": true,
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "Nova-Browser-Setup.exe"
     }
   },
   "scripts": {

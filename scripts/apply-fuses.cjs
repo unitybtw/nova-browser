@@ -96,16 +96,20 @@ async function defaultExport(context) {
       console.log(`[apply-fuses]   ${name} -> ${value ? 'ON' : 'OFF'}`);
     }
   } catch (err) {
-    console.warn(`[apply-fuses] Initial fuse flipping failed (${err.message}). Retrying after deep attribute sweep...`);
+    console.warn(`[apply-fuses] Initial fuse flipping failed (${err.message}).`);
     if (platform === 'darwin' || platform === 'mas') {
+      // macOS: strip resource forks and retry without re-signing
       try {
         const appDir = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
         child_process.execSync(`xattr -cr "${appDir}"`, { stdio: 'ignore' });
         await flipFuses(binaryPath, { ...fuseConfig, resetAdHocDarwinSignature: false });
         console.log(`[apply-fuses] Flipped Electron fuses successfully on retry.`);
       } catch (retryErr) {
-        console.warn(`[apply-fuses] Non-fatal: fuse flipping skipped on unsigned build:`, retryErr.message);
+        console.warn(`[apply-fuses] Non-fatal: fuse flipping skipped on unsigned macOS build:`, retryErr.message);
       }
+    } else {
+      // Windows / Linux: fuse flipping is non-fatal on unsigned CI builds
+      console.warn(`[apply-fuses] Non-fatal: fuse flipping skipped on unsigned ${platform} build.`);
     }
   }
 
