@@ -1,7 +1,7 @@
 # Nova Browser - Complete Technical Specification & Documentation
 
 ## 1. Overview
-Nova Browser is an open-source, AI-native desktop web browser built with Electron, React 19, Tailwind CSS v4, WebGPU, and Rust-based network filtering. It is designed to provide sovereign, high-speed, and completely private web browsing with local AI capabilities.
+Nova Browser is an open-source, AI-native desktop web browser built with Electron, React, Tailwind CSS, WebGPU, and high-performance network filtering. It is designed to provide sovereign, high-speed, and completely private web browsing with local AI capabilities.
 
 ## 2. Core Architecture & Philosophy
 

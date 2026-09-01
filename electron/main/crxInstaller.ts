@@ -296,11 +296,31 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     }
 
-    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=mac&arch=x86-64&nacl_arch=x86-64&prod=chromecrx&prodchannel=unknown&prodversion=126.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+    const platformMap: Record<string, string> = {
+      darwin: 'mac',
+      win32: 'win',
+      linux: 'linux',
+    };
+    const archMap: Record<string, string> = {
+      arm64: 'arm64',
+      x64: 'x86-64',
+      ia32: 'x86-32',
+      arm: 'arm',
+    };
+    const osParam = platformMap[process.platform] || 'mac';
+    const archParam = archMap[process.arch] || 'x86-64';
+
+    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=126.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+
+    const userAgent = process.platform === 'win32'
+      ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+      : process.platform === 'linux'
+      ? 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+      : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
     const res = await fetch(crxUrl, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+        'User-Agent': userAgent
       }
     });
 

@@ -52,10 +52,10 @@
 | **Tab Hibernation Engine** | **Sub-millisecond DOM unmount** | Memory Saver (~20%) | High RAM usage | Partial hibernation | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud OpenAI | Cloud Leo (Subscription) | Apple Intelligence |
 | **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
-| **Ad & Tracker Decision Latency**| **0.46 µs (Rust Native)** | 11.2 ms (Unfiltered) | Extension dependent | 0.35 ms (Brave Shield) | Content Blockers |
+| **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | Extension dependent | 0.35 ms (Brave Shield) | Content Blockers |
 | **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Firebase / Closed | Sync Chain (Brave) | iCloud Keychain |
 | **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available | Not available |
-| **Telemetry & Privacy** | **0 KB (Zero Telemetry)** | Extensive tracking | Analytics enabled | Opt-out required | Telemetry enabled |
+| **Telemetry & Privacy** | **Zero Telemetry** | Extensive tracking | Analytics enabled | Opt-out required | Telemetry enabled |
 | **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | Closed Source | MPL 2.0 | Proprietary Core |
 
 ---
@@ -233,7 +233,7 @@ graph TD
     subgraph Electron["Electron (Main Process)"]
         main["main.ts - App Lifecycle & IPC Dispatcher"]
         mcp["BrowserMCPServer (Port 3020) & mcpBridge.ts"]
-        adblock["AdBlocker & Privacy Shield (Rust Filter)"]
+        adblock["AdBlocker & Privacy Shield (Network Layer Filter)"]
         security["Security Engine (SSRF & Phishing Defense)"]
         crx["crxInstaller.ts (Chrome Web Store Engine)"]
         downloads["downloads.ts (Downloads Manager)"]

@@ -39,7 +39,7 @@ const MODULES = [
     id: 'privacy',
     span: 'lg:col-span-4',
     title: 'Sub-ms Privacy Shield',
-    tag: 'RUST NETWORK ENGINE',
+    tag: 'NETWORK FILTER ENGINE',
     description: 'Intercepts advertising beacons and tracking payloads at the network level before DOM parsing ever starts.',
     icon: Shield,
     stats: '0ms BLOCK RATE',
