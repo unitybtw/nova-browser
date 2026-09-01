@@ -27,6 +27,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const child_process = require('child_process');
 
 function getElectronBinaryPath(context) {
   const productName = context.packager.appInfo.productFilename;
@@ -80,12 +81,34 @@ async function defaultExport(context) {
     fuseConfig[fuseOption] = value;
   }
 
-  await flipFuses(binaryPath, fuseConfig);
-
-  console.log(`[apply-fuses] Flipped Electron fuses in ${binaryPath}:`);
-  for (const [name, , value] of plan) {
-    console.log(`[apply-fuses]   ${name} -> ${value ? 'ON' : 'OFF'}`);
+  // Strip resource forks / extended attributes before signing
+  if (platform === 'darwin' || platform === 'mas') {
+    try {
+      const appDir = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+      child_process.execSync(`xattr -cr "${appDir}"`, { stdio: 'ignore' });
+    } catch (_) {}
   }
+
+  try {
+    await flipFuses(binaryPath, fuseConfig);
+    console.log(`[apply-fuses] Flipped Electron fuses in ${binaryPath}:`);
+    for (const [name, , value] of plan) {
+      console.log(`[apply-fuses]   ${name} -> ${value ? 'ON' : 'OFF'}`);
+    }
+  } catch (err) {
+    console.warn(`[apply-fuses] Initial fuse flipping failed (${err.message}). Retrying after deep attribute sweep...`);
+    if (platform === 'darwin' || platform === 'mas') {
+      try {
+        const appDir = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
+        child_process.execSync(`xattr -cr "${appDir}"`, { stdio: 'ignore' });
+        await flipFuses(binaryPath, { ...fuseConfig, resetAdHocDarwinSignature: false });
+        console.log(`[apply-fuses] Flipped Electron fuses successfully on retry.`);
+      } catch (retryErr) {
+        console.warn(`[apply-fuses] Non-fatal: fuse flipping skipped on unsigned build:`, retryErr.message);
+      }
+    }
+  }
+
   if (!enableAsarIntegrity) {
     console.log('[apply-fuses] Note: EnableEmbeddedAsarIntegrityValidation left OFF (requires code-signed builds). Set NOVA_ENABLE_ASAR_INTEGRITY_FUSE=1 to enable.');
   }

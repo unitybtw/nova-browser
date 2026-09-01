@@ -56,8 +56,7 @@
       "requestedExecutionLevel": "asInvoker",
       "artifactName": "Nova-Browser-${target}.${ext}",
       "icon": "build/icon.ico",
-      "legalTrademarks": "Nova Browser",
-      "publisherName": "unitybtw"
+      "legalTrademarks": "Nova Browser"
     },
     "dmg": {
       "title": "Nova Browser Installer",
