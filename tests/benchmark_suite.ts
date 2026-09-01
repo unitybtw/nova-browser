@@ -1,7 +1,7 @@
 /**
- * Nova Browser - Official Performance Benchmark & Stress Test Suite
- * Measures empirical metrics: Tab creation throughput, memory footprint,
- * Adblocker query latency, serialization speed, and IPC response times.
+ * Nova Browser - Microbenchmark & React State Stress Test Suite
+ * Measures empirical in-memory micro-metrics: React Tab State throughput,
+ * V8 runtime memory allocation, fast domain lookup latency, and bundle chunk sizes.
  */
 
 import { performance } from 'perf_hooks';

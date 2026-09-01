@@ -60,17 +60,17 @@
 
 ---
 
-### Empirical Benchmark Measurements
+### Empirical Microbenchmark Measurements
 
-*Measured on standard test configuration (50,000 requests / 100 tab lifecycle operations):*
+*Internal micro-benchmarks measuring React state dispatch, V8 heap allocation, and JS bundle budgets:*
 
 | Benchmark Suite | Metric | Measured Value | Unit | Architectural Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **Tab Operations** | 100 Tabs Creation Latency | **0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
+| **Tab State Operations** | 100 Tabs Creation Latency | **0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
 | **Tab Allocation** | Throughput | **1,204,224** | ops/sec | Number of virtual tab structures instantiated per second |
-| **Tab Hibernation** | 97 Background Tabs Eviction | **0.014** | ms | Background rendering pipeline unmounted to reclaim memory |
-| **Privacy Shield** | AdBlock Filter Check Latency | **0.467** | µs / request | Zero-latency network request classification before DOM creation |
-| **Privacy Shield** | Filter Throughput | **2,139,644** | checks/sec | Security and tracker domain classifications per second |
+| **Tab Hibernation State**| 97 Background Tabs Eviction | **0.014** | ms | Background rendering pipeline unmounted to reclaim memory |
+| **Fast Domain Lookup** | Blocklist Match Latency | **0.467** | µs / request | In-memory hash set lookup latency per network request |
+| **Fast Domain Lookup** | Lookup Throughput | **2,139,644** | checks/sec | Domain classification queries per second |
 | **V8 Heap Memory** | Heap Allocated | **31.26** | MB | Core JavaScript runtime heap allocation |
 | **Startup JS Bundle** | Core Entry Chunk | **496** | KB | Lightweight initial JS evaluated at browser launch |
 | **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |

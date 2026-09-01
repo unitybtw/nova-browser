@@ -46,7 +46,7 @@ export const WORLDS: World[] = [
     bg: "#18181b",
     bar: "#f59e0b",
     ink: "#18181b",
-    lines: ["420 MB RAM.", "Fifty tabs open.", "Fast, light,", "unbloated."],
+    lines: ["420 MB RAM.", "Twenty tabs open.", "Fast, light,", "unbloated."],
   },
   {
     bg: "#fcfbf9",
