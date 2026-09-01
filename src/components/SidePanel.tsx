@@ -914,11 +914,11 @@ export const SidePanel = React.memo(({
                     >
                       <div className="flex items-center gap-1.5 px-1 text-xs text-slate-400 dark:text-slate-500 font-medium">
                         {isUser ? (
-                          <span>Siz</span>
+                          <span>You</span>
                         ) : (
                           <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
                             <Sparkles className="w-3.5 h-3.5" />
-                            <span>Nova Asistan</span>
+                            <span>Nova Assistant</span>
                           </div>
                         )}
                       </div>
@@ -975,7 +975,7 @@ export const SidePanel = React.memo(({
                   >
                     <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
                       <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Nova Asistan</span>
+                      <span>Nova Assistant</span>
                     </div>
                     <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
@@ -989,7 +989,7 @@ export const SidePanel = React.memo(({
                   >
                     <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
                       <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Nova Asistan</span>
+                      <span>Nova Assistant</span>
                     </div>
                     <div className="rounded-2xl px-4 py-3 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-tl-xs shadow-2xs flex items-center gap-2.5">
                       <div className="flex items-center gap-1">
@@ -997,7 +997,7 @@ export const SidePanel = React.memo(({
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                         <span className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                       </div>
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Düşünüyor...</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Thinking...</span>
                     </div>
                   </motion.div>
                 ) : null}

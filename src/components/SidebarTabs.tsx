@@ -561,6 +561,33 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     saveFavorites(favorites.filter(f => f.id !== id));
   };
 
+  const handleFavoriteClick = (favUrl: string) => {
+    try {
+      const targetHost = new URL(favUrl).hostname.toLowerCase().replace(/^www\./, '');
+      const existingTab = tabs.find(t => {
+        try {
+          const tHost = new URL(t.url).hostname.toLowerCase().replace(/^www\./, '');
+          return tHost === targetHost;
+        } catch {
+          return false;
+        }
+      });
+
+      if (existingTab) {
+        onSelectTab(existingTab.id);
+        return;
+      }
+    } catch (_) {}
+
+    // If current tab is an empty new tab, navigate it directly; otherwise create new tab
+    if (activeTab && (activeTab.url === 'nova://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab')) {
+      if (onNavigate) onNavigate(favUrl);
+      else onNewTab(favUrl);
+    } else {
+      onNewTab(favUrl);
+    }
+  };
+
   // Sync active tab URL into omnibox when not focused
   useEffect(() => {
     if (!isOmniboxFocused) {
@@ -809,7 +836,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
                     : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
-                title="Nova AI Asistan (⌘I)"
+                title="Nova AI Assistant (⌘I)"
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-cyan-500 fill-cyan-500/20 animate-pulse' : 'text-cyan-600 dark:text-cyan-400'}`} />
               </button>
@@ -945,10 +972,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             {favorites.slice(0, 4).map((fav) => (
               <div key={fav.id} className="relative group/fav">
                 <button
-                  onClick={() => {
-                    if (onNavigate) onNavigate(fav.url);
-                    else onNewTab(fav.url);
-                  }}
+                  onClick={() => handleFavoriteClick(fav.url)}
                   className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-colors duration-150 shadow-xs cursor-pointer"
                   title={`${fav.name} (${fav.url})`}
                 >
@@ -1303,7 +1327,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10 transition-colors text-left cursor-pointer font-medium"
                   >
                     <Sparkles className="w-3.5 h-3.5 text-cyan-500 dark:text-cyan-400" />
-                    Nova AI Asistan (⌘I)
+                    Nova AI Assistant (⌘I)
                   </button>
                 )}
                 {onOpenDownloads && (

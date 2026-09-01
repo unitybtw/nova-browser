@@ -428,8 +428,15 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const isAlreadyLoaded = deps.isExtensionLoaded(extensionId);
     let extInfo;
     if (!isAlreadyLoaded) {
-      extInfo = await win?.webContents.session.loadExtension(extractPath) || await session.defaultSession.loadExtension(extractPath);
-      deps.addLoadedExtension(extInfo);
+      try {
+        extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: true });
+        deps.addLoadedExtension(extInfo);
+      } catch (loadErr: any) {
+        console.error('Failed to load extension into session:', loadErr);
+        try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
+        try { fs.unlinkSync(crxFilePath); } catch (_) {}
+        return { error: `Failed to load extension: ${loadErr?.message || 'Unsupported or invalid extension'}` };
+      }
     } else {
       extInfo = deps.findLoadedExtension(extensionId);
     }

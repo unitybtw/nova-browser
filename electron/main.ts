@@ -1,4 +1,12 @@
 console.log('Main process starting...');
+// Process-level crash guards: prevent unexpected unhandled async errors from terminating Electron
+process.on('uncaughtException', (err) => {
+  console.error('[Main Process] Uncaught Exception caught safely:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main Process] Unhandled Rejection caught safely:', reason);
+});
+
 import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
 import path from 'path';
 import fetch from 'cross-fetch';
