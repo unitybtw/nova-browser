@@ -153,9 +153,9 @@ const MATRIX_FEATURES = [
   },
   {
     feature: 'Intelligent Tab Hibernation',
-    sub: 'Background DOM tree unmounting with instant restore',
+    sub: 'Idle webview unmounting with background memory reclamation',
     nova: '-64% RAM Active Drop',
-    chrome: 'Memory Saver (~20%)',
+    chrome: 'Memory Saver (Tab Discard)',
     arc: 'Heavy (~1,450 MB)',
     brave: 'Partial (~920 MB)',
     isNovaLeader: true,

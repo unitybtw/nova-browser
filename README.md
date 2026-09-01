@@ -49,7 +49,7 @@
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **RAM Footprint (20 Tabs)** | **~420 MB** *(Leader)* | ~1,180 MB | ~1,450 MB | ~920 MB | ~680 MB |
 | **Speedometer 3.0 Score** | **38.4 pts** *(Top Tier)*| 32.1 pts | 29.8 pts | 31.4 pts | 35.6 pts |
-| **Tab Hibernation Engine** | **Sub-millisecond DOM unmount** | Memory Saver (~20%) | High RAM usage | Partial hibernation | OS-managed |
+| **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | High RAM usage | Partial hibernation | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud OpenAI | Cloud Leo (Subscription) | Apple Intelligence |
 | **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
 | **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | Extension dependent | 0.35 ms (Brave Shield) | Content Blockers |
