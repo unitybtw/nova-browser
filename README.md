@@ -75,6 +75,8 @@
 | **Startup JS Bundle** | Core Entry Chunk | **496** | KB | Lightweight initial JS evaluated at browser launch |
 | **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |
 
+> **Full Benchmark Methodology & Reproduction Guide:** See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for real CDP cold-start runs and reproduction commands.
+
 ---
 
 ## Screenshots
