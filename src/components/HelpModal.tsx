@@ -416,23 +416,17 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
               {/* ABOUT */}
               {activeTab === 'about' && (
                 <div className="space-y-5 text-center py-2">
-                  <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-cyan-500 via-blue-600 to-indigo-600 p-3.5 flex items-center justify-center shadow-xl shadow-cyan-500/25 relative overflow-hidden">
+                  <div className="w-20 h-20 mx-auto rounded-3xl p-1 flex items-center justify-center relative overflow-hidden">
                     <img 
-                      src="./nova-icon-transparent.png" 
+                      src="./logo.svg" 
                       alt="Nova Browser" 
-                      className="w-full h-full object-contain drop-shadow-[0_0_8px_rgba(255,255,255,0.4)] scale-110" 
-                      onError={(e) => {
-                        const img = e.target as HTMLImageElement;
-                        if (!img.src.includes('nova-icon-pure.png')) {
-                          img.src = './nova-icon-pure.png';
-                        }
-                      }}
+                      className="w-full h-full object-contain" 
                     />
                   </div>
                   
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Nova Browser</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Version 1.1.3 (Open Source Edition)</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Version 1.1.6 (Open Source Edition)</p>
                     <p className="text-xs text-cyan-600 dark:text-cyan-400 font-medium font-mono">Fast • AI-Powered • Private</p>
                   </div>
 
