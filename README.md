@@ -51,7 +51,6 @@
 | **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~78.0 MB | OS-managed |
 | **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | Partial hibernation | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud Leo (Subscription) | Apple Intelligence |
-| **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
 | **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | 0.35 ms (Brave Shield) | Content Blockers |
 | **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Sync Chain (Brave) | iCloud Keychain |
 | **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available |
