@@ -287,7 +287,7 @@ export const Benchmarks: React.FC = () => {
             type="button"
             onClick={() => setViewMode('matrix')}
             aria-pressed={viewMode === 'matrix'}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-xs font-semibold cursor-pointer transition-all duration-200 ${
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[11px] font-semibold cursor-pointer transition-all duration-200 sm:px-4 sm:text-xs ${
               viewMode === 'matrix'
                 ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
                 : 'text-neutral-600 hover:text-neutral-900'

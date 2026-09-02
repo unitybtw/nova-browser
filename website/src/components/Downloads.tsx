@@ -104,7 +104,7 @@ export const Downloads: React.FC = () => {
               <span>Download DMG</span>
             </a>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
-              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">brew install --cask nova-browser</code>
+              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">brew install --cask unitybtw/tap/nova-browser</code>
             </p>
           </div>
         </motion.div>

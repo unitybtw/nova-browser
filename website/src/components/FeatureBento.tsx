@@ -12,7 +12,7 @@ const MODULES = [
     tag: 'WEBGPU NEURAL RUNTIME',
     description: 'On-device neural inference with Llama 3.2 3B & Phi 3.5 Vision. Deep DOM parsing, shader execution, and intelligent code synthesis with 0% cloud transmission.',
     icon: Bot,
-    stats: '60+ TOKENS / SEC',
+    stats: '100% LOCAL WEBGPU',
     hasVisual: true,
   },
   {
@@ -42,7 +42,7 @@ const MODULES = [
     tag: 'NETWORK FILTER ENGINE',
     description: 'Intercepts advertising beacons and tracking payloads at the network level before DOM parsing ever starts.',
     icon: Shield,
-    stats: '0ms BLOCK RATE',
+    stats: '<1ms DECISION',
     hasVisual: false,
   },
   {
