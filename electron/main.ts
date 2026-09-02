@@ -1304,12 +1304,21 @@ app.on('web-contents-created', (_event, contents) => {
       // 1. Phishing Check
       if (isPhishing(navigationUrl)) {
         e.preventDefault();
-        sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
-        // VULN-05: HTML-escape and JSON.stringify to prevent script injection breakout
-        const escapedUrl = navigationUrl.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#x27;');
+        const escapedUrl = navigationUrl.substring(0, 500);
         const safeUrlJson = JSON.stringify(escapedUrl);
         contents.executeJavaScript(`
-          document.body.innerHTML = '<div style="font-family:sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;"><h1 style="font-size:24px;font-weight:700;margin-bottom:12px;">Dangerous Site Blocked</h1><p style="font-size:14px;color:#7f1d1d;">This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.</p></div>';
+          (() => {
+            document.body.innerHTML = '';
+            document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;';
+            const h1 = document.createElement('h1');
+            h1.textContent = 'Dangerous Site Blocked';
+            h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+            const p = document.createElement('p');
+            p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.';
+            p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;';
+            document.body.appendChild(h1);
+            document.body.appendChild(p);
+          })()
         `).catch(() => {});
         return;
       }
