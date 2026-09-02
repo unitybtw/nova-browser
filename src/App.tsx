@@ -817,6 +817,52 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
     
     // Apply custom accent colors via style injection
+    const defaultColorMap: Record<string, string> = {
+      'blue': '#3b82f6',
+      'emerald': '#10b981',
+      'purple': '#a855f7',
+      'rose': '#f43f5e',
+      'amber': '#f59e0b'
+    };
+
+    let hex = defaultColorMap['blue'];
+    if (settings.accentColor === 'custom' && settings.customAccentColor) {
+      const isValidHex = /^#[0-9a-fA-F]{3,8}$/.test(settings.customAccentColor);
+      hex = isValidHex ? settings.customAccentColor : '#3b82f6';
+    } else if (settings.accentColor && defaultColorMap[settings.accentColor]) {
+      hex = defaultColorMap[settings.accentColor];
+    }
+
+    const cssVariables = {
+      '--color-blue-50': `color-mix(in srgb, ${hex} 10%, white)`,
+      '--color-blue-100': `color-mix(in srgb, ${hex} 20%, white)`,
+      '--color-blue-200': `color-mix(in srgb, ${hex} 40%, white)`,
+      '--color-blue-300': `color-mix(in srgb, ${hex} 60%, white)`,
+      '--color-blue-400': `color-mix(in srgb, ${hex} 80%, white)`,
+      '--color-blue-500': hex,
+      '--color-blue-600': `color-mix(in srgb, ${hex} 80%, black)`,
+      '--color-blue-700': `color-mix(in srgb, ${hex} 60%, black)`,
+      '--color-blue-800': `color-mix(in srgb, ${hex} 40%, black)`,
+      '--color-blue-900': `color-mix(in srgb, ${hex} 20%, black)`,
+      '--color-blue-950': `color-mix(in srgb, ${hex} 10%, black)`,
+      '--nova-accent': hex,
+      '--nova-accent-hover': `color-mix(in srgb, ${hex} 80%, black)`,
+      '--nova-accent-light': `color-mix(in srgb, ${hex} 20%, white)`,
+      '--nova-accent-dark': `color-mix(in srgb, ${hex} 60%, black)`,
+      '--nova-accent-text': '#ffffff',
+      '--color-accent': hex,
+      '--color-accent-hover': `color-mix(in srgb, ${hex} 80%, black)`,
+      '--color-accent-light': `color-mix(in srgb, ${hex} 20%, white)`,
+      '--color-accent-dark': `color-mix(in srgb, ${hex} 60%, black)`,
+      '--color-accent-text': '#ffffff'
+    };
+
+    // Apply directly to root style object for immediate reactivity
+    const rootStyle = document.documentElement.style;
+    for (const [key, value] of Object.entries(cssVariables)) {
+      rootStyle.setProperty(key, value);
+    }
+
     let accentStyleEl = document.getElementById('nova-accent-style');
     if (!accentStyleEl) {
       accentStyleEl = document.createElement('style');
@@ -824,75 +870,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       document.head.appendChild(accentStyleEl);
     }
     
-    if (settings.accentColor === 'custom' && settings.customAccentColor) {
-      // VULN-26 FIX: Validate hex color to prevent CSS injection
-      const isValidHex = /^#[0-9a-fA-F]{3,8}$/.test(settings.customAccentColor);
-      const hex = isValidHex ? settings.customAccentColor : '#3b82f6';
-      accentStyleEl.textContent = `
-        :root {
-          --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
-          --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
-          --color-blue-200: color-mix(in oklab, ${hex} 40%, white) !important;
-          --color-blue-300: color-mix(in oklab, ${hex} 60%, white) !important;
-          --color-blue-400: color-mix(in oklab, ${hex} 80%, white) !important;
-          --color-blue-500: ${hex} !important;
-          --color-blue-600: color-mix(in oklab, ${hex} 80%, black) !important;
-          --color-blue-700: color-mix(in oklab, ${hex} 60%, black) !important;
-          --color-blue-800: color-mix(in oklab, ${hex} 40%, black) !important;
-          --color-blue-900: color-mix(in oklab, ${hex} 20%, black) !important;
-          --color-blue-950: color-mix(in oklab, ${hex} 10%, black) !important;
-          --nova-accent: ${hex};
-          --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
-          --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
-          --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
-          --nova-accent-text: #ffffff;
-        }
-      `;
-    } else {
-      // Map standard colors
-      const defaultColorMap: Record<string, string> = {
-        'blue': '#3b82f6',
-        'emerald': '#10b981',
-        'purple': '#a855f7',
-        'rose': '#f43f5e',
-        'amber': '#f59e0b'
-      };
-      const hex = defaultColorMap[settings.accentColor] || defaultColorMap['blue'];
-      
-      // If it's standard blue, we can either clear or just set it
-      if (settings.accentColor === 'blue') {
-        accentStyleEl.textContent = `
-          :root {
-            --nova-accent: ${hex};
-            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
-            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
-            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
-            --nova-accent-text: #ffffff;
-          }
-        `;
-      } else {
-        accentStyleEl.textContent = `
-          :root {
-            --color-blue-50: color-mix(in oklab, ${hex} 10%, white) !important;
-            --color-blue-100: color-mix(in oklab, ${hex} 20%, white) !important;
-            --color-blue-200: color-mix(in oklab, ${hex} 40%, white) !important;
-            --color-blue-300: color-mix(in oklab, ${hex} 60%, white) !important;
-            --color-blue-400: color-mix(in oklab, ${hex} 80%, white) !important;
-            --color-blue-500: ${hex} !important;
-            --color-blue-600: color-mix(in oklab, ${hex} 80%, black) !important;
-            --color-blue-700: color-mix(in oklab, ${hex} 60%, black) !important;
-            --color-blue-800: color-mix(in oklab, ${hex} 40%, black) !important;
-            --color-blue-900: color-mix(in oklab, ${hex} 20%, black) !important;
-            --color-blue-950: color-mix(in oklab, ${hex} 10%, black) !important;
-            --nova-accent: ${hex};
-            --nova-accent-hover: color-mix(in oklab, ${hex} 80%, black);
-            --nova-accent-light: color-mix(in oklab, ${hex} 20%, white);
-            --nova-accent-dark: color-mix(in oklab, ${hex} 60%, black);
-            --nova-accent-text: #ffffff;
-          }
-        `;
+    accentStyleEl.textContent = `
+      :root, html, body {
+        ${Object.entries(cssVariables).map(([k, v]) => `${k}: ${v};`).join('\n        ')}
       }
-    }
+    `;
 
     // Apply to Electron nativeTheme for webviews
     if ((window as any).electronAPI?.setTheme) {
