@@ -22,7 +22,6 @@ import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } fro
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
-import { initializeBlocklist, startPeriodicRefresh } from './main/blocklist.js';
 import { isPrivateIP } from './main/ipAddress.js';
 
 // Standard clean Chromium User-Agent matching host OS and exact runtime version
@@ -109,40 +108,6 @@ if (!app.isPackaged) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let blockedDomains: string[] = [];
-let blockedDomainSet = new Set<string>();
-
-function setBlockedDomains(domains: string[]): void {
-  blockedDomains = domains;
-  blockedDomainSet = new Set(
-    domains
-      .filter((domain): domain is string => typeof domain === 'string')
-      .map(domain => domain.trim().toLowerCase())
-      .filter(Boolean)
-  );
-}
-
-// Initialize blocklist asynchronously (will be populated in app.whenReady)
-// The initializeBlocklist function handles: local cache -> packaged fallback -> remote refresh
-function loadInitialBlocklist(): void {
-  // Do not make app startup wait for blocklist I/O. The packaged/local list is
-  // loaded immediately, while the rest of the main-process setup can continue.
-  void initializeBlocklist().then((domains) => {
-    setBlockedDomains(domains);
-    console.log(`[Main] Initial blocklist loaded: ${blockedDomains.length} domains`);
-
-    // Start periodic refresh (daily) after the first usable list is available.
-    startPeriodicRefresh((updatedDomains) => {
-      setBlockedDomains(updatedDomains);
-      console.log(`[Main] Blocklist updated via periodic refresh: ${blockedDomains.length} domains`);
-    });
-  }).catch((error) => {
-    console.error('[Main] Blocklist initialization failed:', error);
-    startPeriodicRefresh((updatedDomains) => {
-      setBlockedDomains(updatedDomains);
-    });
-  });
-}
 
 // Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
 function sendToMainWindow(channel: string, payload?: unknown) {
@@ -210,17 +175,7 @@ function isPhishing(urlStr: string) {
   try {
     const url = new URL(urlStr);
     const hostname = url.hostname.toLowerCase();
-    
-    if (PHISHING_KEYWORDS.some(kw => hostname.includes(kw))) return true;
-
-    // Check the hostname and each parent domain against a Set instead of
-    // scanning the full blocklist for every navigation.
-    const labels = hostname.split('.');
-    for (let i = 0; i < labels.length; i++) {
-      if (blockedDomainSet.has(labels.slice(i).join('.'))) return true;
-    }
-
-    return false;
+    return PHISHING_KEYWORDS.some(kw => hostname.includes(kw));
   } catch {
     return false;
   }
@@ -894,10 +849,6 @@ app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
   setupApplicationMenu();
-
-  // Initialize phishing blocklist with auto-refresh in the background. The
-  // local/packaged list is loaded asynchronously and never delays app setup.
-  loadInitialBlocklist();
 
   // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
   interface PendingPermission {
