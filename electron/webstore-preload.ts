@@ -122,6 +122,28 @@ if ((window as any).__novaPreloadInjected) {
       });
   });
 
+  const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '134.0.0.0';
+  const majorVer = chromeVer.split('.')[0] || '134';
+  const plat = typeof process !== 'undefined' ? process.platform : 'darwin';
+  const arch = typeof process !== 'undefined' ? process.arch : 'x64';
+
+  let osUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+  let platformName = 'macOS';
+  let platformVersion = '14.0.0';
+  let architecture = arch === 'arm64' ? 'arm' : 'x86';
+
+  if (plat === 'win32') {
+    osUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    platformName = 'Windows';
+    platformVersion = '10.0.0';
+    architecture = 'x86';
+  } else if (plat === 'linux') {
+    osUserAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    platformName = 'Linux';
+    platformVersion = '6.5.0';
+    architecture = 'x86';
+  }
+
   const mainWorldScript = `
     (() => {
       const greaseChars = [' ', '(', ':', ')', '=', '/', ';', '_', '-', '.', '?'];
@@ -132,12 +154,12 @@ if ((window as any).__novaPreloadInjected) {
 
       const dynamicBrands = [
         { brand: greaseBrand, version: greaseVersion },
-        { brand: 'Chromium', version: '134' },
-        { brand: 'Google Chrome', version: '134' }
+        { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
+        { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
       ];
 
       Object.defineProperty(navigator, 'userAgent', {
-        get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        get: () => ${JSON.stringify(osUserAgent)},
         configurable: true
       });
 
@@ -150,17 +172,17 @@ if ((window as any).__novaPreloadInjected) {
         get: () => ({
           brands: dynamicBrands,
           mobile: false,
-          platform: 'macOS',
+          platform: ${JSON.stringify(platformName)},
           getHighEntropyValues: async (hints) => {
             return {
-              architecture: 'x86',
+              architecture: ${JSON.stringify(architecture)},
               bitness: '64',
               brands: dynamicBrands,
               mobile: false,
               model: '',
-              platform: 'macOS',
-              platformVersion: '14.0.0',
-              uaFullVersion: '134.0.0.0'
+              platform: ${JSON.stringify(platformName)},
+              platformVersion: ${JSON.stringify(platformVersion)},
+              uaFullVersion: ${JSON.stringify(chromeVer)}
             };
           }
         }),
