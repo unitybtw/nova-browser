@@ -1163,7 +1163,13 @@ app.whenReady().then(async () => {
                 loadedExtensions.push(extInfo);
                 console.log(`Loaded extension: ${extInfo.name}`);
               }).catch(err => {
-                console.error(`Failed to load extension at ${extPath}:`, err);
+                console.error(`Failed to load extension at ${extPath}, auto-quarantining:`, err);
+                try {
+                  const currentDisabled = getDisabledExtensionIds();
+                  if (!currentDisabled.includes(dir)) {
+                    setDisabledExtensionIds([...currentDisabled, dir]);
+                  }
+                } catch (_) {}
               });
             }
           }

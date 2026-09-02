@@ -176,7 +176,8 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
 ];
 
 function isTurkishText(str: string): boolean {
-  return /[ığüşöçİĞÜŞÖÇ]|(\b(aç|ac|git|ara|sekme|kapat|sayfa|özetle|ozetle|bul|yardım|yardim|merhaba|selam|teşekkür|tesekkur|ekran|kaydır|kaydir|geçmiş|gecmis)\b)/i.test(str);
+  if (/[ığüşöçİĞÜŞÖÇ]/.test(str)) return true;
+  return /\b(merhaba|selam|selamlar|nasılsın|naber|lütfen|teşekkür|tesekkur|sekme|sekmeyi|sayfa|sayfayı|özetle|ozetle|kapat|kaydır|kaydir|gecmis|gecmisi)\b/i.test(str);
 }
 
 // Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
@@ -1017,10 +1018,11 @@ OUTPUT FORMAT: One JSON object per turn, nothing else.
 - To answer or converse: {"reply": "<your response>"}
 
 CRITICAL RULES:
-1. GENERAL CHAT & GREETINGS: If the user says hello ('selam', 'merhaba'), asks a general question, thanks you, or chats, DO NOT call any tool! Immediately output {"reply": "<helpful friendly answer>"}.
+1. GENERAL CHAT & GREETINGS: If the user says hello, asks a general question, thanks you, or chats, DO NOT call any tool! Immediately output {"reply": "<helpful friendly answer>"}.
 2. ONLY USE TOOLS FOR EXPLICIT ACTIONS: Only use tools when the user explicitly commands a browser action (e.g. open a site, search something, click an element, read page).
 3. NEVER CALL auto_fill_form unless the user explicitly tells you to fill a form on the current web page.
-4. Answer in Turkish (or the user's language). Ground your facts in reality. STRICT RULE: NEVER USE EMOJIS ANYWHERE.`;
+4. LANGUAGE MATCHING: ALWAYS reply in the EXACT SAME language the user is speaking/prompting in. If the user writes in English, reply strictly in English. If the user writes in Turkish, reply in Turkish. If the user writes in Spanish, reply in Spanish, French in French, German in German, etc. Never switch languages unless explicitly requested by the user.
+5. STRICT RULE: NEVER USE EMOJIS ANYWHERE. Ground your facts in reality.`;
   }
 
   private initPromise: Promise<void> | null = null;
@@ -2094,15 +2096,20 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       // Honest-failure bookkeeping: never claim success when nothing ran.
       let executedAnyTool = false;
       const executedToolSignatures: string[] = [];
-      const NO_VALID_OUTPUT_MSG = 'Uzgunum, bu istegi isleyemedim: model gecerli bir arac cagrisi veya yanit uretmedi. Lutfen tekrar deneyin.';
-      const LOOP_EXHAUSTED_MSG = 'Arac adimlari calistirildi ancak sonuc ozetlenemedi. Devam etmek icin lutfen mesaj gonderin.';
+      const isTr = isTurkishText(userQuery);
+      const NO_VALID_OUTPUT_MSG = isTr
+        ? 'Üzgünüm, bu isteği işleyemedim. Lütfen tekrar deneyin.'
+        : 'Sorry, I could not process this request. Please try again.';
+      const LOOP_EXHAUSTED_MSG = isTr
+        ? 'İşlem adımları çalıştırıldı ancak sonuç özetlenemedi.'
+        : 'The requested actions were performed, but the summary could not be completed.';
 
       while (!isDone) {
         await new Promise(r => setTimeout(r, 40));
         loopCount++;
 
         if (!this.isOperationActive(generation)) {
-          finalAnswer = 'Islem durduruldu.';
+          finalAnswer = isTr ? 'İşlem durduruldu.' : 'Operation cancelled.';
           break;
         }
         if (loopCount > MAX_LOOPS) {
@@ -2136,7 +2143,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
             internalMessages.push({
               role: 'user',
-              content: 'Observation: Bu islem zaten calistirildi. Lutfen baska bir arac cagirmadan, kullaniciya dogrudan {"reply": "..."} formatinda nihai yaniti ver.'
+              content: 'Observation: This action was already executed. Please provide the final response to the user in {"reply": "..."} format in the same language as their query without calling more tools.'
             } as ChatCompletionMessageParam);
             return;
           }
@@ -2150,13 +2157,13 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
               internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
               internalMessages.push({
                 role: 'user',
-                content: 'Observation: Sayfada aktif bir form doldurma islemi istenmedi. Lutfen kullanicinin mesajina dogrudan {"reply": "..."} formatinda yanit ver.'
+                content: 'Observation: No active form filling was requested on the page. Please reply directly to the user\'s message in {"reply": "..."} format in the same language as their query.'
               } as ChatCompletionMessageParam);
               return;
             }
           }
 
-          if (onChunk) onChunk(`> Arac calistiriliyor: ${name}...\n\n`);
+          if (onChunk) onChunk(isTr ? `> Araç çalıştırılıyor: ${name}...\n\n` : `> Executing action: ${name}...\n\n`);
           let toolResult = '';
           try {
             toolResult = await this.handleToolCall({
@@ -2172,7 +2179,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
           internalMessages.push({
             role: 'user',
-            content: `Observation: ${toolResult}\nLutfen bu sonucu kullaniciya dogrudan {"reply": "..."} formatinda acikla. Baska bir arac cagirma.`
+            content: `Observation: ${toolResult}\nPlease explain this result directly to the user in {"reply": "..."} format in the same language as their query without calling any more tools.`
           } as ChatCompletionMessageParam);
         };
 

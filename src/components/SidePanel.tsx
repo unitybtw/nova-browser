@@ -567,21 +567,22 @@ export const SidePanel = React.memo(({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          initial={{ x: '100%', opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: '100%', opacity: 0 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="absolute top-0 right-0 bottom-0 w-88 sm:w-96 border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col h-full z-40 shadow-2xl"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 384, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+          className="flex-shrink-0 relative h-full border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
-            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
-              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                <Sparkles className="w-4 h-4" />
+          <div className="w-88 sm:w-96 h-full flex flex-col flex-1 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
+              <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
+                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <h2 className="font-semibold text-sm">Browser AI</h2>
               </div>
-              <h2 className="font-semibold text-sm">Browser AI</h2>
-            </div>
-            <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1">
               <button
                 onClick={() => setShowMemoryVault(!showMemoryVault)}
                 className={`p-1.5 rounded-lg transition-colors ${showMemoryVault ? 'bg-accent/20 dark:bg-accent-dark/50 text-accent-hover' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
@@ -1304,6 +1305,7 @@ export const SidePanel = React.memo(({
               />
             </div>
           )}
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

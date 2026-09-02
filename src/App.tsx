@@ -3056,7 +3056,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         />
 
         {/* Primary View */}
-        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : '100%' }} className="h-full relative transition-none">
+        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : undefined }} className={`h-full relative transition-none ${secondaryTab ? '' : 'flex-1 min-w-0'}`}>
           {sortedTabs.map((tab) => {
             if (secondaryTab && tab.id === secondaryTab.id) {
               return null;
