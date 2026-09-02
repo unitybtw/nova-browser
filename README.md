@@ -280,13 +280,13 @@ graph TD
             sync["syncService.ts - E2EE Cloud Sync Engine"]
         end
 
-        subgraph InternalPages["Internal Pages"]
+        subgraph InternalPages["Internal Views & Pages"]
             settings["SettingsPage.tsx (nova://settings)"]
             history["HistoryPage.tsx (nova://history)"]
             newtab["NewTabPage.tsx (nova://newtab)"]
-            reader["ReaderMode.tsx (nova://reader)"]
             downloadsPage["DownloadsPage.tsx (nova://downloads)"]
-            extModal["ExtensionsModal.tsx (nova://extensions)"]
+            reader["ReaderMode.tsx (Reader Mode View)"]
+            extModal["ExtensionsModal.tsx (Extensions Manager)"]
         end
         
         webview["Webview Host - Sandboxed Webpages"]
@@ -300,19 +300,19 @@ graph TD
         claude["Claude Desktop / Cursor / Antigravity"]
     end
 
-    main <-->|Secure IPC| api
-    api <-->|Method Calls| app
+    main <-->|Secure IPC Bridge| api
+    api <-->|Typed API Invocations| app
     app --> InternalPages
     app --> webview
     app --> AISubsystem
     app --> CoreWorkspaces
     
-    agent <-->|Off-thread Inference| worker
+    agent <-->|Off-thread Web Worker| worker
     agent <-->|Read & Write| memory
     agent --> preview
     agent --> translate
     
-    sync <-->|Realtime Encrypted WebSocket| supabase
+    sync <-->|Encrypted WebSocket (AES-GCM)| supabase
     
     main --> adblock
     main --> security
@@ -321,8 +321,8 @@ graph TD
     main --> keychain
     main --> tts
     
-    claude <-->|JSON-RPC over SSE or Stdio| mcp
-    mcp <-->|DOM Control & Screenshots| webview
+    claude <-->|JSON-RPC over SSE (Port 3020)| mcp
+    mcp <-->|CDP & Main Process Bridge| webview
     
     style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
     style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
