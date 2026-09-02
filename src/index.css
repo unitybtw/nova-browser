@@ -101,6 +101,14 @@ body {
   width: 100%;
 }
 
+webview, iframe {
+  display: flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 auto !important;
+  border: none !important;
+}
+
 h1, h2, h3, h4, h5, h6, .font-serif {
   font-family: 'Lora', serif;
 }

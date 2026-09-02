@@ -976,7 +976,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         )}
       </AnimatePresence>
 
-      <div className="flex-1 w-full relative overflow-hidden">
+      <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col min-h-0">
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
@@ -984,7 +984,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             data-tab-id={tab.id}
             partition={isIncognito ? 'incognito' : undefined}
             src={getSafeUrl(tab.url)}
-            className="w-full h-full border-none bg-white"
+            className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             allowpopups={"true" as any}
             useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
           />

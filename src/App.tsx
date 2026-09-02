@@ -2901,7 +2901,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           PERF: transition is scoped to the properties that actually change on
           sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
           the compositor watch every property of this full-size container. */}
-      <div className={`flex flex-col flex-1 min-w-0 relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      <div className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
@@ -2988,7 +2988,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
       {/* MAIN BROWSER CONTENT */}
       <main 
-        className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden"
+        className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden min-h-0"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
           if (types.includes('text/plain')) {
@@ -3056,7 +3056,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         />
 
         {/* Primary View */}
-        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : undefined }} className={`h-full relative transition-none ${secondaryTab ? '' : 'flex-1 min-w-0'}`}>
+        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : undefined }} className={`h-full relative transition-none ${secondaryTab ? '' : 'flex-1 min-w-0'} flex flex-col min-h-0`}>
           {sortedTabs.map((tab) => {
             if (secondaryTab && tab.id === secondaryTab.id) {
               return null;
@@ -3064,7 +3064,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return (
               <div
                 key={tab.id}
-                className={`w-full h-full absolute inset-0 ${
+                className={`w-full h-full absolute inset-0 flex flex-col ${
                   tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto visible' : 'opacity-0 z-0 pointer-events-none invisible'
                 }`}
               >
@@ -3139,7 +3139,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         {/* Secondary View (Split Screen) */}
         {secondaryTab && (
-          <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none">
+          <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0">
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
               <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
                 {secondaryTab.title || secondaryTab.url}
