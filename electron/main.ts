@@ -552,8 +552,8 @@ function setupApplicationMenu() {
     try {
       app.setAboutPanelOptions({
         applicationName: 'Nova Browser',
-        applicationVersion: '1.1.1',
-        version: '1.1.1',
+        applicationVersion: '1.1.2',
+        version: '1.1.2',
         copyright: 'Copyright © 2026 Nova Browser. All rights reserved.',
         credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
         website: 'https://github.com/unitybtw/nova-browser'
@@ -1101,11 +1101,46 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('check-for-updates', async (event) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    sendToMainWindow('update-checking');
     try {
+      if (!app.isPackaged) {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
+          headers: { 'User-Agent': 'Nova-Browser-App' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const latestTag = (data.tag_name || '').replace(/^v/, '');
+          const currentVersion = app.getVersion();
+          if (latestTag && latestTag !== currentVersion) {
+            sendToMainWindow('update-available', { version: latestTag, releaseDate: data.published_at });
+            return { success: true, version: latestTag };
+          } else {
+            sendToMainWindow('update-not-available', { version: currentVersion });
+            return { success: true, version: currentVersion };
+          }
+        }
+      }
       const result = await autoUpdater.checkForUpdatesAndNotify();
       return { success: true, version: result?.updateInfo?.version || null };
     } catch (err: any) {
-      console.error('Check for updates failed:', err);
+      console.error('Check for updates failed, trying fallback:', err);
+      try {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
+          headers: { 'User-Agent': 'Nova-Browser-App' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const latestTag = (data.tag_name || '').replace(/^v/, '');
+          const currentVersion = app.getVersion();
+          if (latestTag && latestTag !== currentVersion) {
+            sendToMainWindow('update-available', { version: latestTag, releaseDate: data.published_at });
+            return { success: true, version: latestTag };
+          } else {
+            sendToMainWindow('update-not-available', { version: currentVersion });
+            return { success: true, version: currentVersion };
+          }
+        }
+      } catch (_) {}
       sendToMainWindow('update-error', err?.message || 'Check failed');
       return { success: false, error: err?.message || 'Check failed' };
     }

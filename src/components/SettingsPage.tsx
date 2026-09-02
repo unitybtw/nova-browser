@@ -857,7 +857,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version 1.1.1 (Open Source Edition)</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version 1.1.2 (Open Source Edition)</p>
                   </div>
                   <UpdateWidget />
                 </div>
