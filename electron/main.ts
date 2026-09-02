@@ -3047,19 +3047,53 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
 // Read Chrome Bookmarks
 ipcMain.handle('import-chrome-bookmarks', async (event) => {
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
-  const isMac = process.platform === 'darwin';
-  const isWin = process.platform === 'win32';
-  
-  let bookmarksPath = '';
-  if (isMac) {
-    bookmarksPath = path.join(app.getPath('home'), 'Library/Application Support/Google/Chrome/Default/Bookmarks');
-  } else if (isWin) {
-    bookmarksPath = path.join(app.getPath('appData'), '..', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks');
+  const home = app.getPath('home');
+  const candidatePaths: string[] = [];
+
+  if (process.platform === 'darwin') {
+    candidatePaths.push(
+      path.join(home, 'Library/Application Support/Google/Chrome/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/Google/Chrome/Profile 1/Bookmarks'),
+      path.join(home, 'Library/Application Support/Chromium/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/BraveSoftware/Brave-Browser/Default/Bookmarks'),
+      path.join(home, 'Library/Application Support/Microsoft Edge/Default/Bookmarks')
+    );
+  } else if (process.platform === 'win32') {
+    const localAppData = path.join(app.getPath('appData'), '..', 'Local');
+    candidatePaths.push(
+      path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Profile 1', 'Bookmarks'),
+      path.join(localAppData, 'Chromium', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data', 'Default', 'Bookmarks'),
+      path.join(localAppData, 'Microsoft', 'Edge', 'User Data', 'Default', 'Bookmarks')
+    );
   } else if (process.platform === 'linux') {
-    const chromeLinux = path.join(app.getPath('home'), '.config', 'google-chrome', 'Default', 'Bookmarks');
-    const chromiumLinux = path.join(app.getPath('home'), '.config', 'chromium', 'Default', 'Bookmarks');
-    bookmarksPath = fs.existsSync(chromeLinux) ? chromeLinux : chromiumLinux;
+    // 1. Native packages (~/.config/...)
+    candidatePaths.push(
+      path.join(home, '.config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'google-chrome', 'Profile 1', 'Bookmarks'),
+      path.join(home, '.config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'chromium', 'Profile 1', 'Bookmarks'),
+      path.join(home, '.config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks'),
+      path.join(home, '.config', 'microsoft-edge', 'Default', 'Bookmarks')
+    );
+    // 2. Flatpak packages (~/.var/app/...)
+    candidatePaths.push(
+      path.join(home, '.var', 'app', 'com.google.Chrome', 'config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'org.chromium.Chromium', 'config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'com.brave.Browser', 'config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks'),
+      path.join(home, '.var', 'app', 'com.microsoft.Edge', 'config', 'microsoft-edge', 'Default', 'Bookmarks')
+    );
+    // 3. Snap packages (~/snap/...)
+    candidatePaths.push(
+      path.join(home, 'snap', 'chromium', 'current', '.config', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'chromium', 'common', 'chromium', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'google-chrome', 'current', '.config', 'google-chrome', 'Default', 'Bookmarks'),
+      path.join(home, 'snap', 'brave', 'current', '.config', 'BraveSoftware', 'Brave-Browser', 'Default', 'Bookmarks')
+    );
   }
+
+  const bookmarksPath = candidatePaths.find(p => fs.existsSync(p)) || '';
 
   if (!fs.existsSync(bookmarksPath)) {
     return { success: false, error: 'Chrome Bookmarks file not found.' };
