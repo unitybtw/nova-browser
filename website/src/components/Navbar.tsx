@@ -69,12 +69,13 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
         return;
       }
 
-      const scrollPos = scrollY + 200;
+      const scrollPos = scrollY + 160;
       for (let i = 1; i < sectionIds.length; i++) {
         const el = document.getElementById(sectionIds[i]);
         if (el) {
-          const top = el.offsetTop;
-          const height = el.offsetHeight;
+          const rect = el.getBoundingClientRect();
+          const top = rect.top + scrollY;
+          const height = rect.height;
           if (scrollPos >= top && scrollPos < top + height) {
             setSelected(i);
             break;
