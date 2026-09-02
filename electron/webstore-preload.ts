@@ -123,44 +123,49 @@ if ((window as any).__novaPreloadInjected) {
   });
 
   const mainWorldScript = `
-    Object.defineProperty(navigator, 'userAgent', {
-      get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
-      configurable: true
-    });
+    (() => {
+      const greaseChars = [' ', '(', ':', ')', '=', '/', ';', '_', '-', '.', '?'];
+      const c1 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
+      const c2 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
+      const greaseBrand = 'Not' + c1 + 'A' + c2 + 'Brand';
+      const greaseVersion = ['8', '24', '99'][Math.floor(Math.random() * 3)];
 
-    Object.defineProperty(navigator, 'vendor', {
-      get: () => 'Google Inc.',
-      configurable: true
-    });
+      const dynamicBrands = [
+        { brand: greaseBrand, version: greaseVersion },
+        { brand: 'Chromium', version: '134' },
+        { brand: 'Google Chrome', version: '134' }
+      ];
 
-    Object.defineProperty(navigator, 'userAgentData', {
-      get: () => ({
-        brands: [
-          { brand: 'Not/A)Brand', version: '8' },
-          { brand: 'Chromium', version: '134' },
-          { brand: 'Google Chrome', version: '134' }
-        ],
-        mobile: false,
-        platform: 'macOS',
-        getHighEntropyValues: async (hints) => {
-          return {
-            architecture: 'x86',
-            bitness: '64',
-            brands: [
-              { brand: 'Not/A)Brand', version: '8' },
-              { brand: 'Chromium', version: '134' },
-              { brand: 'Google Chrome', version: '134' }
-            ],
-            mobile: false,
-            model: '',
-            platform: 'macOS',
-            platformVersion: '14.0.0',
-            uaFullVersion: '134.0.0.0'
-          };
-        }
-      }),
-      configurable: true
-    });
+      Object.defineProperty(navigator, 'userAgent', {
+        get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
+        configurable: true
+      });
+
+      Object.defineProperty(navigator, 'vendor', {
+        get: () => 'Google Inc.',
+        configurable: true
+      });
+
+      Object.defineProperty(navigator, 'userAgentData', {
+        get: () => ({
+          brands: dynamicBrands,
+          mobile: false,
+          platform: 'macOS',
+          getHighEntropyValues: async (hints) => {
+            return {
+              architecture: 'x86',
+              bitness: '64',
+              brands: dynamicBrands,
+              mobile: false,
+              model: '',
+              platform: 'macOS',
+              platformVersion: '14.0.0',
+              uaFullVersion: '134.0.0.0'
+            };
+          }
+        }),
+        configurable: true
+      });
 
     window.chrome = window.chrome || {};
     window.chrome.webstore = {
@@ -218,6 +223,7 @@ if ((window as any).__novaPreloadInjected) {
         else return Promise.resolve(false);
       }
     };
+  })();
   `;
 
   // Synchronously execute spoofing in the main world (World ID: 0)
