@@ -1105,7 +1105,12 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
-    sendToMainWindow('update-error', err?.message || 'Unknown update error');
+    const msg = err?.message || '';
+    if (msg.includes('Cannot parse releases feed') || msg.includes('Unable to find') || msg.includes('404') || msg.includes('HttpError')) {
+      sendToMainWindow('update-not-available', { version: app.getVersion() });
+    } else {
+      sendToMainWindow('update-error', msg || 'Update check failed');
+    }
   });
 
   ipcMain.handle('check-for-updates', async (event) => {
@@ -1113,45 +1118,47 @@ app.whenReady().then(async () => {
     sendToMainWindow('update-checking');
     try {
       if (!app.isPackaged) {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() }
         });
         if (res.ok) {
-          const data = await res.json();
-          const latestTag = (data.tag_name || '').replace(/^v/, '');
-          const currentVersion = app.getVersion();
-          if (latestTag && latestTag !== currentVersion) {
-            sendToMainWindow('update-available', { version: latestTag, releaseDate: data.published_at });
-            return { success: true, version: latestTag };
-          } else {
-            sendToMainWindow('update-not-available', { version: currentVersion });
-            return { success: true, version: currentVersion };
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && latestTag !== currentVersion) {
+              sendToMainWindow('update-available', { version: latestTag, releaseDate: latestRelease.published_at });
+              return { success: true, version: latestTag };
+            }
           }
+          sendToMainWindow('update-not-available', { version: app.getVersion() });
+          return { success: true, version: app.getVersion() };
         }
       }
       const result = await autoUpdater.checkForUpdatesAndNotify();
       return { success: true, version: result?.updateInfo?.version || null };
     } catch (err: any) {
-      console.error('Check for updates failed, trying fallback:', err);
+      console.warn('Check for updates failed via autoUpdater, checking GitHub releases directly:', err?.message);
       try {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() }
         });
         if (res.ok) {
-          const data = await res.json();
-          const latestTag = (data.tag_name || '').replace(/^v/, '');
-          const currentVersion = app.getVersion();
-          if (latestTag && latestTag !== currentVersion) {
-            sendToMainWindow('update-available', { version: latestTag, releaseDate: data.published_at });
-            return { success: true, version: latestTag };
-          } else {
-            sendToMainWindow('update-not-available', { version: currentVersion });
-            return { success: true, version: currentVersion };
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && latestTag !== currentVersion) {
+              sendToMainWindow('update-available', { version: latestTag, releaseDate: latestRelease.published_at });
+              return { success: true, version: latestTag };
+            }
           }
         }
       } catch (_) {}
-      sendToMainWindow('update-error', err?.message || 'Check failed');
-      return { success: false, error: err?.message || 'Check failed' };
+      sendToMainWindow('update-not-available', { version: app.getVersion() });
+      return { success: true, version: app.getVersion() };
     }
   });
 

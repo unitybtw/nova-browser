@@ -59,3 +59,40 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+
+  publish-release:
+    name: Publish Release
+    needs: [release-mac, release-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish Draft Release
+        run: |
+          node -e '
+          async function run() {
+            const token = process.env.GITHUB_TOKEN;
+            const repo = process.env.GITHUB_REPOSITORY;
+            const tag = process.env.GITHUB_REF_NAME;
+            
+            const res = await fetch(`https://api.github.com/repos/${repo}/releases`, {
+              headers: { Authorization: `token ${token}`, Accept: "application/vnd.github+json" }
+            });
+            const releases = await res.json();
+            const draftRelease = Array.isArray(releases) ? releases.find(r => r.tag_name === tag && r.draft) : null;
+            if (draftRelease) {
+              console.log(`Publishing release ID ${draftRelease.id} for tag ${tag}...`);
+              const pub = await fetch(`https://api.github.com/repos/${repo}/releases/${draftRelease.id}`, {
+                method: "PATCH",
+                headers: { Authorization: `token ${token}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+                body: JSON.stringify({ draft: false })
+              });
+              console.log(`Publish status: ${pub.status}`);
+            } else {
+              console.log("No draft release found for tag:", tag);
+            }
+          }
+          run().catch(console.error);
+          '
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
