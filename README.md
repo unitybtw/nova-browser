@@ -45,18 +45,18 @@
 
 ### Head-to-Head Comparison Matrix
 
-| Feature / Metric | Nova Browser | Google Chrome | Arc Browser | Brave Browser | Apple Safari 18 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **RAM Footprint (20 Tabs)** | **~420 MB** *(Leader)* | ~1,180 MB | ~1,450 MB | ~920 MB | ~680 MB |
-| **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~142.0 MB | ~78.0 MB | OS-managed |
-| **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | High RAM usage | Partial hibernation | OS-managed |
-| **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud OpenAI | Cloud Leo (Subscription) | Apple Intelligence |
-| **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
-| **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | Extension dependent | 0.35 ms (Brave Shield) | Content Blockers |
-| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Firebase / Closed | Sync Chain (Brave) | iCloud Keychain |
-| **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available | Not available |
-| **Telemetry & Privacy** | **Zero Telemetry** | Extensive tracking | Analytics enabled | Opt-out required | Telemetry enabled |
-| **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | Closed Source | MPL 2.0 | Proprietary Core |
+| Feature / Metric | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
+| :--- | :--- | :--- | :--- | :--- |
+| **RAM Footprint (20 Tabs)** | **~420 MB** *(Leader)* | ~1,180 MB | ~920 MB | ~680 MB |
+| **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~78.0 MB | OS-managed |
+| **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | Partial hibernation | OS-managed |
+| **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud Leo (Subscription) | Apple Intelligence |
+| **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
+| **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | 0.35 ms (Brave Shield) | Content Blockers |
+| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Sync Chain (Brave) | iCloud Keychain |
+| **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available |
+| **Telemetry & Privacy** | **Zero Telemetry** | Extensive tracking | Opt-out required | Telemetry enabled |
+| **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | MPL 2.0 | Proprietary Core |
 
 ---
 

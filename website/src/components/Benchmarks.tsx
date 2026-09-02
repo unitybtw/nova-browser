@@ -58,7 +58,6 @@ const CATEGORIES: BenchmarkCategory[] = [
     competitors: [
       { name: 'Nova Browser', value: 420, displayValue: '420 MB', isWinner: true },
       { name: 'Google Chrome', value: 1180, displayValue: '1,180 MB' },
-      { name: 'Arc Browser', value: 1450, displayValue: '1,450 MB' },
       { name: 'Brave Browser', value: 920, displayValue: '920 MB' },
     ],
   },
@@ -82,7 +81,6 @@ const CATEGORIES: BenchmarkCategory[] = [
       { name: 'Nova Browser', value: 31.2, displayValue: '31.2 MB', isWinner: true },
       { name: 'Google Chrome', value: 85.0, displayValue: '~85.0 MB' },
       { name: 'Brave Browser', value: 78.0, displayValue: '~78.0 MB' },
-      { name: 'Arc Browser', value: 142.0, displayValue: '~142.0 MB' },
     ],
   },
   {
@@ -138,7 +136,6 @@ const MATRIX_FEATURES = [
     sub: 'Client-side WebGPU neural execution with zero cloud transmission',
     nova: 'Native WebGPU (64 tok/s)',
     chrome: 'Cloud Gemini (Paywalled)',
-    arc: 'Cloud OpenAI (Telemetry)',
     brave: 'Cloud Leo (Paid Tier)',
     isNovaLeader: true,
   },
@@ -147,7 +144,6 @@ const MATRIX_FEATURES = [
     sub: 'Batched DOM tree translation directly inside renderer',
     nova: 'Built-in (DOM Batching)',
     chrome: 'Built-in (Cloud)',
-    arc: 'Extension Only',
     brave: 'Brave Translate (Cloud)',
     isNovaLeader: true,
   },
@@ -156,7 +152,6 @@ const MATRIX_FEATURES = [
     sub: 'Idle webview unmounting with background memory reclamation',
     nova: '-64% RAM Active Drop',
     chrome: 'Memory Saver (Tab Discard)',
-    arc: 'Heavy (~1,450 MB)',
     brave: 'Partial (~920 MB)',
     isNovaLeader: true,
   },
@@ -165,7 +160,6 @@ const MATRIX_FEATURES = [
     sub: 'Multi-pane parallel browsing with synchronized scrolling',
     nova: 'Native Split Engine',
     chrome: 'No (Separate Windows)',
-    arc: 'Basic Split',
     brave: 'No (Separate Windows)',
     isNovaLeader: true,
   },
@@ -174,7 +168,6 @@ const MATRIX_FEATURES = [
     sub: 'Zero analytics pings, zero remote identifier logs',
     nova: '100% Sovereign (0 KB)',
     chrome: 'Extensive Telemetry',
-    arc: 'Usage Analytics',
     brave: 'Opt-out Required',
     isNovaLeader: true,
   },
@@ -183,7 +176,6 @@ const MATRIX_FEATURES = [
     sub: 'Open source codebase with reproducible build pipeline',
     nova: '100% MIT License',
     chrome: 'Proprietary Core',
-    arc: 'Closed Source',
     brave: 'MPL 2.0',
     isNovaLeader: true,
   },
@@ -757,7 +749,6 @@ export const Benchmarks: React.FC = () => {
                   <th className="p-6 font-semibold w-1/3">Capability & Architecture</th>
                   <th className="p-6 font-bold text-[#4338ca] bg-indigo-50/50">Nova Browser</th>
                   <th className="p-6 font-semibold">Google Chrome</th>
-                  <th className="p-6 font-semibold">Arc Browser</th>
                   <th className="p-6 font-semibold">Brave</th>
                 </tr>
               </thead>
@@ -786,14 +777,6 @@ export const Benchmarks: React.FC = () => {
                       <div className="flex items-center gap-1.5">
                         <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
                         <span>{item.chrome}</span>
-                      </div>
-                    </td>
-
-                    {/* Arc Column */}
-                    <td className="p-6 font-mono text-neutral-600">
-                      <div className="flex items-center gap-1.5">
-                        <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                        <span>{item.arc}</span>
                       </div>
                     </td>
 
