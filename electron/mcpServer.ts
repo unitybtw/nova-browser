@@ -369,12 +369,44 @@ export class BrowserMCPServer {
   }
 
   private loadOrGenerateToken(): string {
-    return randomUUID();
+    try {
+      if (this.tokenFilePath && fs.existsSync(this.tokenFilePath)) {
+        const raw = fs.readFileSync(this.tokenFilePath);
+        if (raw.length > 0) {
+          try {
+            if (safeStorage.isEncryptionAvailable()) {
+              const decrypted = safeStorage.decryptString(raw);
+              if (decrypted && decrypted.length >= 16) return decrypted;
+            }
+          } catch (_) {}
+          // Fallback to UTF-8 plaintext if safeStorage is unavailable
+          const plaintext = raw.toString('utf-8').trim();
+          if (plaintext && plaintext.length >= 16) return plaintext;
+        }
+      }
+    } catch (err) {
+      console.warn('[MCP Server] Error loading persisted token:', err);
+    }
+    return this.saveNewToken();
   }
 
   private saveNewToken(): string {
     const newToken = randomUUID();
     this.token = newToken;
+    try {
+      if (this.tokenFilePath) {
+        const dir = path.dirname(this.tokenFilePath);
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        if (safeStorage.isEncryptionAvailable()) {
+          const encrypted = safeStorage.encryptString(newToken);
+          fs.writeFileSync(this.tokenFilePath, encrypted, { mode: 0o600 });
+        } else {
+          fs.writeFileSync(this.tokenFilePath, newToken, { encoding: 'utf-8', mode: 0o600 });
+        }
+      }
+    } catch (err) {
+      console.warn('[MCP Server] Error saving persisted token:', err);
+    }
     return newToken;
   }
 
@@ -498,26 +530,33 @@ export class BrowserMCPServer {
   private setupRoutes(app: Express) {
     // Security: Prevent DNS rebinding attacks by strictly validating the Host header
     app.use((req, res, next) => {
-      const host = req.headers.host || '';
+      const host = (req.headers.host || '').toLowerCase();
       const port = this.actualPort || this.requestedPort;
-      const allowedHosts = [`localhost:${port}`, `127.0.0.1:${port}`, 'localhost', '127.0.0.1'];
+      const allowedHosts = [
+        `localhost:${port}`,
+        `127.0.0.1:${port}`,
+        `[::1]:${port}`,
+        'localhost',
+        '127.0.0.1',
+        '[::1]'
+      ];
       if (!allowedHosts.includes(host)) {
         return res.status(403).json({ error: 'Forbidden: Invalid Host header' });
       }
       next();
     });
 
-    // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*)
+    // CORS for all routes - restricted to local origins (http://localhost:*, http://127.0.0.1:*, http://[::1]:*)
     app.use((req, res, next) => {
       const origin = req.headers.origin;
       if (origin) {
         try {
           const url = new URL(origin);
-          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.protocol === 'nova:') {
+          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.protocol === 'nova:') {
             res.header('Access-Control-Allow-Origin', origin);
           }
         } catch (_) {
-          if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+          if (/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/i.test(origin)) {
             res.header('Access-Control-Allow-Origin', origin);
           }
         }

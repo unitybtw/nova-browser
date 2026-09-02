@@ -9,10 +9,19 @@ process.on('unhandledRejection', (reason) => {
 
 import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import fetch from 'cross-fetch';
 import dns from 'dns';
 import { promisify } from 'util';
 import fs from 'fs';
+
+// Security: Enforce single-instance lock to prevent duplicate process conflicts,
+// database/LevelDB corruption, and hostile command-line flag injection.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  console.warn('[Security] Another instance of Nova Browser is already running. Quitting duplicate process.');
+  app.quit();
+}
 import child_process from 'child_process';
 import crypto from 'crypto';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
@@ -162,8 +171,12 @@ function isTrustedAppOrigin(urlStr: string): boolean {
     if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
       const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
-      const navPath = decodeURIComponent(parsed.pathname);
-      return path.resolve(navPath) === allowedPath;
+      try {
+        const navPath = fileURLToPath(urlStr);
+        return path.resolve(navPath) === allowedPath;
+      } catch {
+        return false;
+      }
     }
     return false;
   } catch {
@@ -845,6 +858,26 @@ function setupApplicationMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+// Security: When a second instance is launched, focus the existing window and safely route any valid URL
+app.on('second-instance', (_event, commandLine) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+
+    const possibleUrl = commandLine.find(arg => {
+      try {
+        const u = new URL(arg);
+        return (u.protocol === 'http:' || u.protocol === 'https:') && !u.username && !u.password;
+      } catch {
+        return false;
+      }
+    });
+    if (possibleUrl) {
+      sendToMainWindow('new-tab', possibleUrl);
+    }
+  }
+});
+
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
@@ -906,6 +939,13 @@ app.whenReady().then(async () => {
         return callback(false);
       }
 
+      // Security: Block openExternal unconditionally for all web content.
+      // Web pages must never be allowed to invoke OS-level URI schemes or external applications.
+      if (permission === 'openExternal') {
+        console.warn(`[Security] Blocked openExternal request from ${url}`);
+        return callback(false);
+      }
+
       let origin = '';
       try {
         origin = new URL(url).origin;
@@ -930,7 +970,6 @@ app.whenReady().then(async () => {
         'midiSysex': 'MIDI Devices (SysEx)',
         'pointerLock': 'Pointer Lock',
         'fullscreen': 'Fullscreen',
-        'openExternal': 'Open External App',
         'clipboard-read': 'Read Clipboard',
         'clipboard-sanitized-write': 'Write Clipboard',
         'display-capture': 'Screen Sharing',
@@ -980,6 +1019,9 @@ app.whenReady().then(async () => {
     });
 
     targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      // Security: Deny openExternal checks immediately
+      if (permission === 'openExternal') return false;
+
       // Internal pages are not permission principals. Keep all app-origin
       // permission checks denied unless a future capability explicitly needs it.
       if (isTrustedAppOrigin(requestingOrigin)) {
@@ -1209,11 +1251,28 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
   });
 
-  // Security: Block arbitrary window popups and route valid HTTP/HTTPS URLs to our secure tab system
+  // Security: Sliding-window rate limiter per WebContents to prevent popup flooding (DoS)
+  const popupHistory = new Map<number, number[]>();
+  contents.once('destroyed', () => {
+    popupHistory.delete(contents.id);
+  });
+
+  // Security: Block arbitrary window popups, rate-limit rapid bursts, and route valid HTTP/HTTPS URLs to our secure tab system
   contents.setWindowOpenHandler(({ url }) => {
     try {
+      const now = Date.now();
+      const id = contents.id;
+      const history = (popupHistory.get(id) || []).filter(ts => now - ts < 2000);
+      if (history.length >= 3) {
+        console.warn(`[Security] Blocked popup flood from webContents ${id} (url: ${url})`);
+        popupHistory.set(id, history);
+        return { action: 'deny' };
+      }
+      history.push(now);
+      popupHistory.set(id, history);
+
       const parsed = new URL(url);
-      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password) {
         sendToMainWindow('new-tab', url);
       }
     } catch {}
@@ -2188,7 +2247,10 @@ async function validatePreviewUrl(rawUrl: string): Promise<URL | { error: string
   }
 
   const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
-  if (port === '3020') return { error: 'Requests to MCP server port are blocked.' };
+  const activeMcpPort = String(mcpServer?.getPort?.() || 3020);
+  if (port === '3020' || port === activeMcpPort) {
+    return { error: 'Requests to MCP server port are blocked.' };
+  }
   return parsedUrl;
 }
 
@@ -2763,7 +2825,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
   const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
   if (url.startsWith('file://')) {
     try {
-      const filePath = path.resolve(decodeURIComponent(new URL(url).pathname));
+      const filePath = path.resolve(fileURLToPath(url));
       if (!filePath.startsWith(extensionsDir + path.sep)) {
         return { error: 'Blocked: file:// URL must be within extensions directory.' };
       }

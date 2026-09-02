@@ -249,16 +249,22 @@ function assertExtractionContained(dir: string): void {
 export async function installFromWebstore(deps: CrxInstallerDeps, event: Electron.IpcMainInvokeEvent, urlOrId: string) {
   const { isTrustedSender, getMainWindow } = deps;
 
-  // Security: Allow only trusted main window OR Chrome Web Store origin
-  const senderUrl = event.sender?.getURL() || '';
+  // Security: Allow only trusted main window OR Chrome Web Store top-level main frame
   const isFromMainWindow = isTrustedSender(event);
   let isFromWebstore = false;
-  try {
-    const sender = new URL(senderUrl);
-    isFromWebstore = sender.protocol === 'https:' &&
-      ((sender.hostname === 'chromewebstore.google.com') ||
-       (sender.hostname === 'chrome.google.com' && sender.pathname.startsWith('/webstore/')));
-  } catch (_) {}
+  if (!isFromMainWindow && event.sender) {
+    try {
+      const isMainFrame = !event.senderFrame || event.senderFrame === event.sender.mainFrame;
+      const frameUrlStr = (event.senderFrame && typeof event.senderFrame.url === 'string')
+        ? event.senderFrame.url
+        : event.sender.getURL() || '';
+      const sender = new URL(frameUrlStr);
+      const isWebstoreHost = sender.protocol === 'https:' &&
+        ((sender.hostname === 'chromewebstore.google.com') ||
+         (sender.hostname === 'chrome.google.com' && sender.pathname.startsWith('/webstore/')));
+      isFromWebstore = isMainFrame && isWebstoreHost;
+    } catch (_) {}
+  }
   if (!isFromMainWindow && !isFromWebstore) {
     return { error: 'Unauthorized: install-from-webstore can only be called from Chrome Web Store or Nova main window.' };
   }
