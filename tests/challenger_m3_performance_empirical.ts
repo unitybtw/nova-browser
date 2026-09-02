@@ -572,21 +572,28 @@ async function runMilestone3ChallengerSuite() {
       }
     }
 
-    mount() {
-      // 1. Initialize SpeechRecognition per instance (not singleton)
-      this.recognitionInstance = {
-        continuous: true,
-        interimResults: true,
-        lang: 'en-US',
-        isStarted: false,
-        onresult: (_e: any) => {},
-        onerror: (_e: any) => {},
-        onend: (_e: any) => {},
-        start() { this.isStarted = true; },
-        stop() { this.isStarted = false; }
-      };
+    getOrCreateRecognition() {
+      if (!this.recognitionInstance) {
+        this.recognitionInstance = {
+          continuous: true,
+          interimResults: true,
+          lang: 'en-US',
+          isStarted: false,
+          onresult: (_e: any) => {},
+          onerror: (_e: any) => {},
+          onend: (_e: any) => {},
+          start() { this.isStarted = true; },
+          stop() { this.isStarted = false; }
+        };
+      }
+      return this.recognitionInstance;
+    }
 
-      // 2. Global window event listener with stable ref handler
+    mount() {
+      // Lazy: not instantiated on mount to prevent instant macOS mic permission prompt
+      this.recognitionInstance = null;
+
+      // Global window event listener with stable ref handler
       this.quickActionHandler = (e: any) => {
         // simulate handleAIActionRef.current invocation
       };
@@ -615,11 +622,12 @@ async function runMilestone3ChallengerSuite() {
 
   const sidePanelSim = new SidePanelLifecycleSimulator();
   sidePanelSim.mount();
+  const rec = sidePanelSim.getOrCreateRecognition();
 
   recordTest(
     'SidePanel Lifecycle',
-    'SpeechRecognition instance created on mount',
-    sidePanelSim.recognitionInstance !== null && sidePanelSim.recognitionInstance.lang === 'en-US',
+    'SpeechRecognition instance created on demand',
+    rec !== null && rec.lang === 'en-US',
     'Instance initialized with lang="en-US"'
   );
 

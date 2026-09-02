@@ -136,36 +136,39 @@ export const SidePanel = React.memo(({
     return aiAgent.onStatus(setAgentStatus);
   }, []);
 
-  // Initialize SpeechRecognition with proper lifecycle cleanup
-  useEffect(() => {
+  const getOrCreateRecognition = useCallback(() => {
+    if (recognitionRef.current) return recognitionRef.current;
     const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognitionClass) {
-      try {
-        const rec = new SpeechRecognitionClass();
-        rec.continuous = true;
-        rec.interimResults = true;
-        rec.lang = 'en-US';
+    if (!SpeechRecognitionClass) return null;
+    try {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = true;
+      rec.interimResults = true;
+      rec.lang = 'en-US';
 
-        rec.onresult = (event: any) => {
-          let finalTranscript = '';
-          for (let i = event.resultIndex; i < event.results.length; ++i) {
-            if (event.results[i].isFinal) {
-              finalTranscript += event.results[i][0].transcript;
-            }
+      rec.onresult = (event: any) => {
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
           }
-          if (finalTranscript) {
-            setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
-          }
-        };
-        rec.onerror = () => setIsListening(false);
-        rec.onend = () => setIsListening(false);
+        }
+        if (finalTranscript) {
+          setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
+        }
+      };
+      rec.onerror = () => setIsListening(false);
+      rec.onend = () => setIsListening(false);
 
-        recognitionRef.current = rec;
-      } catch (err) {
-        console.error('Failed to initialize SpeechRecognition:', err);
-      }
+      recognitionRef.current = rec;
+      return rec;
+    } catch (err) {
+      console.error('Failed to initialize SpeechRecognition:', err);
+      return null;
     }
+  }, []);
 
+  useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try {
@@ -179,14 +182,15 @@ export const SidePanel = React.memo(({
     };
   }, []);
 
-  // Push-to-Talk Handlers
+  // Push-to-Talk Handlers (Lazy Initialization on Click)
   const handleMouseDownMic = useCallback(() => {
-    if (!recognitionRef.current) return;
+    const rec = getOrCreateRecognition();
+    if (!rec) return;
     try {
-      recognitionRef.current.start();
+      rec.start();
       setIsListening(true);
     } catch (e) { console.error(e); }
-  }, []);
+  }, [getOrCreateRecognition]);
 
   const handleMouseUpMic = useCallback(() => {
     if (!recognitionRef.current) return;

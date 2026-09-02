@@ -369,43 +369,12 @@ export class BrowserMCPServer {
   }
 
   private loadOrGenerateToken(): string {
-    try {
-      if (fs.existsSync(this.tokenFilePath)) {
-        if (safeStorage.isEncryptionAvailable()) {
-          const encrypted = fs.readFileSync(this.tokenFilePath);
-          return safeStorage.decryptString(encrypted);
-        }
-
-        // Remove only the legacy plaintext format. Binary/encrypted data is
-        // left untouched so a temporary keychain failure cannot destroy a
-        // recoverable token.
-        try {
-          const legacy = fs.readFileSync(this.tokenFilePath, 'utf8').trim();
-          if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(legacy)) {
-            fs.unlinkSync(this.tokenFilePath);
-          }
-        } catch (_) {}
-      }
-    } catch (e) {
-      console.warn('[MCP Server] Error reading token file:', e);
-    }
-    return this.saveNewToken();
+    return randomUUID();
   }
 
   private saveNewToken(): string {
     const newToken = randomUUID();
-    try {
-      if (safeStorage.isEncryptionAvailable()) {
-        const encrypted = safeStorage.encryptString(newToken);
-        fs.writeFileSync(this.tokenFilePath, encrypted);
-      } else {
-        // Never persist the MCP bearer token in plaintext. It remains valid for
-        // this process only and will rotate on the next launch.
-        console.warn('[MCP Server] safeStorage unavailable; MCP token will not be persisted.');
-      }
-    } catch (e) {
-      console.warn('[MCP Server] Error saving token file:', e);
-    }
+    this.token = newToken;
     return newToken;
   }
 

@@ -348,7 +348,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const visibleWorkspaceTabs = tabs.filter(tab =>
       (tab.workspaceId || 'default') === activeWorkspaceId
     );
-    if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
+    if (visibleWorkspaceTabs.length === 0 && !demoParams.isDemo) {
+      const newTabId = Date.now().toString();
+      const initialWorkspaceTab: Tab = {
+        id: newTabId,
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        workspaceId: activeWorkspaceId
+      };
+      setTabs(prev => [...prev, initialWorkspaceTab]);
+      setActiveTabId(newTabId);
+    } else if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
       setActiveTabId(visibleWorkspaceTabs[0].id);
     }
   }, [tabs, activeTabId, activeWorkspaceId]);
@@ -561,7 +574,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     if (demoParams.isDemo) return false;
-    return localStorage.getItem('nova_onboarding_complete') !== 'true';
+    const isCompleted = localStorage.getItem('nova_onboarding_complete') === 'true';
+    const hasUserSettings = localStorage.getItem('user_settings') !== null;
+    if (!hasUserSettings) {
+      return true;
+    }
+    return !isCompleted;
   });
 
   useEffect(() => {
@@ -1061,6 +1079,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     e?.stopPropagation();
     const prevTabs = tabsRef.current;
     const targetTab = prevTabs.find(t => t.id === id);
+    const activeWs = activeWorkspaceId || 'default';
+    const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
+    if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
+      const newTabId = Date.now().toString();
+      const newTab: Tab = {
+        id: newTabId,
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        workspaceId: activeWs
+      };
+      if (targetTab) {
+        setClosedTabsStack(stack => [...stack, targetTab]);
+      }
+      setTabs(prev => [...prev.filter(t => t.id !== id), newTab]);
+      setActiveTabId(newTabId);
+      return;
+    }
 
     if (prevTabs.length <= 1) {
       setTabs([{
@@ -1069,7 +1107,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
-        canGoForward: false
+        canGoForward: false,
+        workspaceId: activeWs
       }]);
       return;
     }
