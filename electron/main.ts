@@ -1105,7 +1105,7 @@ app.whenReady().then(async () => {
     try {
       if (!app.isPackaged) {
         const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
-          headers: { 'User-Agent': 'Nova-Browser-App' }
+          headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' }
         });
         if (res.ok) {
           const data = await res.json();
@@ -1126,7 +1126,7 @@ app.whenReady().then(async () => {
       console.error('Check for updates failed, trying fallback:', err);
       try {
         const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases/latest', {
-          headers: { 'User-Agent': 'Nova-Browser-App' }
+          headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36' }
         });
         if (res.ok) {
           const data = await res.json();
@@ -1465,7 +1465,7 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   try {
     const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
     const whRes = await fetch(whUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 NovaBrowser/1.0', 'Accept': 'application/json' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36', 'Accept': 'application/json' },
       // 🔧 Robustness: hard 10s cap so a hung provider can't stall the handler
       signal: AbortSignal.timeout(10000)
     });
