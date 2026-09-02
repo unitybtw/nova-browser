@@ -1,10 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
   <defs>
-    <filter id="novaGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#3B82F6" flood-opacity="0.3" />
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.15" />
+    <filter id="macShadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#000000" flood-opacity="0.18" />
+      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="#000000" flood-opacity="0.08" />
     </filter>
-    <linearGradient id="novaFlow" x1="20%" y1="90%" x2="80%" y2="10%">
+    <filter id="markShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#3b82f6" flood-opacity="0.22" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.10" />
+    </filter>
+    <linearGradient id="whiteBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF" />
+      <stop offset="100%" stop-color="#F3F5F9" />
+    </linearGradient>
+    <linearGradient id="novaGrad" x1="20%" y1="90%" x2="80%" y2="10%">
       <stop offset="0%" stop-color="#FF6B4A" />
       <stop offset="28%" stop-color="#F43F86" />
       <stop offset="55%" stop-color="#9333EA" />
@@ -13,11 +21,15 @@
     </linearGradient>
   </defs>
 
+  <!-- Clean White Squircle Container with Soft Shadow -->
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#whiteBg)" filter="url(#macShadow)" stroke="#E2E8F0" stroke-width="2" />
+
+  <!-- Smooth Geometric Precision N -->
   <path d="M 340 710 L 340 360 L 684 664 L 684 314"
         fill="none"
-        stroke="url(#novaFlow)"
+        stroke="url(#novaGrad)"
         stroke-width="126"
         stroke-linecap="round"
         stroke-linejoin="round"
-        filter="url(#novaGlow)" />
+        filter="url(#markShadow)" />
 </svg>
