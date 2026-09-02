@@ -163,7 +163,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
             onClick={() => handleTabClick(0, '#top')}
             className="flex items-center gap-2.5 focus:outline-none cursor-pointer"
           >
-            <img src="/nova-logo-tight.png" alt="Nova" className="h-6 w-6 object-contain" />
+            <img src="/logo.svg" alt="Nova" className="h-6 w-6 object-contain" />
             <span className="font-display font-extrabold text-base tracking-tight text-white">
               Nova
             </span>

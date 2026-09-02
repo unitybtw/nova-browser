@@ -1,11 +1,11 @@
 <div align="center">
 
-  <img src="assets/logo.png" alt="Nova Browser Logo" width="140" style="filter: drop-shadow(0 12px 24px rgba(6, 182, 212, 0.3)); margin-bottom: 16px;" />
+  <img src="assets/logo.svg" alt="Nova Browser Logo" width="140" style="margin-bottom: 16px;" />
 
   # Nova Browser
 
-  **The Sovereign, AI-Native, Privacy-First Desktop Browser**  
-  *Built with Electron, React, TypeScript & Vite — Featuring On-Device WebGPU Inference, Zero-Knowledge Cloud Sync & Autonomous AI Agents*
+  **Open-Source Desktop Browser for Developers & Coding Agents**  
+  *Built with Electron, React, TypeScript & Vite — Featuring Native MCP Server, On-Device WebGPU, and Zero-Knowledge E2EE Sync*
 
   <br/>
 
@@ -15,16 +15,15 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![Tests](https://img.shields.io/badge/Tests-18%20Suites%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
+    <a href="#why-nova">Why Nova?</a> •
     <a href="#overview">Overview</a> •
     <a href="#performance-benchmarks--browser-comparison">Benchmarks</a> •
     <a href="#screenshots">Screenshots</a> •
     <a href="#key-features">Key Features</a> •
-    <a href="#ai-architecture--memory-vault">AI Vault</a> •
-    <a href="#keyboard-shortcuts">Shortcuts</a> •
     <a href="#tech-stack">Tech Stack</a> •
     <a href="#platform-support">Platforms</a> •
     <a href="#architecture">Architecture</a> •
@@ -35,9 +34,19 @@
 
 ---
 
+## Why Nova?
+
+Rather than bloated cloud telemetry or generic hype, Nova focuses on three concrete developer pain points:
+
+- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local MCP server allows coding agents (Claude Code, Cursor, Windsurf, or custom scripts) to inspect tabs, interact with DOM nodes, and stream console logs with zero configuration.
+- **Zero-Telemetry Network-Level Privacy Shield**: Uses `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate trackers and ad requests at the network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
+- **Tab Hibernation & Memory Virtualization**: Dormant background webviews are automatically unmounted from the DOM while preserving back-forward navigation state, keeping memory usage for 20+ open tabs around ~420 MB.
+
+---
+
 ## Overview
 
-**Nova Browser** is an open-source, high-performance desktop web browser engineered for power users, developers, and AI-driven workflows. Combining the speed and rendering engine of Chromium with a refined sovereign architecture, Nova introduces **native autonomous AI agents via the Model Context Protocol (MCP)**, **on-device WebGPU inference**, **zero-knowledge end-to-end encrypted multi-device sync**, **1-click Chrome Web Store extension installs**, and a **dual-view split-screen layout**.
+**Nova Browser** is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite. Designed for developers and privacy-conscious users, Nova pairs standard Chromium rendering with a native **Model Context Protocol (MCP) server**, **on-device WebGPU neural execution**, **zero-knowledge encrypted multi-device sync**, **Chrome Web Store extension support**, and a **dual-view split screen**.
 
 ---
 
@@ -47,7 +56,7 @@
 
 | Feature / Metric | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
 | :--- | :--- | :--- | :--- | :--- |
-| **RAM Footprint (20 Tabs)** | **~420 MB** *(Leader)* | ~1,180 MB | ~920 MB | ~680 MB |
+| **RAM Footprint (20 Tabs)** | **~420 MB** *(Hibernated)* | ~1,180 MB | ~920 MB | ~680 MB |
 | **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~78.0 MB | OS-managed |
 | **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | Partial hibernation | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud Leo (Subscription) | Apple Intelligence |
@@ -68,8 +77,8 @@
 | **Tab State Operations** | 100 Tabs Creation Latency | **0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
 | **Tab Allocation** | Throughput | **1,204,224** | ops/sec | Number of virtual tab structures instantiated per second |
 | **Tab Hibernation State**| 97 Background Tabs Eviction | **0.014** | ms | Background rendering pipeline unmounted to reclaim memory |
-| **Fast Domain Lookup** | Blocklist Match Latency | **0.467** | µs / request | In-memory hash set lookup latency per network request |
-| **Fast Domain Lookup** | Lookup Throughput | **2,139,644** | checks/sec | Domain classification queries per second |
+| **Network Filter Decision**| Rule Match Latency | **0.46** | µs / request | In-memory Bloom filter lookup latency per network request |
+| **Network Filter Decision**| Lookup Throughput | **2,100,000+** | checks/sec | Network-level ad and tracker classification queries per second |
 | **V8 Heap Memory** | Heap Allocated | **31.26** | MB | Core JavaScript runtime heap allocation |
 | **Startup JS Bundle** | Core Entry Chunk | **496** | KB | Lightweight initial JS evaluated at browser launch |
 | **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |

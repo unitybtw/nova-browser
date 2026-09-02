@@ -19,7 +19,7 @@ export const Footer: React.FC = () => {
             <div>
               <div className="mb-6 flex items-center gap-3">
                 <img
-                  src="/nova-logo-tight.png"
+                  src="/logo.svg"
                   alt="Nova Logo"
                   className="h-9 w-9 object-contain"
                 />
