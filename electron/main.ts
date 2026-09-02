@@ -25,17 +25,21 @@ import { autoUpdater } from 'electron-updater';
 import { initializeBlocklist, startPeriodicRefresh } from './main/blocklist.js';
 import { isPrivateIP } from './main/ipAddress.js';
 
-// Removed global User-Agent spoofing (VULN-24) to prevent cross-site fingerprinting.
-// We still spoof User-Agent in onBeforeSendHeaders only for Chrome Web Store domains.
+// Standard clean Chromium User-Agent matching host OS and exact runtime version
 export function getStandardUserAgent(): string {
+  const chromeVer = process.versions.chrome || '134.0.0.0';
   if (process.platform === 'win32') {
-    return 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+    return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
   }
   if (process.platform === 'linux') {
-    return 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+    return `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
   }
-  return 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+  return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 }
+
+try {
+  app.userAgentFallback = getStandardUserAgent();
+} catch (_) {}
 
 // Hardware acceleration config
 try {
@@ -374,15 +378,19 @@ function createWindow() {
 
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   function applyPrivacyHeadersToSession(targetSession: Electron.Session) {
+    try {
+      targetSession.setUserAgent(getStandardUserAgent());
+    } catch (_) {}
+
     // Inject Do Not Track, Global Privacy Control & Chrome Web Store spoofing headers
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
       
       if (details.url.includes('chrome.google.com') || details.url.includes('chromewebstore.google.com')) {
-        requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"';
+        requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="134", "Google Chrome";v="134"';
         requestHeaders['sec-ch-ua-mobile'] = '?0';
-        requestHeaders['sec-ch-ua-platform'] = '"macOS"';
-        requestHeaders['User-Agent'] = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+        requestHeaders['sec-ch-ua-platform'] = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
+        requestHeaders['User-Agent'] = getStandardUserAgent();
       }
 
       if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
@@ -392,7 +400,7 @@ function createWindow() {
       callback({ requestHeaders });
     });
 
-    // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP + X-Content-Type-Options
+    // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP for internal app pages only
     targetSession.webRequest.onHeadersReceived((details, callback) => {
       let isDevLocalhost = false;
       let isAppFile = false;
@@ -408,10 +416,8 @@ function createWindow() {
         }
       } catch {}
 
-      // Perf: remote traffic only ever gets X-Content-Type-Options here (and
-      // only when Privacy Shield is on) - skip cloning every response header and
-      // building the map entirely when nothing would be added anyway.
-      if (!isDevLocalhost && !isAppFile && !isPrivacyShieldEnabled) {
+      // Never modify response headers for external sites (YouTube, Google, streaming, etc.)
+      if (!isDevLocalhost && !isAppFile) {
         callback({});
         return;
       }
@@ -433,8 +439,6 @@ function createWindow() {
       // VULN-16: Add Content Security Policy for the app's own pages
       if (isAppFile || isDevLocalhost) {
         const isDev = isDevLocalhost || !app.isPackaged;
-        
-        // Generate a cryptographically secure nonce for this request
         const nonce = crypto.randomBytes(16).toString('base64');
         const nonceAttr = `'nonce-${nonce}'`;
         
@@ -443,14 +447,10 @@ function createWindow() {
             ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
             : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
         ];
-        
-        // Store nonce for potential use in preload/renderer (e.g., for inline scripts)
         responseHeaders['X-Content-Security-Policy-Nonce'] = [nonce];
-      }
-
-      if (isPrivacyShieldEnabled) {
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
+
       callback({ responseHeaders });
     });
   }
