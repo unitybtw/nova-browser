@@ -49,3 +49,20 @@ For measuring internal React UI responsiveness, V8 heap usage, and fast domain l
 ```bash
 npm run benchmark
 ```
+
+---
+
+## 3. Speedometer 3.0 Automated Benchmark Harness
+
+Nova includes an automated Speedometer 3.0 benchmark harness at [`scripts/speedometer_runner.ts`](scripts/speedometer_runner.ts). It launches an isolated browser session with hardware acceleration enabled, connects to the official W3C Speedometer 3.0 suite, completes the test suite across multiple iterations, and exports detailed sub-test timings to `SPEEDOMETER_REPORT.json`.
+
+### Features
+- Auto-starts the Speedometer 3.0 benchmark without manual interaction.
+- Logs real-time elapsed progress and sub-test completion in the terminal.
+- Generates structured JSON reports containing V8 runtime version, Chromium build, and individual framework execution times (React, Vue, Angular, Svelte, CodeMirror, TipTap).
+
+### Reproduction
+```bash
+npm run benchmark:speedometer
+```
+

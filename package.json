@@ -114,6 +114,7 @@
     "build": "tsc && vite build && npm run build:electron",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
+    "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
     "pack:win": "npm run build && electron-builder --win",
     "pack:mac": "npm run build && electron-builder --mac",
     "dev:website": "npm --prefix website run dev",
