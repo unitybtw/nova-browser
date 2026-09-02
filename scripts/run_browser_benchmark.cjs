@@ -23,16 +23,6 @@ const browsers = [
     ]
   },
   {
-    name: 'Arc',
-    binary: '/Applications/Arc.app/Contents/MacOS/Arc',
-    args: (profile, port) => [
-      '--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run',
-      '--disable-background-networking', '--disable-component-update',
-      '--disable-features=Translate,MediaRouter', `--user-data-dir=${profile}`,
-      `--remote-debugging-port=${port}`, fixtureUrl
-    ]
-  },
-  {
     name: 'Nova Electron renderer',
     binary: require('electron'),
     args: (profile, port) => [
