@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/logo.svg" alt="Nova Browser Logo" width="140" style="margin-bottom: 16px;" />
+  <img src="assets/logo.png" alt="Nova Browser Logo" width="130" style="margin-bottom: 16px;" />
 
   # Nova Browser
 
