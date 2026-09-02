@@ -310,17 +310,19 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const osParam = platformMap[process.platform] || 'mac';
     const archParam = archMap[process.arch] || 'x86-64';
 
-    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=126.0.0.0&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+    const chromeVer = process.versions.chrome || '134.0.0.0';
+    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=${chromeVer}&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
 
     const userAgent = process.platform === 'win32'
-      ? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+      ? `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
       : process.platform === 'linux'
-      ? 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
-      : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
+      ? `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
+      : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 
     const res = await fetch(crxUrl, {
       headers: {
-        'User-Agent': userAgent
+        'User-Agent': userAgent,
+        'Accept': 'application/x-chrome-extension,application/octet-stream,*/*'
       }
     });
 
@@ -360,7 +362,23 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     if (!fs.existsSync(extractPath)) {
       fs.mkdirSync(extractPath, { recursive: true });
-      await unzip(crxFilePath, extractPath);
+      
+      // Extract cleanly with JSZip
+      const zipPayload = await JSZip.loadAsync(getCrxInnerZip(buffer));
+      for (const [filename, file] of Object.entries(zipPayload.files)) {
+        const normalized = filename.replace(/\\/g, '/');
+        const destFile = path.resolve(extractPath, normalized);
+        if (!destFile.startsWith(path.resolve(extractPath) + path.sep) && destFile !== path.resolve(extractPath)) {
+          continue;
+        }
+        if (file.dir) {
+          fs.mkdirSync(destFile, { recursive: true });
+        } else {
+          const content = await file.async('nodebuffer');
+          fs.mkdirSync(path.dirname(destFile), { recursive: true });
+          fs.writeFileSync(destFile, content);
+        }
+      }
 
       // 🔒 Security: post-extraction containment + symlink sweep.
       assertExtractionContained(extractPath);

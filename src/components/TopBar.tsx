@@ -53,7 +53,7 @@ import {
   Cloud,
   Languages
 } from 'lucide-react';
-import { Tab, Bookmark, Workspace, PermissionRequest } from '../types/browser';
+import { Tab, Bookmark, Workspace, PermissionRequest, Extension } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
@@ -126,6 +126,8 @@ interface TopBarProps {
   showBookmarksBar?: boolean;
   onToggleReaderMode?: () => void;
   onOpenExtensions: () => void;
+  extensions?: Extension[];
+  activeTab?: Tab | null;
   onOpenAccount?: () => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
@@ -1766,6 +1768,52 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               buttonRef={downloadsBtnRef}
             />
           </div>
+
+          {/* Active Extension Toolbar Buttons */}
+          {extensions && extensions.filter(ext => ext.enabled !== false && (ext.popupUrl || ext.optionsUrl)).slice(0, 5).map(ext => (
+            <button
+              key={ext.id}
+              onClick={(e) => {
+                if (ext.popupUrl) {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
+                  const url = `chrome-extension://${ext.id}/${cleanPopup}`;
+                  if ((window as any).electronAPI?.openExtensionPopup) {
+                    (window as any).electronAPI.openExtensionPopup(
+                      url,
+                      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+                      activeTab ? {
+                        id: activeTab.id,
+                        url: activeTab.url,
+                        title: activeTab.title,
+                        favIconUrl: activeTab.favicon,
+                        webContentsId: activeTab.webContentsId
+                      } : undefined
+                    );
+                  } else {
+                    onNavigate(url);
+                  }
+                } else if (ext.optionsUrl) {
+                  const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
+                  onNavigate(`chrome-extension://${ext.id}/${cleanOptions}`);
+                }
+              }}
+              className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${
+                isIncognito 
+                  ? 'hover:bg-slate-700 text-slate-300' 
+                  : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'
+              }`}
+              title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
+            >
+              {ext.iconData ? (
+                <img src={ext.iconData} alt={ext.name} className="w-4 h-4 object-contain rounded-xs" />
+              ) : (
+                <div className="w-4 h-4 rounded-xs bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold uppercase">
+                  {ext.name ? ext.name.charAt(0) : 'E'}
+                </div>
+              )}
+            </button>
+          ))}
 
           {/* Extensions Manager Button */}
           <button 

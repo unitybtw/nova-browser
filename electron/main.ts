@@ -1254,27 +1254,8 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.sandbox = true;
     webPreferences.backgroundThrottling = true;
 
-    // Preload restriction: only allow authorized webstore preload script
-    const authorizedPreloads = [
-      path.resolve(path.join(__dirname, 'webstore-preload.cjs')),
-      path.resolve(path.join(__dirname, 'webstore-preload.js'))
-    ];
-    try {
-      const host = new URL(params.src || '').hostname.toLowerCase();
-      if (host === 'chromewebstore.google.com' || host === 'chrome.google.com') {
-        webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
-      } else {
-        delete webPreferences.preload;
-      }
-    } catch {
-      delete webPreferences.preload;
-    }
-    if (webPreferences.preload) {
-      const resolvedPreload = path.resolve(webPreferences.preload);
-      if (!authorizedPreloads.includes(resolvedPreload)) {
-        delete webPreferences.preload;
-      }
-    }
+    // Preload restriction: attach authorized webstore preload script (safely self-scoped to Web Store domains)
+    webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
   });
 
   // 🔒 Security: Block arbitrary window popups and route valid HTTP/HTTPS URLs to our secure tab system
@@ -2737,6 +2718,16 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
 ipcMain.handle('list-extensions', async (event) => {
   if (!isTrustedSender(event)) return [];
   const disabledIds = getDisabledExtensionIds();
+
+  // Sync with session extensions
+  try {
+    const sessionExts = session.defaultSession.getAllExtensions();
+    for (const se of sessionExts) {
+      if (!loadedExtensions.some(e => e.id === se.id)) {
+        loadedExtensions.push(se);
+      }
+    }
+  } catch (_) {}
   
   return Promise.all(loadedExtensions.map(async (e) => {
     let iconData = undefined;

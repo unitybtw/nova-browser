@@ -124,7 +124,7 @@ if ((window as any).__novaPreloadInjected) {
 
   const mainWorldScript = `
     Object.defineProperty(navigator, 'userAgent', {
-      get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+      get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36',
       configurable: true
     });
 
@@ -137,8 +137,8 @@ if ((window as any).__novaPreloadInjected) {
       get: () => ({
         brands: [
           { brand: 'Not/A)Brand', version: '8' },
-          { brand: 'Chromium', version: '126' },
-          { brand: 'Google Chrome', version: '126' }
+          { brand: 'Chromium', version: '134' },
+          { brand: 'Google Chrome', version: '134' }
         ],
         mobile: false,
         platform: 'macOS',
@@ -148,14 +148,14 @@ if ((window as any).__novaPreloadInjected) {
             bitness: '64',
             brands: [
               { brand: 'Not/A)Brand', version: '8' },
-              { brand: 'Chromium', version: '126' },
-              { brand: 'Google Chrome', version: '126' }
+              { brand: 'Chromium', version: '134' },
+              { brand: 'Google Chrome', version: '134' }
             ],
             mobile: false,
             model: '',
             platform: 'macOS',
-            platformVersion: '13.0.0',
-            uaFullVersion: '126.0.0.0'
+            platformVersion: '14.0.0',
+            uaFullVersion: '134.0.0.0'
           };
         }
       }),
