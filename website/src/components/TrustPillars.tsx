@@ -6,7 +6,7 @@ import { BlurRevealCard } from './blurreveal/BlurRevealCard';
 const PILLARS = [
   {
     icon: ShieldCheck,
-    tag: 'PRIVACY AUDIT',
+    tag: 'PRIVACY & SECURITY',
     title: 'Zero Telemetry & Offline Core',
     description:
       'Zero background pings, analytics trackers, or user telemetry. All network traffic originates strictly from user requests.',
@@ -22,10 +22,10 @@ const PILLARS = [
   },
   {
     icon: Code2,
-    tag: 'OPEN ARCHITECTURE',
-    title: 'MIT Licensed & Auditable',
+    tag: 'OPEN SOURCE',
+    title: 'MIT Licensed & Verifiable',
     description:
-      'Every line of Electron, Chromium, and IPC handler code is publicly accessible, auditable, and forkable on GitHub.',
+      'Every line of Electron, Chromium, and IPC handler code is publicly accessible, open source, and forkable on GitHub.',
     stat: 'Open Source',
   },
   {

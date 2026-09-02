@@ -70,12 +70,12 @@ export const Footer: React.FC = () => {
                 </li>
                 <li className="flex md:justify-end">
                   <a
-                    href="https://github.com/unitybtw/nova-browser/issues"
+                    href="https://github.com/unitybtw/nova-browser/security"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    Security Audit & Issues
+                    Security & Issues
                   </a>
                 </li>
                 <li className="flex md:justify-end">
