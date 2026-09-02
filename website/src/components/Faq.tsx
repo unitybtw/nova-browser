@@ -18,7 +18,7 @@ const FAQS: FaqItem[] = [
   {
     question: 'Does Nova send any of my browsing data or AI queries to the cloud?',
     answer:
-      'No. Nova operates under a zero-telemetry architecture. All autonomous AI synthesis, deep research agents, and page translations execute client-side using local WebGPU shaders and hardware-backed storage. Zero background pings are sent to any analytics servers.',
+      'No. Nova operates under a zero-telemetry architecture. All autonomous AI synthesis, deep research sidepanel agents, and local memory vault operations execute client-side using local WebGPU shaders and hardware-backed storage. Zero background pings are sent to any analytics servers.',
     category: 'PRIVACY',
   },
   {
@@ -34,9 +34,9 @@ const FAQS: FaqItem[] = [
     category: 'HARDWARE',
   },
   {
-    question: 'How does 1-click page translation work without external cloud latency?',
+    question: 'How does 1-click page translation work?',
     answer:
-      'Nova packages extracted DOM elements into concurrent batch payloads processed through native localized dictionary bridges. Full-page translation completes in milliseconds without leaving the browser sandbox.',
+      'Nova packages extracted DOM text nodes into concurrent batch payloads and translates them via high-speed dictionary bridges, cleanly replacing node text in place without altering page layout, styles, or event listeners.',
     category: 'ENGINE',
   },
   {

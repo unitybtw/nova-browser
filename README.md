@@ -48,7 +48,7 @@
 | Feature / Metric | Nova Browser | Google Chrome | Arc Browser | Brave Browser | Apple Safari 18 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **RAM Footprint (20 Tabs)** | **~420 MB** *(Leader)* | ~1,180 MB | ~1,450 MB | ~920 MB | ~680 MB |
-| **Speedometer 3.0 Score** | **38.4 pts** *(Top Tier)*| 32.1 pts | 29.8 pts | 31.4 pts | 35.6 pts |
+| **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~142.0 MB | ~78.0 MB | OS-managed |
 | **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | High RAM usage | Partial hibernation | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud OpenAI | Cloud Leo (Subscription) | Apple Intelligence |
 | **AI Token Generation Speed**| **~64 tok/s (WebGPU)** | Cloud latency dependent | Cloud latency dependent | Cloud latency dependent | Local / Private Cloud |
