@@ -32,7 +32,7 @@ Every audited feature and requirement mapped to concrete milestones:
 | 11 | Website Navbar Audit Verification | Verify `website/src/components/Navbar.tsx` contains no `isScrolled` or conditional white bg | M3 | Constraint / Survey |
 | 12 | Security & Bug Regression Tests | Add regression test suite covering all fixes in M1, M2, M3, maintaining 23 existing tests | M4 | R5 / Survey |
 | 13 | Build & Typecheck Verification | Verify `npm test`, `npm run build`, and `npx tsc --noEmit` pass with zero errors | M4 | R5 / Acceptance |
-| 14 | Security Audit Documentation | Produce `SECURITY_AUDIT.md` documenting findings, severities, and remediations | M5 | R5 / Acceptance |
+| 14 | Security Policy Documentation | Produce `SECURITY.md` documenting policy, supported versions, and responsible disclosure | M5 | R5 / Acceptance |
 | 15 | Semantic Commits & Git Push | Commit each fix with `type(scope): description` and push to `origin/main` | M5 | R5 / Acceptance |
 
 ## Milestones
@@ -42,7 +42,7 @@ Every audited feature and requirement mapped to concrete milestones:
 | 2 | M2: URL Validation & Navigation Security | Case-insensitive protocol matching, dangerous scheme blocks, favorite URL sanitization | none | DONE |
 | 3 | M3: React Frontend Bugs & Navbar Check | AILinkPreview duplicate interval fix, SidebarTabs fallback, Website navbar check | none | DONE |
 | 4 | M4: Regression Tests & Build Verification | Regression test suite in tests/, runAll.ts integration, npm test 23+, build & tsc checks | M1, M2, M3 | DONE |
-| 5 | M5: Documentation, Commits & Push | SECURITY_AUDIT.md generation, semantic git commits per fix, push to origin/main | M4 | IN_PROGRESS |
+| 5 | M5: Documentation, Commits & Push | SECURITY.md generation, semantic git commits per fix, push to origin/main | M4 | DONE |
 
 ## Interface Contracts
 ### Electron IPC Contract
@@ -58,10 +58,10 @@ Every audited feature and requirement mapped to concrete milestones:
 ## Code Layout
 - `electron/main.ts`: Main process IPC handlers, session privacy configuration, window management.
 - `src/utils/searchEngine.ts`: URL parsing and search engine query construction.
-- `src/utils/safeNavigation.ts`: Scheme sterilization and navigation validation.
-- `src/components/AILinkPreview.tsx`: Link preview popover and summary typewriter effect.
-- `src/components/SidebarTabs.tsx`: Vertical tabs and sidebar omnibox.
+- `src/utils/safeNavigation.ts`: Dangerous protocol filtration.
+- `src/components/AILinkPreview.tsx`: Sanitized typewriter rendering with clean interval teardown.
+- `src/components/SidebarTabs.tsx`: Tab management and omnibox submit fallback handling.
 - `src/components/NewTabPage.tsx`: Speed dial and new tab background widgets.
-- `website/src/components/Navbar.tsx`: Marketing website navigation component.
-- `tests/`: Empirical test suites and test runner entry point (`tests/runAll.ts`).
-- `SECURITY_AUDIT.md`: Final security findings report.
+- `website/src/components/Navbar.tsx`: Transparent/glass navbar without conditional white styling.
+- `tests/regression_suite.ts`: 29 security and bug regression unit tests.
+- `SECURITY.md`: GitHub Security Policy and vulnerability reporting guidelines.

@@ -3055,6 +3055,10 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     bookmarksPath = path.join(app.getPath('home'), 'Library/Application Support/Google/Chrome/Default/Bookmarks');
   } else if (isWin) {
     bookmarksPath = path.join(app.getPath('appData'), '..', 'Local', 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks');
+  } else if (process.platform === 'linux') {
+    const chromeLinux = path.join(app.getPath('home'), '.config', 'google-chrome', 'Default', 'Bookmarks');
+    const chromiumLinux = path.join(app.getPath('home'), '.config', 'chromium', 'Default', 'Bookmarks');
+    bookmarksPath = fs.existsSync(chromeLinux) ? chromeLinux : chromiumLinux;
   }
 
   if (!fs.existsSync(bookmarksPath)) {
