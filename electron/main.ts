@@ -561,8 +561,8 @@ function setupApplicationMenu() {
     try {
       app.setAboutPanelOptions({
         applicationName: 'Nova Browser',
-        applicationVersion: '1.1.2',
-        version: '1.1.2',
+        applicationVersion: '1.1.3',
+        version: '1.1.3',
         copyright: 'Copyright © 2026 Nova Browser. All rights reserved.',
         credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
         website: 'https://github.com/unitybtw/nova-browser'

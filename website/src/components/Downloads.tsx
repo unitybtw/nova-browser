@@ -73,7 +73,7 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.1.2 // UNIVERSAL
+                v1.1.3 // UNIVERSAL
               </span>
             </div>
 
@@ -123,7 +123,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.1.2 // X64
+                v1.1.3 // X64
               </span>
             </div>
 
@@ -173,7 +173,7 @@ export const Downloads: React.FC = () => {
                 <Terminal className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.1.2 // LINUX
+                v1.1.3 // LINUX
               </span>
             </div>
 
