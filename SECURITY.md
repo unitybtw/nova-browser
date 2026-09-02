@@ -2,12 +2,9 @@
 
 ## Supported Versions
 
-We actively support and provide security updates for the following versions of Nova Browser:
+Nova Browser operates on a rolling release model on the `main` branch. Security fixes and patches are applied directly to `main` and released in the latest build.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 1.1.x   | Yes                |
-| < 1.1.0 | No                 |
+**Only the latest released version is actively supported.** Users are encouraged to always update to the most recent release for security and stability patches.
 
 ## Reporting a Vulnerability
 
