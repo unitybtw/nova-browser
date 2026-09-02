@@ -1,6 +1,6 @@
 import { BrowserWindow, ipcMain } from 'electron';
 
-// 🔒 Security: MCP browser_* tools are forwarded to the renderer over an
+// Security: MCP browser_* tools are forwarded to the renderer over an
 // 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
 // below — never executed as injected JS in the privileged UI context.
 //

@@ -8,7 +8,7 @@ if ((window as any).__novaPreloadInjected) {
 } else if (isChromeWebStore) {
   (window as any).__novaPreloadInjected = true;
 
-  // 🔒 Security: all markup is built with explicit DOM APIs (createElementNS +
+  // Security: all markup is built with explicit DOM APIs (createElementNS +
   // setAttribute) — no innerHTML, no Trusted Types policy needed.
   const SVG_NS = 'http://www.w3.org/2000/svg';
   type SvgPart = { tag: string; attrs: Record<string, string> };

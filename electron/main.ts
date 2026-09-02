@@ -159,7 +159,7 @@ const PHISHING_KEYWORDS = [
   'refund-2024', 'gift-card-free', 'survey-winner'
 ];
 
-// 🔒 Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
+// Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
 function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
   if (event.sender.id !== mainWindow.webContents.id) return false;
@@ -171,12 +171,12 @@ function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEv
   return true;
 }
 
-// 🔒 Security: MCP browser_* tools are forwarded to the renderer over an
+// Security: MCP browser_* tools are forwarded to the renderer over an
 // 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
 // below — never executed as injected JS in the privileged UI context.
 initMcpBridge(isTrustedSender);
 
-// 🔒 Security: Validate dev server and app internal page origins strictly
+// Security: Validate dev server and app internal page origins strictly
 function isTrustedAppOrigin(urlStr: string): boolean {
   if (!urlStr || typeof urlStr !== 'string') return false;
   try {
@@ -193,7 +193,7 @@ function isTrustedAppOrigin(urlStr: string): boolean {
         (parsed.hostname !== 'settings' ? !parsed.hash : allowedSettingsHash);
     }
     if (parsed.protocol === 'devtools:') return false;
-    // 🔒 Security: The Vite dev server is only trusted in unpackaged dev builds.
+    // Security: The Vite dev server is only trusted in unpackaged dev builds.
     if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
       const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
@@ -249,8 +249,8 @@ function updateAdblockWhitelist(whitelist: string[]) {
 }
 
 // Initialize AdBlocker globally so IPC can access it
-// ⚡ Perf: cache the serialized engine on disk. Without `caching`, fromCached()
-// just runs init() on every launch → re-downloads ~14 filter lists (~5-10MB)
+// Performance: cache the serialized engine on disk. Without `caching`, fromCached()
+// just runs init() on every launch > re-downloads ~14 filter lists (~5-10MB)
 // and re-parses ~80k filters each startup. Shape per @cliqz/adblocker typings:
 // interface Caching { path: string; read: (path) => Promise<Uint8Array>; write: (path, buffer) => Promise<void> }
 const ADBLOCKER_CACHE_PATH = path.join(app.getPath('userData'), 'adblocker-engine.cache');
@@ -344,7 +344,7 @@ function createWindow() {
     }
   });
 
-  // ⚡ Perf: don't paint a blank window while content loads — show once the
+  // Performance: don't paint a blank window while content loads — show once the
   // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
   // never fires (e.g. dev-server retry loop failing for a while).
   mainWindow.once('ready-to-show', () => {
@@ -354,7 +354,7 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
   }, 3000);
 
-  // 🔒 Security: Prevent Drag and Drop navigation on the main UI window
+  // Security: Prevent Drag and Drop navigation on the main UI window
   mainWindow.webContents.on('will-navigate', (event, url) => {
     // Only allow navigation to localhost dev server origin or the specific dist/index.html in prod
     if (isTrustedAppOrigin(url)) {
@@ -475,7 +475,7 @@ function createWindow() {
       attempts++;
       mainWindow?.loadURL(devUrl).catch(() => {
         if (attempts >= maxAttempts) {
-          // 🐛 Fix: terminate the retry loop after maxAttempts REGARDLESS of dist existence,
+          // Fix: terminate the retry loop after maxAttempts REGARDLESS of dist existence,
           // otherwise a missing dist/index.html causes infinite retries.
           if (fs.existsSync(distHtmlPath)) {
             console.log('[Main] Loading local dist/index.html build...');
@@ -495,7 +495,7 @@ function createWindow() {
 
 
   // Listen for console messages from the renderer process and log them safely to the terminal.
-  // ⚡ Perf: dev-only value — skip regex-sanitizing/printing every renderer
+  // Performance: dev-only value — skip regex-sanitizing/printing every renderer
   // console line entirely in packaged builds.
   if (!app.isPackaged) {
     mainWindow?.webContents.on('console-message', (event: any, ...rest: any[]) => {
@@ -519,7 +519,7 @@ function createWindow() {
     });
   }
 
-  // ⌨️ App-local keyboard shortcuts via before-input-event.
+  // App-local keyboard shortcuts via before-input-event.
   // Replaces the old system-wide globalShortcut hooks which intercepted Cmd+K/Cmd+F
   // even when OTHER apps were focused and shadowed the menu accelerators.
   // Cmd+F is intentionally NOT handled here: the Edit menu accelerator ("Find in Page...",
@@ -916,7 +916,7 @@ app.whenReady().then(async () => {
   const rememberedPermissions = new Map<string, Map<string, boolean>>();
 
   ipcMain.handle('permission-response', async (_event, payload: unknown) => {
-    // 🔒 Security: only the trusted main window may resolve permission requests
+    // Security: only the trusted main window may resolve permission requests
     if (!isTrustedSender(_event)) return { success: false, error: 'Unauthorized' };
     if (!payload || typeof payload !== 'object') return { success: false, error: 'Invalid payload' };
     const { requestId, allow, remember } = payload as Record<string, unknown>;
@@ -1053,7 +1053,7 @@ app.whenReady().then(async () => {
   // Initialize and auto-start MCP Server (default port 3020 with fallback)
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
-  // ⚡ Perf: don't block startup (extension loading below) on the MCP bind.
+  // Performance: don't block startup (extension loading below) on the MCP bind.
   // Fire-and-forget keeps the rest of the startup order deterministic; a bind
   // failure is logged but must not stall first paint.
   const serverInstance = mcpServer;
@@ -1241,7 +1241,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('web-contents-created', (_event, contents) => {
-  // 🔒 Security: Force secure webPreferences for any <webview> tags
+  // Security: Force secure webPreferences for any <webview> tags
   contents.on('will-attach-webview', (event, webPreferences, params) => {
     // Force entirely secure environment for webviews
     webPreferences.nodeIntegration = false;
@@ -1258,7 +1258,7 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
   });
 
-  // 🔒 Security: Block arbitrary window popups and route valid HTTP/HTTPS URLs to our secure tab system
+  // Security: Block arbitrary window popups and route valid HTTP/HTTPS URLs to our secure tab system
   contents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url);
@@ -1336,7 +1336,7 @@ app.on('web-contents-created', (_event, contents) => {
           addUpgradedUrl(navigationUrl);
           const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
           
-          // 🔒 Security (L-7): never auto-fall back to plain HTTP when the HTTPS
+          // Security (L-7): never auto-fall back to plain HTTP when the HTTPS
           // upgrade fails — a MITM can force that downgrade. Log and stay put.
           // navigationUrl is now in upgradedUrls, so an EXPLICIT user retry of
           // the http:// URL is still allowed through (see the check above).
@@ -1389,7 +1389,7 @@ app.on('will-quit', () => {
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
       if (settings.clearOnExit) {
-        // 🔧 Robustness: attach catch handlers so cleanup rejections can't float;
+        // Robustness: attach catch handlers so cleanup rejections can't float;
         // quit is intentionally NOT blocked on these async clears.
         session.defaultSession.clearStorageData().catch((e) => console.warn('[Quit] clearStorageData failed:', e));
         session.defaultSession.clearCache().catch((e) => console.warn('[Quit] clearCache failed:', e));
@@ -1441,7 +1441,7 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   // Provider 1: Bing Official Daily 4K UHD Image Archive (3840x2160 Ultra HD)
   try {
     const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
-      // 🔧 Robustness: hard 10s cap so a hung provider can't stall the handler
+      // Robustness: hard 10s cap so a hung provider can't stall the handler
       signal: AbortSignal.timeout(10000)
     });
     if (bingRes.ok) {
@@ -1472,7 +1472,7 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
     const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
     const whRes = await fetch(whUrl, {
       headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
-      // 🔧 Robustness: hard 10s cap so a hung provider can't stall the handler
+      // Robustness: hard 10s cap so a hung provider can't stall the handler
       signal: AbortSignal.timeout(10000)
     });
     if (whRes.ok) {
@@ -1521,7 +1521,7 @@ ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => 
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return null;
     
-    // 🔒 Security: Only allow capturing webviews (tabs)
+    // Security: Only allow capturing webviews (tabs)
     if (wc.getType() !== 'webview') return null;
 
     const image = await wc.capturePage();
@@ -1903,7 +1903,7 @@ app.on('web-contents-created', (_event, wc) => {
           accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
           click: () => {
             const currentUrl = wc.getURL();
-            // 🐛 Fix: internal pages use the `nova:` protocol (rendered as nova://newtab etc.).
+            // Fix: internal pages use the `nova:` protocol (rendered as nova://newtab etc.).
             // Block view-source for ANY nova-prefixed protocol, not just the literal 'nova://' prefix.
             let isInternalPage = false;
             let isViewSource = false;
@@ -2190,7 +2190,7 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   const proxyRules = (isEnabled && rawProxyUrl) ? rawProxyUrl : 'direct://';
   
   if (isEnabled && rawProxyUrl) {
-    // 🔒 Security: Validate proxy URL protocol
+    // Security: Validate proxy URL protocol
     const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
     if (!allowedProxyProtocols.some(proto => proxyRules.startsWith(proto))) {
       console.error('Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://');
@@ -2885,7 +2885,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      // 🔒 Security: extension popup content is untrusted — run it in the
+      // Security: extension popup content is untrusted — run it in the
       // Chromium sandbox (the active-tab bridge is injected via executeJavaScript,
       // which does not require an unsandboxed renderer).
       sandbox: true,
@@ -2896,7 +2896,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
   activeExtensionPopupWin = popupWin;
   activeExtensionPopupUrl = url;
 
-  // 🔒 Security: Block arbitrary window popups from extension popup content
+  // Security: Block arbitrary window popups from extension popup content
   popupWin.webContents.setWindowOpenHandler(({ url }) => {
     try {
       const parsed = new URL(url);
@@ -3087,7 +3087,7 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
       if (node.type === 'url' && typeof node.url === 'string') {
         try {
           const parsed = new URL(node.url);
-          // 🔒 Security: Only allow http and https protocols in imported bookmarks
+          // Security: Only allow http and https protocols in imported bookmarks
           if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
             const domain = parsed.hostname;
             importedBookmarks.push({
@@ -3277,7 +3277,7 @@ let activeTtsProcess: child_process.ChildProcess | null = null;
 // the newer request.
 let ttsGeneration = 0;
 
-// ⚡ Perf: async execFile so a slow `/usr/bin/say` can never block the Electron main process
+// Performance: async execFile so a slow `/usr/bin/say` can never block the Electron main process
 const execFileAsync = promisify(child_process.execFile);
 
 ipcMain.handle('native-tts-get-voices', async (event) => {
@@ -3329,7 +3329,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
 
   if (process.platform === 'darwin') {
     return new Promise((resolve) => {
-      // 🔧 Robustness: hard overall cap so a hung `say` process can never leave this
+      // Robustness: hard overall cap so a hung `say` process can never leave this
       // handler pending forever. Single shared deadline across voice-fallback retries.
       let settled = false;
       let sayTimedOut = false;
@@ -3347,7 +3347,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
         resolve(result);
       };
 
-      // 🔒 Security: Sanitize voice name strictly against command flag injection
+      // Security: Sanitize voice name strictly against command flag injection
       let cleanVoice: string | null = null;
       if (voiceName && typeof voiceName === 'string') {
         const rawName = voiceName.split('(')[0].trim();
@@ -3387,7 +3387,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
           });
           activeTtsProcess = proc;
 
-          // 🔧 Robustness: drain stderr so pipe backpressure can never stall the process
+          // Robustness: drain stderr so pipe backpressure can never stall the process
           if (proc.stderr) {
             proc.stderr.on('data', () => {});
           }

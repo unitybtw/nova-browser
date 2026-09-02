@@ -37,7 +37,7 @@ async function runAdversarialTests() {
   const unicodeTestCases = [
     { name: 'Cyrillic URL', url: 'https://ru.wikipedia.org/wiki/Заглавная_страница' },
     { name: 'CJK URL', url: 'https://zh.wikipedia.org/wiki/中文' },
-    { name: 'Emoji URL', url: 'https://example.com/😊/🎉/test' },
+    { name: 'Emoji URL', url: 'https://example.com/\uD83D\uDE0A/\uD83C\uDF89/test' },
     { name: 'Percent-encoded space & amp', url: 'https://example.com/foo%20bar%26baz' },
     { name: 'Percent-encoded UTF8 CJK', url: 'https://example.com/%E4%B8%AD%E6%96%87' },
     { name: 'Mixed Scripts & Special Symbols', url: 'https://example.com/тест?query=こんにちは&symbol=§¶†‡' },

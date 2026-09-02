@@ -195,11 +195,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.6 }}
         onClick={goNext}
         whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
-        whileTap={{ scale: 0.95 }}
         className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-lg shadow-cyan-500/25 no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
-        Let's Get Started →
+        Let&apos;s Get Started
       </motion.button>
     </motion.div>,
 
@@ -280,7 +279,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             </div>
             <span className="text-white font-semibold text-xs">{t.icon} {t.name}</span>
             {theme === t.id && (
-              <span className="text-cyan-400 text-[11px] font-bold">✓ Selected</span>
+              <span className="text-cyan-400 text-[11px] font-bold">Selected</span>
             )}
           </button>
         ))}
@@ -523,14 +522,14 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             className="text-slate-400 hover:text-white transition-colors font-medium flex items-center gap-2 text-xs no-drag cursor-pointer"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            ← Back
+            Back
           </button>
           <button
             onClick={goNext}
             className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-500/20 no-drag cursor-pointer"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
-            {step === TOTAL_STEPS - 2 ? 'Complete ✓' : 'Next →'}
+            {step === TOTAL_STEPS - 2 ? 'Complete' : 'Next'}
           </button>
         </div>
       )}

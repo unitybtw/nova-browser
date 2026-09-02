@@ -59,7 +59,7 @@ async function runChallengerStressTest() {
     { name: 'Lone Trail Surrogate U+DFFF', input: 'https://example.com/\uDFFF/end' },
     { name: 'Reversed Surrogate Pair (Trail then Lead)', input: 'https://example.com/\uDFFF\uD800/test' },
     { name: 'Multiple Unpaired Surrogates Interspersed', input: 'a\uD800b\uD800c\uDC00d\uDFFF' },
-    { name: 'Valid Surrogate Pair followed by Lone Surrogate', input: 'https://example.com/😊/\uD800' },
+    { name: 'Valid Surrogate Pair followed by Lone Surrogate', input: 'https://example.com/\uD83D\uDE0A/\uD83C\uDF89/\uD800' },
     { name: 'Lone Surrogate in Percent-encoded context', input: 'https://example.com/%20\uD800%21' },
     { name: 'Empty String', input: '' },
     { name: 'Null-ish coerced string', input: String(null) },

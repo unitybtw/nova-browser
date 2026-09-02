@@ -175,7 +175,7 @@ async function verifyLocalPassword(password: string, email: string, storedHash: 
   }
 
   // Legacy scheme: SHA-256(password + ':' + email), lowercase hex.
-  // 🔒 Only accept well-formed legacy digests — an attacker who can write the
+  // Only accept well-formed legacy digests — an attacker who can write the
   // registry must not be able to plant an arbitrary downgrade hash.
   if (!/^[0-9a-f]{64}$/.test(storedHash)) return false;
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${password}:${email}`));

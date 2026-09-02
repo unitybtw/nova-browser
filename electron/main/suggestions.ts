@@ -183,7 +183,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
     }
 
-    // ⚡ Perf + 🔒 Privacy: Fast staggered fallback to keep latency ultra-low.
+    // Performance + Privacy: Fast staggered fallback to keep latency ultra-low.
     // Resolve as soon as results are usable: if any provider already returned
     // non-empty results and nothing is in flight, cancel pending stagger timers
     // instead of waiting them out (they only exist to probe fallbacks when we

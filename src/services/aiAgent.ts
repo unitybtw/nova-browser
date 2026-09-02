@@ -1164,7 +1164,7 @@ CRITICAL RULES:
       args = {};
     }
 
-    // 🔒 Security: never log tool args — they can carry form field values,
+    // Security: never log tool args — they can carry form field values,
     // search queries and other user-typed data that would leak into terminal
     // logs. Log only the tool name.
     console.log(`[AI Agent] Executing tool: ${functionName}`);
@@ -1655,7 +1655,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       }
 
       else if (functionName === "scroll_page") {
-        // 🔒 Security: direction/amount come from model-generated JSON and are
+        // Security: direction/amount come from model-generated JSON and are
         // interpolated into a script executed on the page — validate strictly and
         // interpolate ONLY whitelisted values.
         const VALID_SCROLL_DIRECTIONS = ['up', 'down', 'top', 'bottom'];
@@ -1705,7 +1705,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "save_to_memory") {
         const { fact, category } = args;
-        // 🔒 Security: this memory originates from a TOOL, not a direct user
+        // Security: this memory originates from a TOOL, not a direct user
         // request. aiMemory tags it source:'tool', so model-authored
         // 'instruction' entries stay session-only and can never persist into
         // the system prompt of future sessions.
@@ -2200,7 +2200,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             finalAnswer = outcome.text;
             break;
           }
-          // Invalid → one corrective retry instead of fake success
+          // Invalid > one corrective retry instead of fake success
           if (loopCount >= MAX_LOOPS) {
             finalAnswer = executedAnyTool ? LOOP_EXHAUSTED_MSG : NO_VALID_OUTPUT_MSG;
             break;

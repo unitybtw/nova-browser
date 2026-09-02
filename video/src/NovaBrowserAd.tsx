@@ -195,7 +195,7 @@ const PrivacyOverlay: React.FC<{ frame: number }> = ({ frame }) => {
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-end', padding: 24, pointerEvents: 'none', opacity: reveal }}>
       <div style={{ width: 250, padding: 18, borderRadius: 15, background: 'rgba(6,78,59,0.96)', border: `1px solid ${GREEN}99`, boxShadow: `0 0 40px ${GREEN}33`, color: '#ecfdf5', fontFamily: FONT }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <span style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 9, background: `${GREEN}22`, color: GREEN, fontSize: 18 }}>✓</span>
+          <span style={{ width: 30, height: 30, display: 'grid', placeItems: 'center', borderRadius: 9, background: `${GREEN}22`, color: GREEN, fontSize: 14, fontWeight: 'bold' }}>ON</span>
           <div><div style={{ fontWeight: 800, fontSize: 14 }}>Privacy Shield</div><div style={{ color: GREEN, fontFamily: MONO, fontSize: 9 }}>ACTIVE PROTECTION</div></div>
         </div>
         <div style={{ fontFamily: MONO, fontSize: 11, color: '#a7f3d0' }}>TRACKERS BLOCKED</div>

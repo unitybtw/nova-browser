@@ -152,7 +152,7 @@ export interface CrxInstallerDeps {
   setDisabledExtensionIds: (ids: string[]) => void;
 }
 
-// 🔒 Security: read an HTTP response body while enforcing a hard byte limit.
+// Security: read an HTTP response body while enforcing a hard byte limit.
 // Aborts as soon as the limit is exceeded instead of buffering an unbounded payload.
 async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
   const body = res.body;
@@ -182,7 +182,7 @@ async function readBodyWithLimit(res: any, maxBytes: number): Promise<Buffer> {
   return Buffer.from(arrayBuffer);
 }
 
-// 🔒 Security: mirror unzip-crx-3's CRX unwrapping so the inner zip payload can
+// Security: mirror unzip-crx-3's CRX unwrapping so the inner zip payload can
 // be inspected BEFORE anything is written to disk — unzip-crx-3 joins entry names
 // onto the destination with no validation, which allows zip-slip.
 function getCrxInnerZip(buffer: Buffer): Buffer {
@@ -249,7 +249,7 @@ function assertExtractionContained(dir: string): void {
 export async function installFromWebstore(deps: CrxInstallerDeps, event: Electron.IpcMainInvokeEvent, urlOrId: string) {
   const { isTrustedSender, getMainWindow } = deps;
 
-  // 🔒 Security: Allow only trusted main window OR Chrome Web Store origin
+  // Security: Allow only trusted main window OR Chrome Web Store origin
   const senderUrl = event.sender?.getURL() || '';
   const isFromMainWindow = isTrustedSender(event);
   let isFromWebstore = false;
@@ -273,7 +273,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     if (!match) return { error: 'Invalid extension URL or ID' };
     const extensionId = match[0];
 
-    // 🔒 Security: installs requested from Chrome Web Store page content are not
+    // Security: installs requested from Chrome Web Store page content are not
     // strictly user-initiated — the webstore preload forwards postMessage install
     // requests, so page scripts can trigger them. Gate those behind a native
     // confirmation; requests from Nova's own window already come from UI interaction.
@@ -331,7 +331,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       throw new Error(`Failed to download extension (HTTP ${res.status}): ${errText.substring(0, 100)}`);
     }
 
-    // 🔒 Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
+    // Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
     // Reject early on a declared Content-Length over the limit; abort mid-stream otherwise.
     const MAX_CRX_BYTES = 100 * 1024 * 1024;
     const declaredLength = Number.parseInt(res.headers.get('content-length') || '', 10);
@@ -341,7 +341,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     const buffer = await readBodyWithLimit(res, MAX_CRX_BYTES);
 
-    // 🔒 Security: Validate CRX magic header (Cr24: 0x43 0x72 0x32 0x34) or PK zip header (0x50 0x4B)
+    // Security: Validate CRX magic header (Cr24: 0x43 0x72 0x32 0x34) or PK zip header (0x50 0x4B)
     if (buffer.length < 4 || ((buffer[0] !== 0x43 || buffer[1] !== 0x72 || buffer[2] !== 0x32 || buffer[3] !== 0x34) && (buffer[0] !== 0x50 || buffer[1] !== 0x4B))) {
       throw new Error('Downloaded file is not a valid extension package format.');
     }
@@ -355,7 +355,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
     const extractPath = path.join(extensionsBaseDir, extensionId);
 
-    // 🔒 Security: validate every zip entry against the extraction target BEFORE
+    // Security: validate every zip entry against the extraction target BEFORE
     // extracting — rejects absolute paths, '..' segments, and any path that would
     // resolve outside the target dir (zip-slip).
     await assertCrxEntriesSafe(buffer, extractPath);
@@ -380,7 +380,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
         }
       }
 
-      // 🔒 Security: post-extraction containment + symlink sweep.
+      // Security: post-extraction containment + symlink sweep.
       assertExtractionContained(extractPath);
 
       // Verify realpath of extractPath to prevent directory escaping
@@ -397,7 +397,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     }
 
-    // 🔒 Security: Show permission review dialog before installing
+    // Security: Show permission review dialog before installing
     // This is done via IPC to the renderer which shows a native dialog
     const permissions = await parseExtensionPermissions(extractPath);
     const allPermissions = [

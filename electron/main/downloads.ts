@@ -126,7 +126,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       });
     } else {
       const defaultDir = app.getPath('downloads');
-      // 🔒 Security: item.getFilename() is server-controlled (Content-Disposition) —
+      // Security: item.getFilename() is server-controlled (Content-Disposition) —
       // strip directory components, separators, and leading dots before it touches disk.
       const safeName = path.basename(filename).replace(/[/\\]/g, '_').replace(/^\.+/, '').trim() || 'download';
       let targetPath = path.join(defaultDir, safeName);
@@ -142,7 +142,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
         }
       } catch {}
-      // 🔒 Security: final containment check — the resolved save path must stay
+      // Security: final containment check — the resolved save path must stay
       // inside the downloads directory. Fall back to a fixed name otherwise.
       if (!path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
         targetPath = path.join(defaultDir, 'download');

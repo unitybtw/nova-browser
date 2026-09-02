@@ -1,4 +1,4 @@
-// ⚡ Perf: activate the print-media font stylesheet once it loads. External file
+// Performance: activate the print-media font stylesheet once it loads. External file
 // because the production CSP blocks inline event handlers.
 const activate = (link) => { link.media = 'all'; };
 

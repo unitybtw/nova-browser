@@ -4,7 +4,7 @@ import { randomUUID, createHash, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { app as electronApp } from 'electron';
-// 🔒 Security: browser_* tools are forwarded to the renderer over a
+// Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
 import { requestRendererMcpAction } from './main/mcpBridge.js';
@@ -263,7 +263,7 @@ const TOOLS: McpTool[] = [
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
 export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
-  // 🟢 Safe — always allowed
+  // Safe — always allowed
   nova_browser_info: 'safe',
   browser_navigate: 'safe',
   browser_read_page: 'safe',
@@ -278,7 +278,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_get_element_text: 'safe',
   browser_scroll_to_element: 'safe',
   browser_full_page_screenshot: 'safe',
-  // 🟡 Medium — disabled by default, can be enabled in settings
+  // Medium — disabled by default, can be enabled in settings
   browser_click: 'medium',
   browser_hover: 'medium',
   browser_focus: 'medium',
@@ -289,7 +289,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_pin_tab: 'medium',
   browser_duplicate_tab: 'medium',
   browser_zoom: 'medium',
-  // 🔴 Sensitive — disabled by default, can be enabled in settings
+  // Sensitive — disabled by default, can be enabled in settings
   browser_type: 'sensitive',
 
   browser_press_key: 'sensitive',
@@ -322,7 +322,7 @@ export class BrowserMCPServer {
   private portFilePath: string = '';
 
   constructor(private requestedPort: number = 3020) {
-    // ⚡ Perf: express/express-rate-limit are NOT required here — they are
+    // Performance: express/express-rate-limit are NOT required here — they are
     // dynamically imported in start() so the main bundle doesn't pay their
     // parse/require cost on every launch when the MCP server never starts.
     // Set token file path in app userData
@@ -412,7 +412,7 @@ export class BrowserMCPServer {
     } catch {}
   }
 
-  // 🔒 Security: constant-time token comparison. Both sides are hashed with SHA-256
+  // Security: constant-time token comparison. Both sides are hashed with SHA-256
   // first so the buffers always have equal length (a timingSafeEqual requirement) and
   // comparison cost is independent of where the first differing byte occurs.
   private tokenMatches(provided: string): boolean {
@@ -496,7 +496,7 @@ export class BrowserMCPServer {
   }
 
   private setupRoutes(app: Express) {
-    // 🔒 Security: Prevent DNS rebinding attacks by strictly validating the Host header
+    // Security: Prevent DNS rebinding attacks by strictly validating the Host header
     app.use((req, res, next) => {
       const host = req.headers.host || '';
       const port = this.actualPort || this.requestedPort;
@@ -621,7 +621,7 @@ export class BrowserMCPServer {
       const body = req.body;
       const sessionId = req.query.sessionId as string;
 
-      // 🔒 Security: only route responses to KNOWN sessions. A missing or unknown
+      // Security: only route responses to KNOWN sessions. A missing or unknown
       // sessionId must never fall back to broadcasting tool results to ALL clients.
       if (!sessionId || !this.clients.has(sessionId)) {
         return res.status(sessionId ? 404 : 400).json({
@@ -732,7 +732,7 @@ export class BrowserMCPServer {
   }
 
   public async start(): Promise<void> {
-    // ⚡ Perf: load express + express-rate-limit lazily — they are only parsed/
+    // Performance: load express + express-rate-limit lazily — they are only parsed/
     // required when the MCP server actually starts, not on every app launch.
     const [{ default: express }, { default: rateLimit }] = await Promise.all([
       import('express'),
@@ -756,7 +756,7 @@ export class BrowserMCPServer {
             // Persist the actual port for client reconnection
             this.savePersistedPort(this.actualPort);
           }
-          console.log(`[MCP Server] ✓ Running at http://localhost:${this.actualPort}`);
+          console.log(`[MCP Server] Running at http://localhost:${this.actualPort}`);
           console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
           console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
           console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
@@ -773,7 +773,7 @@ export class BrowserMCPServer {
                   this.actualPort = address.port;
                   this.savePersistedPort(this.actualPort);
                 }
-                console.log(`[MCP Server] ✓ Running on fallback port http://localhost:${this.actualPort}`);
+                console.log(`[MCP Server] Running on fallback port http://localhost:${this.actualPort}`);
                 console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
                 console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
                 console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
