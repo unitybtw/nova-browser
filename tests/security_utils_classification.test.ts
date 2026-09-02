@@ -9,10 +9,11 @@ assert.equal(extractHostname('http://localhost:3000'), 'localhost');
 assert.equal(extractHostname('not a url'), '');
 assert.equal(extractHostname(''), '');
 
-// 2. Phishing Keyword Detection
-assert.equal(checkPhishingDomain('https://paypal-verify-account.com/login'), true);
-assert.equal(checkPhishingDomain('http://bank-security-alert.net'), true);
-assert.equal(checkPhishingDomain('https://free-robux-generator.xyz'), true);
+// 2. Homograph & Structural Phishing Detection (Punycode & Credential Obfuscation)
+assert.equal(checkPhishingDomain('https://xn--pple-43d.com/login'), true); // IDN homograph spoofing
+assert.equal(checkPhishingDomain('https://paypal.com@evil-phishing.com/signin'), true); // Basic auth credential spoofing
+assert.equal(checkPhishingDomain('https://security-alert.cisco.com'), false); // Legitimate domain with security keyword (no false positive)
+assert.equal(checkPhishingDomain('https://billing-update.aws.amazon.com'), false); // Legitimate domain with billing keyword (no false positive)
 assert.equal(checkPhishingDomain('https://github.com'), false);
 assert.equal(checkPhishingDomain('https://google.com'), false);
 
@@ -34,8 +35,8 @@ assert.equal(httpInfo.label, 'Not Secure');
 const internalInfo = getUrlSecurityInfo('nova://settings');
 assert.equal(internalInfo.level, 'internal');
 
-const dangerousInfo = getUrlSecurityInfo('https://paypal-verify-account.com');
+const dangerousInfo = getUrlSecurityInfo('https://sub.phishing-hub.org/login');
 assert.equal(dangerousInfo.level, 'dangerous');
 assert.equal(dangerousInfo.label, 'Dangerous');
 
-console.log('[PASS] [Security Utils] Hostname extraction, phishing heuristics, blocklist matching, and security levels validated.');
+console.log('[PASS] [Security Utils] Hostname extraction, structural heuristics, blocklist matching, and security levels validated.');

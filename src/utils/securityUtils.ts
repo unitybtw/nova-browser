@@ -17,15 +17,6 @@ export interface SecurityInfo {
 // Internal nova:// pages are always safe
 const INTERNAL_PROTOCOLS = ['nova:', 'about:', 'chrome-extension:'];
 
-// Common phishing indicators in domain names
-const PHISHING_KEYWORDS = [
-  'login-secure', 'verify-account', 'account-verify', 'security-alert',
-  'billing-update', 'account-suspended', 'at-risk', 'urgent-verify',
-  'secure-login', 'identity-verify', 'recovery-team', 'prize-winner',
-  'free-robux', 'free-bitcoin', 'nitro-free', 'wallet-recovery',
-  'refund-2024', 'gift-card-free', 'survey-winner'
-];
-
 /**
  * Extract the hostname from a URL string safely.
  */
@@ -38,25 +29,40 @@ export function extractHostname(url: string): string {
 }
 
 /**
- * Check if a domain matches the local blocklist.
- * Also checks for heuristic phishing patterns.
+ * Check if a domain matches the blocklist or exhibits concrete structural phishing vectors.
+ * Replaces naive keyword matching with signed blocklist matching and structural heuristic checks.
  */
 let cachedBlocklist: string[] | null = null;
 
 export function checkPhishingDomain(url: string): boolean {
-  const hostname = extractHostname(url);
+  if (!url || typeof url !== 'string') return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
   if (!hostname) return false;
 
-  // Check heuristic keyword patterns
-  const hasPhishingKeyword = PHISHING_KEYWORDS.some(kw => hostname.includes(kw));
-  if (hasPhishingKeyword) return true;
+  // 1. Structural Phishing: Embedded authority credentials used to spoof URLs (e.g., https://paypal.com@phishing.com)
+  if (parsed.username || parsed.password) {
+    return true;
+  }
 
-  // Check against cached blocklist (populated by loadBlocklist())
-  if (cachedBlocklist) {
-    return cachedBlocklist.some(blocked => {
-      // Exact match or subdomain match
+  // 2. Concrete Homograph / Punycode spoofing check (e.g. xn--apple-...)
+  if (hostname.startsWith('xn--') || hostname.includes('.xn--')) {
+    return true;
+  }
+
+  // 3. Cryptographically verified blocklist matching (exact or subdomain)
+  if (cachedBlocklist && cachedBlocklist.length > 0) {
+    const isBlocked = cachedBlocklist.some(blocked => {
       return hostname === blocked || hostname.endsWith('.' + blocked);
     });
+    if (isBlocked) return true;
   }
 
   return false;
