@@ -76,5 +76,14 @@ export function isSafeNavigationUrl(url: string): boolean {
     ].includes(normalized);
   }
 
+  if (protocol === 'chrome-extension:') {
+    try {
+      const parsed = new URL(candidate);
+      return /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
+    } catch {
+      return false;
+    }
+  }
+
   return false;
 }

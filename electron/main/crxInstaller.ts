@@ -2,8 +2,6 @@ import { app, BrowserWindow, dialog, session } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import fetch from 'cross-fetch';
-// @ts-ignore
-import unzip from 'unzip-crx-3';
 import JSZip from 'jszip';
 
 /**

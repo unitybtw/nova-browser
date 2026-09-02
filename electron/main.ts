@@ -1271,7 +1271,9 @@ app.on('web-contents-created', (_event, contents) => {
       popupHistory.set(id, history);
 
       const parsed = new URL(url);
-      if ((parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password) {
+      const isHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+      const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
+      if (isHttp || isExtension) {
         sendToMainWindow('new-tab', url);
       }
     } catch {}
@@ -1299,7 +1301,11 @@ app.on('web-contents-created', (_event, contents) => {
         const parsed = new URL(navigationUrl);
         const allowedProtocols = ['http:', 'https:'];
         const isAllowedAboutBlank = parsed.protocol === 'about:' && parsed.pathname === 'blank';
-        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank) ||
+        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
+          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
+          (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(session.defaultSession.getExtension(parsed.hostname)));
+
+        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
             parsed.username || parsed.password) {
           e.preventDefault();
           console.warn('Blocked navigation to forbidden protocol or credential-bearing URL:', navigationUrl);

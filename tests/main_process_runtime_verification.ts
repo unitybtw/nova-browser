@@ -62,7 +62,7 @@ async function verifyMainProcessRuntime() {
     'express',
     '@modelcontextprotocol/sdk/package.json',
     'electron-updater',
-    'unzip-crx-3'
+    'jszip'
   ];
 
   for (const dep of externalDependencies) {
