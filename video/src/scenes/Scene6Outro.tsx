@@ -61,7 +61,7 @@ export const Scene6Outro: React.FC = () => {
           }}
         />
         <Img
-          src={staticFile('nova-icon-transparent.png')}
+          src={staticFile('logo.svg')}
           alt="Nova Logo"
           style={{
             width: 140,
@@ -118,7 +118,7 @@ export const Scene6Outro: React.FC = () => {
             border: '1px solid rgba(255, 255, 255, 0.3)',
           }}
         >
-          <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 26, height: 26 }} />
+          <Img src={staticFile('logo.svg')} style={{ width: 26, height: 26 }} />
           <span>Download Nova Browser</span>
         </div>
 

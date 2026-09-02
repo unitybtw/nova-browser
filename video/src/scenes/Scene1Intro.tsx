@@ -150,7 +150,7 @@ export const Scene1Intro: React.FC = () => {
 
         {/* Real Official Nova Logo Image */}
         <Img
-          src={staticFile('nova-icon-transparent.png')}
+          src={staticFile('logo.svg')}
           alt="Nova Logo"
           style={{
             width: 160,

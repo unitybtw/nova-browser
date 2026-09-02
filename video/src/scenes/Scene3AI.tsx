@@ -64,7 +64,7 @@ export const Scene3AI: React.FC = () => {
           boxShadow: '0 0 30px rgba(168, 85, 247, 0.3)',
         }}
       >
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 22, height: 22 }} />
+        <Img src={staticFile('logo.svg')} style={{ width: 22, height: 22 }} />
         <span>Local AI Intelligence</span>
       </div>
 
@@ -115,7 +115,7 @@ export const Scene3AI: React.FC = () => {
                 boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)',
               }}
             >
-              <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 30, height: 30 }} />
+              <Img src={staticFile('logo.svg')} style={{ width: 30, height: 30 }} />
             </div>
             <div>
               <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 20 }}>Nova AI Copilot</div>

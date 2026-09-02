@@ -61,7 +61,7 @@ export const Scene2Speed: React.FC = () => {
           boxShadow: '0 0 30px rgba(234, 179, 8, 0.25)',
         }}
       >
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 22, height: 22 }} />
+        <Img src={staticFile('logo.svg')} style={{ width: 22, height: 22 }} />
         <span>Performance Telemetry</span>
       </div>
 

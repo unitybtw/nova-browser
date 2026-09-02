@@ -146,7 +146,7 @@ const AIPanel: React.FC<{ frame: number; vertical: boolean }> = ({ frame, vertic
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 18, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 30, height: 30, filter: 'drop-shadow(0 0 12px #818cf8)' }} />
+        <Img src={staticFile('logo.svg')} style={{ width: 30, height: 30, filter: 'drop-shadow(0 0 12px #818cf8)' }} />
         <div>
           <div style={{ color: '#f8fafc', fontWeight: 800, fontSize: 15 }}>Nova AI</div>
           <div style={{ color: GREEN, fontFamily: MONO, fontSize: 9 }}>LOCAL / WEBGPU</div>
@@ -233,7 +233,7 @@ const BrowserFrame: React.FC<BrowserFrameProps> = ({ mode, vertical, frame, scal
           {!showTabs && <><BrowserTab title="Nova new tab" active /><BrowserTab title="GitHub / Nova Browser" /></>}
           {showTabs && <BrowserTab title="Research session · 5 tabs" active accent={INDIGO} />}
         </div>
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 24, height: 24 }} />
+        <Img src={staticFile('logo.svg')} style={{ width: 24, height: 24 }} />
       </div>
       <div style={{ height: 52, display: 'flex', alignItems: 'center', gap: 10, padding: '0 18px', background: '#111b2d', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
         <span style={{ color: '#64748b', fontSize: 18 }}>‹</span><span style={{ color: '#64748b', fontSize: 18 }}>›</span><AddressBar value={showAi ? 'nova://newtab · ask @ai' : showSplit ? 'react.dev/reference/react' : 'https://github.com/unitybtw/nova-browser'} />
@@ -272,7 +272,7 @@ export const NovaBrowserAd: React.FC<AdProps> = ({ format = 'landscape' }) => {
       <div style={{ position: 'absolute', width: vertical ? 620 : 920, height: vertical ? 620 : 920, borderRadius: '50%', left: '50%', top: '42%', transform: 'translate(-50%,-50%)', background: 'radial-gradient(circle, rgba(67,56,202,0.24), transparent 68%)', filter: 'blur(30px)' }} />
 
       <div style={{ position: 'absolute', top: vertical ? 100 : 72, left: 0, right: 0, zIndex: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', opacity: introOpacity, transform: `translateY(${(1 - introOpacity) * 18}px)` }}>
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: vertical ? 74 : 62, height: vertical ? 74 : 62, transform: `scale(${logoIn})`, filter: 'drop-shadow(0 0 30px rgba(103,232,249,0.7))' }} />
+        <Img src={staticFile('logo.svg')} style={{ width: vertical ? 74 : 62, height: vertical ? 74 : 62, transform: `scale(${logoIn})`, filter: 'drop-shadow(0 0 30px rgba(103,232,249,0.7))' }} />
         <div style={{ marginTop: 18, color: CYAN, fontFamily: MONO, fontSize: vertical ? 14 : 13, letterSpacing: '0.24em', fontWeight: 700 }}>SOVEREIGN COMPUTING</div>
         <h1 style={{ margin: '14px 0 0', fontSize: vertical ? 48 : 66, lineHeight: 0.98, letterSpacing: '-0.05em', fontWeight: 900, background: 'linear-gradient(135deg,#fff 15%,#a5f3fc 55%,#818cf8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>NOVA BROWSER</h1>
       </div>

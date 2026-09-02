@@ -49,7 +49,7 @@ export const Scene5Workflow: React.FC = () => {
           boxShadow: '0 0 30px rgba(59, 130, 246, 0.3)',
         }}
       >
-        <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 22, height: 22 }} />
+        <Img src={staticFile('logo.svg')} style={{ width: 22, height: 22 }} />
         <span>Productivity & Workspaces</span>
       </div>
 
@@ -120,7 +120,7 @@ export const Scene5Workflow: React.FC = () => {
                 gap: 8,
               }}
             >
-              <Img src={staticFile('nova-icon-transparent.png')} style={{ width: 16, height: 16 }} />
+              <Img src={staticFile('logo.svg')} style={{ width: 16, height: 16 }} />
               <span>nova://newtab</span>
             </div>
 
