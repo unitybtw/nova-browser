@@ -15,7 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-61%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
@@ -122,10 +122,10 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 - **Manual CRX / Unpacked Add-ons**: Load developer extensions or zip packages effortlessly through `nova://extensions`.
 
 ### Native `nova://` Internal Pages
-- **`nova://settings`**: Complete preferences, theme toggles, search engine picker, shortcuts, and sync controls.
+- **`nova://settings`**: Complete browser preferences, theme toggles, search engine picker, shortcuts, zero-knowledge password vault, and sync controls.
 - **`nova://history`**: Grouped timeline search, date filtering, and quick item deletion.
 - **`nova://downloads`**: Live progress indicators, pause/resume, folder shortcuts, and file launching.
-- **`nova://passwords`**: Zero-knowledge encrypted password vault with auto-fill and password generator.
+- **`nova://newtab`**: Start page with quick dials, customizable animated background, and tasks widget.
 
 ### Productivity & Multi-Tasking
 - **Dual-View Split Screen**: Snap two active tabs side-by-side with a drag-to-resize divider.
@@ -153,22 +153,28 @@ Nova Browser features a local-first neural execution architecture powered by Web
 ---
 
 ## Keyboard Shortcuts
-
-| Shortcut (macOS) | Shortcut (Windows/Linux) | Action |
-| :--- | :--- | :--- |
-| `Cmd + T` | `Ctrl + T` | Open New Tab |
-| `Cmd + W` | `Ctrl + W` | Close Active Tab |
-| `Cmd + Shift + T` | `Ctrl + Shift + T` | Reopen Last Closed Tab |
-| `Cmd + L` / `Cmd + K` | `Ctrl + L` / `Ctrl + K` | Focus Omnibox / Address Bar |
-| `Cmd + B` | `Ctrl + B` | Toggle AI Assistant Sidepanel |
-| `Cmd + Shift + S` | `Ctrl + Shift + S` | Capture Full-Page Screenshot |
-| `Cmd + [` / `Cmd + ]` | `Alt + Left` / `Alt + Right` | Back / Forward History Navigation |
-| `Cmd + R` | `Ctrl + R` / `F5` | Reload Current Page |
-| `Cmd + Shift + D` | `Ctrl + Shift + D` | Toggle Dual Split-Screen Canvas |
-| `Cmd + Shift + E` | `Ctrl + Shift + E` | Open Extensions Manager (`nova://extensions`) |
-| `Cmd + H` | `Ctrl + H` | Open History (`nova://history`) |
-| `Cmd + J` | `Ctrl + J` | Open Downloads (`nova://downloads`) |
-| `Cmd + ,` | `Ctrl + ,` | Open Settings (`nova://settings`) |
+ 
+ | Shortcut (macOS) | Shortcut (Windows/Linux) | Action |
+ | :--- | :--- | :--- |
+ | `Cmd + T` | `Ctrl + T` | Open New Tab |
+ | `Cmd + W` | `Ctrl + W` | Close Active Tab |
+ | `Cmd + Shift + T` | `Ctrl + Shift + T` | Reopen Last Closed Tab |
+ | `Cmd + L` | `Ctrl + L` | Focus Address Bar / Omnibox |
+ | `Cmd + K` | `Ctrl + K` | Spotlight Omnibox Quick Search |
+ | `Cmd + I` / `Cmd + Shift + A` | `Ctrl + I` / `Ctrl + Shift + A` | Toggle AI Assistant Sidepanel |
+ | `Cmd + S` | `Ctrl + S` | Toggle Vertical Tabs Sidebar |
+ | `Ctrl + Tab` / `Ctrl + Shift + Tab` | `Ctrl + Tab` / `Ctrl + Shift + Tab` | Switch to Next / Previous Tab |
+ | `Cmd + 1..9` | `Ctrl + 1..9` | Direct Tab Jump (1st through 9th) |
+ | `Cmd + R` / `F5` | `Ctrl + R` / `F5` | Reload Current Page |
+ | `Cmd + [` / `Cmd + ]` | `Alt + Left` / `Alt + Right` | Back / Forward History Navigation |
+ | `Cmd + F` | `Ctrl + F` | Find in Page |
+ | `Cmd + D` | `Ctrl + D` | Bookmark Current Page |
+ | `Cmd + Shift + S` | `Ctrl + Shift + S` | Capture Full-Page Screenshot |
+ | `Cmd + H` | `Ctrl + H` | Open History (`nova://history`) |
+ | `Cmd + J` | `Ctrl + J` | Open Downloads (`nova://downloads`) |
+ | `Cmd + ,` | `Ctrl + ,` | Open Settings (`nova://settings`) |
+ | `F12` / `Cmd + Opt + I` | `F12` / `Ctrl + Shift + I` | Open Developer Tools |
+ | `F1` / `Cmd + /` | `F1` / `Ctrl + /` | Open Help & Shortcuts Guide |
 
 ---
 
@@ -190,11 +196,9 @@ Nova Browser features a local-first neural execution architecture powered by Web
 
 ## Quick Start
 
-### Option A: Install with Homebrew (macOS Recommended)
+### Option A: Download Official Release (Recommended)
 
-```bash
-brew install --cask unitybtw/tap/nova-browser
-```
+Download the latest prebuilt installer for your operating system (DMG for macOS, Setup Exe for Windows, AppImage/Deb for Linux) directly from [GitHub Releases](https://github.com/unitybtw/nova-browser/releases).
 
 ### Option B: Build from Source
 
@@ -334,7 +338,7 @@ graph TD
 
 1. **Main Process Security Shell (`electron/main.ts`)**:
    - **Process Sandboxing**: Sandboxed webviews with `contextIsolation: true`, `nodeIntegration: false`, and strict `isTrustedSender` senderFrame verification on every IPC channel.
-   - **Privacy Shield & AdBlock**: Kernel-level network interception via `@cliqz/adblocker-electron` and $O(1)$ Hash Set phishing blocklists with automatic SSRF/Private IP filtering.
+   - **Privacy Shield & AdBlock**: High-performance network request interception via Chromium session hooks and `@cliqz/adblocker-electron`, backed by an in-memory hash set phishing filter with automatic SSRF and private IP blocking.
    - **Chrome Web Store Engine (`crxInstaller.ts`)**: Direct CRX package retrieval, zip-slip path traversal neutralization, and permission review gate before installation.
    - **Native Hardware & OS Integration**: macOS Metal / Windows GPU flags, native OS Text-to-Speech synthesis, and `safeStorage` OS keychain password encryption.
 
@@ -358,18 +362,23 @@ graph TD
 
 Nova Browser natively exposes an MCP endpoint on port `3020`, enabling AI assistants to browse the web autonomously.
 
-To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_desktop_config.json`:
+To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add this entry to your MCP configuration file:
 
 ```json
 {
   "mcpServers": {
     "nova-browser": {
       "command": "node",
-      "args": ["/ABSOLUTE_PATH_TO_NOVA/mcp-bridge.mjs"]
+      "args": ["/ABSOLUTE_PATH_TO_NOVA/mcp-bridge.mjs"],
+      "env": {
+        "MCP_TOKEN": "YOUR_NOVA_MCP_TOKEN"
+      }
     }
   }
 }
 ```
+
+*(Note: Find your persistent token under `nova://settings` -> Developer / MCP Server, or check the terminal output on startup).*
 
 ---
 
@@ -384,7 +393,7 @@ To connect **Claude Desktop** to Nova Browser, add this entry to your `claude_de
 - [x] Reader Mode with High-Fidelity Native OS Text-to-Speech (TTS)
 - [x] Local Offline LLM Integration (Web-LLM / WebGPU)
 - [x] Persistent Info Vault & Task History Tracking
-- [x] Comprehensive Automated Test Suite (18 Suites, 265+ Assertions)
+- [x] Comprehensive Automated Test Suite (61 Regression, Security & Empirical Tests)
 - [ ] Mobile Companion Application
 
 ---
