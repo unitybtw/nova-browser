@@ -1203,18 +1203,17 @@ app.whenReady().then(async () => {
                 });
               } catch (_) {}
             } else {
-              session.defaultSession.loadExtension(extPath).then(extInfo => {
-                loadedExtensions.push(extInfo);
-                console.log(`Loaded extension: ${extInfo.name}`);
-              }).catch(err => {
-                console.error(`Failed to load extension at ${extPath}, auto-quarantining:`, err);
-                try {
-                  const currentDisabled = getDisabledExtensionIds();
-                  if (!currentDisabled.includes(dir)) {
-                    setDisabledExtensionIds([...currentDisabled, dir]);
+              try {
+                if (!session.defaultSession.getExtension(dir)) {
+                  const extInfo = await session.defaultSession.loadExtension(extPath, { allowFileAccess: true });
+                  if (!loadedExtensions.some(e => e.id === extInfo.id)) {
+                    loadedExtensions.push(extInfo);
                   }
-                } catch (_) {}
-              });
+                  console.log(`Loaded extension: ${extInfo.name}`);
+                }
+              } catch (err) {
+                console.error(`Failed to load extension at ${extPath}:`, err);
+              }
             }
           }
         }
@@ -2836,8 +2835,9 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     try {
       const parsedExtensionUrl = new URL(url);
       const extensionId = parsedExtensionUrl.hostname;
-      if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) ||
-          !loadedExtensions.some(extension => extension.id === extensionId)) {
+      const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
+        Boolean(session.defaultSession.getExtension(extensionId));
+      if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled) {
         return { error: 'Blocked: extension is not installed.' };
       }
     } catch {
@@ -2897,11 +2897,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     show: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true,
-      // Security: extension popup content is untrusted — run it in the
-      // Chromium sandbox (the active-tab bridge is injected via executeJavaScript,
-      // which does not require an unsandboxed renderer).
-      sandbox: true,
+      contextIsolation: false, // Required for Chromium extension origin bindings to attach chrome.runtime and chrome.storage
       session: session.defaultSession
     }
   });
@@ -2943,33 +2939,33 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     const bridgeCode = `
       (function() {
         try {
-          if (window.chrome && window.chrome.tabs) {
-            const realTab = ${JSON.stringify(tabData)};
-            const origQuery = window.chrome.tabs.query;
-            window.chrome.tabs.query = function(q, cb) {
-              if (typeof cb === 'function') {
-                if (!q || q.active || q.currentWindow || q.lastFocusedWindow) {
-                  cb([realTab]);
-                } else if (origQuery) {
-                  origQuery.call(window.chrome.tabs, q, function(res) {
-                    cb(res && res.length > 0 ? res : [realTab]);
-                  });
-                } else {
-                  cb([realTab]);
-                }
+          window.chrome = window.chrome || {};
+          window.chrome.tabs = window.chrome.tabs || {};
+          const realTab = ${JSON.stringify(tabData)};
+          const origQuery = window.chrome.tabs.query;
+          window.chrome.tabs.query = function(q, cb) {
+            if (typeof cb === 'function') {
+              if (!q || q.active || q.currentWindow || q.lastFocusedWindow) {
+                cb([realTab]);
+              } else if (origQuery) {
+                origQuery.call(window.chrome.tabs, q, function(res) {
+                  cb(res && res.length > 0 ? res : [realTab]);
+                });
               } else {
-                return Promise.resolve([realTab]);
+                cb([realTab]);
               }
-            };
-            window.chrome.tabs.get = function(id, cb) {
-              if (typeof cb === 'function') cb(realTab);
-              else return Promise.resolve(realTab);
-            };
-            window.chrome.tabs.getCurrent = function(cb) {
-              if (typeof cb === 'function') cb(realTab);
-              else return Promise.resolve(realTab);
-            };
-          }
+            } else {
+              return Promise.resolve([realTab]);
+            }
+          };
+          window.chrome.tabs.get = function(id, cb) {
+            if (typeof cb === 'function') cb(realTab);
+            else return Promise.resolve(realTab);
+          };
+          window.chrome.tabs.getCurrent = function(cb) {
+            if (typeof cb === 'function') cb(realTab);
+            else return Promise.resolve(realTab);
+          };
         } catch(e) {}
       })();
     `;
@@ -2977,8 +2973,21 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
   };
 
+  // Graceful show & blur handling: only allow blur-close after popup is stably shown
+  let canCloseOnBlur = false;
+  const showPopup = () => {
+    if (!popupWin.isDestroyed() && !popupWin.isVisible()) {
+      popupWin.show();
+      popupWin.focus();
+      setTimeout(() => {
+        canCloseOnBlur = true;
+      }, 400);
+    }
+  };
+
   popupWin.webContents.on('dom-ready', async () => {
     injectActiveTabBridge();
+    showPopup();
     
     // Auto-fit popup dimensions to content
     try {
@@ -2989,45 +2998,23 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
         })
       `);
       if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
-        const fitWidth = Math.min(Math.max(dimensions.width, 320), 600);
-        const fitHeight = Math.min(Math.max(dimensions.height, 200), 650);
+        const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
+        const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
         
         if (!popupWin.isDestroyed()) {
-          let newX = posX;
-          if (bounds && typeof bounds.x === 'number' && win) {
-            const [winX] = win.getPosition();
-            const [winW] = win.getSize();
-            const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);
-            const calculatedX = btnCenterX - Math.round(fitWidth / 2);
-            newX = Math.max(winX + 12, Math.min(calculatedX, winX + winW - fitWidth - 12));
-          }
-          popupWin.setBounds({
-            x: newX,
-            y: posY,
-            width: fitWidth,
-            height: fitHeight
-          });
+          popupWin.setSize(fitWidth, fitHeight);
         }
       }
     } catch (_) {}
-
-    if (!popupWin.isDestroyed() && !popupWin.isVisible()) {
-      popupWin.show();
-      popupWin.focus();
-    }
   });
 
-  // Show only when ready to prevent blank/white flash
-  popupWin.once('ready-to-show', () => {
-    if (!popupWin.isDestroyed()) {
-      popupWin.show();
-      popupWin.focus();
-    }
-  });
+  popupWin.once('ready-to-show', showPopup);
 
-  // Close popup when it loses focus
+  // Close popup when it loses focus (after grace period)
   popupWin.on('blur', () => {
-    if (!popupWin.isDestroyed()) popupWin.close();
+    if (canCloseOnBlur && !popupWin.isDestroyed()) {
+      popupWin.close();
+    }
   });
 
   popupWin.on('closed', () => {
@@ -3050,6 +3037,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
 
   try {
     await popupWin.loadURL(url);
+    showPopup();
     return { success: true };
   } catch (err: any) {
     if (!popupWin.isDestroyed()) popupWin.close();

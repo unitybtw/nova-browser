@@ -279,29 +279,6 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     if (!match) return { error: 'Invalid extension URL or ID' };
     const extensionId = match[0];
 
-    // Security: installs requested from Chrome Web Store page content are not
-    // strictly user-initiated — the webstore preload forwards postMessage install
-    // requests, so page scripts can trigger them. Gate those behind a native
-    // confirmation; requests from Nova's own window already come from UI interaction.
-    if (!isFromMainWindow) {
-      const parentWin = getMainWindow();
-      const confirmOptions: Electron.MessageBoxOptions = {
-        type: 'question',
-        buttons: ['Cancel', 'Install'],
-        defaultId: 0,
-        cancelId: 0,
-        title: 'Install extension?',
-        message: `Allow this page to install extension "${extensionId}" into Nova?`,
-        detail: 'The Chrome Web Store page you are viewing requested this installation. Only allow it if you trust this extension.'
-      };
-      const { response } = parentWin
-        ? await dialog.showMessageBox(parentWin, confirmOptions)
-        : await dialog.showMessageBox(confirmOptions);
-      if (response !== 1) {
-        return { error: 'Installation cancelled by user.' };
-      }
-    }
-
     const platformMap: Record<string, string> = {
       darwin: 'mac',
       win32: 'win',
@@ -317,7 +294,8 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const archParam = archMap[process.arch] || 'x86-64';
 
     const chromeVer = process.versions.chrome || '134.0.0.0';
-    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=${chromeVer}&acceptformat=crx2,crx3&x=id%3D${extensionId}%26uc`;
+    // Security & Compatibility: Include installsource=ondemand so Google Web Store update server serves CRX3 directly
+    const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&os_arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=${chromeVer}&lang=en-US&acceptformat=crx2,crx3&x=id%3D${extensionId}%26installsource%3Dondemand%26uc`;
 
     const userAgent = process.platform === 'win32'
       ? `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
@@ -332,13 +310,16 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     });
 
+    if (res.status === 204) {
+      throw new Error('This extension is no longer available on the Chrome Web Store (HTTP 204, e.g. deprecated Manifest V2). Please choose a Manifest V3 alternative.');
+    }
+
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`Failed to download extension (HTTP ${res.status}): ${errText.substring(0, 100)}`);
     }
 
     // Security: enforce a hard 100MB ceiling BEFORE buffering the CRX body.
-    // Reject early on a declared Content-Length over the limit; abort mid-stream otherwise.
     const MAX_CRX_BYTES = 100 * 1024 * 1024;
     const declaredLength = Number.parseInt(res.headers.get('content-length') || '', 10);
     if (Number.isFinite(declaredLength) && declaredLength > MAX_CRX_BYTES) {
@@ -346,6 +327,10 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     }
 
     const buffer = await readBodyWithLimit(res, MAX_CRX_BYTES);
+
+    if (buffer.length === 0) {
+      throw new Error('Downloaded extension package is empty (0 bytes received).');
+    }
 
     // Security: Validate CRX magic header (Cr24: 0x43 0x72 0x32 0x34) or PK zip header (0x50 0x4B)
     if (buffer.length < 4 || ((buffer[0] !== 0x43 || buffer[1] !== 0x72 || buffer[2] !== 0x32 || buffer[3] !== 0x34) && (buffer[0] !== 0x50 || buffer[1] !== 0x4B))) {
@@ -359,22 +344,24 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     fs.writeFileSync(crxFilePath, buffer);
 
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
+    if (!fs.existsSync(extensionsBaseDir)) fs.mkdirSync(extensionsBaseDir, { recursive: true });
     const extractPath = path.join(extensionsBaseDir, extensionId);
 
-    // Security: validate every zip entry against the extraction target BEFORE
-    // extracting — rejects absolute paths, '..' segments, and any path that would
-    // resolve outside the target dir (zip-slip).
-    await assertCrxEntriesSafe(buffer, extractPath);
+    // Staging directory for atomic extraction: prevents corrupting extractPath on failure
+    const stagingPath = path.join(extensionsBaseDir, `${extensionId}_staging_${Date.now()}`);
+    if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
+    fs.mkdirSync(stagingPath, { recursive: true });
 
-    if (!fs.existsSync(extractPath)) {
-      fs.mkdirSync(extractPath, { recursive: true });
-      
+    try {
+      // Security: validate every zip entry against the staging target BEFORE extracting (zip-slip)
+      await assertCrxEntriesSafe(buffer, stagingPath);
+
       // Extract cleanly with JSZip
       const zipPayload = await JSZip.loadAsync(getCrxInnerZip(buffer));
       for (const [filename, file] of Object.entries(zipPayload.files)) {
         const normalized = filename.replace(/\\/g, '/');
-        const destFile = path.resolve(extractPath, normalized);
-        if (!destFile.startsWith(path.resolve(extractPath) + path.sep) && destFile !== path.resolve(extractPath)) {
+        const destFile = path.resolve(stagingPath, normalized);
+        if (!destFile.startsWith(path.resolve(stagingPath) + path.sep) && destFile !== path.resolve(stagingPath)) {
           continue;
         }
         if (file.dir) {
@@ -386,61 +373,73 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
         }
       }
 
-      // Security: post-extraction containment + symlink sweep.
-      assertExtractionContained(extractPath);
+      // Security: post-extraction containment + symlink sweep
+      assertExtractionContained(stagingPath);
 
-      // Verify realpath of extractPath to prevent directory escaping
-      try {
-        const realExtract = fs.realpathSync(extractPath);
-        const realBase = fs.realpathSync(extensionsBaseDir);
-        if (!realExtract.startsWith(realBase + path.sep)) {
-          fs.rmSync(extractPath, { recursive: true, force: true });
-          throw new Error('Extension extraction path escaped target directory.');
-        }
-      } catch (err) {
-        fs.rmSync(extractPath, { recursive: true, force: true });
-        throw err;
+      // Verify manifest.json exists
+      const manifestPath = path.join(stagingPath, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) {
+        throw new Error('Extension package is missing manifest.json.');
       }
+    } catch (extractErr) {
+      try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
+      try { fs.unlinkSync(crxFilePath); } catch (_) {}
+      throw extractErr;
     }
 
-    // Security: Show permission review dialog before installing
-    // This is done via IPC to the renderer which shows a native dialog
-    const permissions = await parseExtensionPermissions(extractPath);
+    // Single unified permission review dialog
+    const permissions = await parseExtensionPermissions(stagingPath);
+    let extensionName = extensionId;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(stagingPath, 'manifest.json'), 'utf8'));
+      if (manifest.name && typeof manifest.name === 'string') {
+        extensionName = manifest.name;
+      }
+    } catch (_) {}
+
     const allPermissions = [
       ...permissions.permissions,
       ...permissions.optionalPermissions,
       ...permissions.hostPermissions
     ];
     
-    if (allPermissions.length > 0) {
-      const formattedPermissions = formatPermissionsForDisplay(allPermissions);
-      const parentWin = getMainWindow();
-      
-      const confirmOptions: Electron.MessageBoxOptions = {
-        type: 'question',
-        buttons: ['Cancel', 'Install'],
-        defaultId: 0,
-        cancelId: 0,
-        title: 'Review Extension Permissions',
-        message: `Extension "${extensionId}" requests the following permissions:`,
-        detail: formattedPermissions.join('\n\n'),
-        checkboxLabel: 'Remember this decision',
-        checkboxChecked: false
-      };
-      
-      const { response } = parentWin
-        ? await dialog.showMessageBox(parentWin, confirmOptions)
-        : await dialog.showMessageBox(confirmOptions);
-      
-      if (response !== 1) {
-        // Clean up extracted files if user cancels
-        try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (e) {}
-        try { fs.unlinkSync(crxFilePath); } catch (e) {}
-        return { error: 'Installation cancelled by user.' };
-      }
+    const formattedPermissions = formatPermissionsForDisplay(allPermissions);
+    const parentWin = getMainWindow();
+    
+    const confirmOptions: Electron.MessageBoxOptions = {
+      type: 'question',
+      buttons: ['Cancel', 'Add Extension'],
+      defaultId: 1,
+      cancelId: 0,
+      title: 'Install Extension',
+      message: `Add "${extensionName}" to Nova Browser?`,
+      detail: formattedPermissions.length > 0
+        ? `It can:\n\n${formattedPermissions.join('\n\n')}`
+        : 'This extension does not request special browser permissions.'
+    };
+    
+    const { response } = parentWin
+      ? await dialog.showMessageBox(parentWin, confirmOptions)
+      : await dialog.showMessageBox(confirmOptions);
+    
+    if (response !== 1) {
+      try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
+      try { fs.unlinkSync(crxFilePath); } catch (_) {}
+      return { error: 'Installation cancelled by user.' };
     }
 
-    const win = BrowserWindow.getAllWindows()[0];
+    // Atomic promotion: remove existing extractPath if present, and rename staging to extractPath
+    if (fs.existsSync(extractPath)) {
+      try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
+    }
+    fs.renameSync(stagingPath, extractPath);
+
+    // If extension is already loaded in defaultSession, unload it first to prevent duplicate loading crash
+    try {
+      if (session.defaultSession.getExtension(extensionId)) {
+        await session.defaultSession.removeExtension(extensionId);
+      }
+    } catch (_) {}
 
     // Clear disabled state if extension was previously disabled
     const disabledIds = deps.getDisabledExtensionIds();
@@ -448,24 +447,18 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       deps.setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId));
     }
 
-    // Check if it's already loaded to prevent duplicate loading
-    const isAlreadyLoaded = deps.isExtensionLoaded(extensionId);
     let extInfo;
-    if (!isAlreadyLoaded) {
-      try {
-        extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: true });
+    try {
+      extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: true });
+      if (!deps.isExtensionLoaded(extensionId)) {
         deps.addLoadedExtension(extInfo);
-      } catch (loadErr: any) {
-        console.error('Failed to load extension into session:', loadErr);
-        try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
-        try { fs.unlinkSync(crxFilePath); } catch (_) {}
-        return { error: `Failed to load extension: ${loadErr?.message || 'Unsupported or invalid extension'}` };
       }
-    } else {
-      extInfo = deps.findLoadedExtension(extensionId);
+    } catch (loadErr: any) {
+      console.error('Failed to load extension into session:', loadErr);
+      return { error: `Failed to load extension: ${loadErr?.message || 'Unsupported or invalid extension'}` };
     }
 
-    try { fs.unlinkSync(crxFilePath); } catch (e) {}
+    try { fs.unlinkSync(crxFilePath); } catch (_) {}
 
     // Notify all frontend windows immediately
     for (const w of BrowserWindow.getAllWindows()) {

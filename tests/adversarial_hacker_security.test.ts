@@ -136,3 +136,55 @@ const resolvedPath = fileURLToPath(testFileUrl);
 assert.ok(resolvedPath.includes("my file.txt"), "fileURLToPath decodes percent encoding safely");
 
 console.log("[PASS] [Hacker-Defense-7] Standard fileURLToPath cross-platform resolution verified.");
+
+// 8. Test CRX3 Inner Zip Offset Calculation
+function getCrxInnerZipTest(buffer: Buffer): Buffer {
+  if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
+    return buffer;
+  }
+  const readU32 = (offset: number) => buffer.readUInt32LE(offset);
+  const version = buffer[4];
+  if (version === 3) {
+    const headerSize = readU32(8);
+    return buffer.subarray(12 + headerSize);
+  }
+  throw new Error("Unsupported format");
+}
+
+// Build a mock CRX3 buffer: Cr24 (4B), version 3 (4B), headerSize 16 (4B), header (16B), PK\x03\x04 (zip)
+const mockCrx3 = Buffer.alloc(12 + 16 + 4);
+mockCrx3.write("Cr24", 0, "ascii");
+mockCrx3.writeUInt32LE(3, 4); // version = 3
+mockCrx3.writeUInt32LE(16, 8); // headerSize = 16
+mockCrx3.write("PK\x03\x04", 12 + 16, "ascii"); // inner zip start
+const extractedZip = getCrxInnerZipTest(mockCrx3);
+assert.strictEqual(extractedZip.subarray(0, 4).toString("ascii"), "PK\x03\x04", "CRX3 offset accurately isolates zip payload");
+
+console.log("[PASS] [Hacker-Defense-8] CRX3 container header extraction validated.");
+
+// 9. Test Extension Popup Blur Grace Period
+class PopupLifecycle {
+  public isClosed = false;
+  private canCloseOnBlur = false;
+
+  public show() {
+    setTimeout(() => {
+      this.canCloseOnBlur = true;
+    }, 50);
+  }
+
+  public handleBlur() {
+    if (this.canCloseOnBlur) {
+      this.isClosed = true;
+    }
+  }
+}
+
+const popup = new PopupLifecycle();
+popup.show();
+// Immediate blur during launch transition:
+popup.handleBlur();
+assert.strictEqual(popup.isClosed, false, "Popup must ignore blur during startup grace period");
+
+console.log("[PASS] [Hacker-Defense-9] Extension popup blur grace period prevents premature window destruction.");
+

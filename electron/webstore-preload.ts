@@ -298,6 +298,25 @@ if ((window as any).__novaPreloadInjected) {
       btn.addEventListener('click', () => {
         const match = window.location.href.match(/[a-p]{32}/);
         if (match) {
+          btn.setAttribute('disabled', 'true');
+          btn.style.opacity = '0.7';
+          btn.textContent = "Installing...";
+
+          const cleanupListener = (e: MessageEvent) => {
+            if (e.source !== window || !e.data || e.data.type !== 'NOVA_INSTALL_RESULT') return;
+            window.removeEventListener('message', cleanupListener);
+            if (e.data.success) {
+              btn.textContent = "Installed!";
+              btn.style.background = "#10b981";
+              btn.style.color = "white";
+            } else {
+              btn.removeAttribute('disabled');
+              btn.style.opacity = '1';
+              btn.textContent = "Add to Nova";
+            }
+          };
+          window.addEventListener('message', cleanupListener);
+
           window.postMessage({ 
             type: 'NOVA_INSTALL_EXTENSION', 
             extensionId: match[0]
