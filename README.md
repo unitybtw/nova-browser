@@ -308,11 +308,11 @@ graph TD
     app --> CoreWorkspaces
     
     agent <-->|Off-thread Web Worker| worker
-    agent <-->|Read & Write| memory
+    agent <-->|Read and Write| memory
     agent --> preview
     agent --> translate
     
-    sync <-->|Encrypted WebSocket (AES-GCM)| supabase
+    sync <-->|Encrypted WebSocket AES-GCM| supabase
     
     main --> adblock
     main --> security
@@ -321,8 +321,8 @@ graph TD
     main --> keychain
     main --> tts
     
-    claude <-->|JSON-RPC over SSE (Port 3020)| mcp
-    mcp <-->|CDP & Main Process Bridge| webview
+    claude <-->|JSON-RPC over SSE Port 3020| mcp
+    mcp <-->|CDP and Main Process Bridge| webview
     
     style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
     style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
