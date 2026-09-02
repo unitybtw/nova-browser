@@ -1,69 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
   <defs>
-    <filter id="shadow" x="-10%" y="-10%" width="125%" height="125%" filterUnits="userSpaceOnUse">
-      <feDropShadow dx="0" dy="24" stdDeviation="36" flood-color="#000000" flood-opacity="0.14" />
-      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#000000" flood-opacity="0.06" />
+    <filter id="novaGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="16" stdDeviation="20" flood-color="#3B82F6" flood-opacity="0.3" />
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.15" />
     </filter>
-
-    <linearGradient id="squircleBg" x1="512" y1="96" x2="512" y2="928" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="100%" stop-color="#F8FAFC" />
-    </linearGradient>
-
-    <!-- The flowing signature Nova gradient: Peach Coral -> Rose Pink -> Lavender Violet -> Cyan Sky -->
-    <linearGradient id="novaRibbon" x1="200" y1="200" x2="824" y2="824" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFAA80" />
-      <stop offset="25%" stop-color="#F472B6" />
-      <stop offset="55%" stop-color="#C084FC" />
-      <stop offset="85%" stop-color="#60A5FA" />
-      <stop offset="100%" stop-color="#38BDF8" />
-    </linearGradient>
-
-    <linearGradient id="novaGloss" x1="300" y1="240" x2="724" y2="784" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.4" />
-      <stop offset="40%" stop-color="#FFFFFF" stop-opacity="0" />
-      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.2" />
+    <linearGradient id="novaFlow" x1="20%" y1="90%" x2="80%" y2="10%">
+      <stop offset="0%" stop-color="#FF6B4A" />
+      <stop offset="28%" stop-color="#F43F86" />
+      <stop offset="55%" stop-color="#9333EA" />
+      <stop offset="80%" stop-color="#3B82F6" />
+      <stop offset="100%" stop-color="#06B6D4" />
     </linearGradient>
   </defs>
 
-  <!-- iOS / macOS Squircle Container -->
-  <rect x="96" y="96" width="832" height="832" rx="208" ry="208" fill="url(#squircleBg)" filter="url(#shadow)" stroke="#E2E8F0" stroke-width="2" />
-
-  <!-- Continuous Smooth Fluid 'N' Geometry -->
-  <path d="M 336 720
-           C 292 720 256 684 256 640
-           L 256 384
-           C 256 340 292 304 336 304
-           C 380 304 416 340 416 384
-           L 416 524
-           L 608 276
-           C 636 240 692 248 712 288
-           C 724 312 728 336 728 360
-           L 728 640
-           C 728 684 692 720 648 720
-           C 604 720 568 684 568 640
-           L 568 500
-           L 376 748
-           C 364 764 348 772 332 772
-           C 304 772 284 756 280 732
-           Z"
-        fill="url(#novaRibbon)" />
-  <path d="M 336 720
-           C 292 720 256 684 256 640
-           L 256 384
-           C 256 340 292 304 336 304
-           C 380 304 416 340 416 384
-           L 416 524
-           L 608 276
-           C 636 240 692 248 712 288
-           C 724 312 728 336 728 360
-           L 728 640
-           C 728 684 692 720 648 720
-           C 604 720 568 684 568 640
-           L 568 500
-           L 376 748
-           C 364 764 348 772 332 772
-           C 304 772 284 756 280 732
-           Z"
-        fill="url(#novaGloss)" />
+  <path d="M 340 710 L 340 360 L 684 664 L 684 314"
+        fill="none"
+        stroke="url(#novaFlow)"
+        stroke-width="126"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        filter="url(#novaGlow)" />
 </svg>
