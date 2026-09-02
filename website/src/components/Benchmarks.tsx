@@ -74,7 +74,7 @@ const CATEGORIES: BenchmarkCategory[] = [
     metricLabel: 'Initial V8 JavaScript heap allocation at startup',
     directionLabel: 'Lower is better',
     directionDescription: 'Lower initial heap allocation leaves more system memory available for tabs and apps.',
-    benchmarkNote: 'Test setup: V8 heap memory allocated on clean cold launch.',
+    benchmarkNote: 'Engine Parity: Runs the same Chromium Blink & Google V8 engine as Chrome. Differences stem from zero background telemetry and modular chunk isolation.',
     maxValue: 160,
     lowerIsBetter: true,
     competitors: [

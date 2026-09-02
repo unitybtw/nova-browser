@@ -52,6 +52,8 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 ## Performance Benchmarks & Browser Comparison
 
+> **Architecture & Engine Parity Note:** Nova Browser is powered by modern Chromium (Blink) and Google V8 via Electron 43. Core JavaScript loop execution, HTML parsing, and DOM rendering performance are on par with Google Chrome (engine parity). Nova's distinct speed and efficiency advantages come from architectural design: zero background Google telemetry/account sync services, an aggressive idle tab hibernation engine, network-level ad/tracker interception, and an on-demand decoupled bundle structure.
+
 ### Head-to-Head Comparison Matrix
 
 | Feature / Metric | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
