@@ -1,4 +1,5 @@
 import { UserSettings } from '../App';
+import { DANGEROUS_PROTOCOLS } from './safeNavigation';
 
 const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;
 
@@ -9,8 +10,7 @@ export function isValidUrlOrDomain(input: string): boolean {
   // Security: reject all dangerous and non-navigable protocols immediately,
   // before any other pattern matching. This prevents javascript:3000 or
   // data:text/html from being treated as a valid "domain:port" URL.
-  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'blob:', 'chrome:', 'edge:', 'about:config'];
-  if (dangerousProtocols.some(p => trimmed.toLowerCase().startsWith(p))) return false;
+  if (DANGEROUS_PROTOCOLS.some(p => trimmed.toLowerCase().startsWith(p))) return false;
 
   // Query with spaces is a search query (e.g. "google.com is down", "node.js tutorial")
   if (/\s/.test(trimmed)) return false;
@@ -75,8 +75,7 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
 
   // Security: reject all dangerous and non-navigable protocols immediately.
   // Prevents javascript:alert(1) from being navigated to if it somehow reaches here.
-  const dangerousProtocols = ['javascript:', 'data:', 'vbscript:', 'file:', 'blob:', 'chrome:', 'edge:'];
-  if (dangerousProtocols.some(p => trimmed.toLowerCase().startsWith(p))) {
+  if (DANGEROUS_PROTOCOLS.some(p => trimmed.toLowerCase().startsWith(p))) {
     // Treat as a search query instead of navigating to dangerous URL
     const q = encodeURIComponent(trimmed);
     return `https://www.google.com/search?q=${q}`;

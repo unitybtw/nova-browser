@@ -149,6 +149,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const [isFocused, setIsFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const suggestionRequestIdRef = useRef<number>(0);
 
   const [speedDials, setSpeedDials] = useState(() => {
     // Incognito: never read persistent storage
@@ -217,13 +218,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    const currentReqId = ++suggestionRequestIdRef.current;
 
     const timer = setTimeout(async () => {
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (!abortController.signal.aborted && Array.isArray(results)) {
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && Array.isArray(results)) {
             setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 6));
             setShowSuggestions(results.length > 0);
@@ -235,7 +237,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
           signal: abortController.signal
         });
-        if (!abortController.signal.aborted && res.ok) {
+        if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && res.ok) {
           const data = await res.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
             const list = data[1].slice(0, 6);

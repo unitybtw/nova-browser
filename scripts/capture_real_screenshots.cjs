@@ -2,7 +2,7 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-const outDir = '/Users/siracsimsek/.gemini/antigravity/brain/fe1c65cb-cf48-45aa-9d96-323058f123a7';
+const outDir = process.env.OUTPUT_DIR || path.join(__dirname, '..', 'dist-screenshots');
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({

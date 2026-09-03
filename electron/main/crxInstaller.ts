@@ -301,7 +301,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const osParam = platformMap[process.platform] || 'mac';
     const archParam = archMap[process.arch] || 'x86-64';
 
-    const chromeVer = process.versions.chrome || '134.0.0.0';
+    const chromeVer = process.versions.chrome || '150.0.0.0';
     // Security & Compatibility: Include installsource=ondemand so Google Web Store update server serves CRX3 directly
     const crxUrl = `https://clients2.google.com/service/update2/crx?response=redirect&os=${osParam}&arch=${archParam}&os_arch=${archParam}&nacl_arch=${archParam}&prod=chromecrx&prodchannel=unknown&prodversion=${chromeVer}&lang=en-US&acceptformat=crx2,crx3&x=id%3D${extensionId}%26installsource%3Dondemand%26uc`;
 
@@ -312,6 +312,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 
     const res = await fetch(crxUrl, {
+      signal: AbortSignal.timeout(30000),
       headers: {
         'User-Agent': userAgent,
         'Accept': 'application/x-chrome-extension,application/octet-stream,*/*'
@@ -425,7 +426,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const confirmOptions: Electron.MessageBoxOptions = {
       type: 'question',
       buttons: ['Cancel', 'Add Extension'],
-      defaultId: 1,
+      defaultId: 0,
       cancelId: 0,
       title: 'Install Extension',
       message: `Add "${extensionName}" to Nova Browser?`,
@@ -465,7 +466,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     let extInfo;
     try {
-      extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: true });
+      extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: false });
       if (!deps.isExtensionLoaded(extensionId)) {
         deps.addLoadedExtension(extInfo);
       }

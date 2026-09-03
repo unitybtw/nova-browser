@@ -43,7 +43,13 @@ export function useModalFocusTrap(
         if (!containerRef.current) return;
         const focusables = Array.from(
           containerRef.current.querySelectorAll<HTMLElement>(focusableQuery)
-        ).filter(el => el.offsetParent !== null || el === document.activeElement);
+        ).filter(el => {
+          if (el === document.activeElement) return true;
+          if (typeof el.checkVisibility === 'function') {
+            return el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true });
+          }
+          return el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0;
+        });
 
         if (focusables.length === 0) {
           e.preventDefault();

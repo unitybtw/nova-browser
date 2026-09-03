@@ -458,17 +458,11 @@ export class BrowserMCPServer {
   }
 
   private isAuthenticated(req: Request): boolean {
-    // Check Authorization header: Bearer <token>
+    // Security: Only accept Authorization header: Bearer <token>
+    // Tokens in URL query strings (?token=...) are strictly rejected as they leak into logs, proxies, and referrers.
     const authHeader = req.headers.authorization || '';
-    if (authHeader.startsWith('Bearer ') && this.tokenMatches(authHeader.slice(7))) return true;
-    // Check query param: ?token=<token> — DEPRECATED (kept one-release for backward
-    // compat). Tokens in URLs leak into logs/proxies; prefer the header above.
-    if (typeof req.query.token === 'string') {
-      if (!this.warnedQueryToken) {
-        this.warnedQueryToken = true;
-        console.warn('[MCP Server] DEPRECATION: auth via the "?token=" query parameter is deprecated and leaks into logs. Use the "Authorization: Bearer" header instead.');
-      }
-      return this.tokenMatches(req.query.token);
+    if (authHeader.startsWith('Bearer ') && this.tokenMatches(authHeader.slice(7))) {
+      return true;
     }
     return false;
   }

@@ -14,6 +14,10 @@ export function usePermissionRequests() {
       const removeListener = (window as any).electronAPI.onPermissionRequest((_event: any, request: PermissionRequest) => {
         setPermissionRequests(prev => {
           const filtered = prev.filter(r => r.requestId !== request.requestId);
+          if (filtered.length >= 5) {
+            // Drop excessive permission requests to prevent UI flooding attacks
+            return filtered;
+          }
           return [...filtered, request];
         });
       });

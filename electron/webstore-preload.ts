@@ -202,8 +202,8 @@ if ((window as any).__novaPreloadInjected) {
         
         const extensionId = match[0];
         
-        const listener = (event) => {
-          if (event.source !== window || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
+        const listener = (event: MessageEvent) => {
+          if (event.source !== window || event.origin !== window.location.origin || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
           window.removeEventListener('message', listener);
           
           if (event.data.success) {

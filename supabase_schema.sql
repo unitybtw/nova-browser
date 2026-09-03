@@ -1,17 +1,8 @@
--- Nova Browser secure sync schema — FULL RESET MIGRATION.
--- This script is idempotent and safe to re-run: it drops the sync tables
--- (nova_sync_chains, nova_pairing_invitations, nova_sync_vaults) and recreates
--- them with the current v2 E2EE shape, then reapplies RLS policies, the
--- pairing-invitation consumption RPC, grants, and realtime publication.
---
--- WARNING: dropping these tables destroys any previously synced vault data.
--- Run against a project where that is acceptable (fresh setup or schema reset).
+-- Nova Browser secure sync schema — IDEMPOTENT MIGRATION.
+-- This script creates or upgrades sync tables and reapplies RLS policies
+-- without destructively dropping user vaults on re-run.
 
-drop table if exists public.nova_sync_chains cascade;
-drop table if exists public.nova_pairing_invitations cascade;
-drop table if exists public.nova_sync_vaults cascade;
-
-create table public.nova_sync_vaults (
+create table if not exists public.nova_sync_vaults (
   user_id uuid primary key references auth.users(id) on delete cascade,
   envelope jsonb not null,
   updated_at timestamptz not null default now(),
@@ -21,13 +12,16 @@ create table public.nova_sync_vaults (
 
 alter table public.nova_sync_vaults enable row level security;
 
-create policy "Users access only their encrypted vault"
-  on public.nova_sync_vaults for all
-  to authenticated
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+do $$ begin
+  create policy "Users access only their encrypted vault"
+    on public.nova_sync_vaults for all
+    to authenticated
+    using (auth.uid() = user_id)
+    with check (auth.uid() = user_id);
+exception when duplicate_object then null;
+end $$;
 
-create table public.nova_pairing_invitations (
+create table if not exists public.nova_pairing_invitations (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users(id) on delete cascade,
   token_hash text not null unique,
@@ -40,20 +34,29 @@ create table public.nova_pairing_invitations (
 
 alter table public.nova_pairing_invitations enable row level security;
 
-create policy "Owners create their invitations"
-  on public.nova_pairing_invitations for insert
-  to authenticated
-  with check (auth.uid() = owner_id and expires_at <= now() + interval '10 minutes');
+do $$ begin
+  create policy "Owners create their invitations"
+    on public.nova_pairing_invitations for insert
+    to authenticated
+    with check (auth.uid() = owner_id and expires_at <= now() + interval '10 minutes');
+exception when duplicate_object then null;
+end $$;
 
-create policy "Owners view their invitations"
-  on public.nova_pairing_invitations for select
-  to authenticated
-  using (auth.uid() = owner_id);
+do $$ begin
+  create policy "Owners view their invitations"
+    on public.nova_pairing_invitations for select
+    to authenticated
+    using (auth.uid() = owner_id);
+exception when duplicate_object then null;
+end $$;
 
-create policy "Users can delete own pairing invitations"
-  on public.nova_pairing_invitations for delete
-  to authenticated
-  using (auth.uid() = owner_id);
+do $$ begin
+  create policy "Users can delete own pairing invitations"
+    on public.nova_pairing_invitations for delete
+    to authenticated
+    using (auth.uid() = owner_id);
+exception when duplicate_object then null;
+end $$;
 
 create or replace function public.consume_nova_pairing_invitation(p_token_hash text)
 returns uuid

@@ -146,10 +146,19 @@ class AIMemoryService {
     return newItem;
   }
 
+  private redactSensitiveInfo(text: string): string {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/(?:password|passwd|pwd|token|api[_-]?key|secret)\s*[:=]\s*["']?[^\s"']+["']?/gi, '[REDACTED_CREDENTIAL]')
+      .replace(/bearer\s+[a-zA-Z0-9._-]+/gi, 'Bearer [REDACTED_TOKEN]')
+      .replace(/\b[A-Za-z0-9+/]{40,}\b/g, '[REDACTED_BLOB]');
+  }
+
   public addTaskSummary(summary: string): TaskSummary {
+    const cleanSummary = this.redactSensitiveInfo(summary);
     const task: TaskSummary = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
-      summary,
+      summary: cleanSummary,
       timestamp: Date.now(),
     };
     
@@ -219,8 +228,23 @@ class AIMemoryService {
   public getFormattedMemoryPrompt(): string {
     let prompt = '';
     if (this.memories.length > 0) {
-      const factsList = this.memories.map(m => `- [${m.category.toUpperCase()}] ${m.fact}`).join('\n');
-      prompt += `\n\n[USER MEMORY VAULT]\nHere are things you remember about the user from past interactions:\n${factsList}\nUse these to personalize your responses and behavior automatically.\n`;
+      // Security & Context Budget: exclude untrusted tool observations and cap to 10 verified preferences (max 1200 chars)
+      const allowedMemories = this.memories
+        .filter(m => m.source !== 'tool' || m.category === 'preference')
+        .slice(-10);
+
+      let totalChars = 0;
+      const safeFacts: string[] = [];
+      for (const m of allowedMemories) {
+        const cleanFact = (m.fact || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+        if (totalChars + cleanFact.length > 1200) break;
+        totalChars += cleanFact.length;
+        safeFacts.push(`- [${m.category.toUpperCase()}] ${cleanFact}`);
+      }
+
+      if (safeFacts.length > 0) {
+        prompt += `\n\n[USER MEMORY VAULT]\nHere are things you remember about the user from past interactions:\n${safeFacts.join('\n')}\nUse these to personalize your responses and behavior automatically.\n`;
+      }
     }
     
     if (this.taskHistory.length > 0) {

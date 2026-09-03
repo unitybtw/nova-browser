@@ -314,13 +314,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
                 
                 if (foundUser && activePwd.value) {
-                  try {
-                    console.log('NOVA_SAVE_PW::' + JSON.stringify({
-                      hostname: window.location.hostname,
-                      username: foundUser,
-                      password: activePwd.value
-                    }));
-                  } catch(e) {}
+                  // Password detection is handled exclusively via secure isolated preload IPC
                 }
               };
 
@@ -498,7 +492,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         const isSafe =
           (typeof raw === 'string') &&
           (raw.startsWith('https://') ||
-            raw.startsWith('http://') ||
+            raw.startsWith('http://localhost') ||
+            raw.startsWith('http://127.0.0.1') ||
             /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,/.test(raw));
         if (isSafe) {
           onUpdateTab(tab.id, { favicon: raw });
@@ -608,14 +603,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleConsoleMessage = (e: any) => {
-      if (e.message && e.message.startsWith('NOVA_SAVE_PW::')) {
-        try {
-          const data = JSON.parse(e.message.substring(14));
-          if (data.hostname && data.username && data.password) {
-            handlePasswordDetected(data.hostname, data.username, data.password);
-          }
-        } catch (_) {}
-      }
       if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
         try {
           const data = JSON.parse(e.message.substring(17));

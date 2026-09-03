@@ -2277,11 +2277,13 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
     // VULN-06: Warn and mark when encryption is unavailable
     if (safeStorage.isEncryptionAvailable()) {
       const encrypted = safeStorage.encryptString(value);
-      fs.writeFileSync(keyPath, encrypted);
+      fs.writeFileSync(keyPath, encrypted, { mode: 0o600 });
+      try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
     } else {
       console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Storing key "${key}" with [UNENCRYPTED] marker.`);
       const markedValue = Buffer.from('[UNENCRYPTED]' + value, 'utf-8');
-      fs.writeFileSync(keyPath, markedValue);
+      fs.writeFileSync(keyPath, markedValue, { mode: 0o600 });
+      try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
     }
     return true;
   } catch (err) {
@@ -2329,6 +2331,10 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
       return { error: 'Invalid key format' };
+    }
+    const RESTRICTED_STORE_KEYS = ['settings', 'config', 'passwords', 'secrets', 'auth'];
+    if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) {
+      return { error: 'Access denied: restricted storage key' };
     }
     if (typeof value !== 'string') {
       return { error: 'Invalid value format: must be string' };
@@ -3117,7 +3123,7 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     show: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: false, // Required for Chromium extension origin bindings to attach chrome.runtime and chrome.storage
+      contextIsolation: true,
       sandbox: true,
       session: session.defaultSession
     }

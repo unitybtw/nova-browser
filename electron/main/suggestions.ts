@@ -66,7 +66,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       return cachedList;
     }
 
-    const chromeVer = process.versions.chrome || '134.0.0.0';
+    const chromeVer = process.versions.chrome || '150.0.0.0';
     const userAgent = process.platform === 'win32'
       ? `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
       : process.platform === 'linux'

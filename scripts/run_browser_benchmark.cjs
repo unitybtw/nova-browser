@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 const http = require('http');
-const WebSocket = require('ws');
+const WebSocket = globalThis.WebSocket || (() => { try { return require('ws'); } catch { return null; } })();
 
 const ROOT = path.resolve(__dirname, '..');
 const FIXTURE = path.join(ROOT, 'scripts', 'benchmark_fixture.html');

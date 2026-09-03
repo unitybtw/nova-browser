@@ -19,8 +19,7 @@ const READ_ONLY_TOOLS = new Set([
   'read_page_content',
   'get_page_url',
   'get_page_links',
-  'get_all_tabs',
-  'search_history'
+  'get_all_tabs'
 ]);
 
 class AgentOrchestrator {
@@ -85,10 +84,11 @@ class AgentOrchestrator {
    */
   public enqueueAction(toolName: string, args: any): { id: string; done: Promise<boolean> } {
     const id = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
+    const clonedArgs = args ? JSON.parse(JSON.stringify(args)) : {};
     const action: QueuedAction = {
       id,
       toolName,
-      args,
+      args: clonedArgs,
       // Read-only tools auto-execute; everything else requires user approval
       state: READ_ONLY_TOOLS.has(toolName) ? 'executing' : 'pending'
     };

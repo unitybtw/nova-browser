@@ -28,7 +28,7 @@ SPEEDOMETER_REPORT.json
 *.tsbuildinfo
 
 # Video renders (large binary assets)
-video/out/*.mp4
+video/out/
 
 # Operating System & IDE Debris
 .DS_Store

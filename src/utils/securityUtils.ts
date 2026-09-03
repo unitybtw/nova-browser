@@ -2,8 +2,9 @@
  * Nova Browser Security Utilities
  * Provides URL security classification, phishing detection, and HTTPS enforcement helpers.
  */
+import { DANGEROUS_PROTOCOLS } from './safeNavigation';
 
-export type SecurityLevel = 'secure' | 'http' | 'dangerous' | 'internal' | 'unknown';
+export type SecurityLevel = 'secure' | 'http' | 'dangerous' | 'internal' | 'unknown' | 'file';
 
 export interface SecurityInfo {
   level: SecurityLevel;
@@ -13,6 +14,8 @@ export interface SecurityInfo {
   icon: string;         // emoji icon
   tooltip: string;
 }
+
+export type SecurityStatus = SecurityInfo;
 
 // Internal nova:// pages are always safe
 const INTERNAL_PROTOCOLS = ['nova:', 'about:', 'chrome-extension:'];
@@ -77,37 +80,67 @@ export function setBlocklist(domains: string[]) {
 }
 
 /**
- * Classify a URL's security level.
+ * Get security classification for a given URL
  */
 export function getUrlSecurityInfo(url: string): SecurityInfo {
-  if (!url || url === 'nova://newtab' || url === '') {
+  if (!url || typeof url !== 'string') {
+    return {
+      level: 'unknown',
+      label: 'Unknown',
+      color: 'text-slate-500',
+      bgColor: 'bg-slate-100 dark:bg-slate-800',
+      icon: 'Globe',
+      tooltip: 'Invalid or unknown connection'
+    };
+  }
+
+  // Internal Nova pages
+  if (
+    url.startsWith('nova://') ||
+    url.startsWith('about:') ||
+    url === 'about:blank' ||
+    url.startsWith('chrome://') ||
+    url.startsWith('edge://')
+  ) {
     return {
       level: 'internal',
-      label: 'Nova',
+      label: 'System',
       color: 'text-cyan-500',
-      bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
-      icon: 'Search',
-      tooltip: 'Nova internal page'
+      bgColor: 'bg-cyan-500/10',
+      icon: 'Shield',
+      tooltip: 'Internal system page'
     };
   }
 
   try {
     const parsed = new URL(url);
-    const protocol = parsed.protocol;
+    const protocol = parsed.protocol.toLowerCase();
 
-    // Internal pages
-    if (INTERNAL_PROTOCOLS.includes(protocol)) {
+    // Local files
+    if (protocol === 'file:') {
       return {
-        level: 'internal',
-        label: 'Nova',
-        color: 'text-cyan-500',
-        bgColor: 'bg-cyan-50 dark:bg-cyan-500/10',
-        icon: 'Search',
-        tooltip: 'Nova internal page'
+        level: 'file',
+        label: 'Local File',
+        color: 'text-blue-500',
+        bgColor: 'bg-blue-500/10',
+        icon: 'FileText',
+        tooltip: 'Local system file'
       };
     }
 
-    // Check phishing first (applies to both HTTP and HTTPS)
+    // Dangerous protocols
+    if (DANGEROUS_PROTOCOLS.includes(protocol)) {
+      return {
+        level: 'dangerous',
+        label: 'Dangerous',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50 dark:bg-red-500/10',
+        icon: 'ShieldAlert',
+        tooltip: 'Dangerous or untrusted protocol'
+      };
+    }
+
+    // Check phishing
     if (checkPhishingDomain(url)) {
       return {
         level: 'dangerous',
@@ -116,18 +149,6 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
         bgColor: 'bg-red-50 dark:bg-red-500/10',
         icon: 'ShieldAlert',
         tooltip: 'Potential phishing or dangerous site'
-      };
-    }
-
-    // Dangerous protocols
-    if (['javascript:', 'data:', 'vbscript:', 'file:'].includes(protocol)) {
-      return {
-        level: 'dangerous',
-        label: 'Dangerous',
-        color: 'text-red-600',
-        bgColor: 'bg-red-50 dark:bg-red-500/10',
-        icon: 'ShieldAlert',
-        tooltip: 'Dangerous or untrusted protocol'
       };
     }
 
@@ -171,12 +192,27 @@ export function getHttpsUpgradeUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
     if (parsed.protocol === 'http:') {
+      const host = parsed.hostname.toLowerCase();
+      // Exclude localhost and private intranet addresses from HTTPS upgrade to align with main process
+      if (
+        host === 'localhost' ||
+        host.endsWith('.localhost') ||
+        host.endsWith('.local') ||
+        host.endsWith('.internal') ||
+        host.startsWith('127.') ||
+        host === '0.0.0.0' ||
+        host === '::1'
+      ) {
+        return null;
+      }
       parsed.protocol = 'https:';
       return parsed.toString();
     }
   } catch {}
   return null;
 }
+
+export const getConnectionSecurity = getUrlSecurityInfo;
 
 /**
  * Format a URL for display in the address bar (strip trailing slash, protocol for common sites)

@@ -851,7 +851,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const mcpConfigSnippet = `{
   "mcpServers": {
     "nova-browser": {
-      "url": "http://localhost:${mcpStatus?.port || 3020}/sse?token=${mcpToken}"
+      "url": "http://localhost:${mcpStatus?.port || 3020}/sse",
+      "headers": {
+        "Authorization": "Bearer ${mcpToken}"
+      }
     }
   }
 }`;

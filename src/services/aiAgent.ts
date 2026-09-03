@@ -1212,9 +1212,9 @@ CRITICAL RULES:
 
       if (functionName === "navigate_to_url") {
         let url = args.url as string;
-        if (!url.startsWith('http://') && !url.startsWith('https://') && !url.includes('.')) {
+        if (!/^https?:\/\//i.test(url) && !url.includes('.')) {
           url = `https://www.google.com/search?q=${encodeURIComponent(url)}`;
-        } else if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        } else if (!/^https?:\/\//i.test(url)) {
           url = 'https://' + url;
         }
         
@@ -1758,7 +1758,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "take_screenshot") {
         const base64 = await this.actionContext.onTakeScreenshot();
-        result = { success: true, screenshotBase64Length: base64.length };
+        result = { success: true, screenshot: base64, screenshotBase64Length: base64.length };
       }
 
       else if (functionName === "wait") {
@@ -1908,7 +1908,8 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         if (remainingChars <= 0) break;
         const textSlice = (f.text || '').substring(0, remainingChars);
         remainingChars -= textSlice.length;
-        fileBlocksList.push(`<attached_file name="${f.name}">\n${textSlice}\n</attached_file>`);
+        const safeName = (f.name || 'file').replace(/[<>&"']/g, '_');
+        fileBlocksList.push(`<attached_file name="${safeName}">\n${textSlice}\n</attached_file>`);
       }
       const fileBlocks = fileBlocksList.join('\n\n');
       const hasAttachments = images.length > 0 || fileBlocks.length > 0;

@@ -1790,7 +1790,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         case 'browser_scroll': {
           const direction = String(args.direction || 'down');
-          const cleanAmount = Math.abs(Number(args.amount) || 500);
+          const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(args.amount) || 500)));
           if (activeWebview && activeWebview.executeJavaScript) {
             if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
             else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
@@ -1803,6 +1803,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         case 'browser_new_tab': {
           const newUrl = args.url || 'nova://newtab';
+          if (!isSafeNavigationUrl(newUrl)) {
+            return `Error: Navigation blocked for unsafe URL scheme: ${newUrl}`;
+          }
           mcpHandlersRef.current.handleNewTab(newUrl);
           return `Opened new tab: ${newUrl}`;
         }
@@ -2407,7 +2410,27 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           setHistory(sanitizedHistory);
         }
         if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
-          setSettings(prev => ({ ...prev, ...data.settings }));
+          const raw = data.settings;
+          const safeSettings: Partial<UserSettings> = {};
+          if (typeof raw.theme === 'string' && ['dark', 'light', 'system'].includes(raw.theme)) safeSettings.theme = raw.theme;
+          if (typeof raw.searchEngine === 'string' && ['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'yahoo'].includes(raw.searchEngine)) safeSettings.searchEngine = raw.searchEngine;
+          if (typeof raw.privacyShield === 'boolean') safeSettings.privacyShield = raw.privacyShield;
+          if (typeof raw.useVerticalTabs === 'boolean') safeSettings.useVerticalTabs = raw.useVerticalTabs;
+          if (typeof raw.fontSize === 'string' && ['small', 'medium', 'large'].includes(raw.fontSize)) safeSettings.fontSize = raw.fontSize;
+          if (typeof raw.tabStyle === 'string' && ['rounded', 'square', 'floating'].includes(raw.tabStyle)) safeSettings.tabStyle = raw.tabStyle;
+          if (typeof raw.doNotTrack === 'boolean') safeSettings.doNotTrack = raw.doNotTrack;
+          if (typeof raw.clearOnExit === 'boolean') safeSettings.clearOnExit = raw.clearOnExit;
+          if (typeof raw.hardwareAcceleration === 'boolean') safeSettings.hardwareAcceleration = raw.hardwareAcceleration;
+          if (typeof raw.tabHibernationEnabled === 'boolean') safeSettings.tabHibernationEnabled = raw.tabHibernationEnabled;
+          if (typeof raw.aiLinkPreviewEnabled === 'boolean') safeSettings.aiLinkPreviewEnabled = raw.aiLinkPreviewEnabled;
+          if (typeof raw.energySaverMode === 'boolean') safeSettings.energySaverMode = raw.energySaverMode;
+          if (typeof raw.preloadDnsEnabled === 'boolean') safeSettings.preloadDnsEnabled = raw.preloadDnsEnabled;
+          if (typeof raw.smoothScrollingEnabled === 'boolean') safeSettings.smoothScrollingEnabled = raw.smoothScrollingEnabled;
+          if (typeof raw.newTabBackground === 'string' && ['default', 'gradient', 'mesh', 'glass', 'unsplash', 'custom_url', 'aurora_waves', 'cyber_grid', 'hyper_space', 'fireflies', 'nebula', 'matrix'].includes(raw.newTabBackground)) safeSettings.newTabBackground = raw.newTabBackground;
+          if (typeof raw.backgroundCustomUrl === 'string' && isSafeNavigationUrl(raw.backgroundCustomUrl)) safeSettings.backgroundCustomUrl = raw.backgroundCustomUrl;
+          if (typeof raw.accentColor === 'string' && ['blue', 'emerald', 'purple', 'rose', 'amber', 'custom'].includes(raw.accentColor)) safeSettings.accentColor = raw.accentColor;
+          if (typeof raw.customAccentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw.customAccentColor)) safeSettings.customAccentColor = raw.customAccentColor;
+          setSettings(prev => ({ ...prev, ...safeSettings }));
         }
       } catch (err) {
         console.error('Backup import error:', err);

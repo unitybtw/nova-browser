@@ -5,6 +5,11 @@
  * exact internal pages are accepted. Callers that accept user text must run it
  * through the search formatter before calling this helper.
  */
+export const DANGEROUS_PROTOCOLS = [
+  'javascript:', 'data:', 'vbscript:', 'file:', 'blob:',
+  'view-source:', 'chrome:', 'edge:', 'devtools:', 'about:config'
+];
+
 export function isSafeNavigationUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
 
@@ -30,11 +35,7 @@ export function isSafeNavigationUrl(url: string): boolean {
   }
 
   const normalized = decoded.toLowerCase();
-  const blockedSchemes = [
-    'javascript:', 'data:', 'vbscript:', 'file:', 'blob:',
-    'view-source:', 'chrome:', 'edge:', 'devtools:'
-  ];
-  if (blockedSchemes.some(scheme => normalized.startsWith(scheme))) return false;
+  if (DANGEROUS_PROTOCOLS.some(scheme => normalized.startsWith(scheme))) return false;
 
   const protocolMatch = normalized.match(/^([a-z][a-z0-9+.-]*):/);
   if (!protocolMatch) return false;

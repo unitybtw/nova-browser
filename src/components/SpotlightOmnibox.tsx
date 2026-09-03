@@ -40,6 +40,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const suggestionRequestIdRef = useRef<number>(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -69,12 +70,13 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     }
 
     const controller = new AbortController();
+    const currentReqId = ++suggestionRequestIdRef.current;
     const fetchSuggestions = async () => {
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (Array.isArray(results) && !controller.signal.aborted) {
+          if (Array.isArray(results) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 5));
             return;
@@ -85,7 +87,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
         const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
         if (response.ok) {
           const data = await response.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted) {
+          if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             const list = data[1].slice(0, 5);
             setClientCachedSuggestions(cacheKey, list);
             setSuggestions(list);

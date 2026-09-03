@@ -510,6 +510,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const [isSiteInfoOpen, setIsSiteInfoOpen] = useState(false);
   const siteInfoBtnRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const suggestionRequestIdRef = useRef<number>(0);
   const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const relevantPermissionRequests = useMemo(() => {
@@ -635,13 +636,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
+    const currentReqId = ++suggestionRequestIdRef.current;
 
     const fetchSuggestions = async () => {
       try {
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (!abortController.signal.aborted && Array.isArray(results)) {
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && Array.isArray(results)) {
             setClientCachedSuggestions(cacheKey, results);
             setSuggestions(results.slice(0, 6));
             return;
@@ -653,7 +655,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`,
           { signal: abortController.signal }
         );
-        if (!abortController.signal.aborted && response.ok) {
+        if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && response.ok) {
           const data = await response.json();
           if (data && Array.isArray(data) && Array.isArray(data[1])) {
             const list = data[1].slice(0, 6);
