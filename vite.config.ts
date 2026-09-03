@@ -45,6 +45,9 @@ export default defineConfig({
     tailwindcss(),
     hardenCspForProduction()
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.2.1')
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')

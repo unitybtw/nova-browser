@@ -73,7 +73,7 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.0 // UNIVERSAL
+                v1.2.1 // UNIVERSAL
               </span>
             </div>
 
@@ -104,7 +104,7 @@ export const Downloads: React.FC = () => {
               <span>Download DMG</span>
             </a>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
-              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">brew install --cask unitybtw/tap/nova-browser</code>
+              Direct prebuilt DMG package for macOS
             </p>
           </div>
         </motion.div>
@@ -123,7 +123,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.0 // X64
+                v1.2.1 // X64
               </span>
             </div>
 
@@ -153,8 +153,8 @@ export const Downloads: React.FC = () => {
               <Download className="w-4 h-4" aria-hidden="true" />
               <span>Download Setup (.EXE)</span>
             </a>
-            <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
-              or <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">winget install NovaBrowser.Nova</code>
+            <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
+              Direct NSIS setup installer for Windows
             </p>
           </div>
         </motion.div>
@@ -173,13 +173,13 @@ export const Downloads: React.FC = () => {
                 <Terminal className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.0 // LINUX
+                v1.2.1 // LINUX
               </span>
             </div>
 
             <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">Linux</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Universal AppImage, Debian/Ubuntu (.deb), and Arch AUR builds with Wayland & Vulkan acceleration.
+              Universal AppImage and Debian/Ubuntu (.deb) builds with native Wayland & Vulkan acceleration.
             </p>
 
             {/* Architecture Chips */}
@@ -203,8 +203,8 @@ export const Downloads: React.FC = () => {
               <Download className="w-4 h-4" aria-hidden="true" />
               <span>Download AppImage / .deb</span>
             </a>
-            <p className="font-mono text-[10px] text-neutral-400 text-center mt-2.5">
-              AUR: <code className="bg-neutral-100 text-[#171717] px-1 py-0.5 rounded text-[10px]">yay -S nova-browser-bin</code>
+            <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
+              Native AppImage & Debian package
             </p>
           </div>
         </motion.div>

@@ -15,6 +15,9 @@ interface Window {
     // MCP action bridge (main process <-> renderer round-trip)
     onMcpActionRequest?: (callback: (id: string, toolName: string, args: any) => void) => () => void;
     respondMcpAction?: (id: string, result: unknown) => void;
+    getAppVersion?: () => Promise<string>;
   };
 }
+
+declare const __APP_VERSION__: string;
 

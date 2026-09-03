@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   HelpCircle, 
@@ -92,6 +92,18 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
 }) => {
   const [activeTab, setActiveTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>(initialTab);
   const [shortcutSearch, setShortcutSearch] = useState('');
+  const [appVersion, setAppVersion] = useState<string>(() => {
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.1';
+  });
+
+  useEffect(() => {
+    if (window.electronAPI?.getAppVersion) {
+      window.electronAPI.getAppVersion().then(ver => {
+        if (ver) setAppVersion(ver);
+      }).catch(() => {});
+    }
+  }, []);
+
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
 
@@ -426,7 +438,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Nova Browser</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Version 1.2.0 (Open Source Edition)</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Version {appVersion} (Open Source Edition)</p>
                     <p className="text-xs text-cyan-600 dark:text-cyan-400 font-medium font-mono">Fast • AI-Powered • Private</p>
                   </div>
 

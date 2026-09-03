@@ -593,6 +593,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
+  const [appVersion, setAppVersion] = useState<string>(() => {
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.1';
+  });
+
+  useEffect(() => {
+    if (window.electronAPI?.getAppVersion) {
+      window.electronAPI.getAppVersion().then(ver => {
+        if (ver) setAppVersion(ver);
+      }).catch(() => {});
+    }
+  }, []);
 
   useEffect(() => {
     const unsub = syncService.subscribe(status => {
@@ -857,7 +868,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version 1.1.3 (Open Source Edition)</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version {appVersion} (Open Source Edition)</p>
                   </div>
                   <UpdateWidget />
                 </div>

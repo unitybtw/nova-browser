@@ -24,7 +24,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   cancelDownload: (id: string) => ipcRenderer.invoke('cancel-download', id),
   openDownload: (pathStr: string) => ipcRenderer.invoke('open-download', pathStr),
   showDownloadInFolder: (pathStr: string) => ipcRenderer.invoke('show-download-in-folder', pathStr),
-  // Auto Updater APIs
+  // Auto Updater & Version APIs
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateChecking: (callback: (event: any) => void) => {

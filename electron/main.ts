@@ -1169,6 +1169,11 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('get-app-version', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return app.getVersion();
+  });
+
   // Wait 8 seconds before checking on startup to not slow down startup
   setTimeout(() => {
     autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Startup update check failed:", err));
