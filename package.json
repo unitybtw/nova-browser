@@ -1,7 +1,7 @@
 {
   "name": "nova-browser",
   "description": "An open source browser built with React and Electron",
-  "author": "unitybtw",
+  "author": "unitybtw <contact@nova-browser.org>",
   "private": true,
   "version": "1.2.1",
   "type": "module",
@@ -106,6 +106,8 @@
         "AppImage",
         "deb"
       ],
+      "maintainer": "unitybtw <contact@nova-browser.org>",
+      "synopsis": "Open-source sovereign desktop browser",
       "category": "Network;WebBrowser",
       "artifactName": "Nova-Browser-${arch}.${ext}",
       "icon": "build/icon.png"
