@@ -82,6 +82,8 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
     };
   }, [menuState.isOpen, onClose]);
 
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+
   const tab = menuState.tab;
   const tabIndex = menuState.tabIndex;
   const isRightmost = tabIndex >= totalTabs - 1;
@@ -125,7 +127,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
             <RotateCw className="w-3.5 h-3.5 opacity-70" />
             Reload
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘R</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘R' : 'Ctrl+R'}</span>
         </button>
 
         {/* Duplicate Tab */}
@@ -170,7 +172,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'text-amber-500 fill-amber-500' : 'opacity-70'}`} />
             {isBookmarked ? 'Edit bookmark' : 'Bookmark tab'}
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘D</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘D' : 'Ctrl+D'}</span>
         </button>
 
         {/* Copy URL */}
@@ -200,7 +202,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
             <X className="w-3.5 h-3.5 opacity-70" />
             Close tab
           </span>
-          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘W</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘W' : 'Ctrl+W'}</span>
         </button>
 
         {/* Close Other Tabs */}
@@ -241,7 +243,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
                 <Undo2 className="w-3.5 h-3.5" />
                 Reopen closed tab
               </span>
-              <span className="text-[10px] font-mono opacity-80">⇧⌘T</span>
+              <span className="text-[10px] font-mono opacity-80">{isMac ? '⇧⌘T' : 'Ctrl+Shift+T'}</span>
             </button>
           </>
         )}

@@ -2423,6 +2423,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
   }, []);
 
+  const isWindows = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent);
+  }, []);
+
+  const isLinux = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Linux/i.test(navigator.platform || navigator.userAgent) && !/Android/i.test(navigator.userAgent);
+  }, []);
+
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
 
   const handleSpotlightSelectTab = useCallback((tabId: string) => {
@@ -3037,6 +3045,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Windows Controls Overlay Spacer & Drag Bar when Vertical Tabs is active */}
+        {useVerticalTabs && isWindows && (
+          <div 
+            className="w-full h-8 shrink-0 flex items-center justify-between drag-region select-none px-3 bg-slate-100/60 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-white/5"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          >
+            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium truncate no-drag">
+              <span className="truncate max-w-sm text-[11px]">{activeTab?.title || 'Nova Browser'}</span>
+            </div>
+            {/* 140px reserved spacer so Windows native titlebar controls don't overlap web content */}
+            <div 
+              className="w-[140px] h-full shrink-0 select-none drag-region" 
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            />
+          </div>
+        )}
 
       {/* MAIN BROWSER CONTENT */}
       <main 

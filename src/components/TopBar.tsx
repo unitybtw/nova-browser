@@ -1575,7 +1575,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' 
                   : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
               }`}
-              title="New Tab (⌘T)"
+              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
             >
               <Plus className="w-4 h-4" />
             </motion.button>
@@ -1592,7 +1592,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   ? 'text-slate-300 hover:bg-slate-700 hover:text-white' 
                   : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
               }`}
-              title="New Private / Incognito Tab (⇧⌘N)"
+              title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
             >
               <ShieldOff className="w-4 h-4" />
             </motion.button>
