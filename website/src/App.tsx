@@ -18,12 +18,9 @@ export default function App() {
       history.scrollRestoration = 'manual';
     }
 
-    if (window.location.hash) {
-      window.history.replaceState(null, '', window.location.pathname + window.location.search);
+    if (!window.location.hash) {
+      window.scrollTo(0, 0);
     }
-
-    // Scroll to top on initial page mount cleanly
-    window.scrollTo({ top: 0, left: 0, behavior: 'instant' as ScrollBehavior });
 
     let scrollTicking = false;
     const updateScrollState = () => {

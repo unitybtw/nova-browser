@@ -14,41 +14,11 @@
     <meta name="theme-color" content="#fcfbf9" />
     <link rel="canonical" href="https://nova-browser.org/" />
 
-    <!-- Synchronously reset scroll position to (0,0) before DOM render -->
+    <!-- Prevent browser scroll restoration jump -->
     <script>
       if ('scrollRestoration' in history) {
         history.scrollRestoration = 'manual';
       }
-      if (window.location.hash) {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
-      window.scrollTo(0, 0);
-
-      // User-gesture-guarded scroll lock: ensures the page strictly stays on Manifesto
-      // until the user physically initiates a scroll gesture (wheel, touch, key).
-      var __userInteracted = false;
-      function __onUserGesture() {
-        __userInteracted = true;
-        window.removeEventListener('wheel', __onUserGesture);
-        window.removeEventListener('touchstart', __onUserGesture);
-        window.removeEventListener('touchmove', __onUserGesture);
-        window.removeEventListener('keydown', __onUserGesture);
-        window.removeEventListener('pointerdown', __onUserGesture);
-      }
-      window.addEventListener('wheel', __onUserGesture, { passive: true });
-      window.addEventListener('touchstart', __onUserGesture, { passive: true });
-      window.addEventListener('touchmove', __onUserGesture, { passive: true });
-      window.addEventListener('keydown', __onUserGesture, { passive: true });
-      window.addEventListener('pointerdown', __onUserGesture, { passive: true });
-
-      function __preventAutoScroll() {
-        if (!__userInteracted && window.scrollY > 0) {
-          window.scrollTo(0, 0);
-        }
-      }
-      window.addEventListener('scroll', __preventAutoScroll, { passive: true });
-      window.addEventListener('pageshow', function() { window.scrollTo(0, 0); });
-      window.addEventListener('load', function() { window.scrollTo(0, 0); });
     </script>
 
     <!-- Open Graph / Facebook -->

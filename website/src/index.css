@@ -38,7 +38,7 @@ html, body {
 }
 
 html {
-  scroll-behavior: smooth;
+  scrollbar-gutter: stable;
   background-color: #171717;
   scrollbar-width: thin;
   scrollbar-color: #6366f1 transparent;

@@ -7,10 +7,9 @@ export const ManifestoHero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const handleScrollDown = () => {
-    window.dispatchEvent(new Event('wheel'));
     const mainEl = document.getElementById('main-content');
     if (mainEl) {
-      mainEl.scrollIntoView({ behavior: 'smooth' });
+      mainEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
     }
   };
 
