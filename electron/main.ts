@@ -1067,9 +1067,46 @@ app.whenReady().then(async () => {
     sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
   });
 
+  function isNewerVersion(remote: string, current: string): boolean {
+    const parse = (v: string) => v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);
+    const r = parse(remote);
+    const c = parse(current);
+    for (let i = 0; i < Math.max(r.length, c.length); i++) {
+      const rVal = r[i] ?? 0;
+      const cVal = c[i] ?? 0;
+      if (rVal > cVal) return true;
+      if (rVal < cVal) return false;
+    }
+    return false;
+  }
+
+  function getPlatformAsset(assets: any[]) {
+    if (!Array.isArray(assets) || assets.length === 0) return null;
+    const platform = process.platform;
+    const arch = process.arch;
+
+    if (platform === 'darwin') {
+      if (arch === 'arm64') {
+        return assets.find((a: any) => a.name?.includes('arm64.dmg')) || assets.find((a: any) => a.name?.endsWith('.dmg'));
+      }
+      return assets.find((a: any) => a.name?.includes('x64.dmg')) || assets.find((a: any) => a.name?.endsWith('.dmg'));
+    }
+
+    if (platform === 'win32') {
+      return assets.find((a: any) => a.name?.endsWith('.exe')) || assets.find((a: any) => a.name?.endsWith('.zip'));
+    }
+
+    if (platform === 'linux') {
+      return assets.find((a: any) => a.name?.endsWith('.AppImage')) || assets.find((a: any) => a.name?.endsWith('.deb'));
+    }
+
+    return assets[0];
+  }
+
   // Auto Updater Configuration
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
+  let isUpdateDownloaded = false;
 
   autoUpdater.on('checking-for-update', () => {
     console.log('Checking for updates...');
@@ -1078,12 +1115,16 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('update-available', (info) => {
     console.log('Update available:', info.version);
-    sendToMainWindow('update-available', { version: info.version, releaseDate: info.releaseDate });
+    sendToMainWindow('update-available', { 
+      version: info.version, 
+      releaseDate: info.releaseDate,
+      isManual: false 
+    });
   });
 
   autoUpdater.on('update-not-available', (info) => {
-    console.log('No update available. Current version is up to date:', info.version);
-    sendToMainWindow('update-not-available', { version: info.version });
+    console.log('No update available. Current version is up to date:', info?.version || app.getVersion());
+    sendToMainWindow('update-not-available', { version: info?.version || app.getVersion() });
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -1097,6 +1138,7 @@ app.whenReady().then(async () => {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
+    isUpdateDownloaded = true;
     console.log('Update downloaded:', info.version);
     sendToMainWindow('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
   });
@@ -1125,8 +1167,15 @@ app.whenReady().then(async () => {
           if (latestRelease) {
             const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
             const currentVersion = app.getVersion();
-            if (latestTag && latestTag !== currentVersion) {
-              sendToMainWindow('update-available', { version: latestTag, releaseDate: latestRelease.published_at });
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              sendToMainWindow('update-available', { 
+                version: latestTag, 
+                releaseDate: latestRelease.published_at,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name,
+                isManual: true
+              });
               return { success: true, version: latestTag };
             }
           }
@@ -1135,7 +1184,12 @@ app.whenReady().then(async () => {
         }
       }
       const result = await autoUpdater.checkForUpdatesAndNotify();
-      return { success: true, version: result?.updateInfo?.version || null };
+      if (result?.updateInfo?.version && isNewerVersion(result.updateInfo.version, app.getVersion())) {
+        return { success: true, version: result.updateInfo.version };
+      } else {
+        sendToMainWindow('update-not-available', { version: app.getVersion() });
+        return { success: true, version: app.getVersion() };
+      }
     } catch (err: any) {
       console.warn('Check for updates failed via autoUpdater, checking GitHub releases directly:', err?.message);
       try {
@@ -1148,8 +1202,15 @@ app.whenReady().then(async () => {
           if (latestRelease) {
             const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
             const currentVersion = app.getVersion();
-            if (latestTag && latestTag !== currentVersion) {
-              sendToMainWindow('update-available', { version: latestTag, releaseDate: latestRelease.published_at });
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              sendToMainWindow('update-available', { 
+                version: latestTag, 
+                releaseDate: latestRelease.published_at,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name,
+                isManual: true
+              });
               return { success: true, version: latestTag };
             }
           }
@@ -1160,13 +1221,61 @@ app.whenReady().then(async () => {
     }
   });
 
-  ipcMain.handle('install-update', (event) => {
-    if (!isTrustedSender(event)) return;
+  ipcMain.handle('install-update', async (event) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    console.log('[Updater] Restart and install requested.');
     try {
-      autoUpdater.quitAndInstall(false, true);
+      if (mcpServer && mcpServer.isRunning()) {
+        try { mcpServer.stop(); } catch (_) {}
+      }
+
+      const allWindows = BrowserWindow.getAllWindows();
+      for (const win of allWindows) {
+        try {
+          win.removeAllListeners('close');
+          win.destroy();
+        } catch (_) {}
+      }
+
+      setTimeout(() => {
+        try {
+          if (isUpdateDownloaded) {
+            autoUpdater.quitAndInstall(false, true);
+          } else {
+            app.relaunch();
+            app.exit(0);
+          }
+        } catch (quitErr) {
+          console.error('[Updater] quitAndInstall threw error, fallback to app.relaunch:', quitErr);
+          try {
+            app.relaunch();
+            app.exit(0);
+          } catch (_) {}
+        }
+      }, 250);
+
+      return { success: true };
     } catch (err: any) {
-      console.error('Install update failed:', err);
+      console.error('[Updater] Install update failed:', err);
+      try {
+        app.relaunch();
+        app.exit(0);
+      } catch (_) {}
+      return { success: false, error: err?.message };
     }
+  });
+
+  ipcMain.handle('open-external', async (event, targetUrl: string) => {
+    if (!isTrustedSender(event)) return false;
+    try {
+      if (typeof targetUrl === 'string' && (targetUrl.startsWith('https://') || targetUrl.startsWith('http://'))) {
+        await shell.openExternal(targetUrl);
+        return true;
+      }
+    } catch (e) {
+      console.error('[Security] Failed to open external URL:', e);
+    }
+    return false;
   });
 
   ipcMain.handle('get-app-version', (event) => {

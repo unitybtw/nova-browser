@@ -73,7 +73,7 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.2 // UNIVERSAL
+                v1.2.3 // UNIVERSAL
               </span>
             </div>
 
@@ -123,7 +123,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.2 // X64
+                v1.2.3 // X64
               </span>
             </div>
 
@@ -133,29 +133,35 @@ export const Downloads: React.FC = () => {
             </p>
 
             {/* Architecture Chips */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-8">
-              <span className="font-mono text-[10px] font-semibold bg-indigo-50 text-[#4338ca] border border-indigo-100 px-2 py-0.5 rounded-md">
-                Windows 10 / 11 (64-bit)
+            <div className="flex gap-2 mb-6">
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-neutral-100 text-neutral-600 border border-neutral-200/60">
+                x64 (AMD64)
               </span>
-              <span className="font-mono text-[10px] font-semibold bg-neutral-100 text-neutral-600 px-2 py-0.5 rounded-md">
-                Vulkan / DX12
+              <span className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-neutral-100 text-neutral-400 border border-neutral-200/60">
+                ARM64 Emulated
               </span>
             </div>
-          </div>
 
-          <div>
-            <a
-              href="https://github.com/unitybtw/nova-browser/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
-            >
-              <Download className="w-4 h-4" aria-hidden="true" />
-              <span>Download Setup (.EXE)</span>
-            </a>
-            <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
-              Direct NSIS setup installer for Windows
-            </p>
+            <div className="space-y-2">
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest"
+                className="w-full py-3 px-4 rounded-xl bg-[#171717] hover:bg-neutral-800 text-white font-mono text-xs font-semibold tracking-wide transition-all shadow-sm active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                DOWNLOAD .EXE (64-BIT)
+              </a>
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest"
+                className="w-full py-2.5 px-4 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+              >
+                PORTABLE ZIP ARCHIVE
+              </a>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between text-[11px] font-mono text-neutral-400">
+              <span>SHA-256 Verified</span>
+              <span>144 MB</span>
+            </div>
           </div>
         </motion.div>
 
@@ -173,7 +179,7 @@ export const Downloads: React.FC = () => {
                 <Terminal className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.2.2 // LINUX
+                v1.2.3 // LINUX
               </span>
             </div>
 

@@ -450,6 +450,9 @@ const UpdateWidget = () => {
   const [errorMsg, setErrorMsg] = React.useState('');
   const [progress, setProgress] = React.useState(0);
   const [updateVersion, setUpdateVersion] = React.useState('');
+  const [downloadUrl, setDownloadUrl] = React.useState('');
+  const [isManual, setIsManual] = React.useState(false);
+  const [isRestarting, setIsRestarting] = React.useState(false);
 
   React.useEffect(() => {
     let unsubs: (() => void)[] = [];
@@ -459,6 +462,8 @@ const UpdateWidget = () => {
       if (api.onUpdateAvailable) unsubs.push(api.onUpdateAvailable((_: any, info: any) => {
         setStatus('available');
         setUpdateVersion(info?.version || '');
+        setDownloadUrl(info?.downloadUrl || '');
+        setIsManual(Boolean(info?.isManual));
       }));
       if (api.onUpdateNotAvailable) unsubs.push(api.onUpdateNotAvailable((_: any, info: any) => {
         setStatus('up-to-date');
@@ -497,10 +502,24 @@ const UpdateWidget = () => {
     }
   };
 
-  const install = () => {
+  const install = async () => {
+    setIsRestarting(true);
     const api = (window as any).electronAPI;
     if (api?.installUpdate) {
-      api.installUpdate();
+      try {
+        await api.installUpdate();
+      } catch {
+        setIsRestarting(false);
+      }
+    }
+  };
+
+  const openDownload = (url: string) => {
+    const api = (window as any).electronAPI;
+    if (api?.openExternal) {
+      api.openExternal(url);
+    } else {
+      window.open(url, '_blank');
     }
   };
 
@@ -510,8 +529,17 @@ const UpdateWidget = () => {
         <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
           v{updateVersion || 'new'} ready to install!
         </span>
-        <button onClick={install} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2">
-          <Download className="w-4 h-4" /> Restart & Install
+        <button 
+          onClick={install} 
+          disabled={isRestarting}
+          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60"
+        >
+          {isRestarting ? (
+            <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          {isRestarting ? 'Restarting...' : 'Restart & Install'}
         </button>
       </div>
     );
@@ -523,7 +551,7 @@ const UpdateWidget = () => {
         <div className="flex-1">
           <div className="flex justify-between text-xs mb-1">
             <span className="text-blue-600 dark:text-blue-400 font-medium">Downloading{updateVersion ? ` v${updateVersion}` : ''}...</span>
-            <span className="text-slate-500">{progress}%</span>
+            <span className="text-slate-500 font-mono">{progress}%</span>
           </div>
           <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
             <div className="h-full bg-blue-500 rounded-full transition-all duration-300 ease-out" style={{ width: `${progress}%` }} />
@@ -534,6 +562,27 @@ const UpdateWidget = () => {
   }
 
   if (status === 'available') {
+    if (isManual && downloadUrl) {
+      return (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+            v{updateVersion || 'new'} available
+          </span>
+          <button
+            onClick={() => openDownload(downloadUrl)}
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5" /> Download
+          </button>
+          <button 
+            onClick={check} 
+            className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+          >
+            Check again
+          </button>
+        </div>
+      );
+    }
     return (
       <div className="flex items-center gap-3">
         <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Update v{updateVersion || '?'} found, downloading...</span>
@@ -548,7 +597,7 @@ const UpdateWidget = () => {
         <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
           <Check className="w-4 h-4" /> Up to date (v{updateVersion || '?'})
         </span>
-        <button onClick={check} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+        <button onClick={check} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer">
           Check again
         </button>
       </div>
@@ -559,7 +608,7 @@ const UpdateWidget = () => {
     return (
       <div className="flex items-center gap-3">
         <span className="text-xs text-red-500">Failed: {errorMsg.substring(0, 50)}{errorMsg.length > 50 ? '...' : ''}</span>
-        <button onClick={check} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-sm">
+        <button onClick={check} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-sm cursor-pointer">
           Try Again
         </button>
       </div>
@@ -567,7 +616,7 @@ const UpdateWidget = () => {
   }
 
   return (
-    <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50">
+    <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer">
       {status === 'checking' ? <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin" /> : <RefreshCw className="w-4 h-4" />}
       {status === 'checking' ? 'Checking...' : 'Check for Updates'}
     </button>
@@ -594,7 +643,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.2';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.3';
   });
 
   useEffect(() => {
