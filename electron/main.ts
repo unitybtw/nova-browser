@@ -19,8 +19,31 @@ import fs from 'fs';
 import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
 
-const jsdomWindow = new JSDOM('').window;
-const mainDOMPurify = createDOMPurify(jsdomWindow as any);
+let cachedDOMPurify: any = null;
+function getMainDOMPurify(): any {
+  if (cachedDOMPurify) return cachedDOMPurify;
+  try {
+    const jsdomWindow = new JSDOM('').window;
+    cachedDOMPurify = createDOMPurify(jsdomWindow as any);
+  } catch (err) {
+    console.error('[Main] Failed to initialize JSDOM/DOMPurify, using safe regex fallback:', err);
+    cachedDOMPurify = {
+      sanitize: (html: string) => {
+        return (html || '')
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+          .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+          .replace(/<embed[^>]*>/gi, '')
+          .replace(/<applet[^>]*>[\s\S]*?<\/applet>/gi, '')
+          .replace(/<!--[\s\S]*?-->/g, '')
+          .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+          .replace(/\s+(?:href|src|action|formaction)\s*=\s*["']?\s*(?:javascript|vbscript|data):[^"'>\s]*/gi, ' href="#"');
+      }
+    };
+  }
+  return cachedDOMPurify;
+}
 
 // Security: Enforce single-instance lock to prevent duplicate process conflicts,
 // database/LevelDB corruption, and hostile command-line flag injection.
@@ -926,6 +949,11 @@ app.whenReady().then(async () => {
       pendingPermissions.delete(requestId);
       if (remember && pending.origin) {
         if (!rememberedPermissions.has(pending.origin)) {
+          // Cap remembered origins to 200 to prevent unbounded memory growth in long sessions
+          if (rememberedPermissions.size >= 200) {
+            const oldest = rememberedPermissions.keys().next().value;
+            if (oldest) rememberedPermissions.delete(oldest);
+          }
           rememberedPermissions.set(pending.origin, new Map());
         }
         rememberedPermissions.get(pending.origin)!.set(pending.permission, allow);
@@ -1336,7 +1364,7 @@ app.whenReady().then(async () => {
         }
         // Security: Block embedded credentials in URLs (phishing, SSRF, or credential harvesting vector)
         if (parsed.username || parsed.password) {
-          console.warn(`[Security] Blocked open-external with embedded credentials: ${targetUrl}`);
+          console.warn(`[Security] Blocked open-external with embedded credentials for host: ${parsed.host}`);
           return false;
         }
         await shell.openExternal(parsed.href);
@@ -2609,7 +2637,7 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
         }
         const rawHtml = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
         // Security: Robust AST-based DOMPurify sanitization in main process
-        const html = mainDOMPurify.sanitize(rawHtml, {
+        const html = getMainDOMPurify().sanitize(rawHtml, {
           WHOLE_DOCUMENT: true,
           FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base'],
           FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction']

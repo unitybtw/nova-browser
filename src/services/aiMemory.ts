@@ -162,11 +162,16 @@ class AIMemoryService {
     return text
       .replace(/(?:password|passwd|pwd|token|api[_-]?key|secret)\s*[:=]\s*["']?[^\s"']+["']?/gi, '[REDACTED_CREDENTIAL]')
       .replace(/bearer\s+[a-zA-Z0-9._-]+/gi, 'Bearer [REDACTED_TOKEN]')
-      .replace(/\b[A-Za-z0-9+/]{40,}\b/g, '[REDACTED_BLOB]');
+      .replace(/\b[A-Za-z0-9+/]{40,}\b/g, '[REDACTED_BLOB]')
+      .replace(/\b(?:\d[ -]*?){13,19}\b/g, '[REDACTED_CARD]')
+      .replace(/\b[A-Z]{2}\d{2}[A-Za-z0-9]{11,30}\b/g, '[REDACTED_IBAN]')
+      .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '[REDACTED_EMAIL]')
+      .replace(/\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, '[REDACTED_PHONE]');
   }
 
   public addTaskSummary(summary: string): TaskSummary {
-    const cleanSummary = this.redactSensitiveInfo(summary);
+    const raw = (summary || '').slice(0, 300);
+    const cleanSummary = this.redactSensitiveInfo(raw);
     const task: TaskSummary = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
       summary: cleanSummary,
@@ -247,7 +252,9 @@ class AIMemoryService {
       let totalChars = 0;
       const safeFacts: string[] = [];
       for (const m of allowedMemories) {
-        const cleanFact = (m.fact || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+        const redacted = this.redactSensitiveInfo(m.fact || '');
+        const cleanFact = redacted.replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+        if (!cleanFact) continue;
         if (totalChars + cleanFact.length > 1200) break;
         totalChars += cleanFact.length;
         safeFacts.push(`- [${m.category.toUpperCase()}] ${cleanFact}`);
