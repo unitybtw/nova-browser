@@ -879,6 +879,7 @@ class NovaSyncService {
         try {
           await (window as any).electronAPI.secureStoreSet(masterKeyStore, '');
           await (window as any).electronAPI.secureStoreSet(legacyKeyStore, '');
+          await (window as any).electronAPI.secureStoreSet(SUPABASE_AUTH_STORAGE_KEY, '');
         } catch {}
       })();
     }

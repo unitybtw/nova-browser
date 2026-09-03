@@ -1762,9 +1762,10 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       }
 
       else if (functionName === "wait") {
-        const { ms } = args;
-        await this.actionContext.onWait(ms);
-        result = { success: true, waitedMs: ms };
+        const rawMs = Number(args.ms);
+        const safeMs = (!Number.isFinite(rawMs) || rawMs < 0) ? 1000 : Math.min(Math.floor(rawMs), 10000);
+        await this.actionContext.onWait(safeMs);
+        result = { success: true, waitedMs: safeMs };
       }
 
       else if (functionName === "get_page_links") {
@@ -1893,12 +1894,23 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       // ---------------------------------------------------------------
       // FIX 7: attachment processing
       // ---------------------------------------------------------------
-      const images = (attachments?.images ?? []).filter((u): u is string => typeof u === 'string' && u.length > 0);
+      const MAX_ATTACHED_IMAGES = 4;
+      const MAX_IMAGE_CHARS = 5 * 1024 * 1024;
+      const images = (attachments?.images ?? [])
+        .filter((u): u is string => typeof u === 'string' && u.length > 0 && u.length <= MAX_IMAGE_CHARS)
+        .slice(0, MAX_ATTACHED_IMAGES);
+
       const attachedFiles = (attachments?.files ?? []).filter(f => f && typeof f.name === 'string');
-      const maxFileChars = this.ctxWindowSize <= 2048 ? ATTACH_TOTAL_BUDGET_CHARS_SMALL : ATTACH_TOTAL_BUDGET_CHARS_LARGE;
-      const fileBlocks = attachedFiles
-        .map(f => `<attached_file name="${f.name}">\n${(f.text || '').substring(0, maxFileChars)}\n</attached_file>`)
-        .join('\n\n');
+      const maxTotalChars = this.ctxWindowSize <= 2048 ? ATTACH_TOTAL_BUDGET_CHARS_SMALL : ATTACH_TOTAL_BUDGET_CHARS_LARGE;
+      let remainingChars = maxTotalChars;
+      const fileBlocksList: string[] = [];
+      for (const f of attachedFiles) {
+        if (remainingChars <= 0) break;
+        const textSlice = (f.text || '').substring(0, remainingChars);
+        remainingChars -= textSlice.length;
+        fileBlocksList.push(`<attached_file name="${f.name}">\n${textSlice}\n</attached_file>`);
+      }
+      const fileBlocks = fileBlocksList.join('\n\n');
       const hasAttachments = images.length > 0 || fileBlocks.length > 0;
 
       // Images require a vision-capable model — fail fast with a typed,

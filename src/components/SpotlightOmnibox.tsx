@@ -216,6 +216,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
               <input
                 ref={inputRef}
                 type="text"
+                aria-label="Spotlight search and command bar"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => {

@@ -9,7 +9,8 @@ import path from 'path';
 // via transformIndexHtml (apply: 'build' keeps dev mode untouched).
 const HARDENED_PROD_CSP = [
   "default-src 'self'",
-  "script-src 'self'",
+  "script-src 'self' 'wasm-unsafe-eval' blob:",
+  "worker-src 'self' blob:",
   // Google Fonts (loaded via <link> in index.html) must stay allowed — the
   // header CSP in electron/main.ts allows them too; policies intersect.
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",

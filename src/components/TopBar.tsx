@@ -240,6 +240,8 @@ const MemoizedTabItem = React.memo(({
         <div className="flex w-full items-center h-full gap-0.5">
           {/* Primary Tab Half */}
           <div 
+            role="button"
+            tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-left relative ${
               activeTabId === tab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
@@ -249,6 +251,12 @@ const MemoizedTabItem = React.memo(({
               e.stopPropagation(); 
               onTabLeave?.();
               onSelectTab(tab.id); 
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectTab(tab.id);
+              }
             }}
             onMouseEnter={(e) => {
               e.stopPropagation();
@@ -269,6 +277,7 @@ const MemoizedTabItem = React.memo(({
             <span className="truncate text-[12px] flex-1">{tab.title || tab.url || 'New Tab'}</span>
             
             <button
+              aria-label="Close Left Tab"
               onClick={(e) => {
                 e.stopPropagation();
                 onTabLeave?.();
@@ -284,6 +293,7 @@ const MemoizedTabItem = React.memo(({
           {/* Unsplit / Separate Tabs Button */}
           <div className="flex items-center px-0.5 shrink-0">
             <button
+              aria-label="Separate Tabs"
               onClick={(e) => {
                 e.stopPropagation();
                 onTabLeave?.();
@@ -299,6 +309,8 @@ const MemoizedTabItem = React.memo(({
 
           {/* Secondary Tab Half */}
           <div 
+            role="button"
+            tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-right relative ${
               activeTabId === splitTab.id
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
@@ -308,6 +320,12 @@ const MemoizedTabItem = React.memo(({
               e.stopPropagation(); 
               onTabLeave?.();
               onSelectTab(splitTab.id); 
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelectTab(splitTab.id);
+              }
             }}
             onMouseEnter={(e) => {
               e.stopPropagation();
@@ -328,6 +346,7 @@ const MemoizedTabItem = React.memo(({
             <span className="truncate text-[12px] flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
             
             <button 
+              aria-label="Close Right Tab"
               onClick={(e) => { 
                 e.stopPropagation(); 
                 onTabLeave?.();
@@ -789,6 +808,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           <input
             type="text"
+            aria-label="Address and search bar"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={(e) => {
@@ -1145,8 +1165,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     return () => { unsubscribe(); };
   }, []);
 
-  const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
-  const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [extensions, setExtensions] = useState<any[]>([]);
   const [mcpClientCount, setMcpClientCount] = useState(0);
@@ -2185,6 +2203,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       a.isPinned !== b.isPinned ||
       a.isPlayingAudio !== b.isPlayingAudio ||
       a.isSuspended !== b.isSuspended ||
+      a.isTranslated !== b.isTranslated ||
       a.splitWith !== b.splitWith ||
       a.canGoBack !== b.canGoBack ||
       a.canGoForward !== b.canGoForward ||

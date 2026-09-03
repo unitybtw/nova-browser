@@ -31,7 +31,7 @@ Nova includes an automated Chrome DevTools Protocol (CDP) benchmark harness at [
 | **Cold Start RSS Memory** | ~1,100 - 1,340 MB | ~640 MB | ~380 MB | Nova excludes background telemetries |
 | **RAM with 20 Tabs (Hibernated)** | ~1,180 MB | **~420 MB** | N/A | Nova unmounts background view pipelines |
 
-*Note: The isolated Electron host (`electron_benchmark_host.cjs`) measures the baseline Electron container without React or UI loaded, whereas the full application includes the complete React 19 interface, sidebar tabs, and adblocker engine.*
+*Note: The isolated Electron host (`electron_benchmark_host.cjs`) measures the baseline Electron container without React or UI loaded, whereas the full application includes the complete React UI interface, sidebar tabs, and adblocker engine.*
 
 ---
 

@@ -8,7 +8,7 @@ Nova Browser is an Electron + React + TypeScript web browser featuring:
   - Webview lifecycle management with `contextIsolation: true`, `nodeIntegration: false`, `webSecurity: true`, and strict sandbox settings.
   - Safe extension loading and native TTS execution.
 - **Renderer Process (`src/*`)**:
-  - React 19 UI with vertical tabs, omnibox (`TopBar.tsx`, `SpotlightOmnibox.tsx`), split views, and side panel AI integrations.
+  - React UI (React 18.3 in Electron client, React 19 in landing website) with vertical tabs, omnibox (`TopBar.tsx`, `SpotlightOmnibox.tsx`), split views, and side panel AI integrations.
   - Safe URL parsing and search query formatting (`src/utils/searchEngine.ts`, `src/utils/safeNavigation.ts`).
   - Memory-safe component lifecycles and sanitized rendering (`ReaderMode.tsx`, `BrowserView.tsx`).
 - **Test Infrastructure (`tests/*`, `dist-test/runAll.cjs`)**:
@@ -63,5 +63,5 @@ Every audited feature and requirement mapped to concrete milestones:
 - `src/components/SidebarTabs.tsx`: Tab management and omnibox submit fallback handling.
 - `src/components/NewTabPage.tsx`: Speed dial and new tab background widgets.
 - `website/src/components/Navbar.tsx`: Transparent/glass navbar without conditional white styling.
-- `tests/regression_suite.ts`: 29 security and bug regression unit tests.
+- `tests/security_regression_audit.test.ts`: Security and bug regression unit tests.
 - `SECURITY.md`: GitHub Security Policy and vulnerability reporting guidelines.

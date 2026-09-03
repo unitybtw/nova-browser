@@ -202,10 +202,20 @@ function getCrxInnerZip(buffer: Buffer): Buffer {
   throw new Error('Unsupported CRX container format.');
 }
 
+// Zip bomb defense limits
+const MAX_TOTAL_UNCOMPRESSED_BYTES = 150 * 1024 * 1024; // 150 MB max uncompressed
+const MAX_SINGLE_FILE_UNCOMPRESSED_BYTES = 50 * 1024 * 1024; // 50 MB max single file
+const MAX_TOTAL_ENTRIES = 2000; // 2000 files max
+
 async function assertCrxEntriesSafe(buffer: Buffer, targetDir: string): Promise<void> {
   const zip = await JSZip.loadAsync(getCrxInnerZip(buffer));
   const resolvedTarget = path.resolve(targetDir);
-  for (const entryName of Object.keys(zip.files)) {
+  const entryKeys = Object.keys(zip.files);
+  if (entryKeys.length > MAX_TOTAL_ENTRIES) {
+    throw new Error(`Extension contains too many entries (${entryKeys.length} > ${MAX_TOTAL_ENTRIES}), potential zip bomb.`);
+  }
+
+  for (const entryName of entryKeys) {
     // Reject Windows drive-letter/UNC paths and backslash separators outright
     if (/^[a-zA-Z]:[\\/]/.test(entryName) || entryName.startsWith('\\\\')) {
       throw new Error(`Extension contains an unsafe entry path: ${entryName}`);
@@ -354,8 +364,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       // Security: validate every zip entry against the staging target BEFORE extracting (zip-slip)
       await assertCrxEntriesSafe(buffer, stagingPath);
 
-      // Extract cleanly with JSZip
+      // Extract cleanly with JSZip with cumulative and per-file byte limits
       const zipPayload = await JSZip.loadAsync(getCrxInnerZip(buffer));
+      let totalUncompressedBytes = 0;
       for (const [filename, file] of Object.entries(zipPayload.files)) {
         const normalized = filename.replace(/\\/g, '/');
         const destFile = path.resolve(stagingPath, normalized);
@@ -366,6 +377,13 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
           fs.mkdirSync(destFile, { recursive: true });
         } else {
           const content = await file.async('nodebuffer');
+          if (content.length > MAX_SINGLE_FILE_UNCOMPRESSED_BYTES) {
+            throw new Error(`Extension file '${filename}' exceeds maximum single file limit (${content.length} > ${MAX_SINGLE_FILE_UNCOMPRESSED_BYTES} bytes).`);
+          }
+          totalUncompressedBytes += content.length;
+          if (totalUncompressedBytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
+            throw new Error(`Extension total uncompressed size exceeds limit (${totalUncompressedBytes} > ${MAX_TOTAL_UNCOMPRESSED_BYTES} bytes), potential zip bomb.`);
+          }
           fs.mkdirSync(path.dirname(destFile), { recursive: true });
           fs.writeFileSync(destFile, content);
         }

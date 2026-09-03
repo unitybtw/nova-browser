@@ -16,7 +16,6 @@ interface PreviewData {
   domain: string;
   summary: string;
   readingTimeMinutes: number;
-  ogImage?: string;
   isAiGenerated: boolean;
 }
 
@@ -43,51 +42,6 @@ function setCachedPreview(url: string, preview: PreviewData): void {
     if (oldestKey === undefined) break;
     previewCache.delete(oldestKey);
   }
-}
-
-// Helper to extract clean, complete sentences from text
-function extractCompleteSentences(text: string, maxChars = 280): string {
-  if (!text) return '';
-  // Clean unwanted boilerplate & whitespace
-  let clean = text
-    .replace(/cookie policy|çerez politikası|tüm hakları saklıdır|all rights reserved|sign in|giriş yap|privacy policy|gizlilik politikası/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  // Split by sentence terminators (. ! ?)
-  const sentences = clean.match(/[^.!?]+[.!?]+/g) || [];
-  let result = '';
-  
-  for (const s of sentences) {
-    const trimmed = s.trim();
-    if (!trimmed || trimmed.length < 15) continue;
-    // Don't add menu-like short fragments
-    if (/^(menü|menu|home|anasayfa|ara|search|paylaş|share|yazar|author)/i.test(trimmed)) continue;
-    
-    if ((result + ' ' + trimmed).length > maxChars && result.length > 50) {
-      break;
-    }
-    result = result ? `${result} ${trimmed}` : trimmed;
-    if (result.length >= maxChars) break;
-  }
-
-  // Fallback if regex split didn't find clear periods
-  if (!result || result.length < 40) {
-    result = clean.substring(0, maxChars);
-    const lastSpace = result.lastIndexOf(' ');
-    if (lastSpace > 40) {
-      result = result.substring(0, lastSpace) + '.';
-    } else {
-      result = result + '.';
-    }
-  }
-
-  // Ensure trailing period
-  if (!/[.!?]$/.test(result.trim())) {
-    result = result.trim() + '.';
-  }
-
-  return result;
 }
 
 export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen }) => {
@@ -174,7 +128,6 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
         const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
         const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
         const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
-        const ogImage = doc.querySelector('meta[property="og:image"]')?.getAttribute('content');
 
         let pageTitle = ogTitle || doc.title || domain;
         let cleanText = '';
@@ -229,7 +182,6 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
           title: pageTitle,
           domain,
           summary: finalSummary,
-          ogImage: ogImage || undefined,
           readingTimeMinutes,
           isAiGenerated
         };

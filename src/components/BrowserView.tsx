@@ -63,9 +63,30 @@ const getLinkPreviewScript = () => `
   })();
 `;
 
-// Origins already hinted via <link rel="dns-prefetch">. Deduping by origin keeps
-// document.head bounded (growth is capped by the number of distinct origins visited).
-const dnsPrefetchedOrigins = new Set<string>();
+// Origins already hinted via <link rel="preconnect">. LRU bounded to max 50 entries
+// so document.head does not accumulate unbounded link DOM nodes over long sessions.
+const MAX_PRECONNECT_HINTS = 50;
+const preconnectedOrigins = new Set<string>();
+const preconnectLinkElements: HTMLLinkElement[] = [];
+
+function addPreconnectHint(origin: string) {
+  if (!origin || origin.startsWith('null') || preconnectedOrigins.has(origin)) return;
+  if (preconnectedOrigins.size >= MAX_PRECONNECT_HINTS) {
+    const oldestOrigin = preconnectedOrigins.values().next().value;
+    if (oldestOrigin) {
+      preconnectedOrigins.delete(oldestOrigin);
+      const oldestNode = preconnectLinkElements.shift();
+      oldestNode?.remove();
+    }
+  }
+  preconnectedOrigins.add(origin);
+  const hint = document.createElement('link');
+  hint.rel = 'preconnect';
+  hint.href = origin;
+  hint.crossOrigin = 'anonymous';
+  document.head.appendChild(hint);
+  preconnectLinkElements.push(hint);
+}
 
 interface BrowserViewProps {
   tab?: Tab | null;
@@ -213,11 +234,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (latestSettingsRef.current.passwordManagerEnabled === true) {
         // 1. Password Autofill & Capture Logic
         try {
+          if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+
           // Fetch saved passwords for current domain.
           // Read the URL through latestTabRef: tab.url can change (SPA
           // navigations) without this effect re-running.
           let hostname = '';
           try { hostname = new URL(latestTabRef.current?.url || '').hostname; } catch (e) {}
+          if (!hostname) return;
           
           let savedPasswords: any[] = [];
           try {
@@ -233,22 +257,37 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               if (window.__nova_pw_injected) return;
               window.__nova_pw_injected = true;
 
+              function isElementVisible(el) {
+                if (!el || el.type === 'hidden') return false;
+                if (el.disabled || el.readOnly) return false;
+                const style = window.getComputedStyle(el);
+                if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+                if (parseFloat(style.opacity || '1') < 0.1) return false;
+                const rect = el.getBoundingClientRect();
+                if (rect.width < 15 || rect.height < 15) return false;
+                if (rect.bottom < 0 || rect.right < 0) return false;
+                return true;
+              }
+
               // Autofill existing credentials
               const savedCredentials = ${JSON.stringify(savedPasswords)};
               if (savedCredentials.length > 0) {
                 const cred = savedCredentials[0];
-                const pwdInputs = Array.from(document.querySelectorAll('input[type="password"]'));
-                if (pwdInputs.length > 0) {
-                  const root = pwdInputs[0].closest('form') || pwdInputs[0].closest('div') || document;
-                  const textInputs = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
-                  if (textInputs.length > 0) {
-                    textInputs[0].value = cred.username;
-                    textInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                    textInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+                const allPwds = Array.from(document.querySelectorAll('input[type="password"]'));
+                const visiblePwds = allPwds.filter(isElementVisible);
+                if (visiblePwds.length > 0) {
+                  const targetPwd = visiblePwds[0];
+                  const root = targetPwd.closest('form') || targetPwd.closest('fieldset') || targetPwd.parentElement || document;
+                  const allTexts = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
+                  const visibleTexts = allTexts.filter(isElementVisible);
+                  if (visibleTexts.length > 0) {
+                    visibleTexts[0].value = cred.username;
+                    visibleTexts[0].dispatchEvent(new Event('input', { bubbles: true }));
+                    visibleTexts[0].dispatchEvent(new Event('change', { bubbles: true }));
                   }
-                  pwdInputs[0].value = cred.password;
-                  pwdInputs[0].dispatchEvent(new Event('input', { bubbles: true }));
-                  pwdInputs[0].dispatchEvent(new Event('change', { bubbles: true }));
+                  targetPwd.value = cred.password;
+                  targetPwd.dispatchEvent(new Event('input', { bubbles: true }));
+                  targetPwd.dispatchEvent(new Event('change', { bubbles: true }));
                 }
               }
 
@@ -588,13 +627,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
               try {
                 const origin = new URL(data.url).origin;
-                if (origin && !origin.startsWith('null') && !dnsPrefetchedOrigins.has(origin)) {
-                  dnsPrefetchedOrigins.add(origin);
-                  const hint = document.createElement('link');
-                  hint.rel = 'preconnect';
-                  hint.href = origin;
-                  hint.crossOrigin = 'anonymous';
-                  document.head.appendChild(hint);
+                if (origin && !origin.startsWith('null')) {
+                  addPreconnectHint(origin);
                 }
               } catch (_) {}
             }
@@ -1233,6 +1267,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.tab?.blockedAdsCount !== nextProps.tab?.blockedAdsCount) return false;
   if (prevProps.tab?.webContentsId !== nextProps.tab?.webContentsId) return false;
   if (prevProps.tab?.isSuspended !== nextProps.tab?.isSuspended) return false;
+  if (prevProps.tab?.isTranslated !== nextProps.tab?.isTranslated) return false;
 
   // Settings comparison
   if (prevProps.settings?.searchEngine !== nextProps.settings?.searchEngine) return false;

@@ -12,6 +12,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'cross-fetch';
 import dns from 'dns';
+import http from 'http';
+import https from 'https';
 import { promisify } from 'util';
 import fs from 'fs';
 
@@ -2368,7 +2370,12 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
 
 const dnsLookup = promisify(dns.lookup);
 
-async function validatePreviewUrl(rawUrl: string): Promise<URL | { error: string }> {
+interface ValidatedPreviewTarget {
+  url: URL;
+  pinnedIp: string;
+}
+
+async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarget | { error: string }> {
   let parsedUrl: URL;
   try {
     parsedUrl = new URL(rawUrl);
@@ -2387,11 +2394,16 @@ async function validatePreviewUrl(rawUrl: string): Promise<URL | { error: string
     return { error: 'Requests to local hostnames are blocked.' };
   }
 
+  let pinnedIp = '';
   try {
     const addresses = await dnsLookup(hostname, { all: true }) as any;
     const addrList = Array.isArray(addresses) ? addresses : [addresses];
     if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address))) {
       return { error: 'Requests to private/internal IP addresses are blocked.' };
+    }
+    pinnedIp = String(addrList[0]?.address || '');
+    if (!pinnedIp) {
+      return { error: 'DNS resolution returned empty address.' };
     }
   } catch {
     return { error: 'DNS resolution failed.' };
@@ -2402,7 +2414,7 @@ async function validatePreviewUrl(rawUrl: string): Promise<URL | { error: string
   if (port === '3020' || port === activeMcpPort) {
     return { error: 'Requests to MCP server port are blocked.' };
   }
-  return parsedUrl;
+  return { url: parsedUrl, pinnedIp };
 }
 
 const MAX_PREVIEW_HTML_BYTES = 5 * 1024 * 1024;
@@ -2482,19 +2494,28 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
     // Validate every hop. Redirects can cross from a public host to localhost,
     // a private IP, a mapped IPv4 address, or the local MCP port.
     const validated = await validatePreviewUrl(currentUrl);
-    if (!(validated instanceof URL)) return validated;
-    const parsedUrl = validated;
+    if ('error' in validated) return validated;
+    const { url: parsedUrl, pinnedIp } = validated;
     currentUrl = parsedUrl.href;
 
     try {
+      const isHttps = parsedUrl.protocol === 'https:';
+      const agentOptions = {
+        lookup: (_hostname: string, _opts: any, cb: any) => {
+          cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+        }
+      };
+      const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
+
       const res = await fetch(currentUrl, {
         headers: {
           'User-Agent': getStandardUserAgent(),
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
         },
+        agent,
         redirect: 'manual',
         signal: AbortSignal.timeout(5000)
-      });
+      } as any);
 
       if (res.status >= 300 && res.status < 400) {
         const location = res.headers.get('location');
@@ -2509,10 +2530,19 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
           return { error: 'Response body exceeds 5MB size limit' };
         }
         let html = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
+        // Strip executable tags and framing elements
         html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
         html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
         html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
+        html = html.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
+        html = html.replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '');
+        html = html.replace(/<embed[^>]*>/gi, '');
+        html = html.replace(/<applet[^>]*>[\s\S]*?<\/applet>/gi, '');
         html = html.replace(/<!--[\s\S]*?-->/g, '');
+        // Strip inline event handlers (onerror, onload, onclick, onmouseover, etc.)
+        html = html.replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+        // Neutralize dangerous URI schemes in attributes (javascript:, vbscript:, data:)
+        html = html.replace(/\s+(?:href|src|action|formaction)\s*=\s*["']?\s*(?:javascript|vbscript|data):[^"'>\s]*/gi, ' href="#"');
         return { success: true, html };
       }
       return { error: 'HTTP ' + res.status };
@@ -2937,11 +2967,21 @@ ipcMain.handle('list-extensions', async (event) => {
           // Find largest icon
           const sizes = Object.keys(manifest.icons).map(Number).sort((a, b) => b - a);
           if (sizes.length > 0) {
-            const iconPath = path.join(e.path, manifest.icons[sizes[0]]);
-            if (fs.existsSync(iconPath)) {
-              const ext = path.extname(iconPath).toLowerCase().substring(1) || 'png';
-              const buffer = fs.readFileSync(iconPath);
-              iconData = `data:image/${ext};base64,${buffer.toString('base64')}`;
+            const rawIconRel = manifest.icons[sizes[0]];
+            if (typeof rawIconRel === 'string') {
+              const baseDir = path.resolve(e.path);
+              const resolvedIconPath = path.resolve(baseDir, rawIconRel);
+              const normalizedBase = baseDir + path.sep;
+              if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
+                try {
+                  const realIconPath = fs.realpathSync(resolvedIconPath);
+                  if (realIconPath.startsWith(normalizedBase)) {
+                    const ext = path.extname(realIconPath).toLowerCase().substring(1) || 'png';
+                    const buffer = fs.readFileSync(realIconPath);
+                    iconData = `data:image/${ext};base64,${buffer.toString('base64')}`;
+                  }
+                } catch {}
+              }
             }
           }
         }
@@ -3050,12 +3090,46 @@ ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo)
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: false, // Required for Chromium extension origin bindings to attach chrome.runtime and chrome.storage
+      sandbox: true,
       session: session.defaultSession
     }
   });
 
   activeExtensionPopupWin = popupWin;
   activeExtensionPopupUrl = url;
+
+  // Security: Restrict extension popup navigation to its own chrome-extension origin
+  let popupOrigin = '';
+  try {
+    popupOrigin = new URL(url).origin;
+  } catch {}
+
+  popupWin.webContents.on('will-navigate', (event, destUrl) => {
+    try {
+      const destParsed = new URL(destUrl);
+      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+        return;
+      }
+      event.preventDefault();
+      if (destParsed.protocol === 'http:' || destParsed.protocol === 'https:') {
+        sendToMainWindow('new-tab', destUrl);
+      }
+    } catch {
+      event.preventDefault();
+    }
+  });
+
+  popupWin.webContents.on('will-redirect', (event, destUrl) => {
+    try {
+      const destParsed = new URL(destUrl);
+      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+        return;
+      }
+      event.preventDefault();
+    } catch {
+      event.preventDefault();
+    }
+  });
 
   // Security: Block arbitrary window popups from extension popup content
   popupWin.webContents.setWindowOpenHandler(({ url }) => {

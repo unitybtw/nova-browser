@@ -115,8 +115,9 @@ export function getExtractTextNodesScript(): string {
  * Returns JavaScript code to apply translated texts back to the tagged text nodes.
  */
 export function getApplyTranslationScript(translatedTexts: string[], targetLang: string): string {
-  // Serialize translated texts safely
+  // Serialize translated texts and language tag safely to prevent script injection
   const serialized = JSON.stringify(translatedTexts);
+  const safeTargetLang = JSON.stringify(String(targetLang || '').replace(/[^a-zA-Z0-9_-]/g, ''));
   return `
     (() => {
       try {
@@ -162,8 +163,8 @@ export function getApplyTranslationScript(translatedTexts: string[], targetLang:
           index++;
         }
 
-        document.documentElement.setAttribute('data-nova-translated', '${targetLang}');
-        document.documentElement.setAttribute('lang', '${targetLang}');
+        document.documentElement.setAttribute('data-nova-translated', ${safeTargetLang});
+        document.documentElement.setAttribute('lang', ${safeTargetLang});
 
         return { success: true, updatedCount: index };
       } catch (err) {

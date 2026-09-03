@@ -75,6 +75,10 @@ export const saveSupabaseConfig = (url: string, anonKey: string): void => {
     return;
   }
 
+  if (!isValidCustomSupabaseUrl(cleanUrl)) {
+    throw new Error('Invalid or untrusted Supabase URL. Must be an HTTPS URL pointing to a valid host.');
+  }
+
   const newConfig: SupabaseConfig = {
     url: cleanUrl,
     anonKey: cleanKey,

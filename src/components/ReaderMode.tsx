@@ -569,10 +569,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       localStorage.setItem('nova_reader_speech_rate', String(nextRate));
     }
     if (isPlaying) {
+      tts.stop();
+      readerSessionIdRef.current++;
+      const currentSession = readerSessionIdRef.current;
       isPlayingRef.current = true;
       if ((window as any).electronAPI?.nativeTtsStop) (window as any).electronAPI.nativeTtsStop();
       if (window.speechSynthesis) window.speechSynthesis.cancel();
-      speakSentence(currentSentenceIndex, nextRate);
+      speakSentence(currentSentenceIndex, nextRate, sentences, currentSession);
     }
   };
 
@@ -704,6 +707,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 15 }}
           transition={{ duration: 0.18 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Reader Mode"
           className={`fixed inset-0 z-50 overflow-y-auto ${bgColors[theme]} ${fonts[font]}`}
         >
           {/* Custom style overrides to guarantee dark mode clean contrast without white background bleeding */}

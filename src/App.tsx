@@ -327,6 +327,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => {
     return localStorage.getItem('active_workspace_session') || 'default';
   });
+  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
+  useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
   useEffect(() => {
     try {
@@ -648,6 +650,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
     return defaultSettings;
   });
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   // Sync settings with local storage and backend
   useEffect(() => {
@@ -1061,7 +1065,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     e?.stopPropagation();
     const prevTabs = tabsRef.current;
     const targetTab = prevTabs.find(t => t.id === id);
-    const activeWs = activeWorkspaceId || 'default';
+    const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
       const newTabId = Date.now().toString();
@@ -1123,7 +1127,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
 
     setTabs(newTabs);
-  }, []);
+  }, [activeWorkspaceId]);
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
@@ -1683,6 +1687,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       switch (toolName) {
         case 'browser_navigate':
           if (!safeArgs.url || typeof safeArgs.url !== 'string') return "Error: Missing or invalid 'url' parameter";
+          if (!isSafeNavigationUrl(safeArgs.url)) return "Error: Navigation to this destination is blocked for security.";
           mcpHandlersRef.current.handleNavigate(safeArgs.url);
           return `Navigated to ${safeArgs.url}`;
 
@@ -2035,6 +2040,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     let unsubscribeMcpBridge: (() => void) | undefined;
     if (electronAPI?.onMcpActionRequest && electronAPI.respondMcpAction) {
       unsubscribeMcpBridge = electronAPI.onMcpActionRequest((id, toolName, args) => {
+        if (!settingsRef.current?.mcpServerEnabled) {
+          electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution rejected: MCP server is disabled in settings.' });
+          return;
+        }
         executeMcpAction(toolName, args)
           .then(result => electronAPI.respondMcpAction?.(id, result))
           .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));

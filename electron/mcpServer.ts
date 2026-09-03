@@ -265,7 +265,6 @@ export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   // Safe — always allowed
   nova_browser_info: 'safe',
-  browser_navigate: 'safe',
   browser_read_page: 'safe',
   browser_screenshot: 'safe',
   browser_list_tabs: 'safe',
@@ -279,6 +278,7 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_scroll_to_element: 'safe',
   browser_full_page_screenshot: 'safe',
   // Medium — disabled by default, can be enabled in settings
+  browser_navigate: 'medium',
   browser_click: 'medium',
   browser_hover: 'medium',
   browser_focus: 'medium',
