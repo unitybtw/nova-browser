@@ -155,7 +155,7 @@ const MemoizedTabItem = React.memo(({
       key={tab.id}
       value={tab}
       initial={{ opacity: 0, scale: 0.8, y: 10 }}
-      animate={{ opacity: ghostTab?.id === tab.id ? 0 : 1, scale: 1, y: 0 }}
+      animate={{ opacity: ghostTab?.id === tab.id ? 0.4 : 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
       whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
@@ -165,7 +165,8 @@ const MemoizedTabItem = React.memo(({
       }}
       onDrag={(e, info) => {
         onTabDrag?.(info.point.y);
-        if (info.point.y > 60) {
+        // Only show ghost indicator if dragged completely clear of the TopBar header (> 110px)
+        if (info.point.y > 110) {
           setGhostTab({ id: tab.id, x: info.point.x, y: info.point.y });
         } else {
           setGhostTab(null);
@@ -174,7 +175,7 @@ const MemoizedTabItem = React.memo(({
       onDragEnd={(e, info) => {
         onTabDragEnd?.();
         setGhostTab(null);
-        if (info.point.y > 60) {
+        if (info.point.y > 110 && tab.id !== activeTabId) {
           onDropToSplitScreen?.(tab.id);
         }
       }}
@@ -1489,16 +1490,27 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             axis="x"
             values={visibleTabs}
             onReorder={(newTabs) => {
-              if (ghostTab) return;
               if (onReorderFullList) {
                 const full: Tab[] = [];
+                const seenIds = new Set<string>();
                 for (const t of newTabs) {
-                  full.push(t);
+                  if (!seenIds.has(t.id)) {
+                    full.push(t);
+                    seenIds.add(t.id);
+                  }
                   if (t.splitWith) {
                     const partner = tabs.find(p => p.id === t.splitWith);
-                    if (partner && !full.some(x => x.id === partner.id)) {
+                    if (partner && !seenIds.has(partner.id)) {
                       full.push(partner);
+                      seenIds.add(partner.id);
                     }
+                  }
+                }
+                // Safety guarantee: never lose any tab belonging to this workspace
+                for (const t of tabs) {
+                  if (!seenIds.has(t.id)) {
+                    full.push(t);
+                    seenIds.add(t.id);
                   }
                 }
                 onReorderFullList(full);

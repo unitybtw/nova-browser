@@ -1077,7 +1077,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       if (targetTab) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
-      setTabs(prev => [...prev.filter(t => t.id !== id), newTab]);
+      setTabs(prev => [...prev.filter(t => t.id !== id).map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t), newTab]);
       setActiveTabId(newTabId);
       return;
     }
@@ -1133,11 +1133,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleReorderFullList = useCallback((reorderedWorkspaceTabs: Tab[]) => {
     setTabs(prevTabs => {
+      const activeWs = activeWorkspaceId || 'default';
       const workspaceIds = new Set(reorderedWorkspaceTabs.map(t => t.id));
-      const nonWorkspaceTabs = prevTabs.filter(t => !workspaceIds.has(t.id));
-      return [...reorderedWorkspaceTabs, ...nonWorkspaceTabs];
+      const nonWorkspaceTabs = prevTabs.filter(t => !workspaceIds.has(t.id) && (t.workspaceId || 'default') !== activeWs);
+      // Guarantee any tab from the current workspace that was omitted is preserved
+      const missingWorkspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs && !workspaceIds.has(t.id));
+      return [...reorderedWorkspaceTabs, ...missingWorkspaceTabs, ...nonWorkspaceTabs];
     });
-  }, []);
+  }, [activeWorkspaceId]);
 
   const handleDuplicateTab = useCallback((tabId: string) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
@@ -2190,9 +2193,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   
   const handleCloseSplitView = useCallback((tab1Id?: string, tab2Id?: string) => {
     setTabs(prev => prev.map(t => {
-      if (tab1Id && tab2Id) {
-        if (t.id === tab1Id || t.id === tab2Id) return { ...t, splitWith: undefined };
-      } else if (t.id === activeTabId || (splitTabId && t.id === splitTabId)) {
+      if (tab1Id || tab2Id) {
+        if (
+          t.id === tab1Id || 
+          t.id === tab2Id || 
+          (tab1Id && t.splitWith === tab1Id) || 
+          (tab2Id && t.splitWith === tab2Id)
+        ) {
+          return { ...t, splitWith: undefined };
+        }
+      } else if (t.id === activeTabId || (splitTabId && t.id === splitTabId) || t.splitWith === activeTabId) {
         return { ...t, splitWith: undefined };
       }
       return t;
