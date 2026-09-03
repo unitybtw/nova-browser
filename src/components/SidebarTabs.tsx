@@ -196,6 +196,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   setDragOverTabId
 }) => {
   const isNewTabUrl = !tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
+  const dragCounterRef = useRef(0);
 
   return (
     <motion.div
@@ -203,6 +204,13 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       onDragStart={(e: any) => {
         e.dataTransfer.setData('text/plain', tab.id);
         onTabDragStart?.();
+      }}
+      onDragEnter={(e) => {
+        e.preventDefault();
+        dragCounterRef.current++;
+        if (!isDragOver) {
+          setDragOverTabId(tab.id);
+        }
       }}
       onDragOver={(e) => {
         e.preventDefault();
@@ -213,13 +221,17 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
         }
       }}
       onDragLeave={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+        e.preventDefault();
+        dragCounterRef.current--;
+        if (dragCounterRef.current <= 0) {
+          dragCounterRef.current = 0;
           if (isDragOver) setDragOverTabId(null);
         }
       }}
       onDrop={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        dragCounterRef.current = 0;
         setDragOverTabId(null);
         const draggedId = e.dataTransfer.getData('text/plain');
         if (draggedId && draggedId !== tab.id && onReorderTabs) {
@@ -227,6 +239,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
         }
       }}
       onDragEnd={() => {
+        dragCounterRef.current = 0;
         setDragOverTabId(null);
         onTabDragEnd?.();
       }}
@@ -460,6 +473,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 }) => {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
+  const isMac = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  }, []);
 
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverRect, setHoverRect] = useState<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
@@ -768,7 +784,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
-      <div className="flex flex-col h-full w-[240px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
+      <div className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div 
@@ -776,12 +792,18 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           <div className="flex items-center gap-1">
+            {isMac && (
+              <div 
+                className="w-[72px] h-full shrink-0 select-none drag-region" 
+                style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+              />
+            )}
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
                 style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
                 className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors no-drag cursor-pointer flex items-center justify-center"
-                title={isCollapsed ? "Pin Sidebar (⌘S)" : "Hide Sidebar (⌘S)"}
+                title={isCollapsed ? (isMac ? "Pin Sidebar (⌘S)" : "Pin Sidebar (Ctrl+S)") : (isMac ? "Hide Sidebar (⌘S)" : "Hide Sidebar (Ctrl+S)")}
               >
                 {isCollapsed ? (
                   <Pin className="w-3.5 h-3.5 rotate-45 text-cyan-500 dark:text-cyan-400" />
@@ -836,7 +858,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     ? 'bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-semibold ring-1 ring-cyan-500/30'
                     : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white'
                 }`}
-                title="Nova AI Assistant (⌘I)"
+                title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
               >
                 <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-cyan-500 fill-cyan-500/20 animate-pulse' : 'text-cyan-600 dark:text-cyan-400'}`} />
               </button>
@@ -1117,22 +1139,19 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 5. NEW TAB ACTION BUTTON */}
+        {/* 5. TABS SECTION HEADER */}
         <div 
-          className="px-3 pb-1.5 no-drag"
+          className="px-3.5 pt-1 pb-1 flex items-center justify-between text-[11px] font-semibold tracking-wider text-slate-400/80 dark:text-slate-500 uppercase no-drag select-none"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.98 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
+          <span>Tabs</span>
+          <button
             onClick={() => onNewTab()}
-            className="w-full flex items-center gap-2 px-2.5 h-8.5 rounded-xl transition-colors text-left group cursor-pointer hover:bg-slate-200/60 text-slate-600 hover:text-slate-900 dark:hover:bg-white/6 dark:text-slate-300/80 dark:hover:text-white"
+            className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+            title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
           >
-            <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-900 dark:group-hover:text-white transition-colors" />
-            <span className="text-[13px] tracking-tight flex-1">New Tab</span>
-            <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘T</span>
-          </motion.button>
+            <Plus className="w-3.5 h-3.5" />
+          </button>
         </div>
 
         {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}

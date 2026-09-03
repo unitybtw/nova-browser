@@ -1448,6 +1448,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
     else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
     else if (finalUrl.startsWith('nova://downloads')) initialTitle = 'Downloads';
+
+    // If current tab is an unnavigated empty "New Tab" and url is specific (e.g. settings, history),
+    // navigate current tab instead of spawning a redundant new tab
+    const currentActive = tabsRef.current.find(t => t.id === activeTabIdRef.current);
+    const isCurrentBlank = currentActive && 
+      (currentActive.url === 'nova://newtab' || currentActive.url === 'about:blank' || !currentActive.url) &&
+      !currentActive.isLoading &&
+      !currentActive.canGoBack;
+
+    if (isCurrentBlank && finalUrl !== 'nova://newtab') {
+      setTabs(prev => prev.map(tab => tab.id === currentActive.id ? {
+        ...tab,
+        url: finalUrl,
+        title: initialTitle
+      } : tab));
+      return;
+    }
     
     const newTab: Tab = {
       id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
@@ -2402,6 +2419,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
   }, []);
 
+  const isMac = useMemo(() => {
+    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  }, []);
+
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
 
   const handleSpotlightSelectTab = useCallback((tabId: string) => {
@@ -2770,7 +2791,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {useVerticalTabs && !isSidebarCollapsed && (
           <motion.div 
             initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 240, opacity: 1 }}
+            animate={{ width: 250, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className="h-full flex flex-col shrink-0 relative z-50 overflow-hidden"
@@ -2843,7 +2864,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
           {/* Floating Expand Sidebar Button when Collapsed */}
           <div 
-            className="fixed top-2.5 left-2.5 z-45 flex items-center no-drag"
+            className={`fixed top-2.5 ${isMac ? 'left-[82px]' : 'left-2.5'} z-45 flex items-center no-drag`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <button
