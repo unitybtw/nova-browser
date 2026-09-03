@@ -292,15 +292,20 @@ function createWindow() {
     height: 900,
     minWidth: 1000,
     minHeight: 650,
-    titleBarStyle: 'hidden',
-    ...(process.platform === 'win32' ? {
-      titleBarOverlay: {
-        color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
-        symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
-        height: 44
-      }
-    } : {}),
-    trafficLightPosition: { x: 14, y: 14 },
+    ...(process.platform === 'linux' ? {
+      frame: true,
+      autoHideMenuBar: true,
+    } : {
+      titleBarStyle: 'hidden' as const,
+      ...(process.platform === 'win32' ? {
+        titleBarOverlay: {
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        }
+      } : {}),
+      trafficLightPosition: { x: 14, y: 14 }
+    }),
     show: false,
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
     webPreferences: {

@@ -80,9 +80,43 @@ jobs:
             dist-electron-builder/latest.yml
           if-no-files-found: error
 
+  release-linux:
+    name: Build Linux (AppImage & deb)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build App
+        run: npm run build
+
+      - name: Package Linux (AppImage & deb)
+        run: npx electron-builder --linux AppImage deb --publish never
+
+      - name: Upload Linux Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            dist-electron-builder/*.AppImage
+            dist-electron-builder/*.deb
+            dist-electron-builder/*.zip
+            dist-electron-builder/*.blockmap
+            dist-electron-builder/latest-linux.yml
+          if-no-files-found: error
+
   publish-release:
     name: Publish Release
-    needs: [release-mac, release-windows]
+    needs: [release-mac, release-windows, release-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository

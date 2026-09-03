@@ -100,6 +100,18 @@
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
       "artifactName": "Nova-Browser-Setup.exe"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Network;WebBrowser",
+      "artifactName": "Nova-Browser-${arch}.${ext}",
+      "icon": "build/icon.png",
+      "desktop": {
+        "StartupWMClass": "nova-browser"
+      }
     }
   },
   "scripts": {
