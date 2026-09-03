@@ -659,9 +659,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     try {
       localStorage.setItem('user_settings', JSON.stringify(settings));
     } catch (e) {}
-    if ((window as any).electronAPI?.storeSet) {
-      (window as any).electronAPI.storeSet('settings', JSON.stringify(settings));
-    }
     if (window.electronAPI?.setPrivacyShield) {
       window.electronAPI.setPrivacyShield(settings.privacyShield);
     }

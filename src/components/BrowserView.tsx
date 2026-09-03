@@ -22,47 +22,6 @@ const DownloadsPage = lazy(() => import('./DownloadsPage').then(m => ({ default:
 
 const NOOP = () => {};
 
-const getLinkPreviewScript = () => `
-  (function() {
-    if (window.__nova_hover_injected) return;
-    window.__nova_hover_injected = true;
-    let hoverTimer = null;
-    let currentLink = null;
-
-    document.addEventListener('mouseover', (e) => {
-      const a = e.target.closest('a');
-      if (a && a.href && a.href.startsWith('http')) {
-        if (currentLink === a) return;
-        currentLink = a;
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => {
-          const rect = a.getBoundingClientRect();
-          console.log('NOVA_LINK_HOVER::' + JSON.stringify({
-            url: a.href,
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2
-          }));
-        }, 1500);
-      }
-    });
-
-    document.addEventListener('mouseout', (e) => {
-      const a = e.target.closest('a');
-      if (a) {
-        clearTimeout(hoverTimer);
-        if (currentLink === a) currentLink = null;
-        console.log('NOVA_LINK_HOVER_OUT::');
-      }
-    });
-
-    document.addEventListener('click', () => {
-      clearTimeout(hoverTimer);
-      currentLink = null;
-      console.log('NOVA_LINK_HOVER_OUT::');
-    });
-  })();
-`;
-
 // Origins already hinted via <link rel="preconnect">. LRU bounded to max 50 entries
 // so document.head does not accumulate unbounded link DOM nodes over long sessions.
 const MAX_PRECONNECT_HINTS = 50;
@@ -335,13 +294,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         } catch (e) {}
       }
 
-      // 2. AI Link Preview injection — only active when the feature is enabled
-      // and this tab is visible. Inactive tabs do not need hover listeners.
-      if (latestSettingsRef.current.aiLinkPreviewEnabled !== false && latestIsActiveRef.current) {
-        webview.executeJavaScript(getLinkPreviewScript()).catch(() => {});
-      }
-
-      // 3. Mute state must always be applied, regardless of feature gates
+      // 2. Mute state must always be applied, regardless of feature gates
       if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
 
       // 4. Ensure current URL is synchronized on DOM ready
@@ -599,38 +552,28 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (e.channel === 'password-form-submitted' && e.args?.[0]) {
         const { hostname, username, password } = e.args[0];
         handlePasswordDetected(hostname, username, password);
-      }
-    };
-
-    const handleConsoleMessage = (e: any) => {
-      if (e.message && e.message.startsWith('NOVA_LINK_HOVER::')) {
-        try {
-          const data = JSON.parse(e.message.substring(17));
-          if (typeof data.url === 'string' && data.url.startsWith('https://')) {
-            // Security: Only allow HTTPS origins for DNS prefetch/preconnect.
-            // HTTP origins are blocked to prevent DNS leaks to attacker-controlled domains.
-            // preconnect is used instead of dns-prefetch as it's HTTPS-only and provides
-            // stronger security guarantees (includes TLS handshake).
-            if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
-              try {
-                const origin = new URL(data.url).origin;
-                if (origin && !origin.startsWith('null')) {
-                  addPreconnectHint(origin);
-                }
-              } catch (_) {}
-            }
-
-            setAiPreview({
-              isOpen: true,
-              url: data.url,
-              x: Number(data.x) || 0,
-              y: Number(data.y) || 0
-            });
+      } else if (e.channel === 'nova-link-hover' && e.args?.[0]) {
+        if (latestSettingsRef.current?.aiLinkPreviewEnabled === false || !latestIsActiveRef.current) return;
+        const data = e.args[0];
+        if (typeof data.url === 'string' && data.url.startsWith('https://')) {
+          if (latestSettingsRef.current?.preloadDnsEnabled !== false) {
+            try {
+              const origin = new URL(data.url).origin;
+              if (origin && !origin.startsWith('null')) {
+                addPreconnectHint(origin);
+              }
+            } catch (_) {}
           }
-        } catch (err) {}
-      }
-      if (e.message && e.message.startsWith('NOVA_LINK_HOVER_OUT::')) {
-        setAiPreview(prev => ({ ...prev, isOpen: false }));
+
+          setAiPreview({
+            isOpen: true,
+            url: data.url,
+            x: Number(data.x) || 0,
+            y: Number(data.y) || 0
+          });
+        }
+      } else if (e.channel === 'nova-link-hover-out') {
+        setAiPreview(prev => (prev.isOpen ? { ...prev, isOpen: false } : prev));
       }
     };
 
@@ -654,7 +597,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('media-started-playing', handleMediaStarted);
     webview.addEventListener('media-paused', handleMediaPaused);
     webview.addEventListener('ipc-message', handleIpcMessage);
-    webview.addEventListener('console-message', handleConsoleMessage);
 
     // Initial check: if webview is already not loading, ensure isLoading is false
     const readyCheckTimer = setTimeout(() => {
@@ -688,7 +630,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-started-playing', handleMediaStarted);
       webview.removeEventListener('media-paused', handleMediaPaused);
       webview.removeEventListener('ipc-message', handleIpcMessage);
-      webview.removeEventListener('console-message', handleConsoleMessage);
     };
   }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
 
@@ -732,15 +673,6 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       capture();
     }
   }, [isActive, isNewTab, tab?.id]);
-
-  useEffect(() => {
-    const webview = webviewRef.current;
-    if (!webview || !isActive || tab?.isSuspended || isNewTab || isSettingsTab ||
-        isHistoryTab || isDownloadsTab || settings.aiLinkPreviewEnabled === false ||
-        !isWebviewReady.current) return;
-
-    webview.executeJavaScript(getLinkPreviewScript()).catch(() => {});
-  }, [isActive, isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, settings.aiLinkPreviewEnabled, tab?.id, tab?.isSuspended]);
 
   // Immediately clear loading state for internal React pages since they don't use webview
   useEffect(() => {

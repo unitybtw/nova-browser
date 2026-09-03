@@ -127,12 +127,23 @@ class AIMemoryService {
     category: 'preference' | 'fact' | 'instruction' = 'fact',
     fromTool: boolean = false
   ): MemoryItem {
-    const existing = this.memories.find(m => m.fact.toLowerCase().trim() === fact.toLowerCase().trim());
+    const cleanFact = this.redactSensitiveInfo(fact || '').trim().slice(0, 250);
+    if (!cleanFact) {
+      return {
+        id: 'noop',
+        fact: '',
+        category,
+        createdAt: Date.now(),
+        source: fromTool ? 'tool' : 'user'
+      };
+    }
+
+    const existing = this.memories.find(m => m.fact.toLowerCase().trim() === cleanFact.toLowerCase());
     if (existing) return existing;
 
     const newItem: MemoryItem = {
       id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
-      fact,
+      fact: cleanFact,
       category,
       createdAt: Date.now(),
       source: fromTool ? 'tool' : 'user',
@@ -248,8 +259,18 @@ class AIMemoryService {
     }
     
     if (this.taskHistory.length > 0) {
-      const recentTasks = this.taskHistory.slice(0, 4).map(t => `- ${t.summary}`).join('\n');
-      prompt += `\n\n[RECENT TASKS]\nYou recently completed these tasks. Do not repeat them unless asked:\n${recentTasks}\n`;
+      let taskChars = 0;
+      const safeTasks: string[] = [];
+      for (const t of this.taskHistory.slice(0, 4)) {
+        const cleanTask = this.redactSensitiveInfo(t.summary || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 150);
+        if (!cleanTask) continue;
+        if (taskChars + cleanTask.length > 600) break;
+        taskChars += cleanTask.length;
+        safeTasks.push(`- ${cleanTask}`);
+      }
+      if (safeTasks.length > 0) {
+        prompt += `\n\n[RECENT TASKS]\nYou recently completed these tasks. Do not repeat them unless asked:\n${safeTasks.join('\n')}\n`;
+      }
     }
     
     return prompt;

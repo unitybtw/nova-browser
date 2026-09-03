@@ -122,8 +122,8 @@ if ((window as any).__novaPreloadInjected) {
       });
   });
 
-  const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '134.0.0.0';
-  const majorVer = chromeVer.split('.')[0] || '134';
+  const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '150.0.0.0';
+  const majorVer = chromeVer.split('.')[0] || '150';
   const plat = typeof process !== 'undefined' ? process.platform : 'darwin';
   const arch = typeof process !== 'undefined' ? process.arch : 'x64';
 
@@ -519,8 +519,55 @@ const detectPasswordForms = () => {
   }, true);
 };
 
+const setupLinkHoverDetection = () => {
+  let hoverTimer: any = null;
+  let currentHoveredLink: HTMLElement | null = null;
+
+  document.addEventListener('mouseover', (e) => {
+    const a = (e.target as HTMLElement)?.closest?.('a');
+    if (a && a.href && a.href.startsWith('http')) {
+      if (currentHoveredLink === a) return;
+      currentHoveredLink = a;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => {
+        const rect = a.getBoundingClientRect();
+        try {
+          ipcRenderer.sendToHost('nova-link-hover', {
+            url: a.href,
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          });
+        } catch (_) {}
+      }, 1500);
+    }
+  }, true);
+
+  document.addEventListener('mouseout', (e) => {
+    const a = (e.target as HTMLElement)?.closest?.('a');
+    if (a) {
+      clearTimeout(hoverTimer);
+      if (currentHoveredLink === a) currentHoveredLink = null;
+      try {
+        ipcRenderer.sendToHost('nova-link-hover-out');
+      } catch (_) {}
+    }
+  }, true);
+
+  document.addEventListener('click', () => {
+    clearTimeout(hoverTimer);
+    currentHoveredLink = null;
+    try {
+      ipcRenderer.sendToHost('nova-link-hover-out');
+    } catch (_) {}
+  }, true);
+};
+
 if (document.readyState === 'loading') {
-  window.addEventListener('DOMContentLoaded', detectPasswordForms);
+  window.addEventListener('DOMContentLoaded', () => {
+    detectPasswordForms();
+    setupLinkHoverDetection();
+  });
 } else {
   detectPasswordForms();
+  setupLinkHoverDetection();
 }

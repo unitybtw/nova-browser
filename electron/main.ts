@@ -16,6 +16,11 @@ import http from 'http';
 import https from 'https';
 import { promisify } from 'util';
 import fs from 'fs';
+import { JSDOM } from 'jsdom';
+import createDOMPurify from 'dompurify';
+
+const jsdomWindow = new JSDOM('').window;
+const mainDOMPurify = createDOMPurify(jsdomWindow as any);
 
 // Security: Enforce single-instance lock to prevent duplicate process conflicts,
 // database/LevelDB corruption, and hostile command-line flag injection.
@@ -899,9 +904,12 @@ app.whenReady().then(async () => {
     timeoutId: NodeJS.Timeout;
   }
 
+  const MAX_PENDING_PERMISSIONS = 20;
   const pendingPermissions = new Map<string, PendingPermission>();
   // Origin -> (Permission -> Boolean)
   const rememberedPermissions = new Map<string, Map<string, boolean>>();
+  // Origin -> Rate limit record (max 5 requests per 10s)
+  const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
   ipcMain.handle('permission-response', async (_event, payload: unknown) => {
     // Security: only the trusted main window may resolve permission requests
@@ -955,6 +963,32 @@ app.whenReady().then(async () => {
         origin = new URL(url).origin;
       } catch {
         origin = url;
+      }
+
+      // Security: Rate-limiting to prevent permission request flooding attacks (max 5 per 10s per origin)
+      const now = Date.now();
+      const originKey = origin || 'unknown';
+      let rateRecord = permissionRateLimitMap.get(originKey);
+      if (!rateRecord || now > rateRecord.resetAt) {
+        rateRecord = { count: 0, resetAt: now + 10000 };
+        permissionRateLimitMap.set(originKey, rateRecord);
+      }
+      rateRecord.count++;
+      if (rateRecord.count > 5) {
+        console.warn(`[Security] Rate limit exceeded for permission requests from ${originKey}`);
+        return callback(false);
+      }
+
+      // Security: Cap maximum concurrent pending permissions in main to prevent memory exhaustion
+      if (pendingPermissions.size >= MAX_PENDING_PERMISSIONS) {
+        console.warn(`[Security] Pending permissions cap (${MAX_PENDING_PERMISSIONS}) reached, denying request`);
+        return callback(false);
+      }
+
+      if (permissionRateLimitMap.size > 500) {
+        for (const [k, v] of permissionRateLimitMap.entries()) {
+          if (now > v.resetAt) permissionRateLimitMap.delete(k);
+        }
       }
 
       // Check remembered permissions for this origin
@@ -1294,8 +1328,18 @@ app.whenReady().then(async () => {
   ipcMain.handle('open-external', async (event, targetUrl: string) => {
     if (!isTrustedSender(event)) return false;
     try {
-      if (typeof targetUrl === 'string' && (targetUrl.startsWith('https://') || targetUrl.startsWith('http://'))) {
-        await shell.openExternal(targetUrl);
+      if (typeof targetUrl === 'string') {
+        const parsed = new URL(targetUrl);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+          console.warn(`[Security] Blocked open-external for non-http(s) protocol: ${parsed.protocol}`);
+          return false;
+        }
+        // Security: Block embedded credentials in URLs (phishing, SSRF, or credential harvesting vector)
+        if (parsed.username || parsed.password) {
+          console.warn(`[Security] Blocked open-external with embedded credentials: ${targetUrl}`);
+          return false;
+        }
+        await shell.openExternal(parsed.href);
         return true;
       }
     } catch (e) {
@@ -1350,7 +1394,7 @@ app.whenReady().then(async () => {
             } else {
               try {
                 if (!session.defaultSession.getExtension(dir)) {
-                  const extInfo = await session.defaultSession.loadExtension(extPath, { allowFileAccess: true });
+                  const extInfo = await session.defaultSession.loadExtension(extPath, { allowFileAccess: false });
                   if (!loadedExtensions.some(e => e.id === extInfo.id)) {
                     loadedExtensions.push(extInfo);
                   }
@@ -2563,20 +2607,13 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
         if (contentLength && parseInt(contentLength, 10) > MAX_PREVIEW_HTML_BYTES) {
           return { error: 'Response body exceeds 5MB size limit' };
         }
-        let html = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
-        // Strip executable tags and framing elements
-        html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-        html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-        html = html.replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '');
-        html = html.replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '');
-        html = html.replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '');
-        html = html.replace(/<embed[^>]*>/gi, '');
-        html = html.replace(/<applet[^>]*>[\s\S]*?<\/applet>/gi, '');
-        html = html.replace(/<!--[\s\S]*?-->/g, '');
-        // Strip inline event handlers (onerror, onload, onclick, onmouseover, etc.)
-        html = html.replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
-        // Neutralize dangerous URI schemes in attributes (javascript:, vbscript:, data:)
-        html = html.replace(/\s+(?:href|src|action|formaction)\s*=\s*["']?\s*(?:javascript|vbscript|data):[^"'>\s]*/gi, ' href="#"');
+        const rawHtml = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
+        // Security: Robust AST-based DOMPurify sanitization in main process
+        const html = mainDOMPurify.sanitize(rawHtml, {
+          WHOLE_DOCUMENT: true,
+          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base'],
+          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction']
+        });
         return { success: true, html };
       }
       return { error: 'HTTP ' + res.status };

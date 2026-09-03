@@ -84,7 +84,20 @@ class AgentOrchestrator {
    */
   public enqueueAction(toolName: string, args: any): { id: string; done: Promise<boolean> } {
     const id = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
-    const clonedArgs = args ? JSON.parse(JSON.stringify(args)) : {};
+    let clonedArgs: any = {};
+    if (args && typeof args === 'object') {
+      try {
+        clonedArgs = JSON.parse(JSON.stringify(args));
+      } catch {
+        try {
+          clonedArgs = { ...args };
+        } catch {
+          clonedArgs = {};
+        }
+      }
+    } else if (args !== undefined) {
+      clonedArgs = args;
+    }
     const action: QueuedAction = {
       id,
       toolName,
