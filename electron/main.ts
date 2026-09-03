@@ -1143,10 +1143,37 @@ app.whenReady().then(async () => {
     sendToMainWindow('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
   });
 
-  autoUpdater.on('error', (err) => {
+  autoUpdater.on('error', async (err) => {
     console.error('AutoUpdater error:', err);
     const msg = err?.message || '';
     if (msg.includes('Cannot parse releases feed') || msg.includes('Unable to find') || msg.includes('404') || msg.includes('HttpError')) {
+      sendToMainWindow('update-not-available', { version: app.getVersion() });
+    } else if (msg.includes('ZIP file not provided') || msg.includes('No published versions') || msg.includes('Cannot find')) {
+      // Auto-update zip not provided in release feed, fallback to direct GitHub asset download
+      try {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() }
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              sendToMainWindow('update-available', { 
+                version: latestTag, 
+                releaseDate: latestRelease.published_at,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name,
+                isManual: true
+              });
+              return;
+            }
+          }
+        }
+      } catch (_) {}
       sendToMainWindow('update-not-available', { version: app.getVersion() });
     } else {
       sendToMainWindow('update-error', msg || 'Update check failed');

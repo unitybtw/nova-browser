@@ -605,10 +605,19 @@ const UpdateWidget = () => {
   }
 
   if (status === 'error') {
+    const isZipError = errorMsg.includes('ZIP file not provided');
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-xs text-red-500">Failed: {errorMsg.substring(0, 50)}{errorMsg.length > 50 ? '...' : ''}</span>
-        <button onClick={check} className="px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-sm cursor-pointer">
+      <div className="flex items-center gap-2.5">
+        <span className="text-xs text-red-500 max-w-[240px] truncate" title={errorMsg}>
+          {isZipError ? 'Update ready via GitHub' : `Failed: ${errorMsg.substring(0, 45)}`}
+        </span>
+        <button
+          onClick={() => openDownload('https://github.com/unitybtw/nova-browser/releases/latest')}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" /> Download
+        </button>
+        <button onClick={check} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-medium transition-colors text-xs cursor-pointer">
           Try Again
         </button>
       </div>
@@ -643,7 +652,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.5';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.2.6';
   });
 
   useEffect(() => {

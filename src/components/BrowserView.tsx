@@ -1,11 +1,11 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Folder, Shield, Code2, Palette } from 'lucide-react';
 import { Tab } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
 import { HistoryItem } from '../App';
-import { DownloadItemPage } from './DownloadsPage';
+import type { DownloadItemPage } from './DownloadsPage';
 import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
 import { tabThumbnailCache } from '../services/thumbnailCache';
@@ -14,11 +14,11 @@ import {
   getApplyTranslationScript, 
   getRestoreOriginalScript 
 } from '../services/translationService';
-
-import { SettingsPage } from './SettingsPage';
-import { HistoryPage } from './HistoryPage';
-import { DownloadsPage } from './DownloadsPage';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
+
+const SettingsPage = lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
+const HistoryPage = lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
+const DownloadsPage = lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
 
 const NOOP = () => {};
 
@@ -912,38 +912,44 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isSettingsTab) {
     return (
-      <SettingsPage
-        url={tab.url}
-        settings={settings}
-        onUpdateSettings={onUpdateSettings || NOOP}
-        onExportData={onExportData}
-        onImportData={onImportData}
-        onClearHistory={onClearHistory}
-        onPurgeMemory={onPurgeMemory}
-      />
+      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+        <SettingsPage
+          url={tab.url}
+          settings={settings}
+          onUpdateSettings={onUpdateSettings || NOOP}
+          onExportData={onExportData}
+          onImportData={onImportData}
+          onClearHistory={onClearHistory}
+          onPurgeMemory={onPurgeMemory}
+        />
+      </Suspense>
     );
   }
 
   if (isHistoryTab) {
     return (
-      <HistoryPage
-        history={history}
-        onNavigate={(url) => {
-          onUpdateTab(tab.id, { url, isLoading: true });
-          if (onNavigate) onNavigate(url);
-        }}
-        onClearHistory={onClearHistory || NOOP}
-        onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
-      />
+      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+        <HistoryPage
+          history={history}
+          onNavigate={(url) => {
+            onUpdateTab(tab.id, { url, isLoading: true });
+            if (onNavigate) onNavigate(url);
+          }}
+          onClearHistory={onClearHistory || NOOP}
+          onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
+        />
+      </Suspense>
     );
   }
 
   if (isDownloadsTab) {
     return (
-      <DownloadsPage
-        downloads={downloads}
-        onClearDownloads={onClearDownloads || NOOP}
-      />
+      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+        <DownloadsPage
+          downloads={downloads}
+          onClearDownloads={onClearDownloads || NOOP}
+        />
+      </Suspense>
     );
   }
 
