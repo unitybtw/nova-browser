@@ -15,7 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![Tests](https://img.shields.io/badge/Tests-61%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
@@ -203,8 +203,8 @@ Download the latest prebuilt installer for your operating system (DMG for macOS,
 ### Option B: Build from Source
 
 #### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
-- `npm` or `yarn`
+- [Node.js](https://nodejs.org/) (v20 or higher recommended)
+- [npm](https://www.npmjs.com/) (v9 or higher)
 
 #### 1. Clone the repository
 ```bash
@@ -393,7 +393,7 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 - [x] Reader Mode with High-Fidelity Native OS Text-to-Speech (TTS)
 - [x] Local Offline LLM Integration (Web-LLM / WebGPU)
 - [x] Persistent Info Vault & Task History Tracking
-- [x] Comprehensive Automated Test Suite (61 Regression, Security & Empirical Tests)
+- [x] Comprehensive Automated Test Suite (52 Regression, Security & Empirical Tests)
 - [ ] Mobile Companion Application
 
 ---

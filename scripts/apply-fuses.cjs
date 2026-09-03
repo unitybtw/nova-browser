@@ -65,7 +65,7 @@ async function defaultExport(context) {
   const plan = [
     ['RunAsNode', FuseV1Options.RunAsNode, false],
     ['EnableNodeCliInspectArguments', FuseV1Options.EnableNodeCliInspectArguments, false],
-    ['EnableCookieEncryption', FuseV1Options.EnableCookieEncryption, false],
+    ['EnableCookieEncryption', FuseV1Options.EnableCookieEncryption, true],
     ['OnlyLoadAppFromAsar', FuseV1Options.OnlyLoadAppFromAsar, asarEnabled],
     ['EnableEmbeddedAsarIntegrityValidation', FuseV1Options.EnableEmbeddedAsarIntegrityValidation, enableAsarIntegrity]
   ];

@@ -332,7 +332,16 @@ const out1xPath = path.join(rootDir, 'build', 'dmg-background.png');
 
 fs.writeFileSync(tempHtmlPath, htmlContent);
 
+if (process.platform !== 'darwin') {
+  console.log('[generate-dmg-background] DMG generation is macOS-only. Skipping on ' + process.platform);
+  process.exit(0);
+}
+
 const chromeBin = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+if (!fs.existsSync(chromeBin)) {
+  console.warn('[generate-dmg-background] Google Chrome not found at ' + chromeBin + '. Skipping DMG background render.');
+  process.exit(0);
+}
 
 console.log('Rendering Retina 2x DMG Background (1320x880)...');
 execSync(
@@ -341,7 +350,12 @@ execSync(
 );
 
 console.log('Rendering 1x DMG Background (660x440)...');
-execSync(`sips -z 440 660 "${out2xPath}" --out "${out1xPath}"`, { stdio: 'inherit' });
+try {
+  execSync(`sips -z 440 660 "${out2xPath}" --out "${out1xPath}"`, { stdio: 'inherit' });
+} catch (e) {
+  console.warn('[generate-dmg-background] sips resize failed, copying 2x to 1x:', e.message);
+  fs.copyFileSync(out2xPath, out1xPath);
+}
 
 console.log('DMG Backgrounds generated successfully in build/ directory:');
 console.log(' - ' + out2xPath);

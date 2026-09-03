@@ -68,8 +68,10 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       const resolvedPath = path.resolve(pathStr);
       const realPath = fs.realpathSync(resolvedPath);
       const realDownloads = fs.realpathSync(downloadsPath);
-      const isUnderDownloads = realPath.startsWith(realDownloads + path.sep);
-      const isKnown = knownDownloadPaths.has(realPath);
+      const normPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+      const normDownloads = process.platform === 'win32' ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
+      const isUnderDownloads = normPath.startsWith(normDownloads);
+      const isKnown = knownDownloadPaths.has(realPath) || (process.platform === 'win32' && Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath));
       if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
         shell.openPath(realPath);
         return true;
@@ -88,8 +90,10 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       const resolvedPath = path.resolve(pathStr);
       const realPath = fs.realpathSync(resolvedPath);
       const realDownloads = fs.realpathSync(downloadsPath);
-      const isUnderDownloads = realPath.startsWith(realDownloads + path.sep);
-      const isKnown = knownDownloadPaths.has(realPath);
+      const normPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
+      const normDownloads = process.platform === 'win32' ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
+      const isUnderDownloads = normPath.startsWith(normDownloads);
+      const isKnown = knownDownloadPaths.has(realPath) || (process.platform === 'win32' && Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath));
       if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
         shell.showItemInFolder(realPath);
         return true;

@@ -2066,9 +2066,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           closeTab: { key: 'w', shift: false, meta: true },
                           newIncognito: { key: 'n', shift: true, meta: true },
                           reload: { key: 'r', shift: false, meta: true },
-                          omnibox: { key: 'l', shift: false, meta: true },
+                          omnibox: { key: 'k', shift: false, meta: true },
                           bookmark: { key: 'd', shift: false, meta: true },
-                          history: { key: 'h', shift: false, meta: true },
+                          history: { key: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
                           downloads: { key: 'j', shift: false, meta: true },
                           findInPage: { key: 'f', shift: false, meta: true },
                         }

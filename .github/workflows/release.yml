@@ -99,6 +99,9 @@ jobs:
       - name: Build App
         run: npm run build
 
+      - name: Install System Dependencies (libfuse2 for AppImage)
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
+
       - name: Package Linux (AppImage & deb)
         run: npx electron-builder --linux AppImage deb --publish never
 
@@ -109,7 +112,6 @@ jobs:
           path: |
             dist-electron-builder/*.AppImage
             dist-electron-builder/*.deb
-            dist-electron-builder/*.zip
             dist-electron-builder/*.blockmap
             dist-electron-builder/latest-linux.yml
           if-no-files-found: error

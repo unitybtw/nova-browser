@@ -33,12 +33,13 @@ interface ClockProps {
 
 const getInitialTimeAndGreeting = () => {
   const now = new Date();
-  const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
+  const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   const hour = now.getHours();
   let greet = 'Good Evening';
   if (hour < 12) greet = 'Good Morning';
   else if (hour < 18) greet = 'Good Afternoon';
-  const dateStr = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const dateStr = now.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' });
   return { time, greet, dateStr };
 };
 
@@ -52,12 +53,13 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
     if (!isActive) return;
     const updateTime = () => {
       const now = new Date();
-      setTimeStr(now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }));
+      const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
+      setTimeStr(now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
       const hour = now.getHours();
       if (hour < 12) setGreeting('Good Morning');
       else if (hour < 18) setGreeting('Good Afternoon');
       else setGreeting('Good Evening');
-      setDateStr(now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }));
+      setDateStr(now.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }));
     };
     updateTime();
     // The UI displays minute precision; polling once per second only caused

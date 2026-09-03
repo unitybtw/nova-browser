@@ -16,13 +16,13 @@ import http from 'http';
 import https from 'https';
 import { promisify } from 'util';
 import fs from 'fs';
-import { JSDOM } from 'jsdom';
 import createDOMPurify from 'dompurify';
 
 let cachedDOMPurify: any = null;
 function getMainDOMPurify(): any {
   if (cachedDOMPurify) return cachedDOMPurify;
   try {
+    const { JSDOM } = require('jsdom');
     const jsdomWindow = new JSDOM('').window;
     cachedDOMPurify = createDOMPurify(jsdomWindow as any);
   } catch (err) {
@@ -79,9 +79,21 @@ try {
   app.userAgentFallback = getStandardUserAgent();
 } catch (_) {}
 
-// Hardware acceleration config
+// Portable Mode: If running as a portable executable on Windows, isolate user data
+// into a local directory on the portable device instead of host %APPDATA%
+if (process.env.PORTABLE_EXECUTABLE_DIR) {
+  const portableUserData = path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'NovaBrowserData');
+  try {
+    app.setPath('userData', portableUserData);
+  } catch (_) {}
+}
+
+// Hardware acceleration config: check settings safely before ready without race
 try {
-  const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
+  const targetDir = process.env.PORTABLE_EXECUTABLE_DIR
+    ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'NovaBrowserData')
+    : path.join(app.getPath('appData'), 'nova-browser');
+  const settingsPath = path.join(targetDir, 'store_settings.json');
   if (fs.existsSync(settingsPath)) {
     const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
     if (settings.hardwareAcceleration === false) {
@@ -135,6 +147,21 @@ if (process.platform === 'darwin') {
     'OverlayScrollbar',
     'BlinkSchedulerYield'
   ].join(','));
+}
+
+if (process.platform === 'linux') {
+  // Prevent blurry fonts and rendering under Wayland (GNOME / KDE)
+  app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  // Safe sandbox fallback: If unprivileged user namespaces are disabled in kernel
+  try {
+    if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
+      const userns = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf-8').trim();
+      if (userns === '0') {
+        app.commandLine.appendSwitch('no-sandbox');
+        app.commandLine.appendSwitch('disable-setuid-sandbox');
+      }
+    }
+  } catch (_) {}
 }
 
 // Increase v8 memory limit if doing heavy Local AI tasks in WebWorkers
@@ -246,75 +273,64 @@ function updateAdblockWhitelist(whitelist: string[]) {
   currentWhitelistFilters = newFilters;
 }
 
-// Initialize AdBlocker globally so IPC can access it
-// Performance: cache the serialized engine on disk. Without `caching`, fromCached()
-// just runs init() on every launch > re-downloads ~14 filter lists (~5-10MB)
-// and re-parses ~80k filters each startup. Shape per @cliqz/adblocker typings:
-// interface Caching { path: string; read: (path) => Promise<Uint8Array>; write: (path, buffer) => Promise<void> }
-const ADBLOCKER_CACHE_PATH = path.join(app.getPath('userData'), 'adblocker-engine.cache');
-const ADBLOCKER_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // refetch filter lists older than 3 days
-ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
-  path: ADBLOCKER_CACHE_PATH,
-  read: async (p) => {
-    // TTL: a stale engine silently decays blocking quality, so treat old
-    // caches as missing — the library's .catch() then takes the refetch path.
-    const stat = await fs.promises.stat(p);
-    if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
-      throw new Error('adblocker cache expired');
-    }
-    return fs.promises.readFile(p);
-  },
-  // Swallow write failures: if the disk is read-only/full, ad blocking must
-  // still come up this session (a rejected write would leave blocker null).
-  write: async (p, buffer) => {
-    try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }
-  },
-}).then((engine) => {
-  blocker = engine;
-
-  // Activate blocking immediately if the engine finished loading after window creation
-  if (isPrivacyShieldEnabled) {
-    try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking in default session:', e); }
-    try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable adblocking in incognito session:', e); }
-  }
-
-  // Batch ad-blocked notifications to avoid IPC flooding (can be 50-100+ per page)
-  const pendingAdBlocks = new Map<number, number>();
-  let adBlockFlushTimer: ReturnType<typeof setInterval> | null = null;
-  
-  blocker.on('request-blocked', (request: any) => {
-    if (request.tabId) {
-      pendingAdBlocks.set(request.tabId, (pendingAdBlocks.get(request.tabId) || 0) + 1);
-      
-      if (!adBlockFlushTimer) {
-        adBlockFlushTimer = setInterval(() => {
-          if (pendingAdBlocks.size === 0) {
-            if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
-            adBlockFlushTimer = null;
-            return;
-          }
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            // Send batched counts as a single IPC message
-            const batch = Object.fromEntries(pendingAdBlocks);
-            mainWindow.webContents.send('ad-blocked-batch', batch);
-            pendingAdBlocks.clear();
-          }
-          // Window temporarily unavailable (destroyed/recreating): keep the
-          // pending counts so they are delivered with the next flush instead
-          // of silently dropping the user's blocked-ads counters.
-        }, 2000);
+// Initialize AdBlocker in a dedicated function called after app.whenReady()
+// to prevent race conditions and invalid path resolution from top-level app.getPath('userData').
+function initAdBlocker() {
+  const ADBLOCKER_CACHE_PATH = path.join(app.getPath('userData'), 'adblocker-engine.cache');
+  const ADBLOCKER_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // refetch filter lists older than 3 days
+  ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
+    path: ADBLOCKER_CACHE_PATH,
+    read: async (p) => {
+      const stat = await fs.promises.stat(p);
+      if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
+        throw new Error('adblocker cache expired');
       }
-    }
-  });
+      return fs.promises.readFile(p);
+    },
+    write: async (p, buffer) => {
+      try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }
+    },
+  }).then((engine) => {
+    blocker = engine;
 
-  try {
-    const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
-    if (fs.existsSync(settingsPath)) {
-      const wl = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-      if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+    if (isPrivacyShieldEnabled) {
+      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking in default session:', e); }
+      try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable adblocking in incognito session:', e); }
     }
-  } catch(e) {}
-}).catch((e) => console.error('Failed to initialize adblocker:', e));
+
+    const pendingAdBlocks = new Map<number, number>();
+    let adBlockFlushTimer: ReturnType<typeof setInterval> | null = null;
+    
+    blocker.on('request-blocked', (request: any) => {
+      if (request.tabId) {
+        pendingAdBlocks.set(request.tabId, (pendingAdBlocks.get(request.tabId) || 0) + 1);
+        
+        if (!adBlockFlushTimer) {
+          adBlockFlushTimer = setInterval(() => {
+            if (pendingAdBlocks.size === 0) {
+              if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
+              adBlockFlushTimer = null;
+              return;
+            }
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              const batch = Object.fromEntries(pendingAdBlocks);
+              mainWindow.webContents.send('ad-blocked-batch', batch);
+              pendingAdBlocks.clear();
+            }
+          }, 2000);
+        }
+      }
+    });
+
+    try {
+      const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
+      if (fs.existsSync(settingsPath)) {
+        const wl = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+      }
+    } catch(e) {}
+  }).catch((e) => console.error('Failed to initialize adblocker:', e));
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -561,8 +577,8 @@ function setupApplicationMenu() {
     try {
       app.setAboutPanelOptions({
         applicationName: 'Nova Browser',
-        applicationVersion: '1.1.3',
-        version: '1.1.3',
+        applicationVersion: app.getVersion(),
+        version: app.getVersion(),
         copyright: 'Copyright © 2026 Nova Browser. All rights reserved.',
         credits: 'Built with Electron, React, TypeScript, Web-LLM, and Model Context Protocol.',
         website: 'https://github.com/unitybtw/nova-browser'
@@ -914,6 +930,7 @@ app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
   setupApplicationMenu();
+  initAdBlocker();
 
   // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
   interface PendingPermission {
@@ -1154,7 +1171,15 @@ app.whenReady().then(async () => {
     }
 
     if (platform === 'win32') {
-      return assets.find((a: any) => a.name?.endsWith('.exe')) || assets.find((a: any) => a.name?.endsWith('.zip'));
+      const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+      if (isPortable) {
+        return assets.find((a: any) => a.name?.endsWith('.exe') && !a.name?.toLowerCase().includes('setup')) ||
+               assets.find((a: any) => a.name?.endsWith('.zip')) ||
+               assets.find((a: any) => a.name?.endsWith('.exe'));
+      }
+      return assets.find((a: any) => a.name?.toLowerCase().includes('setup') && a.name?.endsWith('.exe')) ||
+             assets.find((a: any) => a.name?.endsWith('.exe')) ||
+             assets.find((a: any) => a.name?.endsWith('.zip'));
     }
 
     if (platform === 'linux') {
@@ -1245,7 +1270,8 @@ app.whenReady().then(async () => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     sendToMainWindow('update-checking');
     try {
-      if (!app.isPackaged) {
+      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || !!process.env.PORTABLE_EXECUTABLE_DIR;
+      if (isManualUpdateOnly) {
         const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() }
         });
@@ -3385,7 +3411,13 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
       path.join(home, 'Library/Application Support/Microsoft Edge/Default/Bookmarks')
     );
   } else if (process.platform === 'win32') {
-    const localAppData = path.join(app.getPath('appData'), '..', 'Local');
+    let localAppData = process.env.LOCALAPPDATA;
+    if (!localAppData) {
+      try { localAppData = (app as any).getPath('localAppData'); } catch (_) {}
+    }
+    if (!localAppData) {
+      localAppData = path.join(app.getPath('appData'), '..', 'Local');
+    }
     candidatePaths.push(
       path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Default', 'Bookmarks'),
       path.join(localAppData, 'Google', 'Chrome', 'User Data', 'Profile 1', 'Bookmarks'),

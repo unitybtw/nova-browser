@@ -7,16 +7,64 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { EventSource } from 'eventsource';
 
+import os from 'os';
+import path from 'path';
+import fs from 'fs';
+
 // Required for SSEClientTransport in Node.js
 (global as any).EventSource = EventSource;
 
+function getUserDataPath(): string {
+  const home = os.homedir();
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'nova-browser');
+  }
+  if (process.platform === 'win32') {
+    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'nova-browser');
+  }
+  return path.join(home, '.config', 'nova-browser');
+}
+
+function resolveMcpConfig(): { port: number; token?: string } {
+  let port = 3020;
+  let token = process.env.MCP_TOKEN;
+
+  if (process.env.MCP_PORT) {
+    const parsed = parseInt(process.env.MCP_PORT, 10);
+    if (!isNaN(parsed) && parsed > 0 && parsed < 65536) port = parsed;
+  } else {
+    try {
+      const portFile = path.join(getUserDataPath(), 'nova-mcp-port');
+      if (fs.existsSync(portFile)) {
+        const saved = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
+        if (!isNaN(saved) && saved > 0 && saved < 65536) port = saved;
+      }
+    } catch (_) {}
+  }
+
+  if (!token) {
+    try {
+      const tokenFile = path.join(getUserDataPath(), 'nova-mcp-token');
+      if (fs.existsSync(tokenFile)) {
+        const savedToken = fs.readFileSync(tokenFile, 'utf8').trim();
+        if (savedToken) token = savedToken;
+      }
+    } catch (_) {}
+  }
+
+  return { port, token };
+}
+
 async function main() {
-  const sseUrl = new URL(process.env.MCP_SSE_URL || 'http://localhost:3020/sse');
-  // Security: send the token via the Authorization header instead of the URL
-  // query string — query strings leak into logs, history and proxies.
-  const sseTransport = new SSEClientTransport(sseUrl, process.env.MCP_TOKEN ? {
+  const config = resolveMcpConfig();
+  const defaultUrl = `http://localhost:${config.port}/sse`;
+  const sseUrl = new URL(process.env.MCP_SSE_URL || defaultUrl);
+  const activeToken = process.env.MCP_TOKEN || config.token;
+
+  // Security: send the token via the Authorization header instead of the URL query string
+  const sseTransport = new SSEClientTransport(sseUrl, activeToken ? {
     requestInit: {
-      headers: { Authorization: `Bearer ${process.env.MCP_TOKEN}` }
+      headers: { Authorization: `Bearer ${activeToken}` }
     }
   } : undefined);
   const client = new Client({ name: 'mcp-bridge', version: '1.0.0' }, { capabilities: {} });

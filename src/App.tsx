@@ -626,9 +626,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         closeTab: { key: 'w', shift: false, meta: true },
         newIncognito: { key: 'n', shift: true, meta: true },
         reload: { key: 'r', shift: false, meta: true },
-        omnibox: { key: 'l', shift: false, meta: true },
+        omnibox: { key: 'k', shift: false, meta: true },
         bookmark: { key: 'd', shift: false, meta: true },
-        history: { key: 'h', shift: false, meta: true },
+        history: { key: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
         downloads: { key: 'j', shift: false, meta: true },
         findInPage: { key: 'f', shift: false, meta: true },
       }
@@ -1447,6 +1447,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       finalUrl = 'nova://newtab';
     }
     
+    // Extensions page handling: open extensions modal directly
+    if (finalUrl === 'nova://extensions' || finalUrl === 'chrome://extensions') {
+      setIsExtensionsOpen(true);
+      return;
+    }
+    
     let initialTitle = 'New Tab';
     if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
     else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
@@ -1602,6 +1608,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
     if (!isSafeNavigationUrl(url)) {
       console.warn('Blocked malicious navigation protocol:', url);
+      return;
+    }
+
+    if (url === 'nova://extensions' || url === 'chrome://extensions') {
+      setIsExtensionsOpen(true);
       return;
     }
 
@@ -2703,8 +2714,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Toggle Sidebar in Vertical Tabs Mode (⌘S / Ctrl+S)
-      if ((e.metaKey || e.ctrlKey) && key === 's') {
+      // Toggle Sidebar in Vertical Tabs Mode (⌘B / Ctrl+B)
+      if ((e.metaKey || e.ctrlKey) && key === 'b') {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
         return;
@@ -2717,6 +2728,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
 
       if (matches('history')) {
+        // Protect macOS Hide Application (⌘H) — never hijack Cmd+H on macOS
+        if (isMac && meta && key === 'h') {
+          return;
+        }
         e.preventDefault();
         closeAllModals();
         handleOpenHistory();

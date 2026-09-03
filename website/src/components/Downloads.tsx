@@ -6,7 +6,7 @@ export const Downloads: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
-  const [activeCliTab, setActiveCliTab] = useState<'brew' | 'winget' | 'linux' | 'source'>('brew');
+  const [activeCliTab, setActiveCliTab] = useState<'mac' | 'windows' | 'linux' | 'source'>('mac');
   const notificationTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -24,13 +24,13 @@ export const Downloads: React.FC = () => {
   };
 
   const CLI_COMMANDS = {
-    brew: 'brew install --cask unitybtw/tap/nova-browser',
-    winget: 'winget install NovaBrowser.Nova',
+    mac: 'curl -fsSL https://raw.githubusercontent.com/unitybtw/nova-browser/main/install.sh | bash',
+    windows: 'powershell -Command "Invoke-WebRequest -Uri https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup-1.2.6-x64.exe -OutFile Nova-Browser-Setup.exe; Start-Process Nova-Browser-Setup.exe"',
     linux: 'curl -fsSL https://raw.githubusercontent.com/unitybtw/nova-browser/main/install.sh | bash',
     source: 'git clone https://github.com/unitybtw/nova-browser.git && cd nova-browser && npm install && npm run dev',
   };
 
-  const handleCopy = async (tab: 'brew' | 'winget' | 'linux' | 'source') => {
+  const handleCopy = async (tab: 'mac' | 'windows' | 'linux' | 'source') => {
     setCopyError(null);
     try {
       await navigator.clipboard.writeText(CLI_COMMANDS[tab]);
@@ -235,7 +235,7 @@ export const Downloads: React.FC = () => {
 
           {/* CLI Tabs */}
           <div role="tablist" aria-label="Installation methods" className="flex items-center gap-1.5 p-1 bg-neutral-800 rounded-lg">
-            {(['brew', 'winget', 'linux', 'source'] as const).map((tab) => (
+            {(['mac', 'windows', 'linux', 'source'] as const).map((tab) => (
               <button
                 key={tab}
                 id={`install-tab-${tab}`}
@@ -246,7 +246,7 @@ export const Downloads: React.FC = () => {
                 type="button"
                 onClick={() => setActiveCliTab(tab)}
                 onKeyDown={(event) => {
-                  const methods = ['brew', 'winget', 'linux', 'source'] as const;
+                  const methods = ['mac', 'windows', 'linux', 'source'] as const;
                   const currentIndex = methods.indexOf(tab);
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();

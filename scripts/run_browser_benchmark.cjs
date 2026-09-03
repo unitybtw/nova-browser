@@ -11,10 +11,28 @@ const RUNS = Number(process.env.NOVA_BENCHMARK_RUNS || 3);
 const WAIT_TIMEOUT_MS = 30000;
 const fixtureUrl = `file://${FIXTURE}`;
 
+function getChromeBinary() {
+  if (process.platform === 'darwin') {
+    return '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  }
+  if (process.platform === 'win32') {
+    const candidates = [
+      path.join(process.env.PROGRAMFILES || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+      path.join(process.env.LOCALAPPDATA || '', 'Google\\Chrome\\Application\\chrome.exe')
+    ];
+    for (const c of candidates) {
+      if (fs.existsSync(c)) return c;
+    }
+    return 'chrome.exe';
+  }
+  return 'google-chrome';
+}
+
 const browsers = [
   {
     name: 'Google Chrome',
-    binary: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    binary: getChromeBinary(),
     args: (profile, port) => [
       '--headless=new', '--no-sandbox', '--disable-gpu', '--no-first-run',
       '--disable-background-networking', '--disable-component-update',

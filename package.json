@@ -6,6 +6,9 @@
   "version": "1.2.6",
   "type": "module",
   "main": "dist-electron/main.cjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "build": {
     "appId": "com.nova.browser",
     "productName": "Nova Browser",
@@ -27,6 +30,7 @@
       }
     ],
     "win": {
+      "artifactName": "Nova-Browser-${version}-${arch}.${ext}",
       "target": [
         {
           "target": "nsis",
@@ -92,7 +96,7 @@
       "artifactName": "Nova-Browser-${arch}.dmg",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
-      "gatekeeperAssess": false,
+      "gatekeeperAssess": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.inherit.plist"
     },
@@ -106,7 +110,7 @@
       "deleteAppDataOnUninstall": true,
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "Nova-Browser-Setup.exe"
+      "artifactName": "Nova-Browser-Setup-${version}-${arch}.exe"
     },
     "linux": {
       "target": [
@@ -122,7 +126,7 @@
   },
   "scripts": {
     "dev:web": "vite",
-    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:cross-fetch --external:express --external:express-rate-limit --external:@modelcontextprotocol/sdk --external:jsdom --format=cjs --out-extension:.js=.cjs",
+    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
@@ -130,6 +134,7 @@
     "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
     "pack:win": "npm run build && electron-builder --win",
     "pack:mac": "npm run build && electron-builder --mac",
+    "pack:linux": "npm run build && electron-builder --linux",
     "dev:website": "npm --prefix website run dev",
     "build:website": "npm --prefix website run build",
     "video:preview": "remotion preview video/src/index.ts",
