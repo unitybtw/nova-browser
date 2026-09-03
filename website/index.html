@@ -14,10 +14,13 @@
     <meta name="theme-color" content="#fcfbf9" />
     <link rel="canonical" href="https://nova-browser.org/" />
 
-    <!-- Prevent browser scroll restoration jump -->
+    <!-- Prevent browser scroll restoration jump and ensure clean start at top Manifesto -->
     <script>
       if ('scrollRestoration' in history) {
         history.scrollRestoration = 'manual';
+      }
+      if (!window.location.hash) {
+        window.scrollTo(0, 0);
       }
     </script>
 

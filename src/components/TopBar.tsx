@@ -1275,9 +1275,20 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   useEffect(() => {
     if (!tabsContainerRef.current) return;
-    const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`);
-    // PERF: instant scroll — switching tabs should feel immediate.
-    activeTabEl?.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+    const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    if (activeTabEl && tabsContainerRef.current) {
+      const container = tabsContainerRef.current;
+      const tabLeft = activeTabEl.offsetLeft;
+      const tabRight = tabLeft + activeTabEl.offsetWidth;
+      const scrollLeft = container.scrollLeft;
+      const containerWidth = container.clientWidth;
+
+      if (tabLeft < scrollLeft) {
+        container.scrollLeft = tabLeft;
+      } else if (tabRight > scrollLeft + containerWidth) {
+        container.scrollLeft = tabRight - containerWidth;
+      }
+    }
   }, [activeTabId, tabs.length]);
 
   const handleWheel = (e: React.WheelEvent<any>) => {
