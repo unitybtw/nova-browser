@@ -108,10 +108,7 @@
       ],
       "category": "Network;WebBrowser",
       "artifactName": "Nova-Browser-${arch}.${ext}",
-      "icon": "build/icon.png",
-      "desktop": {
-        "StartupWMClass": "nova-browser"
-      }
+      "icon": "build/icon.png"
     }
   },
   "scripts": {
