@@ -19,8 +19,12 @@ const textDecoder = new TextDecoder();
  * spread idiom, which can blow the call stack for large payloads.
  */
 export function bytesToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 0x8000; // 32KB chunks prevent call-stack overflow while avoiding O(n^2) string allocations
   let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    const chunk = bytes.subarray(i, i + CHUNK_SIZE);
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
   return btoa(binary);
 }
 
@@ -35,8 +39,8 @@ export function base64ToBytes(value: string): Uint8Array {
  * Note: the returned key is non-extractable; callers that need the raw key
  * material as a storable string must derive bits themselves.
  */
-export async function deriveKey(passphrase: string, salt: Uint8Array): Promise<CryptoKey> {
-  if (!passphrase || passphrase.length < 12) {
+export async function deriveKey(passphrase: string, salt: Uint8Array, allowLegacyShort = false): Promise<CryptoKey> {
+  if (!passphrase || (!allowLegacyShort && passphrase.length < 12)) {
     throw new Error('Sync passphrase must contain at least 12 characters');
   }
   const material = await crypto.subtle.importKey('raw', textEncoder.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
@@ -62,7 +66,8 @@ export async function decryptSyncPayload<T>(envelope: EncryptedSyncEnvelope, pas
   if (!envelope || envelope.version !== 2 || !envelope.ciphertext || !envelope.salt || !envelope.iv) {
     throw new Error('Invalid encrypted sync payload');
   }
-  const key = await deriveKey(passphrase, base64ToBytes(envelope.salt));
+  // Allow legacy passphrases during decryption to prevent locking out older users
+  const key = await deriveKey(passphrase, base64ToBytes(envelope.salt), true);
   const plaintext = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: base64ToBytes(envelope.iv) },
     key,

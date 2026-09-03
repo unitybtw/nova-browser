@@ -1,5 +1,7 @@
 import { UserSettings } from '../App';
 
+const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;
+
 export function isValidUrlOrDomain(input: string): boolean {
   const trimmed = input.trim();
   if (!trimmed) return false;
@@ -35,8 +37,8 @@ export function isValidUrlOrDomain(input: string): boolean {
     return true;
   }
 
-  // Intranet and developer local domain names (.local, .test, .internal, .lan, .home, .docker)
-  if (/^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i.test(trimmed)) {
+  // Intranet and developer local domain names (.local, .test, .internal, .lan, .home, .docker, .localhost)
+  if (INTRANET_DOMAIN_REGEX.test(trimmed)) {
     return true;
   }
 
@@ -96,8 +98,8 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
     return 'http://' + trimmed;
   }
 
-  // Intranet / local domains (.local, .test, .internal, .lan, .home, .docker)
-  if (/^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker)(:\d+)?(\/.*)?$/i.test(trimmed)) {
+  // Intranet / local domains (.local, .test, .internal, .lan, .home, .docker, .localhost)
+  if (INTRANET_DOMAIN_REGEX.test(trimmed)) {
     return 'http://' + trimmed;
   }
 

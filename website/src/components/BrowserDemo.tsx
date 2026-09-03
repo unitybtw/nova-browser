@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import App, { BrowserDemoOptions } from '@/App';
+import App, { BrowserDemoOptions } from '../../../src/App';
 
 const WEBSITE_DEMO_OPTIONS: BrowserDemoOptions = {
   isDemo: true,

@@ -314,10 +314,19 @@ export const SidePanel = React.memo(({
     setPendingFiles(prev => prev.filter(f => f.id !== id));
   }, []);
 
-  // Only scroll into view when messages change, or when streaming chunk arrives
+  // Only scroll into view when messages change or streaming, and only if user is near the bottom
   useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesEndRef.current;
+    if (!el) return;
+    const parent = el.parentElement;
+    if (!parent) return;
+
+    // Check if user is scrolled within 150px of the bottom
+    const isNearBottom = parent.scrollHeight - parent.scrollTop - parent.clientHeight < 150;
+    
+    // When a whole new message is added, scroll. When streaming tokens arrive, only scroll if near bottom without smooth animation to prevent jitter.
+    if (isNearBottom) {
+      el.scrollIntoView({ behavior: streamingText ? 'auto' : 'smooth' });
     }
   }, [messages.length, streamingText]);
 

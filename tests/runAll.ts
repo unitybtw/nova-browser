@@ -1,3 +1,12 @@
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection in test suite:', reason);
+  process.exit(1);
+});
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception in test suite:', err);
+  process.exit(1);
+});
+
 console.log('Executing all test suites...');
 import './e2e/tier1_feature_coverage.test';
 import './e2e/tier2_boundary_corner.test';
@@ -32,4 +41,3 @@ import './history_bookmarks_search.test';
 import './ai_agent_tools.test';
 import './webllm_config.test';
 import './adversarial_hacker_security.test';
-import './benchmark_suite';

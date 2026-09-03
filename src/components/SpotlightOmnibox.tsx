@@ -272,7 +272,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                   Press Enter to search with {getSearchEngineName(searchEngine)}
                 </div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-1" role="listbox" aria-label="Omnibox results">
                   {items.map((item, idx) => {
                     const isSelected = selectedIndex === idx;
 
@@ -280,6 +280,8 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                       return (
                         <div
                           key={`tab-${item.tab.id}`}
+                          role="option"
+                          aria-selected={isSelected}
                           ref={el => { itemRefs.current[idx] = el; }}
                           onMouseEnter={() => setSelectedIndex(idx)}
                           onClick={() => executeItem(item)}
@@ -327,6 +329,8 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     return (
                       <div
                         key={`sug-${idx}`}
+                        role="option"
+                        aria-selected={isSelected}
                         ref={el => { itemRefs.current[idx] = el; }}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         onClick={() => executeItem(item)}

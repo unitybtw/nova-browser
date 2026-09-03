@@ -129,7 +129,6 @@ export interface SidebarTabsProps {
   onOpenSpotlight?: () => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
-  splitTabId?: string | null;
   onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
   onNavigate?: (url: string) => void;
   onGoBack?: () => void;
@@ -447,7 +446,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onOpenSpotlight,
   onTabDragStart,
   onTabDragEnd,
-  splitTabId,
   onCloseSplit,
   onNavigate,
   onGoBack,
@@ -1485,7 +1483,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  if (prevProps.splitTabId !== nextProps.splitTabId) return false;
 
   // Array-valued props compared by reference (state arrays from App)
   if (prevProps.folders !== nextProps.folders) return false;

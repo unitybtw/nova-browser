@@ -6,6 +6,7 @@ type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
 
 const activeDownloads = new Map<string, Electron.DownloadItem>();
+const knownDownloadPaths = new Set<string>();
 // Tracks sessions that already have a 'will-download' handler so window recreation
 // doesn't stack duplicate listeners (which would duplicate download handling).
 const downloadsRegistered = new WeakSet<Electron.Session>();
@@ -67,7 +68,9 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       const resolvedPath = path.resolve(pathStr);
       const realPath = fs.realpathSync(resolvedPath);
       const realDownloads = fs.realpathSync(downloadsPath);
-      if (realPath && realPath.startsWith(realDownloads + path.sep) && fs.existsSync(realPath)) {
+      const isUnderDownloads = realPath.startsWith(realDownloads + path.sep);
+      const isKnown = knownDownloadPaths.has(realPath);
+      if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
         shell.openPath(realPath);
         return true;
       }
@@ -85,7 +88,9 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       const resolvedPath = path.resolve(pathStr);
       const realPath = fs.realpathSync(resolvedPath);
       const realDownloads = fs.realpathSync(downloadsPath);
-      if (realPath && realPath.startsWith(realDownloads + path.sep) && fs.existsSync(realPath)) {
+      const isUnderDownloads = realPath.startsWith(realDownloads + path.sep);
+      const isKnown = knownDownloadPaths.has(realPath);
+      if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
         shell.showItemInFolder(realPath);
         return true;
       }
@@ -118,11 +123,23 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       return;
     }
 
+    const recordCompletedPath = () => {
+      activeDownloads.delete(downloadId);
+      const finalPath = item.getSavePath();
+      if (finalPath) {
+        try {
+          knownDownloadPaths.add(fs.realpathSync(path.resolve(finalPath)));
+        } catch {
+          knownDownloadPaths.add(path.resolve(finalPath));
+        }
+      }
+    };
+
     if (nextDownloadAsSaveAs) {
       nextDownloadAsSaveAs = false;
       // Do not set save path so Electron shows the Save Dialog automatically
       item.once('done', (_event, state) => {
-        if (state === 'completed') activeDownloads.delete(downloadId);
+        if (state === 'completed') recordCompletedPath();
       });
     } else {
       const defaultDir = app.getPath('downloads');
@@ -149,9 +166,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       }
       item.setSavePath(targetPath);
       item.once('done', (_event, state) => {
-        if (state === 'completed') {
-          activeDownloads.delete(downloadId);
-        }
+        if (state === 'completed') recordCompletedPath();
       });
     }
 

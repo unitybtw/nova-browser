@@ -6,6 +6,26 @@ import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
 
+function safeParseArray<T>(raw: string | null): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function safeParseObject<T>(raw: string | null, fallback: T): T {
+  if (!raw) return fallback;
+  try {
+    const parsed = JSON.parse(raw);
+    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 const PasswordList = () => {
   const [passwords, setPasswords] = useState<any[]>([]);
   const [visibleIndexes, setVisibleIndexes] = useState<Set<number>>(new Set());
@@ -14,7 +34,11 @@ const PasswordList = () => {
     const fetchPasswords = async () => {
       try {
         const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-        if (raw) setPasswords(JSON.parse(raw));
+        if (raw) {
+          const parsed = safeParseArray<any>(raw);
+          const valid = parsed.filter(p => p && typeof p.hostname === 'string' && typeof p.username === 'string');
+          setPasswords(valid);
+        }
       } catch (e) {}
     };
     fetchPasswords();
@@ -171,7 +195,7 @@ const renderBackgroundAnimation = (id: string, isHovered: boolean, isSelected: b
           <div className="absolute top-[22%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-gradient-to-b from-cyan-500/40 via-purple-500/20 to-transparent blur-md" />
           <div className="absolute inset-0" style={{ perspective: '160px', perspectiveOrigin: '50% 50%' }}>
             <motion.div
-              animate={active ? { backgroundPositionY: ['0px', '24px'] } : {}}
+              animate={active ? { y: ['0px', '20px'] } : {}}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'linear' }}
               className="absolute bottom-0 left-[-50%] right-[-50%] h-[65%]"
               style={{
@@ -179,7 +203,7 @@ const renderBackgroundAnimation = (id: string, isHovered: boolean, isSelected: b
                 backgroundSize: '20px 20px',
                 transform: 'rotateX(65deg) scale(1.8)',
                 transformOrigin: '50% 100%',
-                willChange: 'background-position'
+                willChange: 'transform'
               }}
             />
           </div>
@@ -1132,12 +1156,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               const rawS = localStorage.getItem('user_settings');
 
                               await syncService.syncData({
-                                bookmarks: rawB ? JSON.parse(rawB) : [],
-                                folders: rawF ? JSON.parse(rawF) : [],
-                                history: rawH ? JSON.parse(rawH) : [],
-                                passwords: rawP ? JSON.parse(rawP) : [],
-                                settings: rawS ? JSON.parse(rawS) : ({} as any),
-                                workspaces: rawW ? JSON.parse(rawW) : []
+                                bookmarks: safeParseArray(rawB),
+                                folders: safeParseArray(rawF),
+                                history: safeParseArray(rawH),
+                                passwords: safeParseArray(rawP),
+                                settings: safeParseObject(rawS, {} as any),
+                                workspaces: safeParseArray(rawW)
                               });
 
                               setSyncMsg('Sync completed successfully!');
@@ -1188,12 +1212,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               const rawS = localStorage.getItem('user_settings');
 
                               const code = await syncService.generateSyncChainCode({
-                                bookmarks: rawB ? JSON.parse(rawB) : [],
-                                folders: rawF ? JSON.parse(rawF) : [],
-                                history: rawH ? JSON.parse(rawH) : [],
-                                passwords: rawP ? JSON.parse(rawP) : [],
-                                settings: rawS ? JSON.parse(rawS) : ({} as any),
-                                workspaces: rawW ? JSON.parse(rawW) : []
+                                bookmarks: safeParseArray(rawB),
+                                folders: safeParseArray(rawF),
+                                history: safeParseArray(rawH),
+                                passwords: safeParseArray(rawP),
+                                settings: safeParseObject(rawS, {} as any),
+                                workspaces: safeParseArray(rawW)
                               });
 
                               navigator.clipboard.writeText(code);
@@ -1330,12 +1354,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               const rawS = localStorage.getItem('user_settings');
 
                               const code = await syncService.generateSyncChainCode({
-                                bookmarks: rawB ? JSON.parse(rawB) : [],
-                                folders: rawF ? JSON.parse(rawF) : [],
-                                history: rawH ? JSON.parse(rawH) : [],
-                                passwords: rawP ? JSON.parse(rawP) : [],
-                                settings: rawS ? JSON.parse(rawS) : ({} as any),
-                                workspaces: rawW ? JSON.parse(rawW) : []
+                                bookmarks: safeParseArray(rawB),
+                                folders: safeParseArray(rawF),
+                                history: safeParseArray(rawH),
+                                passwords: safeParseArray(rawP),
+                                settings: safeParseObject(rawS, {} as any),
+                                workspaces: safeParseArray(rawW)
                               });
 
                               navigator.clipboard.writeText(code);

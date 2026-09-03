@@ -37,7 +37,7 @@ import { isPrivateIP } from './main/ipAddress.js';
 
 // Standard clean Chromium User-Agent matching host OS and exact runtime version
 export function getStandardUserAgent(): string {
-  const chromeVer = process.versions.chrome || '134.0.0.0';
+  const chromeVer = process.versions.chrome || '150.0.0.0';
   if (process.platform === 'win32') {
     return `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
   }
@@ -414,15 +414,12 @@ function createWindow() {
       // VULN-16: Add Content Security Policy for the app's own pages
       if (isAppFile || isDevLocalhost) {
         const isDev = isDevLocalhost || !app.isPackaged;
-        const nonce = crypto.randomBytes(16).toString('base64');
-        const nonceAttr = `'nonce-${nonce}'`;
         
         responseHeaders['Content-Security-Policy'] = [
           isDev
-            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
-            : `default-src 'self'; script-src 'self' ${nonceAttr} 'wasm-unsafe-eval' blob:; style-src 'self' ${nonceAttr} 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self' https: http:; frame-ancestors 'none';`
+            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'none';`
         ];
-        responseHeaders['X-Content-Security-Policy-Nonce'] = [nonce];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
 
@@ -1486,10 +1483,26 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
 
+      // Helper: check if hostname belongs to localhost, intranet, or private networks
+      function isLocalOrIntranetHost(hostname: string): boolean {
+        if (!hostname) return false;
+        const host = hostname.toLowerCase();
+        if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+          return true;
+        }
+        if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
+          return true;
+        }
+        if (isPrivateIP(host)) {
+          return true;
+        }
+        return false;
+      }
+
       // 2. HTTPS Upgrade
       try {
         const urlObj = new URL(navigationUrl);
-        if (urlObj.protocol === 'http:' && urlObj.hostname !== 'localhost' && !urlObj.hostname.startsWith('127.')) {
+        if (urlObj.protocol === 'http:' && !isLocalOrIntranetHost(urlObj.hostname)) {
           if (upgradedUrls.has(navigationUrl)) {
             // Zaten denedik ve patladı (SSL hatası vs.), sonsuz döngüye girmemek için devam et
             return;
@@ -1533,7 +1546,22 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
 
-      if (parsed.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+      function isLocalOrIntranetHost(hostname: string): boolean {
+        if (!hostname) return false;
+        const host = hostname.toLowerCase();
+        if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+          return true;
+        }
+        if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
+          return true;
+        }
+        if (isPrivateIP(host)) {
+          return true;
+        }
+        return false;
+      }
+
+      if (parsed.protocol === 'http:' && !isLocalOrIntranetHost(parsed.hostname)) {
         if (upgradedUrls.has(redirectUrl)) return;
         e.preventDefault();
         addUpgradedUrl(redirectUrl);

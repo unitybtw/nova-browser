@@ -95,6 +95,7 @@ import { aiAgent } from './services/aiAgent';
 import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
+import { orchestrator } from './services/agentOrchestrator';
 
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
   { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
@@ -1063,6 +1064,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // updater stays pure (StrictMode double-invokes updater functions in dev).
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
+    tabThumbnailCache.remove(id);
     const prevTabs = tabsRef.current;
     const targetTab = prevTabs.find(t => t.id === id);
     const activeWs = activeWorkspaceIdRef.current || 'default';
@@ -1606,6 +1608,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       return;
     }
 
+    if (activeTabIdRef.current) {
+      tabThumbnailCache.remove(activeTabIdRef.current);
+    }
+
     let newTitle: string | undefined = undefined;
     const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
     if (isNewTabUrl) newTitle = 'New Tab';
@@ -2044,9 +2050,37 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution rejected: MCP server is disabled in settings.' });
           return;
         }
-        executeMcpAction(toolName, args)
-          .then(result => electronAPI.respondMcpAction?.(id, result))
-          .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));
+        const readOnlyTools = new Set([
+          'nova_browser_info',
+          'browser_read_page',
+          'browser_screenshot',
+          'browser_list_tabs',
+          'browser_get_url',
+          'browser_wait',
+          'browser_get_element_text',
+          'browser_full_page_screenshot'
+        ]);
+
+        const runAction = () => {
+          executeMcpAction(toolName, args)
+            .then(result => electronAPI.respondMcpAction?.(id, result))
+            .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));
+        };
+
+        if (readOnlyTools.has(toolName)) {
+          runAction();
+        } else {
+          const { done } = orchestrator.enqueueAction(toolName, args);
+          done.then(approved => {
+            if (approved) {
+              runAction();
+            } else {
+              electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution denied by user approval policy.' });
+            }
+          }).catch(err => {
+            electronAPI.respondMcpAction?.(id, { error: String(err) });
+          });
+        }
       });
     }
     return () => {
@@ -2841,7 +2875,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onOpenSpotlight={handleOpenSpotlight}
               onTabDragStart={handleTabDragStart}
               onTabDragEnd={handleTabDragEnd}
-              splitTabId={splitTabId}
               onCloseSplit={handleCloseSplitView}
               onNavigate={handleNavigate}
               onGoBack={handleGoBack}
@@ -2936,7 +2969,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onOpenSpotlight={handleOpenSpotlight}
                   onTabDragStart={handleTabDragStart}
                   onTabDragEnd={handleTabDragEnd}
-                  splitTabId={splitTabId}
                   onCloseSplit={handleCloseSplitView}
                   onNavigate={handleNavigate}
                   onGoBack={handleGoBack}
@@ -3151,7 +3183,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               <div
                 key={tab.id}
                 className={`w-full h-full absolute inset-0 flex flex-col ${
-                  tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto visible' : 'opacity-0 z-0 pointer-events-none invisible'
+                  tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none hidden'
                 }`}
               >
                 <BrowserView 

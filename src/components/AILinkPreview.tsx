@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Loader2, Globe, Clock, ExternalLink } from 'lucide-react';
 import { Readability } from '@mozilla/readability';
+import DOMPurify from 'dompurify';
 import { aiAgent } from '../services/aiAgent';
 
 interface AILinkPreviewProps {
@@ -122,8 +123,9 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
 
         setLoadingText('Analyzing content...');
 
+        const sanitizedHtml = DOMPurify.sanitize(result.html, { WHOLE_DOCUMENT: true });
         const parser = new DOMParser();
-        const doc = parser.parseFromString(result.html, 'text/html');
+        const doc = parser.parseFromString(sanitizedHtml, 'text/html');
         
         const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
         const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');

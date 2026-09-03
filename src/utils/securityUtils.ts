@@ -119,6 +119,18 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
       };
     }
 
+    // Dangerous protocols
+    if (['javascript:', 'data:', 'vbscript:', 'file:'].includes(protocol)) {
+      return {
+        level: 'dangerous',
+        label: 'Dangerous',
+        color: 'text-red-600',
+        bgColor: 'bg-red-50 dark:bg-red-500/10',
+        icon: 'ShieldAlert',
+        tooltip: 'Dangerous or untrusted protocol'
+      };
+    }
+
     // HTTPS
     if (protocol === 'https:') {
       return {
@@ -173,6 +185,9 @@ export function formatDisplayUrl(url: string): string {
   if (!url || url.startsWith('nova://')) return url;
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return url;
+    }
     let display = parsed.hostname + parsed.pathname;
     if (display.endsWith('/')) display = display.slice(0, -1);
     if (parsed.search) display += parsed.search;

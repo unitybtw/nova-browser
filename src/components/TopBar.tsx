@@ -1018,7 +1018,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
               {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
               {suggestions.length > 0 && (
-                <div className="py-1">
+                <div className="py-1" role="listbox" aria-label="Search suggestions">
                   <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
                     Search Suggestions
                   </div>
@@ -1027,6 +1027,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                       <button
                         key={`sug-${idx}`}
                         type="button"
+                        role="option"
+                        aria-selected={selectedIndex === idx}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         onClick={() => {
                           setSearchValue(suggestion);

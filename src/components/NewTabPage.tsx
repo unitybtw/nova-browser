@@ -416,7 +416,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
   };
 
-  const isVideoBg = newTabBackground === 'custom_url' && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
+  const isSafeBgUrl = useMemo(() => {
+    if (!backgroundCustomUrl || typeof backgroundCustomUrl !== 'string') return false;
+    const trimmed = backgroundCustomUrl.trim();
+    if (!isSafeNavigationUrl(trimmed)) return false;
+    try {
+      const parsed = new URL(trimmed);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:' || (parsed.protocol === 'data:' && trimmed.startsWith('data:image/'));
+    } catch {
+      return false;
+    }
+  }, [backgroundCustomUrl]);
+
+  const safeBgCssUrl = useMemo(() => {
+    if (!isSafeBgUrl || !backgroundCustomUrl) return '';
+    return backgroundCustomUrl.replace(/["'\\]/g, '');
+  }, [isSafeBgUrl, backgroundCustomUrl]);
+
+  const isVideoBg = newTabBackground === 'custom_url' && isSafeBgUrl && backgroundCustomUrl && (backgroundCustomUrl.toLowerCase().endsWith('.mp4') || backgroundCustomUrl.toLowerCase().endsWith('.webm'));
 
   if (isIncognito) {
     return (
@@ -504,7 +521,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       )}
 
       {/* Custom URL Background */}
-      {newTabBackground === 'custom_url' && backgroundCustomUrl && (
+      {newTabBackground === 'custom_url' && isSafeBgUrl && safeBgCssUrl && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {isVideoBg ? (
             <video 
@@ -518,7 +535,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           ) : (
             <div 
               className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
-              style={{ backgroundImage: `url('${backgroundCustomUrl}')` }}
+              style={{ backgroundImage: `url('${safeBgCssUrl}')` }}
             />
           )}
           <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
@@ -896,7 +913,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 >
                   <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800/90 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0 border border-slate-100 dark:border-white/10 group-hover:scale-105 transition-transform">
                     <img 
-                      src={`https://www.google.com/s2/favicons?domain=${dial.domain || dial.url}&sz=64`}
+                      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(dial.domain || dial.url)}&sz=64`}
                       alt={dial.name}
                       className="w-full h-full object-contain"
                     />
@@ -990,6 +1007,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
                 onClick={() => toggleTodo(todo.id)}
+                role="checkbox"
+                aria-checked={todo.completed}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggleTodo(todo.id);
+                  }
+                }}
                 className={`flex items-center justify-between gap-3 p-2.5 rounded-xl group cursor-pointer transition-colors ${
                   todo.completed ? 'opacity-60 bg-slate-500/5' : 'hover:bg-slate-100/80 dark:hover:bg-white/10'
                 }`}
