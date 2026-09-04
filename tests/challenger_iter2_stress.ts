@@ -21,10 +21,10 @@ async function runChallengerStressTest() {
   const readerModeSrc = fs.readFileSync(
     path.resolve(process.cwd(), 'src/components/ReaderMode.tsx'),
     'utf-8'
-  );
+  ).replace(/\r\n/g, '\n');
 
   // Extract safeBase64 function implementation using Regex
-  const safeBase64Match = readerModeSrc.match(/const safeBase64 = \(([\s\S]*?)\n\};\n/);
+  const safeBase64Match = readerModeSrc.match(/const safeBase64 = \(([\s\S]*?)\n\};/);
   if (!safeBase64Match) {
     throw new Error('Could not find safeBase64 function definition in ReaderMode.tsx');
   }
