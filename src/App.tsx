@@ -463,7 +463,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // visitors can interact with the real browser UI without tabs changing
   // underneath them.
   useEffect(() => {
-    if (!demoParams.isDemo || demoOptions) return;
+    if (!demoParams.isDemo || demoOptions || (demoParams.feature !== 'default' && demoParams.feature !== 'tour')) return;
 
     let cycle = 0;
     const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
