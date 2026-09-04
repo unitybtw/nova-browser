@@ -131,7 +131,9 @@ assert.strictEqual(isAuthorizedWebstoreSender(false, true, "https://evil.com/fak
 console.log("[PASS] [Hacker-Defense-6] Webstore extension installer subframe isolation strictly enforced.");
 
 // 7. Test fileURLToPath Safety
-const testFileUrl = "file:///path/to/my%20file.txt";
+const testFileUrl = process.platform === "win32"
+  ? "file:///C:/path/to/my%20file.txt"
+  : "file:///path/to/my%20file.txt";
 const resolvedPath = fileURLToPath(testFileUrl);
 assert.ok(resolvedPath.includes("my file.txt"), "fileURLToPath decodes percent encoding safely");
 

@@ -6,6 +6,7 @@
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 console.log('================================================================');
 console.log('STARTING EMPIRICAL ADVERSARIAL VERIFICATION SUITE - MILESTONE 1');
@@ -43,8 +44,12 @@ function isTrustedAppOrigin(urlStr: string, mockDistIndexHtml?: string): boolean
     if (parsed.origin === 'http://localhost:5173') return true;
     if (parsed.protocol === 'file:') {
       const allowedPath = mockDistIndexHtml || path.resolve(path.join(__dirname, '../dist/index.html'));
-      const navPath = decodeURIComponent(parsed.pathname);
-      return path.resolve(navPath) === allowedPath;
+      try {
+        const navPath = fileURLToPath(urlStr);
+        return path.resolve(navPath) === allowedPath;
+      } catch {
+        return false;
+      }
     }
     return false;
   } catch {
@@ -53,6 +58,7 @@ function isTrustedAppOrigin(urlStr: string, mockDistIndexHtml?: string): boolean
 }
 
 const allowedFile = path.resolve(path.join(__dirname, '../dist/index.html'));
+const allowedFileUrl = pathToFileURL(allowedFile).href;
 
 const originAttackVectors = [
   // Bypass attempts on localhost:5173
@@ -92,8 +98,8 @@ const originAttackVectors = [
   { url: 'vbscript:msgbox(1)', expected: false, desc: 'vbscript: protocol' },
 
   // Local file scheme
-  { url: `file://${allowedFile}`, expected: true, desc: 'Exact dist/index.html file URL' },
-  { url: `file://${allowedFile}/../../etc/passwd`, expected: false, desc: 'File URL path traversal' },
+  { url: allowedFileUrl, expected: true, desc: 'Exact dist/index.html file URL' },
+  { url: `${allowedFileUrl}/../../etc/passwd`, expected: false, desc: 'File URL path traversal' },
   { url: 'file:///etc/passwd', expected: false, desc: 'Unauthorized system file URL' },
   { url: 'file:///C:/Windows/System32/cmd.exe', expected: false, desc: 'Windows system file URL' },
 
