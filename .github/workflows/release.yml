@@ -26,11 +26,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Tests
-        run: npm test
-
       - name: Build App
         run: npm run build
+
+      - name: Run Tests
+        run: npm test
 
       - name: Package macOS DMG
         run: npx electron-builder --mac --publish never
@@ -64,11 +64,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Tests
-        run: npm test
-
       - name: Build App
         run: npm run build
+
+      - name: Run Tests
+        run: npm test
 
       - name: Package Windows NSIS Installer
         run: npx electron-builder --win --publish never
@@ -102,11 +102,11 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Run Tests
-        run: npm test
-
       - name: Build App
         run: npm run build
+
+      - name: Run Tests
+        run: npm test
 
       - name: Install System Dependencies (libfuse2 for AppImage)
         run: sudo apt-get update && sudo apt-get install -y libfuse2
