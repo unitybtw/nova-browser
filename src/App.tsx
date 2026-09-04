@@ -1826,7 +1826,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   el.value = ${JSON.stringify(args.text)};
                   el.dispatchEvent(new Event('input', { bubbles: true }));
                   el.dispatchEvent(new Event('change', { bubbles: true }));
-                  if (${args.pressEnter ? 'true' : 'false'}) {
+                  if (${args.pressEnter === true ? 'true' : 'false'}) {
                     const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
                     el.dispatchEvent(enterEvent);
                   }
@@ -2136,15 +2136,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution rejected: MCP server is disabled in settings.' });
           return;
         }
-        const readOnlyTools = new Set([
+        // Security (G-2): Harmless metadata tools execute directly.
+        // Sensitive content inspection tools (read_page, screenshot, get_element_text) require user approval.
+        const safeMetadataTools = new Set([
           'nova_browser_info',
-          'browser_read_page',
-          'browser_screenshot',
           'browser_list_tabs',
           'browser_get_url',
-          'browser_wait',
-          'browser_get_element_text',
-          'browser_full_page_screenshot'
+          'browser_wait'
         ]);
 
         const runAction = () => {
@@ -2153,7 +2151,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));
         };
 
-        if (readOnlyTools.has(toolName)) {
+        if (safeMetadataTools.has(toolName)) {
           runAction();
         } else {
           const { done } = orchestrator.enqueueAction(toolName, args);

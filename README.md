@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="assets/logo.png" alt="Nova Browser Logo" width="130" style="margin-bottom: 16px;" />
+  <img src="public/logo.png" alt="Nova Browser Logo" width="130" style="margin-bottom: 16px;" />
 
   # Nova Browser
 
@@ -94,10 +94,10 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 ### 1. Vertical Tabs Layout
 
 <div align="center">
-  <img src="assets/newtab.png" alt="Nova Browser Start Page with Vertical Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
+  <img src="public/newtab.png" alt="Nova Browser Start Page with Vertical Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
   <p><em>Nova Start Page & Dashboard: Vertical Sidebar, Omni Search, Quick Dials & Task Management</em></p>
   <br/>
-  <img src="assets/preview.png" alt="Nova Browser with AI Assistant and Vertical Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
+  <img src="public/preview.png" alt="Nova Browser with AI Assistant and Vertical Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
   <p><em>Active Browsing Experience: Multi-Tab Workspaces, Webview & Built-in AI Sidepanel</em></p>
 </div>
 
@@ -106,10 +106,10 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 ### 2. Horizontal Tabs Layout (Chrome-Style Top Tabs)
 
 <div align="center">
-  <img src="assets/horizontal-newtab.png" alt="Nova Browser Start Page with Horizontal Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
+  <img src="public/horizontal-newtab.png" alt="Nova Browser Start Page with Horizontal Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
   <p><em>Nova Start Page & Dashboard: Horizontal Top Tabs, Clean Omnibox & Customizable Speed Dials</em></p>
   <br/>
-  <img src="assets/horizontal-preview.png" alt="Nova Browser with AI Assistant and Horizontal Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
+  <img src="public/horizontal-preview.png" alt="Nova Browser with AI Assistant and Horizontal Tabs" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35); margin-bottom: 16px;" />
   <p><em>Active Browsing Experience: Full-Width Viewport, Horizontal Tab Strip & AI Assistant Sidepanel</em></p>
 </div>
 
@@ -118,7 +118,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 ### 3. Zero-Knowledge Cloud Sync
 
 <div align="center">
-  <img src="assets/sync.png" alt="Nova Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
+  <img src="public/sync.png" alt="Nova Sync Interface" width="850" style="border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.35);" />
   <p><em>Nova Sync: Zero-Knowledge 1-Click Multi-Device Pairing Code & Cloud Sync</em></p>
 </div>
 

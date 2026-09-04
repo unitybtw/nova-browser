@@ -50,6 +50,64 @@ const DEFAULT_BLOCKED_DOMAINS = [
   'wallet-connect-auth.com',
 ];
 
+const TARGET_BRANDS = [
+  'apple', 'google', 'paypal', 'microsoft', 'amazon',
+  'github', 'facebook', 'instagram', 'twitter', 'netflix',
+  'coinbase', 'binance', 'steam', 'telegram', 'discord'
+];
+
+const HOMOGLYPH_MAP: Record<string, string> = {
+  '\u0430': 'a', '\u0441': 'c', '\u0435': 'e', '\u043e': 'o',
+  '\u0440': 'p', '\u0455': 's', '\u0456': 'i', '\u0458': 'j',
+  '\u0443': 'y', '\u0445': 'x', '\u03b1': 'a', '\u03bf': 'o',
+  '\u03c1': 'p', '\u04bb': 'h', '\u043f': 'n'
+};
+
+function normalizeHomoglyphs(str: string): string {
+  return str.split('').map(c => HOMOGLYPH_MAP[c] || c).join('');
+}
+
+export function isHomographSpoof(hostname: string): boolean {
+  if (!hostname.includes('xn--')) return false;
+
+  let unicodeDomain = hostname;
+  try {
+    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
+      const urlModule = require('url');
+      if (typeof urlModule.domainToUnicode === 'function') {
+        unicodeDomain = urlModule.domainToUnicode(hostname);
+      }
+    }
+  } catch (_) {}
+
+  if (unicodeDomain !== hostname) {
+    const normalized = normalizeHomoglyphs(unicodeDomain);
+    const domainLabels = normalized.split('.');
+    for (const label of domainLabels) {
+      if (TARGET_BRANDS.includes(label)) {
+        return true;
+      }
+    }
+  }
+
+  // Punycode base label heuristic for environments without domainToUnicode
+  const parts = hostname.split('.');
+  for (const part of parts) {
+    if (part.startsWith('xn--')) {
+      const core = part.slice(4).split('-')[0];
+      if (core && core.length >= 3) {
+        for (const brand of TARGET_BRANDS) {
+          if (brand.includes(core) && core.length >= brand.length - 2) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
 let cachedBlocklist: string[] = [...DEFAULT_BLOCKED_DOMAINS];
 
 export function checkPhishingDomain(url: string): boolean {
@@ -70,8 +128,8 @@ export function checkPhishingDomain(url: string): boolean {
     return true;
   }
 
-  // 2. Concrete Homograph / Punycode spoofing check (e.g. xn--apple-...)
-  if (hostname.startsWith('xn--') || hostname.includes('.xn--')) {
+  // 2. Targeted Homograph / Punycode spoofing check (targeting protected high-value brands)
+  if (isHomographSpoof(hostname)) {
     return true;
   }
 

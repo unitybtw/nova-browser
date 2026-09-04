@@ -8,6 +8,7 @@ import https from 'https';
 import { promisify } from 'util';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
+import { checkPhishingDomain } from '../src/utils/securityUtils.js';
 
 console.log('Main process starting...');
 
@@ -204,14 +205,6 @@ function sendToMainWindow(channel: string, payload?: unknown) {
   } catch (e) { /* window gone */ }
 }
 
-const PHISHING_KEYWORDS = [
-  'login-secure', 'verify-account', 'account-verify', 'security-alert',
-  'billing-update', 'account-suspended', 'at-risk', 'urgent-verify',
-  'secure-login', 'identity-verify', 'recovery-team', 'prize-winner',
-  'free-robux', 'free-bitcoin', 'nitro-free', 'wallet-recovery',
-  'refund-2024', 'gift-card-free', 'survey-winner'
-];
-
 // Security: Validate that IPC messages originate strictly from our trusted main UI window and main frame
 function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEvent): boolean {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
@@ -263,15 +256,6 @@ function isTrustedAppOrigin(urlStr: string): boolean {
   }
 }
 
-function isPhishing(urlStr: string) {
-  try {
-    const url = new URL(urlStr);
-    const hostname = url.hostname.toLowerCase();
-    return PHISHING_KEYWORDS.some(kw => hostname.includes(kw));
-  } catch {
-    return false;
-  }
-}
 
 let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
@@ -427,8 +411,17 @@ function createWindow() {
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
       
-      if (details.url.includes('chrome.google.com') || details.url.includes('chromewebstore.google.com')) {
-        requestHeaders['sec-ch-ua'] = '"Not/A)Brand";v="8", "Chromium";v="134", "Google Chrome";v="134"';
+      let isWebStoreUrl = false;
+      try {
+        const parsedUrl = new URL(details.url);
+        if (parsedUrl.protocol === 'https:' && (parsedUrl.hostname === 'chrome.google.com' || parsedUrl.hostname === 'chromewebstore.google.com')) {
+          isWebStoreUrl = true;
+        }
+      } catch (_) {}
+
+      if (isWebStoreUrl) {
+        const chromeMajor = (process.versions.chrome || '134.0.0.0').split('.')[0] || '134';
+        requestHeaders['sec-ch-ua'] = `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`;
         requestHeaders['sec-ch-ua-mobile'] = '?0';
         requestHeaders['sec-ch-ua-platform'] = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
         requestHeaders['User-Agent'] = getStandardUserAgent();
@@ -1648,9 +1641,9 @@ app.on('web-contents-created', (_event, contents) => {
     if (isAuthorizedWebstore) {
       webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
     } else {
-      // Security P0: never expose full preload (electronAPI) to untrusted guests.
-      // Main window keeps its own preload; webview guests run sandboxed with no preload.
-      webPreferences.preload = undefined;
+      // Sandboxed guest preload: isolated password capture and link hover detection.
+      // Zero Electron APIs or node globals are exposed to untrusted guest pages.
+      webPreferences.preload = path.join(__dirname, 'guest-preload.cjs');
     }
   });
 
@@ -1721,7 +1714,7 @@ app.on('web-contents-created', (_event, contents) => {
       }
 
       // 1. Phishing Check
-      if (isPhishing(navigationUrl)) {
+      if (checkPhishingDomain(navigationUrl)) {
         e.preventDefault();
         const escapedUrl = navigationUrl.substring(0, 500);
         const safeUrlJson = JSON.stringify(escapedUrl);
@@ -1799,7 +1792,7 @@ app.on('web-contents-created', (_event, contents) => {
         console.warn('Blocked redirect to forbidden protocol or credential-bearing URL:', redirectUrl);
         return;
       }
-      if (isPhishing(redirectUrl)) {
+      if (checkPhishingDomain(redirectUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
         return;

@@ -126,7 +126,7 @@
   },
   "scripts": {
     "dev:web": "vite",
-    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
+    "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
     "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",

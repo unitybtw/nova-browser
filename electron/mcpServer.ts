@@ -1,5 +1,5 @@
 import type { Express, Request } from 'express';
-import { BrowserWindow, safeStorage } from 'electron';
+import { BrowserWindow, safeStorage, dialog, powerMonitor } from 'electron';
 import { randomUUID, createHash, timingSafeEqual } from 'crypto';
 import fs from 'fs';
 import path from 'path';
@@ -8,6 +8,13 @@ import { app as electronApp } from 'electron';
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
 import { requestRendererMcpAction } from './main/mcpBridge.js';
+
+// Security: Screen-lock tracking prevents MCP execution while user is away
+let isScreenLocked = false;
+try {
+  powerMonitor.on('lock-screen', () => { isScreenLocked = true; });
+  powerMonitor.on('unlock-screen', () => { isScreenLocked = false; });
+} catch (_) {}
 
 interface McpTool {
   name: string;
@@ -22,7 +29,7 @@ interface McpTool {
 const TOOLS: McpTool[] = [
   {
     name: 'nova_browser_info',
-    description: 'IMPORTANT SYSTEM CONTEXT: You are connected to Nova Browser (a custom web browser) via the Model Context Protocol. You have the ability to control this browser using the provided browser_* tools. When the user asks you to "do something in Nova Browser" or "open a page", use your tools directly to fulfill their request. You do not need to ask for permission. Call this tool if you need a reminder of what Nova Browser is.',
+    description: 'Provides context about Nova Browser and the MCP integration. You can interact with the browser using browser_* tools according to user instructions and safety approvals. Sensitive actions require explicit user confirmation. Call this tool if you need a reminder of what Nova Browser is.',
     inputSchema: { type: 'object', properties: {} }
   },
   {
@@ -263,10 +270,8 @@ const TOOLS: McpTool[] = [
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
 export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
-  // Safe — always allowed
+  // Safe — harmless metadata
   nova_browser_info: 'safe',
-  browser_read_page: 'safe',
-  browser_screenshot: 'safe',
   browser_list_tabs: 'safe',
   browser_get_url: 'safe',
   browser_scroll: 'safe',
@@ -274,10 +279,13 @@ export const TOOL_PERMISSIONS: Record<string, ToolPermissionLevel> = {
   browser_go_forward: 'safe',
   browser_reload: 'safe',
   browser_wait: 'safe',
-  browser_get_element_text: 'safe',
   browser_scroll_to_element: 'safe',
-  browser_full_page_screenshot: 'safe',
-  // Medium — disabled by default, can be enabled in settings
+  // Sensitive read-only & inspection tools — medium (disabled by default, requires approval)
+  browser_read_page: 'medium',
+  browser_screenshot: 'medium',
+  browser_full_page_screenshot: 'medium',
+  browser_get_element_text: 'medium',
+  // Medium — navigation & window actions
   browser_navigate: 'medium',
   browser_click: 'medium',
   browser_hover: 'medium',
@@ -320,6 +328,7 @@ export class BrowserMCPServer {
   private tokenFilePath: string = '';
   private actualPort: number = 0;
   private portFilePath: string = '';
+  private firstUseApproved: boolean = process.env.NODE_ENV === 'test';
 
   constructor(private requestedPort: number = 3020) {
     // Performance: express/express-rate-limit are NOT required here — they are
@@ -494,9 +503,43 @@ export class BrowserMCPServer {
     }
   }
 
+  private async ensureFirstUseApproved(): Promise<boolean> {
+    if (this.firstUseApproved) return true;
+    if (!this.mainWindow || this.mainWindow.isDestroyed()) return false;
+
+    try {
+      const result = await dialog.showMessageBox(this.mainWindow, {
+        type: 'question',
+        buttons: ['Allow', 'Deny'],
+        defaultId: 0,
+        cancelId: 1,
+        title: 'Nova Browser - MCP Authorization',
+        message: 'An external client is attempting to connect to Nova Browser via Model Context Protocol (MCP).',
+        detail: 'Do you want to allow this external client to interact with Nova Browser? Tool permissions can be managed in Settings.',
+        noLink: true
+      });
+      if (result.response === 0) {
+        this.firstUseApproved = true;
+        return true;
+      }
+    } catch (err) {
+      console.warn('[MCP Server] Error prompting for first-use approval:', err);
+    }
+    return false;
+  }
+
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
+    if (isScreenLocked) {
+      throw new Error('MCP tool execution blocked: Nova Browser is currently locked.');
+    }
+
     if (!this.mainWindow || this.mainWindow.isDestroyed()) {
       throw new Error('Nova Browser window is not available');
+    }
+
+    const approved = await this.ensureFirstUseApproved();
+    if (!approved) {
+      throw new Error('Permission denied: MCP connection rejected by the user.');
     }
 
     if (!this.isToolAllowed(toolName)) {
@@ -505,7 +548,7 @@ export class BrowserMCPServer {
 
     // Special: nova_browser_info
     if (toolName === 'nova_browser_info') {
-      return 'You are connected to Nova Browser. Use the browser_* tools to navigate and interact with web pages on behalf of the user.';
+      return 'You are connected to Nova Browser. Use the browser_* tools to navigate and interact with web pages according to user instructions and safety approvals.';
     }
 
     // Special: browser_wait is handled directly

@@ -10,7 +10,9 @@ assert.equal(extractHostname('not a url'), '');
 assert.equal(extractHostname(''), '');
 
 // 2. Homograph & Structural Phishing Detection (Punycode & Credential Obfuscation)
-assert.equal(checkPhishingDomain('https://xn--pple-43d.com/login'), true); // IDN homograph spoofing
+assert.equal(checkPhishingDomain('https://xn--pple-43d.com/login'), true); // IDN homograph spoofing targeting apple
+assert.equal(checkPhishingDomain('https://xn--mnchen-3ya.de'), false); // Legitimate German IDN (münchen.de) must not be blocked
+assert.equal(checkPhishingDomain('https://xn--trk-goa2g.org'), false); // Legitimate Turkish IDN (türkçe.org) must not be blocked
 assert.equal(checkPhishingDomain('https://paypal.com@evil-phishing.com/signin'), true); // Basic auth credential spoofing
 assert.equal(checkPhishingDomain('https://security-alert.cisco.com'), false); // Legitimate domain with security keyword (no false positive)
 assert.equal(checkPhishingDomain('https://billing-update.aws.amazon.com'), false); // Legitimate domain with billing keyword (no false positive)

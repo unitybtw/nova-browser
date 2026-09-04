@@ -209,10 +209,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             }
           } catch (e) {}
 
+          /**
+           * Password Manager Interaction-Driven Autofill & Multi-Account Picker (G-1 Remediation).
+           * Never injects credentials passively on DOM ready. Requires active user interaction
+           * (focus or click on a login input). If multiple accounts exist for the origin, renders
+           * a non-intrusive in-page account picker dropdown to let the user select their account.
+           */
           const passwordScript = `
             (function() {
               if (window.__nova_pw_injected) return;
               window.__nova_pw_injected = true;
+
+              const savedCredentials = ${JSON.stringify(savedPasswords).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
+              if (!Array.isArray(savedCredentials) || savedCredentials.length === 0) return;
 
               function isElementVisible(el) {
                 if (!el || el.type === 'hidden') return false;
@@ -226,65 +235,150 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 return true;
               }
 
-              // Autofill existing credentials
-              const savedCredentials = ${JSON.stringify(savedPasswords).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
-              if (savedCredentials.length > 0) {
-                const cred = savedCredentials[0];
-                const allPwds = Array.from(document.querySelectorAll('input[type="password"]'));
-                const visiblePwds = allPwds.filter(isElementVisible);
-                if (visiblePwds.length > 0) {
-                  const targetPwd = visiblePwds[0];
-                  const root = targetPwd.closest('form') || targetPwd.closest('fieldset') || targetPwd.parentElement || document;
-                  const allTexts = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]'));
-                  const visibleTexts = allTexts.filter(isElementVisible);
-                  if (visibleTexts.length > 0) {
-                    visibleTexts[0].value = cred.username;
-                    visibleTexts[0].dispatchEvent(new Event('input', { bubbles: true }));
-                    visibleTexts[0].dispatchEvent(new Event('change', { bubbles: true }));
-                  }
-                  targetPwd.value = cred.password;
-                  targetPwd.dispatchEvent(new Event('input', { bubbles: true }));
-                  targetPwd.dispatchEvent(new Event('change', { bubbles: true }));
+              function findRelatedInputs(targetEl) {
+                const root = targetEl.closest('form') || targetEl.closest('fieldset') || targetEl.parentElement || document;
+                const allPwds = Array.from(root.querySelectorAll('input[type="password"]')).filter(isElementVisible);
+                const allUsers = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]')).filter(isElementVisible);
+                return {
+                  pwdInput: allPwds[0] || (targetEl.type === 'password' ? targetEl : null),
+                  userInput: allUsers[0] || (targetEl.type !== 'password' ? targetEl : null)
+                };
+              }
+
+              let activePicker = null;
+
+              function dismissPicker() {
+                if (activePicker) {
+                  activePicker.remove();
+                  activePicker = null;
                 }
               }
 
-              // In-page fallback password capture listener
-              let lastUser = '';
-              document.addEventListener('input', (e) => {
-                const t = e.target;
-                if (t && t.tagName === 'INPUT') {
-                  const type = (t.type || '').toLowerCase();
-                  const name = (t.name || '').toLowerCase();
-                  if (type === 'text' || type === 'email' || type === 'tel' || name.includes('user') || name.includes('email') || name.includes('login')) {
-                    if (t.value && t.value.trim()) lastUser = t.value.trim();
+              function fillCredential(cred, targetEl) {
+                if (!cred) return;
+                const { pwdInput, userInput } = findRelatedInputs(targetEl);
+                if (userInput && cred.username) {
+                  userInput.value = cred.username;
+                  userInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  userInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                if (pwdInput && cred.password) {
+                  pwdInput.value = cred.password;
+                  pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+                  pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                dismissPicker();
+              }
+
+              function showAccountPicker(targetInput) {
+                dismissPicker();
+                const rect = targetInput.getBoundingClientRect();
+                if (rect.width === 0 && rect.height === 0) return;
+
+                const picker = document.createElement('div');
+                picker.id = 'nova-credential-picker';
+                picker.style.position = 'fixed';
+                picker.style.left = rect.left + 'px';
+                picker.style.top = (rect.bottom + 4) + 'px';
+                picker.style.width = Math.max(rect.width, 260) + 'px';
+                picker.style.maxHeight = '240px';
+                picker.style.overflowY = 'auto';
+                picker.style.backgroundColor = '#1e293b';
+                picker.style.color = '#f8fafc';
+                picker.style.border = '1px solid #334155';
+                picker.style.borderRadius = '8px';
+                picker.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.4)';
+                picker.style.zIndex = '2147483647';
+                picker.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+                picker.style.fontSize = '13px';
+                picker.style.padding = '4px';
+
+                const header = document.createElement('div');
+                header.style.padding = '6px 8px';
+                header.style.fontSize = '11px';
+                header.style.fontWeight = '600';
+                header.style.textTransform = 'uppercase';
+                header.style.letterSpacing = '0.05em';
+                header.style.color = '#94a3b8';
+                header.textContent = 'Nova Saved Accounts (' + savedCredentials.length + ')';
+                picker.appendChild(header);
+
+                savedCredentials.forEach(function(cred) {
+                  const item = document.createElement('div');
+                  item.style.padding = '8px 10px';
+                  item.style.borderRadius = '6px';
+                  item.style.cursor = 'pointer';
+                  item.style.display = 'flex';
+                  item.style.flexDirection = 'column';
+                  item.style.gap = '2px';
+                  item.style.transition = 'background-color 0.15s ease';
+
+                  const userSpan = document.createElement('span');
+                  userSpan.style.fontWeight = '500';
+                  userSpan.style.color = '#f1f5f9';
+                  userSpan.textContent = cred.username || 'Unnamed Account';
+
+                  const domainSpan = document.createElement('span');
+                  domainSpan.style.fontSize = '11px';
+                  domainSpan.style.color = '#64748b';
+                  domainSpan.textContent = cred.hostname || window.location.hostname;
+
+                  item.appendChild(userSpan);
+                  item.appendChild(domainSpan);
+
+                  item.addEventListener('mouseenter', function() {
+                    item.style.backgroundColor = '#334155';
+                  });
+                  item.addEventListener('mouseleave', function() {
+                    item.style.backgroundColor = 'transparent';
+                  });
+                  item.addEventListener('mousedown', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    fillCredential(cred, targetInput);
+                  });
+
+                  picker.appendChild(item);
+                });
+
+                document.body.appendChild(picker);
+                activePicker = picker;
+              }
+
+              function handleInteraction(e) {
+                const el = e.target;
+                if (!el || el.tagName !== 'INPUT' || !isElementVisible(el)) return;
+
+                if (savedCredentials.length === 1) {
+                  fillCredential(savedCredentials[0], el);
+                } else if (savedCredentials.length > 1) {
+                  showAccountPicker(el);
+                }
+              }
+
+              document.addEventListener('focusin', function(e) {
+                const el = e.target;
+                if (el && el.tagName === 'INPUT') {
+                  const type = (el.type || '').toLowerCase();
+                  if (type === 'password' || type === 'text' || type === 'email') {
+                    handleInteraction(e);
                   }
                 }
               }, true);
 
-              const checkAndEmit = () => {
-                const pwds = Array.from(document.querySelectorAll('input[type="password"]'));
-                const activePwd = pwds.find(p => p.value && p.value.length > 0);
-                if (!activePwd || !activePwd.value) return;
-
-                const root = activePwd.closest('form') || activePwd.closest('div') || document;
-                let userInp = root.querySelector('input[autocomplete="username"], input[autocomplete="email"], input[name*="user" i], input[name*="email" i], input[name*="login" i], input[type="email"], input[type="text"]');
-                const foundUser = (userInp && userInp.value && userInp.value.trim()) || lastUser;
-                
-                if (foundUser && activePwd.value) {
-                  // Password detection is handled exclusively via secure isolated preload IPC
-                }
-              };
-
-              document.addEventListener('submit', checkAndEmit, true);
-              document.addEventListener('keydown', (e) => { if (e.key === 'Enter') checkAndEmit(); }, true);
-              document.addEventListener('click', (e) => {
-                const btn = e.target && e.target.closest('button, input[type="submit"], input[type="button"], a[role="button"], div[role="button"]');
-                if (btn) {
-                  const txt = (btn.textContent || btn.value || '').toLowerCase();
-                  if (btn.type === 'submit' || /log|sign|giriş|kayıt|devam|next|continue|submit|ileri/i.test(txt)) {
-                    setTimeout(checkAndEmit, 50);
+              document.addEventListener('click', function(e) {
+                if (activePicker && !activePicker.contains(e.target)) {
+                  dismissPicker();
+                } else if (e.target && e.target.tagName === 'INPUT') {
+                  const type = (e.target.type || '').toLowerCase();
+                  if (type === 'password' || type === 'text' || type === 'email') {
+                    handleInteraction(e);
                   }
                 }
+              }, true);
+
+              document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') dismissPicker();
               }, true);
             })();
           `;
