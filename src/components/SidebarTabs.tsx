@@ -45,6 +45,7 @@ import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { generateId } from '../utils/idGenerator';
+import { getLocale } from '../services/i18n';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -636,7 +637,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
     const fetchSuggestions = async () => {
       try {
-        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
+        const clientLocale = getLocale();
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted) {
@@ -651,7 +652,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         }
         // Fallback for non-electron web preview only when google is the chosen engine
         if (searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'tr';
+          const lang = clientLocale.split('-')[0] || 'en';
           const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
           const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
             signal: abortController.signal

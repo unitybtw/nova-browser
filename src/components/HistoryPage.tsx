@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Clock, Search, Trash2, Globe, Calendar, ArrowUpRight } from 'lucide-react';
 import { HistoryItem } from '../types/browser';
+import { useTranslation } from '../services/i18n';
 
 interface HistoryPageProps {
   history: HistoryItem[];
@@ -15,6 +16,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   onClearHistory,
   onRemoveHistoryItem
 }) => {
+  const { t, formatTime: formatTimeI18n } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearTimeframe, setClearTimeframe] = useState('all');
@@ -35,33 +37,36 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
     const yesterdayStart = todayStart - 86400000;
     const lastWeekStart = todayStart - 7 * 86400000;
 
+    const todayLabel = t('history.today');
+    const yesterdayLabel = t('history.yesterday');
+    const last7DaysLabel = t('history.last7Days');
+    const olderLabel = t('history.older');
+
     const groups: { [key: string]: HistoryItem[] } = {
-      'Today': [],
-      'Yesterday': [],
-      'Last 7 Days': [],
-      'Older': []
+      [todayLabel]: [],
+      [yesterdayLabel]: [],
+      [last7DaysLabel]: [],
+      [olderLabel]: []
     };
 
     filteredHistory.forEach(item => {
-      const t = item.timestamp;
-      if (t >= todayStart) {
-        groups['Today'].push(item);
-      } else if (t >= yesterdayStart) {
-        groups['Yesterday'].push(item);
-      } else if (t >= lastWeekStart) {
-        groups['Last 7 Days'].push(item);
+      const tTime = item.timestamp;
+      if (tTime >= todayStart) {
+        groups[todayLabel].push(item);
+      } else if (tTime >= yesterdayStart) {
+        groups[yesterdayLabel].push(item);
+      } else if (tTime >= lastWeekStart) {
+        groups[last7DaysLabel].push(item);
       } else {
-        groups['Older'].push(item);
+        groups[olderLabel].push(item);
       }
     });
 
     return Object.entries(groups).filter(([_, items]) => items.length > 0);
-  }, [filteredHistory]);
+  }, [filteredHistory, t]);
 
   const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
-    return date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    return formatTimeI18n(timestamp);
   };
 
   const handleFaviconError = (id: string) => {
@@ -81,8 +86,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               <Clock className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">History</h1>
-              <p className="text-sm text-slate-500 dark:text-slate-400">{history.length} pages recorded</p>
+              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{t('history.title')}</h1>
+              <p className="text-sm text-slate-500 dark:text-slate-400">{t('history.pagesRecorded', { count: history.length })}</p>
             </div>
           </div>
           {history.length > 0 && (
@@ -91,7 +96,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-500/10 dark:hover:bg-red-500/20 dark:text-red-400 rounded-xl text-sm font-semibold transition-colors"
             >
               <Trash2 className="w-4 h-4" />
-              Clear browsing data
+              {t('history.clearBrowsingData')}
             </button>
           )}
         </header>
@@ -104,26 +109,25 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   <Trash2 className="w-6 h-6" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">Clear Browsing Data</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
+                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">{t('history.clearModalTitle')}</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{t('history.clearModalDesc')}</p>
                 </div>
               </div>
               
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Time range
+                    {t('settings.appearance')}
                   </label>
                   <select 
                     value={clearTimeframe}
                     onChange={(e) => setClearTimeframe(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500/50 text-slate-800 dark:text-slate-200"
                   >
-                    <option value="hour">Last hour</option>
-                    <option value="day">Last 24 hours</option>
-                    <option value="week">Last 7 days</option>
-                    <option value="month">Last 4 weeks</option>
-                    <option value="all">All time</option>
+                    <option value="hour">{t('history.lastHour')}</option>
+                    <option value="day">{t('history.last24Hours')}</option>
+                    <option value="week">{t('history.last7DaysOption')}</option>
+                    <option value="all">{t('history.allTime')}</option>
                   </select>
                 </div>
               </div>
@@ -133,7 +137,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   onClick={() => setIsClearModalOpen(false)}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
                 >
-                  Cancel
+                  {t('common.cancel')}
                 </button>
                 <button
                   onClick={() => {
@@ -142,7 +146,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                   }}
                   className="px-5 py-2.5 rounded-xl text-sm font-medium bg-red-500 hover:bg-red-600 text-white shadow-sm transition-colors"
                 >
-                  Clear Data
+                  {t('common.clear')}
                 </button>
               </div>
             </div>
@@ -155,7 +159,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search history by title or URL..."
+            placeholder={t('history.searchPlaceholder')}
             className="w-full h-12 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 rounded-2xl pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-500/50 shadow-sm transition-shadow text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 backdrop-blur-md"
           />
         </div>
@@ -164,13 +168,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
           {history.length === 0 ? (
             <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
               <Clock className="w-16 h-16 text-slate-200 dark:text-slate-700 mb-4" />
-              <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">Your history is clear</h3>
-              <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Pages you visit will appear here.</p>
+              <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300">{t('history.noHistory')}</h3>
             </div>
           ) : filteredHistory.length === 0 ? (
             <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-12 flex flex-col items-center justify-center text-center shadow-sm">
               <Search className="w-12 h-12 text-slate-200 dark:text-slate-700 mb-4" />
-              <p className="text-base font-medium text-slate-500 dark:text-slate-400">No matching history found.</p>
+              <p className="text-base font-medium text-slate-500 dark:text-slate-400">{t('history.noHistory')}</p>
             </div>
           ) : (
             groupedHistory.map(([groupLabel, items]) => (

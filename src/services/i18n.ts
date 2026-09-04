@@ -14,6 +14,30 @@ const dictionaries: Record<SupportedLanguage, Record<string, any>> = {
   de
 };
 
+export const LOCALE_MAP: Record<SupportedLanguage, string> = {
+  en: 'en-US',
+  tr: 'tr-TR',
+  de: 'de-DE',
+  ar: 'ar-SA'
+};
+
+export function getLocale(lang?: SupportedLanguage): string {
+  const current = lang || activeLanguage;
+  return LOCALE_MAP[current] || 'en-US';
+}
+
+export function formatDate(date: Date | number, lang?: SupportedLanguage, options?: Intl.DateTimeFormatOptions): string {
+  const d = typeof date === 'number' ? new Date(date) : date;
+  const locale = getLocale(lang);
+  return d.toLocaleDateString(locale, options || { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+export function formatTime(date: Date | number, lang?: SupportedLanguage, options?: Intl.DateTimeFormatOptions): string {
+  const d = typeof date === 'number' ? new Date(date) : date;
+  const locale = getLocale(lang);
+  return d.toLocaleTimeString(locale, options || { hour: '2-digit', minute: '2-digit' });
+}
+
 const RTL_LANGUAGES = new Set<string>(['ar']);
 
 const SUPPORTED_LANGUAGES: SupportedLanguage[] = ['en', 'tr', 'ar', 'de'];
@@ -155,7 +179,10 @@ export function useTranslation() {
   return {
     t,
     language: lang,
+    locale: getLocale(lang),
     isRTL: isRTL(lang),
-    setLanguage
+    setLanguage,
+    formatDate: (date: Date | number, options?: Intl.DateTimeFormatOptions) => formatDate(date, lang, options),
+    formatTime: (date: Date | number, options?: Intl.DateTimeFormatOptions) => formatTime(date, lang, options)
   };
 }

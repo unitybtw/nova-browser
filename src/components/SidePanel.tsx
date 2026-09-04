@@ -9,6 +9,7 @@ import { tts } from '../services/tts';
 import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { showConfirm } from '../utils/confirmDialog';
+import { getLocale } from '../services/i18n';
 
 interface SidePanelProps {
   isOpen: boolean;
@@ -845,7 +846,7 @@ export const SidePanel = React.memo(({
                           <div className="flex flex-col gap-1 flex-1">
                             <div className="flex items-center justify-between">
                               <span className="text-[10px] text-slate-400 font-medium">Task Record</span>
-                              <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}</span>
                             </div>
                             <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
                               {t.summary}

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Search, FolderOpen } from 'lucide-react';
+import { useTranslation } from '../services/i18n';
 
 export interface DownloadItemPage {
   id: string;
@@ -21,6 +22,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   downloads,
   onClearDownloads
 }) => {
+  const { t } = useTranslation();
   const [filterText, setFilterText] = useState('');
 
   const formatBytes = (bytes: number) => {
@@ -49,7 +51,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
               <Download className="w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Downloads</h1>
+              <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{t('downloads.title')}</h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{downloads.length} total items</p>
             </div>
           </div>
@@ -60,7 +62,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                 className="flex items-center gap-2 px-3.5 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold transition-colors border border-red-500/20"
               >
                 <Trash2 className="w-4 h-4" />
-                Clear list
+                {t('downloads.clearList')}
               </button>
             )}
           </div>
@@ -73,7 +75,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
               type="text"
               value={filterText}
               onChange={(e) => setFilterText(e.target.value)}
-              placeholder="Filter downloads by name or URL..."
+              placeholder={t('downloads.searchPlaceholder')}
               className="flex-1 bg-transparent text-xs font-medium outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
             />
           </div>
@@ -85,10 +87,10 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Download className="w-16 h-16 text-slate-300 dark:text-slate-700 mb-4" />
                 <h3 className="text-base font-semibold text-slate-700 dark:text-slate-300">
-                  {downloads.length === 0 ? 'No downloads yet' : 'No matching downloads found'}
+                  {t('downloads.noDownloads')}
                 </h3>
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                  {downloads.length === 0 ? 'Files you download will appear here.' : 'Try changing your search filter.'}
+                  {t('downloads.noDownloadsDesc')}
                 </p>
               </div>
             ) : (
@@ -116,17 +118,17 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                       <div className="shrink-0 text-right">
                         {item.state === 'completed' && (
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Done
+                            <CheckCircle2 className="w-3.5 h-3.5" /> {t('downloads.completed')}
                           </span>
                         )}
                         {item.state === 'cancelled' && (
                           <span className="flex items-center gap-1.5 text-xs font-semibold text-red-500 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20">
-                            <AlertCircle className="w-3.5 h-3.5" /> Cancelled
+                            <AlertCircle className="w-3.5 h-3.5" /> {t('downloads.cancelled')}
                           </span>
                         )}
                         {item.state === 'progressing' && (
                           <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">
-                            {item.isPaused ? 'Paused' : `${percent}%`}
+                            {item.isPaused ? t('downloads.pause') : `${percent}%`}
                           </span>
                         )}
                       </div>
@@ -157,7 +159,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                               }
                             }}
                             className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-500 transition-colors"
-                            title={item.isPaused ? "Resume" : "Pause"}
+                            title={item.isPaused ? t('downloads.resume') : t('downloads.pause')}
                           >
                             {item.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
                           </button>
@@ -166,7 +168,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                               (window as any).electronAPI?.cancelDownload?.(item.id);
                             }}
                             className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
-                            title="Cancel"
+                            title={t('downloads.cancel')}
                           >
                             <XCircle className="w-3.5 h-3.5" />
                           </button>
@@ -178,7 +180,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                             onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
                             className="text-xs font-semibold text-slate-600 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center gap-1"
                           >
-                            <FolderOpen className="w-3.5 h-3.5" /> Show in folder
+                            <FolderOpen className="w-3.5 h-3.5" /> {t('downloads.openFolder')}
                           </button>
                           <button
                             onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}

@@ -7,7 +7,7 @@ import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../types/browser';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { generateId } from '../utils/idGenerator';
-import { useTranslation } from '../services/i18n';
+import { useTranslation, getLocale } from '../services/i18n';
 
 interface Todo {
   id: string;
@@ -33,35 +33,20 @@ interface ClockProps {
   isActive?: boolean;
 }
 
-const getInitialTimeAndGreeting = () => {
-  const now = new Date();
-  const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
-  const time = now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
-  const hour = now.getHours();
-  let greet = 'Good Evening';
-  if (hour < 12) greet = 'Good Morning';
-  else if (hour < 18) greet = 'Good Afternoon';
-  const dateStr = now.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' });
-  return { time, greet, dateStr };
+const getGreetingKey = (hour: number): string => {
+  if (hour < 12) return 'newtab.goodMorning';
+  if (hour < 18) return 'newtab.goodAfternoon';
+  return 'newtab.goodEvening';
 };
 
 export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = true }) => {
-  const initial = useMemo(() => getInitialTimeAndGreeting(), []);
-  const [timeStr, setTimeStr] = useState(initial.time);
-  const [greeting, setGreeting] = useState(initial.greet);
-  const [dateStr, setDateStr] = useState(initial.dateStr);
+  const { t, language } = useTranslation();
+  const [currentTime, setCurrentTime] = useState(() => new Date());
 
   useEffect(() => {
     if (!isActive) return;
     const updateTime = () => {
-      const now = new Date();
-      const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
-      setTimeStr(now.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }));
-      const hour = now.getHours();
-      if (hour < 12) setGreeting('Good Morning');
-      else if (hour < 18) setGreeting('Good Afternoon');
-      else setGreeting('Good Evening');
-      setDateStr(now.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' }));
+      setCurrentTime(new Date());
     };
     updateTime();
     // The UI displays minute precision; polling once per second only caused
@@ -78,6 +63,19 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
       if (interval) clearInterval(interval);
     };
   }, [isActive]);
+
+  const locale = getLocale(language);
+  const timeStr = useMemo(() => {
+    return currentTime.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+  }, [currentTime, locale]);
+
+  const dateStr = useMemo(() => {
+    return currentTime.toLocaleDateString(locale, { weekday: 'long', month: 'long', day: 'numeric' });
+  }, [currentTime, locale]);
+
+  const greeting = useMemo(() => {
+    return t(getGreetingKey(currentTime.getHours()));
+  }, [currentTime, t, language]);
 
   return (
     <motion.div 
@@ -137,7 +135,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   isActive = true,
   energySaverMode = false,
 }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
   const [shouldAnimate] = useState(() => {
     if (!hasAnimatedInitialLaunch) {
@@ -227,7 +225,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
     const timer = setTimeout(async () => {
       try {
-        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
+        const clientLocale = getLocale(language);
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
@@ -244,7 +242,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         }
         // Fallback for non-electron web preview only when google is the chosen engine
         if (searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'tr';
+          const lang = clientLocale.split('-')[0] || 'en';
           const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
           const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
             signal: abortController.signal
@@ -268,7 +266,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       clearTimeout(timer);
       abortController.abort();
     };
-  }, [query, isFocused, searchEngine]);
+  }, [query, isFocused, searchEngine, language]);
 
   useEffect(() => {
     if (isIncognito) return; // Incognito: never persist
@@ -463,9 +461,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-2xl shadow-black/50">
               <VenetianMask className="w-16 h-16 text-slate-300" strokeWidth={1.5} />
             </div>
-            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">You are in Incognito Tab</h1>
+            <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">{t('newtab.incognitoTitle')}</h1>
             <p className="text-lg text-slate-400 max-w-lg">
-              Your browsing history, cookies, site data, and information entered in forms will not be saved.
+              {t('newtab.incognitoDesc')}
             </p>
           </motion.div>
 
@@ -478,7 +476,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search or type URL in incognito mode..."
+                placeholder={t('newtab.incognitoPlaceholder')}
                 className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
               />
               <button 
@@ -526,7 +524,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 type="button"
                 onClick={shuffleWallpaper}
                 className="ml-1 p-1 hover:bg-white/20 rounded-full transition-colors flex items-center gap-1 text-white/90 hover:text-white"
-                title="Shuffle / Next Daily Photo"
+                title={t('newtab.shuffleWallpaper')}
               >
                 <Shuffle className="w-3.5 h-3.5" />
               </button>
@@ -899,16 +897,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               {privacyShield ? (
                 <>
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
-                  <span>Shield Active (AdBlock & Tracker Protection)</span>
+                  <span>{t('newtab.shieldActive')}</span>
                 </>
               ) : (
                 <>
                   <ShieldAlert className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
-                  <span>Shield Disabled</span>
+                  <span>{t('newtab.shieldDisabled')}</span>
                 </>
               ) }
             </div>
-            <span>Engine: {getSearchEngineName(searchEngine)}</span>
+            <span>{t('newtab.searchEngine', { engine: getSearchEngineName(searchEngine) })}</span>
           </div>
         </motion.div>
 
@@ -995,19 +993,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
           <div className="flex items-center gap-2">
             <ListTodo className="w-4 h-4 text-accent" />
-            <span>Tasks</span>
+            <span>{t('newtab.tasks')}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium opacity-60 bg-slate-500/10 px-2 py-0.5 rounded-full">
-              {todos.filter(t => !t.completed).length} left
+              {t('newtab.tasksLeft', { count: todos.filter(t => !t.completed).length })}
             </span>
             {todos.some(t => t.completed) && (
               <button
                 onClick={clearCompletedTodos}
                 className="text-xs font-semibold text-red-500 hover:text-red-400 transition-colors opacity-80 hover:opacity-100 ml-1 cursor-pointer"
-                title="Clear completed tasks"
+                title={t('newtab.clearTasksTitle')}
               >
-                Clear
+                {t('newtab.clearCompletedTasks')}
               </button>
             )}
           </div>
@@ -1057,7 +1055,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     deleteTodo(todo.id);
                   }}
                   className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors shrink-0 cursor-pointer"
-                  title="Delete task"
+                  title={t('newtab.deleteTask')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
@@ -1067,7 +1065,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           {todos.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center text-xs opacity-50 space-y-1">
               <CheckSquare className="w-6 h-6 stroke-[1.5] text-accent" />
-              <span>No tasks for today. All done!</span>
+              <span>{t('newtab.noTasks')}</span>
             </div>
           )}
         </div>
@@ -1078,7 +1076,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               type="text"
               value={newTodo}
               onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="Add a new task..."
+              placeholder={t('newtab.addTaskPlaceholder')}
               className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-colors focus:ring-2 focus:ring-accent/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
             />
             {newTodo.trim() && (
@@ -1109,10 +1107,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             exit={{ scale: 0.95 }}
             className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700"
           >
-            <h3 className="text-lg font-bold mb-4">{editingDial.index !== null ? 'Edit Shortcut' : 'Add Shortcut'}</h3>
+            <h3 className="text-lg font-bold mb-4">{editingDial.index !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}</h3>
             <div className="space-y-3">
               <div>
-                <label className="text-xs font-semibold opacity-70 block mb-1">Name</label>
+                <label className="text-xs font-semibold opacity-70 block mb-1">{t('newtab.shortcutName')}</label>
                 <input 
                   type="text" 
                   value={editingDial.name}
@@ -1122,7 +1120,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold opacity-70 block mb-1">URL</label>
+                <label className="text-xs font-semibold opacity-70 block mb-1">{t('newtab.shortcutUrl')}</label>
                 <input 
                   type="text" 
                   value={editingDial.url}
@@ -1137,13 +1135,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 onClick={() => setIsEditModalOpen(false)}
                 className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-sm font-medium transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button 
                 onClick={handleAddSpeedDial}
                 className="px-4 py-2 bg-accent-hover hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-md shadow-indigo-600/20"
               >
-                Save
+                {t('common.save')}
               </button>
             </div>
           </motion.div>

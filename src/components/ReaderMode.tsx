@@ -10,6 +10,7 @@ import { Readability } from '@mozilla/readability';
 import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo, tts } from '../services/tts';
 import { safeBase64 as safeBase64Util } from '../utils/securityUtils';
 import { generateId } from '../utils/idGenerator';
+import { getLocale } from '../services/i18n';
 
 const safeBase64 = (str: string): string => {
   return safeBase64Util(str);
@@ -93,7 +94,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   });
   const [currentSentenceIndex, setCurrentSentenceIndex] = useState(0);
   const [sentences, setSentences] = useState<string[]>([]);
-  const [detectedLang, setDetectedLang] = useState(() => (typeof navigator !== 'undefined' ? navigator.language || 'tr-TR' : 'tr-TR'));
+  const [detectedLang, setDetectedLang] = useState(() => getLocale());
   const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
   
   // Voices (Native OS + Web Speech)

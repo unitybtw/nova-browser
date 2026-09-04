@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { getLocale } from '../services/i18n';
 
 interface AccountModalProps {
   isOpen: boolean;
@@ -149,7 +150,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     const diff = Math.floor((Date.now() - timestamp) / 1000);
     if (diff < 10) return 'Just now';
     if (diff < 60) return `${diff} seconds ago`;
-    const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
+    const locale = getLocale();
     return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
   };
 

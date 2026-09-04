@@ -5,6 +5,7 @@ import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
+import { getLocale } from '../services/i18n';
 
 interface SpotlightOmniboxProps {
   isOpen: boolean;
@@ -72,7 +73,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     const currentReqId = ++suggestionRequestIdRef.current;
     const fetchSuggestions = async () => {
       try {
-        const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
+        const clientLocale = getLocale();
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
@@ -87,7 +88,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
         }
         // Fallback for non-electron web preview only when google is the chosen engine
         if (searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'tr';
+          const lang = clientLocale.split('-')[0] || 'en';
           const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
           const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
           if (response.ok) {
