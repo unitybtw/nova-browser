@@ -149,8 +149,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     const diff = Math.floor((Date.now() - timestamp) / 1000);
     if (diff < 10) return 'Just now';
     if (diff < 60) return `${diff} seconds ago`;
-    if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-    return new Date(timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const locale = typeof navigator !== 'undefined' ? navigator.language : undefined;
+    return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(new Date(timestamp));
   };
 
   return (

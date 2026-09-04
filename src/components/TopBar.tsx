@@ -53,13 +53,12 @@ import {
   Cloud,
   Languages
 } from 'lucide-react';
-import { Tab, Bookmark, Workspace, PermissionRequest, Extension } from '../types/browser';
+import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { PageTranslatePopover } from './PageTranslatePopover';
-import { UserSettings } from '../App';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabHoverPreview } from './TabHoverPreview';
@@ -121,7 +120,7 @@ interface TopBarProps {
   onToggleVpn?: () => void;
   onToggleAIAssistant: () => void;
   activeDownloadsCount?: number;
-  downloads?: any[];
+  downloads?: DownloadItem[];
   onClearDownloads?: () => void;
   showBookmarksBar?: boolean;
   onToggleReaderMode?: () => void;
@@ -643,24 +642,31 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && Array.isArray(results)) {
-            setClientCachedSuggestions(cacheKey, results);
-            setSuggestions(results.slice(0, 6));
-            return;
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
+            if (Array.isArray(results)) {
+              setClientCachedSuggestions(cacheKey, results);
+              setSuggestions(results.slice(0, 6));
+            } else {
+              setSuggestions([]);
+            }
           }
+          return;
         }
-        const lang = clientLocale.split('-')[0] || 'tr';
-        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const response = await fetch(
-          `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`,
-          { signal: abortController.signal }
-        );
-        if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1])) {
-            const list = data[1].slice(0, 6);
-            setClientCachedSuggestions(cacheKey, list);
-            setSuggestions(list);
+        // Fallback for non-electron web preview only when google is the chosen engine
+        if (searchEngine === 'google') {
+          const lang = clientLocale.split('-')[0] || 'tr';
+          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+          const response = await fetch(
+            `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`,
+            { signal: abortController.signal }
+          );
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && response.ok) {
+            const data = await response.json();
+            if (data && Array.isArray(data) && Array.isArray(data[1])) {
+              const list = data[1].slice(0, 6);
+              setClientCachedSuggestions(cacheKey, list);
+              setSuggestions(list);
+            }
           }
         }
       } catch (err: any) {

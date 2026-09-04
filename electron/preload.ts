@@ -74,7 +74,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mcp-status-changed', handler);
     return () => ipcRenderer.removeListener('mcp-status-changed', handler);
   },
-  getMcpToken: () => ipcRenderer.invoke('get-mcp-token'),
+  copyMcpToken: () => ipcRenderer.invoke('copy-mcp-token'),
+  copyMcpConfig: () => ipcRenderer.invoke('copy-mcp-config'),
+  getMcpTokenStatus: () => ipcRenderer.invoke('get-mcp-token-status'),
   rotateMcpToken: () => ipcRenderer.invoke('rotate-mcp-token'),
   getMcpToolSettings: () => ipcRenderer.invoke('get-mcp-tool-settings'),
   setMcpToolEnabled: (toolName: string, enabled: boolean) => ipcRenderer.invoke('set-mcp-tool-enabled', toolName, enabled),
@@ -94,10 +96,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
   secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
+  secureStoreDelete: (key: string) => ipcRenderer.invoke('secure-store-delete', key),
   // Password Manager: fire-and-forget send channel (not invoke)
   savePassword: (data: { hostname: string; username: string; password: string }) => ipcRenderer.send('save-password', data),
   storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),
   storeGet: (key: string) => ipcRenderer.invoke('store-get', key),
+  showConfirmDialog: (options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) =>
+    ipcRenderer.invoke('show-confirm-dialog', options),
   // VPN
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => ipcRenderer.invoke('set-vpn', config),
   // Shortcuts, Navigation & Downloads events

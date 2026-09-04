@@ -1,13 +1,4 @@
-console.log('Main process starting...');
-// Process-level crash guards: prevent unexpected unhandled async errors from terminating Electron
-process.on('uncaughtException', (err) => {
-  console.error('[Main Process] Uncaught Exception caught safely:', err);
-});
-process.on('unhandledRejection', (reason) => {
-  console.error('[Main Process] Unhandled Rejection caught safely:', reason);
-});
-
-import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu } from 'electron';
+import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, clipboard } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'cross-fetch';
@@ -17,6 +8,37 @@ import https from 'https';
 import { promisify } from 'util';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
+
+console.log('Main process starting...');
+
+const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
+function appendCrashLog(entry: string): void {
+  try {
+    const logPath = app.isReady() ? path.join(app.getPath('userData'), 'crash.log') : 'crash.log';
+    if (fs.existsSync(logPath)) {
+      const stats = fs.statSync(logPath);
+      if (stats.size > MAX_CRASH_LOG_BYTES) {
+        const existing = fs.readFileSync(logPath, 'utf8');
+        const trimmed = existing.slice(-100 * 1024); // retain last 100 KB
+        fs.writeFileSync(logPath, trimmed, 'utf8');
+      }
+    }
+    fs.appendFileSync(logPath, entry);
+  } catch {}
+}
+
+// Process-level crash guards: log errors safely to prevent full browser shutdown DoS
+process.on('uncaughtException', (err) => {
+  console.error('[Main Process] Uncaught Exception caught safely:', err);
+  const errorLog = `[${new Date().toISOString()}] Uncaught Exception: ${err?.stack || err}\n`;
+  appendCrashLog(errorLog);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Main Process] Unhandled Rejection:', reason);
+  const errorLog = `[${new Date().toISOString()}] Unhandled Rejection: ${reason instanceof Error ? reason.stack : String(reason)}\n`;
+  appendCrashLog(errorLog);
+});
 
 let cachedDOMPurify: any = null;
 function getMainDOMPurify(): any {
@@ -461,8 +483,8 @@ function createWindow() {
         
         responseHeaders['Content-Security-Policy'] = [
           isDev
-            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'none';`
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' ws: wss: http: https:; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; base-uri 'self'; frame-ancestors 'none';`
+            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
         ];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
@@ -1065,7 +1087,7 @@ app.whenReady().then(async () => {
         return callback(false);
       }
 
-      const requestId = `perm_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+      const requestId = `perm_${crypto.randomUUID()}`;
 
       const timeoutId = setTimeout(() => {
         const req = pendingPermissions.get(requestId);
@@ -1384,13 +1406,128 @@ app.whenReady().then(async () => {
     try {
       if (typeof targetUrl === 'string') {
         const parsed = new URL(targetUrl);
-        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-          console.warn(`[Security] Blocked open-external for non-http(s) protocol: ${parsed.protocol}`);
+        // Security: Strictly enforce https: protocol only. Reject plaintext http: and custom schemes.
+        if (parsed.protocol !== 'https:') {
+          console.warn(`[Security] Blocked open-external for non-https protocol: ${parsed.protocol}`);
+          return false;
+        }
+        // Security: Block loopback, intranet, and link-local destinations to prevent SSRF and local service compromise
+        const host = parsed.hostname.toLowerCase();
+        const isPrivateOrLoopback = (() => {
+          if (
+            host === 'localhost' ||
+            host === '::1' ||
+            host === '[::1]' ||
+            host === '0.0.0.0' ||
+            host.endsWith('.local') ||
+            host.endsWith('.internal') ||
+            host.endsWith('.lan')
+          ) {
+            return true;
+          }
+          if (/^0x[0-9a-f]+$/i.test(host) || /^\d+$/.test(host)) {
+            return true;
+          }
+          const ipv4Match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+          if (ipv4Match) {
+            const o1 = Number(ipv4Match[1]);
+            const o2 = Number(ipv4Match[2]);
+            if (o1 === 127) return true; // 127.0.0.0/8 loopback
+            if (o1 === 10) return true; // 10.0.0.0/8 private
+            if (o1 === 172 && o2 >= 16 && o2 <= 31) return true; // 172.16.0.0/12 private (172.16.x - 172.31.x)
+            if (o1 === 192 && o2 === 168) return true; // 192.168.0.0/16 private
+            if (o1 === 169 && o2 === 254) return true; // 169.254.0.0/16 link-local / cloud metadata (169.254.169.254)
+            if (o1 === 0) return true; // 0.0.0.0/8
+            if (o1 === 100 && o2 >= 64 && o2 <= 127) return true; // 100.64.0.0/10 carrier-grade NAT
+          }
+          if (host.startsWith('[') && host.endsWith(']')) {
+            const rawIpv6 = host.slice(1, -1);
+            if (rawIpv6 === '::1' || rawIpv6.startsWith('fe80:') || rawIpv6.startsWith('fc00:') || rawIpv6.startsWith('fd00:')) {
+              return true;
+            }
+          }
+          // Fallback: normalize hex/octal/decimal obfuscations (0x7f.0.0.1,
+          // 0177.0.0.1, 2130706433, 0x7f000001) then re-check via shared policy.
+          // This also catches TEST-NET/multicast/reserved ranges the inline
+          // checks above miss. DNS rebinding is handled by the async DNS pin
+          // below (mirrors validatePreviewUrl); literal-IP parsing only here.
+          const normalizeObfuscatedIPv4 = (value: string): string | null => {
+            const parsePart = (part: string): number | null => {
+              if (/^0x[0-9a-f]+$/i.test(part)) {
+                const n = parseInt(part, 16);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              if (/^0[0-7]+$/.test(part)) {
+                const n = parseInt(part, 8);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              if (/^\d+$/.test(part)) {
+                const n = parseInt(part, 10);
+                return Number.isSafeInteger(n) ? n : null;
+              }
+              return null;
+            };
+            if (/^0x[0-9a-f]+$/i.test(value) || /^\d+$/.test(value)) {
+              const n = parsePart(value);
+              if (n === null || n < 0 || n > 0xffffffff) return null;
+              return `${(n >>> 24) & 255}.${(n >>> 16) & 255}.${(n >>> 8) & 255}.${n & 255}`;
+            }
+            const parts = value.split('.');
+            if (parts.length === 4) {
+              const nums: number[] = [];
+              for (const p of parts) {
+                const n = parsePart(p);
+                if (n === null || n < 0 || n > 255) return null;
+                nums.push(n);
+              }
+              return nums.join('.');
+            }
+            return null;
+          };
+          try {
+            const normalizedIp = normalizeObfuscatedIPv4(host);
+            if (normalizedIp && isPrivateIP(normalizedIp)) return true;
+            // Canonical dotted-decimal that slipped past inline checks (TEST-NET-1/2/3,
+            // IETF assignments, multicast/reserved) still fails closed via shared policy.
+            if (/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.test(host) && isPrivateIP(host)) return true;
+            // IPv6 literals (bracketed or bare incl. ::, ff02::1, 2001:db8::1,
+            // ::ffff:127.0.0.1, NAT64, 6to4) via shared policy.
+            const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+            if (bareV6.includes(':') && isPrivateIP(bareV6)) return true;
+          } catch {}
+          return false;
+        })();
+
+        if (isPrivateOrLoopback) {
+          console.warn(`[Security] Blocked open-external to private/loopback host: ${host}`);
+          return false;
+        }
+        // Security: DNS pin (mirrors validatePreviewUrl) — resolve hostname and
+        // fail closed if any resolved IP is private. Fail closed on DNS error.
+        try {
+          const lookupHost = (host.startsWith('[') && host.endsWith(']')) ? host.slice(1, -1) : host;
+          const dnsResult = await Promise.race([
+            dnsLookup(lookupHost, { all: true }) as Promise<any>,
+            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('DNS lookup timeout')), 3000)),
+          ]);
+          const addrList = Array.isArray(dnsResult) ? dnsResult : [dnsResult];
+          if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address ?? String(entry ?? '')))) {
+            console.warn(`[Security] Blocked open-external to DNS-pinned private IP for host: ${host}`);
+            return false;
+          }
+        } catch (dnsErr: any) {
+          console.warn(`[Security] Blocked open-external, DNS resolution failed for host: ${host}`, dnsErr?.message || dnsErr);
           return false;
         }
         // Security: Block embedded credentials in URLs (phishing, SSRF, or credential harvesting vector)
         if (parsed.username || parsed.password) {
           console.warn(`[Security] Blocked open-external with embedded credentials for host: ${parsed.host}`);
+          return false;
+        }
+        // Security: Block dangerous file extensions that could execute on the host OS
+        const pathname = parsed.pathname.toLowerCase();
+        if (/\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)$/i.test(pathname)) {
+          console.warn(`[Security] Blocked open-external for dangerous file extension: ${pathname}`);
           return false;
         }
         await shell.openExternal(parsed.href);
@@ -1489,8 +1626,32 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.sandbox = true;
     webPreferences.backgroundThrottling = true;
 
-    // Preload restriction: attach authorized webstore preload script (safely self-scoped to Web Store domains)
-    webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
+    // Security: Only attach webstore-preload.cjs to authorized Chrome Web Store origins.
+    // Untrusted third-party websites must never receive webstore APIs or privileges.
+    let isAuthorizedWebstore = false;
+    try {
+      if (params.src) {
+        const parsed = new URL(params.src);
+        if (parsed.protocol === 'javascript:' || parsed.protocol === 'data:' || parsed.protocol === 'file:') {
+          console.warn(`[Security] Blocked dangerous webview scheme in src: ${parsed.protocol}`);
+          event.preventDefault();
+          return;
+        }
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')) {
+          isAuthorizedWebstore = true;
+        }
+      }
+    } catch {
+      // Invalid URL format
+    }
+
+    if (isAuthorizedWebstore) {
+      webPreferences.preload = path.join(__dirname, 'webstore-preload.cjs');
+    } else {
+      // Security P0: never expose full preload (electronAPI) to untrusted guests.
+      // Main window keeps its own preload; webview guests run sandboxed with no preload.
+      webPreferences.preload = undefined;
+    }
   });
 
   // Security: Sliding-window rate limiter per WebContents to prevent popup flooding (DoS)
@@ -2270,13 +2431,64 @@ ipcMain.handle('stop-mcp-server', (event) => {
   return false;
 });
 
-ipcMain.handle('get-mcp-token', (event) => {
-  if (!isTrustedSender(event)) return '';
-  return mcpServer?.getToken() || '';
+let clipboardTokenClearTimer: NodeJS.Timeout | null = null;
+ipcMain.handle('copy-mcp-token', (event) => {
+  if (!isTrustedSender(event)) return false;
+  const token = mcpServer?.getToken();
+  if (token) {
+    clipboard.writeText(token);
+    // Security: Auto-clear token from clipboard after 60 seconds to prevent unauthorized exfiltration
+    if (clipboardTokenClearTimer) clearTimeout(clipboardTokenClearTimer);
+    clipboardTokenClearTimer = setTimeout(() => {
+      try {
+        if (clipboard.readText() === token) {
+          clipboard.clear();
+        }
+      } catch (_) {}
+    }, 60000);
+    return true;
+  }
+  return false;
+});
+let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
+ipcMain.handle('copy-mcp-config', (event) => {
+  if (!isTrustedSender(event)) return false;
+  const token = mcpServer?.getToken() || '';
+  const port = (mcpServer as any)?.port || 3020;
+  const config = JSON.stringify({
+    mcpServers: {
+      "nova-browser": {
+        url: `http://localhost:${port}/sse`,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    }
+  }, null, 2);
+  clipboard.writeText(config);
+  // Security: Auto-clear Bearer-bearing config from clipboard after 60s (same as copy-mcp-token)
+  if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);
+  clipboardConfigClearTimer = setTimeout(() => {
+    try {
+      if (clipboard.readText() === config) {
+        clipboard.clear();
+      }
+    } catch (_) {}
+  }, 60000);
+  return { ok: true, autoClearSec: 60 };
+});
+ipcMain.handle('get-mcp-token-status', (event) => {
+  if (!isTrustedSender(event)) return { configured: false, prefix: '' };
+  const token = mcpServer?.getToken();
+  return {
+    configured: Boolean(token),
+    prefix: token ? 'nova_mcp_••••••••' : ''
+  };
 });
 ipcMain.handle('rotate-mcp-token', (event) => {
-  if (!isTrustedSender(event)) return '';
-  return mcpServer?.rotateToken() || '';
+  if (!isTrustedSender(event)) return false;
+  mcpServer?.rotateToken();
+  return true;
 });
 ipcMain.handle('get-mcp-tool-settings', (event) => {
   if (!isTrustedSender(event)) return [];
@@ -2423,6 +2635,21 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
   return null;
 });
 
+ipcMain.handle('secure-store-delete', async (event, key: string) => {
+  if (!isTrustedSender(event)) return false;
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
+    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+    if (fs.existsSync(keyPath)) {
+      fs.unlinkSync(keyPath);
+    }
+    return true;
+  } catch (err) {
+    console.error('Secure store delete error:', err);
+    return false;
+  }
+});
+
 // Generic JSON Storage API (for highlights, stats, whitelists, etc.)
 ipcMain.handle('store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
@@ -2485,11 +2712,23 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   const proxyRules = (isEnabled && rawProxyUrl) ? rawProxyUrl : 'direct://';
   
   if (isEnabled && rawProxyUrl) {
-    // Security: Validate proxy URL protocol
-    const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
-    if (!allowedProxyProtocols.some(proto => proxyRules.startsWith(proto))) {
-      console.error('Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://');
-      return { error: 'Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://' };
+    // Security: Only secure proxy protocols are accepted (https://, socks5://).
+    // Plain http:// and socks4:// are rejected (credentials would travel
+    // in cleartext / weak handshake). Mirrors src/utils/proxyValidation.ts.
+    const normalizedProxyUrl = rawProxyUrl.trim().toLowerCase();
+    const allowedProxyProtocols = ['https://', 'socks5://'];
+    let validProxy = allowedProxyProtocols.some(proto => normalizedProxyUrl.startsWith(proto));
+    if (validProxy) {
+      try {
+        const parsedProxy = new URL(normalizedProxyUrl);
+        validProxy = (parsedProxy.protocol === 'https:' || parsedProxy.protocol === 'socks5:') && !!parsedProxy.hostname;
+      } catch {
+        validProxy = false;
+      }
+    }
+    if (!validProxy) {
+      console.error('Secure proxy required: https:// or socks5://');
+      return { error: 'Secure proxy required: https:// or socks5://' };
     }
   }
 
@@ -2663,11 +2902,18 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
         }
         const rawHtml = await readResponseTextWithLimit(res, MAX_PREVIEW_HTML_BYTES);
         // Security: Robust AST-based DOMPurify sanitization in main process
-        const html = getMainDOMPurify().sanitize(rawHtml, {
+        let html = getMainDOMPurify().sanitize(rawHtml, {
           WHOLE_DOCUMENT: true,
-          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base'],
-          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction']
+          FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'applet', 'svg', 'base', 'math', 'form', 'meta', 'link'],
+          FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'onfocus', 'onblur', 'formaction', 'ontoggle', 'oninput', 'onchange', 'onsubmit', 'onkeydown', 'onkeyup', 'onkeypress', 'onmouseenter', 'onmouseleave', 'onmousedown', 'onmouseup', 'ondblclick', 'oncontextmenu', 'onwheel', 'onscroll', 'ondragstart', 'srcdoc']
         });
+        // Security: Cap sanitized output at 3MB (also bounds the ReaderMode
+        // outerHTML -> fetchPageHtml fallback path at the main-process boundary).
+        const MAX_SANITIZED_HTML_CHARS = 3 * 1024 * 1024;
+        if (html.length > MAX_SANITIZED_HTML_CHARS) {
+          console.warn(`[fetch-page-html] Sanitized HTML exceeds 3MB (${html.length} chars), truncating`);
+          html = html.slice(0, MAX_SANITIZED_HTML_CHARS);
+        }
         return { success: true, html };
       }
       return { error: 'HTTP ' + res.status };
@@ -3487,10 +3733,10 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
           if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
             const domain = parsed.hostname;
             importedBookmarks.push({
-              id: `imported-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+              id: `bm_imp_${crypto.randomUUID()}`,
               title: String(node.name || node.url).substring(0, 200),
               url: node.url,
-              favicon: domain ? `https://www.google.com/s2/favicons?domain=${domain}&sz=32` : undefined
+              favicon: domain ? `https://${domain}/favicon.ico` : undefined
             });
           }
         } catch (_) {}
@@ -3842,4 +4088,46 @@ ipcMain.handle('native-tts-stop', async (event) => {
     return true;
   }
   return false;
+});
+
+// Sliding-window rate limit state for show-confirm-dialog (dialog flood protection)
+const CONFIRM_DIALOG_LIMIT = 5;
+const CONFIRM_DIALOG_WINDOW_MS = 10_000;
+const confirmDialogAttempts = new Map<number, number[]>();
+
+ipcMain.handle('show-confirm-dialog', async (event, options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) => {
+  if (!isTrustedSender(event)) return false;
+  // Security: Sliding-window rate limit against dialog flood (5 per 10s per sender).
+  const now = Date.now();
+  const senderId = event.sender.id;
+  const recentAttempts = (confirmDialogAttempts.get(senderId) || []).filter(t => now - t < CONFIRM_DIALOG_WINDOW_MS);
+  if (recentAttempts.length === 0) confirmDialogAttempts.delete(senderId);
+  // Avoid unbounded growth from destroyed senders: drop state when the sender dies.
+  try {
+    if (!confirmDialogAttempts.has(senderId)) {
+      event.sender.once('destroyed' as any, () => { confirmDialogAttempts.delete(senderId); });
+    }
+  } catch {}
+  if (recentAttempts.length >= CONFIRM_DIALOG_LIMIT) {
+    console.warn('[show-confirm-dialog] Rate limit exceeded for sender', senderId);
+    return false;
+  }
+  recentAttempts.push(now);
+  confirmDialogAttempts.set(senderId, recentAttempts);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const targetWin = win && !win.isDestroyed() ? win : (mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any);
+  const hasCancel = Boolean(options?.cancelLabel && options.cancelLabel.trim().length > 0);
+  const rawButtons = hasCancel ? [options?.confirmLabel || 'OK', options!.cancelLabel!] : [options?.confirmLabel || 'OK'];
+  const buttons = rawButtons.map(b => String(b || '').slice(0, 2048));
+  const result = await dialog.showMessageBox(targetWin, {
+    type: hasCancel ? 'question' : 'info',
+    buttons,
+    defaultId: 0,
+    cancelId: hasCancel ? 1 : 0,
+    title: String(options?.title || (hasCancel ? 'Confirmation' : 'Nova Browser')).slice(0, 2048),
+    message: String(options?.message || '').slice(0, 2048),
+    detail: options?.detail ? String(options.detail).slice(0, 2048) : undefined,
+    noLink: true
+  });
+  return result.response === 0;
 });

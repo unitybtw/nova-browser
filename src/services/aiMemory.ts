@@ -1,3 +1,5 @@
+import { generateId } from '../utils/idGenerator';
+
 export interface MemoryItem {
   id: string;
   fact: string;
@@ -142,7 +144,7 @@ class AIMemoryService {
     if (existing) return existing;
 
     const newItem: MemoryItem = {
-      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: generateId('mem'),
       fact: cleanFact,
       category,
       createdAt: Date.now(),
@@ -173,7 +175,7 @@ class AIMemoryService {
     const raw = (summary || '').slice(0, 300);
     const cleanSummary = this.redactSensitiveInfo(raw);
     const task: TaskSummary = {
-      id: Date.now().toString(36) + Math.random().toString(36).substring(2, 6),
+      id: generateId('task'),
       summary: cleanSummary,
       timestamp: Date.now(),
     };

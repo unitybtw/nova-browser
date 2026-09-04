@@ -16,10 +16,10 @@
  * accounts cannot sync. Legacy sync-chain/pairing APIs are deprecated (throw).
  */
 
-import { Bookmark, Folder, Tab, Workspace } from '../types/browser';
-import { HistoryItem, UserSettings } from '../App';
-import { getSupabaseClient, isSupabaseConfigured, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
+import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings } from '../types/browser';
+import { getSupabaseClient, isSupabaseConfigured, hasElectronSecureStore, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
 import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';
+import { generateId } from '../utils/idGenerator';
 
 export interface NovaUser {
   id: string;
@@ -234,6 +234,9 @@ class NovaSyncService {
   // post-push cleanup can wipe the legacy material.
   private usedLegacyKeyThisSync = false;
   private realtimeChannel: any = null;
+  // Coalesce realtime bursts: rapid postgres_changes events schedule a single
+  // notify 1000ms after the last event instead of one full sync per event.
+  private realtimeNotifyTimer: ReturnType<typeof setTimeout> | null = null;
   // In-flight lazy Supabase auth-listener initialization. Kept so concurrent
   // triggers share one init; reset on failure so a later auth action retries.
   private supabaseInitPromise: Promise<void> | null = null;
@@ -298,6 +301,229 @@ class NovaSyncService {
       return Boolean(await this.electronAPI?.secureStoreSet?.(name, value));
     } catch {
       return false;
+    }
+  }
+
+  /** Best-effort delete from the OS secure store; never throws. */
+  private async deleteSecureStore(name: string): Promise<boolean> {
+    try {
+      return Boolean(await this.electronAPI?.secureStoreDelete?.(name));
+    } catch {
+      return false;
+    }
+  }
+
+  /** Session-scoped (tab lifetime) Web Storage read; null when unavailable/empty. Never throws. */
+  private readSessionValue(key: string): string | null {
+    try {
+      if (typeof sessionStorage !== 'undefined') return sessionStorage.getItem(key);
+    } catch {
+      // Storage blocked (e.g. private mode) — treat as empty.
+    }
+    return null;
+  }
+
+  /** Session-scoped (tab lifetime) Web Storage write; never throws. */
+  private writeSessionValue(key: string, value: string): void {
+    try {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
+    } catch {
+      console.warn(`[NovaSync] sessionStorage unavailable — "${key}" kept memory-only for this session.`);
+    }
+  }
+
+  /** Session-scoped Web Storage delete; never throws. */
+  private removeSessionValue(key: string): void {
+    try {
+      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
+    } catch {
+      // Best-effort only.
+    }
+  }
+
+  /** Read user profile from OS keychain / secureStore with session + legacy fallbacks. */
+  private async readStoredUser(): Promise<NovaUser | null> {
+    const secure = await this.readSecureStore(STORAGE_KEYS.USER);
+    if (secure) {
+      try {
+        const parsed = JSON.parse(secure);
+        if (parsed && typeof parsed === 'object' && parsed.id) return parsed;
+      } catch {}
+    }
+    // Session-scoped fallback (web builds without the OS secure store).
+    const session = this.readSessionValue(STORAGE_KEYS.USER);
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        if (parsed && typeof parsed === 'object' && parsed.id) return parsed;
+      } catch {}
+    }
+    if (typeof localStorage !== 'undefined') {
+      const legacy = localStorage.getItem(STORAGE_KEYS.USER);
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy);
+          if (parsed && typeof parsed === 'object' && parsed.id) {
+            if (hasElectronSecureStore()) {
+              const ok = await this.writeSecureStore(STORAGE_KEYS.USER, legacy);
+              if (ok) {
+                localStorage.removeItem(STORAGE_KEYS.USER);
+              }
+            } else {
+              // Web fallback: lift the legacy plaintext copy into
+              // session-scoped storage and scrub it from localStorage.
+              this.writeSessionValue(STORAGE_KEYS.USER, legacy);
+              localStorage.removeItem(STORAGE_KEYS.USER);
+              console.warn('[NovaSync] Migrated legacy plaintext user profile from localStorage to session-only storage.');
+            }
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+    return null;
+  }
+
+  /** Write user profile to OS keychain / secureStore; session-only on web, scrubbing plaintext localStorage. */
+  private async writeStoredUser(user: NovaUser | null): Promise<void> {
+    if (!user) {
+      await this.deleteSecureStore(STORAGE_KEYS.USER);
+      this.removeSessionValue(STORAGE_KEYS.USER);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+      return;
+    }
+    const raw = JSON.stringify(user);
+    if (hasElectronSecureStore()) {
+      await this.writeSecureStore(STORAGE_KEYS.USER, raw);
+      this.removeSessionValue(STORAGE_KEYS.USER);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+    } else {
+      // Security: never persist the profile as plaintext in localStorage on
+      // web builds without the OS secure store (same policy as
+      // writeStoredToken). Session-scoped only; the Settings UI should warn
+      // the user that the session will not survive a browser restart.
+      this.writeSessionValue(STORAGE_KEYS.USER, raw);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.USER);
+      }
+      console.warn('[NovaSync] Web build without secure store: user profile kept session-only, not persisted.');
+    }
+  }
+
+  /** Read auth token from OS keychain / secureStore with non-destructive fallback. */
+  private async readStoredToken(): Promise<string | null> {
+    const secure = await this.readSecureStore(STORAGE_KEYS.TOKEN);
+    if (secure) return secure;
+    if (typeof localStorage !== 'undefined') {
+      const legacy = localStorage.getItem(STORAGE_KEYS.TOKEN);
+      if (legacy) {
+        if (hasElectronSecureStore()) {
+          const ok = await this.writeSecureStore(STORAGE_KEYS.TOKEN, legacy);
+          if (ok) {
+            localStorage.removeItem(STORAGE_KEYS.TOKEN);
+          }
+        } else {
+          // Web fallback: lift the legacy plaintext token into
+          // session-scoped storage and scrub it from localStorage (same
+          // policy as readStoredUser/readUserRegistry). Auth tokens must
+          // never linger as plaintext in localStorage.
+          this.writeSessionValue(STORAGE_KEYS.TOKEN, legacy);
+          localStorage.removeItem(STORAGE_KEYS.TOKEN);
+          console.warn('[NovaSync] Migrated legacy plaintext auth token from localStorage to session-only storage.');
+        }
+        return legacy;
+      }
+    }
+    return null;
+  }
+
+  /** Persist auth token to OS keychain / secureStore, wiping plaintext localStorage. */
+  private async writeStoredToken(token: string): Promise<void> {
+    this.token = token;
+    if (!token) {
+      await this.deleteSecureStore(STORAGE_KEYS.TOKEN);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      }
+      return;
+    }
+    if (hasElectronSecureStore()) {
+      await this.writeSecureStore(STORAGE_KEYS.TOKEN, token);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      }
+    } else if (typeof localStorage !== 'undefined') {
+      // Security: never store auth token as plaintext in localStorage
+      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    }
+  }
+
+  /** Read user credential registry from OS keychain / secureStore with session + legacy fallbacks. */
+  private async readUserRegistry(): Promise<Record<string, LocalRegistryEntry>> {
+    const secure = await this.readSecureStore(STORAGE_KEYS.USER_REGISTRY);
+    if (secure) {
+      try {
+        const parsed = JSON.parse(secure);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch {}
+    }
+    // Session-scoped fallback (web builds without the OS secure store).
+    const session = this.readSessionValue(STORAGE_KEYS.USER_REGISTRY);
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        if (parsed && typeof parsed === 'object') return parsed;
+      } catch {}
+    }
+    if (typeof localStorage !== 'undefined') {
+      const legacy = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
+      if (legacy) {
+        try {
+          const parsed = JSON.parse(legacy);
+          if (parsed && typeof parsed === 'object') {
+            if (hasElectronSecureStore()) {
+              const ok = await this.writeSecureStore(STORAGE_KEYS.USER_REGISTRY, legacy);
+              if (ok) {
+                localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
+              }
+            } else {
+              // Web fallback: lift the legacy plaintext copy (holds
+              // passwordHash + syncKeySalt) into session-scoped storage and
+              // scrub it from localStorage.
+              this.writeSessionValue(STORAGE_KEYS.USER_REGISTRY, legacy);
+              localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
+              console.warn('[NovaSync] Migrated legacy plaintext account registry from localStorage to session-only storage.');
+            }
+            return parsed;
+          }
+        } catch {}
+      }
+    }
+    return {};
+  }
+
+  /** Write user credential registry to OS keychain / secureStore; session-only on web, scrubbing plaintext localStorage. */
+  private async writeUserRegistry(registry: Record<string, LocalRegistryEntry>): Promise<void> {
+    const raw = JSON.stringify(registry);
+    if (hasElectronSecureStore()) {
+      await this.writeSecureStore(STORAGE_KEYS.USER_REGISTRY, raw);
+      this.removeSessionValue(STORAGE_KEYS.USER_REGISTRY);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
+      }
+    } else {
+      // Security: the registry holds passwordHash + syncKeySalt — never
+      // persist it as plaintext in localStorage on web builds without the OS
+      // secure store (same policy as writeStoredToken). Session-scoped only.
+      this.writeSessionValue(STORAGE_KEYS.USER_REGISTRY, raw);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
+      }
+      console.warn('[NovaSync] Web build without secure store: account registry kept session-only, not persisted.');
     }
   }
 
@@ -422,30 +648,44 @@ class NovaSyncService {
   }
 
   private loadSession() {
-    // Guard: Web Storage is unavailable in non-browser contexts (unit tests,
-    // SSR). aiMemory uses the same pattern — skip session restore silently.
-    if (typeof localStorage === 'undefined') return;
-    try {
-      const savedUser = localStorage.getItem(STORAGE_KEYS.USER);
-      const savedToken = localStorage.getItem(STORAGE_KEYS.TOKEN);
-      const savedStatus = localStorage.getItem(STORAGE_KEYS.SYNC_STATUS);
-      
-      if (savedUser && savedToken) {
-        const parsedUser: NovaUser = JSON.parse(savedUser);
-        this.currentUser = parsedUser;
-        this.token = savedToken;
-
-        // The E2EE sync key is memory-only and never stored in Web Storage,
-        // so restore it from the OS-encrypted secure store in the background.
-        // Without it the session would look logged-in while every sync fails.
-        // The store name is derived from the restored user (NOT
-        // this.currentUser, which may change before the async read runs) so
-        // accounts can't cross-contaminate each other's keys.
-        this.restoreMasterKeysForUser(parsedUser?.id);
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const savedStatus = localStorage.getItem(STORAGE_KEYS.SYNC_STATUS);
+        if (savedStatus) {
+          const parsed = JSON.parse(savedStatus);
+          this.lastSyncedAt = parsed.lastSyncedAt || null;
+        }
+      } catch (e) {
+        console.error('[NovaSync] Failed to restore sync status:', e);
       }
-      if (savedStatus) {
-        const parsed = JSON.parse(savedStatus);
-        this.lastSyncedAt = parsed.lastSyncedAt || null;
+    }
+
+    void this.restoreSessionAsync();
+  }
+
+  private async restoreSessionAsync(): Promise<void> {
+    try {
+      const [user, token] = await Promise.all([
+        this.readStoredUser(),
+        this.readStoredToken()
+      ]);
+
+      // The auth listener (INITIAL_SESSION) may already have established a
+      // session — never clobber it with stale stored values.
+      if (!this.currentUser && user && token) {
+        this.currentUser = user;
+        this.token = token;
+        this.restoreMasterKeysForUser(user.id);
+        this.notify();
+      } else if (!this.currentUser && user) {
+        // Stored profile without a usable auth token (web builds never
+        // persist tokens): present a clean logged-out state instead of a
+        // broken half-session that syncData() would reject anyway.
+        this.currentUser = null;
+        this.token = null;
+        this.removeSessionValue(STORAGE_KEYS.USER);
+        console.warn('[NovaSync] Stored profile found without an auth token — staying logged out.');
+        this.notify();
       }
     } catch (e) {
       console.error('[NovaSync] Failed to restore sync session:', e);
@@ -471,7 +711,9 @@ class NovaSyncService {
             syncPreferences: userMeta.sync_preferences || { ...DEFAULT_PREFERENCES }
           };
           this.token = session.access_token;
-          localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
+          void this.writeStoredUser(this.currentUser).catch(err => {
+            console.warn('[NovaSync] Failed to persist user profile:', err);
+          });
           // The JWT is persisted by supabase-js through the secure storage
           // adapter — deliberately no localStorage token mirror here.
           this.restoreMasterKeysForUser(session.user.id);
@@ -504,7 +746,7 @@ class NovaSyncService {
           },
           () => {
             console.log('[NovaSync] Remote sync change received via Realtime WebSocket');
-            this.remoteSyncListeners.forEach(fn => fn());
+            this.scheduleRealtimeNotify();
           }
         )
         .subscribe();
@@ -513,10 +755,28 @@ class NovaSyncService {
     }
   }
 
+  private scheduleRealtimeNotify(): void {
+    if (this.realtimeNotifyTimer) clearTimeout(this.realtimeNotifyTimer);
+    this.realtimeNotifyTimer = setTimeout(() => {
+      this.realtimeNotifyTimer = null;
+      this.remoteSyncListeners.forEach(fn => {
+        try {
+          fn();
+        } catch (e) {
+          console.warn('[NovaSync] Remote sync listener failed:', e);
+        }
+      });
+    }, 1000);
+  }
+
   private async unsubscribeFromRealtime(): Promise<void> {
     // Null the channel synchronously so overlapping calls can't double-remove.
     const channel = this.realtimeChannel;
     this.realtimeChannel = null;
+    if (this.realtimeNotifyTimer) {
+      clearTimeout(this.realtimeNotifyTimer);
+      this.realtimeNotifyTimer = null;
+    }
     if (!channel) return;
     try {
       const supabase = await getSupabaseClient();
@@ -659,7 +919,7 @@ class NovaSyncService {
         };
 
         this.currentUser = newUser;
-        this.token = data.session?.access_token || 'sb_token_' + Date.now();
+        this.token = data.session?.access_token || generateId('sb_token');
 
         // Derive a dedicated sync key instead of using the raw password as
         // the long-lived E2EE secret. The per-account salt is mirrored
@@ -674,7 +934,7 @@ class NovaSyncService {
         await this.acquireSyncKey(password, saltB64);
         this.persistMasterKeyBestEffort();
 
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+        await this.writeStoredUser(newUser);
         // Token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
@@ -693,8 +953,7 @@ class NovaSyncService {
     }
 
     // Zero-Config Built-in Vault Registration
-    const registryRaw = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
-    const registry: Record<string, LocalRegistryEntry> = registryRaw ? JSON.parse(registryRaw) : {};
+    const registry = await this.readUserRegistry();
 
     if (registry[normalizedEmail]) {
       throw new Error('An account with this email already exists');
@@ -706,7 +965,7 @@ class NovaSyncService {
     // so future logins re-derive the same key.
     const syncKeySalt = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
 
-    const userId = 'usr_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+    const userId = generateId('usr');
     const newUser: NovaUser = {
       id: userId,
       email: normalizedEmail,
@@ -717,18 +976,17 @@ class NovaSyncService {
     };
 
     registry[normalizedEmail] = { user: newUser, passwordHash, syncKeySalt };
-    localStorage.setItem(STORAGE_KEYS.USER_REGISTRY, JSON.stringify(registry));
+    await this.writeUserRegistry(registry);
 
     this.currentUser = newUser;
-    this.token = 'nvt_' + btoa(`${userId}:${Date.now()}`);
+    this.token = generateId('nvt');
     // Store the derived sync key — never the raw password.
     await this.acquireSyncKey(password, syncKeySalt);
     this.persistMasterKeyBestEffort();
 
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
-    // Synthetic local token: supabase-js does not manage this session, so it
-    // still needs explicit persistence for session restore after a restart.
-    localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+    await this.writeStoredUser(newUser);
+    // Synthetic local token: securely persisted in OS Keychain / SecureStore
+    await this.writeStoredToken(this.token);
 
     this.notify();
     return newUser;
@@ -794,7 +1052,7 @@ class NovaSyncService {
         this.legacyMasterKey = this.legacyMasterKey || password;
         this.persistMasterKeyBestEffort();
 
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(loggedUser));
+        await this.writeStoredUser(loggedUser);
         // Token persistence is handled by supabase-js through its secure
         // storage adapter — no localStorage JWT mirror here.
 
@@ -812,8 +1070,7 @@ class NovaSyncService {
     }
 
     // Zero-Config Built-in Vault Login
-    const registryRaw = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
-    const registry: Record<string, LocalRegistryEntry> = registryRaw ? JSON.parse(registryRaw) : {};
+    const registry = await this.readUserRegistry();
 
     const account = registry[normalizedEmail];
     if (!account) {
@@ -839,17 +1096,16 @@ class NovaSyncService {
       account.syncKeySalt = bytesToBase64(crypto.getRandomValues(new Uint8Array(PBKDF2_SALT_BYTES)));
     }
     registry[normalizedEmail] = account;
-    localStorage.setItem(STORAGE_KEYS.USER_REGISTRY, JSON.stringify(registry));
+    await this.writeUserRegistry(registry);
 
     this.currentUser = account.user;
-    this.token = 'nvt_' + btoa(`${account.user.id}:${Date.now()}`);
+    this.token = generateId('nvt');
     await this.acquireSyncKey(password, account.syncKeySalt);
     this.persistMasterKeyBestEffort();
 
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(account.user));
-    // Synthetic local token: supabase-js does not manage this session, so it
-    // still needs explicit persistence for session restore after a restart.
-    localStorage.setItem(STORAGE_KEYS.TOKEN, this.token);
+    await this.writeStoredUser(account.user);
+    // Synthetic local token: securely persisted in OS Keychain / SecureStore
+    await this.writeStoredToken(this.token);
 
     this.notify();
     return account.user;
@@ -867,22 +1123,16 @@ class NovaSyncService {
       } catch (e) {}
     }
 
-    // Best-effort wipe of the persisted sync keys. The preload bridge has no
-    // remove API, so overwrite with an empty string instead. The store
-    // entries are scoped per user, so capture the names BEFORE clearing
-    // currentUser below. Both the dedicated derived key and the retained
-    // legacy raw-password entry are wiped.
+    // Secure wipe of persisted sync keys and tokens via OS secureStore delete
     const masterKeyStore = this.masterKeyStoreName();
     const legacyKeyStore = this.legacyMasterKeyStoreName();
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.secureStoreSet) {
-      void (async () => {
-        try {
-          await (window as any).electronAPI.secureStoreSet(masterKeyStore, '');
-          await (window as any).electronAPI.secureStoreSet(legacyKeyStore, '');
-          await (window as any).electronAPI.secureStoreSet(SUPABASE_AUTH_STORAGE_KEY, '');
-        } catch {}
-      })();
-    }
+    await Promise.allSettled([
+      this.deleteSecureStore(masterKeyStore),
+      this.deleteSecureStore(legacyKeyStore),
+      this.deleteSecureStore(SUPABASE_AUTH_STORAGE_KEY),
+      this.writeStoredToken(''),
+      this.writeStoredUser(null)
+    ]);
 
     this.currentUser = null;
     this.token = null;
@@ -892,7 +1142,6 @@ class NovaSyncService {
     this.usedLegacyKeyThisSync = false;
     this.lastSyncedAt = null;
 
-    localStorage.removeItem(STORAGE_KEYS.USER);
     localStorage.removeItem(STORAGE_KEYS.TOKEN);
     localStorage.removeItem(STORAGE_KEYS.SYNC_STATUS);
     // Legacy cleanup: older builds leaked the master key into Web Storage.
@@ -912,7 +1161,9 @@ class NovaSyncService {
       ...this.currentUser.syncPreferences,
       ...prefs
     };
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
+    void this.writeStoredUser(this.currentUser).catch(err => {
+      console.warn('[NovaSync] Failed to persist preference change:', err);
+    });
     this.notify();
   }
 
@@ -1129,7 +1380,7 @@ class NovaSyncService {
         userId: this.currentUser.id,
         bookmarks: prefs.syncBookmarks ? mergedBookmarks : undefined,
         folders: prefs.syncBookmarks ? mergedFolders : undefined,
-        history: prefs.syncHistory ? mergedHistory.slice(0, 1000) : undefined,
+        history: prefs.syncHistory ? mergedHistory.slice(0, 300) : undefined,
         encryptedPasswords: encryptedPassPayload?.ciphertext,
         passwordsSalt: encryptedPassPayload?.salt,
         passwordsIv: encryptedPassPayload?.iv,
@@ -1232,9 +1483,9 @@ class NovaSyncService {
 
     if (this.currentUser) {
       this.currentUser.syncCode = code;
-      try {
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
-      } catch (_) {}
+      void this.writeStoredUser(this.currentUser).catch(() => {
+        // Best-effort only — sync code generation must not fail on persistence.
+      });
     }
     this.notify();
     return code;
@@ -1247,9 +1498,9 @@ class NovaSyncService {
     const cleanCode = code.trim().toUpperCase();
     if (this.currentUser) {
       this.currentUser.syncCode = cleanCode;
-      try {
-        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(this.currentUser));
-      } catch (_) {}
+      void this.writeStoredUser(this.currentUser).catch(() => {
+        // Best-effort only — joining must not fail on persistence.
+      });
     }
     this.notify();
     return true;

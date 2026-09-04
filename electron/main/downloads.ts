@@ -1,6 +1,7 @@
 import { app, ipcMain, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 
 type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
@@ -115,7 +116,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
   if (downloadsRegistered.has(targetSession)) return;
   downloadsRegistered.add(targetSession);
   targetSession.on('will-download', (event, item, webContents) => {
-    const downloadId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
+    const downloadId = `dl_${crypto.randomUUID()}`;
     const filename = item.getFilename();
     const totalBytes = item.getTotalBytes();
     activeDownloads.set(downloadId, item);

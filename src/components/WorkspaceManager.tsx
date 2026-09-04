@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, Trash2, Edit2, Check, LayoutGrid, Briefcase, User, Code, Sparkles, Gamepad2, Folder, GraduationCap, DollarSign, ShoppingCart } from 'lucide-react';
 import { Workspace } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { generateId } from '../utils/idGenerator';
 
 interface WorkspaceManagerProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
 
   const handleAddWorkspace = () => {
     const newWorkspace: Workspace = {
-      id: 'ws_' + Date.now().toString(36),
+      id: generateId('ws'),
       name: 'New Workspace',
       color: 'blue',
       icon: 'Folder'

@@ -1,3 +1,5 @@
+import { generateId } from '../utils/idGenerator';
+
 type ActionState = 'pending' | 'approved' | 'denied' | 'executing' | 'completed' | 'failed';
 
 export interface QueuedAction {
@@ -83,7 +85,7 @@ class AgentOrchestrator {
    * fragile getQueue() tail inspection.
    */
   public enqueueAction(toolName: string, args: any): { id: string; done: Promise<boolean> } {
-    const id = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
+    const id = generateId('act');
     let clonedArgs: any = {};
     if (args && typeof args === 'object') {
       try {

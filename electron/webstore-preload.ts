@@ -303,7 +303,7 @@ if ((window as any).__novaPreloadInjected) {
           btn.textContent = "Installing...";
 
           const cleanupListener = (e: MessageEvent) => {
-            if (e.source !== window || !e.data || e.data.type !== 'NOVA_INSTALL_RESULT') return;
+            if (e.source !== window || e.origin !== window.location.origin || !e.data || e.data.type !== 'NOVA_INSTALL_RESULT') return;
             window.removeEventListener('message', cleanupListener);
             if (e.data.success) {
               btn.textContent = "Installed!";

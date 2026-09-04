@@ -39,11 +39,14 @@ export function isPrivateIP(ip: string): boolean {
     );
   }
 
-  // IPv6 loopback, unspecified, unique-local, link-local, multicast and
-  // documentation ranges are not valid public preview targets.
+  // IPv6 loopback, unspecified, unique-local, link-local, multicast,
+  // documentation, NAT64 (64:ff9b::/96) and 6to4 (2002::/16) ranges are not
+  // valid public preview targets.
   return normalized === '::' || normalized === '::1' ||
     /^f[cd][0-9a-f]{2}:/i.test(normalized) ||
     /^fe[89ab][0-9a-f]:/i.test(normalized) ||
     /^ff[0-9a-f]{2}:/i.test(normalized) ||
-    /^2001:db8:/i.test(normalized);
+    /^2001:db8:/i.test(normalized) ||
+    /^64:ff9b:/i.test(normalized) ||
+    /^2002:/i.test(normalized);
 }

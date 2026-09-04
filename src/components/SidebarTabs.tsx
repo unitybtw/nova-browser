@@ -37,14 +37,14 @@ import {
   Cloud,
   Sparkles
 } from 'lucide-react';
-import { Tab, Bookmark, Workspace, Folder } from '../types/browser';
-import { UserSettings } from '../App';
+import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
+import { generateId } from '../utils/idGenerator';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -557,7 +557,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     else if (finalUrl.includes('google.com')) iconType = 'google';
 
     const newFav: FavoriteApp = {
-      id: 'fav_' + Date.now(),
+      id: generateId('fav'),
       name: newFavName.trim(),
       url: finalUrl,
       iconType,
@@ -639,23 +639,30 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (!abortController.signal.aborted && Array.isArray(results)) {
-            setClientCachedSuggestions(cacheKey, results);
-            setSuggestions(results.slice(0, 5));
-            return;
+          if (!abortController.signal.aborted) {
+            if (Array.isArray(results)) {
+              setClientCachedSuggestions(cacheKey, results);
+              setSuggestions(results.slice(0, 5));
+            } else {
+              setSuggestions([]);
+            }
           }
+          return;
         }
-        const lang = clientLocale.split('-')[0] || 'tr';
-        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
-          signal: abortController.signal
-        });
-        if (!abortController.signal.aborted && res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1])) {
-            const list = data[1].slice(0, 5);
-            setClientCachedSuggestions(cacheKey, list);
-            setSuggestions(list);
+        // Fallback for non-electron web preview only when google is the chosen engine
+        if (searchEngine === 'google') {
+          const lang = clientLocale.split('-')[0] || 'tr';
+          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+          const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
+            signal: abortController.signal
+          });
+          if (!abortController.signal.aborted && res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data) && Array.isArray(data[1])) {
+              const list = data[1].slice(0, 5);
+              setClientCachedSuggestions(cacheKey, list);
+              setSuggestions(list);
+            }
           }
         }
       } catch (err: any) {

@@ -4,8 +4,10 @@ import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Ch
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
-import { UserSettings } from '../App';
+import { UserSettings } from '../types/browser';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
+import { generateId } from '../utils/idGenerator';
+import { useTranslation } from '../services/i18n';
 
 interface Todo {
   id: string;
@@ -135,6 +137,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   isActive = true,
   energySaverMode = false,
 }) => {
+  const { t } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
   const [shouldAnimate] = useState(() => {
     if (!hasAnimatedInitialLaunch) {
@@ -227,25 +230,33 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && Array.isArray(results)) {
-            setClientCachedSuggestions(cacheKey, results);
-            setSuggestions(results.slice(0, 6));
-            setShowSuggestions(results.length > 0);
-            return;
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
+            if (Array.isArray(results)) {
+              setClientCachedSuggestions(cacheKey, results);
+              setSuggestions(results.slice(0, 6));
+              setShowSuggestions(results.length > 0);
+            } else {
+              setSuggestions([]);
+              setShowSuggestions(false);
+            }
           }
+          return;
         }
-        const lang = clientLocale.split('-')[0] || 'tr';
-        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
-          signal: abortController.signal
-        });
-        if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1])) {
-            const list = data[1].slice(0, 6);
-            setClientCachedSuggestions(cacheKey, list);
-            setSuggestions(list);
-            setShowSuggestions(list.length > 0);
+        // Fallback for non-electron web preview only when google is the chosen engine
+        if (searchEngine === 'google') {
+          const lang = clientLocale.split('-')[0] || 'tr';
+          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+          const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
+            signal: abortController.signal
+          });
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && res.ok) {
+            const data = await res.json();
+            if (data && Array.isArray(data) && Array.isArray(data[1])) {
+              const list = data[1].slice(0, 6);
+              setClientCachedSuggestions(cacheKey, list);
+              setSuggestions(list);
+              setShowSuggestions(list.length > 0);
+            }
           }
         }
       } catch (err) {
@@ -269,7 +280,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
-    setTodos([...todos, { id: Date.now().toString(), text: newTodo.trim(), completed: false }]);
+    setTodos([...todos, { id: generateId('todo'), text: newTodo.trim(), completed: false }]);
     setNewTodo('');
   };
 
@@ -804,7 +815,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         {/* Omnibox / Search Form */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
           <form onSubmit={handleSearch} className="relative group">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
+            <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
             <input
@@ -816,11 +827,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 if (suggestions.length > 0) setShowSuggestions(true);
               }}
               onKeyDown={handleKeyDown}
-              placeholder={`Search with ${getSearchEngineName(searchEngine)} or enter URL...`}
-              className="w-full py-4 pl-12 pr-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20"
+              placeholder={t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
+              aria-label={t('nav.newTab')}
+              className="w-full py-4 ps-12 pe-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20"
             />
             
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+            <div className="absolute end-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
               {query && (
                 <button
                   type="button"
@@ -864,9 +876,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                       onNavigate(formatSearchUrl(s, searchEngine));
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
-                    className={`w-full flex items-center justify-between px-4 py-2.5 text-left text-sm transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-4 py-2.5 text-start text-sm transition-colors cursor-pointer ${
                       idx === selectedIndex 
-                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-l-2 border-cyan-500' 
+                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-s-2 border-cyan-500' 
                         : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
                     }`}
                   >
@@ -963,7 +975,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed border-slate-300 dark:border-white/20 bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl hover:border-cyan-500 dark:hover:border-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300 cursor-pointer shadow-xs"
                 >
                   <Plus className="w-6 h-6" />
-                  <span className="text-xs font-semibold">Add</span>
+                  <span className="text-xs font-semibold">{t('nav.addShortcut')}</span>
                 </button>
               </motion.div>
             )}

@@ -7,7 +7,8 @@ import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } f
 import { aiMemory, MemoryItem, TaskSummary } from '../services/aiMemory';
 import { tts } from '../services/tts';
 import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
-import { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
+import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
+import { showConfirm } from '../utils/confirmDialog';
 
 interface SidePanelProps {
   isOpen: boolean;
@@ -39,6 +40,28 @@ const MAX_TEXT_FILE_BYTES = 256 * 1024;
 const TEXT_FILE_READ_CAP_CHARS = 200 * 1024;
 
 const ATTACH_INPUT_ACCEPT = 'image/*,.txt,.md,.json,.csv,.js,.ts,.html,.css,.xml,.yml,.yaml';
+
+const safeMarkdownUrlTransform = (url: string): string => {
+  if (!url) return '';
+  // Normalize, strip control chars and zero-width spaces that could evade prefix checks
+  const clean = String(url).trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
+  if (
+    clean.startsWith('javascript:') ||
+    clean.startsWith('data:') ||
+    clean.startsWith('vbscript:') ||
+    clean.startsWith('file:') ||
+    clean.startsWith('blob:')
+  ) {
+    return '';
+  }
+  try {
+    const parsed = new URL(url, 'https://dummy.local');
+    if (parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'mailto:' || parsed.protocol === 'tel:') {
+      return url;
+    }
+  } catch {}
+  return '';
+};
 
 const isImageFile = (file: File) =>
   file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
@@ -367,7 +390,13 @@ export const SidePanel = React.memo(({
   }, [isReady, isInitializing]);
 
   const handleClearAICache = async () => {
-    if (!window.confirm('Clear downloaded AI models and temporary cache to free up disk space?')) return;
+    const confirmed = await showConfirm({
+      title: 'Clear AI Cache',
+      message: 'Clear downloaded AI models and temporary cache to free up disk space?',
+      confirmLabel: 'Clear Cache',
+      cancelLabel: 'Cancel'
+    });
+    if (!confirmed) return;
     try {
       if (typeof window !== 'undefined' && 'caches' in window) {
         const keys = await window.caches.keys();
@@ -945,7 +974,24 @@ export const SidePanel = React.memo(({
                         {isUser ? (
                           <span className="whitespace-pre-wrap break-words">{textContent}</span>
                         ) : (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            urlTransform={safeMarkdownUrlTransform}
+                            components={{
+                              a: ({ href, children, ...props }) => {
+                                const cleanHref = String(href || '').trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
+                                const isDangerous = !cleanHref || cleanHref.startsWith('javascript:') || cleanHref.startsWith('data:') || cleanHref.startsWith('vbscript:') || cleanHref.startsWith('file:') || cleanHref.startsWith('blob:');
+                                if (isDangerous) {
+                                  return <span className="underline opacity-60">{children}</span>;
+                                }
+                                return (
+                                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-500 underline hover:text-cyan-400" {...props}>
+                                    {children}
+                                  </a>
+                                );
+                              }
+                            }}
+                          >
                             {textContent}
                           </ReactMarkdown>
                         )}
@@ -992,7 +1038,24 @@ export const SidePanel = React.memo(({
                       <span>Nova Assistant</span>
                     </div>
                     <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingText}</ReactMarkdown>
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        urlTransform={safeMarkdownUrlTransform}
+                        components={{
+                          a: ({ href, children, ...props }) => {
+                            const cleanHref = String(href || '').trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
+                            const isDangerous = !cleanHref || cleanHref.startsWith('javascript:') || cleanHref.startsWith('data:') || cleanHref.startsWith('vbscript:') || cleanHref.startsWith('file:') || cleanHref.startsWith('blob:');
+                            if (isDangerous) {
+                              return <span className="underline opacity-60">{children}</span>;
+                            }
+                            return (
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-500 underline hover:text-cyan-400" {...props}>
+                                {children}
+                              </a>
+                            );
+                          }
+                        }}
+                      >{streamingText}</ReactMarkdown>
                     </div>
                   </motion.div>
                 ) : isLoading ? (

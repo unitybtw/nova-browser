@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play, Shield, AlertTriangle, CheckCircle } from 'lucide-react';
 import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { showAlert } from '../utils/confirmDialog';
 
 interface ExtensionPermission {
   name: string;
@@ -86,7 +87,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
         if (!result.canceled && result.folderPath) {
           const installRes = await (window as any).electronAPI.installExtension(result.folderPath);
           if (installRes.error) {
-            alert('Extension load error: ' + installRes.error);
+            void showAlert({ title: 'Extensions', message: 'Extension load error: ' + installRes.error });
           }
         }
       }

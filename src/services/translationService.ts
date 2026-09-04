@@ -116,7 +116,11 @@ export function getExtractTextNodesScript(): string {
  */
 export function getApplyTranslationScript(translatedTexts: string[], targetLang: string): string {
   // Serialize translated texts and language tag safely to prevent script injection
-  const serialized = JSON.stringify(translatedTexts);
+  const serialized = JSON.stringify(translatedTexts)
+    .replace(/</g, '\\u003c')
+    .replace(/>/g, '\\u003e')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
   const safeTargetLang = JSON.stringify(String(targetLang || '').replace(/[^a-zA-Z0-9_-]/g, ''));
   return `
     (() => {

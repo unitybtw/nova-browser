@@ -1,7 +1,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Folder as FolderIcon } from 'lucide-react';
-import { DownloadItem } from '../App';
+import { DownloadItem } from '../types/browser';
 
 interface DownloadsPopoverProps {
   downloads: DownloadItem[];

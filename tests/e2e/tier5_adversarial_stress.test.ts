@@ -1,33 +1,30 @@
-// safeBase64 test logic verification
-const safeBase64 = (str: string): string => {
-  if (!str) return '';
-  const wellFormed = typeof (str as any).toWellFormed === 'function'
-    ? (str as any).toWellFormed()
-    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+import assert from 'node:assert/strict';
+import { getApplyTranslationScript } from '../../src/services/translationService';
+import { safeBase64 } from '../../src/utils/securityUtils';
 
-  try {
-    return btoa(unescape(encodeURIComponent(wellFormed)));
-  } catch (e) {
-    try {
-      const sanitized = wellFormed.replace(/%/g, '_');
-      return btoa(sanitized);
-    } catch (e2) {
-      return wellFormed.replace(/[^a-zA-Z0-9]/g, '_');
-    }
-  }
-};
-
-try {
+async function runTier5Tests() {
+  // Test 1: lone surrogate URL safety
   const loneSurrogateUrl = 'https://example.com/\uD800/test';
   const res = safeBase64(loneSurrogateUrl);
-  console.log('[Tier 5 Test] safeBase64 with lone surrogate result:', res);
-  if (!res || typeof res !== 'string') {
-    throw new Error('safeBase64 returned non-string result');
-  }
-  console.log('[Tier 5 Test] safeBase64 lone surrogate test PASSED');
-} catch (err) {
-  console.error('[Tier 5 Test] safeBase64 lone surrogate test FAILED:', err);
-  process.exit(1);
+  assert.equal(typeof res, 'string');
+  assert.equal(res.length > 0, true);
+
+  // Test 2: Poisoned translation payload injection prevention
+  const attackPayload = [
+    'Normal translation',
+    '</script><script>alert("XSS")</script>',
+    '<img src=x onerror=alert(1)>',
+    'Paragraph\u2028LineSeparator'
+  ];
+  const script = getApplyTranslationScript(attackPayload, 'tr');
+  assert.equal(script.includes('</script>'), false, 'Translation script must not contain unescaped closing script tags');
+  assert.equal(script.includes('<script>'), false, 'Translation script must not contain unescaped script tags');
+  assert.equal(script.includes('\\u003c/script\\u003e'), true, 'Script tags must be unicode escaped');
+
+  console.log('Tier 5 adversarial stress tests passed successfully');
 }
 
-console.log('Tier 5 test suite passing');
+runTier5Tests().catch(err => {
+  console.error('Tier 5 test failure:', err);
+  process.exit(1);
+});

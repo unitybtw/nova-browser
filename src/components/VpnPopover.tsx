@@ -2,6 +2,9 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, ShieldAlert, Globe, MapPin, Plus, Trash2, Check, X } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { generateId } from '../utils/idGenerator';
+import { isValidProxyUrl, SECURE_PROXY_ERROR } from '../utils/proxyValidation';
+import { useTranslation } from '../services/i18n';
 
 export interface VpnLocation {
   id: string;
@@ -23,6 +26,19 @@ interface VpnPopoverProps {
   anchorRef: React.RefObject<HTMLButtonElement>;
 }
 
+/** Display only hostname[:port]; mask embedded credentials, never leak them. */
+const formatProxyDisplay = (url: string): string => {
+  try {
+    const u = new URL(url);
+    const host = u.hostname + (u.port ? `:${u.port}` : '');
+    if (!host) throw new Error('empty host');
+    if (u.username || u.password) return `***@${host}`;
+    return host;
+  } catch {
+    return url.replace(/^https?:\/\//, '');
+  }
+};
+
 export const VpnPopover: React.FC<VpnPopoverProps> = ({
   isOpen,
   onClose,
@@ -35,6 +51,7 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
   onRemoveLocation,
   anchorRef
 }) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
 
@@ -58,12 +75,13 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
       setError('Please provide a proxy URL');
       return;
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('socks5://') && !url.startsWith('socks4://')) {
-      url = 'http://' + url;
+    if (!isValidProxyUrl(url)) {
+      setError(SECURE_PROXY_ERROR);
+      return;
     }
 
     const newLoc: VpnLocation = {
-      id: 'custom-' + Date.now(),
+      id: generateId('custom'),
       name: customName.trim(),
       url,
       type: 'custom'
@@ -98,9 +116,9 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                   {isEnabled ? <Shield className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
                 </div>
               </div>
-              <h3 className="text-sm font-bold mb-0.5">{isEnabled ? 'Proxy / VPN Active' : 'Proxy / VPN Inactive'}</h3>
+              <h3 className="text-sm font-bold mb-0.5">{isEnabled ? t('vpn.active') : t('vpn.inactive')}</h3>
               <p className={`text-[11px] ${isEnabled ? 'text-emerald-100' : 'text-slate-500 dark:text-slate-400'}`}>
-                {isEnabled ? `Routed via ${selectedLocation.name}` : 'Direct connection (No proxy)'}
+                {isEnabled ? t('vpn.routedVia', { name: selectedLocation?.name ?? '' }) : t('vpn.direct')}
               </p>
               
               <button
@@ -111,7 +129,7 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                     : 'bg-cyan-500 hover:bg-cyan-600 text-white'
                 }`}
               >
-                {isEnabled ? 'Disconnect Proxy' : 'Connect Proxy'}
+                {isEnabled ? t('vpn.disconnect') : t('vpn.connect')}
               </button>
             </div>
 
@@ -119,14 +137,14 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
             <div className="p-2.5 max-h-56 overflow-y-auto">
               <div className="flex items-center justify-between px-2.5 py-1.5">
                 <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-                  Servers & Proxies
+                  {t('vpn.serversTitle')}
                 </span>
                 <button
                   onClick={() => setIsAdding(!isAdding)}
                   className="text-[11px] font-medium text-cyan-600 dark:text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
                 >
                   <Plus className="w-3 h-3" />
-                  <span>Custom Proxy</span>
+                  <span>{t('vpn.customProxy')}</span>
                 </button>
               </div>
 
@@ -135,14 +153,14 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                 <form onSubmit={handleAddCustom} className="p-2.5 mb-2 bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl space-y-2">
                   <input
                     type="text"
-                    placeholder="Location Name (e.g. My SOCKS5)"
+                    placeholder={t('vpn.namePlaceholder')}
                     value={customName}
                     onChange={(e) => setCustomName(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
                   />
                   <input
                     type="text"
-                    placeholder="http://ip:port or socks5://ip:port"
+                    placeholder={t('vpn.urlPlaceholder')}
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
                     className="w-full px-2.5 py-1.5 bg-white dark:bg-black/30 border border-slate-200 dark:border-white/10 rounded-lg text-xs text-slate-900 dark:text-slate-100 focus:outline-none focus:border-cyan-500"
@@ -154,65 +172,72 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
                       onClick={() => { setIsAdding(false); setError(''); }}
                       className="px-2.5 py-1 text-xs text-slate-500 hover:bg-slate-200 dark:hover:bg-white/10 rounded-lg cursor-pointer"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                     <button
                       type="submit"
                       className="px-3 py-1 bg-cyan-500 text-white font-medium text-xs rounded-lg hover:bg-cyan-600 cursor-pointer"
                     >
-                      Save Proxy
+                      {t('vpn.saveProxy')}
                     </button>
                   </div>
                 </form>
               )}
 
               <div className="space-y-1">
-                {locations.map(loc => (
-                  <div
-                    key={loc.id}
-                    className={`w-full flex items-center justify-between p-2 px-2.5 rounded-xl transition-colors ${
-                      selectedLocation.id === loc.id
-                        ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-semibold border border-cyan-500/30'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
-                    }`}
-                  >
-                    <button
-                      onClick={() => onSelectLocation(loc)}
-                      className="flex-1 flex items-center gap-2.5 text-left cursor-pointer"
-                    >
-                      {loc.type === 'custom' ? <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" /> : <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />}
-                      <div className="truncate">
-                        <p className="text-xs truncate">{loc.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono truncate">{loc.url.replace(/^https?:\/\//, '')}</p>
-                      </div>
-                    </button>
-
-                    <div className="flex items-center gap-1.5">
-                      {selectedLocation.id === loc.id && (
-                        <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-xs" />
-                      )}
-                      {loc.type === 'custom' && onRemoveLocation && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRemoveLocation(loc.id);
-                          }}
-                          className="p-1 text-slate-400 hover:text-rose-500 rounded-md transition-colors cursor-pointer"
-                          title="Delete proxy"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
+                {locations.length === 0 ? (
+                  <div className="text-center py-4 px-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{t('vpn.noServers')}</p>
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">{t('vpn.noServersDesc')}</p>
                   </div>
-                ))}
+                ) : (
+                  locations.map(loc => (
+                    <div
+                      key={loc.id}
+                      className={`w-full flex items-center justify-between p-2 px-2.5 rounded-xl transition-colors ${
+                        selectedLocation?.id === loc.id
+                          ? 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 font-semibold border border-cyan-500/30'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5 font-medium'
+                      }`}
+                    >
+                      <button
+                        onClick={() => onSelectLocation(loc)}
+                        className="flex-1 flex items-center gap-2.5 text-left cursor-pointer"
+                      >
+                        {loc.type === 'custom' ? <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" /> : <Globe className="w-3.5 h-3.5 text-cyan-500 shrink-0" />}
+                        <div className="truncate">
+                          <p className="text-xs truncate">{loc.name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono truncate">{formatProxyDisplay(loc.url)}</p>
+                        </div>
+                      </button>
+
+                      <div className="flex items-center gap-1.5">
+                        {selectedLocation?.id === loc.id && (
+                          <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-xs" />
+                        )}
+                        {loc.type === 'custom' && onRemoveLocation && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRemoveLocation(loc.id);
+                            }}
+                            className="p-1 text-slate-400 hover:text-rose-500 rounded-md transition-colors cursor-pointer"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
             
             {/* Footer info */}
             <div className="p-2.5 bg-slate-50/80 dark:bg-black/30 border-t border-slate-100 dark:border-white/5 text-center">
               <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                HTTP, HTTPS, SOCKS4 and SOCKS5 proxy formats supported.
+                {t('vpn.footerNote')}
               </p>
             </div>
           </motion.div>

@@ -8,48 +8,38 @@ import { BrowserView } from './components/BrowserView';
 // existing `from '../App'` import paths (DownloadToast, DownloadsPopover,
 // HistoryPage, BrowserView, syncService) keep resolving unchanged.
 import { useDownloads } from './hooks/useDownloads';
-export type { DownloadItem } from './hooks/useDownloads';
-import { useHistoryRecorder, type HistoryItem } from './hooks/useHistoryRecorder';
-export type { HistoryItem };
+import { useHistoryRecorder } from './hooks/useHistoryRecorder';
 import { usePermissionRequests } from './hooks/usePermissionRequests';
-export interface UserSettings {
-  searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia' | 'yahoo';
-  privacyShield: boolean;
-  theme: 'light' | 'dark' | 'system';
-  fontSize: 'small' | 'medium' | 'large';
-  accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
-  customAccentColor?: string;
-  showBookmarksBar: boolean;
-  useVerticalTabs: boolean;
-  mcpServerEnabled: boolean;
-  showTasksWidget?: boolean;
-  newTabBackground: 'default' | 'gradient' | 'mesh' | 'glass' | 'unsplash' | 'custom_url' | 'aurora_waves' | 'cyber_grid' | 'hyper_space' | 'fireflies' | 'nebula' | 'matrix';
-  backgroundCustomUrl?: string;
-  startupBehavior: 'newTab' | 'continue' | 'specificPages';
-  tabStyle: 'rounded' | 'square' | 'floating';
-  doNotTrack: boolean;
-  clearOnExit: boolean;
-  hardwareAcceleration: boolean;
-  developerMode: boolean;
-  tabHibernationEnabled?: boolean;
-  hibernationTimeoutMinutes?: number;
-  shortcuts?: Record<string, { key: string; shift?: boolean; meta?: boolean }>;
-  aiLinkPreviewEnabled?: boolean;
-  energySaverMode?: boolean;
-  preloadDnsEnabled?: boolean;
-  smoothScrollingEnabled?: boolean;
-  passwordManagerEnabled?: boolean;
-  defaultTranslationLanguage?: string;
-}
+import type { 
+  DownloadItem, 
+  HistoryItem, 
+  UserSettings, 
+  BrowserDemoOptions, 
+  VpnLocation, 
+  Tab, 
+  Folder, 
+  Bookmark, 
+  Extension, 
+  Workspace, 
+  ShortcutConfig 
+} from './types/browser';
+import { defaultSettings } from './types/browser';
+export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
 import { FindInPage } from './components/FindInPage';
 import { SpotlightOmnibox } from './components/SpotlightOmnibox';
-import { VpnPopover, VpnLocation } from './components/VpnPopover';
+import { VpnPopover } from './components/VpnPopover';
 import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from './utils/verticalTabs';
+import { generateId } from './utils/idGenerator';
+import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/safeStorage';
+import { showConfirm, showAlert } from './utils/confirmDialog';
+import { computeLiveAndSuspendedTabs } from './utils/tabManager';
+import { setLanguage } from './services/i18n';
+import { isValidProxyUrl } from './utils/proxyValidation';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -92,18 +82,24 @@ const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m 
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { aiAgent } from './services/aiAgent';
-import { Tab, Folder, Bookmark, Extension, Workspace } from './types/browser';
 import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
 import { orchestrator } from './services/agentOrchestrator';
 
+const DEFAULT_VPN_LOCATION: VpnLocation = {
+  id: 'direct',
+  name: 'Direct Connection',
+  url: '',
+  type: 'free',
+};
+
 const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
-  { id: 'us-1', name: 'United States (Public)', url: 'http://198.199.86.11:8080', type: 'free' },
-  { id: 'uk-1', name: 'United Kingdom (Public)', url: 'http://188.166.38.163:8080', type: 'free' },
-  { id: 'de-1', name: 'Germany (Public)', url: 'http://167.235.215.35:8080', type: 'free' },
+  { id: 'direct', name: 'Direct Connection', url: '', type: 'free' },
+  { id: 'local-socks', name: 'Local SOCKS5 (127.0.0.1:1080)', url: 'socks5://127.0.0.1:1080', type: 'custom' },
+  { id: 'tor-socks', name: 'Tor Proxy (127.0.0.1:9050)', url: 'socks5://127.0.0.1:9050', type: 'custom' },
 ];
 
-const EMPTY_ARRAY: any[] = [];
+const EMPTY_ARRAY: never[] = [];
 
 const normalizeAIActionPayload = (detail: unknown): string => {
   if (typeof detail === 'string') return detail.trim();
@@ -160,15 +156,6 @@ const getDemoParams = (): DemoParams => {
   };
 };
 
-export interface BrowserDemoOptions {
-  isDemo?: boolean;
-  feature?: string;
-  bg?: string;
-  theme?: 'dark' | 'light';
-  tabs?: string;
-  showTasksWidget?: boolean;
-}
-
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const demoParams = useMemo(() => {
     const queryParams = getDemoParams();
@@ -189,6 +176,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     if (demoParams.isDemo) {
       const handleMessage = (e: MessageEvent) => {
+        // Security: Validate message origin to prevent cross-origin state tampering
+        if (e.origin) {
+          try {
+            const originUrl = new URL(e.origin);
+            const isSameOrigin = e.origin === window.location.origin;
+            const isOfficialPages = originUrl.protocol === 'https:' && (originUrl.hostname === 'unitybtw.github.io' || originUrl.hostname === 'novabrowser.pages.dev');
+            const isLocal = (originUrl.protocol === 'http:' || originUrl.protocol === 'https:') && (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1');
+            if (!isSameOrigin && !isOfficialPages && !isLocal) {
+              return;
+            }
+          } catch (_) {
+            return;
+          }
+        }
         if (e.data && e.data.type === 'NOVA_THEME_CHANGE') {
           const newTheme = e.data.theme === 'light' ? 'light' : 'dark';
           setSettings(s => ({ ...s, theme: newTheme }));
@@ -205,8 +206,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (demoParams.isDemo) {
       if (demoParams.feature === 'ai') {
         return [
-          { id: '1', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false },
-          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false }
+          { id: '1', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser - GitHub', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
         ];
       }
       if (demoParams.feature === 'website') {
@@ -218,41 +219,38 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
       if (demoParams.feature === 'vertical_tabs') {
         return [
-          { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', folderId: 'f1', isLoading: false },
-          { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', folderId: 'f1', isLoading: false },
-          { id: '3', url: 'https://spotify.com', title: 'Spotify Web (Playing)', isMuted: false, workspaceId: 'default', isLoading: false },
-          { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', folderId: 'f2', isLoading: false }
+          { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', folderId: 'f1', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', folderId: 'f1', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '3', url: 'https://spotify.com', title: 'Spotify Web (Playing)', isMuted: false, workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', folderId: 'f2', isLoading: false, canGoBack: false, canGoForward: false }
         ];
       }
       if (demoParams.feature === 'split') {
         return [
-          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false, splitWith: '2' },
-          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, splitWith: '1' }
+          { id: '1', url: 'https://react.dev/reference/react', title: 'React Documentation', isLoading: false, splitWith: '2', canGoBack: false, canGoForward: false },
+          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, splitWith: '1', canGoBack: false, canGoForward: false }
         ];
       }
       if (demoParams.feature === 'shield') {
         return [
-          { id: '1', url: 'https://techinsider.io/ai-revolution', title: 'Tech News & Privacy', blockedAdsCount: 148, isLoading: false },
-          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false }
+          { id: '1', url: 'https://techinsider.io/ai-revolution', title: 'Tech News & Privacy', blockedAdsCount: 148, isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
         ];
       }
     }
 
-    let startupBehavior = 'newTab';
-    try {
-      const savedSettings = localStorage.getItem('user_settings');
-      if (savedSettings) {
-        startupBehavior = JSON.parse(savedSettings).startupBehavior || 'newTab';
-      }
-    } catch (e) {}
+    const rawSettings = localStorage.getItem('user_settings');
+    const parsedSettings = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', rawSettings, {});
+    const startupBehavior = parsedSettings.startupBehavior || 'newTab';
 
     if (startupBehavior === 'continue') {
       const saved = localStorage.getItem('nova_session_tabs');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-        } catch (e) {}
+      const parsedTabs = safeParseArrayWithBackup<Tab>('nova_session_tabs', saved, []);
+      if (parsedTabs.length > 0) {
+        return parsedTabs.map((t, idx) => ({
+          ...t,
+          lastAccessed: t.lastAccessed || (Date.now() - (parsedTabs.length - idx) * 1000)
+        }));
       }
     }
 
@@ -263,7 +261,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
-        canGoForward: false
+        canGoForward: false,
+        lastAccessed: Date.now()
       }
     ];
   });
@@ -293,13 +292,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       ];
     }
     const saved = localStorage.getItem('folders_session');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      } catch (e) {}
-    }
-    return [];
+    return safeParseArrayWithBackup<Folder>('folders_session', saved, []);
   });
 
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -311,33 +304,35 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
   
   // Workspaces State
-  const [workspaces, setWorkspaces] = useState<import('./types/browser').Workspace[]>(() => {
+  const defaultWorkspaces: Workspace[] = [
+    { id: 'default', name: 'Personal', color: 'slate' },
+    { id: 'work', name: 'Work', color: 'blue' },
+    { id: 'research', name: 'Research', color: 'purple' }
+  ];
+  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
     const saved = localStorage.getItem('workspaces_session');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      } catch (e) {}
-    }
-    return [
-      { id: 'default', name: 'Personal', color: 'slate' },
-      { id: 'work', name: 'Work', color: 'blue' },
-      { id: 'research', name: 'Research', color: 'purple' }
-    ];
+    const parsed = safeParseArrayWithBackup<Workspace>('workspaces_session', saved, []);
+    return parsed.length > 0 ? parsed : defaultWorkspaces;
   });
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => {
     return localStorage.getItem('active_workspace_session') || 'default';
   });
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
+  const workspacesRef = useRef(workspaces);
+  useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
 
+  // Debounced 500ms like tabs — workspace switching must not storm localStorage.
   useEffect(() => {
-    try {
-      localStorage.setItem('workspaces_session', JSON.stringify(workspaces));
-    } catch (e) {}
-    try {
-      localStorage.setItem('active_workspace_session', activeWorkspaceId);
-    } catch (e) {}
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('workspaces_session', JSON.stringify(workspaces));
+      } catch (e) {}
+      try {
+        localStorage.setItem('active_workspace_session', activeWorkspaceId);
+      } catch (e) {}
+    }, 500);
+    return () => clearTimeout(timer);
   }, [workspaces, activeWorkspaceId]);
 
   useEffect(() => {
@@ -352,7 +347,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       (tab.workspaceId || 'default') === activeWorkspaceId
     );
     if (visibleWorkspaceTabs.length === 0 && !demoParams.isDemo) {
-      const newTabId = Date.now().toString();
+      const newTabId = generateId('tab');
       const initialWorkspaceTab: Tab = {
         id: newTabId,
         url: 'nova://newtab',
@@ -405,7 +400,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [isDraggingTab, setIsDraggingTab] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isHoverRevealing, setIsHoverRevealing] = useState(false);
-  const hoverCloseTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleHoverSidebarOpen = useCallback(() => {
     if (hoverCloseTimerRef.current) clearTimeout(hoverCloseTimerRef.current);
@@ -420,19 +415,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
-  const [vpnLocation, setVpnLocation] = useState<VpnLocation>(DEFAULT_VPN_LOCATIONS[0]);
   const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(() => {
     try {
       const saved = localStorage.getItem('nova_vpn_locations');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return [...DEFAULT_VPN_LOCATIONS, ...parsed];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.map((l: any) => {
+            if (!l || typeof l.url !== 'string') return null;
+            // '' = Direct Connection entry, always kept. Only secure proxies pass.
+            if (l.url === '' || isValidProxyUrl(l.url)) {
+              return l as VpnLocation;
+            }
+            console.warn(`[VPN] Dropped insecure proxy location "${l?.name ?? l?.id ?? 'unknown'}": Secure proxy required (https:// or socks5:// only)`);
+            return null;
+          }).filter(Boolean) as VpnLocation[];
+          if (valid.length > 0) return valid;
         }
       }
     } catch (e) {}
     return DEFAULT_VPN_LOCATIONS;
   });
+  const [vpnLocation, setVpnLocation] = useState<VpnLocation>(() => vpnLocations[0] || DEFAULT_VPN_LOCATION);
 
   const handleAddVpnLocation = useCallback((newLoc: VpnLocation) => {
     setVpnLocations(prev => {
@@ -535,8 +539,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        if ((window as any).electronAPI?.listExtensions) {
-          const loaded = await (window as any).electronAPI.listExtensions();
+        if (window.electronAPI?.listExtensions) {
+          const loaded = await window.electronAPI.listExtensions();
           setExtensions(loaded || []);
         }
       } catch (err) {
@@ -546,8 +550,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     fetchExtensions();
     
     let cleanup: (() => void) | undefined;
-    if ((window as any).electronAPI?.onExtensionChanged) {
-      cleanup = (window as any).electronAPI.onExtensionChanged(() => {
+    if (window.electronAPI?.onExtensionChanged) {
+      cleanup = window.electronAPI.onExtensionChanged(() => {
         fetchExtensions();
       });
     }
@@ -587,84 +591,56 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   useEffect(() => {
     (window as any).openOnboarding = () => setShowOnboarding(true);
+    return () => {
+      delete (window as any).openOnboarding;
+    };
   }, []);
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {
-    const defaultSettings: UserSettings = {
-      searchEngine: 'google',
-      privacyShield: true,
-      theme: demoParams.isDemo ? demoParams.theme : 'dark',
-      fontSize: 'medium',
-      accentColor: 'blue',
-      customAccentColor: '#3b82f6',
-      showBookmarksBar: false,
-      showTasksWidget: demoParams.showTasksWidget ?? (demoParams.feature === 'website' ? false : true),
+    const initialSettings: UserSettings = {
+      ...defaultSettings,
+      theme: demoParams.isDemo ? demoParams.theme : defaultSettings.theme,
+      showTasksWidget: demoParams.showTasksWidget ?? (demoParams.feature === 'website' ? false : defaultSettings.showTasksWidget ?? true),
       useVerticalTabs: demoParams.isDemo
         ? demoParams.feature === 'website'
           ? false
           : demoParams.tabs === 'vertical'
-        : false,
-      mcpServerEnabled: false,
-      newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : 'default'),
-      backgroundCustomUrl: '',
-      startupBehavior: 'newTab',
-      tabStyle: 'floating',
-      doNotTrack: true,
-      clearOnExit: false,
-      hardwareAcceleration: true,
-      developerMode: false,
-      tabHibernationEnabled: true,
-      hibernationTimeoutMinutes: 10,
-      energySaverMode: false,
-      preloadDnsEnabled: true,
-      smoothScrollingEnabled: true,
-      passwordManagerEnabled: false,
+        : defaultSettings.useVerticalTabs,
+      newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : defaultSettings.newTabBackground),
       shortcuts: {
-        newTab: { key: 't', shift: false, meta: true },
-        reopenTab: { key: 't', shift: true, meta: true },
-        closeTab: { key: 'w', shift: false, meta: true },
-        newIncognito: { key: 'n', shift: true, meta: true },
-        reload: { key: 'r', shift: false, meta: true },
-        omnibox: { key: 'k', shift: false, meta: true },
-        bookmark: { key: 'd', shift: false, meta: true },
-        history: { key: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
+        ...defaultSettings.shortcuts,
         downloads: { key: 'j', shift: false, meta: true },
         findInPage: { key: 'f', shift: false, meta: true },
       }
     };
 
     if (demoParams.isDemo) {
-      return defaultSettings;
+      return initialSettings;
     }
 
-    try {
-      const saved = localStorage.getItem('user_settings');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && typeof parsed === 'object') {
-          return { ...defaultSettings, ...parsed };
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load user_settings from localStorage:', e);
-    }
-    return defaultSettings;
+    const saved = localStorage.getItem('user_settings');
+    const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
+    return { ...initialSettings, ...parsed };
   });
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // Sync settings with local storage and backend
+  // Sync settings with local storage and backend (debounced 500ms like tabs:
+  // color picker drags must not write localStorage / IPC per pixel)
   useEffect(() => {
-    try {
-      localStorage.setItem('user_settings', JSON.stringify(settings));
-    } catch (e) {}
-    if (window.electronAPI?.setPrivacyShield) {
-      window.electronAPI.setPrivacyShield(settings.privacyShield);
-    }
-    if ((window as any).electronAPI?.setDoNotTrack) {
-      (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('user_settings', JSON.stringify(settings));
+      } catch (e) {}
+      if (window.electronAPI?.setPrivacyShield) {
+        window.electronAPI.setPrivacyShield(settings.privacyShield);
+      }
+      if (window.electronAPI?.setDoNotTrack) {
+        (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
   }, [settings]);
 
   useEffect(() => {
@@ -672,10 +648,29 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (savedVpn) {
       try {
         const { enabled, location, customLocations } = JSON.parse(savedVpn);
-        setVpnEnabled(enabled);
-        if (location) setVpnLocation(location);
+        setVpnEnabled(Boolean(enabled));
+        if (location && typeof location.url === 'string') {
+          if (location.url === '' || isValidProxyUrl(location.url)) {
+            setVpnLocation(location);
+          } else {
+            console.warn('[VPN] Dropped insecure saved proxy location: Secure proxy required (https:// or socks5:// only)');
+          }
+        }
         if (customLocations && Array.isArray(customLocations)) {
-          setVpnLocations([...DEFAULT_VPN_LOCATIONS, ...customLocations]);
+          const validLocations = customLocations.map((l: any) => {
+            if (!l || typeof l.url !== 'string') return null;
+            if (l.url === '' || isValidProxyUrl(l.url)) {
+              return l as VpnLocation;
+            }
+            console.warn(`[VPN] Dropped insecure saved proxy "${l?.name ?? l?.id ?? 'unknown'}": Secure proxy required (https:// or socks5:// only)`);
+            return null;
+          }).filter(Boolean) as VpnLocation[];
+          if (validLocations.length > 0) {
+            setVpnLocations(validLocations);
+          }
+          if (!location && validLocations.length > 0) {
+            setVpnLocation(validLocations[0]);
+          }
         }
       } catch(e) {}
     }
@@ -686,13 +681,24 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     localStorage.setItem('nova_vpn', JSON.stringify({ enabled: vpnEnabled, location: vpnLocation, customLocations }));
     
     if (typeof window !== 'undefined' && (window as any).electronAPI?.setVpn) {
+      const isValidProxy = Boolean(vpnLocation?.url) && isValidProxyUrl(vpnLocation.url);
+      if (vpnEnabled && !isValidProxy) {
+        // K2: keep UI truthful — IPC below sends enabled:false, so the
+        // toggle state must fall back too (Popover reads isEnabled).
+        console.warn("Proxy URL rejected: Secure proxy required (https:// or socks5:// only)");
+        setVpnEnabled(false);
+      }
       (window as any).electronAPI.setVpn({ 
-        enabled: vpnEnabled, 
-        proxyUrl: vpnLocation.url 
-      }).then((success: boolean) => {
-        if (!success && vpnEnabled) {
+        enabled: vpnEnabled && isValidProxy, 
+        proxyUrl: isValidProxy ? vpnLocation.url : '' 
+      }).then((res: boolean | { error?: string } | void) => {
+        if (typeof res === 'object' && res !== null && 'error' in res && (res as { error?: string }).error) {
+          console.error("Failed to set proxy via electron:", (res as { error?: string }).error);
+        } else if (res === false && vpnEnabled && isValidProxy) {
           console.error("Failed to set proxy via electron");
         }
+      }).catch((err: unknown) => {
+        console.error("Failed to set proxy via electron:", err);
       });
     }
   }, [vpnEnabled, vpnLocation, vpnLocations]);
@@ -759,7 +765,43 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // History state + debounced (~2s) localStorage persistence + navigation
   // recorder that handleUpdateTab calls OUTSIDE the tabs updater
   // (extracted to useHistoryRecorder)
-  const { history, setHistory, recordVisit } = useHistoryRecorder();
+  const { history, setHistory, recordVisit, flushHistory } = useHistoryRecorder();
+
+  const foldersRef = useRef(folders);
+  useEffect(() => { foldersRef.current = folders; }, [folders]);
+  // Early ref for the beforeunload flush below (bookmarks state is declared
+  // further down; it syncs into this ref via its own effect).
+  const bookmarksRef = useRef<Bookmark[]>([]);
+
+  // Immediate flush on beforeunload to prevent session loss on abrupt browser close
+  // (also flushes debounced settings/bookmarks/workspaces stores)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      try {
+        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
+        localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
+        if (activeTabIdRef.current) {
+          localStorage.setItem('active_tab_session', activeTabIdRef.current);
+        }
+        localStorage.setItem('folders_session', JSON.stringify(foldersRef.current));
+        localStorage.setItem('user_settings', JSON.stringify(settingsRef.current));
+        localStorage.setItem('bookmarks', JSON.stringify(bookmarksRef.current));
+        localStorage.setItem('workspaces_session', JSON.stringify(workspacesRef.current));
+        localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
+        flushHistory();
+      } catch (e) {}
+    };
+    const handleVisibilityHidden = () => {
+      if (document.visibilityState === 'hidden') handleBeforeUnload();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityHidden);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityHidden);
+    };
+  }, [flushHistory]);
 
   // Save session whenever tabs changes (Excluding Incognito Tabs)
   useEffect(() => {
@@ -769,7 +811,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       try {
         localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
       } catch (e) {}
-    }, 2000);
+    }, 500);
 
     return () => clearTimeout(timer);
   }, [tabs]);
@@ -777,14 +819,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
   useEffect(() => {
     if (tabs.length === 0) {
-      const fallbackId = Date.now().toString();
+      const fallbackId = generateId('tab');
       setTabs([{
         id: fallbackId,
         url: 'nova://newtab',
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
-        canGoForward: false
+        canGoForward: false,
+        lastAccessed: Date.now()
       }]);
       setActiveTabId(fallbackId);
     } else if (!tabs.some(t => t.id === activeTabId)) {
@@ -793,15 +836,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [tabs, activeTabId]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('active_tab_session', activeTabId);
-    } catch (e) {}
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('active_tab_session', activeTabId);
+      } catch (e) {}
+    }, 300);
+    return () => clearTimeout(timer);
   }, [activeTabId]);
 
   useEffect(() => {
-    try {
-      localStorage.setItem('folders_session', JSON.stringify(folders));
-    } catch (e) {}
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('folders_session', JSON.stringify(folders));
+      } catch (e) {}
+    }, 300);
+    return () => clearTimeout(timer);
   }, [folders]);
 
   // Apply Theme Mode & Custom Accent
@@ -897,25 +946,30 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       return () => mediaQuery.removeEventListener('change', listener);
     }
   }, [settings.theme, settings.accentColor, settings.customAccentColor]);
+
+  // Apply Language and RTL Mode
+  useEffect(() => {
+    if (settings.language) {
+      // setLanguage falls back to 'en' internally for unknown values.
+      setLanguage(settings.language as NonNullable<UserSettings['language']>);
+    }
+  }, [settings.language]);
   
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
-    try {
-      const saved = localStorage.getItem('bookmarks');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to load bookmarks from localStorage:', e);
-    }
-    return [];
+    const saved = localStorage.getItem('bookmarks');
+    return safeParseArrayWithBackup<Bookmark>('bookmarks', saved, []);
   });
 
-  // Save bookmarks to localStorage whenever they change
+  useEffect(() => { bookmarksRef.current = bookmarks; }, [bookmarks]);
+
+  // Save bookmarks to localStorage (debounced 500ms like tabs)
   useEffect(() => {
-    try {
-      localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
-    } catch (e) {}
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+      } catch (e) {}
+    }, 500);
+    return () => clearTimeout(timer);
   }, [bookmarks]);
 
   // Cloud Sync Handler
@@ -1009,7 +1063,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setTabs(prev => prev.map(t => (t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio && !t.isPinned) ? { ...t, isSuspended: true } : t));
     // 2. Clear thumbnail memory cache
     tabThumbnailCache.clear();
-    // 3. Invoke native Electron session cache purge & host resolver trim
+    // 3. Terminate background AI worker and release GPU VRAM
+    try {
+      await aiAgent.unload();
+    } catch (err) {
+      console.warn('Purge AI worker error:', err);
+    }
+    // 4. Invoke native Electron session cache purge & host resolver trim
     try {
       if ((window as any).electronAPI?.purgeSystemMemory) {
         await (window as any).electronAPI.purgeSystemMemory();
@@ -1055,6 +1115,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     return () => clearInterval(interval);
   }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
 
+  // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion
+  const MAX_LIVE_WEBVIEWS = 6;
+  useEffect(() => {
+    const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, MAX_LIVE_WEBVIEWS);
+    if (tabsToSuspend.size > 0) {
+      setTabs(prev => prev.map(t => tabsToSuspend.has(t.id) ? { ...t, isSuspended: true } : t));
+    }
+  }, [tabs, activeTabId, splitTabId]);
+
   // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
   // All side effects (closed-tabs stack, active-tab selection, incognito session
   // cleanup) are computed from tabsRef OUTSIDE the setState updater so every
@@ -1067,7 +1136,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
-      const newTabId = Date.now().toString();
+      const newTabId = generateId('tab');
       const newTab: Tab = {
         id: newTabId,
         url: 'nova://newtab',
@@ -1075,7 +1144,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         isLoading: false,
         canGoBack: false,
         canGoForward: false,
-        workspaceId: activeWs
+        workspaceId: activeWs,
+        lastAccessed: Date.now()
       };
       if (targetTab) {
         setClosedTabsStack(stack => [...stack, targetTab]);
@@ -1087,13 +1157,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     if (prevTabs.length <= 1) {
       setTabs([{
-        id: Date.now().toString(),
+        id: generateId('tab'),
         url: 'nova://newtab',
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
         canGoForward: false,
-        workspaceId: activeWs
+        workspaceId: activeWs,
+        lastAccessed: Date.now()
       }]);
       return;
     }
@@ -1153,7 +1224,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const original = prev[idx];
     const newTab: Tab = {
       ...original,
-      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 6),
+      id: generateId('tab'),
       title: original.title,
       url: original.url,
       favicon: original.favicon,
@@ -1210,14 +1281,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   const handleNewTabRight = useCallback((index: number) => {
-    const newId = Date.now().toString();
+    const newId = generateId('tab');
     const newTab: Tab = {
       id: newId,
       url: 'nova://newtab',
       title: 'New Tab',
       isLoading: false,
       canGoBack: false,
-      canGoForward: false
+      canGoForward: false,
+      lastAccessed: Date.now()
     };
     setTabs(prev => {
       const newTabs = [...prev];
@@ -1378,7 +1450,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if ((window as any).electronAPI?.onExtensionInstalledSilently) {
       cleanupExtInstall = (window as any).electronAPI.onExtensionInstalledSilently((_event: any, data: any) => {
         if (data.success) {
-          alert(`Extension successfully installed: ${data.name}`);
+          void showAlert({ title: 'Extensions', message: `Extension successfully installed: ${data.name}` });
         }
       });
     }
@@ -1408,7 +1480,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Folder Management
   const handleCreateFolder = useCallback(() => {
     const newFolder: Folder = {
-      id: `folder-${Date.now()}`,
+      id: generateId('folder'),
       name: 'New Folder',
       isExpanded: true,
       workspaceId: activeWorkspaceId
@@ -1476,13 +1548,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
     
     const newTab: Tab = {
-      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+      id: generateId('tab'),
       url: finalUrl,
       title: initialTitle,
       isLoading: false,
       canGoBack: false,
       canGoForward: false,
-      workspaceId: activeWorkspaceId
+      workspaceId: activeWorkspaceId,
+      lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
@@ -1497,13 +1570,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else {
       // Create a new tab if empty workspace
       const newTab: Tab = {
-        id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+        id: generateId('tab'),
         url: 'nova://newtab',
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
         canGoForward: false,
-        workspaceId: workspaceId
+        workspaceId: workspaceId,
+        lastAccessed: Date.now()
       };
       setTabs(prev => [...prev, newTab]);
       setActiveTabId(newTab.id);
@@ -1530,14 +1604,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
 
     const newTab: Tab = {
-      id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+      id: generateId('tab'),
       url: targetUrl,
       title: targetUrl !== 'nova://newtab' ? targetUrl : 'Private Tab',
       isLoading: targetUrl !== 'nova://newtab',
       canGoBack: false,
       canGoForward: false,
       isIncognito: true,
-      workspaceId: activeWorkspaceId
+      workspaceId: activeWorkspaceId,
+      lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
@@ -1636,7 +1711,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const prev = tabsRef.current;
 
     if (prev.length === 0) {
-      const newTabId = Date.now().toString();
+      const newTabId = generateId('tab');
       setTabs([{
         id: newTabId,
         url,
@@ -2156,7 +2231,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           }
         })();
       `, true).catch((e: any) => {
-        alert("Picture-in-Picture Error: " + (e.message || e));
+        void showAlert({ title: 'Picture-in-Picture', message: "Picture-in-Picture Error: " + (e.message || e) });
       });
     }
   }, []);
@@ -2169,7 +2244,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return prev.filter(b => b.url !== tab.url);
       } else {
         return [...prev, {
-          id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+          id: generateId('bm'),
           url: tab.url,
           title: tab.title || tab.url,
           favicon: tab.favicon,
@@ -2230,7 +2305,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           setScreenshotDataUrl(dataUrl);
           setIsScreenshotOpen(true);
         } else {
-          alert("Failed to capture screenshot. The page might not be fully loaded.");
+          void showAlert({ title: 'Screenshot', message: "Failed to capture screenshot. The page might not be fully loaded." });
         }
       } catch (err) {
         console.error('Screenshot capture failed:', err);
@@ -2239,9 +2314,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       // Check if it's an internal page by looking at activeTab url
       const tab = tabs.find(t => t.id === activeTabId);
       if (tab?.url?.startsWith('nova://')) {
-         alert("Screenshots cannot be taken on internal pages (Settings, New Tab, etc.).");
+         void showAlert({ title: 'Screenshot', message: "Screenshots cannot be taken on internal pages (Settings, New Tab, etc.)." });
       } else {
-         alert("Screenshot feature is only available in the desktop app.");
+         void showAlert({ title: 'Screenshot', message: "Screenshot feature is only available in the desktop app." });
       }
     }
   }, [activeTabId, tabs]);
@@ -2293,7 +2368,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           return t;
         }));
       } else {
-        const newId = Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7);
+        const newId = generateId('tab');
         const newTab: Tab = {
           id: newId,
           url: 'nova://newtab',
@@ -2363,19 +2438,22 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
 
     // Persistence happens OUTSIDE the updater (StrictMode-safe): the updater
-    // stays pure and the same filtered snapshot is written to localStorage
-    // right after the setHistory call.
-    const isOlderThanCutoff = (item: HistoryItem) => {
+    // stays pure and the same id set is used for both state and localStorage
+    // so the two writes stay atomic. Newer-than-cutoff items are deleted,
+    // older items are kept (e.g. "son 1 saat" deletes the last hour).
+    const isNewerThanCutoff = (item: HistoryItem) => {
       const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
-      return !isNaN(itemTime) && itemTime < cutoff;
+      return !isNaN(itemTime) && itemTime >= cutoff;
     };
 
-    setHistory(prev => prev.filter(isOlderThanCutoff));
-    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(isOlderThanCutoff))); } catch (e) {}
+    const idsToDelete = new Set(history.filter(isNewerThanCutoff).map(item => item.id));
+    setHistory(prev => prev.filter(item => !idsToDelete.has(item.id)));
+    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => !idsToDelete.has(item.id)))); } catch (e) {}
   }, [history]);
   const handleRemoveHistoryItem = useCallback((id: string) => {
-    setHistory(prev => prev.filter(item => item.id !== id));
-    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => item.id !== id))); } catch (e) {}
+    const idsToDelete = new Set([id]);
+    setHistory(prev => prev.filter(item => !idsToDelete.has(item.id)));
+    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => !idsToDelete.has(item.id)))); } catch (e) {}
   }, [history]);
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
@@ -2479,11 +2557,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [extensions]);
 
   const handleRemoveExtension = useCallback(async (id: string) => {
-    if (window.confirm('Are you sure you want to remove this extension?')) {
+    const confirmed = await showConfirm({
+      title: 'Remove Extension',
+      message: 'Are you sure you want to remove this extension?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel'
+    });
+    if (confirmed) {
       try {
         const res = await (window as any).electronAPI?.removeExtension?.(id);
         if (res?.error) {
-          alert('Failed to remove extension: ' + res.error);
+          console.error('Failed to remove extension:', res.error);
           return;
         }
         setExtensions(prev => prev.filter(e => e.id !== id));

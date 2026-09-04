@@ -93,7 +93,7 @@ export const saveSupabaseConfig = (url: string, anonKey: string): void => {
 
 // --- Secure session storage -------------------------------------------------
 
-const hasElectronSecureStore = (): boolean =>
+export const hasElectronSecureStore = (): boolean =>
   typeof window !== 'undefined' &&
   Boolean((window as any).electronAPI?.secureStoreSet) &&
   Boolean((window as any).electronAPI?.secureStoreGet);
@@ -160,7 +160,7 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
           },
           realtime: {
             params: {
-              eventsPerSecond: 10
+              eventsPerSecond: 3
             }
           }
         });

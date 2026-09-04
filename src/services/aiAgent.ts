@@ -2,6 +2,7 @@ import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam, ChatC
 import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
+import { generateId } from "../utils/idGenerator";
 
 // ---------------------------------------------------------------------------
 // Public API types
@@ -529,6 +530,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
 
 class AIAgent {
   private engine: MLCEngine | null = null;
+  private worker: Worker | null = null;
   private actionContext: AIActionContext | null = null;
   private isInitializing = false;
   private isInterrupted = false;
@@ -629,18 +631,40 @@ class AIAgent {
     return this.ctxWindowSize <= 2048 ? 400 : 1500;
   }
 
-  public setModel(modelId: string) {
+  /**
+   * Fully unloads the Web-LLM engine and terminates the background Web Worker.
+   * Reclaims GPU VRAM and eliminates dangling worker threads.
+   */
+  public async unload(): Promise<void> {
+    this.operationGeneration++;
+    this.isInterrupted = true;
+    if (this.engine) {
+      try {
+        await this.engine.unload?.();
+      } catch (e) {
+        console.warn('[AI Agent] Engine unload warning:', e);
+      }
+      this.engine = null;
+    }
+    if (this.worker) {
+      try {
+        this.worker.terminate();
+      } catch (e) {
+        console.warn('[AI Agent] Worker termination error:', e);
+      }
+      this.worker = null;
+    }
+    this.isInitializing = false;
+    this.emitStatus('idle');
+  }
+
+  public async setModel(modelId: string) {
     if (this.modelId === modelId) return;
     this.modelId = modelId;
     try {
       localStorage.setItem('nova_ai_model', modelId);
     } catch {}
-    if (this.engine) {
-      try {
-        this.engine.unload?.();
-      } catch (e) {}
-      this.engine = null;
-    }
+    await this.unload();
   }
 
   public getAvailableModels(): AIModelOption[] {
@@ -1059,8 +1083,22 @@ CRITICAL RULES:
         this.emitStatus('loading_model', `${pct}% ${initProgress.text}`.trim());
       };
 
+      // Terminate any previous lingering worker before spinning up a new one
+      if (this.worker) {
+        try {
+          this.worker.terminate();
+        } catch {}
+        this.worker = null;
+      }
+      if (this.engine) {
+        try {
+          await this.engine.unload?.();
+        } catch {}
+        this.engine = null;
+      }
+
       const { CreateWebWorkerMLCEngine } = await import("@mlc-ai/web-llm");
-      const worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
+      this.worker = new Worker(new URL('../workers/aiWorker.ts', import.meta.url), { type: 'module' });
 
       // Resolve stored model against the catalog; stale ids migrate to default
       try {
@@ -1069,7 +1107,7 @@ CRITICAL RULES:
         localStorage.setItem('nova_ai_model', this.modelId);
       } catch {}
 
-      this.engine = await CreateWebWorkerMLCEngine(worker, this.modelId, {
+      this.engine = await CreateWebWorkerMLCEngine(this.worker, this.modelId, {
         initProgressCallback,
         context_window_size: this.getContextWindowSizeForModel(this.modelId)
       } as any) as any;
@@ -1609,13 +1647,22 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
               // fill_input resolves elements via [data-ai-id], so map the CSS
               // selector to its tagged ai_id first (tagging on the fly if the
               // element has not been indexed by read_page_content yet).
+              // fallbackAfId is CSPRNG (generateId -> crypto.randomUUID) so the
+              // in-page script never falls back to predictable Date.now().
+              const fallbackAfId = generateId('af');
               const resolveScript = `(() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(cmd.selector)});
                   if (!el) return JSON.stringify({ error: 'Element not found for selector: ' + ${JSON.stringify(cmd.selector)} });
                   let aiId = el.getAttribute('data-ai-id');
                   if (!aiId) {
-                    aiId = 'af_' + Math.random().toString(36).substring(2, 10);
+                    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+                      aiId = 'af_' + crypto.randomUUID().replace(/-/g, '').substring(0, 12);
+                    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+                      aiId = 'af_' + Array.from(crypto.getRandomValues(new Uint8Array(12))).map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 12);
+                    } else {
+                      aiId = ${JSON.stringify(fallbackAfId)};
+                    }
                     el.setAttribute('data-ai-id', aiId);
                   }
                   return JSON.stringify({ ai_id: aiId });
@@ -1631,7 +1678,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
               if (resolved && resolved.ai_id) {
                 await this.handleToolCall(
-                  { id: Math.random().toString(), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ ai_id: resolved.ai_id, value: cmd.value }) } },
+                  { id: generateId('call'), type: "function", function: { name: "fill_input", arguments: JSON.stringify({ ai_id: resolved.ai_id, value: cmd.value }) } },
                   generation
                 );
               } else {
@@ -1972,7 +2019,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         let friendlyResponse = "Action completed.";
         try {
           const toolResult = await this.handleToolCall({
-            id: Date.now().toString(),
+            id: generateId('call'),
             type: "function",
             function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
           }, generation);
@@ -2180,7 +2227,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           let toolResult = '';
           try {
             toolResult = await this.handleToolCall({
-              id: Date.now().toString(),
+              id: generateId('call'),
               type: 'function',
               function: { name, arguments: JSON.stringify(args) }
             }, generation);

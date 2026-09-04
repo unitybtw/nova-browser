@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MousePointer2, Keyboard } from 'lucide-react';
+import { generateId } from '../utils/idGenerator';
 
 export interface AICursorEvent {
   x: number;
@@ -12,7 +13,7 @@ export interface AICursorEvent {
 export const AICursorOverlay: React.FC = () => {
   const [cursor, setCursor] = useState<AICursorEvent | null>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const [ripples, setRipples] = useState<{id: number, x: number, y: number}[]>([]);
+  const [ripples, setRipples] = useState<{id: string, x: number, y: number}[]>([]);
 
   useEffect(() => {
     let hideTimeout: NodeJS.Timeout;
@@ -23,7 +24,7 @@ export const AICursorOverlay: React.FC = () => {
       setIsVisible(true);
 
       if (customEvent.detail.action === 'click') {
-        const id = Date.now();
+        const id = generateId('ripple');
         setRipples(prev => [...prev, { id, x: customEvent.detail.x, y: customEvent.detail.y }]);
         setTimeout(() => {
           setRipples(prev => prev.filter(r => r.id !== id));

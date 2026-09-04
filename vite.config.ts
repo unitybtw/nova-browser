@@ -16,10 +16,9 @@ const HARDENED_PROD_CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  // NOTE: `https:` in connect-src is intentionally broad — WebLLM downloads
-  // model shards from arbitrary Hugging Face CDN URLs inside renderer workers,
-  // which cannot be enumerated ahead of time.
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws: wss: http://localhost:* https:",
+  // NOTE: connect-src is an explicit allowlist (no bare `https:`/`ws:` wildcards).
+  // WebLLM model shards come from Hugging Face CDN hosts enumerated here.
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-src https://*.supabase.co",
@@ -47,7 +46,7 @@ export default defineConfig({
     hardenCspForProduction()
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.3.0')
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.3.1')
   },
   resolve: {
     alias: {
@@ -74,12 +73,12 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          'web-llm': ['@mlc-ai/web-llm'],
           'vendor-react': ['react', 'react-dom'],
           'vendor-ui': ['framer-motion', 'lucide-react'],
           'vendor-markdown': ['react-markdown', 'remark-gfm', 'dompurify'],
           'vendor-supabase': ['@supabase/supabase-js'],
-          'vendor-readability': ['@mozilla/readability']
+          'vendor-readability': ['@mozilla/readability'],
+          'web-llm': ['@mlc-ai/web-llm']
         }
       }
     }

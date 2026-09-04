@@ -35,7 +35,22 @@ export function extractHostname(url: string): string {
  * Check if a domain matches the blocklist or exhibits concrete structural phishing vectors.
  * Replaces naive keyword matching with signed blocklist matching and structural heuristic checks.
  */
-let cachedBlocklist: string[] | null = null;
+const DEFAULT_BLOCKED_DOMAINS = [
+  'phishing.com',
+  'malware.com',
+  'evil.com',
+  'account-security-update.com',
+  'login-verification-alert.com',
+  'apple-security-check.com',
+  'google-verify-security.com',
+  'paypal-account-center.com',
+  'microsoft-login-auth.com',
+  'secure-banking-portal.com',
+  'metamask-validation.com',
+  'wallet-connect-auth.com',
+];
+
+let cachedBlocklist: string[] = [...DEFAULT_BLOCKED_DOMAINS];
 
 export function checkPhishingDomain(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -76,7 +91,7 @@ export function checkPhishingDomain(url: string): boolean {
  * The list is fetched via a custom protocol or passed via IPC from main.
  */
 export function setBlocklist(domains: string[]) {
-  cachedBlocklist = domains.map(d => d.toLowerCase().trim());
+  cachedBlocklist = Array.from(new Set([...DEFAULT_BLOCKED_DOMAINS, ...domains.map(d => d.toLowerCase().trim())]));
 }
 
 /**
@@ -94,13 +109,23 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
     };
   }
 
+  // Blocked / dangerous Chromium internals
+  if (url.startsWith('chrome://') || url.startsWith('edge://')) {
+    return {
+      level: 'dangerous',
+      label: 'Blocked Protocol',
+      color: 'text-rose-500',
+      bgColor: 'bg-rose-500/10',
+      icon: 'AlertTriangle',
+      tooltip: 'Restricted internal protocol blocked for safety'
+    };
+  }
+
   // Internal Nova pages
   if (
     url.startsWith('nova://') ||
     url.startsWith('about:') ||
-    url === 'about:blank' ||
-    url.startsWith('chrome://') ||
-    url.startsWith('edge://')
+    url === 'about:blank'
   ) {
     return {
       level: 'internal',
@@ -230,5 +255,25 @@ export function formatDisplayUrl(url: string): string {
     return display;
   } catch {
     return url;
+  }
+}
+
+/**
+ * Safe base64 encoding that sanitizes lone surrogates and url-encodes well-formed UTF-16
+ * to prevent DOMException / btoa errors on unconventional character sequences.
+ */
+export function safeBase64(str: string): string {
+  if (!str) return '';
+  const wellFormed = typeof (str as any).toWellFormed === 'function'
+    ? (str as any).toWellFormed()
+    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+
+  try {
+    return btoa(unescape(encodeURIComponent(wellFormed)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch (e) {
+    return wellFormed.replace(/[^a-zA-Z0-9_-]/g, '_');
   }
 }

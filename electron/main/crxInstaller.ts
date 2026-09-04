@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, session } from 'electron';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import fetch from 'cross-fetch';
 import JSZip from 'jszip';
 
@@ -202,6 +203,62 @@ function getCrxInnerZip(buffer: Buffer): Buffer {
   throw new Error('Unsupported CRX container format.');
 }
 
+// Security (lightweight, no full CRX3 protobuf verify): extract the claimed
+// crx_id from the CRX3 header when present, so it can be cross-checked
+// against the expected extension folder ID. Returns the 32-char (a-p)
+// extension ID, or null when absent/unparseable (plain zip, CRX2, etc.).
+function getCrxHeaderClaimedExtensionId(buffer: Buffer): string | null {
+  try {
+    if (buffer.length < 12) return null;
+    if (!(buffer[0] === 0x43 && buffer[1] === 0x72 && buffer[2] === 0x32 && buffer[3] === 0x34)) return null;
+    if (buffer[4] !== 3) return null;
+    const headerSize = buffer.readUInt32LE(8);
+    if (headerSize <= 0 || headerSize > 64 * 1024) return null;
+    if (buffer.length < 12 + headerSize) return null;
+    const header = buffer.subarray(12, 12 + headerSize);
+    // CrxFileHeader.signed_header_data: field 10000, wire type 2 -> tag 0x82 0xF1 0x04
+    const tagIdx = header.indexOf(Buffer.from([0x82, 0xf1, 0x04]));
+    if (tagIdx === -1) return null;
+    let off = tagIdx + 3;
+    let len = 0;
+    let shift = 0;
+    let lenOk = false;
+    while (off < header.length) {
+      const b = header[off++];
+      len |= (b & 0x7f) << shift;
+      shift += 7;
+      if ((b & 0x80) === 0) { lenOk = true; break; }
+      if (shift > 28) return null;
+    }
+    if (!lenOk || len <= 0 || off + len > header.length) return null;
+    const signedData = header.subarray(off, off + len);
+    // CrxSignedHeaderData.crx_id: field 1, wire type 2 -> tag 0x0A, 16 bytes
+    const idTagIdx = signedData.indexOf(0x0a);
+    if (idTagIdx === -1) return null;
+    let o = idTagIdx + 1;
+    let idLen = 0;
+    let s = 0;
+    let idLenOk = false;
+    while (o < signedData.length) {
+      const b = signedData[o++];
+      idLen |= (b & 0x7f) << s;
+      s += 7;
+      if ((b & 0x80) === 0) { idLenOk = true; break; }
+      if (s > 28) return null;
+    }
+    if (!idLenOk || idLen !== 16 || o + 16 > signedData.length) return null;
+    const idBytes = signedData.subarray(o, o + 16);
+    let extId = '';
+    for (const byte of idBytes) {
+      extId += String.fromCharCode(97 + (byte >> 4), 97 + (byte & 0x0f));
+    }
+    if (!/^[a-p]{32}$/.test(extId)) return null;
+    return extId;
+  } catch {
+    return null;
+  }
+}
+
 // Zip bomb defense limits
 const MAX_TOTAL_UNCOMPRESSED_BYTES = 150 * 1024 * 1024; // 150 MB max uncompressed
 const MAX_SINGLE_FILE_UNCOMPRESSED_BYTES = 50 * 1024 * 1024; // 50 MB max single file
@@ -346,6 +403,13 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       throw new Error('Downloaded file is not a valid extension package format.');
     }
 
+    // Security: cross-check CRX3 header crx_id (when present) against the expected folder ID
+    const claimedId = getCrxHeaderClaimedExtensionId(buffer);
+    if (claimedId && claimedId !== extensionId) {
+      console.warn(`[Security] Rejected extension: CRX header crx_id mismatch (header=${claimedId}, expected=${extensionId}).`);
+      throw new Error('Extension package identity mismatch (CRX header ID does not match expected extension ID).');
+    }
+
     const tempPath = path.join(app.getPath('userData'), 'temp_extensions');
     if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
 
@@ -398,6 +462,34 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       if (!fs.existsSync(manifestPath)) {
         throw new Error('Extension package is missing manifest.json.');
       }
+
+      // Security: manifest update_url must be https when present; http/plain is rejected.
+      // Non-WebStore update hosts are sideload candidates — warn only, no block.
+      try {
+        const rawManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+        const updateUrl = (rawManifest as any)?.update_url;
+        if (typeof updateUrl === 'string' && updateUrl.length > 0) {
+          let parsedUpdate: URL;
+          try {
+            parsedUpdate = new URL(updateUrl);
+          } catch {
+            throw new Error('Extension manifest contains an invalid update_url.');
+          }
+          if (parsedUpdate.protocol !== 'https:') {
+            throw new Error('Extension manifest update_url must use HTTPS.');
+          }
+          if (parsedUpdate.hostname.toLowerCase() !== 'clients2.google.com') {
+            console.warn(`[Security] Sideload warning: extension ${extensionId} update_url host is ${parsedUpdate.hostname} (expected clients2.google.com).`);
+          }
+        }
+      } catch (manifestErr: any) {
+        if (manifestErr?.message === 'Extension manifest update_url must use HTTPS.' ||
+            manifestErr?.message === 'Extension manifest contains an invalid update_url.') {
+          throw manifestErr;
+        }
+        // Unparseable manifest for this pre-check only: the dialog-stage parse
+        // below handles naming gracefully, so don't fail open/closed here.
+      }
     } catch (extractErr) {
       try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
       try { fs.unlinkSync(crxFilePath); } catch (_) {}
@@ -422,7 +514,13 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     
     const formattedPermissions = formatPermissionsForDisplay(allPermissions);
     const parentWin = getMainWindow();
-    
+
+    // Info-only identity line: short SHA256 + extension ID (no blocking).
+    let identityLine = `Extension ID: ${extensionId}`;
+    try {
+      identityLine += `\nSHA256: ${crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 16)}`;
+    } catch (_) {}
+
     const confirmOptions: Electron.MessageBoxOptions = {
       type: 'question',
       buttons: ['Cancel', 'Add Extension'],
@@ -431,8 +529,8 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       title: 'Install Extension',
       message: `Add "${extensionName}" to Nova Browser?`,
       detail: formattedPermissions.length > 0
-        ? `It can:\n\n${formattedPermissions.join('\n\n')}`
-        : 'This extension does not request special browser permissions.'
+        ? `${identityLine}\n\nIt can:\n\n${formattedPermissions.join('\n\n')}`
+        : `${identityLine}\n\nThis extension does not request special browser permissions.`
     };
     
     const { response } = parentWin

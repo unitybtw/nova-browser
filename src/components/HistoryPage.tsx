@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Clock, Search, Trash2, Globe, Calendar, ArrowUpRight } from 'lucide-react';
-import { HistoryItem } from '../App';
+import { HistoryItem } from '../types/browser';
 
 interface HistoryPageProps {
   history: HistoryItem[];

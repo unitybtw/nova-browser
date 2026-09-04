@@ -8,6 +8,12 @@ import {
 import DOMPurify from 'dompurify';
 import { Readability } from '@mozilla/readability';
 import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, NativeVoiceInfo, tts } from '../services/tts';
+import { safeBase64 as safeBase64Util } from '../utils/securityUtils';
+import { generateId } from '../utils/idGenerator';
+
+const safeBase64 = (str: string): string => {
+  return safeBase64Util(str);
+};
 
 interface HighlightData {
   id: string;
@@ -24,22 +30,6 @@ interface ReaderModeProps {
   isActive: boolean;
   onClose: () => void;
 }
-
-const safeBase64 = (str: string): string => {
-  if (!str) return '';
-  const wellFormed = typeof (str as any).toWellFormed === 'function'
-    ? (str as any).toWellFormed()
-    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
-
-  try {
-    return btoa(unescape(encodeURIComponent(wellFormed)))
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
-  } catch (e) {
-    return wellFormed.replace(/[^a-zA-Z0-9_-]/g, '_');
-  }
-};
 
 export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, onClose }) => {
   const [content, setContent] = useState<string | null>(null);
@@ -177,12 +167,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
     };
     updateWebVoices();
     if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.onvoiceschanged = updateWebVoices;
+      window.speechSynthesis.addEventListener('voiceschanged', updateWebVoices);
     }
 
     return () => {
       if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.onvoiceschanged = null;
+        window.speechSynthesis.removeEventListener('voiceschanged', updateWebVoices);
       }
     };
   }, []);
@@ -313,7 +303,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   const saveHighlight = () => {
     if (!popoverState.range) return;
 
-    const id = popoverState.existingId || Math.random().toString(36).substr(2, 9);
+    const id = popoverState.existingId || generateId('hl');
     const newHighlight: HighlightData = {
       id,
       text: popoverState.text,
@@ -390,6 +380,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   // Extract sentences when content changes using smart Intl / regex sentence splitting
   useEffect(() => {
     if (contentRef.current) {
+      // Defense in depth: enforce rel/target on rendered article links (tabnabbing).
+      contentRef.current.querySelectorAll('a').forEach((a) => {
+        a.setAttribute('rel', 'noopener noreferrer');
+        a.setAttribute('target', '_blank');
+      });
       const text = contentRef.current.innerText || title;
       const parsed = splitIntoSentences(text);
       setSentences(parsed);
@@ -594,7 +589,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       }
 
       try {
-        let html = '';
+        const MAX_READER_HTML_CHARS = 3 * 1024 * 1024;
+        let html: any = '';
         const webview = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
         if (webview && typeof webview.executeJavaScript === 'function') {
           try {
@@ -605,10 +601,18 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
         }
         if (!html && (window as any).electronAPI?.fetchPageHtml) {
           try {
-            html = await (window as any).electronAPI.fetchPageHtml(url);
+            const res = await (window as any).electronAPI.fetchPageHtml(url);
+            html = typeof res === 'string' ? res : (res?.html ?? '');
           } catch (e) {
             console.warn('ReaderMode fetchPageHtml fallback failed', e);
           }
+        }
+        if (typeof html !== 'string') html = String(html ?? '');
+        // Main-process fetch-page-html already caps sanitized output at 3MB;
+        // cap the unbounded webview outerHTML path here as well.
+        if (html.length > MAX_READER_HTML_CHARS) {
+          console.warn(`ReaderMode HTML exceeds 3MB (${html.length} chars), truncating`);
+          html = html.slice(0, MAX_READER_HTML_CHARS);
         }
         if (!html) throw new Error('Unable to extract article content from this page.');
         
@@ -644,13 +648,23 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
           setWordCount(words);
           setReadingTime(Math.max(1, Math.ceil(words / 200)));
 
-          // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode
-          const cleanHtml = DOMPurify.sanitize(article.content, { 
-            ADD_ATTR: ['target', 'src', 'srcset', 'alt', 'title'],
+          // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode and security
+          const rawCleanHtml = DOMPurify.sanitize(article.content, { 
+            USE_PROFILES: { html: true },
+            ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
             ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
-            FORBID_ATTR: ['style', 'color', 'bgcolor', 'background']
+            FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
+            FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
+            ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
           });
-          setContent(cleanHtml);
+          // Harden links against tabnabbing: force rel + blank target.
+          const linkHost = document.createElement('div');
+          linkHost.innerHTML = rawCleanHtml;
+          linkHost.querySelectorAll('a').forEach((a) => {
+            a.setAttribute('rel', 'noopener noreferrer');
+            a.setAttribute('target', '_blank');
+          });
+          setContent(linkHost.innerHTML);
         } else {
           setError('The text content on this page is not suitable for reader mode.');
         }
@@ -948,7 +962,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
                 <div 
                   ref={contentRef}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(content) }} 
+                  dangerouslySetInnerHTML={{ 
+                    __html: DOMPurify.sanitize(content, {
+                      USE_PROFILES: { html: true },
+                      ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
+                      ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
+                      FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
+                      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
+                      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+                    }) 
+                  }} 
                 />
               </motion.div>
             )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DownloadItem } from '../App';
+import { DownloadItem } from '../types/browser';
 import { 
   CheckCircle2, 
   AlertCircle, 

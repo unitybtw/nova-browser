@@ -1,12 +1,10 @@
 import React, { useRef, useEffect, useState, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Folder, Shield, Code2, Palette } from 'lucide-react';
-import { Tab } from '../types/browser';
+import { Tab, HistoryItem, UserSettings } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
-import { HistoryItem } from '../App';
 import type { DownloadItemPage } from './DownloadsPage';
-import { UserSettings } from '../App';
 import { AILinkPreview } from './AILinkPreview';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { 
@@ -229,7 +227,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               }
 
               // Autofill existing credentials
-              const savedCredentials = ${JSON.stringify(savedPasswords)};
+              const savedCredentials = ${JSON.stringify(savedPasswords).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
               if (savedCredentials.length > 0) {
                 const cred = savedCredentials[0];
                 const allPwds = Array.from(document.querySelectorAll('input[type="password"]'));
@@ -949,7 +947,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         ) : (
           /* Web Demo Mode: Render rich simulated pages for mockups or fallback iframe cleanly */
           (() => {
-            const isDarkTheme = settings.theme === 'dark' || (settings.theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
+            const isDarkTheme = settings.theme === 'dark' || (settings.theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || Boolean(typeof document !== 'undefined' && document?.documentElement?.classList?.contains?.('dark'));
             
             if (tab.url?.includes('github.com')) {
               return (

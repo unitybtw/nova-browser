@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Plus, X } from 'lucide-react';
-import { Tab } from '../types/browser';
+import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
-import { UserSettings } from '../App';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 
@@ -76,21 +75,28 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
         const clientLocale = typeof navigator !== 'undefined' ? navigator.language : 'tr-TR';
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
-          if (Array.isArray(results) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
-            setClientCachedSuggestions(cacheKey, results);
-            setSuggestions(results.slice(0, 5));
-            return;
+          if (!controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
+            if (Array.isArray(results)) {
+              setClientCachedSuggestions(cacheKey, results);
+              setSuggestions(results.slice(0, 5));
+            } else {
+              setSuggestions([]);
+            }
           }
+          return;
         }
-        const lang = clientLocale.split('-')[0] || 'tr';
-        const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-        const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
-        if (response.ok) {
-          const data = await response.json();
-          if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
-            const list = data[1].slice(0, 5);
-            setClientCachedSuggestions(cacheKey, list);
-            setSuggestions(list);
+        // Fallback for non-electron web preview only when google is the chosen engine
+        if (searchEngine === 'google') {
+          const lang = clientLocale.split('-')[0] || 'tr';
+          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
+          const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
+          if (response.ok) {
+            const data = await response.json();
+            if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
+              const list = data[1].slice(0, 5);
+              setClientCachedSuggestions(cacheKey, list);
+              setSuggestions(list);
+            }
           }
         }
       } catch (err: any) {

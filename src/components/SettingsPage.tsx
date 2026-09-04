@@ -1,30 +1,55 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power } from 'lucide-react';
-import { UserSettings } from '../App';
+import { UserSettings } from '../types/browser';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
 
-function safeParseArray<T>(raw: string | null): T[] {
-  if (!raw) return [];
+import { backupCorruptData, safeParseArrayWithBackup, safeParseObjectWithBackup } from '../utils/safeStorage';
+import { showConfirm, showAlert } from '../utils/confirmDialog';
+
+function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
+  return safeParseArrayWithBackup<T>(key, raw, []);
+}
+
+function safeParseObject<T extends object>(raw: string | null, fallback: T, key: string = 'unknown_object'): T {
+  return safeParseObjectWithBackup<T>(key, raw, fallback);
+}
+
+// P0: crash-safe clipboard. navigator.clipboard throws in insecure contexts
+// (http/file) — fall back to legacy textarea+execCommand. Resolves true only
+// on actual success so callers set "copied" state conditionally.
+async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {
+    // fall through to legacy path
+  }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (_) {
+    return false;
   }
 }
 
-function safeParseObject<T>(raw: string | null, fallback: T): T {
-  if (!raw) return fallback;
-  try {
-    const parsed = JSON.parse(raw);
-    return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : fallback;
-  } catch {
-    return fallback;
-  }
-}
+// mcpToken from getMcpTokenStatus is only a display prefix (e.g. "nova_mcp_••••").
+// Never treat a masked value as the real secret.
+const isMaskedToken = (v: string) => !v || v.includes('•') || v.includes('****');
 
 const PasswordList = () => {
   const [passwords, setPasswords] = useState<any[]>([]);
@@ -45,7 +70,13 @@ const PasswordList = () => {
   }, []);
 
   const handleDelete = async (index: number) => {
-    if (!window.confirm('Are you sure you want to delete this password?')) return;
+    const confirmed = await showConfirm({
+      title: 'Delete Password',
+      message: 'Are you sure you want to delete this password?',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel'
+    });
+    if (!confirmed) return;
     const newPasses = [...passwords];
     newPasses.splice(index, 1);
     setPasswords(newPasses);
@@ -70,8 +101,8 @@ const PasswordList = () => {
       {passwords.map((p, i) => (
         <div key={`${p.hostname}-${p.username}-${i}`} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
           <div className="flex items-center gap-4 flex-1">
-            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center flex-shrink-0">
-              <img src={`https://www.google.com/s2/favicons?domain=${p.hostname}&sz=32`} className="w-5 h-5" alt="" />
+            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800/80 rounded-xl flex items-center justify-center flex-shrink-0 text-slate-500 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+              <Key size={16} />
             </div>
             <div className="flex-1">
               <div className="font-medium text-slate-800 dark:text-slate-200">{p.hostname}</div>
@@ -676,7 +707,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.0';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.1';
   });
 
   useEffect(() => {
@@ -719,7 +750,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
 
   const handleClearAiCache = async () => {
-    if (!window.confirm('Clear all downloaded local AI model files and temporary cache?')) return;
+    const confirmed = await showConfirm({
+      title: 'Clear AI Cache',
+      message: 'Clear all downloaded local AI model files and temporary cache?',
+      confirmLabel: 'Clear Cache',
+      cancelLabel: 'Cancel'
+    });
+    if (!confirmed) return;
     setIsClearingCache(true);
     try {
       if (typeof window !== 'undefined' && 'caches' in window) {
@@ -747,8 +784,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       const status = await (window as any).electronAPI.getMcpStatus();
       setMcpStatus(status);
     }
-    if ((window as any).electronAPI?.getMcpToken) {
-      setMcpToken(await (window as any).electronAPI.getMcpToken());
+    if ((window as any).electronAPI?.getMcpTokenStatus) {
+      const tokenStatus = await (window as any).electronAPI.getMcpTokenStatus();
+      if (tokenStatus?.configured) {
+        setMcpToken(tokenStatus.prefix || 'nova_mcp_••••••••');
+      } else {
+        setMcpToken('');
+      }
     }
     if ((window as any).electronAPI?.getMcpToolSettings) {
       setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
@@ -803,15 +845,31 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   const handleRotateToken = async () => {
     if ((window as any).electronAPI?.rotateMcpToken) {
-      const newToken = await (window as any).electronAPI.rotateMcpToken();
-      setMcpToken(newToken);
+      await (window as any).electronAPI.rotateMcpToken();
+      await fetchMcpStatus();
     }
   };
 
-  const handleCopyToken = () => {
-    navigator.clipboard.writeText(mcpToken);
-    setTokenCopied(true);
-    setTimeout(() => setTokenCopied(false), 2000);
+  const handleCopyToken = async () => {
+    // Real token lives in main process — copy via IPC, never the masked prefix.
+    try {
+      if ((window as any).electronAPI?.copyMcpToken) {
+        const ok = await (window as any).electronAPI.copyMcpToken();
+        if (ok) {
+          setTokenCopied(true);
+          setTimeout(() => setTokenCopied(false), 2000);
+          return;
+        }
+      }
+    } catch (_) {}
+    // Fallback only when we hold an unmasked value; placeholder prefix must not be copied.
+    if (mcpToken && !isMaskedToken(mcpToken)) {
+      const ok = await copyTextToClipboard(mcpToken);
+      if (ok) {
+        setTokenCopied(true);
+        setTimeout(() => setTokenCopied(false), 2000);
+      }
+    }
   };
 
   const handleToggleTool = async (toolName: string, currentlyDisabled: boolean) => {
@@ -834,11 +892,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   };
 
   const handleRemoveExtension = async (ext: any) => {
-    if (window.confirm(`Are you sure you want to remove "${ext.name}"?`)) {
+    const confirmed = await showConfirm({
+      title: 'Remove Extension',
+      message: `Are you sure you want to remove "${ext.name}"?`,
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel'
+    });
+    if (confirmed) {
       try {
         const res = await (window as any).electronAPI?.removeExtension?.(ext.id);
         if (res?.error) {
-          alert('Failed to remove extension: ' + res.error);
+          console.error('Failed to remove extension:', res.error);
           return;
         }
         setExtensions(prev => prev.filter(e => e.id !== ext.id));
@@ -859,10 +923,24 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }
 }`;
 
-  const handleCopyConfig = () => {
-    navigator.clipboard.writeText(mcpConfigSnippet);
-    setMcpCopied(true);
-    setTimeout(() => setMcpCopied(false), 2000);
+  const handleCopyConfig = async () => {
+    // Main builds the config with the real token — prefer IPC over the
+    // status prefix shown in the UI.
+    try {
+      if ((window as any).electronAPI?.copyMcpConfig) {
+        const ok = await (window as any).electronAPI.copyMcpConfig();
+        if (ok) {
+          setMcpCopied(true);
+          setTimeout(() => setMcpCopied(false), 2000);
+          return;
+        }
+      }
+    } catch (_) {}
+    const ok = await copyTextToClipboard(mcpConfigSnippet);
+    if (ok) {
+      setMcpCopied(true);
+      setTimeout(() => setMcpCopied(false), 2000);
+    }
   };
 
   const MCP_TOOLS = [
@@ -956,6 +1034,28 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version {appVersion} (Open Source Edition)</p>
                   </div>
                   <UpdateWidget />
+                </div>
+              </section>
+
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Language & Layout</h2>
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Application Language</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select interface language. Arabic automatically switches UI to RTL layout.</p>
+                    </div>
+                    <select
+                      value={settings.language || 'en'}
+                      onChange={(e) => onUpdateSettings({ language: e.target.value as any })}
+                      className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="en">English (LTR)</option>
+                      <option value="tr">Türkçe (LTR)</option>
+                      <option value="ar">العربية (RTL)</option>
+                      <option value="de">Deutsch (LTR)</option>
+                    </select>
+                  </div>
                 </div>
               </section>
 
@@ -1067,14 +1167,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Clear your browsing history, cookies, cache, and more.</p>
                   </div>
                   <button
-                    onClick={() => {
-                      if (window.confirm("Are you sure you want to clear your browsing history?")) {
+                    onClick={async () => {
+                      const confirmed = await showConfirm({
+                        title: 'Clear Browsing History',
+                        message: 'Are you sure you want to clear your browsing history?',
+                        confirmLabel: 'Clear History',
+                        cancelLabel: 'Cancel'
+                      });
+                      if (confirmed) {
                         if (onClearHistory) {
                           onClearHistory();
                         } else {
                           localStorage.removeItem('browsing_history');
                         }
-                        alert("Browsing history cleared.");
                       }
                     }}
                     className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:hover:bg-red-500/20 rounded-xl font-medium transition-colors text-sm"
@@ -1223,10 +1328,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 workspaces: safeParseArray(rawW)
                               });
 
-                              navigator.clipboard.writeText(code);
-                              setCopiedSyncCode(true);
-                              setSyncMsg(`Sync Code Copied to Clipboard: ${code}`);
-                              setTimeout(() => setCopiedSyncCode(false), 3000);
+                              const copied = await copyTextToClipboard(code);
+                              if (copied) {
+                                setCopiedSyncCode(true);
+                                setSyncMsg(`Sync Code Copied to Clipboard: ${code}`);
+                                setTimeout(() => setCopiedSyncCode(false), 3000);
+                              } else {
+                                setSyncMsg(`Sync Code: ${code} (copy manually)`);
+                              }
                             } catch (err: any) {
                               setSyncErr(err.message || 'Failed to generate code');
                             }
@@ -1365,10 +1474,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 workspaces: safeParseArray(rawW)
                               });
 
-                              navigator.clipboard.writeText(code);
-                              setCopiedSyncCode(true);
-                              setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
-                              setTimeout(() => setCopiedSyncCode(false), 4000);
+                              const copied = await copyTextToClipboard(code);
+                              if (copied) {
+                                setCopiedSyncCode(true);
+                                setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
+                                setTimeout(() => setCopiedSyncCode(false), 4000);
+                              } else {
+                                setSyncMsg(`Sync Code: ${code} (copy manually)`);
+                              }
                             } catch (err: any) {
                               setSyncErr(err.message || 'Failed to generate code');
                             }
@@ -2197,7 +2310,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                             if (!result.canceled && result.folderPath) {
                               const installRes = await (window as any).electronAPI.installExtension(result.folderPath);
                               if (installRes.error) {
-                                alert('Failed to load extension: ' + installRes.error);
+                                void showAlert({ title: 'Extensions', message: 'Failed to load extension: ' + installRes.error });
                               } else {
                                 const list = await (window as any).electronAPI.listExtensions();
                                 setExtensions(list || []);

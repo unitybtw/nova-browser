@@ -1,4 +1,4 @@
-import { UserSettings } from '../App';
+import { UserSettings } from '../types/browser';
 import { DANGEROUS_PROTOCOLS } from './safeNavigation';
 
 const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;

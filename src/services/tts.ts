@@ -256,9 +256,11 @@ class TTSService {
       };
 
       if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => { 
-          if (sessionId === this.currentSessionId) speakNext(); 
+        const onVoices = () => {
+          window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+          if (sessionId === this.currentSessionId) speakNext();
         };
+        window.speechSynthesis.addEventListener('voiceschanged', onVoices);
       } else {
         speakNext();
       }

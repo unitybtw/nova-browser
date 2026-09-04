@@ -191,3 +191,42 @@ button:active:not(:disabled) {
   background: var(--bg-main);
   border-bottom: 1px solid var(--border-color);
 }
+
+/* RTL Layout Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] input,
+[dir="rtl"] textarea {
+  text-align: right;
+}
+
+[dir="rtl"] input[type="url"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"] {
+  direction: ltr;
+  text-align: left;
+}
+
+/* RTL faz-1: logical helpers (search bar + container only) */
+[dir="rtl"] .rtl-rotate-arrow {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .rtl-text-start {
+  text-align: start;
+}
+
+/* Accessibility: Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,16 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Tab } from '../types/browser';
-
-// Moved verbatim from App.tsx so the history domain is self-contained;
-// App.tsx re-exports this type to keep existing `from '../App'` imports
-// (HistoryPage, BrowserView, syncService) resolving unchanged.
-export interface HistoryItem {
-  id: string;
-  url: string;
-  title: string;
-  favicon?: string;
-  timestamp: number;
-}
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Tab, HistoryItem } from '../types/browser';
+import { generateId } from '../utils/idGenerator';
+import { safeParseArrayWithBackup } from '../utils/safeStorage';
+export type { HistoryItem };
 
 /**
  * Owns the browsing-history domain: the history list state, its debounced
@@ -19,26 +11,44 @@ export interface HistoryItem {
  */
 export function useHistoryRecorder() {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('browsing_history');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {
-      console.error('Failed to load browsing_history from localStorage:', e);
-    }
-    return [];
+    const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('browsing_history') : null;
+    return safeParseArrayWithBackup<HistoryItem>('browsing_history', raw, []);
   });
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
       try {
         localStorage.setItem('browsing_history', JSON.stringify(history));
-      } catch (e) {}
+      } catch {
+        console.warn('[History] Persist failed (quota?) — retrying with trimmed snapshot.');
+        try {
+          // History is newest-first: keep the newer half, drop the older half.
+          localStorage.setItem('browsing_history', JSON.stringify(history.slice(0, Math.ceil(history.length / 2))));
+        } catch {
+          console.warn('[History] Trimmed persist also failed; keeping in-memory history.');
+        }
+      }
     }, 2000);
     return () => clearTimeout(timer);
   }, [history]);
+
+  const historyRef = useRef(history);
+  historyRef.current = history;
+
+  /** Synchronous persist of the latest history snapshot (for beforeunload). */
+  const flushHistory = useCallback(() => {
+    try {
+      localStorage.setItem('browsing_history', JSON.stringify(historyRef.current));
+    } catch {
+      console.warn('[History] Flush failed (quota?) — retrying with trimmed snapshot.');
+      try {
+        const snap = historyRef.current;
+        localStorage.setItem('browsing_history', JSON.stringify(snap.slice(0, Math.ceil(snap.length / 2))));
+      } catch {
+        console.warn('[History] Trimmed flush also failed; keeping in-memory history.');
+      }
+    }
+  }, []);
 
   /**
    * Records a navigation visit derived from a merged tab snapshot. Callers
@@ -62,16 +72,16 @@ export function useHistoryRecorder() {
             return hPrev;
           }
           return [{
-            id: Date.now().toString() + '_' + Math.random().toString(36).substring(2, 7),
+            id: generateId('hist'),
             url: targetUrl,
             title: updated.title || targetUrl,
             favicon: updated.favicon,
             timestamp: Date.now()
-          }, ...hPrev.slice(0, 500)]; // keep last 500
+          }, ...hPrev.slice(0, 299)]; // keep last 300 (matches sync cap)
         });
       }
     }
   }, []);
 
-  return { history, setHistory, recordVisit };
+  return { history, setHistory, recordVisit, flushHistory };
 }

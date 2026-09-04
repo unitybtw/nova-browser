@@ -1,18 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-
-// Moved verbatim from App.tsx so the downloads domain is self-contained;
-// App.tsx re-exports this type to keep existing `from '../App'` imports
-// (DownloadToast, DownloadsPopover) resolving unchanged.
-export interface DownloadItem {
-  id: string;
-  filename: string;
-  url: string;
-  receivedBytes: number;
-  totalBytes: number;
-  state: 'progressing' | 'completed' | 'cancelled' | 'interrupted';
-  isPaused?: boolean;
-  savePath?: string;
-}
+import { DownloadItem } from '../types/browser';
+export type { DownloadItem };
 
 /**
  * Owns the downloads domain: the downloads list state, the onDownloadUpdate
