@@ -2798,8 +2798,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Toggle Sidebar in Vertical Tabs Mode (⌘B / Ctrl+B)
-      if ((e.metaKey || e.ctrlKey) && key === 'b') {
+      // Capture Screenshot (Cmd + Shift + S / Ctrl + Shift + S)
+      if (meta && shift && key === 's') {
+        e.preventDefault();
+        void handleTakeScreenshot();
+        return;
+      }
+
+      // Toggle Sidebar in Vertical Tabs Mode (⌘B / ⌘S / Ctrl+B / Ctrl+S)
+      if (matches('toggleSidebar') || ((e.metaKey || e.ctrlKey) && !shift && (key === 'b' || key === 's'))) {
         e.preventDefault();
         setIsSidebarCollapsed(prev => !prev);
         return;
@@ -2822,7 +2829,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      if (matches('downloads')) {
+      if (matches('downloads') || (meta && !shift && key === 'j')) {
         e.preventDefault();
         closeAllModals();
         handleOpenDownloads();
@@ -2916,7 +2923,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, closeAllModals, settings.shortcuts]);
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
   const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';

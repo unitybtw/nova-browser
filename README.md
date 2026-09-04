@@ -78,11 +78,11 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 | :--- | :--- | :--- | :--- | :--- |
 | **Tab State Operations** | 100 Tabs Creation Latency | **0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
 | **Tab Allocation** | Throughput | **1,204,224** | ops/sec | Number of virtual tab structures instantiated per second |
-| **Tab Hibernation State**| 97 Background Tabs Eviction | **0.014** | ms | Background rendering pipeline unmounted to reclaim memory |
+| **Tab Hibernation State**| 94 Inactive Tabs Hibernation | **0.014** | ms | State transition setting isSuspended: true for pool eviction |
 | **Network Filter Decision**| Rule Match Latency | **0.46** | µs / request | In-memory Bloom filter lookup latency per network request |
 | **Network Filter Decision**| Lookup Throughput | **2,100,000+** | checks/sec | Network-level ad and tracker classification queries per second |
 | **V8 Heap Memory** | Heap Allocated | **31.26** | MB | Core JavaScript runtime heap allocation |
-| **Startup JS Bundle** | Core Entry Chunk | **496** | KB | Lightweight initial JS evaluated at browser launch |
+| **Startup JS Bundle** | Core Entry Chunk | **440** | KB | Lightweight initial JS evaluated at browser launch |
 | **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |
 
 > **Full Benchmark Methodology & Reproduction Guide:** See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for real CDP cold-start runs and reproduction commands.
@@ -135,7 +135,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 ### Security & Privacy First
 - **Privacy Shield**: Built-in AdBlocker and tracking protection powered by `@cliqz/adblocker-electron`.
-- **Proxy VPN Support**: Toggle proxy servers or custom VPN endpoints for encrypted browsing.
+- **Encrypted Proxy Support**: Toggle secure HTTPS and SOCKS5 proxy endpoints for private browsing.
 - **Incognito Mode**: Isolated session tabs that leave no trace in history or local storage.
 - **Strict Context Isolation**: Process sandboxing, CSP headers, and DNS SSRF protections.
 
@@ -145,7 +145,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 Nova Browser features a local-first neural execution architecture powered by WebGPU and WebLLM:
 
-- **Supported Models**: Llama 3.2 1B/3B, Qwen 2.5 1.5B/3B, Gemma 2 2B, Phi 3.5 Vision (Multimodal), SmolLM2 360M, DeepSeek R1 Distill.
+- **Supported Models**: Llama 3.2 3B (`Llama-3.2-3B-Instruct`), Phi 3.5 Vision (`Phi-3.5-vision-instruct`, Multimodal), and Qwen 2.5 0.5B (`Qwen2.5-0.5B-Instruct`, Ultra-Light).
 - **Natural Language Direct Intent Engine**: Automatically identifies direct browser actions (e.g. `"github unitybtw/nova-browser aç"`, `"duckduckgo'da webgpu ara"`, `"geçmişte react bul"`, `"açık sekmeleri listele"`, `"bu sayfayı özetle"`).
 - **Persistent Info & Memory Vault**: Remembers user preferences (e.g. tone, language, dark theme) and automatically injects them into agent instructions.
 - **Task History Tracking**: Maintains a persistent chronological log of completed browser tasks and AI executions.
@@ -162,7 +162,7 @@ Nova Browser features a local-first neural execution architecture powered by Web
  | `Cmd + L` | `Ctrl + L` | Focus Address Bar / Omnibox |
  | `Cmd + K` | `Ctrl + K` | Spotlight Omnibox Quick Search |
  | `Cmd + I` / `Cmd + Shift + A` | `Ctrl + I` / `Ctrl + Shift + A` | Toggle AI Assistant Sidepanel |
- | `Cmd + S` | `Ctrl + S` | Toggle Vertical Tabs Sidebar |
+ | `Cmd + B` / `Cmd + S` | `Ctrl + B` / `Ctrl + S` | Toggle Vertical Tabs Sidebar |
  | `Ctrl + Tab` / `Ctrl + Shift + Tab` | `Ctrl + Tab` / `Ctrl + Shift + Tab` | Switch to Next / Previous Tab |
  | `Cmd + 1..9` | `Ctrl + 1..9` | Direct Tab Jump (1st through 9th) |
  | `Cmd + R` / `F5` | `Ctrl + R` / `F5` | Reload Current Page |
@@ -170,7 +170,7 @@ Nova Browser features a local-first neural execution architecture powered by Web
  | `Cmd + F` | `Ctrl + F` | Find in Page |
  | `Cmd + D` | `Ctrl + D` | Bookmark Current Page |
  | `Cmd + Shift + S` | `Ctrl + Shift + S` | Capture Full-Page Screenshot |
- | `Cmd + H` | `Ctrl + H` | Open History (`nova://history`) |
+ | `Cmd + Y` | `Ctrl + H` | Open History (`nova://history`) |
  | `Cmd + J` | `Ctrl + J` | Open Downloads (`nova://downloads`) |
  | `Cmd + ,` | `Ctrl + ,` | Open Settings (`nova://settings`) |
  | `F12` / `Cmd + Opt + I` | `F12` / `Ctrl + Shift + I` | Open Developer Tools |
@@ -275,7 +275,8 @@ graph TD
         end
 
         subgraph CoreWorkspaces["Workspaces & Vertical Tabs"]
-            vtabs["verticalTabs.ts - Tab Hibernation Engine"]
+            tabManager["tabManager.ts - Tab Hibernation Engine"]
+            vtabs["verticalTabs.ts - Workspace & Grouping"]
             thumb["thumbnailCache.ts - Viewport Snapshots"]
             sync["syncService.ts - E2EE Cloud Sync Engine"]
         end
@@ -343,7 +344,7 @@ graph TD
    - **Native Hardware & OS Integration**: macOS Metal / Windows GPU flags, native OS Text-to-Speech synthesis, and `safeStorage` OS keychain password encryption.
 
 2. **Decoupled AI & Neural Runtime (`src/services/aiAgent.ts`, `src/workers/aiWorker.ts`)**:
-   - **WebGPU Neural Execution**: Runs local LLMs (Llama 3.2, Qwen 2.5, Phi 3.5 Vision, DeepSeek R1) inside an isolated Web Worker (`aiWorker.ts`), completely decoupled from the main UI bundle (0 KB initial startup load).
+   - **WebGPU Neural Execution**: Runs local LLMs (Llama 3.2 3B, Phi 3.5 Vision, Qwen 2.5 0.5B) inside an isolated Web Worker (`aiWorker.ts`), completely decoupled from the main UI bundle (0 KB initial startup load).
    - **Natural Language Intent Engine**: Instant natural language parsing for direct browser navigation, history searching, tab management, and 3-bullet page summaries without burning LLM generation tokens.
    - **Autonomous ReAct Agent & MCP Server**: Local Model Context Protocol server (Port 3020) enabling external AI clients (Claude Desktop, Cursor, Antigravity) to navigate, query, click, and inspect live DOM trees.
    - **Memory Vault (`aiMemory.ts`)**: Persistent preference extraction, category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`), and automatic chronological task history tracking with storage quota recovery.
@@ -352,7 +353,7 @@ graph TD
    - **Zero-Knowledge Cryptography**: All passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (100,000 iterations) and 256-bit AES-GCM before transmission.
    - **1-Click Device Pairing**: Human-readable pairing codes (`nova-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without accounts or central servers.
 
-4. **Performance & Tab Virtualization (`src/utils/verticalTabs.ts`, `src/components/BrowserView.tsx`)**:
+4. **Performance & Tab Virtualization (`src/utils/tabManager.ts`, `src/components/BrowserView.tsx`)**:
    - **Tab Hibernation Engine**: Dormant background tabs (>10 min idle) automatically unmount their active webview rendering pipelines while preserving navigation state, keeping 50+ tabs under 600 MB RAM.
    - **Dual-View Split Screen**: Synchronized parallel browsing with drag-to-resize divider and independent scrolling contexts.
 
