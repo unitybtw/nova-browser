@@ -18,6 +18,18 @@ let sendToMainWindow: SendToMainWindow = () => {};
 let isTrustedSender: TrustedSenderCheck = () => false;
 
 /**
+ * Registers an externally downloaded file path (such as an in-app updater package)
+ * so open-download and show-download-in-folder permit opening it.
+ */
+export function registerKnownDownloadPath(filePath: string): void {
+  try {
+    knownDownloadPaths.add(fs.realpathSync(path.resolve(filePath)));
+  } catch {
+    knownDownloadPaths.add(path.resolve(filePath));
+  }
+}
+
+/**
  * Registers the download control IPC handlers. Called once by main.ts
  * (the composition root) with its main-window sender helper and
  * trusted-sender validator.

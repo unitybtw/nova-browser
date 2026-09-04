@@ -507,6 +507,7 @@ const UpdateWidget = () => {
   const [progress, setProgress] = React.useState(0);
   const [updateVersion, setUpdateVersion] = React.useState('');
   const [downloadUrl, setDownloadUrl] = React.useState('');
+  const [downloadedFilePath, setDownloadedFilePath] = React.useState('');
   const [isManual, setIsManual] = React.useState(false);
   const [isRestarting, setIsRestarting] = React.useState(false);
 
@@ -532,6 +533,7 @@ const UpdateWidget = () => {
       if (api.onUpdateDownloaded) unsubs.push(api.onUpdateDownloaded((_: any, info: any) => {
         setStatus('downloaded');
         setUpdateVersion(info?.version || '');
+        if (info?.filePath) setDownloadedFilePath(info.filePath);
       }));
       if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: string) => {
         setStatus('error');
@@ -558,6 +560,28 @@ const UpdateWidget = () => {
     }
   };
 
+  const handleDownload = async () => {
+    setStatus('downloading');
+    setProgress(0);
+    setErrorMsg('');
+    const api = (window as any).electronAPI;
+    if (api?.downloadUpdate) {
+      try {
+        const res = await api.downloadUpdate(downloadUrl);
+        if (res?.success) {
+          if (res?.filePath) setDownloadedFilePath(res.filePath);
+          return;
+        }
+        await openDownload(downloadUrl || 'https://github.com/unitybtw/nova-browser/releases/latest');
+      } catch (err: any) {
+        console.error('Download update error:', err);
+        await openDownload(downloadUrl || 'https://github.com/unitybtw/nova-browser/releases/latest');
+      }
+    } else {
+      await openDownload(downloadUrl || 'https://github.com/unitybtw/nova-browser/releases/latest');
+    }
+  };
+
   const install = async () => {
     setIsRestarting(true);
     const api = (window as any).electronAPI;
@@ -570,33 +594,51 @@ const UpdateWidget = () => {
     }
   };
 
-  const openDownload = (url: string) => {
+  const showInFolder = () => {
+    const api = (window as any).electronAPI;
+    if (downloadedFilePath && api?.showDownloadInFolder) {
+      api.showDownloadInFolder(downloadedFilePath);
+    }
+  };
+
+  const openDownload = async (url: string) => {
     const api = (window as any).electronAPI;
     if (api?.openExternal) {
-      api.openExternal(url);
-    } else {
-      window.open(url, '_blank');
+      try {
+        const ok = await api.openExternal(url);
+        if (ok) return;
+      } catch (_) {}
     }
+    window.open(url, '_blank');
   };
 
   if (status === 'downloaded') {
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">
-          v{updateVersion || 'new'} ready to install!
+      <div className="flex items-center gap-2.5">
+        <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
+          <Check className="w-4 h-4" /> v{updateVersion || 'new'} ready to install!
         </span>
         <button 
           onClick={install} 
           disabled={isRestarting}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-sm shadow-sm flex items-center gap-2 cursor-pointer disabled:opacity-60"
+          className="px-3.5 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium transition-colors text-xs shadow-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
         >
           {isRestarting ? (
-            <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
           ) : (
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
           )}
           {isRestarting ? 'Restarting...' : 'Restart & Install'}
         </button>
+        {downloadedFilePath && (
+          <button
+            onClick={showInFolder}
+            className="px-2.5 py-1.5 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+            title="Show downloaded package in folder"
+          >
+            Show in folder
+          </button>
+        )}
       </div>
     );
   }
@@ -618,31 +660,30 @@ const UpdateWidget = () => {
   }
 
   if (status === 'available') {
-    if (isManual && downloadUrl) {
-      return (
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
-            v{updateVersion || 'new'} available
-          </span>
-          <button
-            onClick={() => openDownload(downloadUrl)}
-            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" /> Download
-          </button>
-          <button 
-            onClick={check} 
-            className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
-          >
-            Check again
-          </button>
-        </div>
-      );
-    }
     return (
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Update v{updateVersion || '?'} found, downloading...</span>
-        <div className="w-4 h-4 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
+      <div className="flex items-center gap-2.5">
+        <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+          v{updateVersion || 'new'} available
+        </span>
+        <button
+          onClick={handleDownload}
+          className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
+        >
+          <Download className="w-3.5 h-3.5" /> Download
+        </button>
+        <button
+          onClick={() => openDownload(downloadUrl || `https://github.com/unitybtw/nova-browser/releases/tag/v${updateVersion || 'latest'}`)}
+          className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer flex items-center gap-1"
+          title="View release notes on GitHub"
+        >
+          <ExternalLink className="w-3 h-3" /> Notes
+        </button>
+        <button 
+          onClick={check} 
+          className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+        >
+          Check again
+        </button>
       </div>
     );
   }
@@ -668,7 +709,7 @@ const UpdateWidget = () => {
           {isZipError ? 'Update ready via GitHub' : `Failed: ${errorMsg.substring(0, 45)}`}
         </span>
         <button
-          onClick={() => openDownload('https://github.com/unitybtw/nova-browser/releases/latest')}
+          onClick={handleDownload}
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"
         >
           <Download className="w-3.5 h-3.5" /> Download
@@ -708,7 +749,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.2';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.3';
   });
 
   useEffect(() => {

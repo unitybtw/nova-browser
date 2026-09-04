@@ -80,7 +80,7 @@ import crypto from 'crypto';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
-import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager } from './main/downloads.js';
+import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
@@ -1208,6 +1208,13 @@ app.whenReady().then(async () => {
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   let isUpdateDownloaded = false;
+  let latestReleaseDownloadInfo: {
+    version: string;
+    downloadUrl: string;
+    assetName: string;
+  } | null = null;
+  let downloadedUpdateFilePath: string | null = null;
+  let isDownloadingUpdate = false;
 
   autoUpdater.on('checking-for-update', () => {
     console.log('Checking for updates...');
@@ -1216,6 +1223,11 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('update-available', (info) => {
     console.log('Update available:', info.version);
+    latestReleaseDownloadInfo = {
+      version: info.version || '',
+      downloadUrl: '',
+      assetName: ''
+    };
     sendToMainWindow('update-available', { 
       version: info.version, 
       releaseDate: info.releaseDate,
@@ -1263,10 +1275,15 @@ app.whenReady().then(async () => {
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || ''
+              };
               sendToMainWindow('update-available', { 
                 version: latestTag, 
                 releaseDate: latestRelease.published_at,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
                 assetName: platformAsset?.name,
                 isManual: true
               });
@@ -1298,10 +1315,15 @@ app.whenReady().then(async () => {
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || ''
+              };
               sendToMainWindow('update-available', { 
                 version: latestTag, 
                 releaseDate: latestRelease.published_at,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
                 assetName: platformAsset?.name,
                 isManual: true
               });
@@ -1333,10 +1355,15 @@ app.whenReady().then(async () => {
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || ''
+              };
               sendToMainWindow('update-available', { 
                 version: latestTag, 
                 releaseDate: latestRelease.published_at,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
                 assetName: platformAsset?.name,
                 isManual: true
               });
@@ -1350,10 +1377,150 @@ app.whenReady().then(async () => {
     }
   });
 
+  ipcMain.handle('download-update', async (event, customUrl?: string) => {
+    if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
+    if (isDownloadingUpdate) return { success: false, error: 'Download already in progress' };
+
+    let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
+    let targetVersion = latestReleaseDownloadInfo?.version || '';
+    let assetName = latestReleaseDownloadInfo?.assetName || '';
+
+    // If no URL stored yet, query GitHub releases API directly
+    if (!targetUrl) {
+      try {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() }
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            targetVersion = (latestRelease.tag_name || '').replace(/^v/, '');
+            const platformAsset = getPlatformAsset(latestRelease.assets || []);
+            targetUrl = platformAsset?.browser_download_url || latestRelease.html_url;
+            assetName = platformAsset?.name || '';
+          }
+        }
+      } catch (fetchErr: any) {
+        console.error('[Updater] Failed to retrieve release for download:', fetchErr);
+      }
+    }
+
+    if (!targetUrl || typeof targetUrl !== 'string') {
+      return { success: false, error: 'No download URL available' };
+    }
+
+    try {
+      const parsed = new URL(targetUrl);
+      const isOfficialHost = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com');
+      if (!isOfficialHost || parsed.protocol !== 'https:') {
+        return { success: false, error: 'Untrusted update download URL' };
+      }
+    } catch {
+      return { success: false, error: 'Malformed update download URL' };
+    }
+
+    isDownloadingUpdate = true;
+    sendToMainWindow('update-download-progress', { percent: 0, transferred: 0, total: 0 });
+
+    try {
+      const response = await fetch(targetUrl, {
+        headers: { 'User-Agent': getStandardUserAgent() },
+        redirect: 'follow'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Download HTTP error: ${response.status} ${response.statusText}`);
+      }
+
+      const totalBytes = Number(response.headers.get('content-length')) || 0;
+      const parsedUrl = new URL(targetUrl);
+      const filename = assetName || path.basename(parsedUrl.pathname) || `Nova-Browser-Setup-${targetVersion || 'update'}.exe`;
+      const downloadsDir = app.getPath('downloads');
+      const targetFilePath = path.join(downloadsDir, filename);
+      const tempFilePath = `${targetFilePath}.download_${Date.now()}`;
+
+      const fileStream = fs.createWriteStream(tempFilePath);
+      let transferredBytes = 0;
+      let lastReportTime = Date.now();
+      let lastBytes = 0;
+
+      if (!response.body) {
+        throw new Error('Response body is empty');
+      }
+
+      // @ts-ignore
+      for await (const chunk of response.body) {
+        transferredBytes += chunk.length;
+        fileStream.write(chunk);
+
+        const now = Date.now();
+        const elapsed = (now - lastReportTime) / 1000;
+        if (now - lastReportTime >= 200 || (totalBytes > 0 && transferredBytes >= totalBytes)) {
+          const bytesDiff = transferredBytes - lastBytes;
+          const bytesPerSecond = elapsed > 0 ? Math.round(bytesDiff / elapsed) : 0;
+          lastReportTime = now;
+          lastBytes = transferredBytes;
+          const percent = totalBytes > 0 ? Math.min(100, Math.round((transferredBytes / totalBytes) * 100)) : 0;
+
+          sendToMainWindow('update-download-progress', {
+            percent,
+            transferred: transferredBytes,
+            total: totalBytes,
+            bytesPerSecond
+          });
+        }
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        fileStream.end((err?: Error | null) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      if (fs.existsSync(targetFilePath)) {
+        try { fs.unlinkSync(targetFilePath); } catch (_) {}
+      }
+      fs.renameSync(tempFilePath, targetFilePath);
+
+      downloadedUpdateFilePath = targetFilePath;
+      isUpdateDownloaded = true;
+      isDownloadingUpdate = false;
+      registerKnownDownloadPath(targetFilePath);
+
+      sendToMainWindow('update-downloaded', {
+        version: targetVersion,
+        releaseDate: new Date().toISOString(),
+        filePath: targetFilePath,
+        isManual: true
+      });
+
+      return { success: true, filePath: targetFilePath, version: targetVersion };
+    } catch (downloadErr: any) {
+      isDownloadingUpdate = false;
+      console.error('[Updater] In-app download error:', downloadErr);
+      sendToMainWindow('update-error', downloadErr?.message || 'Download failed');
+      return { success: false, error: downloadErr?.message || 'Download failed' };
+    }
+  });
+
   ipcMain.handle('install-update', async (event) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     console.log('[Updater] Restart and install requested.');
     try {
+      if (downloadedUpdateFilePath && fs.existsSync(downloadedUpdateFilePath)) {
+        console.log('[Updater] Launching downloaded installer:', downloadedUpdateFilePath);
+        try {
+          shell.showItemInFolder(downloadedUpdateFilePath);
+        } catch (_) {}
+        const openResult = await shell.openPath(downloadedUpdateFilePath);
+        if (openResult) {
+          console.warn('[Updater] shell.openPath returned error, attempting fallback:', openResult);
+        }
+        return { success: true, opened: true };
+      }
+
       if (mcpServer && mcpServer.isRunning()) {
         try { mcpServer.stop(); } catch (_) {}
       }
@@ -1517,9 +1684,13 @@ app.whenReady().then(async () => {
           console.warn(`[Security] Blocked open-external with embedded credentials for host: ${parsed.host}`);
           return false;
         }
-        // Security: Block dangerous file extensions that could execute on the host OS
+        // Security: Block dangerous file extensions that could execute on the host OS,
+        // unless it is an official release package from the verified Nova repository.
         const pathname = parsed.pathname.toLowerCase();
-        if (/\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)$/i.test(pathname)) {
+        const isOfficialNovaRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
+          (pathname.startsWith('/unitybtw/nova-browser/releases') || pathname.includes('/unitybtw/nova-browser/releases/'));
+
+        if (!isOfficialNovaRelease && /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)$/i.test(pathname)) {
           console.warn(`[Security] Blocked open-external for dangerous file extension: ${pathname}`);
           return false;
         }

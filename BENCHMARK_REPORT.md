@@ -46,7 +46,7 @@ To avoid variance from JIT warm-up cycles, dynamic CPU thermal throttling, and g
 
 ## 3. Real-Browser CDP Cold-Start & Rendering Results
 
-Comparative measurements comparing clean-profile Google Chrome (version 134.0) with Nova Browser (Release Build 1.3.2).
+Comparative measurements comparing clean-profile Google Chrome (version 134.0) with Nova Browser (Release Build 1.3.3).
 
 | Metric | Google Chrome (Clean Profile) | Nova Browser (Full App) | Nova Host Shell | Delta / Analysis |
 | :--- | :--- | :--- | :--- | :--- |
