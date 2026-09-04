@@ -93,7 +93,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   const [activeTab, setActiveTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>(initialTab);
   const [shortcutSearch, setShortcutSearch] = useState('');
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.1';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.3.2';
   });
 
   useEffect(() => {

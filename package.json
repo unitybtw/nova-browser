@@ -3,7 +3,7 @@
   "description": "An open source browser built with React and Electron",
   "author": "unitybtw <contact@nova-browser.org>",
   "private": true,
-  "version": "1.3.1",
+  "version": "1.3.2",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "engines": {
