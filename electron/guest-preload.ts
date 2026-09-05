@@ -205,13 +205,88 @@ if (protocol === 'https:' || protocol === 'http:') {
     }, true);
   };
 
+  // Secure credential filling listener: received from host when user selects an account in native UI
+  ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string }) => {
+    if (!cred) return;
+    try {
+      const activeEl = document.activeElement as HTMLElement | null;
+      const root = activeEl?.closest('form') || activeEl?.closest('fieldset') || activeEl?.parentElement || document;
+      const allPwds = Array.from(root.querySelectorAll('input[type="password"]')) as HTMLInputElement[];
+      const pwdInput = allPwds[0] || (activeEl instanceof HTMLInputElement && activeEl.type === 'password' ? activeEl : null);
+      const allUsers = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]')) as HTMLInputElement[];
+      const userInput = allUsers[0] || (activeEl instanceof HTMLInputElement && activeEl.type !== 'password' ? activeEl : null);
+
+      if (userInput && cred.username) {
+        userInput.value = cred.username;
+        userInput.dispatchEvent(new Event('input', { bubbles: true }));
+        userInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      if (pwdInput && cred.password) {
+        pwdInput.value = cred.password;
+        pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
+        pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    } catch (_) {}
+  });
+
+  const setupPasswordFocusDetection = () => {
+    document.addEventListener('focusin', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target && target.tagName === 'INPUT') {
+        const type = (target.type || '').toLowerCase();
+        const name = (target.name || '').toLowerCase();
+        const id = (target.id || '').toLowerCase();
+        const autocomplete = (target.autocomplete || '').toLowerCase();
+        const isLoginField =
+          type === 'password' ||
+          type === 'email' ||
+          autocomplete === 'username' ||
+          autocomplete === 'current-password' ||
+          name.includes('user') ||
+          name.includes('login') ||
+          name.includes('email') ||
+          id.includes('user') ||
+          id.includes('login');
+
+        if (isLoginField) {
+          const rect = target.getBoundingClientRect();
+          try {
+            ipcRenderer.sendToHost('login-field-focused', {
+              hostname: window.location.hostname,
+              rect: {
+                left: rect.left,
+                top: rect.top,
+                bottom: rect.bottom,
+                right: rect.right,
+                width: rect.width,
+                height: rect.height
+              }
+            });
+          } catch (_) {}
+        }
+      }
+    }, true);
+
+    document.addEventListener('focusout', () => {
+      setTimeout(() => {
+        if (document.activeElement?.tagName !== 'INPUT') {
+          try {
+            ipcRenderer.sendToHost('login-field-blurred');
+          } catch (_) {}
+        }
+      }, 150);
+    }, true);
+  };
+
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', () => {
       setupPasswordCapture();
+      setupPasswordFocusDetection();
       setupLinkHoverDetection();
     });
   } else {
     setupPasswordCapture();
+    setupPasswordFocusDetection();
     setupLinkHoverDetection();
   }
 }

@@ -116,10 +116,14 @@ try {
   const targetDir = process.env.PORTABLE_EXECUTABLE_DIR
     ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'NovaBrowserData')
     : path.join(app.getPath('appData'), 'nova-browser');
-  const settingsPath = path.join(targetDir, 'store_settings.json');
-  if (fs.existsSync(settingsPath)) {
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    if (settings.hardwareAcceleration === false) {
+  const userSettingsPath = path.join(targetDir, 'store_user_settings.json');
+  const legacySettingsPath = path.join(targetDir, 'store_settings.json');
+  const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
+  if (settingsFile) {
+    const rawContent = fs.readFileSync(settingsFile, 'utf-8');
+    const parsed = JSON.parse(rawContent);
+    const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+    if (settings && settings.hardwareAcceleration === false) {
       app.disableHardwareAcceleration();
     }
   }
@@ -1180,12 +1184,17 @@ app.whenReady().then(async () => {
 
     if (platform === 'darwin') {
       const isDmg = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg') && !a.name.toLowerCase().endsWith('.blockmap');
+      const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
       if (arch === 'arm64') {
         return assets.find((a: any) => isDmg(a) && a.name.toLowerCase().includes('arm64')) ||
-               assets.find(isDmg);
+               assets.find(isDmg) ||
+               assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('mac'))) ||
+               assets.find(isZip);
       }
       return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel'))) ||
-             assets.find(isDmg);
+             assets.find(isDmg) ||
+             assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('mac'))) ||
+             assets.find(isZip);
     }
 
     if (platform === 'win32') {
@@ -1219,9 +1228,281 @@ app.whenReady().then(async () => {
     version: string;
     downloadUrl: string;
     assetName: string;
+    releaseNotes?: string;
+    releaseName?: string;
+    publishedAt?: string;
   } | null = null;
   let downloadedUpdateFilePath: string | null = null;
   let isDownloadingUpdate = false;
+
+  async function performSelfUpdateAndRelaunch(filePath: string): Promise<{ success: boolean; error?: string }> {
+    const platform = process.platform;
+    const currentPid = process.pid;
+
+    console.log('[Updater] Starting self-update and relaunch with package:', filePath);
+
+    if (mcpServer && mcpServer.isRunning()) {
+      try { mcpServer.stop(); } catch (_) {}
+    }
+
+    // 1. macOS (darwin)
+    if (platform === 'darwin') {
+      const isDmg = filePath.toLowerCase().endsWith('.dmg');
+      const isZip = filePath.toLowerCase().endsWith('.zip');
+
+      if (isDmg || isZip) {
+        let destinationApp = '/Applications/Nova Browser.app';
+        try {
+          const exePath = app.getPath('exe');
+          const appMatch = exePath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+          if (appMatch && appMatch[1]) {
+            destinationApp = appMatch[1];
+          }
+        } catch (_) {}
+
+        const tempDir = path.join(app.getPath('temp'), `nova_update_${Date.now()}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+        const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
+
+        let scriptBody = '';
+        if (isDmg) {
+          const mountPoint = path.join(tempDir, 'mount');
+          fs.mkdirSync(mountPoint, { recursive: true });
+          scriptBody = `#!/bin/bash
+hdiutil attach "${filePath}" -mountpoint "${mountPoint}" -nobrowse -quiet -noautoopen
+SOURCE_APP=$(find "${mountPoint}" -maxdepth 2 -name "*.app" | head -n 1)
+if [ -z "$SOURCE_APP" ]; then
+  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
+  rm -rf "${tempDir}"
+  open "${filePath}"
+  exit 1
+fi
+while kill -0 ${currentPid} 2>/dev/null; do
+  sleep 0.3
+done
+if rm -rf "${destinationApp}" 2>/dev/null && cp -R "$SOURCE_APP" "${destinationApp}" 2>/dev/null; then
+  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
+  rm -rf "${tempDir}"
+  open -a "${destinationApp}"
+else
+  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
+  rm -rf "${tempDir}"
+  open "${filePath}"
+fi
+`;
+        } else {
+          const extractDir = path.join(tempDir, 'extracted');
+          fs.mkdirSync(extractDir, { recursive: true });
+          scriptBody = `#!/bin/bash
+ditto -xk "${filePath}" "${extractDir}"
+SOURCE_APP=$(find "${extractDir}" -maxdepth 2 -name "*.app" | head -n 1)
+if [ -z "$SOURCE_APP" ]; then
+  rm -rf "${tempDir}"
+  exit 1
+fi
+while kill -0 ${currentPid} 2>/dev/null; do
+  sleep 0.3
+done
+if rm -rf "${destinationApp}" 2>/dev/null && cp -R "$SOURCE_APP" "${destinationApp}" 2>/dev/null; then
+  rm -rf "${tempDir}"
+  open -a "${destinationApp}"
+else
+  rm -rf "${tempDir}"
+  open "${destinationApp}" 2>/dev/null || open -a "Nova Browser"
+fi
+`;
+        }
+
+        try {
+          fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
+          const runner = child_process.spawn('/bin/bash', [scriptPath], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (scriptErr: any) {
+          console.warn('[Updater] Failed to launch bash updater script:', scriptErr);
+        }
+      }
+    }
+
+    // 2. Windows (win32)
+    if (platform === 'win32') {
+      if (filePath.toLowerCase().endsWith('.exe')) {
+        const tempDir = app.getPath('temp');
+        const batPath = path.join(tempDir, `nova_update_${Date.now()}.bat`);
+        const batContent = `@echo off
+timeout /t 1 /nobreak >nul
+start "" "${filePath}" /S
+exit
+`;
+        try {
+          fs.writeFileSync(batPath, batContent);
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (batErr: any) {
+          console.warn('[Updater] Failed to run bat installer:', batErr);
+        }
+      }
+    }
+
+    // 3. Linux
+    if (platform === 'linux') {
+      if (filePath.toLowerCase().endsWith('.appimage')) {
+        try {
+          fs.chmodSync(filePath, 0o755);
+          const tempDir = app.getPath('temp');
+          const scriptPath = path.join(tempDir, `nova_update_${Date.now()}.sh`);
+          const scriptContent = `#!/bin/bash
+while kill -0 ${currentPid} 2>/dev/null; do
+  sleep 0.3
+done
+"${filePath}" &
+`;
+          fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
+          const runner = child_process.spawn('/bin/bash', [scriptPath], {
+            detached: true,
+            stdio: 'ignore'
+          });
+          runner.unref();
+
+          const allWindows = BrowserWindow.getAllWindows();
+          for (const win of allWindows) {
+            try { win.destroy(); } catch (_) {}
+          }
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 300);
+
+          return { success: true };
+        } catch (linuxErr) {
+          console.warn('[Updater] Failed to launch Linux updater script:', linuxErr);
+        }
+      }
+    }
+
+    // Fallback: show item, open with default handler and exit
+    try {
+      shell.showItemInFolder(filePath);
+    } catch (_) {}
+    const openRes = await shell.openPath(filePath);
+    setTimeout(() => {
+      try { app.quit(); } catch (_) { app.exit(0); }
+    }, 1200);
+    return { success: !openRes, error: openRes || undefined };
+  }
+
+  async function checkForUpdatesInternal(): Promise<{ success: boolean; version?: string; isAvailable?: boolean; error?: string }> {
+    try {
+      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
+      if (isManualUpdateOnly) {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || '',
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`,
+                publishedAt: latestRelease.published_at || new Date().toISOString()
+              };
+              sendToMainWindow('update-available', { 
+                version: latestTag, 
+                releaseDate: latestRelease.published_at,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
+                assetName: platformAsset?.name,
+                isManual: true,
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`
+              });
+              return { success: true, version: latestTag, isAvailable: true };
+            }
+          }
+          sendToMainWindow('update-not-available', { version: app.getVersion() });
+          return { success: true, version: app.getVersion(), isAvailable: false };
+        }
+      }
+      const result = await autoUpdater.checkForUpdatesAndNotify();
+      if (result?.updateInfo?.version && isNewerVersion(result.updateInfo.version, app.getVersion())) {
+        return { success: true, version: result.updateInfo.version, isAvailable: true };
+      } else {
+        sendToMainWindow('update-not-available', { version: app.getVersion() });
+        return { success: true, version: app.getVersion(), isAvailable: false };
+      }
+    } catch (err: any) {
+      console.warn('Check for updates failed via primary method, checking GitHub releases directly:', err?.message);
+      try {
+        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10000)
+        });
+        if (res.ok) {
+          const releases = await res.json();
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          if (latestRelease) {
+            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
+            const currentVersion = app.getVersion();
+            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
+              const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              latestReleaseDownloadInfo = {
+                version: latestTag,
+                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
+                assetName: platformAsset?.name || '',
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`,
+                publishedAt: latestRelease.published_at || new Date().toISOString()
+              };
+              sendToMainWindow('update-available', { 
+                version: latestTag, 
+                releaseDate: latestRelease.published_at,
+                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
+                assetName: platformAsset?.name,
+                isManual: true,
+                releaseNotes: latestRelease.body || '',
+                releaseName: latestRelease.name || `v${latestTag}`
+              });
+              return { success: true, version: latestTag, isAvailable: true };
+            }
+          }
+        }
+      } catch (_) {}
+      sendToMainWindow('update-not-available', { version: app.getVersion() });
+      return { success: true, version: app.getVersion(), isAvailable: false };
+    }
+  }
 
   autoUpdater.on('checking-for-update', () => {
     console.log('Checking for updates...');
@@ -1233,12 +1514,16 @@ app.whenReady().then(async () => {
     latestReleaseDownloadInfo = {
       version: info.version || '',
       downloadUrl: '',
-      assetName: ''
+      assetName: '',
+      releaseNotes: (info as any)?.releaseNotes || '',
+      releaseName: (info as any)?.releaseName || `v${info.version}`
     };
     sendToMainWindow('update-available', { 
       version: info.version, 
       releaseDate: info.releaseDate,
-      isManual: false 
+      isManual: false,
+      releaseNotes: (info as any)?.releaseNotes || '',
+      releaseName: (info as any)?.releaseName || `v${info.version}`
     });
   });
 
@@ -1265,123 +1550,18 @@ app.whenReady().then(async () => {
 
   autoUpdater.on('error', async (err) => {
     console.error('AutoUpdater error:', err);
-    const msg = err?.message || '';
-    if (msg.includes('Cannot parse releases feed') || msg.includes('Unable to find') || msg.includes('404') || msg.includes('HttpError')) {
-      sendToMainWindow('update-not-available', { version: app.getVersion() });
-    } else if (msg.includes('ZIP file not provided') || msg.includes('No published versions') || msg.includes('Cannot find')) {
-      // Auto-update zip not provided in release feed, fallback to direct GitHub asset download
-      try {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
-          headers: { 'User-Agent': getStandardUserAgent() }
-        });
-        if (res.ok) {
-          const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
-          if (latestRelease) {
-            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
-            const currentVersion = app.getVersion();
-            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
-              const platformAsset = getPlatformAsset(latestRelease.assets || []);
-              latestReleaseDownloadInfo = {
-                version: latestTag,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
-                assetName: platformAsset?.name || ''
-              };
-              sendToMainWindow('update-available', { 
-                version: latestTag, 
-                releaseDate: latestRelease.published_at,
-                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
-                assetName: platformAsset?.name,
-                isManual: true
-              });
-              return;
-            }
-          }
-        }
-      } catch (_) {}
-      sendToMainWindow('update-not-available', { version: app.getVersion() });
-    } else {
-      sendToMainWindow('update-error', msg || 'Update check failed');
-    }
+    await checkForUpdatesInternal();
   });
 
   ipcMain.handle('check-for-updates', async (event) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     sendToMainWindow('update-checking');
-    try {
-      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
-      if (isManualUpdateOnly) {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
-          headers: { 'User-Agent': getStandardUserAgent() }
-        });
-        if (res.ok) {
-          const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
-          if (latestRelease) {
-            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
-            const currentVersion = app.getVersion();
-            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
-              const platformAsset = getPlatformAsset(latestRelease.assets || []);
-              latestReleaseDownloadInfo = {
-                version: latestTag,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
-                assetName: platformAsset?.name || ''
-              };
-              sendToMainWindow('update-available', { 
-                version: latestTag, 
-                releaseDate: latestRelease.published_at,
-                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
-                assetName: platformAsset?.name,
-                isManual: true
-              });
-              return { success: true, version: latestTag };
-            }
-          }
-          sendToMainWindow('update-not-available', { version: app.getVersion() });
-          return { success: true, version: app.getVersion() };
-        }
-      }
-      const result = await autoUpdater.checkForUpdatesAndNotify();
-      if (result?.updateInfo?.version && isNewerVersion(result.updateInfo.version, app.getVersion())) {
-        return { success: true, version: result.updateInfo.version };
-      } else {
-        sendToMainWindow('update-not-available', { version: app.getVersion() });
-        return { success: true, version: app.getVersion() };
-      }
-    } catch (err: any) {
-      console.warn('Check for updates failed via autoUpdater, checking GitHub releases directly:', err?.message);
-      try {
-        const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
-          headers: { 'User-Agent': getStandardUserAgent() }
-        });
-        if (res.ok) {
-          const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
-          if (latestRelease) {
-            const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
-            const currentVersion = app.getVersion();
-            if (latestTag && isNewerVersion(latestTag, currentVersion)) {
-              const platformAsset = getPlatformAsset(latestRelease.assets || []);
-              latestReleaseDownloadInfo = {
-                version: latestTag,
-                downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
-                assetName: platformAsset?.name || ''
-              };
-              sendToMainWindow('update-available', { 
-                version: latestTag, 
-                releaseDate: latestRelease.published_at,
-                downloadUrl: latestReleaseDownloadInfo.downloadUrl,
-                assetName: platformAsset?.name,
-                isManual: true
-              });
-              return { success: true, version: latestTag };
-            }
-          }
-        }
-      } catch (_) {}
-      sendToMainWindow('update-not-available', { version: app.getVersion() });
-      return { success: true, version: app.getVersion() };
-    }
+    return await checkForUpdatesInternal();
+  });
+
+  ipcMain.handle('get-update-info', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return latestReleaseDownloadInfo;
   });
 
   ipcMain.handle('download-update', async (event, customUrl?: string) => {
@@ -1423,6 +1603,13 @@ app.whenReady().then(async () => {
       if (!isOfficialHost || parsed.protocol !== 'https:') {
         return { success: false, error: 'Untrusted update download URL' };
       }
+      const isReleaseWebpage = parsed.pathname.includes('/releases/tag/') || parsed.pathname.endsWith('/releases/latest');
+      if (isReleaseWebpage && !assetName) {
+        try {
+          await shell.openExternal(targetUrl);
+        } catch (_) {}
+        return { success: false, error: 'Direct installer asset not available yet for this platform. Opened release page in browser.' };
+      }
     } catch {
       return { success: false, error: 'Malformed update download URL' };
     }
@@ -1447,8 +1634,11 @@ app.whenReady().then(async () => {
       if (process.platform === 'darwin' && !filename.toLowerCase().endsWith('.dmg') && !filename.toLowerCase().endsWith('.zip')) {
         filename = `${filename}.dmg`;
       }
-      const downloadsDir = app.getPath('downloads');
-      const targetFilePath = path.join(downloadsDir, filename);
+      const updatesDir = path.join(app.getPath('userData'), 'updates');
+      if (!fs.existsSync(updatesDir)) {
+        fs.mkdirSync(updatesDir, { recursive: true });
+      }
+      const targetFilePath = path.join(updatesDir, filename);
       const tempFilePath = `${targetFilePath}.download_${Date.now()}`;
 
       const fileStream = fs.createWriteStream(tempFilePath);
@@ -1504,10 +1694,18 @@ app.whenReady().then(async () => {
         version: targetVersion,
         releaseDate: new Date().toISOString(),
         filePath: targetFilePath,
-        isManual: true
+        isManual: true,
+        releaseNotes: latestReleaseDownloadInfo?.releaseNotes || '',
+        releaseName: latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`
       });
 
-      return { success: true, filePath: targetFilePath, version: targetVersion };
+      return { 
+        success: true, 
+        filePath: targetFilePath, 
+        version: targetVersion,
+        releaseNotes: latestReleaseDownloadInfo?.releaseNotes,
+        releaseName: latestReleaseDownloadInfo?.releaseName
+      };
     } catch (downloadErr: any) {
       isDownloadingUpdate = false;
       console.error('[Updater] In-app download error:', downloadErr);
@@ -1521,28 +1719,7 @@ app.whenReady().then(async () => {
     console.log('[Updater] Restart and install requested.');
     try {
       if (downloadedUpdateFilePath && fs.existsSync(downloadedUpdateFilePath)) {
-        console.log('[Updater] Launching downloaded installer:', downloadedUpdateFilePath);
-        try {
-          shell.showItemInFolder(downloadedUpdateFilePath);
-        } catch (_) {}
-        const openResult = await shell.openPath(downloadedUpdateFilePath);
-        if (openResult) {
-          console.warn('[Updater] shell.openPath returned error, attempting fallback:', openResult);
-        }
-
-        if (mcpServer && mcpServer.isRunning()) {
-          try { mcpServer.stop(); } catch (_) {}
-        }
-
-        setTimeout(() => {
-          try {
-            app.quit();
-          } catch (_) {
-            app.exit(0);
-          }
-        }, 1500);
-
-        return { success: true, opened: true };
+        return await performSelfUpdateAndRelaunch(downloadedUpdateFilePath);
       }
 
       if (mcpServer && mcpServer.isRunning()) {
@@ -1732,15 +1909,15 @@ app.whenReady().then(async () => {
     return app.getVersion();
   });
 
-  // Wait 8 seconds before checking on startup to not slow down startup
+  // Wait 15 seconds before background update check on startup to not slow down initialization
   setTimeout(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Startup update check failed:", err));
-  }, 8000);
+    checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));
+  }, 15000);
 
-  // Periodically check for updates every hour
+  // Periodically check for updates every 4 hours
   setInterval(() => {
-    autoUpdater.checkForUpdatesAndNotify().catch(err => console.error("Periodic update check failed:", err));
-  }, 1000 * 60 * 60);
+    checkForUpdatesInternal().catch(err => console.error("[Updater] Periodic background check error:", err));
+  }, 4 * 60 * 60 * 1000);
 
   // Load persistent extensions from disk
   const extensionsPath = path.join(app.getPath('userData'), 'extensions');
@@ -1911,22 +2088,25 @@ app.on('web-contents-created', (_event, contents) => {
       // 1. Phishing Check
       if (checkPhishingDomain(navigationUrl)) {
         e.preventDefault();
+        sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
         const escapedUrl = navigationUrl.substring(0, 500);
         const safeUrlJson = JSON.stringify(escapedUrl);
-        contents.executeJavaScript(`
-          (() => {
-            document.body.innerHTML = '';
-            document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;';
-            const h1 = document.createElement('h1');
-            h1.textContent = 'Dangerous Site Blocked';
-            h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-            const p = document.createElement('p');
-            p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software.';
-            p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;';
-            document.body.appendChild(h1);
-            document.body.appendChild(p);
-          })()
-        `).catch(() => {});
+        contents.loadURL('about:blank').then(() => {
+          contents.executeJavaScript(`
+            (() => {
+              document.title = 'Dangerous Site Blocked';
+              document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+              const h1 = document.createElement('h1');
+              h1.textContent = 'Dangerous Site Blocked';
+              h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+              const p = document.createElement('p');
+              p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+              p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+              document.body.appendChild(h1);
+              document.body.appendChild(p);
+            })()
+          `).catch(() => {});
+        }).catch(() => {});
         return;
       }
 
@@ -1990,6 +2170,24 @@ app.on('web-contents-created', (_event, contents) => {
       if (checkPhishingDomain(redirectUrl)) {
         e.preventDefault();
         sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
+        const escapedUrl = redirectUrl.substring(0, 500);
+        const safeUrlJson = JSON.stringify(escapedUrl);
+        contents.loadURL('about:blank').then(() => {
+          contents.executeJavaScript(`
+            (() => {
+              document.title = 'Dangerous Site Blocked';
+              document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+              const h1 = document.createElement('h1');
+              h1.textContent = 'Dangerous Site Blocked';
+              h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+              const p = document.createElement('p');
+              p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+              p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+              document.body.appendChild(h1);
+              document.body.appendChild(p);
+            })()
+          `).catch(() => {});
+        }).catch(() => {});
         return;
       }
 
@@ -2023,10 +2221,15 @@ app.on('web-contents-created', (_event, contents) => {
 
 app.on('will-quit', () => {
   try {
-    const settingsPath = path.join(app.getPath('userData'), 'store_settings.json');
-    if (fs.existsSync(settingsPath)) {
-      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-      if (settings.clearOnExit) {
+    const userDataDir = app.getPath('userData');
+    const userSettingsPath = path.join(userDataDir, 'store_user_settings.json');
+    const legacySettingsPath = path.join(userDataDir, 'store_settings.json');
+    const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
+    if (settingsFile) {
+      const rawContent = fs.readFileSync(settingsFile, 'utf-8');
+      const parsed = JSON.parse(rawContent);
+      const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+      if (settings && settings.clearOnExit) {
         // Robustness: attach catch handlers so cleanup rejections can't float;
         // quit is intentionally NOT blocked on these async clears.
         session.defaultSession.clearStorageData().catch((e) => console.warn('[Quit] clearStorageData failed:', e));
@@ -2044,6 +2247,11 @@ app.on('before-quit', () => {
   } catch (e) {
     console.error('Error stopping MCP server on quit:', e);
   }
+  try {
+    const incogSession = session.fromPartition('incognito');
+    incogSession.clearStorageData().catch(() => {});
+    incogSession.clearCache().catch(() => {});
+  } catch (_) {}
 });
 
 app.on('window-all-closed', () => {
@@ -2395,17 +2603,19 @@ app.on('web-contents-created', (_event, wc) => {
       if (params.mediaType === 'video' || params.mediaType === 'audio') {
         const isVideo = params.mediaType === 'video';
         const flags = params.mediaFlags as any;
+        const mediaTarget = `(document.elementFromPoint(${params.x}, ${params.y})?.closest('video, audio') || document.querySelector('video:hover, audio:hover') || document.querySelector('video, audio'))`;
+        const videoTarget = `(document.elementFromPoint(${params.x}, ${params.y})?.closest('video') || document.querySelector('video:hover') || document.querySelector('video'))`;
         if (flags) {
           if (flags.canPlay) {
             menu.append(new MenuItem({
               label: flags.isPaused ? labels.play : labels.pause,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {})
+              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {})
             }));
           }
           if (flags.canMute) {
             menu.append(new MenuItem({
               label: flags.isMuted ? labels.unmute : labels.mute,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.muted = !el.muted; })()`).catch(() => {})
+              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.muted = !el.muted; })()`).catch(() => {})
             }));
           }
           if (flags.canLoop) {
@@ -2413,7 +2623,7 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.loop,
               type: 'checkbox',
               checked: flags.isLooping,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.loop = !el.loop; })()`).catch(() => {})
+              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.loop = !el.loop; })()`).catch(() => {})
             }));
           }
           if (flags.canShowControls) {
@@ -2421,13 +2631,13 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.showControls,
               type: 'checkbox',
               checked: flags.isShowingControls,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover, audio:hover'); if(el) el.controls = !el.controls; })()`).catch(() => {})
+              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.controls = !el.controls; })()`).catch(() => {})
             }));
           }
           if (isVideo && flags.canPictureInPicture) {
             menu.append(new MenuItem({
               label: labels.pictureInPicture,
-              click: () => wc.executeJavaScript(`(() => { const el = document.querySelector('video:hover'); if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {})
+              click: () => wc.executeJavaScript(`(() => { const el = ${videoTarget}; if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {})
             }));
           }
           menu.append(new MenuItem({ type: 'separator' }));
@@ -2752,11 +2962,14 @@ ipcMain.on('save-password', (event, data: { hostname: string; username: string; 
   if (!isTrustedSender(event)) return;
   if (!data || typeof data !== 'object') return;
   const { hostname, username, password } = data;
-  if (!hostname || !username || !password) return;
-  // Call the existing handlePasswordDetected logic from the renderer side
-  // We'll emit an event to the main window to trigger the password prompt
+  if (typeof hostname !== 'string' || typeof username !== 'string' || typeof password !== 'string') return;
+  if (hostname.length > 255 || username.length > 256 || password.length > 1024) return;
+  const cleanHost = hostname.trim();
+  const cleanUser = username.trim();
+  if (!cleanHost || !cleanUser || !password) return;
+  // Emit event to the main window to trigger password prompt
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('password-form-submitted', { hostname, username, password });
+    mainWindow.webContents.send('password-form-submitted', { hostname: cleanHost, username: cleanUser, password });
   }
 });
 
@@ -2845,7 +3058,7 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
       return { error: 'Invalid key format' };
     }
-    const RESTRICTED_STORE_KEYS = ['settings', 'config', 'passwords', 'secrets', 'auth'];
+    const RESTRICTED_STORE_KEYS = ['passwords', 'secrets', 'auth'];
     if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) {
       return { error: 'Access denied: restricted storage key' };
     }

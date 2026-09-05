@@ -328,7 +328,7 @@ export class BrowserMCPServer {
   private tokenFilePath: string = '';
   private actualPort: number = 0;
   private portFilePath: string = '';
-  private firstUseApproved: boolean = process.env.NODE_ENV === 'test';
+  private firstUseApproved: boolean = process.env.NODE_ENV === 'test' && Boolean(process.env.VITEST || process.env.JEST_WORKER_ID);
 
   constructor(private requestedPort: number = 3020) {
     // Performance: express/express-rate-limit are NOT required here — they are
@@ -613,12 +613,13 @@ export class BrowserMCPServer {
 
     // Health check endpoint — only return minimal info without auth
     app.get('/health', (req, res) => {
+      const appVersion = electronApp?.getVersion?.() || '1.4.0';
       if (this.isAuthenticated(req)) {
         // Authenticated: return detailed info
         res.json({
           status: 'ok',
           server: 'nova-browser-mcp',
-          version: '2.0.0',
+          version: appVersion,
           port: this.actualPort || this.requestedPort,
           connected_clients: this.clients.size,
           clients: this.getConnectedClientsInfo(),
@@ -629,7 +630,7 @@ export class BrowserMCPServer {
         // Unauthenticated: minimal response only
         res.json({
           status: 'ok',
-          version: '2.0.0'
+          version: appVersion
         });
       }
     });

@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState, Suspense, lazy } from 'react';
+import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Moon, Zap, Folder, Shield, Code2, Palette } from 'lucide-react';
+import { Moon, Zap, Key } from 'lucide-react';
 import { Tab, HistoryItem, UserSettings } from '../types/browser';
 import { NewTabPage } from './NewTabPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
@@ -128,6 +128,23 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     y: 0,
     url: ''
   });
+
+  const [autofillMenu, setAutofillMenu] = useState<{
+    isOpen: boolean;
+    rect: { left: number; top: number; bottom: number; right: number; width: number; height: number };
+    accounts: Array<{ username: string; password: string }>;
+    hostname: string;
+  } | null>(null);
+
+  const handleSelectAutofill = useCallback((account: { username: string; password: string }) => {
+    const webview = webviewRef.current;
+    if (webview && !(typeof webview.isDestroyed === 'function' && webview.isDestroyed())) {
+      try {
+        webview.send('fill-credentials', { username: account.username, password: account.password });
+      } catch (_) {}
+    }
+    setAutofillMenu(null);
+  }, []);
   
   const isSettingsTab = React.useMemo(() => (
     Boolean(tab?.url?.startsWith('nova://settings') || tab?.url?.startsWith('about:settings'))
@@ -183,210 +200,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         console.error('Failed to set zoom factor', err);
       }
 
-      // Passwords are never filled automatically. Explicit user interaction is
-      // required before credentials are exposed to a web page.
-      // NOTE: Only the password-autofill portion is gated behind the password
-      // manager setting. The AI link-preview injection and mute handling below
-      // must run regardless of that setting.
-      if (latestSettingsRef.current.passwordManagerEnabled === true) {
-        // 1. Password Autofill & Capture Logic
-        try {
-          if (!latestSettingsRef.current?.passwordManagerEnabled) return;
-
-          // Fetch saved passwords for current domain.
-          // Read the URL through latestTabRef: tab.url can change (SPA
-          // navigations) without this effect re-running.
-          let hostname = '';
-          try { hostname = new URL(latestTabRef.current?.url || '').hostname; } catch (e) {}
-          if (!hostname) return;
-          
-          let savedPasswords: any[] = [];
-          try {
-            const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-            if (raw) {
-              const all = JSON.parse(raw);
-              savedPasswords = all.filter((p: any) => p.hostname === hostname);
-            }
-          } catch (e) {}
-
-          /**
-           * Password Manager Interaction-Driven Autofill & Multi-Account Picker (G-1 Remediation).
-           * Never injects credentials passively on DOM ready. Requires active user interaction
-           * (focus or click on a login input). If multiple accounts exist for the origin, renders
-           * a non-intrusive in-page account picker dropdown to let the user select their account.
-           */
-          const passwordScript = `
-            (function() {
-              if (window.__nova_pw_injected) return;
-              window.__nova_pw_injected = true;
-
-              const savedCredentials = ${JSON.stringify(savedPasswords).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')};
-              if (!Array.isArray(savedCredentials) || savedCredentials.length === 0) return;
-
-              function isElementVisible(el) {
-                if (!el || el.type === 'hidden') return false;
-                if (el.disabled || el.readOnly) return false;
-                const style = window.getComputedStyle(el);
-                if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
-                if (parseFloat(style.opacity || '1') < 0.1) return false;
-                const rect = el.getBoundingClientRect();
-                if (rect.width < 15 || rect.height < 15) return false;
-                if (rect.bottom < 0 || rect.right < 0) return false;
-                return true;
-              }
-
-              function findRelatedInputs(targetEl) {
-                const root = targetEl.closest('form') || targetEl.closest('fieldset') || targetEl.parentElement || document;
-                const allPwds = Array.from(root.querySelectorAll('input[type="password"]')).filter(isElementVisible);
-                const allUsers = Array.from(root.querySelectorAll('input[type="text"], input[type="email"], input[autocomplete="username"], input[name*="user" i], input[name*="email" i], input[name*="login" i]')).filter(isElementVisible);
-                return {
-                  pwdInput: allPwds[0] || (targetEl.type === 'password' ? targetEl : null),
-                  userInput: allUsers[0] || (targetEl.type !== 'password' ? targetEl : null)
-                };
-              }
-
-              let activePicker = null;
-
-              function dismissPicker() {
-                if (activePicker) {
-                  activePicker.remove();
-                  activePicker = null;
-                }
-              }
-
-              function fillCredential(cred, targetEl) {
-                if (!cred) return;
-                const { pwdInput, userInput } = findRelatedInputs(targetEl);
-                if (userInput && cred.username) {
-                  userInput.value = cred.username;
-                  userInput.dispatchEvent(new Event('input', { bubbles: true }));
-                  userInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                if (pwdInput && cred.password) {
-                  pwdInput.value = cred.password;
-                  pwdInput.dispatchEvent(new Event('input', { bubbles: true }));
-                  pwdInput.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-                dismissPicker();
-              }
-
-              function showAccountPicker(targetInput) {
-                dismissPicker();
-                const rect = targetInput.getBoundingClientRect();
-                if (rect.width === 0 && rect.height === 0) return;
-
-                const picker = document.createElement('div');
-                picker.id = 'nova-credential-picker';
-                picker.style.position = 'fixed';
-                picker.style.left = rect.left + 'px';
-                picker.style.top = (rect.bottom + 4) + 'px';
-                picker.style.width = Math.max(rect.width, 260) + 'px';
-                picker.style.maxHeight = '240px';
-                picker.style.overflowY = 'auto';
-                picker.style.backgroundColor = '#1e293b';
-                picker.style.color = '#f8fafc';
-                picker.style.border = '1px solid #334155';
-                picker.style.borderRadius = '8px';
-                picker.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.4)';
-                picker.style.zIndex = '2147483647';
-                picker.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-                picker.style.fontSize = '13px';
-                picker.style.padding = '4px';
-
-                const header = document.createElement('div');
-                header.style.padding = '6px 8px';
-                header.style.fontSize = '11px';
-                header.style.fontWeight = '600';
-                header.style.textTransform = 'uppercase';
-                header.style.letterSpacing = '0.05em';
-                header.style.color = '#94a3b8';
-                header.textContent = 'Nova Saved Accounts (' + savedCredentials.length + ')';
-                picker.appendChild(header);
-
-                savedCredentials.forEach(function(cred) {
-                  const item = document.createElement('div');
-                  item.style.padding = '8px 10px';
-                  item.style.borderRadius = '6px';
-                  item.style.cursor = 'pointer';
-                  item.style.display = 'flex';
-                  item.style.flexDirection = 'column';
-                  item.style.gap = '2px';
-                  item.style.transition = 'background-color 0.15s ease';
-
-                  const userSpan = document.createElement('span');
-                  userSpan.style.fontWeight = '500';
-                  userSpan.style.color = '#f1f5f9';
-                  userSpan.textContent = cred.username || 'Unnamed Account';
-
-                  const domainSpan = document.createElement('span');
-                  domainSpan.style.fontSize = '11px';
-                  domainSpan.style.color = '#64748b';
-                  domainSpan.textContent = cred.hostname || window.location.hostname;
-
-                  item.appendChild(userSpan);
-                  item.appendChild(domainSpan);
-
-                  item.addEventListener('mouseenter', function() {
-                    item.style.backgroundColor = '#334155';
-                  });
-                  item.addEventListener('mouseleave', function() {
-                    item.style.backgroundColor = 'transparent';
-                  });
-                  item.addEventListener('mousedown', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    fillCredential(cred, targetInput);
-                  });
-
-                  picker.appendChild(item);
-                });
-
-                document.body.appendChild(picker);
-                activePicker = picker;
-              }
-
-              function handleInteraction(e) {
-                const el = e.target;
-                if (!el || el.tagName !== 'INPUT' || !isElementVisible(el)) return;
-
-                if (savedCredentials.length === 1) {
-                  fillCredential(savedCredentials[0], el);
-                } else if (savedCredentials.length > 1) {
-                  showAccountPicker(el);
-                }
-              }
-
-              document.addEventListener('focusin', function(e) {
-                const el = e.target;
-                if (el && el.tagName === 'INPUT') {
-                  const type = (el.type || '').toLowerCase();
-                  if (type === 'password' || type === 'text' || type === 'email') {
-                    handleInteraction(e);
-                  }
-                }
-              }, true);
-
-              document.addEventListener('click', function(e) {
-                if (activePicker && !activePicker.contains(e.target)) {
-                  dismissPicker();
-                } else if (e.target && e.target.tagName === 'INPUT') {
-                  const type = (e.target.type || '').toLowerCase();
-                  if (type === 'password' || type === 'text' || type === 'email') {
-                    handleInteraction(e);
-                  }
-                }
-              }, true);
-
-              document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape') dismissPicker();
-              }, true);
-            })();
-          `;
-          webview.executeJavaScript(passwordScript).catch(() => {});
-        } catch (e) {}
-      }
-
-      // 2. Mute state must always be applied, regardless of feature gates
+      // Mute state must always be applied, regardless of feature gates
       if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
 
       // 4. Ensure current URL is synchronized on DOM ready
@@ -644,6 +458,30 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (e.channel === 'password-form-submitted' && e.args?.[0]) {
         const { hostname, username, password } = e.args[0];
         handlePasswordDetected(hostname, username, password);
+      } else if (e.channel === 'login-field-focused' && e.args?.[0]) {
+        if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+        const data = e.args[0];
+        const hostname = data.hostname || '';
+        if (!hostname) return;
+        (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
+          if (!raw) return;
+          try {
+            const all = JSON.parse(raw);
+            const matching = all.filter((p: any) => p.hostname === hostname && p.username && p.password);
+            if (matching.length > 0) {
+              setAutofillMenu({
+                isOpen: true,
+                rect: data.rect,
+                accounts: matching,
+                hostname
+              });
+            }
+          } catch (_) {}
+        }).catch(() => {});
+      } else if (e.channel === 'login-field-blurred') {
+        setTimeout(() => {
+          setAutofillMenu(prev => (prev?.isOpen ? { ...prev, isOpen: false } : null));
+        }, 300);
       } else if (e.channel === 'nova-link-hover' && e.args?.[0]) {
         if (latestSettingsRef.current?.aiLinkPreviewEnabled === false || !latestIsActiveRef.current) return;
         const data = e.args[0];
@@ -1039,177 +877,57 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             allowpopups={"true" as any}
           />
         ) : (
-          /* Web Demo Mode: Render rich simulated pages for mockups or fallback iframe cleanly */
-          (() => {
-            const isDarkTheme = settings.theme === 'dark' || (settings.theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || Boolean(typeof document !== 'undefined' && document?.documentElement?.classList?.contains?.('dark'));
-            
-            if (tab.url?.includes('github.com')) {
-              return (
-                <div className={`w-full h-full p-6 overflow-auto font-mono text-xs select-text transition-colors ${
-                  isDarkTheme ? 'bg-[#0d1117] text-white' : 'bg-white text-slate-800'
-                }`}>
-                  <div className={`flex items-center gap-2 pb-4 mb-4 border-b ${
-                    isDarkTheme ? 'border-white/10 text-white/90' : 'border-slate-200 text-slate-900'
-                  }`}>
-                    <div className={`w-5 h-5 rounded-md flex items-center justify-center ${
-                      isDarkTheme ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'
-                    }`}>
-                      <Folder className="w-3.5 h-3.5" />
-                    </div>
-                    <span className="font-semibold text-sm">unitybtw / nova-browser</span>
-                    <span className={`text-[10px] px-2 py-0.5 rounded font-sans ml-2 ${
-                      isDarkTheme ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'
-                    }`}>Public</span>
-                    <span className={`ml-auto text-xs font-sans ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>TypeScript • 98.4%</span>
-                  </div>
-                  <div className={`p-4 rounded-xl border space-y-2 leading-relaxed ${
-                    isDarkTheme ? 'bg-[#161b22] border-white/10 text-white/80' : 'bg-slate-50 border-slate-200 text-slate-800'
-                  }`}>
-                    <div className={`text-[11px] pb-2 border-b flex items-center justify-between ${
-                      isDarkTheme ? 'text-white/40 border-white/5' : 'text-slate-400 border-slate-200'
-                    }`}>
-                      <span>electron / mcpServer.ts</span>
-                      <span>64 lines • 2.1 KB</span>
-                    </div>
-                    <p><span className="text-purple-500 font-semibold">import</span> &#123; <span className="text-amber-500">Server</span> &#125; <span className="text-purple-500 font-semibold">from</span> <span className="text-emerald-500">'@modelcontextprotocol/sdk'</span>;</p>
-                    <p><span className="text-purple-500 font-semibold">export class</span> <span className="text-amber-500 font-semibold">BrowserMCPServer</span> &#123;</p>
-                    <p className="pl-4"><span className="text-purple-500 font-semibold">private</span> port = <span className="text-emerald-500">3020</span>;</p>
-                    <p className="pl-4 pt-1"><span className="text-purple-500 font-semibold">async</span> <span className="text-blue-500">executeAutonomousAction</span>(command: <span className="text-amber-500">string</span>) &#123;</p>
-                    <p className="pl-8 text-emerald-600 dark:text-emerald-400">// Direct AI browser control bridge with sandboxed WebGPU execution</p>
-                    <p className="pl-8"><span className="text-purple-500 font-semibold">return await</span> this.mainWindow.webContents.executeJavaScript(command);</p>
-                    <p className="pl-4">&#125;</p>
-                    <p>&#125;</p>
-                  </div>
-                </div>
-              );
-            }
-
-            if (tab.url?.includes('techinsider.io')) {
-              return (
-                <div className={`w-full h-full p-8 overflow-auto select-none transition-colors ${
-                  isDarkTheme ? 'bg-[#0a0e1a] text-white' : 'bg-slate-50 text-slate-800'
-                }`}>
-                  <div className="max-w-2xl mx-auto space-y-6">
-                    <div className="space-y-2">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
-                        isDarkTheme ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                      }`}>
-                        AI & Privacy Revolution
-                      </span>
-                      <h1 className={`text-2xl font-bold tracking-tight pt-2 ${isDarkTheme ? 'text-white' : 'text-slate-900'}`}>
-                        Next-Gen Browsers: Running LLMs 100% Locally with Zero Cloud Latency
-                      </h1>
-                      <p className={`text-xs ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>By Elena Vance • Published Oct 2026 • 4 min read</p>
-                    </div>
-
-                    <div className={`w-full h-24 rounded-2xl border border-dashed flex items-center justify-center gap-3 text-xs font-medium ${
-                      isDarkTheme ? 'border-emerald-500/40 bg-emerald-950/20 text-emerald-400' : 'border-emerald-400 bg-emerald-50/80 text-emerald-800'
-                    }`}>
-                      <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
-                        <Shield className="w-4 h-4" />
-                      </div>
-                      <span>Targeted Ad Banner Blocked by Nova Privacy Shield (3 Trackers Stopped)</span>
-                    </div>
-
-                    <div className={`space-y-3 text-xs leading-relaxed ${isDarkTheme ? 'text-white/70' : 'text-slate-600'}`}>
-                      <p>
-                        Local AI models powered by WebGPU transform how users navigate the web. Unlike traditional browsers that upload your personal browsing history to third-party servers, Nova executes all inference directly on local silicon.
-                      </p>
-                      <p>
-                        By preventing telemetry and fingerprinting at the engine level, pages render up to 64% faster with zero data leakage.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            if (tab.url?.includes('react.dev')) {
-              return (
-                <div className={`w-full h-full p-8 overflow-auto select-none transition-colors ${
-                  isDarkTheme ? 'bg-[#16181d] text-white' : 'bg-white text-slate-800'
-                }`}>
-                  <div className="max-w-2xl mx-auto space-y-6">
-                    <div className={`flex items-center gap-3 pb-4 border-b ${isDarkTheme ? 'border-white/10' : 'border-slate-200'}`}>
-                      <div className="w-8 h-8 rounded-xl bg-cyan-500/20 flex items-center justify-center text-cyan-400 font-bold text-sm">
-                        <Code2 className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h2 className={`text-lg font-bold ${isDarkTheme ? 'text-white' : 'text-slate-900'}`}>React 19 Documentation</h2>
-                        <p className={`text-xs ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>Server Components & Actions Architecture</p>
-                      </div>
-                      <span className="ml-auto text-xs px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-mono">v19.0.0</span>
-                    </div>
-
-                    <div className={`space-y-3 text-xs leading-relaxed ${isDarkTheme ? 'text-white/80' : 'text-slate-700'}`}>
-                      <p>
-                        React 19 introduces automatic action transitions, async data primitives, and first-class compiler optimizations that optimize rendering cycles.
-                      </p>
-                      <div className={`p-4 rounded-xl border font-mono text-[11px] space-y-1 ${
-                        isDarkTheme ? 'bg-black/40 border-white/10 text-cyan-300/90' : 'bg-slate-50 border-slate-200 text-cyan-800'
-                      }`}>
-                        <p className={isDarkTheme ? 'text-white/40' : 'text-slate-400'}>// Example: Async Action Transition</p>
-                        <p><span className="text-purple-500 font-semibold">const</span> [isPending, startTransition] = <span className="text-blue-500">useTransition</span>();</p>
-                        <p><span className="text-purple-500 font-semibold">const</span> [state, formAction] = <span className="text-blue-500">useActionState</span>(updateItem, null);</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            if (tab.url?.includes('tailwindcss.com')) {
-              return (
-                <div className={`w-full h-full p-8 overflow-auto select-none transition-colors ${
-                  isDarkTheme ? 'bg-[#0b1120] text-white' : 'bg-slate-50 text-slate-800'
-                }`}>
-                  <div className="max-w-2xl mx-auto space-y-6">
-                    <div className={`flex items-center gap-3 pb-4 border-b ${isDarkTheme ? 'border-white/10' : 'border-slate-200'}`}>
-                      <div className="w-8 h-8 rounded-xl bg-sky-500/20 flex items-center justify-center text-sky-400 font-bold text-sm">
-                        <Palette className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <h2 className={`text-lg font-bold ${isDarkTheme ? 'text-white' : 'text-slate-900'}`}>Tailwind CSS v4 Oxide Engine</h2>
-                        <p className={`text-xs ${isDarkTheme ? 'text-white/50' : 'text-slate-400'}`}>High Performance Unified CSS Engine</p>
-                      </div>
-                      <span className="ml-auto text-xs px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">v4.0</span>
-                    </div>
-
-                    <div className={`space-y-3 text-xs leading-relaxed ${isDarkTheme ? 'text-white/80' : 'text-slate-700'}`}>
-                      <p>
-                        Tailwind CSS v4 is rewritten in Rust from the ground up, delivering 10x faster compile times with zero-configuration CSS imports.
-                      </p>
-                      <div className={`p-4 rounded-xl border font-mono text-[11px] space-y-1 ${
-                        isDarkTheme ? 'bg-black/40 border-white/10 text-sky-300/90' : 'bg-white border-slate-200 text-sky-800 shadow-xs'
-                      }`}>
-                        <p className={isDarkTheme ? 'text-white/40' : 'text-slate-400'}>/* app.css */</p>
-                        <p><span className="text-purple-500 font-semibold">@import</span> <span className="text-emerald-500">"tailwindcss"</span>;</p>
-                        <p><span className="text-purple-500 font-semibold">@theme</span> &#123; <span className="text-blue-500">--color-brand</span>: <span className="text-amber-500">#6366f1</span>; &#125;</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            }
-
-            return (
-              <iframe
-                ref={webviewRef as any}
-                data-tab-id={tab.id}
-                src={getSafeUrl(tab?.url)}
-                className="w-full h-full border-none bg-white"
-                title={tab.title}
-                sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-                onLoad={() => {
-                  if (tab.isLoading) {
-                    onUpdateTab(tab.id, { isLoading: false });
-                  }
-                }}
-              />
-            );
-          })()
+          <iframe
+            ref={webviewRef as any}
+            data-tab-id={tab.id}
+            src={getSafeUrl(tab?.url)}
+            className="w-full h-full border-none bg-white"
+            title={tab.title}
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+            onLoad={() => {
+              if (tab.isLoading) {
+                onUpdateTab(tab.id, { isLoading: false });
+              }
+            }}
+          />
         )}
       </div>
+
+      {autofillMenu?.isOpen && autofillMenu.accounts.length > 0 && (
+        <div
+          style={{
+            position: 'absolute',
+            left: Math.max(16, Math.min(autofillMenu.rect?.left || 20, (typeof window !== 'undefined' ? window.innerWidth : 800) - 280)),
+            top: Math.min((autofillMenu.rect?.bottom || 100) + 6, (typeof window !== 'undefined' ? window.innerHeight : 600) - 200),
+            zIndex: 9999
+          }}
+          className="w-64 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none text-xs"
+        >
+          <div className="px-3 py-2 bg-slate-800/80 border-b border-slate-700/50 flex items-center justify-between text-[11px] font-semibold text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Key className="w-3.5 h-3.5 text-blue-400" />
+              Saved Accounts ({autofillMenu.accounts.length})
+            </span>
+            <span className="text-[10px] text-slate-500 font-mono truncate max-w-[100px]">{autofillMenu.hostname}</span>
+          </div>
+          <div className="max-h-48 overflow-y-auto divide-y divide-slate-800/60 p-1">
+            {autofillMenu.accounts.map((acc, i) => (
+              <button
+                key={i}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  handleSelectAutofill(acc);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
+              >
+                <span className="font-medium text-slate-100">{acc.username || 'Unnamed Account'}</span>
+                <span className="text-[10px] text-slate-400">Click to fill password</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <PasswordPromptModal
         isOpen={passwordPrompt.isOpen}

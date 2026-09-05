@@ -326,7 +326,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('workspaces_session', JSON.stringify(workspaces));
+        const serialized = JSON.stringify(workspaces);
+        localStorage.setItem('workspaces_session', serialized);
+        (window as any).electronAPI?.storeSet?.('workspaces_session', serialized);
       } catch (e) {}
       try {
         localStorage.setItem('active_workspace_session', activeWorkspaceId);
@@ -631,7 +633,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('user_settings', JSON.stringify(settings));
+        const serialized = JSON.stringify(settings);
+        localStorage.setItem('user_settings', serialized);
+        (window as any).electronAPI?.storeSet?.('user_settings', serialized);
       } catch (e) {}
       if (window.electronAPI?.setPrivacyShield) {
         window.electronAPI.setPrivacyShield(settings.privacyShield);
@@ -779,14 +783,29 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const handleBeforeUnload = () => {
       try {
         const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
-        localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
+        const serializedTabs = JSON.stringify(sessionTabs);
+        localStorage.setItem('nova_session_tabs', serializedTabs);
+        (window as any).electronAPI?.storeSet?.('session_tabs', serializedTabs);
         if (activeTabIdRef.current) {
           localStorage.setItem('active_tab_session', activeTabIdRef.current);
+          (window as any).electronAPI?.storeSet?.('active_tab_session', activeTabIdRef.current);
         }
-        localStorage.setItem('folders_session', JSON.stringify(foldersRef.current));
-        localStorage.setItem('user_settings', JSON.stringify(settingsRef.current));
-        localStorage.setItem('bookmarks', JSON.stringify(bookmarksRef.current));
-        localStorage.setItem('workspaces_session', JSON.stringify(workspacesRef.current));
+        const serializedFolders = JSON.stringify(foldersRef.current);
+        localStorage.setItem('folders_session', serializedFolders);
+        (window as any).electronAPI?.storeSet?.('folders_session', serializedFolders);
+
+        const serializedSettings = JSON.stringify(settingsRef.current);
+        localStorage.setItem('user_settings', serializedSettings);
+        (window as any).electronAPI?.storeSet?.('user_settings', serializedSettings);
+
+        const serializedBookmarks = JSON.stringify(bookmarksRef.current);
+        localStorage.setItem('bookmarks', serializedBookmarks);
+        (window as any).electronAPI?.storeSet?.('bookmarks', serializedBookmarks);
+
+        const serializedWorkspaces = JSON.stringify(workspacesRef.current);
+        localStorage.setItem('workspaces_session', serializedWorkspaces);
+        (window as any).electronAPI?.storeSet?.('workspaces_session', serializedWorkspaces);
+
         localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
         flushHistory();
       } catch (e) {}
@@ -809,7 +828,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       .filter(t => !t.isIncognito);
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('nova_session_tabs', JSON.stringify(sessionTabs));
+        const serialized = JSON.stringify(sessionTabs);
+        localStorage.setItem('nova_session_tabs', serialized);
+        (window as any).electronAPI?.storeSet?.('session_tabs', serialized);
       } catch (e) {}
     }, 500);
 
@@ -847,7 +868,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('folders_session', JSON.stringify(folders));
+        const serialized = JSON.stringify(folders);
+        localStorage.setItem('folders_session', serialized);
+        (window as any).electronAPI?.storeSet?.('folders_session', serialized);
       } catch (e) {}
     }, 300);
     return () => clearTimeout(timer);
@@ -966,11 +989,99 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
+        const serialized = JSON.stringify(bookmarks);
+        localStorage.setItem('bookmarks', serialized);
+        (window as any).electronAPI?.storeSet?.('bookmarks', serialized);
       } catch (e) {}
     }, 500);
     return () => clearTimeout(timer);
   }, [bookmarks]);
+
+  // Disk-backed storage hydration fallback: if localStorage was cleared, corrupted,
+  // or exceeded quota, restore session tabs, folders, workspaces, bookmarks and user settings
+  // from Electron disk store.
+  useEffect(() => {
+    const restoreFromDisk = async () => {
+      try {
+        const electronStore = (window as any).electronAPI;
+        if (!electronStore?.storeGet) return;
+
+        // Restore settings if missing from localStorage
+        if (!localStorage.getItem('user_settings')) {
+          const diskSettings = await electronStore.storeGet('user_settings');
+          if (diskSettings) {
+            try {
+              const parsed = JSON.parse(diskSettings);
+              if (parsed && typeof parsed === 'object') {
+                setSettings(prev => ({ ...prev, ...parsed }));
+                localStorage.setItem('user_settings', diskSettings);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Restore workspaces if missing
+        if (!localStorage.getItem('workspaces_session')) {
+          const diskWorkspaces = await electronStore.storeGet('workspaces_session');
+          if (diskWorkspaces) {
+            try {
+              const parsed = JSON.parse(diskWorkspaces);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setWorkspaces(parsed);
+                localStorage.setItem('workspaces_session', diskWorkspaces);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Restore folders if missing
+        if (!localStorage.getItem('folders_session')) {
+          const diskFolders = await electronStore.storeGet('folders_session');
+          if (diskFolders) {
+            try {
+              const parsed = JSON.parse(diskFolders);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setFolders(parsed);
+                localStorage.setItem('folders_session', diskFolders);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Restore bookmarks if missing
+        if (!localStorage.getItem('bookmarks')) {
+          const diskBookmarks = await electronStore.storeGet('bookmarks');
+          if (diskBookmarks) {
+            try {
+              const parsed = JSON.parse(diskBookmarks);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setBookmarks(parsed);
+                localStorage.setItem('bookmarks', diskBookmarks);
+              }
+            } catch (_) {}
+          }
+        }
+
+        // Restore tabs if missing
+        if (!localStorage.getItem('nova_session_tabs')) {
+          const diskTabs = await electronStore.storeGet('session_tabs');
+          if (diskTabs) {
+            try {
+              const parsed = JSON.parse(diskTabs);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setTabs(parsed);
+                localStorage.setItem('nova_session_tabs', diskTabs);
+              }
+            } catch (_) {}
+          }
+        }
+      } catch (err) {
+        console.warn('[Storage] Fallback restore from disk encountered an error:', err);
+      }
+    };
+
+    restoreFromDisk();
+  }, []);
 
   // Cloud Sync Handler
   const handlePerformSync = useCallback(async () => {
@@ -1796,13 +1907,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) { 
-                  const rect = el.getBoundingClientRect();
-                  el.click(); 
-                  return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) { 
+                    const rect = el.getBoundingClientRect();
+                    el.click(); 
+                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                  }
+                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
+                } catch (err) {
+                  return { success: false, error: "Invalid selector or DOM error: " + String(err) };
                 }
-                return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
               })();
             `);
             if (result && result.success) {
@@ -1820,19 +1935,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) { 
-                  const rect = el.getBoundingClientRect();
-                  el.value = ${JSON.stringify(args.text)};
-                  el.dispatchEvent(new Event('input', { bubbles: true }));
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  if (${args.pressEnter === true ? 'true' : 'false'}) {
-                    const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
-                    el.dispatchEvent(enterEvent);
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) { 
+                    const rect = el.getBoundingClientRect();
+                    el.value = ${JSON.stringify(args.text)};
+                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (${args.pressEnter === true ? 'true' : 'false'}) {
+                      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
+                      el.dispatchEvent(enterEvent);
+                    }
+                    return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                   }
-                  return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
+                } catch (err) {
+                  return { success: false, error: "Invalid selector or DOM error: " + String(err) };
                 }
-                return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
               })();
             `);
             if (result && result.success) {
@@ -1923,13 +2042,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) {
-                  el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-                  el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
-                  return "Hovered over element";
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) {
+                    el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                    el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+                    return "Hovered over element";
+                  }
+                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                } catch (err) {
+                  return "Error: Invalid selector or DOM error: " + String(err);
                 }
-                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
               })()
             `);
           }
@@ -1939,9 +2062,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) { el.focus(); return "Focused element"; }
-                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) { el.focus(); return "Focused element"; }
+                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                } catch (err) {
+                  return "Error: Invalid selector or DOM error: " + String(err);
+                }
               })()
             `);
           }
@@ -1951,13 +2078,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el && el.tagName === 'SELECT') {
-                  el.value = ${JSON.stringify(args.value)};
-                  el.dispatchEvent(new Event('change', { bubbles: true }));
-                  return "Selected option: " + ${JSON.stringify(args.value)};
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el && el.tagName === 'SELECT') {
+                    el.value = ${JSON.stringify(args.value)};
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                    return "Selected option: " + ${JSON.stringify(args.value)};
+                  }
+                  return "Error: Select element not found: " + ${JSON.stringify(args.selector)};
+                } catch (err) {
+                  return "Error: Invalid selector or DOM error: " + String(err);
                 }
-                return "Error: Select element not found: " + ${JSON.stringify(args.selector)};
               })()
             `);
           }
@@ -1965,18 +2096,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         case 'browser_press_key':
           if (activeWebview && activeWebview.executeJavaScript) {
-            const focusSelector = args.selector ? `document.querySelector(${JSON.stringify(args.selector)})?.focus();` : '';
             return await activeWebview.executeJavaScript(`
               (() => {
-                ${focusSelector}
-                const target = ${args.selector ? `document.querySelector(${JSON.stringify(args.selector)}) || document.activeElement` : 'document.activeElement || document.body'};
-                const key = ${JSON.stringify(args.key)};
-                const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
-                const keyCode = keyMap[key] || key.charCodeAt(0);
-                ['keydown','keypress','keyup'].forEach(t => {
-                  target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true }));
-                });
-                return "Pressed key: " + key;
+                try {
+                  const selector = ${JSON.stringify(args.selector || null)};
+                  let target = null;
+                  if (selector) {
+                    try {
+                      target = document.querySelector(selector);
+                      if (target && target.focus) target.focus();
+                    } catch (_) {}
+                  }
+                  if (!target) target = document.activeElement || document.body;
+                  const key = ${JSON.stringify(args.key)};
+                  const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
+                  const keyCode = keyMap[key] || (key && key.charCodeAt ? key.charCodeAt(0) : 0);
+                  ['keydown','keypress','keyup'].forEach(t => {
+                    target.dispatchEvent(new KeyboardEvent(t, { key, keyCode, which: keyCode, bubbles: true }));
+                  });
+                  return "Pressed key: " + key;
+                } catch (err) {
+                  return "Error: Failed to press key: " + String(err);
+                }
               })()
             `);
           }
@@ -1986,9 +2127,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) return el.innerText || el.textContent || '';
-                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) return el.innerText || el.textContent || '';
+                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                } catch (err) {
+                  return "Error: Invalid selector or DOM error: " + String(err);
+                }
               })()
             `);
           }
@@ -1998,9 +2143,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                const el = document.querySelector(${JSON.stringify(args.selector)});
-                if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return "Scrolled to element"; }
-                return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                try {
+                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return "Scrolled to element"; }
+                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                } catch (err) {
+                  return "Error: Invalid selector or DOM error: " + String(err);
+                }
               })()
             `);
           }

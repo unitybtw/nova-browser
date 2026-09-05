@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Auto Updater & Version APIs
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  getUpdateInfo: () => ipcRenderer.invoke('get-update-info'),
   downloadUpdate: (url?: string) => ipcRenderer.invoke('download-update', url),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   openExternal: (url: string) => ipcRenderer.invoke('open-external', url),
@@ -174,4 +175,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('permission-request', handler);
   },
   respondPermissionRequest: (requestId: string, allow: boolean, remember?: boolean) => ipcRenderer.invoke('permission-response', { requestId, allow, remember }),
+  onBlockedSite: (callback: (event: any, data: { url: string; reason: string }) => void) => {
+    const handler = (_event: any, data: any) => callback(null, data);
+    ipcRenderer.on('blocked-site', handler);
+    return () => ipcRenderer.removeListener('blocked-site', handler);
+  },
 });

@@ -23,6 +23,8 @@ interface ElectronUpdateInfo {
   downloadUrl?: string;
   assetName?: string;
   isManual?: boolean;
+  releaseNotes?: string;
+  releaseName?: string;
 }
 
 /** Numeric progress payload of the auto-updater `download-progress` event. */
@@ -125,6 +127,7 @@ interface ElectronAPI {
   // Auto updater & version
   getAppVersion: () => Promise<string>;
   checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
+  getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
   downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;
   installUpdate: () => Promise<{ success: boolean; error?: string }>;
   openExternal: (url: string) => Promise<boolean>;
@@ -241,6 +244,9 @@ interface ElectronAPI {
     allow: boolean,
     remember?: boolean
   ) => Promise<{ success: boolean; error?: string }>;
+  onBlockedSite: (
+    callback: (event: null, data: { url: string; reason: string }) => void
+  ) => () => void;
 }
 
 declare global {
