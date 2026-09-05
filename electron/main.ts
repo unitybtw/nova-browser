@@ -49,19 +49,15 @@ function getMainDOMPurify(): any {
     const jsdomWindow = new JSDOM('').window;
     cachedDOMPurify = createDOMPurify(jsdomWindow as any);
   } catch (err) {
-    console.error('[Main] Failed to initialize JSDOM/DOMPurify, using safe regex fallback:', err);
+    console.error('[Main] Failed to initialize JSDOM/DOMPurify, using fail-closed entity encoding fallback:', err);
     cachedDOMPurify = {
       sanitize: (html: string) => {
         return (html || '')
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-          .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
-          .replace(/<embed[^>]*>/gi, '')
-          .replace(/<applet[^>]*>[\s\S]*?<\/applet>/gi, '')
-          .replace(/<!--[\s\S]*?-->/g, '')
-          .replace(/\s+on[a-zA-Z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-          .replace(/\s+(?:href|src|action|formaction)\s*=\s*["']?\s*(?:javascript|vbscript|data):[^"'>\s]*/gi, ' href="#"');
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
       }
     };
   }
@@ -85,6 +81,22 @@ import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
+
+// Reusable helper: check if hostname belongs to localhost, intranet, or private networks
+export function isLocalOrIntranetHost(hostname: string): boolean {
+  if (!hostname) return false;
+  const host = hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
+    return true;
+  }
+  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
+    return true;
+  }
+  if (isPrivateIP(host)) {
+    return true;
+  }
+  return false;
+}
 
 // Standard clean Chromium User-Agent matching host OS and exact runtime version
 export function getStandardUserAgent(): string {
@@ -184,6 +196,7 @@ if (process.platform === 'linux') {
     if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
       const userns = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf-8').trim();
       if (userns === '0') {
+        console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Falling back to un-sandboxed mode.');
         app.commandLine.appendSwitch('no-sandbox');
         app.commandLine.appendSwitch('disable-setuid-sandbox');
       }
@@ -1239,7 +1252,12 @@ app.whenReady().then(async () => {
     const platform = process.platform;
     const currentPid = process.pid;
 
-    console.log('[Updater] Starting self-update and relaunch with package:', filePath);
+    const resolvedFilePath = path.resolve(filePath);
+    if (!fs.existsSync(resolvedFilePath)) {
+      return { success: false, error: 'Update package does not exist on disk' };
+    }
+
+    console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
 
     if (mcpServer && mcpServer.isRunning()) {
       try { mcpServer.stop(); } catch (_) {}
@@ -1247,8 +1265,8 @@ app.whenReady().then(async () => {
 
     // 1. macOS (darwin)
     if (platform === 'darwin') {
-      const isDmg = filePath.toLowerCase().endsWith('.dmg');
-      const isZip = filePath.toLowerCase().endsWith('.zip');
+      const isDmg = resolvedFilePath.toLowerCase().endsWith('.dmg');
+      const isZip = resolvedFilePath.toLowerCase().endsWith('.zip');
 
       if (isDmg || isZip) {
         let destinationApp = '/Applications/Nova Browser.app';
@@ -1269,53 +1287,65 @@ app.whenReady().then(async () => {
           const mountPoint = path.join(tempDir, 'mount');
           fs.mkdirSync(mountPoint, { recursive: true });
           scriptBody = `#!/bin/bash
-hdiutil attach "${filePath}" -mountpoint "${mountPoint}" -nobrowse -quiet -noautoopen
-SOURCE_APP=$(find "${mountPoint}" -maxdepth 2 -name "*.app" | head -n 1)
+FILE_PATH="$1"
+DEST_APP="$2"
+TARGET_PID="$3"
+TEMP_DIR="$4"
+MOUNT_POINT="\${TEMP_DIR}/mount"
+
+hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -noautoopen
+SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
 if [ -z "$SOURCE_APP" ]; then
-  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
-  rm -rf "${tempDir}"
-  open "${filePath}"
+  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
+  rm -rf "\${TEMP_DIR}"
+  open "\${FILE_PATH}"
   exit 1
 fi
-while kill -0 ${currentPid} 2>/dev/null; do
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-if rm -rf "${destinationApp}" 2>/dev/null && cp -R "$SOURCE_APP" "${destinationApp}" 2>/dev/null; then
-  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
-  rm -rf "${tempDir}"
-  open -a "${destinationApp}"
+if rm -rf "\${DEST_APP}" 2>/dev/null && cp -R "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null; then
+  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
+  rm -rf "\${TEMP_DIR}"
+  open -a "\${DEST_APP}"
 else
-  hdiutil detach "${mountPoint}" -force -quiet 2>/dev/null
-  rm -rf "${tempDir}"
-  open "${filePath}"
+  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
+  rm -rf "\${TEMP_DIR}"
+  open "\${FILE_PATH}"
 fi
 `;
         } else {
           const extractDir = path.join(tempDir, 'extracted');
           fs.mkdirSync(extractDir, { recursive: true });
           scriptBody = `#!/bin/bash
-ditto -xk "${filePath}" "${extractDir}"
-SOURCE_APP=$(find "${extractDir}" -maxdepth 2 -name "*.app" | head -n 1)
+FILE_PATH="$1"
+DEST_APP="$2"
+TARGET_PID="$3"
+TEMP_DIR="$4"
+EXTRACT_DIR="\${TEMP_DIR}/extracted"
+
+ditto -xk "\${FILE_PATH}" "\${EXTRACT_DIR}"
+SOURCE_APP=$(find "\${EXTRACT_DIR}" -maxdepth 2 -name "*.app" | head -n 1)
 if [ -z "$SOURCE_APP" ]; then
-  rm -rf "${tempDir}"
+  rm -rf "\${TEMP_DIR}"
   exit 1
 fi
-while kill -0 ${currentPid} 2>/dev/null; do
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-if rm -rf "${destinationApp}" 2>/dev/null && cp -R "$SOURCE_APP" "${destinationApp}" 2>/dev/null; then
-  rm -rf "${tempDir}"
-  open -a "${destinationApp}"
+if rm -rf "\${DEST_APP}" 2>/dev/null && cp -R "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null; then
+  rm -rf "\${TEMP_DIR}"
+  open -a "\${DEST_APP}"
 else
-  rm -rf "${tempDir}"
-  open "${destinationApp}" 2>/dev/null || open -a "Nova Browser"
+  rm -rf "\${TEMP_DIR}"
+  open "\${DEST_APP}" 2>/dev/null || open -a "Nova Browser"
 fi
 `;
         }
 
         try {
           fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath], {
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, destinationApp, String(currentPid), tempDir], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1338,17 +1368,17 @@ fi
 
     // 2. Windows (win32)
     if (platform === 'win32') {
-      if (filePath.toLowerCase().endsWith('.exe')) {
+      if (resolvedFilePath.toLowerCase().endsWith('.exe')) {
         const tempDir = app.getPath('temp');
         const batPath = path.join(tempDir, `nova_update_${Date.now()}.bat`);
         const batContent = `@echo off
 timeout /t 1 /nobreak >nul
-start "" "${filePath}" /S
+start "" "%~1" /S
 exit
 `;
         try {
           fs.writeFileSync(batPath, batContent);
-          const runner = child_process.spawn('cmd.exe', ['/c', batPath], {
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1371,19 +1401,24 @@ exit
 
     // 3. Linux
     if (platform === 'linux') {
-      if (filePath.toLowerCase().endsWith('.appimage')) {
+      if (resolvedFilePath.toLowerCase().endsWith('.appimage')) {
         try {
-          fs.chmodSync(filePath, 0o755);
+          fs.chmodSync(resolvedFilePath, 0o755);
           const tempDir = app.getPath('temp');
           const scriptPath = path.join(tempDir, `nova_update_${Date.now()}.sh`);
           const scriptContent = `#!/bin/bash
-while kill -0 ${currentPid} 2>/dev/null; do
+FILE_PATH="$1"
+TARGET_PID="$2"
+TEMP_DIR="$3"
+
+while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-"${filePath}" &
+rm -rf "\${TEMP_DIR}"
+"\${FILE_PATH}" &
 `;
           fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath], {
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, String(currentPid), tempDir], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1406,9 +1441,9 @@ done
 
     // Fallback: show item, open with default handler and exit
     try {
-      shell.showItemInFolder(filePath);
+      shell.showItemInFolder(resolvedFilePath);
     } catch (_) {}
-    const openRes = await shell.openPath(filePath);
+    const openRes = await shell.openPath(resolvedFilePath);
     setTimeout(() => {
       try { app.quit(); } catch (_) { app.exit(0); }
     }, 1200);
@@ -2123,22 +2158,6 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
 
-      // Helper: check if hostname belongs to localhost, intranet, or private networks
-      function isLocalOrIntranetHost(hostname: string): boolean {
-        if (!hostname) return false;
-        const host = hostname.toLowerCase();
-        if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
-          return true;
-        }
-        if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
-          return true;
-        }
-        if (isPrivateIP(host)) {
-          return true;
-        }
-        return false;
-      }
-
       // 2. HTTPS Upgrade
       try {
         const urlObj = new URL(navigationUrl);
@@ -2202,21 +2221,6 @@ app.on('web-contents-created', (_event, contents) => {
           `).catch(() => {});
         }).catch(() => {});
         return;
-      }
-
-      function isLocalOrIntranetHost(hostname: string): boolean {
-        if (!hostname) return false;
-        const host = hostname.toLowerCase();
-        if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
-          return true;
-        }
-        if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
-          return true;
-        }
-        if (isPrivateIP(host)) {
-          return true;
-        }
-        return false;
       }
 
       if (parsed.protocol === 'http:' && !isLocalOrIntranetHost(parsed.hostname)) {
@@ -2605,10 +2609,12 @@ app.on('web-contents-created', (_event, wc) => {
           label: labels.copyImageAddress,
           click: () => clipboard.writeText(params.srcURL)
         }));
-        menu.append(new MenuItem({
-          label: labels.searchImageLens,
-          click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
-        }));
+        if (params.srcURL && (params.srcURL.startsWith('http://') || params.srcURL.startsWith('https://'))) {
+          menu.append(new MenuItem({
+            label: labels.searchImageLens,
+            click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
+          }));
+        }
         menu.append(new MenuItem({ type: 'separator' }));
       }
 
@@ -2865,7 +2871,7 @@ let clipboardConfigClearTimer: NodeJS.Timeout | null = null;
 ipcMain.handle('copy-mcp-config', (event) => {
   if (!isTrustedSender(event)) return false;
   const token = mcpServer?.getToken() || '';
-  const port = (mcpServer as any)?.port || 3020;
+  const port = mcpServer ? mcpServer.getPort() : 3020;
   const config = JSON.stringify({
     mcpServers: {
       "nova-browser": {
@@ -2998,15 +3004,33 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
       throw new Error('Value exceeds maximum allowed size of 5MB');
     }
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
-    // VULN-06: Warn and mark when encryption is unavailable
     if (safeStorage.isEncryptionAvailable()) {
       const encrypted = safeStorage.encryptString(value);
       fs.writeFileSync(keyPath, encrypted, { mode: 0o600 });
       try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
     } else {
-      console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Storing key "${key}" with [UNENCRYPTED] marker.`);
-      const markedValue = Buffer.from('[UNENCRYPTED]' + value, 'utf-8');
-      fs.writeFileSync(keyPath, markedValue, { mode: 0o600 });
+      console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
+      const getFallbackKey = (): Buffer => {
+        const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+        let secret: Buffer;
+        if (fs.existsSync(secretPath)) {
+          secret = fs.readFileSync(secretPath);
+        } else {
+          secret = crypto.randomBytes(32);
+          try {
+            fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+            try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+          } catch (_) {}
+        }
+        return crypto.scryptSync(secret, 'nova-secure-store-salt', 32);
+      };
+      const keyBuf = getFallbackKey();
+      const iv = crypto.randomBytes(12);
+      const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
+      const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+      const tag = cipher.getAuthTag();
+      const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+      fs.writeFileSync(keyPath, payload, { mode: 0o600 });
       try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
     }
     return true;
@@ -3023,25 +3047,32 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     if (fs.existsSync(keyPath)) {
       const raw = fs.readFileSync(keyPath);
-      // VULN-06: Handle encrypted vs unencrypted data
       if (safeStorage.isEncryptionAvailable()) {
         try {
           return safeStorage.decryptString(raw);
-        } catch (_) {
-          const str = raw.toString('utf-8');
-          if (str.startsWith('[UNENCRYPTED]')) {
-            return str.slice('[UNENCRYPTED]'.length);
-          }
-          return null;
-        }
-      } else {
-        const str = raw.toString('utf-8');
-        console.warn(`[SECURITY WARNING] safeStorage encryption unavailable. Reading key "${key}" as unencrypted.`);
-        if (str.startsWith('[UNENCRYPTED]')) {
-          return str.slice('[UNENCRYPTED]'.length);
-        }
-        return str;
+        } catch (_) {}
       }
+      // Check for fallback AES-256-GCM format
+      if (raw.length >= 36 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+        try {
+          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+          if (fs.existsSync(secretPath)) {
+            const secret = fs.readFileSync(secretPath);
+            const keyBuf = crypto.scryptSync(secret, 'nova-secure-store-salt', 32);
+            const iv = raw.subarray(4, 16);
+            const tag = raw.subarray(16, 32);
+            const enc = raw.subarray(32);
+            const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
+            decipher.setAuthTag(tag);
+            return decipher.update(enc) + decipher.final('utf8');
+          }
+        } catch (_) {}
+      }
+      const str = raw.toString('utf-8');
+      if (str.startsWith('[UNENCRYPTED]')) {
+        return str.slice('[UNENCRYPTED]'.length);
+      }
+      return null;
     }
   } catch (err) {
     console.error('Secure store get error:', err);

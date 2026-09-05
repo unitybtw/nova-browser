@@ -408,6 +408,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handlePasswordDetected = async (hostname: string, username: string, password: string) => {
+      if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+
       // Derive the hostname at EVENT time from the live webview. The captured
       // `tab?.url` closure goes stale after SPA navigations (this effect does
       // not depend on tab.url), which previously caused credentials to be

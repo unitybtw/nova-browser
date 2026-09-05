@@ -282,11 +282,22 @@ export function getHttpsUpgradeUrl(url: string): string | null {
         host.endsWith('.localhost') ||
         host.endsWith('.local') ||
         host.endsWith('.internal') ||
+        host.endsWith('.lan') ||
         host.startsWith('127.') ||
         host === '0.0.0.0' ||
-        host === '::1'
+        host === '::1' ||
+        host === '[::1]'
       ) {
         return null;
+      }
+      const ipv4Match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+      if (ipv4Match) {
+        const o1 = Number(ipv4Match[1]);
+        const o2 = Number(ipv4Match[2]);
+        if (o1 === 10 || o1 === 0 || o1 === 127) return null;
+        if (o1 === 172 && o2 >= 16 && o2 <= 31) return null;
+        if (o1 === 192 && o2 === 168) return null;
+        if (o1 === 169 && o2 === 254) return null;
       }
       parsed.protocol = 'https:';
       return parsed.toString();

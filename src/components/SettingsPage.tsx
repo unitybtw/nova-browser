@@ -860,7 +860,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.1';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.2';
   });
   const [systemVersions, setSystemVersions] = useState<{
     app: string;

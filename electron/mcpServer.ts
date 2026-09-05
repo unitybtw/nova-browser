@@ -328,7 +328,7 @@ export class BrowserMCPServer {
   private tokenFilePath: string = '';
   private actualPort: number = 0;
   private portFilePath: string = '';
-  private firstUseApproved: boolean = process.env.NODE_ENV === 'test' && Boolean(process.env.VITEST || process.env.JEST_WORKER_ID);
+  private firstUseApproved: boolean = process.env.NODE_ENV === 'test' && !electronApp.isPackaged && Boolean(process.env.VITEST || process.env.JEST_WORKER_ID);
 
   constructor(private requestedPort: number = 3020) {
     // Performance: express/express-rate-limit are NOT required here — they are
@@ -613,7 +613,7 @@ export class BrowserMCPServer {
 
     // Health check endpoint — only return minimal info without auth
     app.get('/health', (req, res) => {
-      const appVersion = electronApp?.getVersion?.() || '1.4.1';
+      const appVersion = electronApp?.getVersion?.() || '1.4.2';
       if (this.isAuthenticated(req)) {
         // Authenticated: return detailed info
         res.json({
@@ -836,7 +836,7 @@ export class BrowserMCPServer {
           console.log(`[MCP Server] Running at http://localhost:${this.actualPort}`);
           console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
           console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
-          console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
+          console.log('[MCP Server] Authentication token loaded securely');
           resolve();
         });
 
@@ -853,7 +853,7 @@ export class BrowserMCPServer {
                 console.log(`[MCP Server] Running on fallback port http://localhost:${this.actualPort}`);
                 console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
                 console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
-                console.log(`[MCP Server] Token: ${this.token.substring(0, 4)}***`);
+                console.log('[MCP Server] Authentication token loaded securely');
                 resolve();
               });
               return;
