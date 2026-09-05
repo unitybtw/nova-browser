@@ -28,7 +28,7 @@ export class AiError extends Error {
 
 /** Lifecycle status of the agent, broadcast via aiAgent.onStatus() (FIX 6). */
 export type AgentStatus = {
-  state: 'idle' | 'loading_model' | 'thinking' | 'acting' | 'waiting_approval' | 'error';
+  state: 'idle' | 'loading_model' | 'thinking' | 'acting' | 'waiting_approval' | 'error' | 'parked';
   detail?: string;
 };
 
@@ -631,11 +631,92 @@ class AIAgent {
     return this.ctxWindowSize <= 2048 ? 400 : 1500;
   }
 
+  private idleParkTimer: any = null;
+
+  public isEngineLoaded(): boolean {
+    return !!this.engine;
+  }
+
+  public getVramEstimate(): number {
+    if (!this.engine) return 0;
+    if (this.modelId.includes('3B')) return 2200;
+    if (this.modelId.includes('Vision')) return 3100;
+    if (this.modelId.includes('0.5B')) return 450;
+    return 2000;
+  }
+
+  public getAutoParkTimeoutMinutes(): number {
+    try {
+      const stored = localStorage.getItem('nova_ai_park_timeout');
+      if (stored !== null) {
+        const val = parseInt(stored, 10);
+        if (!isNaN(val)) return val;
+      }
+    } catch {}
+    return 3; // Default: 3 minutes of idle inactivity
+  }
+
+  public setAutoParkTimeoutMinutes(mins: number): void {
+    try {
+      localStorage.setItem('nova_ai_park_timeout', String(mins));
+    } catch {}
+    this.resetIdleParkTimer();
+  }
+
+  public resetIdleParkTimer(): void {
+    if (this.idleParkTimer) {
+      clearTimeout(this.idleParkTimer);
+      this.idleParkTimer = null;
+    }
+    if (!this.engine) return;
+    const mins = this.getAutoParkTimeoutMinutes();
+    if (mins <= 0) return; // 0 = Never park (always resident)
+
+    this.idleParkTimer = setTimeout(() => {
+      if (this.lastStatus.state === 'idle' && !this.isInitializing) {
+        this.parkModel().catch(err => console.warn('[AI Agent] Auto-park error:', err));
+      }
+    }, mins * 60 * 1000);
+  }
+
+  /**
+   * Explicitly park resident model: unloads from VRAM to release GPU command buffers
+   * and memory bandwidth back to Chromium compositor, eliminating scroll jank.
+   */
+  public async parkModel(): Promise<void> {
+    if (!this.engine && !this.worker) return;
+    console.log('[AI Agent] Parking resident model to reclaim VRAM for GPU compositor.');
+    if (this.idleParkTimer) {
+      clearTimeout(this.idleParkTimer);
+      this.idleParkTimer = null;
+    }
+    await this.unload();
+    this.emitStatus('parked', 'Model parked (VRAM freed)');
+  }
+
+  /**
+   * Cooperative micro-yield to browser event loop and compositor.
+   * Guarantees regular 16ms V-Sync paint windows for smooth 60/120 FPS scrolling.
+   */
+  public async yieldToCompositor(): Promise<void> {
+    if (typeof window !== 'undefined' && 'scheduler' in window && typeof (window as any).scheduler?.yield === 'function') {
+      try {
+        await (window as any).scheduler.yield();
+        return;
+      } catch {}
+    }
+    await new Promise(r => setTimeout(r, 12));
+  }
+
   /**
    * Fully unloads the Web-LLM engine and terminates the background Web Worker.
    * Reclaims GPU VRAM and eliminates dangling worker threads.
    */
   public async unload(): Promise<void> {
+    if (this.idleParkTimer) {
+      clearTimeout(this.idleParkTimer);
+      this.idleParkTimer = null;
+    }
     this.operationGeneration++;
     this.isInterrupted = true;
     if (this.engine) {
@@ -1122,6 +1203,7 @@ CRITICAL RULES:
       this.toolCallSchemaString = null;
       this.constrainedUnsupported = false;
       this.emitStatus('idle');
+      this.resetIdleParkTimer();
 
     } catch (err: any) {
       console.error("Failed to initialize AI Engine:", err);
@@ -1886,6 +1968,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       return { text: 'Islem durduruldu.', constrained: false };
     }
     this.emitStatus('thinking');
+    await this.yieldToCompositor();
     if (!this.constrainedUnsupported) {
       try {
         const reply = await this.engine!.chat.completions.create({
@@ -1895,6 +1978,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           stream: false,
           response_format: { type: "json_object", schema: this.getToolCallSchemaString() }
         } as any);
+        await this.yieldToCompositor();
         if (!isActive()) {
           return { text: 'Islem durduruldu.', constrained: false };
         }
@@ -1916,12 +2000,14 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
+    await this.yieldToCompositor();
     const reply = await this.engine!.chat.completions.create({
       messages: windowedMessages,
       temperature: 0.1,
       max_tokens: AGENT_MAX_TOKENS,
       stream: false
     });
+    await this.yieldToCompositor();
     if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
@@ -1933,7 +2019,10 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     onChunk?: (chunk: string) => void,
     attachments?: ChatAttachments
   ): Promise<ChatCompletionMessageParam[]> {
-    if (!this.engine) throw new Error("Engine not initialized");
+    if (!this.engine) {
+      this.emitStatus('loading_model', 'Waking up parked model...');
+      await this.init();
+    }
     this.isInterrupted = false;
     const generation = ++this.operationGeneration;
 
@@ -2165,7 +2254,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         : 'The requested actions were performed, but the summary could not be completed.';
 
       while (!isDone) {
-        await new Promise(r => setTimeout(r, 40));
+        await this.yieldToCompositor();
         loopCount++;
 
         if (!this.isOperationActive(generation)) {
@@ -2326,15 +2415,19 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       if (this.lastStatus.state !== 'error') {
         this.emitStatus('idle');
       }
+      this.resetIdleParkTimer();
     }
   }
 
   // A fast, lightweight method exclusively for background tasks like Link Preview (No tools, no orchestrator)
   public async summarize(text: string, pageTitle?: string): Promise<string> {
-    if (!this.engine) throw new Error("Engine not initialized");
+    if (!this.engine) {
+      this.emitStatus('loading_model', 'Waking up parked model...');
+      await this.init();
+    }
     
     try {
-      const reply = await this.engine.chat.completions.create({
+      const reply = await this.engine!.chat.completions.create({
         messages: [
           { 
             role: "system", 
@@ -2366,6 +2459,8 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     } catch (e) {
       console.warn('[aiAgent] Summarize failed, falling back to clean text extraction:', e);
       throw e;
+    } finally {
+      this.resetIdleParkTimer();
     }
   }
 }

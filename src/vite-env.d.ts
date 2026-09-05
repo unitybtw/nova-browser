@@ -126,6 +126,15 @@ interface ElectronAPI {
   showDownloadInFolder: (pathStr: string) => Promise<boolean>;
   // Auto updater & version
   getAppVersion: () => Promise<string>;
+  getSystemVersions: () => Promise<{
+    app: string;
+    electron: string;
+    chrome: string;
+    node: string;
+    v8: string;
+    platform: string;
+    arch: string;
+  } | null>;
   checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
   getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
   downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;

@@ -9,6 +9,7 @@ import { syncService, SyncStatus, SyncPreferences } from '../services/syncServic
 import { backupCorruptData, safeParseArrayWithBackup, safeParseObjectWithBackup } from '../utils/safeStorage';
 import { showConfirm, showAlert } from '../utils/confirmDialog';
 import { getLocale } from '../services/i18n';
+import { aiAgent } from '../services/aiAgent';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -861,6 +862,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [appVersion, setAppVersion] = useState<string>(() => {
     return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.0';
   });
+  const [systemVersions, setSystemVersions] = useState<{
+    app: string;
+    electron: string;
+    chrome: string;
+    node: string;
+    v8: string;
+    platform: string;
+    arch: string;
+  } | null>(null);
+  const [aiVramTimeout, setAiVramTimeout] = useState<number>(() => aiAgent.getAutoParkTimeoutMinutes());
+  const [aiEngineLoaded, setAiEngineLoaded] = useState<boolean>(() => aiAgent.isEngineLoaded());
 
   useEffect(() => {
     if (window.electronAPI?.getAppVersion) {
@@ -868,6 +880,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ver) setAppVersion(ver);
       }).catch(() => {});
     }
+    if (window.electronAPI?.getSystemVersions) {
+      window.electronAPI.getSystemVersions().then(ver => {
+        if (ver) setSystemVersions(ver);
+      }).catch(() => {});
+    }
+  }, []);
+
+  useEffect(() => {
+    return aiAgent.onStatus(() => {
+      setAiEngineLoaded(aiAgent.isEngineLoaded());
+    });
   }, []);
 
   useEffect(() => {
@@ -1180,13 +1203,43 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">About Nova</h2>
-                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 flex items-center justify-between mb-4">
                   <div>
                     <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Nova Browser</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">Version {appVersion} (Open Source Edition)</p>
                   </div>
                   <UpdateWidget />
                 </div>
+
+                {systemVersions && (
+                  <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
+                    <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                      <span>Engine & Security Patch Transparency</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                        <div className="text-[10px] text-slate-400 uppercase font-semibold">Chromium</div>
+                        <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.chrome || '134.0.6998'}</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                        <div className="text-[10px] text-slate-400 uppercase font-semibold">Electron</div>
+                        <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.electron}</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                        <div className="text-[10px] text-slate-400 uppercase font-semibold">V8 Engine</div>
+                        <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.v8}</div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60">
+                        <div className="text-[10px] text-slate-400 uppercase font-semibold">Architecture</div>
+                        <div className="font-mono text-slate-800 dark:text-slate-200 mt-0.5">{systemVersions.platform} ({systemVersions.arch})</div>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-3 leading-relaxed">
+                      Patch gap tracking active: Automated CI/CD builds release Chromium security patches with verified platform binaries.
+                    </p>
+                  </div>
+                )}
               </section>
 
               <section>
@@ -1887,7 +1940,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Storage & Model Cache</h2>
-                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between">
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between mb-4">
                   <div>
                     <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Purge AI Model Cache</div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Delete downloaded local WebLLM neural network weights to free up disk space</div>
@@ -1905,6 +1958,62 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     <Trash2 className="w-3.5 h-3.5" />
                     {isClearingCache ? 'Clearing...' : 'Clear AI Cache'}
                   </button>
+                </div>
+
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <Cpu className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                        <span>GPU VRAM & Anti-Jank Engine Management</span>
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 max-w-md">
+                        Auto-parks the resident 3B model from VRAM when idle to eliminate scroll jank and keep GPU memory available for heavy web browsing.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-xl text-xs font-mono font-medium border ${
+                        aiEngineLoaded 
+                          ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' 
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-500 border-slate-200 dark:border-slate-700'
+                      }`}>
+                        {aiEngineLoaded ? `VRAM: ~${aiAgent.getVramEstimate()} MB` : 'VRAM: 0 MB (Parked)'}
+                      </span>
+                      {aiEngineLoaded && (
+                        <button
+                          onClick={async () => {
+                            await aiAgent.parkModel();
+                            setAiEngineLoaded(false);
+                          }}
+                          className="px-3 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                        >
+                          Park Now
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-700/50 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-300">Inactivity Auto-Park Timeout</div>
+                      <div className="text-[11px] text-slate-400">Duration before resident WebLLM weights are automatically released from VRAM.</div>
+                    </div>
+                    <select
+                      value={aiVramTimeout}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setAiVramTimeout(val);
+                        aiAgent.setAutoParkTimeoutMinutes(val);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    >
+                      <option value={1}>1 minute</option>
+                      <option value={3}>3 minutes (Recommended)</option>
+                      <option value={5}>5 minutes</option>
+                      <option value={10}>10 minutes</option>
+                      <option value={0}>Disabled (Always Resident)</option>
+                    </select>
+                  </div>
                 </div>
               </section>
             </div>

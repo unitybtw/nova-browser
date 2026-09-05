@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showDownloadInFolder: (pathStr: string) => ipcRenderer.invoke('show-download-in-folder', pathStr),
   // Auto Updater & Version APIs
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  getSystemVersions: () => ipcRenderer.invoke('get-system-versions'),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   getUpdateInfo: () => ipcRenderer.invoke('get-update-info'),
   downloadUpdate: (url?: string) => ipcRenderer.invoke('download-update', url),

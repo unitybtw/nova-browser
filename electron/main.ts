@@ -1909,6 +1909,19 @@ done
     return app.getVersion();
   });
 
+  ipcMain.handle('get-system-versions', (event) => {
+    if (!isTrustedSender(event)) return null;
+    return {
+      app: app.getVersion(),
+      electron: process.versions.electron || '',
+      chrome: process.versions.chrome || '',
+      node: process.versions.node || '',
+      v8: process.versions.v8 || '',
+      platform: process.platform,
+      arch: process.arch
+    };
+  });
+
   // Wait 15 seconds before background update check on startup to not slow down initialization
   setTimeout(() => {
     checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));

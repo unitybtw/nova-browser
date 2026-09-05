@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Cpu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
@@ -159,6 +159,13 @@ export const SidePanel = React.memo(({
   useEffect(() => {
     return aiAgent.onStatus(setAgentStatus);
   }, []);
+
+  // When SidePanel closes, ensure the idle park timer runs to reclaim VRAM
+  useEffect(() => {
+    if (!isOpen) {
+      aiAgent.resetIdleParkTimer();
+    }
+  }, [isOpen]);
 
   const getOrCreateRecognition = useCallback(() => {
     if (recognitionRef.current) return recognitionRef.current;
@@ -585,6 +592,13 @@ export const SidePanel = React.memo(({
           label: 'Waiting for approval',
           classes: 'bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-500/40 text-amber-600 dark:text-amber-400',
         };
+      case 'parked':
+        return {
+          icon: <Cpu className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
+          label: 'Model parked (VRAM freed)',
+          detail: 'GPU memory restored to web browsing tabs',
+          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
+        };
       case 'error':
         return {
           icon: <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />,
@@ -625,9 +639,31 @@ export const SidePanel = React.memo(({
                 </div>
                 <h2 className="font-semibold text-sm">Browser AI</h2>
               </div>
-              <div className="flex items-center gap-1">
-              <button
-                onClick={() => setShowMemoryVault(!showMemoryVault)}
+              <div className="flex items-center gap-1.5">
+                {aiAgent.isEngineLoaded() ? (
+                  <button
+                    onClick={async () => {
+                      await aiAgent.parkModel();
+                      setIsReady(false);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-medium bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 transition-all cursor-pointer"
+                    title="Resident model is loaded in VRAM. Click to park and release GPU memory to tabs."
+                  >
+                    <Cpu className="w-3 h-3" />
+                    <span>~{aiAgent.getVramEstimate()}MB</span>
+                    <span className="text-[9px] opacity-75 underline ml-0.5">Park</span>
+                  </button>
+                ) : (
+                  <span
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-medium bg-slate-100 dark:bg-white/5 text-slate-400 border border-slate-200/60 dark:border-white/10"
+                    title="Model is parked. 0 MB VRAM used. Wakes up automatically when prompted."
+                  >
+                    <Cpu className="w-3 h-3" />
+                    <span>0MB Parked</span>
+                  </span>
+                )}
+                <button
+                  onClick={() => setShowMemoryVault(!showMemoryVault)}
                 className={`p-1.5 rounded-lg transition-colors ${showMemoryVault ? 'bg-accent/20 dark:bg-accent-dark/50 text-accent-hover' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
                 title="AI Persistent Memory Panel"
               >
