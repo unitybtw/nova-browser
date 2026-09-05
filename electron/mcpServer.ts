@@ -613,7 +613,7 @@ export class BrowserMCPServer {
 
     // Health check endpoint — only return minimal info without auth
     app.get('/health', (req, res) => {
-      const appVersion = electronApp?.getVersion?.() || '1.4.0';
+      const appVersion = electronApp?.getVersion?.() || '1.4.1';
       if (this.isAuthenticated(req)) {
         // Authenticated: return detailed info
         res.json({
