@@ -1179,33 +1179,40 @@ app.whenReady().then(async () => {
     const arch = process.arch;
 
     if (platform === 'darwin') {
+      const isDmg = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg') && !a.name.toLowerCase().endsWith('.blockmap');
       if (arch === 'arm64') {
-        return assets.find((a: any) => a.name?.includes('arm64.dmg')) || assets.find((a: any) => a.name?.endsWith('.dmg'));
+        return assets.find((a: any) => isDmg(a) && a.name.toLowerCase().includes('arm64')) ||
+               assets.find(isDmg);
       }
-      return assets.find((a: any) => a.name?.includes('x64.dmg')) || assets.find((a: any) => a.name?.endsWith('.dmg'));
+      return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel'))) ||
+             assets.find(isDmg);
     }
 
     if (platform === 'win32') {
+      const isExe = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe') && !a.name.toLowerCase().endsWith('.blockmap');
+      const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
       const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
       if (isPortable) {
-        return assets.find((a: any) => a.name?.endsWith('.exe') && !a.name?.toLowerCase().includes('setup')) ||
-               assets.find((a: any) => a.name?.endsWith('.zip')) ||
-               assets.find((a: any) => a.name?.endsWith('.exe'));
+        return assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup')) ||
+               assets.find(isZip) ||
+               assets.find(isExe);
       }
-      return assets.find((a: any) => a.name?.toLowerCase().includes('setup') && a.name?.endsWith('.exe')) ||
-             assets.find((a: any) => a.name?.endsWith('.exe')) ||
-             assets.find((a: any) => a.name?.endsWith('.zip'));
+      return assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup')) ||
+             assets.find(isExe) ||
+             assets.find(isZip);
     }
 
     if (platform === 'linux') {
-      return assets.find((a: any) => a.name?.endsWith('.AppImage')) || assets.find((a: any) => a.name?.endsWith('.deb'));
+      const isAppImage = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.appimage');
+      const isDeb = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.deb');
+      return assets.find(isAppImage) || assets.find(isDeb);
     }
 
-    return assets[0];
+    return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
   }
 
   // Auto Updater Configuration
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
   let isUpdateDownloaded = false;
   let latestReleaseDownloadInfo: {
@@ -1302,7 +1309,7 @@ app.whenReady().then(async () => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     sendToMainWindow('update-checking');
     try {
-      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || !!process.env.PORTABLE_EXECUTABLE_DIR;
+      const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
       if (isManualUpdateOnly) {
         const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
           headers: { 'User-Agent': getStandardUserAgent() }
@@ -1435,7 +1442,11 @@ app.whenReady().then(async () => {
 
       const totalBytes = Number(response.headers.get('content-length')) || 0;
       const parsedUrl = new URL(targetUrl);
-      const filename = assetName || path.basename(parsedUrl.pathname) || `Nova-Browser-Setup-${targetVersion || 'update'}.exe`;
+      const defaultExt = process.platform === 'darwin' ? 'dmg' : process.platform === 'win32' ? 'exe' : 'AppImage';
+      let filename = assetName || path.basename(parsedUrl.pathname) || `Nova-Browser-Setup-${targetVersion || 'update'}.${defaultExt}`;
+      if (process.platform === 'darwin' && !filename.toLowerCase().endsWith('.dmg') && !filename.toLowerCase().endsWith('.zip')) {
+        filename = `${filename}.dmg`;
+      }
       const downloadsDir = app.getPath('downloads');
       const targetFilePath = path.join(downloadsDir, filename);
       const tempFilePath = `${targetFilePath}.download_${Date.now()}`;
@@ -1518,6 +1529,19 @@ app.whenReady().then(async () => {
         if (openResult) {
           console.warn('[Updater] shell.openPath returned error, attempting fallback:', openResult);
         }
+
+        if (mcpServer && mcpServer.isRunning()) {
+          try { mcpServer.stop(); } catch (_) {}
+        }
+
+        setTimeout(() => {
+          try {
+            app.quit();
+          } catch (_) {
+            app.exit(0);
+          }
+        }, 1500);
+
         return { success: true, opened: true };
       }
 
