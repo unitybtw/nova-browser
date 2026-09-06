@@ -157,6 +157,11 @@ const getDemoParams = (): DemoParams => {
   };
 };
 
+// Platform detection constants (module-level to prevent TDZ issues in hooks and initializers)
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent);
+const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.platform || navigator.userAgent) && !/Android/i.test(navigator.userAgent);
+
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const demoParams = useMemo(() => {
     const queryParams = getDemoParams();
@@ -2739,18 +2744,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         console.error('Failed to remove extension:', e);
       }
     }
-  }, []);
-
-  const isMac = useMemo(() => {
-    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-  }, []);
-
-  const isWindows = useMemo(() => {
-    return typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent);
-  }, []);
-
-  const isLinux = useMemo(() => {
-    return typeof navigator !== 'undefined' && /Linux/i.test(navigator.platform || navigator.userAgent) && !/Android/i.test(navigator.userAgent);
   }, []);
 
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);

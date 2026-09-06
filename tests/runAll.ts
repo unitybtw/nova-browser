@@ -43,3 +43,4 @@ import './webllm_config.test';
 import './adversarial_hacker_security.test';
 import './i18n_localization.test';
 import './ai_vram_anti_jank.test';
+import './tdz_initialization_safety.test';
