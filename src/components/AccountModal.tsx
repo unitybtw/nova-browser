@@ -340,7 +340,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         required
                         value={inputSyncCode}
                         onChange={(e) => setInputSyncCode(e.target.value)}
-                        placeholder="nova-xxxx-xxxx-xxxx-xxxx"
+                        placeholder="nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx"
                         className="flex-1 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
                       />
                       <button

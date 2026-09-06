@@ -40,6 +40,7 @@ import { showConfirm, showAlert } from './utils/confirmDialog';
 import { computeLiveAndSuspendedTabs } from './utils/tabManager';
 import { setLanguage } from './services/i18n';
 import { isValidProxyUrl } from './utils/proxyValidation';
+import { matchesShortcut } from './utils/keyboardShortcuts';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -612,7 +613,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : defaultSettings.newTabBackground),
       shortcuts: {
         ...defaultSettings.shortcuts,
-        downloads: { key: 'j', shift: false, meta: true },
+        downloads: { key: 'j', shift: isMac, meta: true },
         findInPage: { key: 'f', shift: false, meta: true },
       }
     };
@@ -623,7 +624,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     const saved = localStorage.getItem('user_settings');
     const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
-    return { ...initialSettings, ...parsed };
+    const merged = { ...initialSettings, ...parsed };
+    // Migration: ensure macOS users have shift: true for downloads shortcut if they had the legacy default shift: false
+    // Preserve custom user settings: do NOT overwrite if the user has explicitly customized their shortcuts
+    const isCustomized = localStorage.getItem('shortcuts_customized') === 'true';
+    if (!isCustomized && isMac && merged.shortcuts?.downloads && merged.shortcuts.downloads.key === 'j' && merged.shortcuts.downloads.shift === false) {
+      const migrated = localStorage.getItem('shortcuts_v2_migrated');
+      if (!migrated) {
+        merged.shortcuts = {
+          ...merged.shortcuts,
+          downloads: { key: 'j', shift: true, meta: true }
+        };
+        try {
+          localStorage.setItem('shortcuts_v2_migrated', 'true');
+        } catch (_) {}
+      }
+    }
+    return merged;
   });
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
@@ -2865,11 +2882,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const meta = e.metaKey || e.ctrlKey; // Accept either Meta (Mac) or Ctrl (Windows)
 
       const matches = (shortcutName: keyof typeof s) => {
-        const binding = s[shortcutName];
-        if (!binding) return false;
-        return key === binding.key.toLowerCase() && 
-               shift === !!binding.shift && 
-               meta === !!binding.meta;
+        return matchesShortcut(s[shortcutName], e, isMac);
       };
 
       if (matches('newTab')) {
@@ -2976,7 +2989,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      if (matches('downloads') || (meta && !shift && key === 'j')) {
+      if (matches('downloads')) {
         e.preventDefault();
         closeAllModals();
         handleOpenDownloads();

@@ -1,6 +1,7 @@
 import type { Express, Request } from 'express';
 import { BrowserWindow, safeStorage, dialog, powerMonitor } from 'electron';
-import { randomUUID, createHash, timingSafeEqual } from 'crypto';
+import { randomUUID, createHash, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import os from 'os';
 import fs from 'fs';
 import path from 'path';
 import { app as electronApp } from 'electron';
@@ -377,20 +378,56 @@ export class BrowserMCPServer {
     }
   }
 
+  private getFallbackMcpKey(): Buffer {
+    const secretPath = path.join(electronApp.getPath('userData'), '.machine_secret');
+    let secret: Buffer;
+    if (fs.existsSync(secretPath)) {
+      secret = fs.readFileSync(secretPath);
+    } else {
+      secret = randomBytes(32);
+      try {
+        fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+        if (process.platform !== 'win32') {
+          fs.chmodSync(secretPath, 0o600);
+        }
+      } catch (_) {}
+    }
+    let username = 'unknown';
+    try {
+      username = os.userInfo().username;
+    } catch (_) {
+      username = process.env.USER || process.env.USERNAME || 'unknown';
+    }
+    const machineSalt = createHash('sha256')
+      .update(`${os.hostname()}:${username}:${os.homedir()}:nova-mcp-salt`)
+      .digest();
+    return scryptSync(secret, machineSalt, 32);
+  }
+
   private loadOrGenerateToken(): string {
     try {
       if (this.tokenFilePath && fs.existsSync(this.tokenFilePath)) {
         const raw = fs.readFileSync(this.tokenFilePath);
         if (raw.length > 0) {
-          try {
-            if (safeStorage.isEncryptionAvailable()) {
+          if (safeStorage.isEncryptionAvailable()) {
+            try {
               const decrypted = safeStorage.decryptString(raw);
               if (decrypted && decrypted.length >= 16) return decrypted;
-            }
-          } catch (_) {}
-          // Fallback to UTF-8 plaintext if safeStorage is unavailable
-          const plaintext = raw.toString('utf-8').trim();
-          if (plaintext && plaintext.length >= 16) return plaintext;
+            } catch (_) {}
+          }
+          // Check for fallback AES-256-GCM authenticated format
+          if (raw.length >= 36 && raw.subarray(0, 4).toString('utf8') === 'NMCP') {
+            try {
+              const keyBuf = this.getFallbackMcpKey();
+              const iv = raw.subarray(4, 16);
+              const tag = raw.subarray(16, 32);
+              const enc = raw.subarray(32);
+              const decipher = createDecipheriv('aes-256-gcm', keyBuf, iv);
+              decipher.setAuthTag(tag);
+              const decrypted = decipher.update(enc) + decipher.final('utf8');
+              if (decrypted && decrypted.length >= 16) return decrypted;
+            } catch (_) {}
+          }
         }
       }
     } catch (err) {
@@ -405,12 +442,24 @@ export class BrowserMCPServer {
     try {
       if (this.tokenFilePath) {
         const dir = path.dirname(this.tokenFilePath);
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
         if (safeStorage.isEncryptionAvailable()) {
           const encrypted = safeStorage.encryptString(newToken);
           fs.writeFileSync(this.tokenFilePath, encrypted, { mode: 0o600 });
+          if (process.platform !== 'win32') {
+            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (_) {}
+          }
         } else {
-          fs.writeFileSync(this.tokenFilePath, newToken, { encoding: 'utf-8', mode: 0o600 });
+          const keyBuf = this.getFallbackMcpKey();
+          const iv = randomBytes(12);
+          const cipher = createCipheriv('aes-256-gcm', keyBuf, iv);
+          const enc = Buffer.concat([cipher.update(newToken, 'utf8'), cipher.final()]);
+          const tag = cipher.getAuthTag();
+          const payload = Buffer.concat([Buffer.from('NMCP', 'utf8'), iv, tag, enc]);
+          fs.writeFileSync(this.tokenFilePath, payload, { mode: 0o600 });
+          if (process.platform !== 'win32') {
+            try { fs.chmodSync(this.tokenFilePath, 0o600); } catch (_) {}
+          }
         }
       }
     } catch (err) {
@@ -613,7 +662,7 @@ export class BrowserMCPServer {
 
     // Health check endpoint — only return minimal info without auth
     app.get('/health', (req, res) => {
-      const appVersion = electronApp?.getVersion?.() || '1.4.2';
+      const appVersion = electronApp?.getVersion?.() || '1.4.3';
       if (this.isAuthenticated(req)) {
         // Authenticated: return detailed info
         res.json({
@@ -641,7 +690,7 @@ export class BrowserMCPServer {
         return res.status(401).send('Unauthorized: Invalid or missing token');
       }
 
-      const clientId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const clientId = `client_${randomUUID().replace(/-/g, '')}`;
 
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache');
@@ -817,9 +866,19 @@ export class BrowserMCPServer {
     ]);
 
     const app = express();
-    // VULN-28: Add rate limiting
-    app.use(rateLimit({ windowMs: 60 * 1000, max: 120, message: 'Too many requests' }));
-    app.use(express.json({ limit: '10mb' }));
+    // Security: Tighten JSON body limit to 1MB (prevents memory exhaustion DoS)
+    app.use(express.json({ limit: '1mb' }));
+
+    // Rate limiter: exempt /health so liveness checks are never locked out
+    const apiLimiter = rateLimit({
+      windowMs: 60 * 1000,
+      max: 120,
+      message: 'Too many requests',
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.path === '/health'
+    });
+    app.use(apiLimiter);
     this.setupRoutes(app);
 
     return new Promise((resolve, reject) => {

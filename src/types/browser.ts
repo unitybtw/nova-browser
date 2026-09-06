@@ -144,7 +144,7 @@ export const defaultSettings: UserSettings = {
     history: { key: (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
     settings: { key: ',', shift: false, meta: true },
     toggleSidebar: { key: 's', shift: false, meta: true },
-    downloads: { key: 'j', shift: false, meta: true },
+    downloads: { key: 'j', shift: (typeof navigator !== 'undefined' && typeof navigator.userAgent === 'string' && navigator.userAgent.includes('Mac')), meta: true },
   }
 };
 

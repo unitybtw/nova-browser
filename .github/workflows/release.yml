@@ -139,6 +139,30 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Generate SHA-256 Checksums
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt 2>/dev/null || true
+          echo "### SHA-256 Release Checksums" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          cat SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Scan Release Binaries with VirusTotal
+        id: virustotal
+        if: env.VIRUSTOTAL_API_KEY != ''
+        env:
+          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          files: |
+            release-assets/*.exe
+            release-assets/*.dmg
+            release-assets/*.AppImage
+            release-assets/*.deb
+          request_rate: 4
+
       - name: Create & Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:

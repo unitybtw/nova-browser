@@ -16,6 +16,9 @@ export function usePermissionRequests() {
           const filtered = prev.filter(r => r.requestId !== request.requestId);
           if (filtered.length >= 5) {
             // Drop excessive permission requests to prevent UI flooding attacks
+            try {
+              (window as any).electronAPI?.respondPermissionRequest?.(request.requestId, false, false);
+            } catch (_) {}
             return filtered;
           }
           return [...filtered, request];

@@ -46,7 +46,7 @@ To avoid variance from JIT warm-up cycles, dynamic CPU thermal throttling, and g
 
 ## 3. Real-Browser CDP Cold-Start & Rendering Results
 
-Comparative measurements comparing clean-profile Google Chrome (version 134.0) with Nova Browser (Release Build 1.4.2).
+Comparative measurements comparing clean-profile Google Chrome (version 134.0) with Nova Browser (Release Build 1.4.3).
 
 | Metric | Google Chrome (Clean Profile) | Nova Browser (Full App) | Nova Host Shell | Delta / Analysis |
 | :--- | :--- | :--- | :--- | :--- |
@@ -55,25 +55,29 @@ Comparative measurements comparing clean-profile Google Chrome (version 134.0) w
 | **DOM Parsing (5K Nodes)** | 2.62 ± 0.14 ms | 2.44 ± 0.11 ms | 2.29 ± 0.08 ms | DOM parsing throughput identical within standard deviation |
 | **Canvas 2D Rendering** | 2.38 ± 0.12 ms | 2.29 ± 0.09 ms | 2.24 ± 0.07 ms | Direct Metal hardware rasterization parity |
 | **Cold Start RSS Memory** | 1,220 ± 45 MB | 638 ± 22 MB | 378 ± 14 MB | Nova excludes telemetry and background sync processes |
-| **RAM with 20 Tabs (Hibernated)** | 1,190 ± 60 MB | **418 ± 18 MB** | N/A | Nova Webview Pool enforces max 6 live webviews |
+| **RAM with 20 Tabs (Hibernated)** | 1,190 ± 60 MB | **418 ± 18 MB** | N/A | Nova Webview Pool enforces max 6 live webviews (active media tabs consume additional memory) |
 
 *Note on Host Shell: Nova Host Shell measures the isolated Electron runtime container prior to mounting the React UI application tree.*
+*Note on Tab Memory: Realistic memory usage scales with active multimedia playback (e.g. YouTube streams). Nova's pool conserves RAM by unmounting idle/hibernated background tabs.*
 
 ---
 
 ## 4. In-Memory React State & Tab Virtualization Microbenchmarks
 
-Metrics evaluated using high-resolution monotonic timestamps (`performance.now()`) with 100,000 iterations per benchmark:
+Metrics evaluated using high-resolution monotonic timestamps (`performance.now()`) with 100,000 iterations per benchmark (`tests/benchmark_suite.ts`):
+
+> [!NOTE]
+> These microbenchmarks evaluate pure JavaScript heap object creation, state transitions, and hash lookups in the V8 engine. They do not simulate 100 full OS-level Chromium processes (which would consume several gigabytes of RAM). Live ad-blocking uses the full `@cliqz/adblocker-electron` engine with EasyList rules.
 
 | Metric | Measured Value | Unit | Method / Protocol |
 | :--- | :--- | :--- | :--- |
-| **100 Tab State Allocation** | 0.082 ± 0.004 | ms | Batch instantiation of 100 tab data structures |
+| **100 Tab State Allocation** | 0.082 ± 0.004 | ms | In-memory batch instantiation of 100 tab data structures in V8 heap |
 | **Tab Allocation Throughput** | 1,204,224 | ops/sec | Object allocation rate in V8 young generation |
 | **94 Inactive Tabs Hibernation** | 0.014 ± 0.001 | ms | State transition setting `isSuspended: true` for pool eviction |
-| **Fast Domain Lookup Latency** | 0.467 ± 0.012 | µs / req | Hash Set domain lookup decision time |
-| **Domain Lookup Throughput** | 2,139,644 | checks/sec | Security and tracker filter classification queries |
-| **Core JS Bundle Entry** | 406.58 | KB | Initial startup JS parsed by V8 before UI paint |
-| **WebLLM Engine Chunk** | Decoupled (0 KB) | - | 5.76 MB MLC neural engine loaded asynchronously on-demand |
+| **Fast Domain Lookup Latency** | 0.467 ± 0.012 | µs / req | Hash Set domain lookup decision time (10 domain baseline) |
+| **Domain Lookup Throughput** | 2,139,644 | checks/sec | In-memory Set classification queries per second |
+| **Core JS Bundle Entry** | ~444 | KB | Initial startup JS parsed by V8 before UI paint |
+| **WebLLM Engine Chunk** | Decoupled (0 KB) | - | ~6.0 MB MLC neural engine loaded asynchronously on-demand |
 
 ---
 

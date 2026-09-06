@@ -20,6 +20,7 @@ import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings } from '../
 import { getSupabaseClient, isSupabaseConfigured, hasElectronSecureStore, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
 import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';
 import { generateId } from '../utils/idGenerator';
+import { normalizeSyncCode, formatSyncCode } from '../utils/syncCodeUtils';
 
 export interface NovaUser {
   id: string;
@@ -1475,11 +1476,15 @@ class NovaSyncService {
 
   // --- SYNC CHAIN & PAIRING ---
 
+  public static normalizeSyncCode = normalizeSyncCode;
+  public static formatSyncCode = formatSyncCode;
+
   public async generateSyncChainCode(currentData?: Partial<SyncDataBundle>): Promise<string> {
-    const code = Array.from(crypto.getRandomValues(new Uint8Array(12)))
+    const rawHex = Array.from(crypto.getRandomValues(new Uint8Array(12)))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('')
       .toUpperCase();
+    const code = NovaSyncService.formatSyncCode(rawHex);
 
     if (this.currentUser) {
       this.currentUser.syncCode = code;
@@ -1492,13 +1497,17 @@ class NovaSyncService {
   }
 
   public async joinSyncChain(code: string): Promise<boolean> {
-    if (!code || code.trim().length === 0) {
-      throw new Error('Invalid sync chain code');
+    if (!code || typeof code !== 'string' || code.trim().length === 0) {
+      throw new Error('Invalid sync chain code: code is required');
     }
-    const cleanCode = code.trim().toUpperCase();
+    const cleanCode = NovaSyncService.normalizeSyncCode(code);
+    if (!/^[0-9A-F]{16,32}$/.test(cleanCode)) {
+      throw new Error('Invalid sync chain code: expected format nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx or 16-32 hexadecimal characters');
+    }
+    const formattedCode = NovaSyncService.formatSyncCode(cleanCode);
     if (this.currentUser) {
-      this.currentUser.syncCode = cleanCode;
-      void this.writeStoredUser(this.currentUser).catch(() => {
+      this.currentUser.syncCode = formattedCode;
+      await this.writeStoredUser(this.currentUser).catch(() => {
         // Best-effort only — joining must not fail on persistence.
       });
     }

@@ -15,6 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
+  [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=for-the-badge&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases)
   [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
@@ -127,8 +128,8 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 ## Key Features
 
 ### 1-Click Nova Cloud Sync (Zero-Knowledge E2EE)
-- **1-Click Device Pairing**: Pair laptops and desktops instantly using a human-friendly pairing code (`nova-xxxx-xxxx-xxxx-xxxx`). No email, passwords, or account registration needed.
-- **End-to-End Encryption (AES-256-GCM)**: All saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted on your device with PBKDF2 (100,000 iterations) and 256-bit AES-GCM before being sent to the cloud.
+- **1-Click Device Pairing**: Pair laptops and desktops instantly using a human-friendly pairing code (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`). No email, passwords, or account registration needed.
+- **End-to-End Encryption (AES-256-GCM)**: All saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted on your device with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before being sent to the cloud.
 - **Realtime WebSocket Sync**: Remote changes propagate seamlessly across your devices in real-time.
 
 ### AI Agent & Virtual Cursor (MCP Protocol)
@@ -177,6 +178,8 @@ Nova Browser features a local-first neural execution architecture powered by Web
  | Shortcut (macOS) | Shortcut (Windows/Linux) | Action |
  | :--- | :--- | :--- |
  | `Cmd + T` | `Ctrl + T` | Open New Tab |
+ | `Cmd + N` | `Ctrl + N` | Open New Window |
+ | `Cmd + Shift + N` | `Ctrl + Shift + N` | Open Incognito Window |
  | `Cmd + W` | `Ctrl + W` | Close Active Tab |
  | `Cmd + Shift + T` | `Ctrl + Shift + T` | Reopen Last Closed Tab |
  | `Cmd + L` | `Ctrl + L` | Focus Address Bar / Omnibox |
@@ -188,10 +191,12 @@ Nova Browser features a local-first neural execution architecture powered by Web
  | `Cmd + R` / `F5` | `Ctrl + R` / `F5` | Reload Current Page |
  | `Cmd + [` / `Cmd + ]` | `Alt + Left` / `Alt + Right` | Back / Forward History Navigation |
  | `Cmd + F` | `Ctrl + F` | Find in Page |
+ | `Cmd + P` | `Ctrl + P` | Print Page / Save as PDF |
+ | `Cmd + +` / `Cmd + -` / `Cmd + 0` | `Ctrl + +` / `Ctrl + -` / `Ctrl + 0` | Zoom In / Zoom Out / Reset (100%) |
  | `Cmd + D` | `Ctrl + D` | Bookmark Current Page |
  | `Cmd + Shift + S` | `Ctrl + Shift + S` | Capture Full-Page Screenshot |
  | `Cmd + Y` | `Ctrl + H` | Open History (`nova://history`) |
- | `Cmd + J` | `Ctrl + J` | Open Downloads (`nova://downloads`) |
+ | `Shift + Cmd + J` | `Ctrl + J` | Open Downloads (`nova://downloads`) |
  | `Cmd + ,` | `Ctrl + ,` | Open Settings (`nova://settings`) |
  | `F12` / `Cmd + Opt + I` | `F12` / `Ctrl + Shift + I` | Open Developer Tools |
  | `F1` / `Cmd + /` | `F1` / `Ctrl + /` | Open Help & Shortcuts Guide |
@@ -370,8 +375,8 @@ graph TD
    - **Memory Vault (`aiMemory.ts`)**: Persistent preference extraction, category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`), and automatic chronological task history tracking with storage quota recovery.
 
 3. **Client-Side E2EE Sync Engine (`src/services/syncService.ts`)**:
-   - **Zero-Knowledge Cryptography**: All passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (100,000 iterations) and 256-bit AES-GCM before transmission.
-   - **1-Click Device Pairing**: Human-readable pairing codes (`nova-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without accounts or central servers.
+   - **Zero-Knowledge Cryptography**: All passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
+   - **1-Click Device Pairing**: Human-readable pairing codes (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without accounts or central servers.
 
 4. **Performance & Tab Virtualization (`src/utils/tabManager.ts`, `src/components/BrowserView.tsx`)**:
    - **Tab Hibernation Engine**: Dormant background tabs (>10 min idle) automatically unmount their active webview rendering pipelines while preserving navigation state, keeping 50+ tabs under 600 MB RAM.
@@ -423,7 +428,7 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 
 - **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
-- **Zero Telemetry**: We do not collect, store, or monetize your browsing history.
+- **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Transparent disclosure: direct connections occur only when explicitly using specific features, such as opt-in Supabase sync, downloading local model weights from HuggingFace, fetching wallpapers from Unsplash/Bing, or page translation via Google Translate).
 
 ---
 

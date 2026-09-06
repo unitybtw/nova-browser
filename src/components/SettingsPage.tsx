@@ -860,7 +860,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.2';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.3';
   });
   const [systemVersions, setSystemVersions] = useState<{
     app: string;
@@ -1619,7 +1619,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="space-y-3 pt-2">
                         <input
                           type="text"
-                          placeholder="nova-xxxx-xxxx-xxxx-xxxx"
+                          placeholder="nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx"
                           id="quick-pair-input"
                           className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 outline-none focus:border-cyan-500 font-mono"
                         />
@@ -2433,6 +2433,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Keyboard Shortcuts</h2>
                   <button 
                     onClick={() => {
+                      try {
+                        localStorage.removeItem('shortcuts_customized');
+                        localStorage.setItem('shortcuts_v2_migrated', 'true');
+                      } catch (_) {}
                       onUpdateSettings({ 
                         shortcuts: {
                           newTab: { key: 't', shift: false, meta: true },
@@ -2443,7 +2447,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           omnibox: { key: 'k', shift: false, meta: true },
                           bookmark: { key: 'd', shift: false, meta: true },
                           history: { key: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
-                          downloads: { key: 'j', shift: false, meta: true },
+                          downloads: { key: 'j', shift: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')), meta: true },
                           findInPage: { key: 'f', shift: false, meta: true },
                         }
                       });
@@ -2487,6 +2491,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           shift: input.toLowerCase() !== input,
                           meta: true
                         };
+                        try {
+                          localStorage.setItem('shortcuts_customized', 'true');
+                          localStorage.setItem('shortcuts_v2_migrated', 'true');
+                        } catch (_) {}
                         onUpdateSettings({
                           shortcuts: {
                             ...settings.shortcuts,

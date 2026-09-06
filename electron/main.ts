@@ -9,6 +9,8 @@ import { promisify } from 'util';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain } from '../src/utils/securityUtils.js';
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
+export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 
 console.log('Main process starting...');
 
@@ -73,6 +75,8 @@ if (!gotSingleInstanceLock) {
 }
 import child_process from 'child_process';
 import crypto from 'crypto';
+import os from 'os';
+import { isIP } from 'net';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
@@ -89,14 +93,19 @@ export function isLocalOrIntranetHost(hostname: string): boolean {
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
     return true;
   }
-  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1') {
+  if (host === '127.0.0.1' || host.startsWith('127.') || host === '0.0.0.0' || host === '::1' || host === '[::1]') {
     return true;
   }
-  if (isPrivateIP(host)) {
-    return true;
+  // K-1: isPrivateIP fails closed for unknown values (isIP === 0). If host is a domain
+  // (e.g. google.com), isIP is 0, so calling isPrivateIP returned true, breaking HTTPS upgrade!
+  const bareV6 = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (isIP(bareV6) !== 0) {
+    return isPrivateIP(bareV6);
   }
   return false;
 }
+
+
 
 // Standard clean Chromium User-Agent matching host OS and exact runtime version
 export function getStandardUserAgent(): string {
@@ -964,6 +973,33 @@ app.whenReady().then(async () => {
   setupApplicationMenu();
   initAdBlocker();
 
+  // Y-1: Restore persistent VPN proxy on startup if previously configured
+  try {
+    const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
+    if (fs.existsSync(vpnConfigPath)) {
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+      }
+      const raw = fs.readFileSync(vpnConfigPath);
+      let savedVpn: any = null;
+      try {
+        const decrypted = decryptDataWithFallback(raw, app.getPath('userData'), safeStorage);
+        if (decrypted) {
+          savedVpn = JSON.parse(decrypted);
+        }
+      } catch (_) {}
+
+      if (savedVpn?.enabled && isValidSecureProxy(savedVpn?.proxyRules)) {
+        const rules = normalizeProxyForChromium(savedVpn.proxyRules);
+        session.defaultSession.setProxy({ proxyRules: rules }).catch(() => {});
+        session.fromPartition('incognito').setProxy({ proxyRules: rules }).catch(() => {});
+      } else {
+        // Cleartext, pac-script, malformed, or tampered proxy: purge corrupt/plaintext file
+        try { fs.unlinkSync(vpnConfigPath); } catch (_) {}
+      }
+    }
+  } catch (_) {}
+
   // --- CHROME-STYLE PERMISSION SYSTEM (SECURITY) ---
   interface PendingPermission {
     requestId: string;
@@ -1105,7 +1141,7 @@ app.whenReady().then(async () => {
           pendingPermissions.delete(requestId);
           try { req.callback(false); } catch {}
         }
-      }, 60000); // 60 seconds timeout
+      }, 30000); // 30 seconds timeout
 
       const mediaTypes = (details as any)?.mediaTypes;
 
@@ -1278,51 +1314,93 @@ app.whenReady().then(async () => {
           }
         } catch (_) {}
 
-        const tempDir = path.join(app.getPath('temp'), `nova_update_${Date.now()}`);
-        fs.mkdirSync(tempDir, { recursive: true });
+        const backupToken = crypto.randomBytes(16).toString('hex');
+        const tempDir = path.join(app.getPath('temp'), `nova_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
+        fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+        if (process.platform !== 'win32') {
+          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+        }
         const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
 
         let scriptBody = '';
         if (isDmg) {
           const mountPoint = path.join(tempDir, 'mount');
-          fs.mkdirSync(mountPoint, { recursive: true });
+          fs.mkdirSync(mountPoint, { recursive: true, mode: 0o700 });
           scriptBody = `#!/bin/bash
 FILE_PATH="$1"
 DEST_APP="$2"
 TARGET_PID="$3"
 TEMP_DIR="$4"
+BACKUP_TOKEN="$5"
 MOUNT_POINT="\${TEMP_DIR}/mount"
+STAGING_APP="\${DEST_APP}.staging_\${BACKUP_TOKEN}"
+BACKUP_APP="\${DEST_APP}.backup_\${BACKUP_TOKEN}"
+
+cleanup_mount() {
+  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
+  rm -rf "\${TEMP_DIR}"
+}
 
 hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -noautoopen
 SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
 if [ -z "$SOURCE_APP" ]; then
-  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
-  rm -rf "\${TEMP_DIR}"
+  cleanup_mount
   open "\${FILE_PATH}"
   exit 1
 fi
+
+# Bundle integrity & signature verification
+if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+if command -v codesign >/dev/null 2>&1; then
+  if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
+    cleanup_mount
+    exit 1
+  fi
+fi
+
 while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-if rm -rf "\${DEST_APP}" 2>/dev/null && cp -R "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null; then
-  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
-  rm -rf "\${TEMP_DIR}"
-  open -a "\${DEST_APP}"
+
+rm -rf "\${STAGING_APP}" 2>/dev/null
+if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Contents/Info.plist" ]; then
+  if [ -d "\${DEST_APP}" ]; then
+    mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+  fi
+  if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
+    rm -rf "\${BACKUP_APP}" 2>/dev/null
+    cleanup_mount
+    open -a "\${DEST_APP}"
+  else
+    rm -rf "\${STAGING_APP}" 2>/dev/null
+    if [ -d "\${BACKUP_APP}" ]; then
+      mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+    fi
+    cleanup_mount
+    open "\${FILE_PATH}"
+  fi
 else
-  hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
-  rm -rf "\${TEMP_DIR}"
+  rm -rf "\${STAGING_APP}" 2>/dev/null
+  cleanup_mount
   open "\${FILE_PATH}"
 fi
 `;
         } else {
           const extractDir = path.join(tempDir, 'extracted');
-          fs.mkdirSync(extractDir, { recursive: true });
+          fs.mkdirSync(extractDir, { recursive: true, mode: 0o700 });
           scriptBody = `#!/bin/bash
 FILE_PATH="$1"
 DEST_APP="$2"
 TARGET_PID="$3"
 TEMP_DIR="$4"
+BACKUP_TOKEN="$5"
 EXTRACT_DIR="\${TEMP_DIR}/extracted"
+STAGING_APP="\${DEST_APP}.staging_\${BACKUP_TOKEN}"
+BACKUP_APP="\${DEST_APP}.backup_\${BACKUP_TOKEN}"
 
 ditto -xk "\${FILE_PATH}" "\${EXTRACT_DIR}"
 SOURCE_APP=$(find "\${EXTRACT_DIR}" -maxdepth 2 -name "*.app" | head -n 1)
@@ -1330,22 +1408,51 @@ if [ -z "$SOURCE_APP" ]; then
   rm -rf "\${TEMP_DIR}"
   exit 1
 fi
+
+# Bundle integrity & signature verification
+if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
+  rm -rf "\${TEMP_DIR}"
+  exit 1
+fi
+if command -v codesign >/dev/null 2>&1; then
+  if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
+    rm -rf "\${TEMP_DIR}"
+    exit 1
+  fi
+fi
+
 while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-if rm -rf "\${DEST_APP}" 2>/dev/null && cp -R "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null; then
-  rm -rf "\${TEMP_DIR}"
-  open -a "\${DEST_APP}"
+
+rm -rf "\${STAGING_APP}" 2>/dev/null
+if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Contents/Info.plist" ]; then
+  if [ -d "\${DEST_APP}" ]; then
+    mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+  fi
+  if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
+    rm -rf "\${BACKUP_APP}" 2>/dev/null
+    rm -rf "\${TEMP_DIR}"
+    open -a "\${DEST_APP}"
+  else
+    rm -rf "\${STAGING_APP}" 2>/dev/null
+    if [ -d "\${BACKUP_APP}" ]; then
+      mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+    fi
+    rm -rf "\${TEMP_DIR}"
+    open "\${DEST_APP}" 2>/dev/null || open -a "Nova Browser"
+  fi
 else
+  rm -rf "\${STAGING_APP}" 2>/dev/null
   rm -rf "\${TEMP_DIR}"
-  open "\${DEST_APP}" 2>/dev/null || open -a "Nova Browser"
+  exit 1
 fi
 `;
         }
 
         try {
           fs.writeFileSync(scriptPath, scriptBody, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, destinationApp, String(currentPid), tempDir], {
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, destinationApp, String(currentPid), tempDir, backupToken], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1372,13 +1479,23 @@ fi
         const tempDir = app.getPath('temp');
         const batPath = path.join(tempDir, `nova_update_${Date.now()}.bat`);
         const batContent = `@echo off
-timeout /t 1 /nobreak >nul
-start "" "%~1" /S
+set FILE_PATH=%~1
+set TARGET_PID=%~2
+
+:wait_loop
+if not "%TARGET_PID%"=="" (
+  tasklist /FI "PID eq %TARGET_PID%" 2>nul | findstr /i "%TARGET_PID%" >nul
+  if not errorlevel 1 (
+    timeout /t 1 /nobreak >nul
+    goto wait_loop
+  )
+)
+start "" "%FILE_PATH%" /S
 exit
 `;
         try {
           fs.writeFileSync(batPath, batContent);
-          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath], {
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath, String(currentPid)], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1404,8 +1521,10 @@ exit
       if (resolvedFilePath.toLowerCase().endsWith('.appimage')) {
         try {
           fs.chmodSync(resolvedFilePath, 0o755);
-          const tempDir = app.getPath('temp');
-          const scriptPath = path.join(tempDir, `nova_update_${Date.now()}.sh`);
+          const tempDir = path.join(app.getPath('temp'), `nova_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
+          fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
+          try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
+          const scriptPath = path.join(tempDir, 'update_and_relaunch.sh');
           const scriptContent = `#!/bin/bash
 FILE_PATH="$1"
 TARGET_PID="$2"
@@ -3019,10 +3138,14 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
           secret = crypto.randomBytes(32);
           try {
             fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-            try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+            if (process.platform !== 'win32') {
+              fs.chmodSync(secretPath, 0o600);
+            }
           } catch (_) {}
         }
-        return crypto.scryptSync(secret, 'nova-secure-store-salt', 32);
+        // K-3: Bind salt to machine identity so copying userData to another machine/account fails
+        const machineSalt = getMachineSalt('nova-secure-salt');
+        return crypto.scryptSync(secret, machineSalt, 32);
       };
       const keyBuf = getFallbackKey();
       const iv = crypto.randomBytes(12);
@@ -3031,7 +3154,9 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
       const tag = cipher.getAuthTag();
       const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
       fs.writeFileSync(keyPath, payload, { mode: 0o600 });
-      try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
+      }
     }
     return true;
   } catch (err) {
@@ -3058,7 +3183,8 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
           const secretPath = path.join(app.getPath('userData'), '.machine_secret');
           if (fs.existsSync(secretPath)) {
             const secret = fs.readFileSync(secretPath);
-            const keyBuf = crypto.scryptSync(secret, 'nova-secure-store-salt', 32);
+            const machineSalt = getMachineSalt('nova-secure-salt');
+            const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
             const iv = raw.subarray(4, 16);
             const tag = raw.subarray(16, 32);
             const enc = raw.subarray(32);
@@ -3068,10 +3194,7 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
           }
         } catch (_) {}
       }
-      const str = raw.toString('utf-8');
-      if (str.startsWith('[UNENCRYPTED]')) {
-        return str.slice('[UNENCRYPTED]'.length);
-      }
+      // K-4: Fail closed: do NOT read unauthenticated plaintext
       return null;
     }
   } catch (err) {
@@ -3154,33 +3277,36 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   }
   const isEnabled = Boolean(config.enabled);
   const rawProxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : '';
-  const proxyRules = (isEnabled && rawProxyUrl) ? rawProxyUrl : 'direct://';
   
   if (isEnabled && rawProxyUrl) {
-    // Security: Only secure proxy protocols are accepted (https://, socks5://).
-    // Plain http:// and socks4:// are rejected (credentials would travel
-    // in cleartext / weak handshake). Mirrors src/utils/proxyValidation.ts.
-    const normalizedProxyUrl = rawProxyUrl.trim().toLowerCase();
-    const allowedProxyProtocols = ['https://', 'socks5://'];
-    let validProxy = allowedProxyProtocols.some(proto => normalizedProxyUrl.startsWith(proto));
-    if (validProxy) {
-      try {
-        const parsedProxy = new URL(normalizedProxyUrl);
-        validProxy = (parsedProxy.protocol === 'https:' || parsedProxy.protocol === 'socks5:') && !!parsedProxy.hostname;
-      } catch {
-        validProxy = false;
-      }
-    }
-    if (!validProxy) {
+    if (!isValidSecureProxy(rawProxyUrl)) {
       console.error('Secure proxy required: https:// or socks5://');
       return { error: 'Secure proxy required: https:// or socks5://' };
     }
   }
 
+  // Security: Chromium setProxy does not recognize socks5h:// (falls back to direct://).
+  // In Chromium, socks5:// already performs remote DNS resolution. Normalize to socks5://.
+  const chromiumRules = (isEnabled && rawProxyUrl) ? normalizeProxyForChromium(rawProxyUrl) : 'direct://';
+
   await Promise.all([
-    session.defaultSession.setProxy({ proxyRules }),
-    session.fromPartition('incognito').setProxy({ proxyRules }),
+    session.defaultSession.setProxy({ proxyRules: chromiumRules }),
+    session.fromPartition('incognito').setProxy({ proxyRules: chromiumRules }),
   ]);
+  try {
+    const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
+    if (isEnabled && rawProxyUrl) {
+      // Store encrypted with safeStorage / AES-256-GCM machine secret (avoids plaintext & protects on Windows)
+      const payload = JSON.stringify({ enabled: true, proxyRules: rawProxyUrl });
+      const encrypted = encryptDataWithFallback(payload, app.getPath('userData'), safeStorage);
+      fs.writeFileSync(vpnConfigPath, encrypted, { mode: 0o600 });
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(vpnConfigPath, 0o600); } catch (_) {}
+      }
+    } else if (fs.existsSync(vpnConfigPath)) {
+      fs.unlinkSync(vpnConfigPath);
+    }
+  } catch (_) {}
   return true;
 });
 

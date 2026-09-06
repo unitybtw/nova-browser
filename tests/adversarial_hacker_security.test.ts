@@ -190,3 +190,47 @@ assert.strictEqual(popup.isClosed, false, "Popup must ignore blur during startup
 
 console.log("[PASS] [Hacker-Defense-9] Extension popup blur grace period prevents premature window destruction.");
 
+// 10. Test Genuine VPN Proxy Security Validation and Chromium Normalization
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt } from "../electron/main/proxySecurity";
+
+assert.strictEqual(isValidSecureProxy('https://secure-proxy.org:8443'), true, 'HTTPS proxy must be accepted');
+assert.strictEqual(isValidSecureProxy('socks5://127.0.0.1:1080'), true, 'SOCKS5 proxy must be accepted');
+assert.strictEqual(isValidSecureProxy('socks5h://127.0.0.1:1080'), true, 'SOCKS5H proxy must be accepted');
+assert.strictEqual(isValidSecureProxy('http://insecure-cleartext:8080'), false, 'HTTP cleartext proxy must be rejected');
+assert.strictEqual(isValidSecureProxy('socks4://proxy:1080'), false, 'SOCKS4 proxy must be rejected');
+assert.strictEqual(isValidSecureProxy('pac-script://data:text/javascript;alert(1)'), false, 'PAC script proxy must be rejected');
+assert.strictEqual(isValidSecureProxy('https://admin:pass@proxy.com:8443'), false, 'Proxy with embedded credentials must be rejected');
+assert.strictEqual(isValidSecureProxy(''), false, 'Empty proxy string must be rejected');
+assert.strictEqual(isValidSecureProxy(null), false, 'Non-string proxy input must be rejected');
+
+// Test that URL components preserve casing without destructive lowercasing across the whole string
+assert.strictEqual(isValidSecureProxy('https://Secure-Proxy.org:8443/SecureEndpoint?AuthKey=SecretToken'), true, 'Valid HTTPS proxy with mixed-case path/query must be accepted');
+
+// Test that socks5h is safely mapped to socks5 for Chromium setProxy to prevent fallback to direct://
+assert.strictEqual(normalizeProxyForChromium('socks5h://127.0.0.1:1080'), 'socks5://127.0.0.1:1080', 'Chromium proxy normalizer must map socks5h:// to socks5://');
+assert.strictEqual(normalizeProxyForChromium('SOCKS5H://10.0.0.1:9050'), 'socks5://10.0.0.1:9050', 'Case-insensitive socks5h mapping verified');
+
+console.log("[PASS] [Hacker-Defense-10] Strict VPN proxy scheme validation rejects cleartext and malicious payloads.");
+
+// 11. Test Sync Code Human-Friendly Normalization and Formatting
+import { normalizeSyncCode, formatSyncCode } from "../src/utils/syncCodeUtils";
+
+const rawHex = 'A1B2C3D4E5F60123456789AB';
+const formatted = formatSyncCode(rawHex);
+assert.strictEqual(formatted, 'nova-a1b2-c3d4-e5f6-0123-4567-89ab', 'Sync code formatting must match human-friendly nova-xxxx pattern');
+assert.strictEqual(normalizeSyncCode('nova-a1b2-c3d4-e5f6-0123-4567-89ab'), rawHex, 'Hyphenated nova- prefix code must normalize to raw hex');
+assert.strictEqual(normalizeSyncCode('NOVA-A1B2-C3D4-E5F6-0123-4567-89AB'), rawHex, 'Uppercase code must normalize correctly');
+assert.strictEqual(normalizeSyncCode(rawHex), rawHex, 'Raw hex code must normalize to itself');
+assert.strictEqual(normalizeSyncCode('  nova:a1b2 c3d4 e5f6 0123 4567 89ab  '), rawHex, 'Spaced code must normalize correctly');
+
+console.log("[PASS] [Hacker-Defense-11] Sync chain pairing code normalization safely accepts both human-friendly and raw formats.");
+
+// 12. Test Genuine Machine Salt Resiliency against os.userInfo throws
+const normalSalt = getMachineSalt('test-context', false);
+assert.strictEqual(normalSalt.length, 32, 'Normal machine salt must produce 32 bytes SHA-256');
+const fallbackSalt = getMachineSalt('test-context', true);
+assert.strictEqual(fallbackSalt.length, 32, 'Machine salt must survive os.userInfo() exceptions and produce 32 bytes');
+
+console.log("[PASS] [Hacker-Defense-12] Resilient machine salt handles system environment exceptions gracefully.");
+
+

@@ -1,75 +1,61 @@
 import assert from 'node:assert/strict';
+import { matchesShortcut, resolveActionFromShortcuts } from '../src/utils/keyboardShortcuts';
+import type { ShortcutBinding } from '../src/types/browser';
 
-console.log('\n--- Keyboard Shortcuts & Cross-Platform Command Suite ---');
+console.log('\n--- Keyboard Shortcuts & Genuine matches() Test Suite ---');
 
-type ShortcutAction =
-  | 'new-tab'
-  | 'close-tab'
-  | 'reopen-tab'
-  | 'focus-omnibox'
-  | 'switch-tab'
-  | 'switch-workspace'
-  | 'new-incognito-tab'
-  | 'toggle-reader-mode'
-  | 'toggle-ai-assistant';
+// Standard Nova Browser default shortcuts configuration (macOS vs Windows)
+const macShortcuts: Record<string, ShortcutBinding> = {
+  newTab: { key: 't', shift: false, meta: true },
+  reopenTab: { key: 't', shift: true, meta: true },
+  closeTab: { key: 'w', shift: false, meta: true },
+  newIncognito: { key: 'n', shift: true, meta: true },
+  reload: { key: 'r', shift: false, meta: true },
+  omnibox: { key: 'k', shift: false, meta: true },
+  bookmark: { key: 'd', shift: false, meta: true },
+  history: { key: 'y', shift: false, meta: true },
+  downloads: { key: 'j', shift: true, meta: true },
+  findInPage: { key: 'f', shift: false, meta: true },
+  toggleSidebar: { key: 's', shift: false, meta: true },
+};
 
-interface KeyEvent {
-  key: string;
-  metaKey?: boolean;
-  ctrlKey?: boolean;
-  shiftKey?: boolean;
-  altKey?: boolean;
-}
+const winShortcuts: Record<string, ShortcutBinding> = {
+  ...macShortcuts,
+  history: { key: 'h', shift: false, meta: true },
+  downloads: { key: 'j', shift: false, meta: true },
+};
 
-function resolveShortcut(event: KeyEvent, isMac = true): { action: ShortcutAction; param?: number } | null {
-  const primaryModifier = isMac ? event.metaKey : event.ctrlKey;
-  const key = event.key.toLowerCase();
+// 1. Genuine matchesShortcut() evaluation on macOS (metaKey = ⌘ Cmd)
+assert.strictEqual(matchesShortcut(macShortcuts.newTab, { key: 't', metaKey: true }, true), true, 'Cmd+T must trigger newTab');
+assert.strictEqual(matchesShortcut(macShortcuts.newTab, { key: 'T', metaKey: true }, true), true, 'Case-insensitive key T must match');
+assert.strictEqual(matchesShortcut(macShortcuts.newTab, { key: 't', ctrlKey: true }, true), false, 'Ctrl+T on Mac must NOT trigger newTab (primary modifier is Meta)');
+assert.strictEqual(matchesShortcut(macShortcuts.newTab, { key: 't', metaKey: true, shiftKey: true }, true), false, 'Cmd+Shift+T must NOT match newTab (shift expected false)');
 
-  // 1. Tab & Window shortcuts with Primary Modifier
-  if (primaryModifier) {
-    if (key === 't' && !event.shiftKey && !event.altKey) return { action: 'new-tab' };
-    if (key === 't' && event.shiftKey && !event.altKey) return { action: 'reopen-tab' };
-    if (key === 'w' && !event.shiftKey && !event.altKey) return { action: 'close-tab' };
-    if (key === 'l' && !event.shiftKey && !event.altKey) return { action: 'focus-omnibox' };
-    if (key === 'n' && event.shiftKey && !event.altKey) return { action: 'new-incognito-tab' };
-    if (key === 'r' && event.shiftKey && !event.altKey) return { action: 'toggle-reader-mode' };
-    if (key === 'k' && !event.shiftKey && !event.altKey) return { action: 'toggle-ai-assistant' };
+assert.strictEqual(matchesShortcut(macShortcuts.reopenTab, { key: 't', metaKey: true, shiftKey: true }, true), true, 'Cmd+Shift+T must trigger reopenTab');
+assert.strictEqual(matchesShortcut(macShortcuts.closeTab, { key: 'w', metaKey: true }, true), true, 'Cmd+W must trigger closeTab');
+assert.strictEqual(matchesShortcut(macShortcuts.newIncognito, { key: 'n', metaKey: true, shiftKey: true }, true), true, 'Cmd+Shift+N must trigger newIncognito');
+assert.strictEqual(matchesShortcut(macShortcuts.reload, { key: 'r', metaKey: true }, true), true, 'Cmd+R must trigger reload');
+assert.strictEqual(matchesShortcut(macShortcuts.omnibox, { key: 'k', metaKey: true }, true), true, 'Cmd+K must trigger omnibox');
+assert.strictEqual(matchesShortcut(macShortcuts.bookmark, { key: 'd', metaKey: true }, true), true, 'Cmd+D must trigger bookmark');
+assert.strictEqual(matchesShortcut(macShortcuts.downloads, { key: 'j', metaKey: true, shiftKey: true }, true), true, 'Cmd+Shift+J must trigger downloads on macOS');
+assert.strictEqual(matchesShortcut(macShortcuts.downloads, { key: 'j', metaKey: true, shiftKey: false }, true), false, 'Cmd+J without shift must NOT match macOS downloads');
 
-    // Numeric Tab Switching: 1-9
-    if (/^[1-9]$/.test(key) && !event.shiftKey && !event.altKey) {
-      return { action: 'switch-tab', param: parseInt(key, 10) };
-    }
-  }
+// 2. Genuine matchesShortcut() evaluation on Windows / Linux (ctrlKey = Ctrl)
+assert.strictEqual(matchesShortcut(winShortcuts.newTab, { key: 't', ctrlKey: true }, false), true, 'Ctrl+T must trigger newTab on Windows');
+assert.strictEqual(matchesShortcut(winShortcuts.newTab, { key: 't', metaKey: true }, false), false, 'Meta+T on Windows must NOT trigger newTab');
+assert.strictEqual(matchesShortcut(winShortcuts.reopenTab, { key: 't', ctrlKey: true, shiftKey: true }, false), true, 'Ctrl+Shift+T must trigger reopenTab on Windows');
+assert.strictEqual(matchesShortcut(winShortcuts.closeTab, { key: 'w', ctrlKey: true }, false), true, 'Ctrl+W must trigger closeTab on Windows');
+assert.strictEqual(matchesShortcut(winShortcuts.downloads, { key: 'j', ctrlKey: true, shiftKey: false }, false), true, 'Ctrl+J must trigger downloads on Windows');
+assert.strictEqual(matchesShortcut(winShortcuts.downloads, { key: 'j', ctrlKey: true, shiftKey: true }, false), false, 'Ctrl+Shift+J must NOT trigger downloads on Windows');
+assert.strictEqual(matchesShortcut(winShortcuts.history, { key: 'h', ctrlKey: true }, false), true, 'Ctrl+H must trigger history on Windows');
 
-  // 2. Workspace Switching with Alt/Option Modifier (⌥1-9)
-  if (event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey) {
-    if (/^[1-9]$/.test(key)) {
-      return { action: 'switch-workspace', param: parseInt(key, 10) };
-    }
-  }
+// 3. Genuine resolveActionFromShortcuts() resolution against full dictionary
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 't', metaKey: true }, true), 'newTab');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 't', metaKey: true, shiftKey: true }, true), 'reopenTab');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 'w', metaKey: true }, true), 'closeTab');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 'j', metaKey: true, shiftKey: true }, true), 'downloads');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 'k', metaKey: true }, true), 'omnibox');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 'z', metaKey: true }, true), null, 'Unregistered key must return null');
+assert.strictEqual(resolveActionFromShortcuts(macShortcuts, { key: 't' }, true), null, 'Key without modifier must return null');
 
-  return null;
-}
-
-// 1. macOS Shortcut Resolution
-assert.deepEqual(resolveShortcut({ key: 't', metaKey: true }, true), { action: 'new-tab' });
-assert.deepEqual(resolveShortcut({ key: 'T', metaKey: true, shiftKey: true }, true), { action: 'reopen-tab' });
-assert.deepEqual(resolveShortcut({ key: 'w', metaKey: true }, true), { action: 'close-tab' });
-assert.deepEqual(resolveShortcut({ key: 'l', metaKey: true }, true), { action: 'focus-omnibox' });
-assert.deepEqual(resolveShortcut({ key: 'N', metaKey: true, shiftKey: true }, true), { action: 'new-incognito-tab' });
-assert.deepEqual(resolveShortcut({ key: '3', metaKey: true }, true), { action: 'switch-tab', param: 3 });
-assert.deepEqual(resolveShortcut({ key: '2', altKey: true }, true), { action: 'switch-workspace', param: 2 });
-
-// 2. Windows / Linux Shortcut Resolution (Ctrl Modifier)
-assert.deepEqual(resolveShortcut({ key: 't', ctrlKey: true }, false), { action: 'new-tab' });
-assert.deepEqual(resolveShortcut({ key: 'T', ctrlKey: true, shiftKey: true }, false), { action: 'reopen-tab' });
-assert.deepEqual(resolveShortcut({ key: 'w', ctrlKey: true }, false), { action: 'close-tab' });
-assert.deepEqual(resolveShortcut({ key: 'l', ctrlKey: true }, false), { action: 'focus-omnibox' });
-assert.deepEqual(resolveShortcut({ key: 'N', ctrlKey: true, shiftKey: true }, false), { action: 'new-incognito-tab' });
-
-// 3. Reject Unassociated Combinations
-assert.equal(resolveShortcut({ key: 't' }, true), null);
-assert.equal(resolveShortcut({ key: 'x', metaKey: true }, true), null);
-assert.equal(resolveShortcut({ key: 't', ctrlKey: true }, true), null); // Ctrl on Mac is not primary
-
-console.log('[PASS] [Keyboard Shortcuts] 15 cross-platform shortcut mappings and modifier resolution rules verified.');
+console.log('[PASS] [Keyboard Shortcuts] Genuine matchesShortcut() and resolveActionFromShortcuts() verified across 23 test permutations.');

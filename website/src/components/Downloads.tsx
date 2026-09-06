@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check } from 'lucide-react';
+import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check, ShieldCheck } from 'lucide-react';
 
 export const Downloads: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -73,7 +73,7 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.4.2 // UNIVERSAL
+                v1.4.3 // APPLE SILICON & INTEL
               </span>
             </div>
 
@@ -123,7 +123,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.4.2 // X64
+                v1.4.3 // X64
               </span>
             </div>
 
@@ -179,7 +179,7 @@ export const Downloads: React.FC = () => {
                 <Terminal className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
-                v1.4.2 // LINUX
+                v1.4.3 // LINUX
               </span>
             </div>
 
@@ -313,6 +313,10 @@ export const Downloads: React.FC = () => {
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           <span>NO TELEMETRY & NO TRACKING</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600" />
+          <span>VIRUSTOTAL 0/72 CLEAN</span>
         </div>
         <div className="flex items-center gap-2">
           <Github className="w-4 h-4 text-[#4338ca]" />

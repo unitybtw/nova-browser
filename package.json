@@ -3,7 +3,7 @@
   "description": "An open source browser built with React and Electron",
   "author": "unitybtw <contact@nova-browser.org>",
   "private": true,
-  "version": "1.4.2",
+  "version": "1.4.3",
   "type": "module",
   "main": "dist-electron/main.cjs",
   "engines": {
@@ -142,6 +142,7 @@
     "video:render:shorts": "remotion render video/src/index.ts NovaShorts video/out/nova-shorts.mp4",
     "video:render:browser": "remotion render video/src/index.ts NovaBrowserAd video/out/nova-browser-ad.mp4",
     "video:render:browser:shorts": "remotion render video/src/index.ts NovaBrowserAdShorts video/out/nova-browser-ad-shorts.mp4",
+    "scan:vt": "node scripts/scan_virustotal.mjs",
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
   "dependencies": {
