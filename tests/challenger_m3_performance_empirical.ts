@@ -158,6 +158,7 @@ async function runMilestone3ChallengerSuite() {
     abortedFetchCount = 0;
     completedFetchCount = 0;
     suggestions: string[] = [];
+    isFetchInFlight = false;
 
     handleKeystroke(searchValue: string, isAIMode: boolean = false) {
       // Clear suggestions immediately for AI mode or URLs
@@ -183,6 +184,7 @@ async function runMilestone3ChallengerSuite() {
 
       this.activeTimer = setTimeout(async () => {
         this.fetchCount++;
+        this.isFetchInFlight = true;
         try {
           const res = await this.mockNetworkFetch(searchValue, controller.signal);
           if (!controller.signal.aborted) {
@@ -193,8 +195,10 @@ async function runMilestone3ChallengerSuite() {
           if (err.name === 'AbortError') {
             this.abortedFetchCount++;
           }
+        } finally {
+          this.isFetchInFlight = false;
         }
-      }, 150);
+      }, 50);
     }
 
     mockNetworkFetch(query: string, signal: TrackedAbortSignal): Promise<string[]> {
@@ -207,7 +211,7 @@ async function runMilestone3ChallengerSuite() {
           } else {
             resolve([`${query} 1`, `${query} 2`, `${query} 3`]);
           }
-        }, 50);
+        }, 30);
 
         signal.onabort = () => {
           clearTimeout(timeout);
@@ -223,15 +227,28 @@ async function runMilestone3ChallengerSuite() {
       if (this.activeController) this.activeController.abort('Unmounted');
     }
 
-    async waitForCompletion(expectedCompleted: number, timeoutMs = 1000): Promise<void> {
+    async waitForCompletion(expectedCompleted: number, timeoutMs = 10000): Promise<void> {
       const start = Date.now();
-      while (this.completedFetchCount < expectedCompleted && Date.now() - start < timeoutMs) {
+      while (this.completedFetchCount < expectedCompleted) {
+        if (Date.now() - start > timeoutMs) {
+          break;
+        }
+        await new Promise(r => setTimeout(r, 10));
+      }
+    }
+
+    async waitForInFlight(timeoutMs = 10000): Promise<void> {
+      const start = Date.now();
+      while (!this.isFetchInFlight) {
+        if (Date.now() - start > timeoutMs) {
+          break;
+        }
         await new Promise(r => setTimeout(r, 10));
       }
     }
   }
 
-  // Scenario 2.1: Rapid typing burst within 150ms debounce window
+  // Scenario 2.1: Rapid typing burst within debounce window
   const acSession = new AutocompleteSessionSimulator();
   const burstKeystrokes = ['r', 're', 'rea', 'reac', 'react'];
   for (const k of burstKeystrokes) {
@@ -258,8 +275,8 @@ async function runMilestone3ChallengerSuite() {
 
   // Scenario 2.2: In-flight cancellation when user types during active network request
   acSession.handleKeystroke('nextjs');
-  // Wait 175ms so the 150ms debounce fires and network fetch is in-flight (takes 50ms)
-  await new Promise(r => setTimeout(r, 175));
+  // Wait until debounce fires and network fetch is actively in-flight
+  await acSession.waitForInFlight();
   const inFlightController = acSession.activeController;
 
   // Type new query while "nextjs" is in-flight
