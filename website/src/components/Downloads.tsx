@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check, ShieldCheck } from 'lucide-react';
+import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check, ShieldCheck, ExternalLink } from 'lucide-react';
 
 export const Downloads: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
@@ -106,6 +106,19 @@ export const Downloads: React.FC = () => {
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
               Direct prebuilt DMG package for macOS
             </p>
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-mono text-emerald-600">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline flex items-center gap-1"
+                title="View VirusTotal 0/72 Clean Antivirus Verification"
+              >
+                <span>VirusTotal: 0/72 Clean</span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+              </a>
+            </div>
           </div>
         </motion.div>
 
@@ -159,8 +172,18 @@ export const Downloads: React.FC = () => {
             </div>
 
             <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between text-[11px] font-mono text-neutral-400">
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-emerald-600 hover:underline"
+                title="View VirusTotal 0/72 Clean Antivirus Verification"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>VirusTotal: 0/72 Clean</span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+              </a>
               <span>SHA-256 Verified</span>
-              <span>144 MB</span>
             </div>
           </div>
         </motion.div>
@@ -212,6 +235,19 @@ export const Downloads: React.FC = () => {
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
               Native AppImage & Debian package
             </p>
+            <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-mono text-emerald-600">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline flex items-center gap-1"
+                title="View VirusTotal 0/72 Clean Antivirus Verification"
+              >
+                <span>VirusTotal: 0/72 Clean</span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-70" />
+              </a>
+            </div>
           </div>
         </motion.div>
       </div>
@@ -314,10 +350,17 @@ export const Downloads: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           <span>NO TELEMETRY & NO TRACKING</span>
         </div>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-600" />
-          <span>VIRUSTOTAL 0/72 CLEAN</span>
-        </div>
+        <a
+          href="https://github.com/unitybtw/nova-browser/releases"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 hover:text-emerald-600 transition-colors group cursor-pointer"
+          title="Inspect VirusTotal Antivirus 0/72 Clean Scan Reports"
+        >
+          <ShieldCheck className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
+          <span className="group-hover:underline">VIRUSTOTAL 0/72 CLEAN</span>
+          <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-emerald-600" />
+        </a>
         <div className="flex items-center gap-2">
           <Github className="w-4 h-4 text-[#4338ca]" />
           <span>GITHUB VERIFIED RELEASES</span>

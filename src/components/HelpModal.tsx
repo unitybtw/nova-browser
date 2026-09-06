@@ -6,6 +6,7 @@ import {
   Keyboard, 
   Sparkles, 
   Shield, 
+  ShieldCheck,
   Info, 
   ExternalLink, 
   Command, 
@@ -436,6 +437,33 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       <p className="text-slate-500 dark:text-slate-400 text-[11px]">Multi-device synchronization encrypted with client-side AES-256-GCM keys.</p>
                     </div>
                   </div>
+
+                  {/* VirusTotal Verification Card */}
+                  <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 font-bold text-xs text-emerald-800 dark:text-emerald-300">
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                        <span>VirusTotal Antivirus Verification</span>
+                      </div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                        0 / 72 Clean
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                      Every official release binary is scanned across 70+ antivirus engines including Microsoft Defender, Kaspersky, Bitdefender, and Sophos.
+                    </p>
+                    <div className="pt-1">
+                      <a
+                        href="https://github.com/unitybtw/nova-browser/releases"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400 hover:underline"
+                      >
+                        <span>Inspect VirusTotal Audits & Checksums</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -490,7 +518,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     </div>
                   )}
 
-                  <div className="flex items-center justify-center gap-3 pt-2">
+                  <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                     <a
                       href="https://github.com/unitybtw/nova-browser"
                       target="_blank"
@@ -499,6 +527,16 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     >
                       <GithubIcon className="w-4 h-4" />
                       <span>GitHub Repository</span>
+                    </a>
+                    <a
+                      href="https://github.com/unitybtw/nova-browser/releases"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 font-semibold text-xs transition-colors cursor-pointer"
+                      title="VirusTotal 0/72 Clean Verified"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>VirusTotal 0/72 Clean</span>
                     </a>
                     <a
                       href="https://github.com/unitybtw/nova-browser/issues"

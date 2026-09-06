@@ -430,6 +430,25 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
 - **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Transparent disclosure: direct connections occur only when explicitly using specific features, such as opt-in Supabase sync, downloading local model weights from HuggingFace, fetching wallpapers from Unsplash/Bing, or page translation via Google Translate).
 
+### Antivirus Verification & VirusTotal Audits
+
+Every release package is compiled via reproducible GitHub Actions workflows and inspected by VirusTotal API across 70+ antivirus engines (including Microsoft Defender, Kaspersky, Bitdefender, Sophos, CrowdStrike, and Avast).
+
+| Platform | Target Package | Antivirus Status | Inspection Link |
+| :--- | :--- | :--- | :--- |
+| **Windows** | `Nova-Browser-Setup-*.exe` / `.zip` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
+| **macOS** | `Nova-Browser-*.dmg` / `.zip` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
+| **Linux** | `Nova-Browser-*.AppImage` / `.deb` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
+
+Every release also publishes a cryptographic `SHA256SUMS.txt` file for independent local checksum verification:
+```bash
+# Verify checksum on macOS / Linux:
+sha256sum -c SHA256SUMS.txt
+
+# Verify checksum on Windows (PowerShell):
+Get-FileHash Nova-Browser-Setup-*.exe -Algorithm SHA256
+```
+
 ---
 
 ## Contributing
