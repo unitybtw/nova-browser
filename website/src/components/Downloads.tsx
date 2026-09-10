@@ -113,9 +113,9 @@ export const Downloads: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline flex items-center gap-1"
-                title="View VirusTotal 0/72 Clean Antivirus Verification"
+                title="Verify SHA-256 checksum on GitHub Releases"
               >
-                <span>VirusTotal: 0/72 Clean</span>
+                <span>SHA-256 Verified</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-70" />
               </a>
             </div>
@@ -177,10 +177,10 @@ export const Downloads: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-emerald-600 hover:underline"
-                title="View VirusTotal 0/72 Clean Antivirus Verification"
+                title="Verify SHA-256 checksum on GitHub Releases"
               >
                 <ShieldCheck className="w-3.5 h-3.5" />
-                <span>VirusTotal: 0/72 Clean</span>
+                <span>SHA-256 Verified</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-70" />
               </a>
               <span>SHA-256 Verified</span>
@@ -242,9 +242,9 @@ export const Downloads: React.FC = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="hover:underline flex items-center gap-1"
-                title="View VirusTotal 0/72 Clean Antivirus Verification"
+                title="Verify SHA-256 checksum on GitHub Releases"
               >
-                <span>VirusTotal: 0/72 Clean</span>
+                <span>SHA-256 Verified</span>
                 <ExternalLink className="w-2.5 h-2.5 opacity-70" />
               </a>
             </div>
@@ -355,10 +355,10 @@ export const Downloads: React.FC = () => {
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-2 hover:text-emerald-600 transition-colors group cursor-pointer"
-          title="Inspect VirusTotal Antivirus 0/72 Clean Scan Reports"
+          title="Verify SHA-256 checksums on GitHub Releases"
         >
           <ShieldCheck className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
-          <span className="group-hover:underline">VIRUSTOTAL 0/72 CLEAN</span>
+          <span className="group-hover:underline">SHA-256 VERIFIED</span>
           <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-emerald-600" />
         </a>
         <div className="flex items-center gap-2">

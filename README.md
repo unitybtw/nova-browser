@@ -15,7 +15,6 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=for-the-badge&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases)
   [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
@@ -430,24 +429,26 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk.
 - **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Transparent disclosure: direct connections occur only when explicitly using specific features, such as opt-in Supabase sync, downloading local model weights from HuggingFace, fetching wallpapers from Unsplash/Bing, or page translation via Google Translate).
 
-### Antivirus Verification & VirusTotal Audits
+### Binary Verification
 
-Every release package is compiled via reproducible GitHub Actions workflows and inspected by VirusTotal API across 70+ antivirus engines (including Microsoft Defender, Kaspersky, Bitdefender, Sophos, CrowdStrike, and Avast).
+Every release package is compiled via reproducible GitHub Actions workflows. Each release publishes a `SHA256SUMS.txt` file signed by the CI pipeline so you can independently verify that what you download is exactly what was built.
 
-| Platform | Target Package | Antivirus Status | Inspection Link |
-| :--- | :--- | :--- | :--- |
-| **Windows** | `Nova-Browser-Setup-*.exe` / `.zip` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
-| **macOS** | `Nova-Browser-*.dmg` / `.zip` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
-| **Linux** | `Nova-Browser-*.AppImage` / `.deb` | [![VirusTotal](https://img.shields.io/badge/VirusTotal-0%2F72%20Clean-059669?style=flat&logo=virustotal)](https://github.com/unitybtw/nova-browser/releases) | [Verify on GitHub Releases](https://github.com/unitybtw/nova-browser/releases) |
+Cryptographic checksums are the only verifiable guarantee we can honestly make. We do not link raw antivirus detection counts as trust signals — antivirus results vary widely across engines and detection states, and a low count does not imply safety on its own.
 
-Every release also publishes a cryptographic `SHA256SUMS.txt` file for independent local checksum verification:
 ```bash
-# Verify checksum on macOS / Linux:
+# Download the release binary and its checksum file from GitHub Releases, then:
+
+# Verify on macOS / Linux:
 sha256sum -c SHA256SUMS.txt
 
-# Verify checksum on Windows (PowerShell):
-Get-FileHash Nova-Browser-Setup-*.exe -Algorithm SHA256
+# Verify on Windows (PowerShell):
+$hash = Get-FileHash Nova-Browser-Setup-*.exe -Algorithm SHA256
+# Compare $hash.Hash against the value in SHA256SUMS.txt
 ```
+
+All checksums are generated and published automatically in the `publish-release` CI step; see [`.github/workflows/release.yml`](.github/workflows/release.yml) for the full pipeline source.
+
+
 
 ---
 
