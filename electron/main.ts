@@ -2671,49 +2671,59 @@ ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
 ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   if (!isTrustedSender(event)) return [];
   const results: any[] = [];
+  const seenIds = new Set<string>();
 
-  // Provider 1: Bing Official Daily 4K UHD Image Archive (3840x2160 Ultra HD)
-  try {
-    const bingRes = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
-      // Robustness: hard 10s cap so a hung provider can't stall the handler
-      signal: AbortSignal.timeout(10000)
-    });
-    if (bingRes.ok) {
-      const bingData = await bingRes.json();
-      if (bingData.images && Array.isArray(bingData.images)) {
-        for (const img of bingData.images) {
-          const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-          results.push({
-            id: `bing-${img.hsh || img.startdate}`,
-            title: img.title || 'Bing Daily 4K Wallpaper',
-            author: img.copyright || 'Microsoft Bing Daily',
-            authorUrl: 'https://bing.com',
-            imageUrl: uhdUrl,
-            thumbnailUrl: `https://www.bing.com${img.url}`,
-            source: 'Bing 4K UHD Daily',
-            resolution: '3840x2160',
-            date: img.startdate
-          });
+  // Helper to add unique photos
+  const addPhoto = (photo: any) => {
+    if (!photo || !photo.id || !photo.imageUrl || seenIds.has(photo.id)) return;
+    seenIds.add(photo.id);
+    results.push(photo);
+  };
+
+  // Provider 1: Bing Official Daily 4K UHD Image Archive (Batches for current and recent days)
+  for (const idx of [0, 7]) {
+    try {
+      const bingRes = await fetch(`https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=8&mkt=en-US`, {
+        // Robustness: hard 8s cap so a hung provider can't stall the handler
+        signal: AbortSignal.timeout(8000)
+      });
+      if (bingRes.ok) {
+        const bingData = await bingRes.json();
+        if (bingData.images && Array.isArray(bingData.images)) {
+          for (const img of bingData.images) {
+            const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+            const photoId = `bing-${img.hsh || img.startdate}`;
+            addPhoto({
+              id: photoId,
+              title: img.title || 'Bing Daily 4K Wallpaper',
+              author: img.copyright || 'Microsoft Bing Daily',
+              authorUrl: 'https://bing.com',
+              imageUrl: uhdUrl,
+              thumbnailUrl: `https://www.bing.com${img.url}`,
+              source: 'Bing 4K UHD Daily',
+              resolution: '3840x2160',
+              date: img.startdate
+            });
+          }
         }
       }
+    } catch (e) {
+      console.warn(`Bing daily IPC fetch error (idx=${idx}):`, e);
     }
-  } catch (e) {
-    console.warn('Bing daily IPC fetch error:', e);
   }
 
-  // Provider 2: Wallhaven Top 4K Desktop Wallpaper Feed
+  // Provider 2: Wallhaven Top 4K Desktop Wallpaper Feed (Curated UHD Landscapes)
   try {
     const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
     const whRes = await fetch(whUrl, {
       headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
-      // Robustness: hard 10s cap so a hung provider can't stall the handler
-      signal: AbortSignal.timeout(10000)
+      signal: AbortSignal.timeout(8000)
     });
     if (whRes.ok) {
       const whData = await whRes.json();
       if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
-        for (const item of whData.data.slice(0, 10)) {
-          results.push({
+        for (const item of whData.data.slice(0, 15)) {
+          addPhoto({
             id: `wh-${item.id}`,
             title: `4K Desktop Wallpaper (${item.category || 'Landscape'})`,
             author: 'Wallhaven 4K Curated',
