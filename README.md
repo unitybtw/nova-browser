@@ -40,7 +40,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 - **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local MCP server allows coding agents (Claude Code, Cursor, Windsurf, or custom scripts) to inspect tabs, interact with DOM nodes, and stream console logs with zero configuration.
 - **Zero-Telemetry Network-Level Privacy Shield**: Uses `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate trackers and ad requests at the network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
-- **Tab Hibernation & Memory Virtualization**: Dormant background webviews are automatically unmounted from the DOM while preserving back-forward navigation state, keeping memory usage for 20+ open tabs around ~420 MB.
+- **Tab Hibernation & Resource Management**: Dormant background webviews automatically pause active rendering execution while preserving navigation state, helping minimize background CPU and memory usage during multi-tab sessions.
 
 ---
 

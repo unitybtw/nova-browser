@@ -42,23 +42,23 @@ const CATEGORIES: BenchmarkCategory[] = [
   {
     id: 'memory',
     title: 'Memory & Tab Hibernation',
-    subtitle: '20 Active Tabs with Intelligent DOM Unmounting',
+    subtitle: '20 Inactive Tabs with Background Process Suspension',
     icon: HardDrive,
-    badge: '64% RAM Reduction',
+    badge: 'Suspension Engine',
     highlightNumber: '420',
     highlightUnit: 'MB',
     highlightLabel: 'Total RAM (20 Tabs)',
-    summary: 'Nova suspends dormant webview rendering pipelines while retaining instant back-forward state, keeping memory below 500MB.',
-    metricLabel: 'Memory used with 20 tabs open at the same time',
+    summary: 'Nova pauses rendering cycles in dormant background tabs, helping keep baseline memory usage lower during multi-tab sessions.',
+    metricLabel: 'Approximate memory used with 20 inactive tabs open',
     directionLabel: 'Lower is better',
-    directionDescription: 'Using less RAM leaves more room for tabs and smoother multitasking.',
-    benchmarkNote: 'Test setup: 20 active tabs with the same content set; background tabs may be hibernated.',
+    directionDescription: 'Pausing background tabs leaves more system memory available for active apps.',
+    benchmarkNote: 'Test setup: Estimated typical footprint with 20 inactive background tabs suspended; active media playback tabs scale normally.',
     maxValue: 1600,
     lowerIsBetter: true,
     competitors: [
-      { name: 'Nova Browser', value: 420, displayValue: '420 MB', isWinner: true },
-      { name: 'Google Chrome', value: 1180, displayValue: '1,180 MB' },
-      { name: 'Brave Browser', value: 920, displayValue: '920 MB' },
+      { name: 'Nova Browser', value: 420, displayValue: '~420 MB', isWinner: true },
+      { name: 'Google Chrome', value: 1180, displayValue: '~1,180 MB' },
+      { name: 'Brave Browser', value: 920, displayValue: '~920 MB' },
     ],
   },
   {
@@ -70,7 +70,7 @@ const CATEGORIES: BenchmarkCategory[] = [
     highlightNumber: '31.2',
     highlightUnit: 'MB',
     highlightLabel: 'Initial V8 Heap Footprint',
-    summary: 'Modular chunk isolation and decoupled WebLLM neural runtime keep initial JS evaluation down to 496 KB with minimal heap allocation.',
+    summary: 'Modular chunk isolation and decoupled WebLLM neural runtime keep initial JS evaluation down to ~435 KB with minimal heap allocation.',
     metricLabel: 'Initial V8 JavaScript heap allocation at startup',
     directionLabel: 'Lower is better',
     directionDescription: 'Lower initial heap allocation leaves more system memory available for tabs and apps.',
@@ -108,23 +108,22 @@ const CATEGORIES: BenchmarkCategory[] = [
   {
     id: 'privacy',
     title: 'Ad & Tracker Block Latency',
-    subtitle: 'Network-Level Filter Engine',
+    subtitle: 'Session-Level Request Interception',
     icon: Shield,
-    badge: '0ms Overhead',
-    highlightNumber: '0.1',
-    highlightUnit: 'ms',
-    highlightLabel: 'Filter Decision Time',
-    summary: 'Ad and tracker requests are terminated at the network layer before DOM creation, saving up to 48% bandwidth per page load.',
-    metricLabel: 'Time to filter an ad or tracker request',
+    badge: 'Built-in EasyList',
+    highlightNumber: '0.44',
+    highlightUnit: 'µs',
+    highlightLabel: 'Fast Domain Decision Time',
+    summary: 'Known tracker and ad requests are evaluated and blocked directly at the network session layer before page scripts execute.',
+    metricLabel: 'In-memory domain lookup decision time',
     directionLabel: 'Lower is better',
-    directionDescription: 'Lower latency means less extra processing while pages load.',
-    benchmarkNote: 'Test setup: Average network-level filter decision time; results vary by page and hardware.',
-    maxValue: 12,
+    directionDescription: 'Faster lookup means minimal latency added to network requests.',
+    benchmarkNote: 'Test setup: In-memory tracker domain classification latency in internal microbenchmark.',
+    maxValue: 1.0,
     lowerIsBetter: true,
     competitors: [
-      { name: 'Nova (Network Filter)', value: 0.1, displayValue: '0.12 ms', isWinner: true },
-      { name: 'Brave Shield', value: 0.35, displayValue: '0.35 ms' },
-      { name: 'Standard Chrome (Unfiltered)', value: 11.2, displayValue: '11.20 ms' },
+      { name: 'Nova (Fast Domain Lookup)', value: 0.44, displayValue: '~0.44 µs', isWinner: true },
+      { name: 'Standard Rule Check', value: 0.85, displayValue: '~0.85 µs' },
     ],
   },
 ];
@@ -148,8 +147,8 @@ const MATRIX_FEATURES = [
   },
   {
     feature: 'Intelligent Tab Hibernation',
-    sub: 'Idle webview unmounting with background memory reclamation',
-    nova: '-64% RAM Active Drop',
+    sub: 'Background webview execution suspension with dormant process pausing',
+    nova: 'Background Suspension',
     chrome: 'Memory Saver (Tab Discard)',
     brave: 'Partial (~920 MB)',
     isNovaLeader: true,
@@ -551,7 +550,7 @@ export const Benchmarks: React.FC = () => {
                     Estimate Your RAM Savings
                   </h3>
                   <p className="font-sans text-xs sm:text-sm text-neutral-600 leading-relaxed mt-2">
-                    Drag the slider to see how Nova’s automatic background DOM unmounting slashes memory pressure as your tab workload expands.
+                    Drag the slider to see how Nova’s automatic background tab suspension reduces inactive memory usage as your tab workload expands.
                   </p>
                 </div>
 
@@ -662,7 +661,7 @@ export const Benchmarks: React.FC = () => {
                       Hibernated
                     </span>
                     <span className="font-mono text-[10px] text-neutral-400">
-                      DOM unmounted
+                      Background suspended
                     </span>
                   </div>
                 </div>
