@@ -1029,6 +1029,59 @@ function cleanStaleUpdateArtifacts(): void {
         }
       }
     }
+
+    // 4. Clean any orphaned updater staging or backup artifacts in app parent directory (e.g. /Applications)
+    if (process.platform === 'darwin') {
+      try {
+        const exePath = app.getPath('exe');
+        const appBundlePath = path.dirname(path.dirname(path.dirname(exePath)));
+        const searchDirs = new Set<string>();
+        searchDirs.add('/Applications');
+        if (appBundlePath.endsWith('.app')) {
+          searchDirs.add(path.dirname(appBundlePath));
+        }
+
+        const lsregisterPath = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
+        let foundOrphans = false;
+
+        for (const dir of searchDirs) {
+          if (!fs.existsSync(dir)) continue;
+          let entries: string[] = [];
+          try {
+            entries = fs.readdirSync(dir);
+          } catch (_) {
+            continue;
+          }
+
+          for (const entry of entries) {
+            if (
+              entry.startsWith('.nova_staging_') ||
+              entry.startsWith('.nova_backup_') ||
+              entry.startsWith('Nova Browser.app.staging_') ||
+              entry.startsWith('Nova Browser.app.backup_')
+            ) {
+              const orphanPath = path.join(dir, entry);
+              try {
+                if (fs.existsSync(lsregisterPath)) {
+                  try {
+                    child_process.execFileSync(lsregisterPath, ['-u', orphanPath], { stdio: 'ignore' });
+                  } catch (_) {}
+                }
+                fs.rmSync(orphanPath, { recursive: true, force: true });
+                foundOrphans = true;
+                console.log(`[Cleanup] Removed orphaned update artifact: ${orphanPath}`);
+              } catch (_) {}
+            }
+          }
+        }
+
+        if (foundOrphans && fs.existsSync(lsregisterPath)) {
+          try {
+            child_process.execFileSync(lsregisterPath, ['-gc'], { stdio: 'ignore' });
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
   } catch (e) {
     console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
   }
@@ -1404,14 +1457,18 @@ DEST_APP="$2"
 TARGET_PID="$3"
 TEMP_DIR="$4"
 BACKUP_TOKEN="$5"
+DEST_PARENT="$(dirname "\${DEST_APP}")"
 MOUNT_POINT="\${TEMP_DIR}/mount"
-STAGING_APP="\${DEST_APP}.staging_\${BACKUP_TOKEN}"
-BACKUP_APP="\${DEST_APP}.backup_\${BACKUP_TOKEN}"
+STAGING_DIR="\${TEMP_DIR}/staging"
+STAGING_APP="\${STAGING_DIR}/Nova Browser.app"
+BACKUP_APP="\${DEST_PARENT}/.nova_backup_\${BACKUP_TOKEN}"
 
 cleanup_mount() {
   hdiutil detach "\${MOUNT_POINT}" -force -quiet 2>/dev/null
-  rm -rf "\${TEMP_DIR}"
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
 }
+
+mkdir -p "\${STAGING_DIR}" 2>/dev/null
 
 hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -noautoopen
 SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
@@ -1427,8 +1484,23 @@ if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/Ma
   open "\${FILE_PATH}"
   exit 1
 fi
+
+# Stage app cleanly inside isolated temp directory (never in /Applications)
+rm -rf "\${STAGING_APP}" 2>/dev/null
+if ! ditto "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
+if [ ! -f "\${STAGING_APP}/Contents/Info.plist" ] || [ ! -d "\${STAGING_APP}/Contents/MacOS" ]; then
+  cleanup_mount
+  open "\${FILE_PATH}"
+  exit 1
+fi
+
 if command -v codesign >/dev/null 2>&1; then
-  if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
+  if ! codesign -v --deep "\${STAGING_APP}" 2>/dev/null; then
     cleanup_mount
     exit 1
   fi
@@ -1438,26 +1510,25 @@ while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
 
-rm -rf "\${STAGING_APP}" 2>/dev/null
-if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Contents/Info.plist" ]; then
-  if [ -d "\${DEST_APP}" ]; then
-    mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
+if [ -d "\${DEST_APP}" ]; then
+  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+fi
+
+if ditto "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
+  rm -rf "\${BACKUP_APP}" 2>/dev/null
+  rm -f "\${FILE_PATH}" 2>/dev/null
+  cleanup_mount
+  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
   fi
-  if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
-    rm -rf "\${BACKUP_APP}" 2>/dev/null
-    rm -f "\${FILE_PATH}" 2>/dev/null
-    cleanup_mount
-    open -a "\${DEST_APP}"
-  else
-    rm -rf "\${STAGING_APP}" 2>/dev/null
-    if [ -d "\${BACKUP_APP}" ]; then
-      mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
-    fi
-    cleanup_mount
-    open "\${FILE_PATH}"
-  fi
+  open -a "\${DEST_APP}"
 else
-  rm -rf "\${STAGING_APP}" 2>/dev/null
+  rm -rf "\${DEST_APP}" 2>/dev/null
+  if [ -d "\${BACKUP_APP}" ]; then
+    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+  fi
   cleanup_mount
   open "\${FILE_PATH}"
 fi
@@ -1471,25 +1542,25 @@ DEST_APP="$2"
 TARGET_PID="$3"
 TEMP_DIR="$4"
 BACKUP_TOKEN="$5"
+DEST_PARENT="$(dirname "\${DEST_APP}")"
 EXTRACT_DIR="\${TEMP_DIR}/extracted"
-STAGING_APP="\${DEST_APP}.staging_\${BACKUP_TOKEN}"
-BACKUP_APP="\${DEST_APP}.backup_\${BACKUP_TOKEN}"
+BACKUP_APP="\${DEST_PARENT}/.nova_backup_\${BACKUP_TOKEN}"
 
 ditto -xk "\${FILE_PATH}" "\${EXTRACT_DIR}"
 SOURCE_APP=$(find "\${EXTRACT_DIR}" -maxdepth 2 -name "*.app" | head -n 1)
 if [ -z "$SOURCE_APP" ]; then
-  rm -rf "\${TEMP_DIR}"
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
   exit 1
 fi
 
 # Bundle integrity & signature verification
 if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
-  rm -rf "\${TEMP_DIR}"
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
   exit 1
 fi
 if command -v codesign >/dev/null 2>&1; then
   if ! codesign -v --deep "$SOURCE_APP" 2>/dev/null; then
-    rm -rf "\${TEMP_DIR}"
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
     exit 1
   fi
 fi
@@ -1498,28 +1569,27 @@ while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
 
-rm -rf "\${STAGING_APP}" 2>/dev/null
-if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Contents/Info.plist" ]; then
-  if [ -d "\${DEST_APP}" ]; then
-    mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+# Atomically backup old app to hidden directory without .app extension so LaunchServices ignores it
+if [ -d "\${DEST_APP}" ]; then
+  mv "\${DEST_APP}" "\${BACKUP_APP}" 2>/dev/null
+fi
+
+if ditto "$SOURCE_APP" "\${DEST_APP}" 2>/dev/null && [ -f "\${DEST_APP}/Contents/Info.plist" ]; then
+  rm -rf "\${BACKUP_APP}" 2>/dev/null
+  rm -f "\${FILE_PATH}" 2>/dev/null
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+  if [ -x "$LSREGISTER" ]; then
+    "$LSREGISTER" -f "\${DEST_APP}" 2>/dev/null
   fi
-  if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
-    rm -rf "\${BACKUP_APP}" 2>/dev/null
-    rm -f "\${FILE_PATH}" 2>/dev/null
-    rm -rf "\${TEMP_DIR}"
-    open -a "\${DEST_APP}"
-  else
-    rm -rf "\${STAGING_APP}" 2>/dev/null
-    if [ -d "\${BACKUP_APP}" ]; then
-      mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
-    fi
-    rm -rf "\${TEMP_DIR}"
-    open "\${DEST_APP}" 2>/dev/null || open -a "Nova Browser"
-  fi
+  open -a "\${DEST_APP}"
 else
-  rm -rf "\${STAGING_APP}" 2>/dev/null
-  rm -rf "\${TEMP_DIR}"
-  exit 1
+  rm -rf "\${DEST_APP}" 2>/dev/null
+  if [ -d "\${BACKUP_APP}" ]; then
+    mv "\${BACKUP_APP}" "\${DEST_APP}" 2>/dev/null
+  fi
+  rm -rf "\${TEMP_DIR}" 2>/dev/null
+  open "\${DEST_APP}" 2>/dev/null || open -a "Nova Browser"
 fi
 `;
         }

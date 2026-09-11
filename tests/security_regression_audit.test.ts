@@ -776,6 +776,52 @@ async function runSecurityRegressionAuditSuite() {
   );
 
   // =========================================================================
+  // R5: macOS Auto-Updater Index Isolation & Artifact Hygiene
+  // =========================================================================
+  console.log('\n--- R5: macOS Auto-Updater Index Isolation & Artifact Hygiene ---');
+  const latestMainTsContent = fs.readFileSync(mainTsPath, 'utf8');
+
+  // R5.1: No .app.staging_ paths in destination application folder
+  const hasAppStagingInDest = latestMainTsContent.includes('STAGING_APP="${DEST_APP}.staging_');
+  record(
+    'R5-Updater-Staging-Isolation',
+    'Updater scripts never stage new bundles inside destination directory as .app.staging',
+    !hasAppStagingInDest,
+    `Found indexable .app.staging in destination: ${hasAppStagingInDest}`
+  );
+
+  // R5.2: Staging is isolated in TEMP_DIR
+  const hasTempStaging = latestMainTsContent.includes('STAGING_APP="\\${STAGING_DIR}/Nova Browser.app"') &&
+    latestMainTsContent.includes('STAGING_DIR="\\${TEMP_DIR}/staging"');
+  record(
+    'R5-Updater-Temp-Staging',
+    'Updater scripts isolate staging bundle strictly within TEMP_DIR',
+    hasTempStaging,
+    `Isolated temp staging present: ${hasTempStaging}`
+  );
+
+  // R5.3: Backup uses hidden dot-prefix without .app extension
+  const hasHiddenBackup = latestMainTsContent.includes('BACKUP_APP="\\${DEST_PARENT}/.nova_backup_\\${BACKUP_TOKEN}"');
+  record(
+    'R5-Updater-Hidden-Backup',
+    'Updater backup directory uses hidden dotfile prefix without .app extension',
+    hasHiddenBackup,
+    `Hidden backup directory present: ${hasHiddenBackup}`
+  );
+
+  // R5.4: Cleanup routine clears orphaned staging and backup artifacts
+  const hasCleanupOrphans = latestMainTsContent.includes('.nova_staging_') &&
+    latestMainTsContent.includes('.nova_backup_') &&
+    latestMainTsContent.includes('Nova Browser.app.staging_') &&
+    latestMainTsContent.includes('lsregister');
+  record(
+    'R5-Updater-Artifact-Cleanup',
+    'cleanStaleUpdateArtifacts purges and unregisters orphaned updater artifacts',
+    hasCleanupOrphans,
+    `Orphan cleanup and lsregister unregistration present: ${hasCleanupOrphans}`
+  );
+
+  // =========================================================================
   // SUMMARY & VERDICT
   // =========================================================================
   console.log('\n================================================================');
