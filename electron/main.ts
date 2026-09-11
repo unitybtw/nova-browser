@@ -395,6 +395,19 @@ function createWindow() {
     }
   });
 
+  // Sync Windows native titlebar buttons with theme updates
+  nativeTheme.on('updated', () => {
+    if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        });
+      } catch (_) {}
+    }
+  });
+
   // Performance: don't paint a blank window while content loads — show once the
   // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
   // never fires (e.g. dev-server retry loop failing for a while).
@@ -1082,6 +1095,40 @@ function cleanStaleUpdateArtifacts(): void {
         }
       } catch (_) {}
     }
+
+    // 5. Clean any orphaned updater artifacts on Linux and Windows
+    if (process.platform === 'linux') {
+      try {
+        const appImagePath = process.env.APPIMAGE;
+        if (appImagePath && fs.existsSync(appImagePath)) {
+          const backupFile = `${appImagePath}.old`;
+          if (fs.existsSync(backupFile)) {
+            const stat = fs.statSync(backupFile);
+            if ((Date.now() - stat.mtimeMs) > 10 * 60 * 1000) {
+              fs.unlinkSync(backupFile);
+            }
+          }
+        }
+      } catch (_) {}
+    } else if (process.platform === 'win32') {
+      try {
+        const osTemp = app.getPath('temp');
+        if (fs.existsSync(osTemp)) {
+          const entries = fs.readdirSync(osTemp);
+          for (const entry of entries) {
+            if (entry.startsWith('update_') && entry.endsWith('.bat')) {
+              const p = path.join(osTemp, entry);
+              try {
+                const stat = fs.statSync(p);
+                if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
+                  fs.unlinkSync(p);
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      } catch (_) {}
+    }
   } catch (e) {
     console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
   }
@@ -1375,12 +1422,24 @@ app.whenReady().then(async () => {
       const isExe = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.exe') && !a.name.toLowerCase().endsWith('.blockmap');
       const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
       const isPortable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+      const isArm = arch === 'arm64';
+
+      const matchesArch = (a: any) => {
+        const n = (typeof a.name === 'string' ? a.name : '').toLowerCase();
+        if (isArm) return n.includes('arm64');
+        return !n.includes('arm64') && (n.includes('x64') || n.includes('x86_64') || n.includes('win') || n.includes('setup'));
+      };
+
       if (isPortable) {
-        return assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup')) ||
+        return assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup') && matchesArch(a)) ||
+               assets.find((a: any) => isExe(a) && !a.name.toLowerCase().includes('setup')) ||
+               assets.find((a: any) => isZip(a) && matchesArch(a)) ||
                assets.find(isZip) ||
                assets.find(isExe);
       }
-      return assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup')) ||
+      return assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup') && matchesArch(a)) ||
+             assets.find((a: any) => isExe(a) && a.name.toLowerCase().includes('setup')) ||
+             assets.find((a: any) => isExe(a) && matchesArch(a)) ||
              assets.find(isExe) ||
              assets.find(isZip);
     }
@@ -1388,7 +1447,26 @@ app.whenReady().then(async () => {
     if (platform === 'linux') {
       const isAppImage = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.appimage');
       const isDeb = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.deb');
-      return assets.find(isAppImage) || assets.find(isDeb);
+      const isArm = arch === 'arm64' || arch === 'arm';
+
+      const matchesArch = (a: any) => {
+        const n = (typeof a.name === 'string' ? a.name : '').toLowerCase();
+        if (isArm) return n.includes('arm64') || n.includes('aarch64');
+        return !n.includes('arm64') && !n.includes('aarch64') && (n.includes('x64') || n.includes('x86_64') || n.includes('amd64') || n.includes('linux'));
+      };
+
+      const isRunningAppImage = !!process.env.APPIMAGE;
+      if (isRunningAppImage) {
+        return assets.find((a: any) => isAppImage(a) && matchesArch(a)) ||
+               assets.find(isAppImage) ||
+               assets.find((a: any) => isDeb(a) && matchesArch(a)) ||
+               assets.find(isDeb);
+      }
+
+      return assets.find((a: any) => isAppImage(a) && matchesArch(a)) ||
+             assets.find((a: any) => isDeb(a) && matchesArch(a)) ||
+             assets.find(isAppImage) ||
+             assets.find(isDeb);
     }
 
     return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
@@ -1625,28 +1703,41 @@ fi
         const updateDir = path.join(tempDir, `nova_update_${Date.now()}_${randomSuffix}`);
         fs.mkdirSync(updateDir, { recursive: true });
         const batPath = path.join(updateDir, 'update.bat');
+        const destinationExe = app.getPath('exe');
         const batContent = `@echo off
-set FILE_PATH=%~1
-set TARGET_PID=%~2
-set UPDATE_DIR=%~dp0
+setlocal enabledelayedexpansion
+set "FILE_PATH=%~1"
+set "TARGET_PID=%~2"
+set "DEST_EXE=%~3"
+set "UPDATE_DIR=%~dp0"
 
 :wait_loop
 if not "%TARGET_PID%"=="" (
   tasklist /FI "PID eq %TARGET_PID%" 2>nul | findstr /i "%TARGET_PID%" >nul
   if not errorlevel 1 (
-    timeout /t 1 /nobreak >nul
+    ping 127.0.0.1 -n 2 >nul 2>&1
     goto wait_loop
   )
 )
+
 start /wait "" "%FILE_PATH%" /S
 del /f /q "%FILE_PATH%" 2>nul
+
+if not "%DEST_EXE%"=="" (
+  if exist "%DEST_EXE%" (
+    start "" "%DEST_EXE%"
+  ) else (
+    start "" "%LOCALAPPDATA%\\Programs\\Nova Browser\\Nova Browser.exe" 2>nul
+  )
+)
+
 cd /d "%TEMP%"
 rmdir /s /q "%UPDATE_DIR%" 2>nul
 exit
 `;
         try {
           fs.writeFileSync(batPath, batContent);
-          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath, String(currentPid)], {
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath, String(currentPid), destinationExe], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1669,9 +1760,13 @@ exit
 
     // 3. Linux
     if (platform === 'linux') {
-      if (resolvedFilePath.toLowerCase().endsWith('.appimage')) {
+      const isAppImage = resolvedFilePath.toLowerCase().endsWith('.appimage');
+      const isDeb = resolvedFilePath.toLowerCase().endsWith('.deb');
+
+      if (isAppImage) {
         try {
           fs.chmodSync(resolvedFilePath, 0o755);
+          const currentAppImage = process.env.APPIMAGE || '';
           const tempDir = path.join(app.getPath('temp'), `nova_update_${Date.now()}_${crypto.randomBytes(8).toString('hex')}`);
           fs.mkdirSync(tempDir, { recursive: true, mode: 0o700 });
           try { fs.chmodSync(tempDir, 0o700); } catch (_) {}
@@ -1680,15 +1775,36 @@ exit
 FILE_PATH="$1"
 TARGET_PID="$2"
 TEMP_DIR="$3"
+CURRENT_APPIMAGE="$4"
 
 while kill -0 "\${TARGET_PID}" 2>/dev/null; do
   sleep 0.3
 done
-rm -rf "\${TEMP_DIR}"
-"\${FILE_PATH}" &
+
+chmod +x "\${FILE_PATH}" 2>/dev/null
+
+if [ -n "\${CURRENT_APPIMAGE}" ] && [ -f "\${CURRENT_APPIMAGE}" ]; then
+  BACKUP_APPIMAGE="\${CURRENT_APPIMAGE}.old"
+  mv "\${CURRENT_APPIMAGE}" "\${BACKUP_APPIMAGE}" 2>/dev/null
+  if cp "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null || mv "\${FILE_PATH}" "\${CURRENT_APPIMAGE}" 2>/dev/null; then
+    chmod +x "\${CURRENT_APPIMAGE}" 2>/dev/null
+    rm -f "\${BACKUP_APPIMAGE}" 2>/dev/null
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
+    "\${CURRENT_APPIMAGE}" &
+  else
+    if [ -f "\${BACKUP_APPIMAGE}" ]; then
+      mv "\${BACKUP_APPIMAGE}" "\${CURRENT_APPIMAGE}" 2>/dev/null
+    fi
+    rm -rf "\${TEMP_DIR}" 2>/dev/null
+    "\${CURRENT_APPIMAGE}" &
+  fi
+else
+  TARGET_RUN="\${FILE_PATH}"
+  "\${TARGET_RUN}" &
+fi
 `;
           fs.writeFileSync(scriptPath, scriptContent, { mode: 0o755 });
-          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, String(currentPid), tempDir], {
+          const runner = child_process.spawn('/bin/bash', [scriptPath, resolvedFilePath, String(currentPid), tempDir, currentAppImage], {
             detached: true,
             stdio: 'ignore'
           });
@@ -1705,6 +1821,16 @@ rm -rf "\${TEMP_DIR}"
           return { success: true };
         } catch (linuxErr) {
           console.warn('[Updater] Failed to launch Linux updater script:', linuxErr);
+        }
+      } else if (isDeb) {
+        try {
+          shell.openPath(resolvedFilePath);
+          setTimeout(() => {
+            try { app.quit(); } catch (_) { app.exit(0); }
+          }, 1000);
+          return { success: true };
+        } catch (debErr) {
+          console.warn('[Updater] Failed to open Linux .deb package:', debErr);
         }
       }
     }
@@ -2872,6 +2998,15 @@ ipcMain.on('set-theme', (event, theme: 'light' | 'dark' | 'system') => {
   if (!isTrustedSender(event)) return;
   if (theme === 'light' || theme === 'dark' || theme === 'system') {
     nativeTheme.themeSource = theme;
+    if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+      try {
+        mainWindow.setTitleBarOverlay({
+          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+          height: 44
+        });
+      } catch (_) {}
+    }
   }
 });
 

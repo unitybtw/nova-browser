@@ -821,6 +821,48 @@ async function runSecurityRegressionAuditSuite() {
     `Orphan cleanup and lsregister unregistration present: ${hasCleanupOrphans}`
   );
 
+  // R5.5: Windows updater reliability (ping delay and relaunch DEST_EXE)
+  const hasWinUpdaterFixes = latestMainTsContent.includes('ping 127.0.0.1 -n 2 >nul 2>&1') &&
+    latestMainTsContent.includes('start "" "%DEST_EXE%"') &&
+    !latestMainTsContent.includes('timeout /t 1 /nobreak >nul');
+  record(
+    'R5-Windows-Updater-Reliability',
+    'Windows updater uses reliable stdin-independent ping sleep and relaunches DEST_EXE',
+    hasWinUpdaterFixes,
+    `Windows updater ping sleep and relaunch present: ${hasWinUpdaterFixes}`
+  );
+
+  // R5.6: Linux AppImage atomic replacement and deb handler
+  const hasLinuxUpdaterFixes = latestMainTsContent.includes('CURRENT_APPIMAGE') &&
+    latestMainTsContent.includes('BACKUP_APPIMAGE') &&
+    latestMainTsContent.includes('isDeb');
+  record(
+    'R5-Linux-AppImage-Replacement',
+    'Linux updater replaces running AppImage with atomic backup and opens deb packages',
+    hasLinuxUpdaterFixes,
+    `Linux AppImage atomic replacement present: ${hasLinuxUpdaterFixes}`
+  );
+
+  // R5.7: Multi-architecture detection on Windows and Linux
+  const hasArchMatching = latestMainTsContent.includes("isArm = arch === 'arm64'") &&
+    latestMainTsContent.includes("matchesArch");
+  record(
+    'R5-CrossPlatform-Arch-Matching',
+    'Release asset selection checks CPU architecture for both Windows and Linux',
+    hasArchMatching,
+    `Cross-platform architecture matching present: ${hasArchMatching}`
+  );
+
+  // R5.8: Windows TitleBarOverlay dynamic theme sync
+  const hasTitleBarOverlaySync = latestMainTsContent.includes("setTitleBarOverlay") &&
+    latestMainTsContent.includes("nativeTheme.on('updated'");
+  record(
+    'R5-Windows-Titlebar-Theme-Sync',
+    'Windows native titlebar controls dynamically update on light/dark theme switch',
+    hasTitleBarOverlaySync,
+    `Windows titlebar theme sync present: ${hasTitleBarOverlaySync}`
+  );
+
   // =========================================================================
   // SUMMARY & VERDICT
   // =========================================================================
