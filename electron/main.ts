@@ -649,6 +649,12 @@ function setupApplicationMenu() {
             sendToMainWindow('shortcut', 'check-updates');
           }
         },
+        {
+          label: "What's New in Nova Browser",
+          click: () => {
+            sendToMainWindow('shortcut', 'whats-new');
+          }
+        },
         { type: 'separator' as const },
         {
           label: 'Preferences...',
@@ -916,9 +922,9 @@ function setupApplicationMenu() {
           }
         },
         {
-          label: "What's New in This Version",
-          click: async () => {
-            await shell.openExternal('https://github.com/unitybtw/nova-browser/releases');
+          label: "What's New in This Version (Changelog)",
+          click: () => {
+            sendToMainWindow('shortcut', 'whats-new');
           }
         },
         { type: 'separator' as const },

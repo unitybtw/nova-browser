@@ -17,6 +17,7 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 const SettingsPage = lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
 const HistoryPage = lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
 const DownloadsPage = lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
+const ChangelogPage = lazy(() => import('./ChangelogPage').then(m => ({ default: m.ChangelogPage })));
 
 const NOOP = () => {};
 
@@ -156,6 +157,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   
   const isDownloadsTab = React.useMemo(() => (
     tab?.url === 'nova://downloads' || tab?.url === 'about:downloads'
+  ), [tab?.url]);
+
+  const isChangelogTab = React.useMemo(() => (
+    Boolean(
+      tab?.url?.startsWith('nova://changelog') || 
+      tab?.url?.startsWith('nova://whats-new') || 
+      tab?.url === 'about:changelog' || 
+      tab?.url === 'about:whats-new'
+    )
   ), [tab?.url]);
 
   const latestTabRef = useRef(tab);
@@ -833,6 +843,20 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         <DownloadsPage
           downloads={downloads}
           onClearDownloads={onClearDownloads || NOOP}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isChangelogTab) {
+    return (
+      <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
+        <ChangelogPage
+          currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.6'}
+          onNavigate={(url) => {
+            onUpdateTab(tab.id, { url, isLoading: true });
+            if (onNavigate) onNavigate(url);
+          }}
         />
       </Suspense>
     );

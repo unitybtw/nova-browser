@@ -805,6 +805,12 @@ const UpdateWidget = () => {
         <span className="text-sm text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1.5">
           <Check className="w-4 h-4" /> Up to date (v{updateVersion || '?'})
         </span>
+        <button 
+          onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
+          className="px-3 py-1.5 text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg font-medium transition-colors cursor-pointer"
+        >
+          View Changelog
+        </button>
         <button onClick={check} className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer">
           Check again
         </button>
@@ -833,10 +839,18 @@ const UpdateWidget = () => {
   }
 
   return (
-    <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer">
-      {status === 'checking' ? <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-      {status === 'checking' ? 'Checking...' : 'Check for Updates'}
-    </button>
+    <div className="flex items-center gap-2">
+      <button onClick={check} disabled={status === 'checking'} className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-500/10 dark:text-blue-400 dark:hover:bg-blue-500/20 rounded-xl font-medium transition-colors text-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer">
+        {status === 'checking' ? <div className="w-4 h-4 rounded-full border-2 border-blue-600 dark:border-blue-400 border-t-transparent animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+        {status === 'checking' ? 'Checking...' : 'Check for Updates'}
+      </button>
+      <button 
+        onClick={() => window.dispatchEvent(new CustomEvent('open-changelog'))}
+        className="px-3.5 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl font-medium transition-colors cursor-pointer"
+      >
+        View Changelog
+      </button>
+    </div>
   );
 };
 

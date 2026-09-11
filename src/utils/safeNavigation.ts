@@ -53,7 +53,7 @@ export function isSafeNavigationUrl(url: string): boolean {
   if (protocol === 'nova:') {
     try {
       const parsed = new URL(candidate);
-      if (!['newtab', 'settings', 'history', 'downloads'].includes(parsed.hostname) ||
+      if (!['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new'].includes(parsed.hostname) ||
           parsed.pathname || parsed.search || parsed.username || parsed.password) {
         return false;
       }
@@ -73,7 +73,9 @@ export function isSafeNavigationUrl(url: string): boolean {
       'about:settings',
       'about:history',
       'about:downloads',
-      'about:newtab'
+      'about:newtab',
+      'about:changelog',
+      'about:whats-new'
     ].includes(normalized);
   }
 

@@ -1541,6 +1541,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           handlersRef.current.handleOpenHistory();
         } else if (command === 'downloads') {
           handlersRef.current.handleOpenDownloads();
+        } else if (command === 'whats-new' || command === 'changelog') {
+          handlersRef.current.handleNewTab('nova://changelog');
         } else if (command === 'bookmark') {
           handlersRef.current.handleToggleBookmarkActive();
         } else if (command === 'toggle-bookmarks-bar') {
@@ -1591,11 +1593,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const handleOpenSidePanel = () => setIsSidePanelOpen(true);
     const handleOpenWorkspaceManager = () => setIsWorkspaceManagerOpen(true);
     const handleOpenAccountModal = () => setIsAccountModalOpen(true);
+    const handleOpenChangelog = () => handlersRef.current.handleNewTab('nova://changelog');
     
     window.addEventListener('ai-quick-action', handleQuickAIAction);
     window.addEventListener('open-ai-sidepanel', handleOpenSidePanel);
     window.addEventListener('open-workspace-manager', handleOpenWorkspaceManager);
     window.addEventListener('open-account-modal', handleOpenAccountModal);
+    window.addEventListener('open-changelog', handleOpenChangelog);
 
     return () => {
       if (typeof cleanupShortcut === 'function') cleanupShortcut();
@@ -1607,6 +1611,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       window.removeEventListener('open-ai-sidepanel', handleOpenSidePanel);
       window.removeEventListener('open-workspace-manager', handleOpenWorkspaceManager);
       window.removeEventListener('open-account-modal', handleOpenAccountModal);
+      window.removeEventListener('open-changelog', handleOpenChangelog);
     };
   }, []);
 
@@ -1662,6 +1667,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
     else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
     else if (finalUrl.startsWith('nova://downloads')) initialTitle = 'Downloads';
+    else if (finalUrl.startsWith('nova://changelog') || finalUrl.startsWith('nova://whats-new')) initialTitle = "What's New";
 
     // If current tab is an unnavigated empty "New Tab" and url is specific (e.g. settings, history),
     // navigate current tab instead of spawning a redundant new tab
@@ -1834,6 +1840,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     else if (url.startsWith('nova://settings')) newTitle = 'Settings';
     else if (url.startsWith('nova://history')) newTitle = 'History';
     else if (url.startsWith('nova://downloads')) newTitle = 'Downloads';
+    else if (url.startsWith('nova://changelog') || url.startsWith('nova://whats-new')) newTitle = "What's New";
 
     const isInternalPage = !!newTitle;
 
@@ -2857,6 +2864,37 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     handleGoBack,
     handleGoForward
   };
+
+  // Post-update startup check: Automatically open What's New changelog tab when browser is updated
+  useEffect(() => {
+    const LAST_VERSION_KEY = 'nova_last_seen_version';
+    let isCancelled = false;
+
+    const checkVersionAndOpenChangelog = async () => {
+      try {
+        let currentVer = '';
+        if (window.electronAPI?.getAppVersion) {
+          currentVer = await window.electronAPI.getAppVersion();
+        }
+        if (!currentVer && typeof __APP_VERSION__ !== 'undefined') {
+          currentVer = __APP_VERSION__;
+        }
+        if (!currentVer || isCancelled) return;
+
+        const lastSeen = localStorage.getItem(LAST_VERSION_KEY);
+        // If lastSeen exists and differs from current version, browser was just updated!
+        if (lastSeen && lastSeen !== currentVer) {
+          handleNewTab('nova://changelog');
+        }
+        localStorage.setItem(LAST_VERSION_KEY, currentVer);
+      } catch (e) {
+        console.warn('[Changelog] Error checking version on startup:', e);
+      }
+    };
+
+    checkVersionAndOpenChangelog();
+    return () => { isCancelled = true; };
+  }, [handleNewTab]);
 
   // Global Chrome Keyboard Shortcuts Listener
   useEffect(() => {

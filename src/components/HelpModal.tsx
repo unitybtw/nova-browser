@@ -531,6 +531,16 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                   )}
 
                   <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                    <button
+                      onClick={() => {
+                        window.dispatchEvent(new CustomEvent('open-changelog'));
+                        onClose();
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors shadow-sm cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>What's New (Changelog)</span>
+                    </button>
                     <a
                       href="https://github.com/unitybtw/nova-browser"
                       target="_blank"
