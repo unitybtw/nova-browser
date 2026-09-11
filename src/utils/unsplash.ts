@@ -24,6 +24,7 @@ export const STORAGE_KEYS = {
   ACTIVE_WALLPAPER_ID: 'nova_wallpaper_active_id',
   ACTIVE_WALLPAPER_DATE: 'nova_wallpaper_active_date',
   USER_OVERRIDE: 'nova_wallpaper_user_override',
+  CUSTOM_PHOTO: 'nova_wallpaper_custom_photo',
   DAILY_CACHE_PREFIX: 'nova_daily_4k_'
 } as const;
 
@@ -398,6 +399,56 @@ export const CURATED_4K_WALLPAPERS: WallpaperPhoto[] = [
 let cachedDailyWallpapers: WallpaperPhoto[] = [...CURATED_4K_WALLPAPERS];
 
 /**
+ * Validates that a wallpaper URL is a secure, well-formed HTTP/HTTPS URL.
+ * Strips quotes, backslashes, and control characters to prevent CSS injection.
+ */
+export function isValidWallpaperUrl(urlStr: unknown): urlStr is string {
+  if (typeof urlStr !== 'string' || !urlStr.trim()) return false;
+  const trimmed = urlStr.trim();
+  if (/["'\r\n\\]/.test(trimmed)) return false;
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sanitizes an incoming wallpaper photo object from external providers or storage.
+ */
+export function sanitizeWallpaperPhoto(item: any): WallpaperPhoto | null {
+  if (!item || typeof item !== 'object') return null;
+  if (!isValidWallpaperUrl(item.imageUrl) || !isValidWallpaperUrl(item.thumbnailUrl || item.imageUrl)) {
+    return null;
+  }
+
+  const rawId = String(item.id || item.imageUrl).trim();
+  const safeId = rawId.slice(0, 100).replace(/[^a-zA-Z0-9._-]/g, '_');
+  if (!safeId) return null;
+
+  const rawTitle = String(item.title || 'Daily 4K UHD Wallpaper').trim();
+  const safeTitle = rawTitle.slice(0, 150).replace(/[\r\n\t]/g, ' ');
+
+  const rawAuthor = String(item.author || 'Nova 4K Engine').trim();
+  const safeAuthor = rawAuthor.slice(0, 100).replace(/[\r\n\t]/g, ' ');
+
+  const safeAuthorUrl = isValidWallpaperUrl(item.authorUrl) ? item.authorUrl.trim() : undefined;
+
+  return {
+    id: safeId,
+    title: safeTitle,
+    author: safeAuthor,
+    authorUrl: safeAuthorUrl,
+    imageUrl: item.imageUrl.trim(),
+    thumbnailUrl: (item.thumbnailUrl || item.imageUrl).trim(),
+    source: String(item.source || '4K Ultra HD').slice(0, 50),
+    resolution: String(item.resolution || '3840x2160').slice(0, 30),
+    date: item.date ? String(item.date).slice(0, 30) : undefined
+  };
+}
+
+/**
  * Returns current date string in local timezone (YYYY-MM-DD)
  */
 export function getLocalDateString(): string {
@@ -414,9 +465,10 @@ export function getLocalDateString(): string {
  */
 export function getDailyWallpaperIndex(dateStr: string, poolSize: number): number {
   if (poolSize <= 0) return 0;
+  const safeStr = typeof dateStr === 'string' ? dateStr : '';
   let hash = 0;
-  for (let i = 0; i < dateStr.length; i++) {
-    hash = ((hash << 5) - hash) + dateStr.charCodeAt(i);
+  for (let i = 0; i < safeStr.length; i++) {
+    hash = ((hash << 5) - hash) + safeStr.charCodeAt(i);
     hash |= 0;
   }
   return Math.abs(hash) % poolSize;
@@ -424,6 +476,7 @@ export function getDailyWallpaperIndex(dateStr: string, poolSize: number): numbe
 
 /**
  * Reads the active wallpaper ID, ensuring deterministic daily selection if no manual override is active.
+ * Retains custom user choices across browser restarts even before external providers finish loading.
  */
 export function getInitialActiveWallpaper(pool: WallpaperPhoto[]): WallpaperPhoto {
   const currentPool = pool && pool.length > 0 ? pool : CURATED_4K_WALLPAPERS;
@@ -443,6 +496,22 @@ export function getInitialActiveWallpaper(pool: WallpaperPhoto[]): WallpaperPhot
     if (isOverride && savedId) {
       const found = currentPool.find(p => p.id === savedId);
       if (found) return found;
+
+      // Check persisted custom photo object for online/external wallpapers
+      const customRaw = localStorage.getItem(STORAGE_KEYS.CUSTOM_PHOTO);
+      if (customRaw) {
+        try {
+          const parsedCustom = JSON.parse(customRaw);
+          const sanitized = sanitizeWallpaperPhoto(parsedCustom);
+          if (sanitized && sanitized.id === savedId) {
+            return sanitized;
+          }
+        } catch (_) {}
+      }
+
+      // If not yet available in pool, return first pool photo temporarily
+      // but DO NOT reset USER_OVERRIDE to false so preference is preserved
+      return currentPool[0];
     }
 
     // If it's the same day and we already have a saved active ID, preserve it
@@ -499,16 +568,22 @@ function initializeFromStorage() {
     if (local) {
       const parsed = JSON.parse(local);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Merge with curated wallpapers ensuring unique IDs
-        const existingIds = new Set(parsed.map(p => p.id));
-        const merged = [...parsed];
-        for (const item of CURATED_4K_WALLPAPERS) {
-          if (!existingIds.has(item.id)) {
-            merged.push(item);
-            existingIds.add(item.id);
-          }
+        const validated: WallpaperPhoto[] = [];
+        for (const p of parsed) {
+          const s = sanitizeWallpaperPhoto(p);
+          if (s) validated.push(s);
         }
-        cachedDailyWallpapers = merged;
+        if (validated.length > 0) {
+          const existingIds = new Set(validated.map(p => p.id));
+          const merged = [...validated];
+          for (const item of CURATED_4K_WALLPAPERS) {
+            if (!existingIds.has(item.id)) {
+              merged.push(item);
+              existingIds.add(item.id);
+            }
+          }
+          cachedDailyWallpapers = merged;
+        }
       }
     }
   } catch (e) {}
@@ -529,18 +604,9 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
       const ipcResults = await (window as any).electronAPI.fetchWallpaperPhotos('daily');
       if (ipcResults && Array.isArray(ipcResults) && ipcResults.length > 0) {
         for (const item of ipcResults) {
-          if (item.imageUrl && item.imageUrl.startsWith('http')) {
-            fetchedResults.push({
-              id: item.id || item.imageUrl,
-              title: item.title || 'Daily 4K UHD Wallpaper',
-              author: item.author || 'Daily 4K',
-              authorUrl: item.authorUrl,
-              imageUrl: item.imageUrl,
-              thumbnailUrl: item.thumbnailUrl || item.imageUrl,
-              source: item.source || '4K UHD Daily',
-              resolution: item.resolution || '3840x2160',
-              date: item.date
-            });
+          const sanitized = sanitizeWallpaperPhoto(item);
+          if (sanitized) {
+            fetchedResults.push(sanitized);
           }
         }
       }
@@ -558,7 +624,7 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
         if (bingData.images && Array.isArray(bingData.images)) {
           for (const img of bingData.images) {
             const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-            fetchedResults.push({
+            const sanitized = sanitizeWallpaperPhoto({
               id: `bing-${img.hsh || img.startdate}`,
               title: img.title || 'Bing Daily 4K Wallpaper',
               author: img.copyright || 'Microsoft Bing Daily',
@@ -569,6 +635,9 @@ export async function fetchDaily4KWallpapers(): Promise<WallpaperPhoto[]> {
               resolution: '3840x2160',
               date: img.startdate
             });
+            if (sanitized) {
+              fetchedResults.push(sanitized);
+            }
           }
         }
       }
@@ -636,7 +705,7 @@ export function getUnsplashThumbnailUrl(): string {
 export function setActiveWallpaper(photoOrId: string | WallpaperPhoto, isUserOverride = true): WallpaperPhoto | undefined {
   const targetId = typeof photoOrId === 'string' ? photoOrId : photoOrId.id;
   const photo = cachedDailyWallpapers.find(p => p.id === targetId) ||
-    (typeof photoOrId !== 'string' ? photoOrId : undefined);
+    (typeof photoOrId !== 'string' ? sanitizeWallpaperPhoto(photoOrId) || undefined : undefined);
 
   if (!photo) return undefined;
 
@@ -645,6 +714,11 @@ export function setActiveWallpaper(photoOrId: string | WallpaperPhoto, isUserOve
       localStorage.setItem(STORAGE_KEYS.ACTIVE_WALLPAPER_ID, photo.id);
       localStorage.setItem(STORAGE_KEYS.ACTIVE_WALLPAPER_DATE, getLocalDateString());
       localStorage.setItem(STORAGE_KEYS.USER_OVERRIDE, isUserOverride ? 'true' : 'false');
+      if (isUserOverride) {
+        localStorage.setItem(STORAGE_KEYS.CUSTOM_PHOTO, JSON.stringify(photo));
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.CUSTOM_PHOTO);
+      }
     }
   } catch (e) {}
 
@@ -665,6 +739,7 @@ export function resetToDailyWallpaper(): WallpaperPhoto {
       localStorage.setItem(STORAGE_KEYS.ACTIVE_WALLPAPER_ID, dailyPhoto.id);
       localStorage.setItem(STORAGE_KEYS.ACTIVE_WALLPAPER_DATE, todayStr);
       localStorage.setItem(STORAGE_KEYS.USER_OVERRIDE, 'false');
+      localStorage.removeItem(STORAGE_KEYS.CUSTOM_PHOTO);
     }
   } catch (e) {}
 

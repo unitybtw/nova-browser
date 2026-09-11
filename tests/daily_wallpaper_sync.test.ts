@@ -59,5 +59,36 @@ console.log('[PASS] [Wallpaper-Sync-4] Boundary condition with single-item pool 
 assert(STORAGE_KEYS.ACTIVE_WALLPAPER_ID === 'nova_wallpaper_active_id', 'Storage key ACTIVE_WALLPAPER_ID mismatch');
 assert(STORAGE_KEYS.ACTIVE_WALLPAPER_DATE === 'nova_wallpaper_active_date', 'Storage key ACTIVE_WALLPAPER_DATE mismatch');
 assert(STORAGE_KEYS.USER_OVERRIDE === 'nova_wallpaper_user_override', 'Storage key USER_OVERRIDE mismatch');
+assert(STORAGE_KEYS.CUSTOM_PHOTO === 'nova_wallpaper_custom_photo', 'Storage key CUSTOM_PHOTO mismatch');
 console.log('[PASS] [Wallpaper-Sync-5] Persistent storage keys validated.');
+
+// 6. Security URL Validation & Injection Defense
+import { isValidWallpaperUrl, sanitizeWallpaperPhoto } from '../src/utils/unsplash';
+
+assert(isValidWallpaperUrl('https://images.unsplash.com/photo-123?w=3840'), 'Valid HTTPS URL rejected');
+assert(isValidWallpaperUrl('http://example.com/test.jpg'), 'Valid HTTP URL rejected');
+assert(!isValidWallpaperUrl('javascript:alert(1)'), 'Dangerous javascript: scheme was not blocked');
+assert(!isValidWallpaperUrl('data:text/html,<script>'), 'data: scheme was not blocked');
+assert(!isValidWallpaperUrl("https://example.com/photo.jpg'); background: red;"), 'CSS breakout single quote not blocked');
+assert(!isValidWallpaperUrl('https://example.com/photo.jpg"'), 'Double quote not blocked');
+assert(!isValidWallpaperUrl('https://example.com/photo.jpg\\'), 'Backslash not blocked');
+console.log('[PASS] [Wallpaper-Sync-6] Strict URL validation blocks CSS breakout and non-HTTP schemes.');
+
+// 7. Sanitization Hygiene
+const cleanPhoto = sanitizeWallpaperPhoto({
+  id: 'safe_id_123',
+  title: 'Clean Title \n with break',
+  author: 'Author \r Name',
+  imageUrl: 'https://images.unsplash.com/clean.jpg',
+  thumbnailUrl: 'https://images.unsplash.com/thumb.jpg',
+  source: 'Nature',
+  resolution: '3840x2160'
+});
+assert(cleanPhoto !== null, 'Sanitization failed for valid input');
+assert(!cleanPhoto?.title.includes('\n'), 'Title line break was not normalized');
+assert(!cleanPhoto?.author.includes('\r'), 'Author carriage return was not normalized');
+assert(sanitizeWallpaperPhoto(null) === null, 'Null object should return null');
+assert(sanitizeWallpaperPhoto({ imageUrl: 'invalid' }) === null, 'Invalid imageUrl should return null');
+console.log('[PASS] [Wallpaper-Sync-7] Wallpaper photo metadata sanitization and normalization verified.');
+
 

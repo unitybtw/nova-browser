@@ -2259,29 +2259,33 @@ rm -rf "\${TEMP_DIR}"
         // If body has no bullets and there is a previous tag, query compare API to get commits
         if (changes.length === 0 && prev?.tag_name) {
           try {
-            const compRes = await fetch(`https://api.github.com/repos/unitybtw/nova-browser/compare/${prev.tag_name}...${tag}`, {
-              headers: { 'User-Agent': getStandardUserAgent() },
-              signal: AbortSignal.timeout(5000)
-            });
-            if (compRes.ok) {
-              const compData = await compRes.json();
-              if (Array.isArray(compData.commits)) {
-                for (const c of compData.commits) {
-                  const msg = (c.commit?.message || '').split('\n')[0].trim();
-                  if (!msg || msg.startsWith('Merge') || msg.startsWith('release:')) continue;
-                  const match = msg.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
-                  if (match) {
-                    const type = match[1].toLowerCase();
-                    const scope = match[2] ? `[${match[2]}] ` : '';
-                    const desc = match[3];
-                    let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
-                    if (type === 'feat') cat = 'feature';
-                    else if (type === 'fix') cat = 'fix';
-                    else if (type === 'perf') cat = 'performance';
-                    else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
-                    changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
-                  } else {
-                    changes.push({ category: 'improvement', text: msg.charAt(0).toUpperCase() + msg.slice(1) });
+            const safePrev = String(prev.tag_name).trim();
+            const safeCurr = String(tag).trim();
+            if (/^[a-zA-Z0-9._-]+$/.test(safePrev) && /^[a-zA-Z0-9._-]+$/.test(safeCurr)) {
+              const compRes = await fetch(`https://api.github.com/repos/unitybtw/nova-browser/compare/${encodeURIComponent(safePrev)}...${encodeURIComponent(safeCurr)}`, {
+                headers: { 'User-Agent': getStandardUserAgent() },
+                signal: AbortSignal.timeout(5000)
+              });
+              if (compRes.ok) {
+                const compData = await compRes.json();
+                if (Array.isArray(compData.commits)) {
+                  for (const c of compData.commits) {
+                    const msg = (c.commit?.message || '').split('\n')[0].trim();
+                    if (!msg || msg.startsWith('Merge') || msg.startsWith('release:')) continue;
+                    const match = msg.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+                    if (match) {
+                      const type = match[1].toLowerCase();
+                      const scope = match[2] ? `[${match[2]}] ` : '';
+                      const desc = match[3];
+                      let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
+                      if (type === 'feat') cat = 'feature';
+                      else if (type === 'fix') cat = 'fix';
+                      else if (type === 'perf') cat = 'performance';
+                      else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
+                      changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
+                    } else {
+                      changes.push({ category: 'improvement', text: msg.charAt(0).toUpperCase() + msg.slice(1) });
+                    }
                   }
                 }
               }
@@ -2673,72 +2677,115 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   const results: any[] = [];
   const seenIds = new Set<string>();
 
-  // Helper to add unique photos
+  const isSafeHttpUrl = (u: any): boolean => {
+    if (typeof u !== 'string' || !u.trim() || /["'\r\n\\]/.test(u)) return false;
+    try {
+      const p = new URL(u);
+      return p.protocol === 'https:' || p.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  };
+
   const addPhoto = (photo: any) => {
-    if (!photo || !photo.id || !photo.imageUrl || seenIds.has(photo.id)) return;
+    if (!photo || !photo.id || !isSafeHttpUrl(photo.imageUrl) || seenIds.has(photo.id)) return;
     seenIds.add(photo.id);
     results.push(photo);
   };
 
-  // Provider 1: Bing Official Daily 4K UHD Image Archive (Batches for current and recent days)
-  for (const idx of [0, 7]) {
-    try {
-      const bingRes = await fetch(`https://www.bing.com/HPImageArchive.aspx?format=js&idx=${idx}&n=8&mkt=en-US`, {
-        // Robustness: hard 8s cap so a hung provider can't stall the handler
-        signal: AbortSignal.timeout(8000)
-      });
-      if (bingRes.ok) {
-        const bingData = await bingRes.json();
-        if (bingData.images && Array.isArray(bingData.images)) {
-          for (const img of bingData.images) {
-            const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-            const photoId = `bing-${img.hsh || img.startdate}`;
-            addPhoto({
-              id: photoId,
-              title: img.title || 'Bing Daily 4K Wallpaper',
-              author: img.copyright || 'Microsoft Bing Daily',
-              authorUrl: 'https://bing.com',
-              imageUrl: uhdUrl,
-              thumbnailUrl: `https://www.bing.com${img.url}`,
-              source: 'Bing 4K UHD Daily',
-              resolution: '3840x2160',
-              date: img.startdate
-            });
+  // Run all providers concurrently to eliminate sequential network latency
+  await Promise.allSettled([
+    // Bing Batch 1 (Today + recent days)
+    (async () => {
+      try {
+        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.images && Array.isArray(data.images)) {
+            for (const img of data.images) {
+              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+              addPhoto({
+                id: `bing-${img.hsh || img.startdate}`,
+                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                authorUrl: 'https://bing.com',
+                imageUrl: uhdUrl,
+                thumbnailUrl: `https://www.bing.com${img.url}`,
+                source: 'Bing 4K UHD Daily',
+                resolution: '3840x2160',
+                date: img.startdate
+              });
+            }
           }
         }
+      } catch (e) {
+        console.warn('Bing batch 0 fetch error:', e);
       }
-    } catch (e) {
-      console.warn(`Bing daily IPC fetch error (idx=${idx}):`, e);
-    }
-  }
+    })(),
 
-  // Provider 2: Wallhaven Top 4K Desktop Wallpaper Feed (Curated UHD Landscapes)
-  try {
-    const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
-    const whRes = await fetch(whUrl, {
-      headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(8000)
-    });
-    if (whRes.ok) {
-      const whData = await whRes.json();
-      if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
-        for (const item of whData.data.slice(0, 15)) {
-          addPhoto({
-            id: `wh-${item.id}`,
-            title: `4K Desktop Wallpaper (${item.category || 'Landscape'})`,
-            author: 'Wallhaven 4K Curated',
-            authorUrl: item.url || 'https://wallhaven.cc',
-            imageUrl: item.path,
-            thumbnailUrl: item.thumbs?.large || item.thumbs?.small || item.path,
-            source: '4K Ultra HD',
-            resolution: item.resolution || '3840x2160'
-          });
+    // Bing Batch 2 (Previous week)
+    (async () => {
+      try {
+        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=7&n=8&mkt=en-US', {
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.images && Array.isArray(data.images)) {
+            for (const img of data.images) {
+              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+              addPhoto({
+                id: `bing-${img.hsh || img.startdate}`,
+                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                authorUrl: 'https://bing.com',
+                imageUrl: uhdUrl,
+                thumbnailUrl: `https://www.bing.com${img.url}`,
+                source: 'Bing 4K UHD Daily',
+                resolution: '3840x2160',
+                date: img.startdate
+              });
+            }
+          }
         }
+      } catch (e) {
+        console.warn('Bing batch 7 fetch error:', e);
       }
-    }
-  } catch (err) {
-    console.warn('Wallhaven toplist fetch error:', err);
-  }
+    })(),
+
+    // Wallhaven Curated 4K Widescreen
+    (async () => {
+      try {
+        const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
+        const res = await fetch(whUrl, {
+          headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (res.ok) {
+          const whData = await res.json();
+          if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
+            for (const item of whData.data.slice(0, 15)) {
+              if (!isSafeHttpUrl(item.path)) continue;
+              addPhoto({
+                id: `wh-${item.id}`,
+                title: `4K Desktop Wallpaper (${item.category || 'Landscape'})`,
+                author: 'Wallhaven 4K Curated',
+                authorUrl: isSafeHttpUrl(item.url) ? item.url : 'https://wallhaven.cc',
+                imageUrl: item.path,
+                thumbnailUrl: isSafeHttpUrl(item.thumbs?.large) ? item.thumbs.large : (isSafeHttpUrl(item.thumbs?.small) ? item.thumbs.small : item.path),
+                source: '4K Ultra HD',
+                resolution: item.resolution || '3840x2160'
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Wallhaven toplist fetch error:', err);
+      }
+    })()
+  ]);
 
   return results;
 });

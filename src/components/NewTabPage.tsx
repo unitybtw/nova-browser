@@ -507,7 +507,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             key={unsplashUrl}
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in duration-1000"
             style={{ 
-              backgroundImage: `url('${unsplashUrl}')` 
+              backgroundImage: `url('${(unsplashUrl || '').replace(/["'\r\n\\]/g, '')}')` 
             }}
           />
           <div className="absolute inset-0 bg-black/25"></div>
