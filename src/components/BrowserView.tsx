@@ -903,7 +903,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <webview
             ref={webviewRef}
             data-tab-id={tab.id}
-            partition={isIncognito ? 'incognito' : undefined}
+            partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
             src={getSafeUrl(tab.url)}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             allowpopups={"true" as any}

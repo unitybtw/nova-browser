@@ -41,6 +41,9 @@ import { computeLiveAndSuspendedTabs } from './utils/tabManager';
 import { setLanguage } from './services/i18n';
 import { isValidProxyUrl } from './utils/proxyValidation';
 import { matchesShortcut } from './utils/keyboardShortcuts';
+import { useBookmarks } from './hooks/useBookmarks';
+import { useWorkspaces } from './hooks/useWorkspaces';
+import { useTabManager } from './hooks/useTabManager';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -86,6 +89,7 @@ import { aiAgent } from './services/aiAgent';
 import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
 import { orchestrator } from './services/agentOrchestrator';
+import { searchHistoryAndBookmarks, SearchableItem } from './utils/searchHistoryBookmarks';
 
 const DEFAULT_VPN_LOCATION: VpnLocation = {
   id: 'direct',
@@ -290,16 +294,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   tabsRef.current = tabs;
   const activeSplitTabIdRef = useRef<string | null>(null);
 
-  const [folders, setFolders] = useState<Folder[]>(() => {
-    if (demoParams.isDemo && demoParams.feature === 'vertical_tabs') {
-      return [
-        { id: 'f1', name: 'Frontend Stack', isExpanded: true, workspaceId: 'default' },
-        { id: 'f2', name: 'Research Papers', isExpanded: false, workspaceId: 'default' }
-      ];
-    }
-    const saved = localStorage.getItem('folders_session');
-    return safeParseArrayWithBackup<Folder>('folders_session', saved, []);
-  });
+  const {
+    folders,
+    setFolders,
+    workspaces,
+    setWorkspaces,
+    workspacesRef,
+    activeWorkspaceId,
+    setActiveWorkspaceId,
+    activeWorkspaceIdRef
+  } = useWorkspaces({ isDemo: demoParams.isDemo, demoFeature: demoParams.feature });
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
@@ -308,47 +312,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
-  
-  // Workspaces State
-  const defaultWorkspaces: Workspace[] = [
-    { id: 'default', name: 'Personal', color: 'slate' },
-    { id: 'work', name: 'Work', color: 'blue' },
-    { id: 'research', name: 'Research', color: 'purple' }
-  ];
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
-    const saved = localStorage.getItem('workspaces_session');
-    const parsed = safeParseArrayWithBackup<Workspace>('workspaces_session', saved, []);
-    return parsed.length > 0 ? parsed : defaultWorkspaces;
-  });
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => {
-    return localStorage.getItem('active_workspace_session') || 'default';
-  });
-  const activeWorkspaceIdRef = useRef(activeWorkspaceId);
-  useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
-  const workspacesRef = useRef(workspaces);
-  useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
-
-  // Debounced 500ms like tabs — workspace switching must not storm localStorage.
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const serialized = JSON.stringify(workspaces);
-        localStorage.setItem('workspaces_session', serialized);
-        (window as any).electronAPI?.storeSet?.('workspaces_session', serialized);
-      } catch (e) {}
-      try {
-        localStorage.setItem('active_workspace_session', activeWorkspaceId);
-      } catch (e) {}
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [workspaces, activeWorkspaceId]);
-
-  useEffect(() => {
-    if (workspaces.length === 0) return;
-    if (!workspaces.some(workspace => workspace.id === activeWorkspaceId)) {
-      setActiveWorkspaceId(workspaces[0].id);
-    }
-  }, [workspaces, activeWorkspaceId]);
 
   useEffect(() => {
     const visibleWorkspaceTabs = tabs.filter(tab =>
@@ -795,9 +758,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const foldersRef = useRef(folders);
   useEffect(() => { foldersRef.current = folders; }, [folders]);
-  // Early ref for the beforeunload flush below (bookmarks state is declared
-  // further down; it syncs into this ref via its own effect).
-  const bookmarksRef = useRef<Bookmark[]>([]);
+  const {
+    bookmarks,
+    setBookmarks,
+    bookmarksRef,
+    handleToggleBookmark
+  } = useBookmarks();
 
   // Immediate flush on beforeunload to prevent session loss on abrupt browser close
   // (also flushes debounced settings/bookmarks/workspaces stores)
@@ -1421,24 +1387,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
   }, [settings.language]);
   
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
-    const saved = localStorage.getItem('bookmarks');
-    return safeParseArrayWithBackup<Bookmark>('bookmarks', saved, []);
-  });
-
-  useEffect(() => { bookmarksRef.current = bookmarks; }, [bookmarks]);
-
-  // Save bookmarks to localStorage (debounced 500ms like tabs)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const serialized = JSON.stringify(bookmarks);
-        localStorage.setItem('bookmarks', serialized);
-        (window as any).electronAPI?.storeSet?.('bookmarks', serialized);
-      } catch (e) {}
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [bookmarks]);
 
   // Disk-backed storage hydration fallback: if localStorage was cleared, corrupted,
   // or exceeded quota, restore session tabs, folders, workspaces, bookmarks and user settings
@@ -1672,15 +1620,39 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion only when hibernation is enabled
   const MAX_LIVE_WEBVIEWS = 6;
+  // Staggered wake-up ref: tracks the interval used to gradually restore suspended tabs
+  // when hibernation is disabled, preventing simultaneous Chromium renderer process spawning.
+  const staggeredWakeRef = useRef<ReturnType<typeof setInterval> | null>(null);
   useEffect(() => {
     const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
     if (!isHibernationEnabled) {
-      setTabs(prev => {
-        const hasSuspended = prev.some(t => t.isSuspended);
-        if (!hasSuspended) return prev;
-        return prev.map(t => t.isSuspended ? { ...t, isSuspended: false } : t);
-      });
-      return;
+      // Staggered wake-up: wake at most 2 tabs every 300ms to avoid a Chromium process explosion.
+      // Clear any previous interval before starting a new one.
+      if (staggeredWakeRef.current !== null) {
+        clearInterval(staggeredWakeRef.current);
+        staggeredWakeRef.current = null;
+      }
+      staggeredWakeRef.current = setInterval(() => {
+        setTabs(prev => {
+          const suspendedTabs = prev.filter(t => t.isSuspended);
+          if (suspendedTabs.length === 0) {
+            if (staggeredWakeRef.current !== null) {
+              clearInterval(staggeredWakeRef.current);
+              staggeredWakeRef.current = null;
+            }
+            return prev;
+          }
+          // Wake next 2 suspended tabs in this tick
+          const idsToWake = new Set(suspendedTabs.slice(0, 2).map(t => t.id));
+          return prev.map(t => idsToWake.has(t.id) ? { ...t, isSuspended: false } : t);
+        });
+      }, 300);
+      return () => {
+        if (staggeredWakeRef.current !== null) {
+          clearInterval(staggeredWakeRef.current);
+          staggeredWakeRef.current = null;
+        }
+      };
     }
 
     const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, MAX_LIVE_WEBVIEWS);
@@ -1765,8 +1737,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }
 
-    // If closing an incognito tab and no more incognito tabs exist, clear session
+    // If closing an incognito tab, always clear that tab's specific partition immediately.
+    // If no more incognito tabs remain, also clear the legacy shared partition for safety.
     if (targetTab?.isIncognito) {
+      if ((window as any).electronAPI?.clearIncognitoSession) {
+        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
+      }
       const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
       if (!remainingIncognitoTabs && (window as any).electronAPI?.clearIncognitoSession) {
         (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
@@ -2691,7 +2667,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: (direction, amount) => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        const cleanAmount = Math.abs(Number(amount) || 500);
+        const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(amount) || 500)));
         if (webview && webview.executeJavaScript) {
           if (direction === 'up') webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
           if (direction === 'down') webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
@@ -2733,15 +2709,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return [];
       },
       onSearchHistory: (query: string) => {
-        const q = (query || '').toLowerCase();
-        // search history and bookmarks
+        const q = (query || '').trim();
+        if (!q) return [];
         const { history, bookmarks } = browserDataRef.current;
-        const results = [
-          ...(Array.isArray(history) ? history.filter(h => (h?.title && typeof h.title === 'string' && h.title.toLowerCase().includes(q)) || (h?.url && typeof h.url === 'string' && h.url.toLowerCase().includes(q))) : []),
-          ...(Array.isArray(bookmarks) ? bookmarks.filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(q)) || (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(q))) : [])
+        const searchPool: SearchableItem[] = [
+          ...(Array.isArray(bookmarks) ? bookmarks.map(b => ({ id: b.id, title: b.title, url: b.url, type: 'bookmark' as const })) : []),
+          ...(Array.isArray(history) ? history.map(h => ({ id: h.id, title: h.title, url: h.url, type: 'history' as const, timestamp: h.timestamp })) : [])
         ];
-        // deduplicate by URL
-        const unique = Array.from(new Map(results.map(item => [item.url, item])).values());
+        const matches = searchHistoryAndBookmarks(q, searchPool);
+        const unique = Array.from(new Map(matches.map(item => [item.url, item])).values());
         return unique.slice(0, 10).map(u => ({ title: u.title, url: u.url }));
       }
     });
@@ -2856,23 +2832,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
   }, []);
 
-  const handleToggleBookmark = useCallback((tab: Tab) => {
-    if (!tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank') return;
-    setBookmarks(prev => {
-      const isBookmarked = prev.some(b => b.url === tab.url);
-      if (isBookmarked) {
-        return prev.filter(b => b.url !== tab.url);
-      } else {
-        return [...prev, {
-          id: generateId('bm'),
-          url: tab.url,
-          title: tab.title || tab.url,
-          favicon: tab.favicon,
-          timestamp: Date.now()
-        }];
-      }
-    });
-  }, []);
 
   const handleToggleBookmarkActive = useCallback(() => {
     if (activeTab) handleToggleBookmark(activeTab);

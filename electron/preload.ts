@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   respondMcpAction: (id: string, result: unknown) => {
     ipcRenderer.send('mcp-action-response', { id, result });
   },
-  clearIncognitoSession: () => ipcRenderer.invoke('clear-incognito-session'),
+  clearIncognitoSession: (tabId?: string) => ipcRenderer.invoke('clear-incognito-session', tabId),
   clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),

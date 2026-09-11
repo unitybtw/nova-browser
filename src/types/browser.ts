@@ -57,6 +57,13 @@ export interface Bookmark {
   timestamp: number;
 }
 
+export interface SavedPassword {
+  hostname: string;
+  username: string;
+  password?: string;
+  createdAt?: number;
+}
+
 export interface DownloadItem {
   id: string;
   url: string;

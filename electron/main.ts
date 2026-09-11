@@ -205,9 +205,12 @@ if (process.platform === 'linux') {
     if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
       const userns = fs.readFileSync('/proc/sys/kernel/unprivileged_userns_clone', 'utf-8').trim();
       if (userns === '0') {
-        console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Falling back to un-sandboxed mode.');
+        console.warn('[Security] Linux unprivileged user namespaces disabled in kernel. Falling back to un-sandboxed mode. User will be notified after window ready.');
         app.commandLine.appendSwitch('no-sandbox');
         app.commandLine.appendSwitch('disable-setuid-sandbox');
+        // Flag sandbox warning to be shown after the main window is fully ready.
+        // dialog cannot be used before app.whenReady() resolves.
+        (global as any).__sandboxDisabledWarning = true;
       }
     }
   } catch (_) {}
@@ -413,6 +416,24 @@ function createWindow() {
   // never fires (e.g. dev-server retry loop failing for a while).
   mainWindow.once('ready-to-show', () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
+    // Show sandbox-disabled security warning if it was flagged during early startup.
+    if ((global as any).__sandboxDisabledWarning && mainWindow && !mainWindow.isDestroyed()) {
+      (global as any).__sandboxDisabledWarning = false;
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Security Warning — Sandbox Disabled',
+        message: 'Chromium renderer sandbox is disabled on this system.',
+        detail:
+          'Your Linux kernel has unprivileged user namespaces disabled ' +
+          '(/proc/sys/kernel/unprivileged_userns_clone = 0). ' +
+          'Nova Browser is running without the Chromium sandbox, which means a compromised ' +
+          'renderer process could access the host operating system directly.\n\n' +
+          'To re-enable sandbox protection, set the sysctl value to 1:\n' +
+          '  sudo sysctl -w kernel.unprivileged_userns_clone=1',
+        buttons: ['Understand and Continue'],
+        defaultId: 0,
+      }).catch(() => {});
+    }
   });
   setTimeout(() => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
@@ -516,7 +537,9 @@ function createWindow() {
         responseHeaders['Content-Security-Policy'] = [
           isDev
             ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            // Production: unsafe-inline removed from style-src (Tailwind uses class-based CSS, no inline styles needed).
+            // unsafe-inline is intentionally kept in dev only for Vite HMR compatibility.
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
         ];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
@@ -3563,13 +3586,23 @@ ipcMain.handle('get-mcp-status', (event) => {
   };
 });
 
-// Clear incognito mode session
-ipcMain.handle('clear-incognito-session', async (event) => {
+// Clear incognito mode session — accepts optional tabId for per-tab partition isolation.
+// When tabId is provided, clears only that tab's in-memory partition (incognito-{tabId}).
+// When omitted, clears the legacy shared 'incognito' partition (backward compat).
+ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
   if (!isTrustedSender(event)) return false;
   try {
-    const incogSession = session.fromPartition('incognito');
-    await incogSession.clearStorageData(); // cookies, cache, localStorage vs.
-    await incogSession.clearCache();
+    if (tabId && typeof tabId === 'string' && /^[a-zA-Z0-9_-]+$/.test(tabId)) {
+      const partitionName = `incognito-${tabId}`;
+      const sess = session.fromPartition(partitionName);
+      await sess.clearStorageData();
+      await sess.clearCache();
+    } else {
+      // Fallback: clear the legacy shared 'incognito' partition.
+      const legacySess = session.fromPartition('incognito');
+      await legacySess.clearStorageData();
+      await legacySess.clearCache();
+    }
     return true;
   } catch (err) {
     console.error('Error clearing incognito session:', err);
@@ -3627,57 +3660,68 @@ ipcMain.on('save-password', (event, data: { hostname: string; username: string; 
 });
 
 // Generic Secure Storage API (for future password manager, etc.)
+// Mutex: serialize concurrent secure-store operations to prevent read-modify-write races
+// when multiple tabs call save-password / secure-store-set simultaneously.
+let secureStoreMutexChain: Promise<unknown> = Promise.resolve();
+function withSecureStoreMutex<T>(fn: () => Promise<T>): Promise<T> {
+  const next = secureStoreMutexChain.then(fn, fn) as Promise<T>;
+  // Swallow any rejection on the chain tail so the mutex never stalls permanently.
+  secureStoreMutexChain = next.catch(() => undefined);
+  return next;
+}
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
-  try {
-    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
-    if (typeof value !== 'string') throw new Error('Invalid value format');
-    // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
-    const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
-    if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
-      throw new Error('Value exceeds maximum allowed size of 5MB');
-    }
-    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
-    if (safeStorage.isEncryptionAvailable()) {
-      const encrypted = safeStorage.encryptString(value);
-      await fs.promises.writeFile(keyPath, encrypted, { mode: 0o600 });
-      try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
-    } else {
-      console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
-      const getFallbackKey = (): Buffer => {
-        const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-        let secret: Buffer;
-        if (fs.existsSync(secretPath)) {
-          secret = fs.readFileSync(secretPath);
-        } else {
-          secret = crypto.randomBytes(32);
-          try {
-            fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-            if (process.platform !== 'win32') {
-              fs.chmodSync(secretPath, 0o600);
-            }
-          } catch (_) {}
-        }
-        // K-3: Bind salt to machine identity so copying userData to another machine/account fails
-        const machineSalt = getMachineSalt('nova-secure-salt');
-        return crypto.scryptSync(secret, machineSalt, 32);
-      };
-      const keyBuf = getFallbackKey();
-      const iv = crypto.randomBytes(12);
-      const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
-      const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
-      const tag = cipher.getAuthTag();
-      const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
-      await fs.promises.writeFile(keyPath, payload, { mode: 0o600 });
-      if (process.platform !== 'win32') {
-        try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+  return withSecureStoreMutex(async () => {
+    try {
+      if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+      if (typeof value !== 'string') throw new Error('Invalid value format');
+      // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
+      const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
+      if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
+        throw new Error('Value exceeds maximum allowed size of 5MB');
       }
+      const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+      if (safeStorage.isEncryptionAvailable()) {
+        const encrypted = safeStorage.encryptString(value);
+        await fs.promises.writeFile(keyPath, encrypted, { mode: 0o600 });
+        try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+      } else {
+        console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
+        const getFallbackKey = (): Buffer => {
+          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+          let secret: Buffer;
+          if (fs.existsSync(secretPath)) {
+            secret = fs.readFileSync(secretPath);
+          } else {
+            secret = crypto.randomBytes(32);
+            try {
+              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+              if (process.platform !== 'win32') {
+                fs.chmodSync(secretPath, 0o600);
+              }
+            } catch (_) {}
+          }
+          // K-3: Bind salt to machine identity so copying userData to another machine/account fails
+          const machineSalt = getMachineSalt('nova-secure-salt');
+          return crypto.scryptSync(secret, machineSalt, 32);
+        };
+        const keyBuf = getFallbackKey();
+        const iv = crypto.randomBytes(12);
+        const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
+        const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+        const tag = cipher.getAuthTag();
+        const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
+        await fs.promises.writeFile(keyPath, payload, { mode: 0o600 });
+        if (process.platform !== 'win32') {
+          try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error('Secure store set error:', err);
+      return false;
     }
-    return true;
-  } catch (err) {
-    console.error('Secure store set error:', err);
-    return false;
-  }
+  });
 });
 
 ipcMain.handle('secure-store-get', async (event, key: string) => {

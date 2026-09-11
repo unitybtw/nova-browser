@@ -98,7 +98,7 @@ interface ElectronExtensionPopupTabInfo {
  * members exist, so members are required and consumers can use
  * `window.electronAPI` directly with full type safety (no casts).
  */
-interface ElectronAPI {
+export interface ElectronAPI {
   // Theme / privacy
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setPrivacyShield: (enabled: boolean) => Promise<boolean>;
@@ -171,7 +171,7 @@ interface ElectronAPI {
     callback: (id: string, toolName: string, args: unknown) => void
   ) => () => void;
   respondMcpAction: (id: string, result: unknown) => void;
-  clearIncognitoSession: () => Promise<boolean>;
+  clearIncognitoSession: (tabId?: string) => Promise<boolean>;
   clearAiModelsCache: () => Promise<boolean>;
   purgeSystemMemory: () => Promise<boolean>;
   secureStoreSet: (key: string, value: string) => Promise<boolean>;

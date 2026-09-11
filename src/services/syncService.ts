@@ -16,11 +16,14 @@
  * accounts cannot sync. Legacy sync-chain/pairing APIs are deprecated (throw).
  */
 
-import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings } from '../types/browser';
+import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings, SavedPassword } from '../types/browser';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient, isSupabaseConfigured, hasElectronSecureStore, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
 import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';
 import { generateId } from '../utils/idGenerator';
 import { normalizeSyncCode, formatSyncCode } from '../utils/syncCodeUtils';
+import { logger } from '../utils/logger';
+import { getElectronAPI, type ElectronAPI } from '../utils/electronBridge';
 
 export interface NovaUser {
   id: string;
@@ -64,7 +67,7 @@ export interface SyncDataBundle {
   bookmarks?: Bookmark[];
   folders?: Folder[];
   history?: HistoryItem[];
-  passwords?: any[];
+  passwords?: SavedPassword[];
   encryptedPasswords?: string;
   passwordsSalt?: string;
   passwordsIv?: string;
@@ -234,7 +237,7 @@ class NovaSyncService {
   // Set during a sync when the legacy fallback had to be used, so the
   // post-push cleanup can wipe the legacy material.
   private usedLegacyKeyThisSync = false;
-  private realtimeChannel: any = null;
+  private realtimeChannel: RealtimeChannel | null = null;
   // Coalesce realtime bursts: rapid postgres_changes events schedule a single
   // notify 1000ms after the last event instead of one full sync per event.
   private realtimeNotifyTimer: ReturnType<typeof setTimeout> | null = null;
@@ -282,8 +285,8 @@ class NovaSyncService {
     return this.supabaseInitPromise;
   }
 
-  private get electronAPI(): any {
-    return typeof window !== 'undefined' ? (window as any).electronAPI ?? null : null;
+  private get electronAPI(): ElectronAPI | undefined {
+    return getElectronAPI();
   }
 
   /** Read a value from the OS secure store; null when unavailable/empty. */
@@ -349,7 +352,9 @@ class NovaSyncService {
       try {
         const parsed = JSON.parse(secure);
         if (parsed && typeof parsed === 'object' && parsed.id) return parsed;
-      } catch {}
+      } catch (err) {
+        logger.warn('SyncService:readStoredUser', 'Failed to parse user profile from secure store', err);
+      }
     }
     // Session-scoped fallback (web builds without the OS secure store).
     const session = this.readSessionValue(STORAGE_KEYS.USER);
@@ -357,7 +362,9 @@ class NovaSyncService {
       try {
         const parsed = JSON.parse(session);
         if (parsed && typeof parsed === 'object' && parsed.id) return parsed;
-      } catch {}
+      } catch (err) {
+        logger.warn('SyncService:readStoredUser', 'Failed to parse user profile from session store', err);
+      }
     }
     if (typeof localStorage !== 'undefined') {
       const legacy = localStorage.getItem(STORAGE_KEYS.USER);
@@ -556,7 +563,7 @@ class NovaSyncService {
       try {
         // Re-check at execution time in case the user logged out meanwhile.
         if (!this.masterKey || !this.currentUser) return;
-        await this.electronAPI.secureStoreSet(this.masterKeyStoreName(), this.masterKey);
+        await this.electronAPI?.secureStoreSet?.(this.masterKeyStoreName(), this.masterKey);
       } catch {
         // Best-effort only — sync still works for the current session.
       }
@@ -782,12 +789,14 @@ class NovaSyncService {
     try {
       const supabase = await getSupabaseClient();
       supabase.removeChannel(channel);
-    } catch (e) {}
+    } catch (e) {
+      logger.warn('SyncService:unsubscribeFromRealtime', 'Failed to remove realtime channel cleanly', e);
+    }
   }
 
   // --- CRYPTOGRAPHY / E2EE ---
 
-  public async encryptPasswords(passwords: any[], masterPassword: string): Promise<{ ciphertext: string; salt: string; iv: string }> {
+  public async encryptPasswords(passwords: SavedPassword[], masterPassword: string): Promise<{ ciphertext: string; salt: string; iv: string }> {
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     // Reuse syncCrypto.deriveKey (PBKDF2-SHA256 @ 600k) so the inner
@@ -809,7 +818,7 @@ class NovaSyncService {
     };
   }
 
-  public async decryptPasswords(ciphertext: string, saltStr: string, ivStr: string, masterPassword: string): Promise<any[]> {
+  public async decryptPasswords(ciphertext: string, saltStr: string, ivStr: string, masterPassword: string): Promise<SavedPassword[]> {
     let salt: Uint8Array;
     let iv: Uint8Array;
     let encryptedData: Uint8Array;
@@ -1121,7 +1130,9 @@ class NovaSyncService {
         void this.ensureSupabaseListener();
         const supabase = await getSupabaseClient();
         await supabase.auth.signOut();
-      } catch (e) {}
+      } catch (e) {
+        logger.warn('SyncService:logout', 'Failed to cleanly sign out from Supabase', e);
+      }
     }
 
     // Secure wipe of persisted sync keys and tokens via OS secureStore delete
@@ -1174,7 +1185,7 @@ class NovaSyncService {
     bookmarks: Bookmark[];
     folders: Folder[];
     history: HistoryItem[];
-    passwords: any[];
+    passwords: SavedPassword[];
     settings: UserSettings;
     workspaces: Workspace[];
   }): Promise<{
@@ -1182,7 +1193,7 @@ class NovaSyncService {
       bookmarks: Bookmark[];
       folders: Folder[];
       history: HistoryItem[];
-      passwords: any[];
+      passwords: SavedPassword[];
       settings: UserSettings;
       workspaces: Workspace[];
     };
@@ -1317,9 +1328,9 @@ class NovaSyncService {
               remoteBundle.passwordsIv,
               this.masterKey
             );
-            const passKey = (p: any) => `${p.hostname || ''}_${p.username || ''}`;
-            const passMap = new Map(localData.passwords.map(p => [passKey(p), p]));
-            decryptedRemotePasswords.forEach((rp: any) => {
+            const passKey = (p: SavedPassword) => `${p.hostname || ''}_${p.username || ''}`;
+            const passMap = new Map<string, SavedPassword>(localData.passwords.map(p => [passKey(p), p]));
+            decryptedRemotePasswords.forEach((rp: SavedPassword) => {
               const k = passKey(rp);
               if (!passMap.has(k)) passMap.set(k, rp);
             });
@@ -1338,9 +1349,9 @@ class NovaSyncService {
                   legacyKey
                 );
                 this.usedLegacyKeyThisSync = true;
-                const passKey = (p: any) => `${p.hostname || ''}_${p.username || ''}`;
-                const passMap = new Map(localData.passwords.map(p => [passKey(p), p]));
-                decryptedRemotePasswords.forEach((rp: any) => {
+                const passKey = (p: SavedPassword) => `${p.hostname || ''}_${p.username || ''}`;
+                const passMap = new Map<string, SavedPassword>(localData.passwords.map(p => [passKey(p), p]));
+                decryptedRemotePasswords.forEach((rp: SavedPassword) => {
                   const k = passKey(rp);
                   if (!passMap.has(k)) passMap.set(k, rp);
                 });

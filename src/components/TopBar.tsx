@@ -58,6 +58,7 @@ import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../uti
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { PermissionPromptPopover } from './PermissionPromptPopover';
+import { logger } from '../utils/logger';
 import { PageTranslatePopover } from './PageTranslatePopover';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -615,6 +616,16 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     });
   }, [permissionRequests, activeTab?.url, activeTab?.webContentsId]);
 
+  // Memoized search-matched bookmarks: avoids full array filtering on every render and keypress
+  const matchedBookmarks = useMemo(() => {
+    const q = searchValue.trim().toLowerCase();
+    if (!q || !Array.isArray(bookmarks)) return [];
+    return bookmarks
+      .filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(q)) ||
+                   (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(q)))
+      .slice(0, 3);
+  }, [bookmarks, searchValue]);
+
   const [isPermissionPromptDismissed, setIsPermissionPromptDismissed] = useState(false);
 
   // Translation State
@@ -773,13 +784,6 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     if (!searchValue.trim()) return;
 
     let targetValue = searchValue;
-    const searchLower = searchValue.toLowerCase();
-    const matchedBookmarks = Array.isArray(bookmarks)
-      ? bookmarks
-          .filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
-                       (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower)))
-          .slice(0, 3)
-      : [];
 
     if (selectedIndex > -1 && selectedIndex < suggestions.length) {
       targetValue = suggestions[selectedIndex];
@@ -914,12 +918,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 setSelectedIndex(-1);
               } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                const searchLower = searchValue.toLowerCase();
-                const matchedBookmarksCount = Array.isArray(bookmarks)
-                  ? bookmarks.filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
-                                          (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower))).slice(0, 3).length
-                  : 0;
-                const maxIndex = suggestions.length + matchedBookmarksCount - 1;
+                const maxIndex = suggestions.length + matchedBookmarks.length - 1;
                 setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
               } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -1059,17 +1058,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
         {/* Search Suggestions Dropdown */}
         <AnimatePresence>
-          {showSuggestions && searchValue.trim().length > 0 && (() => {
-            const searchLower = searchValue.toLowerCase();
-            const matchedBookmarks = Array.isArray(bookmarks)
-              ? bookmarks
-                  .filter(b => (b?.title && typeof b.title === 'string' && b.title.toLowerCase().includes(searchLower)) || 
-                               (b?.url && typeof b.url === 'string' && b.url.toLowerCase().includes(searchLower)))
-                  .slice(0, 3)
-              : [];
-            
-            return (
-              <motion.div 
+          {showSuggestions && searchValue.trim().length > 0 && (
+            <motion.div 
                 initial={{ opacity: 0, y: -8, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
@@ -1178,8 +1168,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 </div>
                 )}
               </motion.div>
-            );
-          })()}
+            )}
         </AnimatePresence>
       </div>
     </div>
@@ -1454,7 +1443,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             setAdblockWhitelist(Array.isArray(parsed) ? parsed : []);
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        logger.warn('TopBar:adblockWhitelist', 'Failed to fetch adblocker whitelist from store', e);
+      }
     };
     fetchWhitelist();
   }, []);
@@ -1496,7 +1487,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           const list = await (window as any).electronAPI.listExtensions();
           setExtensions(list || []);
         }
-      } catch (err) {}
+      } catch (err) {
+        logger.warn('TopBar:fetchExtensions', 'Failed to fetch extensions list', err);
+      }
     };
     
     fetchExtensions();

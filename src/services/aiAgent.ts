@@ -3,6 +3,50 @@ import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
+import { logger } from "../utils/logger";
+
+// ---------------------------------------------------------------------------
+// Security: Prompt injection sanitizer
+// ---------------------------------------------------------------------------
+// DOM content from arbitrary web pages is passed directly to the LLM as tool
+// results. A hostile page can embed invisible text with system override phrases
+// (indirect prompt injection) to hijack agent behaviour.
+// This function scrubs the most common patterns before content reaches the model.
+function sanitizeAgentInput(raw: string): string {
+  if (!raw || typeof raw !== 'string') return '';
+
+  let text = raw;
+
+  // 1. Strip null bytes and invisible unicode separator / tag characters
+  //    commonly used to hide injected instructions from human reviewers.
+  text = text.replace(/\u0000/g, '');
+  text = text.replace(/[\u2028\u2029\u200B-\u200D\uFEFF\uE0000-\uE007F]/g, '');
+
+  // 2. Remove well-known system-override trigger phrases (case-insensitive).
+  //    These are the most widely documented indirect prompt injection vectors.
+  const injectionPatterns: RegExp[] = [
+    /ignore\s+(all\s+)?(previous|prior|above)\s+instructions?/gi,
+    /disregard\s+(your|all|the)\s+(previous\s+)?instructions?/gi,
+    /forget\s+(everything|all)\s+(you\s+(were|are)\s+told|above)/gi,
+    /you\s+are\s+now\s+(a\s+)?/gi,
+    /act\s+as\s+(a\s+)?(different|new|another|unrestricted)/gi,
+    /new\s+system\s+prompt\s*:/gi,
+    /\[SYSTEM\]/gi,
+    /<\s*system\s*>/gi,
+    /your\s+real\s+instructions?\s+(are|is)\s*:/gi,
+    /do\s+not\s+follow\s+your\s+(previous\s+)?instructions?/gi,
+    /override\s+(previous|all)\s+(instructions?|commands?)/gi,
+  ];
+  for (const pattern of injectionPatterns) {
+    text = text.replace(pattern, '[REDACTED]');
+  }
+
+  // 3. Collapse extreme token-stuffing: more than 200 consecutive identical characters.
+  //    This prevents attempts to push earlier context off the model's attention window.
+  text = text.replace(/(.)\1{200,}/g, '$1$1$1');
+
+  return text;
+}
 
 // ---------------------------------------------------------------------------
 // Public API types
@@ -631,7 +675,7 @@ class AIAgent {
     return this.ctxWindowSize <= 2048 ? 400 : 1500;
   }
 
-  private idleParkTimer: any = null;
+  private idleParkTimer: ReturnType<typeof setTimeout> | null = null;
 
   public isEngineLoaded(): boolean {
     return !!this.engine;
@@ -652,14 +696,18 @@ class AIAgent {
         const val = parseInt(stored, 10);
         if (!isNaN(val)) return val;
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('AIAgent:getAutoParkTimeoutMinutes', 'Failed to read auto park timeout from storage', err);
+    }
     return 3; // Default: 3 minutes of idle inactivity
   }
 
   public setAutoParkTimeoutMinutes(mins: number): void {
     try {
       localStorage.setItem('nova_ai_park_timeout', String(mins));
-    } catch {}
+    } catch (err) {
+      logger.warn('AIAgent:setAutoParkTimeoutMinutes', 'Failed to save auto park timeout to storage', err);
+    }
     this.resetIdleParkTimer();
   }
 
@@ -1358,7 +1406,9 @@ CRITICAL RULES:
         let text = '';
         try {
           const raw = await this.actionContext.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getPageContentMaxChars()})`);
-          text = typeof raw === 'string' ? raw : JSON.stringify(raw);
+          // Security: sanitize DOM content to prevent indirect prompt injection attacks
+          // from hostile web pages embedding system override instructions in page text.
+          text = sanitizeAgentInput(typeof raw === 'string' ? raw : JSON.stringify(raw));
         } catch (e) {
           text = 'Sayfa metni alinamadi.';
         }

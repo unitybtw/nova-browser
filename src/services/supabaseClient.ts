@@ -146,17 +146,16 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
     clientPromise = (async () => {
       try {
         const { createClient } = await import('@supabase/supabase-js');
+        const isElectron = hasElectronSecureStore();
         const client = createClient(config.url, config.anonKey, {
           auth: {
-            persistSession: true,
-            autoRefreshToken: true,
+            // Security: In web mode, never persist sessions to localStorage (prevents JWT theft via XSS).
+            // Persistence is enabled only in Electron where sessions are stored in the OS-keychain-backed secure store.
+            persistSession: isElectron,
+            autoRefreshToken: isElectron,
             detectSessionInUrl: false,
             storageKey: SUPABASE_AUTH_STORAGE_KEY,
-            // Route session persistence (JWTs!) through the OS-keychain-backed
-            // secure store instead of localStorage. Falls back to
-            // supabase-js' default (localStorage) only when the Electron bridge
-            // is unavailable, i.e. plain web dev mode.
-            storage: hasElectronSecureStore() ? electronSecureStorage : undefined
+            storage: isElectron ? electronSecureStorage : undefined
           },
           realtime: {
             params: {
@@ -168,14 +167,9 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
         currentConfigKey = configKey;
         return client;
       } catch (err) {
-        console.warn('[Supabase] Failed to initialize Supabase client:', err);
-        // Fallback dummy client if url is malformed. It resolves the shared
-        // clientPromise, so it IS cached until the config changes — matching
-        // the previous synchronous behavior of one client per config.
-        const { createClient } = await import('@supabase/supabase-js');
-        return createClient('https://fallback.supabase.co', 'dummy', {
-          auth: { persistSession: false }
-        });
+        console.error('[Supabase] Failed to initialize Supabase client:', err);
+        // Fail-closed: do not cache or return a dummy client when configuration is broken.
+        throw err;
       }
     })();
     // Allow a later call to retry after a failed construction.
