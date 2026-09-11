@@ -46,7 +46,7 @@ export default defineConfig({
     hardenCspForProduction()
   ],
   define: {
-    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.4.5')
+    __APP_VERSION__: JSON.stringify(process.env.npm_package_version || '1.4.6')
   },
   resolve: {
     alias: {
