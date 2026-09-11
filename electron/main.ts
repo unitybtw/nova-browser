@@ -967,11 +967,77 @@ app.on('second-instance', (_event, commandLine) => {
   }
 });
 
+function cleanStaleUpdateArtifacts(): void {
+  try {
+    // 1. Clean stale in-flight downloads or old installers in userData/updates
+    const updatesDir = path.join(app.getPath('userData'), 'updates');
+    if (fs.existsSync(updatesDir)) {
+      const files = fs.readdirSync(updatesDir);
+      for (const f of files) {
+        const fullPath = path.join(updatesDir, f);
+        try {
+          // Immediately purge aborted or incomplete download chunks
+          if (f.includes('.download_') || f.endsWith('.download')) {
+            fs.unlinkSync(fullPath);
+            continue;
+          }
+          // In Linux, never delete the currently running AppImage
+          if (process.env.APPIMAGE && path.resolve(fullPath) === path.resolve(process.env.APPIMAGE)) {
+            continue;
+          }
+          // Remove old installers older than 24 hours
+          const stat = fs.statSync(fullPath);
+          const ageHours = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60);
+          if (ageHours > 24) {
+            fs.unlinkSync(fullPath);
+          }
+        } catch (_) {}
+      }
+    }
+
+    // 2. Clean temporary CRX files in userData/temp_extensions
+    const tempExtDir = path.join(app.getPath('userData'), 'temp_extensions');
+    if (fs.existsSync(tempExtDir)) {
+      const crxFiles = fs.readdirSync(tempExtDir);
+      for (const f of crxFiles) {
+        try {
+          fs.unlinkSync(path.join(tempExtDir, f));
+        } catch (_) {}
+      }
+    }
+
+    // 3. Clean abandoned update staging directories in OS temp directory
+    const osTemp = app.getPath('temp');
+    if (fs.existsSync(osTemp)) {
+      const tempEntries = fs.readdirSync(osTemp);
+      for (const entry of tempEntries) {
+        if (entry.startsWith('nova_update_')) {
+          const entryPath = path.join(osTemp, entry);
+          try {
+            const stat = fs.statSync(entryPath);
+            // If older than 30 minutes, it is an abandoned update directory
+            if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
+              fs.rmSync(entryPath, { recursive: true, force: true });
+            }
+          } catch (_) {}
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
+  }
+}
+
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   createWindow();
   setupApplicationMenu();
   initAdBlocker();
+
+  // Background idle garbage collection for updater artifacts after 5s
+  setTimeout(() => {
+    cleanStaleUpdateArtifacts();
+  }, 5000);
 
   // Y-1: Restore persistent VPN proxy on startup if previously configured
   try {
@@ -1373,6 +1439,7 @@ if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Co
   fi
   if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
     rm -rf "\${BACKUP_APP}" 2>/dev/null
+    rm -f "\${FILE_PATH}" 2>/dev/null
     cleanup_mount
     open -a "\${DEST_APP}"
   else
@@ -1432,6 +1499,7 @@ if cp -R "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null && [ -f "\${STAGING_APP}/Co
   fi
   if mv "\${STAGING_APP}" "\${DEST_APP}" 2>/dev/null; then
     rm -rf "\${BACKUP_APP}" 2>/dev/null
+    rm -f "\${FILE_PATH}" 2>/dev/null
     rm -rf "\${TEMP_DIR}"
     open -a "\${DEST_APP}"
   else
@@ -1484,6 +1552,7 @@ fi
         const batContent = `@echo off
 set FILE_PATH=%~1
 set TARGET_PID=%~2
+set UPDATE_DIR=%~dp0
 
 :wait_loop
 if not "%TARGET_PID%"=="" (
@@ -1493,7 +1562,10 @@ if not "%TARGET_PID%"=="" (
     goto wait_loop
   )
 )
-start "" "%FILE_PATH%" /S
+start /wait "" "%FILE_PATH%" /S
+del /f /q "%FILE_PATH%" 2>nul
+cd /d "%TEMP%"
+rmdir /s /q "%UPDATE_DIR%" 2>nul
 exit
 `;
         try {
@@ -1774,6 +1846,7 @@ rm -rf "\${TEMP_DIR}"
     isDownloadingUpdate = true;
     sendToMainWindow('update-download-progress', { percent: 0, transferred: 0, total: 0 });
 
+    let tempFilePath = '';
     try {
       const response = await fetch(targetUrl, {
         headers: { 'User-Agent': getStandardUserAgent() },
@@ -1794,9 +1867,19 @@ rm -rf "\${TEMP_DIR}"
       const updatesDir = path.join(app.getPath('userData'), 'updates');
       if (!fs.existsSync(updatesDir)) {
         fs.mkdirSync(updatesDir, { recursive: true });
+      } else {
+        // Clean any leftover .download_* chunks before downloading
+        try {
+          const existingFiles = fs.readdirSync(updatesDir);
+          for (const f of existingFiles) {
+            if (f.includes('.download_') || f.endsWith('.download')) {
+              try { fs.unlinkSync(path.join(updatesDir, f)); } catch (_) {}
+            }
+          }
+        } catch (_) {}
       }
       const targetFilePath = path.join(updatesDir, filename);
-      const tempFilePath = `${targetFilePath}.download_${Date.now()}`;
+      tempFilePath = `${targetFilePath}.download_${Date.now()}`;
 
       const fileStream = fs.createWriteStream(tempFilePath);
       let transferredBytes = 0;
@@ -1864,6 +1947,9 @@ rm -rf "\${TEMP_DIR}"
         releaseName: latestReleaseDownloadInfo?.releaseName
       };
     } catch (downloadErr: any) {
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try { fs.unlinkSync(tempFilePath); } catch (_) {}
+      }
       isDownloadingUpdate = false;
       console.error('[Updater] In-app download error:', downloadErr);
       sendToMainWindow('update-error', downloadErr?.message || 'Download failed');

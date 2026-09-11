@@ -334,6 +334,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     return { error: 'Unauthorized: install-from-webstore can only be called from Chrome Web Store or Nova main window.' };
   }
 
+  let crxFilePath = '';
+  let stagingPath = '';
+
   try {
     if (typeof urlOrId !== 'string' || urlOrId.length > 256) {
       return { error: 'Invalid extension URL or ID' };
@@ -413,7 +416,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const tempPath = path.join(app.getPath('userData'), 'temp_extensions');
     if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
 
-    const crxFilePath = path.join(tempPath, `${extensionId}.crx`);
+    crxFilePath = path.join(tempPath, `${extensionId}.crx`);
     fs.writeFileSync(crxFilePath, buffer);
 
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
@@ -421,7 +424,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     const extractPath = path.join(extensionsBaseDir, extensionId);
 
     // Staging directory for atomic extraction: prevents corrupting extractPath on failure
-    const stagingPath = path.join(extensionsBaseDir, `${extensionId}_staging_${Date.now()}`);
+    stagingPath = path.join(extensionsBaseDir, `${extensionId}_staging_${Date.now()}`);
     if (fs.existsSync(stagingPath)) fs.rmSync(stagingPath, { recursive: true, force: true });
     fs.mkdirSync(stagingPath, { recursive: true });
 
@@ -570,6 +573,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       }
     } catch (loadErr: any) {
       console.error('Failed to load extension into session:', loadErr);
+      if (crxFilePath && fs.existsSync(crxFilePath)) {
+        try { fs.unlinkSync(crxFilePath); } catch (_) {}
+      }
       return { error: `Failed to load extension: ${loadErr?.message || 'Unsupported or invalid extension'}` };
     }
 
@@ -585,6 +591,12 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
     return { success: true, extension: extInfo };
   } catch (err: any) {
     console.error('Web Store Install Error:', err);
+    if (stagingPath && fs.existsSync(stagingPath)) {
+      try { fs.rmSync(stagingPath, { recursive: true, force: true }); } catch (_) {}
+    }
+    if (crxFilePath && fs.existsSync(crxFilePath)) {
+      try { fs.unlinkSync(crxFilePath); } catch (_) {}
+    }
     return { error: err.message || 'An unknown error occurred.' };
   }
 }
