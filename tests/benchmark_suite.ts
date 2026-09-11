@@ -133,7 +133,7 @@ recordBenchmark(
   'AdBlock Filter Check Latency',
   Number(perUrlLatencyUs.toFixed(3)),
   'µs / request',
-  'Network interception & rule evaluation overhead per network request'
+  'Fast path hostname & tracker lookup overhead (in-memory hash set classification)'
 );
 recordBenchmark(
   'Privacy Shield',
@@ -151,7 +151,7 @@ const heapUsedMB = Number((mem.heapUsed / 1024 / 1024).toFixed(2));
 const heapTotalMB = Number((mem.heapTotal / 1024 / 1024).toFixed(2));
 const rssMB = Number((mem.rss / 1024 / 1024).toFixed(2));
 
-recordBenchmark('Memory Efficiency', 'Heap Used', heapUsedMB, 'MB', 'V8 Heap currently allocated for active structures');
+recordBenchmark('Memory Efficiency', 'Heap Used', heapUsedMB, 'MB', 'V8 Node runtime heap allocated for core structures (microbenchmark baseline)');
 recordBenchmark('Memory Efficiency', 'Heap Total', heapTotalMB, 'MB', 'Total heap memory allocated by V8 runtime');
 recordBenchmark('Memory Efficiency', 'Resident Set Size (RSS)', rssMB, 'MB', 'Total physical RAM currently occupied by node runtime');
 

@@ -42,7 +42,7 @@ const FAQS: FaqItem[] = [
   {
     question: 'How does tab hibernation save memory compared to Chrome?',
     answer:
-      'When background tabs become inactive, Nova suspends their rendering pipeline and unmounts dormant DOM trees from RAM while retaining full navigation history. Clicking a hibernated tab restores it in ~30ms.',
+      'When background tabs become inactive, Nova suspends their rendering pipeline and pauses inactive background execution cycles while preserving full navigation state. Clicking a suspended tab restores it instantly without losing session context.',
     category: 'PERFORMANCE',
   },
 ];

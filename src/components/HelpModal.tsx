@@ -36,6 +36,17 @@ export interface HelpModalProps {
   initialTab?: 'help' | 'shortcuts' | 'ai' | 'privacy' | 'about';
 }
 
+const isMac = typeof navigator !== 'undefined' && /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
+function formatKeyForPlatform(key: string, mac: boolean): string {
+  if (mac) return key;
+  if (key === '⌘') return 'Ctrl';
+  if (key === '⌥') return 'Alt';
+  if (key === '⇧') return 'Shift';
+  if (key === '^') return 'Ctrl';
+  return key;
+}
+
 const SHORTCUT_GROUPS = [
   {
     title: 'Tabs & Windows',
@@ -79,7 +90,7 @@ const SHORTCUT_GROUPS = [
     shortcuts: [
       { keys: ['⌘', 'D'], desc: 'Bookmark current tab' },
       { keys: ['⌘', 'Y'], desc: 'Open History page' },
-      { keys: ['⇧', '⌘', 'J'], desc: 'Open Downloads page' },
+      { keys: isMac ? ['⇧', '⌘', 'J'] : ['Ctrl', 'J'], desc: 'Open Downloads page' },
       { keys: ['⌘', ','], desc: 'Open Settings' },
       { keys: ['F1'], desc: 'Open Help Center' },
     ]
@@ -94,7 +105,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
   const [activeTab, setActiveTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>(initialTab);
   const [shortcutSearch, setShortcutSearch] = useState('');
   const [appVersion, setAppVersion] = useState<string>(() => {
-    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.4';
+    return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.5';
   });
   const [systemVersions, setSystemVersions] = useState<{
     app: string;
@@ -358,7 +369,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                                     key={kIdx} 
                                     className="px-2 py-0.5 text-[11px] font-semibold bg-white dark:bg-[#1a202c] border border-slate-300 dark:border-white/15 rounded-lg shadow-xs text-slate-800 dark:text-slate-200 min-w-[22px] text-center font-mono"
                                   >
-                                    {k}
+                                    {formatKeyForPlatform(k, isMac)}
                                   </kbd>
                                 ))}
                               </div>

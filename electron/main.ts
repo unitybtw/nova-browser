@@ -1477,7 +1477,10 @@ fi
     if (platform === 'win32') {
       if (resolvedFilePath.toLowerCase().endsWith('.exe')) {
         const tempDir = app.getPath('temp');
-        const batPath = path.join(tempDir, `nova_update_${Date.now()}.bat`);
+        const randomSuffix = crypto.randomBytes(8).toString('hex');
+        const updateDir = path.join(tempDir, `nova_update_${Date.now()}_${randomSuffix}`);
+        fs.mkdirSync(updateDir, { recursive: true });
+        const batPath = path.join(updateDir, 'update.bat');
         const batContent = `@echo off
 set FILE_PATH=%~1
 set TARGET_PID=%~2
@@ -3501,7 +3504,8 @@ async function translateTextWithGoogle(text: string, sourceLang: string = 'auto'
   const res = await fetch(url, {
     headers: {
       'User-Agent': getStandardUserAgent(),
-    }
+    },
+    signal: AbortSignal.timeout(8000)
   });
   if (!res.ok) {
     throw new Error(`Translation failed with status ${res.status}`);
@@ -3519,7 +3523,8 @@ async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
     const res = await fetch(url, {
       headers: {
         'User-Agent': getStandardUserAgent(),
-      }
+      },
+      signal: AbortSignal.timeout(6000)
     });
     if (res.ok) {
       const data = await res.json();
