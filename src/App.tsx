@@ -1269,36 +1269,48 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
-      const newTabId = generateId('tab');
-      const newTab: Tab = {
-        id: newTabId,
-        url: 'nova://newtab',
-        title: 'New Tab',
-        isLoading: false,
-        canGoBack: false,
-        canGoForward: false,
-        workspaceId: activeWs,
-        lastAccessed: Date.now()
-      };
-      if (targetTab) {
+      if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
-      setTabs(prev => [...prev.filter(t => t.id !== id).map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t), newTab]);
-      setActiveTabId(newTabId);
+      // Reset sole tab in place without unmounting or regenerating tab ID.
+      // This prevents animation glitching, unmount/remount churn, and rightward drift.
+      setTabs(prev => prev.map(t => {
+        if (t.id === id) {
+          return {
+            ...t,
+            url: 'nova://newtab',
+            title: 'New Tab',
+            isLoading: false,
+            canGoBack: false,
+            canGoForward: false,
+            favicon: undefined,
+            splitWith: undefined,
+            isPinned: false,
+            lastAccessed: Date.now()
+          };
+        }
+        return t.splitWith === id ? { ...t, splitWith: undefined } : t;
+      }));
+      setActiveTabId(id);
       return;
     }
 
     if (prevTabs.length <= 1) {
-      setTabs([{
-        id: generateId('tab'),
+      if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
+        setClosedTabsStack(stack => [...stack, targetTab]);
+      }
+      setTabs(prev => prev.map(t => ({
+        ...t,
         url: 'nova://newtab',
         title: 'New Tab',
         isLoading: false,
         canGoBack: false,
         canGoForward: false,
-        workspaceId: activeWs,
+        favicon: undefined,
+        splitWith: undefined,
+        isPinned: false,
         lastAccessed: Date.now()
-      }]);
+      })));
       return;
     }
 

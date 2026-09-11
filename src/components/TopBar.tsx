@@ -154,11 +154,11 @@ const MemoizedTabItem = React.memo(({
     <Reorder.Item
       key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 0.8, y: 10 }}
+      initial={{ opacity: 0, scale: 0.94, y: 3 }}
       animate={{ opacity: ghostTab?.id === tab.id ? 0.4 : 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25, mass: 0.8 }}
-      whileDrag={{ scale: 1.04, zIndex: 50, cursor: 'grabbing' }}
+      exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.12, ease: 'easeOut' } }}
+      transition={{ type: 'spring', stiffness: 480, damping: 34, mass: 0.7 }}
+      whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
         onTabLeave?.();
         onTabDragStart?.();
@@ -1281,6 +1281,12 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       checkScrollRafRef.current = null;
       const el = tabsContainerRef.current;
       if (!el) return;
+      if (el.scrollWidth <= el.clientWidth) {
+        if (el.scrollLeft !== 0) el.scrollLeft = 0;
+        setCanScrollLeft(false);
+        setCanScrollRight(false);
+        return;
+      }
       setCanScrollLeft(el.scrollLeft > 2);
       setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
     });
@@ -1303,27 +1309,39 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   }, [tabs, checkScroll]);
 
   useEffect(() => {
-    if (!tabsContainerRef.current) return;
-    const activeTabEl = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
-    if (activeTabEl && tabsContainerRef.current) {
-      const container = tabsContainerRef.current;
+    const container = tabsContainerRef.current;
+    if (!container) return;
+
+    // When all tabs fit without overflow, strictly lock scroll to 0.
+    // This physically prevents any rightward drift or phantom scroll offset.
+    if (container.scrollWidth <= container.clientWidth) {
+      if (container.scrollLeft !== 0) {
+        container.scrollLeft = 0;
+      }
+      return;
+    }
+
+    const activeTabEl = container.querySelector(`[data-tab-id="${activeTabId}"]`) as HTMLElement | null;
+    if (activeTabEl) {
       const tabLeft = activeTabEl.offsetLeft;
       const tabRight = tabLeft + activeTabEl.offsetWidth;
       const scrollLeft = container.scrollLeft;
       const containerWidth = container.clientWidth;
 
       if (tabLeft < scrollLeft) {
-        container.scrollLeft = tabLeft;
+        container.scrollTo({ left: Math.max(0, tabLeft - 12), behavior: 'smooth' });
       } else if (tabRight > scrollLeft + containerWidth) {
-        container.scrollLeft = tabRight - containerWidth;
+        container.scrollTo({ left: Math.max(0, tabRight - containerWidth + 12), behavior: 'smooth' });
       }
     }
   }, [activeTabId, tabs.length]);
 
   const handleWheel = (e: React.WheelEvent<any>) => {
-    if (tabsContainerRef.current) {
+    const container = tabsContainerRef.current;
+    if (container) {
+      if (container.scrollWidth <= container.clientWidth) return;
       if (e.deltaY !== 0) {
-        tabsContainerRef.current.scrollLeft += e.deltaY;
+        container.scrollLeft += e.deltaY;
       }
     }
   };
@@ -1526,117 +1544,124 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             </button>
           )}
 
-          <Reorder.Group
-            axis="x"
-            values={visibleTabs}
-            onReorder={(newTabs) => {
-              if (onReorderFullList) {
-                const full: Tab[] = [];
-                const seenIds = new Set<string>();
-                for (const t of newTabs) {
-                  if (!seenIds.has(t.id)) {
-                    full.push(t);
-                    seenIds.add(t.id);
-                  }
-                  if (t.splitWith) {
-                    const partner = tabs.find(p => p.id === t.splitWith);
-                    if (partner && !seenIds.has(partner.id)) {
-                      full.push(partner);
-                      seenIds.add(partner.id);
-                    }
-                  }
-                }
-                // Safety guarantee: never lose any tab belonging to this workspace
-                for (const t of tabs) {
-                  if (!seenIds.has(t.id)) {
-                    full.push(t);
-                    seenIds.add(t.id);
-                  }
-                }
-                onReorderFullList(full);
-              }
-            }}
+          <div
             ref={tabsContainerRef}
             onWheel={handleWheel}
-            className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px]"
+            className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
-            <AnimatePresence>
-            {visibleTabs.map((tab: Tab) => {
-              const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
-              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
-
-              return (
-                <MemoizedTabItem
-                  key={tab.id}
-                  tab={tab}
-                  activeTabId={activeTabId}
-                  index={tabs.findIndex(t => t.id === tab.id)}
-                  isActive={isActive}
-                  splitTab={splitTab}
-                  ghostTab={ghostTab}
-                  tabStyle={tabStyle}
-                  isIncognito={isIncognito}
-                  onTabDragStart={onTabDragStart}
-                  onTabDrag={onTabDrag}
-                  onTabDragEnd={onTabDragEnd}
-                  onDropToSplitScreen={onDropToSplitScreen}
-                  onSelectTab={onSelectTab}
-                  onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
-                  onToggleMuteTab={onToggleMuteTab}
-                  onTogglePip={onTogglePip}
-                  onCloseTab={onCloseTab}
-                  tabsLength={tabs.length}
-                  setGhostTab={setGhostTab}
-                  onTabHover={handleTabHover}
-                  onTabLeave={handleTabLeave}
-                  onOpenContextMenu={(targetTab: Tab, index: number, e: React.MouseEvent) => {
-                    setTabContextMenu({
-                      isOpen: true,
-                      x: e.clientX,
-                      y: e.clientY,
-                      tab: targetTab,
-                      tabIndex: index
-                    });
-                  }}
-                />
-              );
-            })}
-            </AnimatePresence>
-            
-            {/* New Tab Button */}
-            <motion.button
-              layout="position"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
-              onClick={() => onNewTab()}
-              className={`p-1.5 mb-1 ml-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
-                isIncognito 
-                  ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' 
-                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-              }`}
-              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+            <Reorder.Group
+              as="div"
+              axis="x"
+              values={visibleTabs}
+              onReorder={(newTabs) => {
+                if (visibleTabs.length <= 1) return;
+                if (onReorderFullList) {
+                  const full: Tab[] = [];
+                  const seenIds = new Set<string>();
+                  for (const t of newTabs) {
+                    if (!seenIds.has(t.id)) {
+                      full.push(t);
+                      seenIds.add(t.id);
+                    }
+                    if (t.splitWith) {
+                      const partner = tabs.find(p => p.id === t.splitWith);
+                      if (partner && !seenIds.has(partner.id)) {
+                        full.push(partner);
+                        seenIds.add(partner.id);
+                      }
+                    }
+                  }
+                  // Safety guarantee: never lose any tab belonging to this workspace
+                  for (const t of tabs) {
+                    if (!seenIds.has(t.id)) {
+                      full.push(t);
+                      seenIds.add(t.id);
+                    }
+                  }
+                  onReorderFullList(full);
+                }
+              }}
+              className="flex items-end gap-1 shrink-0 h-full min-w-0"
             >
-              <Plus className="w-4 h-4" />
-            </motion.button>
+              <AnimatePresence mode="popLayout" initial={false}>
+              {visibleTabs.map((tab: Tab) => {
+                const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
+                const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
 
-            {/* New Incognito Tab Button */}
-            <motion.button
-              layout="position"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
-              onClick={onNewIncognitoTab}
-              className={`p-1.5 mb-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
-                isIncognito 
-                  ? 'text-slate-300 hover:bg-slate-700 hover:text-white' 
-                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-              }`}
-              title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
-            >
-              <ShieldOff className="w-4 h-4" />
-            </motion.button>
-          </Reorder.Group>
+                return (
+                  <MemoizedTabItem
+                    key={tab.id}
+                    tab={tab}
+                    activeTabId={activeTabId}
+                    index={tabs.findIndex(t => t.id === tab.id)}
+                    isActive={isActive}
+                    splitTab={splitTab}
+                    ghostTab={ghostTab}
+                    tabStyle={tabStyle}
+                    isIncognito={isIncognito}
+                    onTabDragStart={onTabDragStart}
+                    onTabDrag={onTabDrag}
+                    onTabDragEnd={onTabDragEnd}
+                    onDropToSplitScreen={onDropToSplitScreen}
+                    onSelectTab={onSelectTab}
+                    onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                    onToggleMuteTab={onToggleMuteTab}
+                    onTogglePip={onTogglePip}
+                    onCloseTab={onCloseTab}
+                    tabsLength={tabs.length}
+                    setGhostTab={setGhostTab}
+                    onTabHover={handleTabHover}
+                    onTabLeave={handleTabLeave}
+                    onOpenContextMenu={(targetTab: Tab, index: number, e: React.MouseEvent) => {
+                      setTabContextMenu({
+                        isOpen: true,
+                        x: e.clientX,
+                        y: e.clientY,
+                        tab: targetTab,
+                        tabIndex: index
+                      });
+                    }}
+                  />
+                );
+              })}
+              </AnimatePresence>
+            </Reorder.Group>
+
+            {/* New Tab & Incognito Action Buttons */}
+            <div className="flex items-center gap-0.5 shrink-0 mb-1 ml-0.5">
+              <motion.button
+                layout="position"
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
+                onClick={() => onNewTab()}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
+                  isIncognito 
+                    ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' 
+                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+                }`}
+                title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+              >
+                <Plus className="w-4 h-4" />
+              </motion.button>
+
+              <motion.button
+                layout="position"
+                whileHover={{ scale: 1.08 }}
+                whileTap={{ scale: 0.92 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
+                onClick={onNewIncognitoTab}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
+                  isIncognito 
+                    ? 'text-slate-300 hover:bg-slate-700 hover:text-white' 
+                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
+                }`}
+                title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
+              >
+                <ShieldOff className="w-4 h-4" />
+              </motion.button>
+            </div>
+          </div>
 
           {canScrollRight && (
             <button

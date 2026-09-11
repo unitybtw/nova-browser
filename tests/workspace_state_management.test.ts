@@ -80,4 +80,72 @@ const restored = reopenTab();
 assert.equal(restored?.id, 'tab-closed-2', 'LIFO order: most recently closed tab must be reopened first');
 assert.equal(closedTabStack.length, 1);
 
-console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, and LIFO restoration verified.');
+// 5. Sole Tab In-Place Reset Verification (Prevents Rightward Drift & Animation Glitches)
+function simulateCloseTab(
+  tabsList: Tab[], 
+  idToClose: string, 
+  activeWs: string,
+  closedStack: Tab[]
+): { nextTabs: Tab[]; nextActiveId: string } {
+  const targetTab = tabsList.find(t => t.id === idToClose);
+  const workspaceTabs = tabsList.filter(t => (t.workspaceId || 'default') === activeWs);
+  
+  if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === idToClose)) {
+    if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
+      closedStack.push(targetTab);
+    }
+    const nextTabs = tabsList.map(t => {
+      if (t.id === idToClose) {
+        return {
+          ...t,
+          url: 'nova://newtab',
+          title: 'New Tab',
+          isLoading: false,
+          canGoBack: false,
+          canGoForward: false,
+          favicon: undefined,
+          splitWith: undefined,
+          isPinned: false,
+          lastAccessed: Date.now()
+        };
+      }
+      return t.splitWith === idToClose ? { ...t, splitWith: undefined } : t;
+    });
+    return { nextTabs, nextActiveId: idToClose };
+  }
+
+  const targetIdx = tabsList.findIndex(t => t.id === idToClose);
+  const nextTabs = tabsList.filter(t => t.id !== idToClose);
+  if (targetTab) {
+    closedStack.push(targetTab);
+  }
+  const nextActiveIdx = Math.min(Math.max(0, targetIdx), nextTabs.length - 1);
+  return { nextTabs, nextActiveId: nextTabs[nextActiveIdx]?.id || '' };
+}
+
+// Test A: Closing sole tab with an active URL (e.g. google.com)
+const soleTabs = [makeTab('single-tab-1', 'default')];
+const testClosedStack: Tab[] = [];
+const closeResult = simulateCloseTab(soleTabs, 'single-tab-1', 'default', testClosedStack);
+
+assert.equal(closeResult.nextTabs.length, 1, 'Tab count must remain 1');
+assert.equal(closeResult.nextTabs[0].id, 'single-tab-1', 'Tab ID must be preserved in place to prevent DOM unmount/remount churn');
+assert.equal(closeResult.nextTabs[0].url, 'nova://newtab', 'URL must reset to nova://newtab');
+assert.equal(closeResult.nextTabs[0].title, 'New Tab', 'Title must reset to New Tab');
+assert.equal(closeResult.nextActiveId, 'single-tab-1', 'Active tab ID must remain single-tab-1');
+assert.equal(testClosedStack.length, 1, 'Previous URL must be recorded in closedTabsStack for restore');
+assert.equal(testClosedStack[0].id, 'single-tab-1');
+
+// Test B: Closing sole tab when already on clean nova://newtab (idempotent, no duplicate stack push)
+const closeResult2 = simulateCloseTab(closeResult.nextTabs, 'single-tab-1', 'default', testClosedStack);
+assert.equal(closeResult2.nextTabs[0].id, 'single-tab-1');
+assert.equal(testClosedStack.length, 1, 'Clean empty newtab must not add duplicate entry to closedTabsStack');
+
+// Test C: Closing a tab when multiple tabs exist
+const multiTabs = [makeTab('tab-a', 'default'), makeTab('tab-b', 'default')];
+const multiResult = simulateCloseTab(multiTabs, 'tab-a', 'default', testClosedStack);
+assert.equal(multiResult.nextTabs.length, 1);
+assert.equal(multiResult.nextTabs[0].id, 'tab-b');
+assert.equal(multiResult.nextActiveId, 'tab-b');
+
+console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, LIFO restoration, and sole-tab in-place reset verified.');
