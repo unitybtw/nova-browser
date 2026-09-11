@@ -140,10 +140,17 @@ function browserViewMemoComparator(prevProps: any, nextProps: any): boolean {
   if (prevProps.settings?.aiLinkPreviewEnabled !== nextProps.settings?.aiLinkPreviewEnabled) return false;
   if (prevProps.settings?.privacyShield !== nextProps.settings?.privacyShield) return false;
   if (prevProps.settings?.theme !== nextProps.settings?.theme) return false;
+  if (prevProps.settings?.browserColor !== nextProps.settings?.browserColor) return false;
+  if (prevProps.settings?.customBrowserColor !== nextProps.settings?.customBrowserColor) return false;
+  if (prevProps.settings?.accentColor !== nextProps.settings?.accentColor) return false;
+  if (prevProps.settings?.customAccentColor !== nextProps.settings?.customAccentColor) return false;
   if (prevProps.settings?.showTasksWidget !== nextProps.settings?.showTasksWidget) return false;
 
   // Deep comparison for settings object changes that affect internal pages
-  if ((prevProps.tab?.url?.startsWith('nova://settings') || prevProps.tab?.url?.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;
+  const isInternalTab = prevProps.tab?.url?.startsWith('nova://') || 
+                        prevProps.tab?.url?.startsWith('about:') || 
+                        prevProps.tab?.url === 'https://newtab';
+  if (isInternalTab && prevProps.settings !== nextProps.settings) return false;
   if ((prevProps.tab?.url?.startsWith('nova://history') || prevProps.tab?.url?.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
   if ((prevProps.tab?.url?.startsWith('nova://downloads') || prevProps.tab?.url?.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
 
@@ -255,6 +262,34 @@ assertM3(
   'BrowserView Memo',
   'Invalidate memo when newTabBackground prop changes',
   'Should return false when newTabBackground prop changes'
+);
+
+// 3.10 browserColor setting change must invalidate
+assertM3(
+  !browserViewMemoComparator(baseProps, { ...baseProps, settings: { ...baseProps.settings, browserColor: 'midnight' } }),
+  'BrowserView Memo',
+  'Invalidate memo when browserColor setting changes',
+  'Should return false when browserColor setting changes'
+);
+
+// 3.11 customBrowserColor setting change must invalidate
+assertM3(
+  !browserViewMemoComparator(baseProps, { ...baseProps, settings: { ...baseProps.settings, customBrowserColor: '#ff5500' } }),
+  'BrowserView Memo',
+  'Invalidate memo when customBrowserColor setting changes',
+  'Should return false when customBrowserColor setting changes'
+);
+
+// 3.12 internal new tab page invalidates on settings change
+const newTabProps = {
+  ...baseProps,
+  tab: { ...baseProps.tab, url: 'nova://newtab' }
+};
+assertM3(
+  !browserViewMemoComparator(newTabProps, { ...newTabProps, settings: { ...newTabProps.settings, browserColor: 'forest' } }),
+  'BrowserView Memo',
+  'Invalidate memo when newtab settings reference changes',
+  'Should return false when newtab settings update'
 );
 
 // =========================================================================

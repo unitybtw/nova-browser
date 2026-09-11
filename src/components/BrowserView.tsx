@@ -802,6 +802,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         isIncognito={isIncognito}
         theme={settings.theme}
         energySaverMode={settings.energySaverMode}
+        browserColor={settings.browserColor}
+        customBrowserColor={settings.customBrowserColor}
       />
     );
   }
@@ -864,7 +866,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   }
 
   return (
-    <div className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col">
+    <div 
+      style={!isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
+      className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col"
+    >
       {/* Top Progress Bar (GPU Composited scaleX - Ultra Fast Responsive Feedback) */}
       <AnimatePresence>
         {tab.isLoading && (
@@ -1032,13 +1037,20 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.settings?.aiLinkPreviewEnabled !== nextProps.settings?.aiLinkPreviewEnabled) return false;
   if (prevProps.settings?.privacyShield !== nextProps.settings?.privacyShield) return false;
   if (prevProps.settings?.theme !== nextProps.settings?.theme) return false;
+  if (prevProps.settings?.browserColor !== nextProps.settings?.browserColor) return false;
+  if (prevProps.settings?.customBrowserColor !== nextProps.settings?.customBrowserColor) return false;
+  if (prevProps.settings?.accentColor !== nextProps.settings?.accentColor) return false;
+  if (prevProps.settings?.customAccentColor !== nextProps.settings?.customAccentColor) return false;
   if (prevProps.settings?.showTasksWidget !== nextProps.settings?.showTasksWidget) return false;
   if (prevProps.settings?.energySaverMode !== nextProps.settings?.energySaverMode) return false;
   if (prevProps.settings?.preloadDnsEnabled !== nextProps.settings?.preloadDnsEnabled) return false;
   if (prevProps.settings?.smoothScrollingEnabled !== nextProps.settings?.smoothScrollingEnabled) return false;
 
   // Deep comparison for settings object changes that affect internal pages
-  if ((prevProps.tab?.url?.startsWith('nova://settings') || prevProps.tab?.url?.startsWith('about:settings')) && prevProps.settings !== nextProps.settings) return false;
+  const isInternalTab = prevProps.tab?.url?.startsWith('nova://') || 
+                        prevProps.tab?.url?.startsWith('about:') || 
+                        prevProps.tab?.url === 'https://newtab';
+  if (isInternalTab && prevProps.settings !== nextProps.settings) return false;
   if ((prevProps.tab?.url?.startsWith('nova://history') || prevProps.tab?.url?.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
   if ((prevProps.tab?.url?.startsWith('nova://downloads') || prevProps.tab?.url?.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
 

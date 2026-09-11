@@ -1396,10 +1396,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   ] as const;
 
   return (
-    <div className="w-full h-full bg-slate-50 dark:bg-slate-900 overflow-hidden flex font-sans selection:bg-blue-500/30">
+    <div 
+      style={{ backgroundColor: 'var(--nova-frame-bg)' }}
+      className="w-full h-full bg-slate-50 dark:bg-slate-900 overflow-hidden flex font-sans selection:bg-blue-500/30"
+    >
       
       {/* Sidebar */}
-      <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col">
+      <div 
+        style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
+        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
+      >
         <div className="p-6 pb-2">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <Settings className="w-5 h-5 text-blue-500" />

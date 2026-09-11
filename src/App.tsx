@@ -3771,7 +3771,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
           the compositor watch every property of this full-size container. */}
       <div 
-        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : undefined}
+        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
@@ -3877,8 +3877,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
       {/* MAIN BROWSER CONTENT */}
       <main 
-        id="primary-view-container"
-        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : undefined}
+        id="browser-content-main"
+        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden min-h-0"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
@@ -4032,7 +4032,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {secondaryTab && (
           <div 
             id="secondary-view-container" 
-            style={{ width: `${100 - splitRatio}%`, ...(!secondaryTab.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : {}) }} 
+            style={{ width: `${100 - splitRatio}%`, ...(!secondaryTab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}) }} 
             className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0"
           >
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">

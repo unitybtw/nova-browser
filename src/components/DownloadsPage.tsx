@@ -43,7 +43,10 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   }, [downloads, filterText]);
 
   return (
-    <div className="w-full h-full bg-slate-50 dark:bg-[#0b0f17] overflow-y-auto flex justify-center py-10 px-4 select-text">
+    <div 
+      style={{ backgroundColor: 'var(--nova-frame-bg)' }}
+      className="w-full h-full bg-slate-50 dark:bg-[#0b0f17] overflow-y-auto flex justify-center py-10 px-4 select-text"
+    >
       <div className="w-full max-w-4xl space-y-6">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3.5">

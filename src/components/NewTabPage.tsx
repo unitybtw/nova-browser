@@ -28,6 +28,8 @@ interface NewTabPageProps {
   theme?: UserSettings['theme'];
   isActive?: boolean;
   energySaverMode?: boolean;
+  browserColor?: UserSettings['browserColor'];
+  customBrowserColor?: string;
 }
 
 interface ClockProps {
@@ -173,6 +175,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   theme = 'dark',
   isActive = true,
   energySaverMode = false,
+  browserColor = 'default',
+  customBrowserColor = '',
 }) => {
   const { t, language } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
@@ -488,7 +492,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       return 'text-white';
     }
     if (!isDarkTheme) {
-      return 'bg-white text-slate-900';
+      return 'text-slate-900';
     }
     switch (newTabBackground) {
       case 'gradient':
@@ -500,11 +504,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       case 'fireflies':
       case 'nebula':
       case 'matrix':
-        return 'bg-slate-950 text-white';
+        return 'text-white';
       case 'glass':
-        return 'bg-slate-900/90 text-white backdrop-blur-xl';
+        return 'text-white backdrop-blur-xl';
       default:
-        return 'bg-slate-950 text-slate-100';
+        return 'text-slate-100';
     }
   };
 
@@ -576,6 +580,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       initial={shouldAnimate ? { opacity: 0 } : false}
       animate={{ opacity: 1 }}
       transition={shouldAnimate ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
+      style={{
+        backgroundColor: (newTabBackground === 'unsplash' || newTabBackground === 'custom_url')
+          ? undefined
+          : 'var(--nova-frame-bg)'
+      }}
       className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
       
@@ -649,9 +658,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'default' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {isDarkTheme ? (
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_40%,rgba(30,58,138,0.15),rgba(11,15,25,0))]" />
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: 'radial-gradient(ellipse 80% 80% at 50% 40%, color-mix(in srgb, var(--nova-accent, #3b82f6) 18%, transparent), transparent 75%)'
+              }}
+            />
           ) : (
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_30%,rgba(219,234,254,0.6),rgba(255,255,255,0))]" />
+            <div 
+              className="absolute inset-0"
+              style={{
+                background: 'radial-gradient(ellipse 80% 80% at 50% 30%, color-mix(in srgb, var(--nova-accent, #3b82f6) 15%, transparent), transparent 70%)'
+              }}
+            />
           )}
         </div>
       )}
@@ -686,7 +705,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {/* Glass Prism Background */}
       {newTabBackground === 'glass' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-100'}`} />
+          <div className="absolute inset-0" style={{ backgroundColor: 'var(--nova-frame-bg)' }} />
           <div className="absolute -top-[30%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-600/15 blur-[120px]" />
           <div className="absolute -bottom-[30%] right-[10%] w-[60vw] h-[60vw] rounded-full bg-violet-600/15 blur-[120px]" />
           <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:20px_20px]" />
@@ -720,7 +739,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Aurora Waves */}
       {newTabBackground === 'aurora_waves' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#080b12]' : 'bg-slate-50'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <motion.div 
             animate={isActive ? { 
               x: ['0%', '-33.33%', '0%'],
@@ -741,7 +760,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* 3D Cyber Neon Grid */}
       {newTabBackground === 'cyber_grid' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#04060a]' : 'bg-slate-900'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           {/* Horizon Glow Sun */}
           <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40vw] h-[40vw] rounded-full bg-gradient-to-b from-cyan-500/20 via-purple-500/15 to-transparent blur-[60px]" />
           
@@ -773,7 +792,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Hyper Space (Stable Stars) */}
       {newTabBackground === 'hyper_space' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#05070e]' : 'bg-slate-950'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(30,58,138,0.25)_0%,rgba(5,7,14,1)_70%)]" />
           {starParticles.map((star) => (
             <motion.div
@@ -805,7 +824,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Fireflies (Stable Particles) */}
       {newTabBackground === 'fireflies' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#0a0f1d]' : 'bg-slate-900'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom,rgba(30,64,175,0.25)_0%,rgba(10,15,29,1)_75%)]" />
           {fireflyParticles.map((fly) => (
             <motion.div
@@ -839,7 +858,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Nebula Flow */}
       {newTabBackground === 'nebula' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#07070b]' : 'bg-slate-950'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.3)_0%,rgba(7,7,11,1)_70%)]" />
           <motion.div
             animate={isActive ? {
@@ -860,7 +879,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* Digital Rain / Matrix (Stable Streams) */}
       {newTabBackground === 'matrix' && (
-        <div className={`absolute inset-0 overflow-hidden pointer-events-none ${isDarkTheme ? 'bg-[#020503]' : 'bg-slate-950'}`}>
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(6,78,59,0.2)_0%,rgba(2,5,3,1)_80%)]" />
           {matrixColumns.map((col) => (
             <motion.div
