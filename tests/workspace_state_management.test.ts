@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from '../src/utils/verticalTabs';
+import { computeLiveAndSuspendedTabs } from '../src/utils/tabManager';
 import type { Folder, Tab, Workspace } from '../src/types/browser';
 
 console.log('\n--- Workspace State & Tab Management Comprehensive Suite ---');
@@ -148,4 +149,49 @@ assert.equal(multiResult.nextTabs.length, 1);
 assert.equal(multiResult.nextTabs[0].id, 'tab-b');
 assert.equal(multiResult.nextActiveId, 'tab-b');
 
-console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, LIFO restoration, and sole-tab in-place reset verified.');
+// 6. Tab Hibernation Setting Immunity & Auto-Wake Verification
+const poolTabs: Tab[] = [];
+for (let i = 0; i < 10; i++) {
+  poolTabs.push({
+    ...makeTab(`pool-tab-${i}`, 'default'),
+    lastAccessed: 1000 + i * 10,
+    isSuspended: i < 3 // First 3 tabs currently suspended
+  });
+}
+
+// Simulation of LRU pool & hibernation setting effect
+function simulateLRUPool(
+  currentTabs: Tab[],
+  activeId: string,
+  splitId: string | null,
+  tabHibernationEnabled: boolean,
+  maxLive = 6
+): Tab[] {
+  const isHibernationEnabled = tabHibernationEnabled ?? true;
+  if (!isHibernationEnabled) {
+    const hasSuspended = currentTabs.some(t => t.isSuspended);
+    if (!hasSuspended) return currentTabs;
+    return currentTabs.map(t => t.isSuspended ? { ...t, isSuspended: false } : t);
+  }
+
+  const { tabsToSuspend } = computeLiveAndSuspendedTabs(currentTabs, activeId, splitId, maxLive);
+  if (tabsToSuspend.size > 0) {
+    return currentTabs.map(t => tabsToSuspend.has(t.id) ? { ...t, isSuspended: true } : t);
+  }
+  return currentTabs;
+}
+
+// When tabHibernationEnabled is FALSE:
+const tabsWithHibernationDisabled = simulateLRUPool(poolTabs, 'pool-tab-9', null, false);
+// 1. No tabs must be suspended
+assert.equal(tabsWithHibernationDisabled.some(t => t.isSuspended), false, 'When hibernation is disabled, no tabs may remain suspended');
+// 2. All previously suspended tabs must be awakened
+assert.equal(tabsWithHibernationDisabled.filter(t => !t.isSuspended).length, 10, 'All 10 tabs must be live when hibernation is disabled');
+
+// When tabHibernationEnabled is TRUE:
+const tabsWithHibernationEnabled = simulateLRUPool(tabsWithHibernationDisabled, 'pool-tab-9', null, true, 6);
+const suspendedCount = tabsWithHibernationEnabled.filter(t => t.isSuspended).length;
+assert.equal(suspendedCount, 4, 'When hibernation is enabled, excess tabs beyond max 6 must be suspended');
+
+console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, LIFO restoration, sole-tab in-place reset, and tab hibernation toggle immunity verified.');
+

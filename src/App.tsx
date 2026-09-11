@@ -1214,7 +1214,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Tab Hibernation Checker Engine (Idle Timer)
   useEffect(() => {
-    if (!settings.tabHibernationEnabled) return;
+    const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
+    if (!isHibernationEnabled) return;
     const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
 
     const interval = setInterval(() => {
@@ -1248,14 +1249,24 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     return () => clearInterval(interval);
   }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
 
-  // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion
+  // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion only when hibernation is enabled
   const MAX_LIVE_WEBVIEWS = 6;
   useEffect(() => {
+    const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
+    if (!isHibernationEnabled) {
+      setTabs(prev => {
+        const hasSuspended = prev.some(t => t.isSuspended);
+        if (!hasSuspended) return prev;
+        return prev.map(t => t.isSuspended ? { ...t, isSuspended: false } : t);
+      });
+      return;
+    }
+
     const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, MAX_LIVE_WEBVIEWS);
     if (tabsToSuspend.size > 0) {
       setTabs(prev => prev.map(t => tabsToSuspend.has(t.id) ? { ...t, isSuspended: true } : t));
     }
-  }, [tabs, activeTabId, splitTabId]);
+  }, [tabs, activeTabId, splitTabId, settings.tabHibernationEnabled]);
 
   // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
   // All side effects (closed-tabs stack, active-tab selection, incognito session
