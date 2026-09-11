@@ -232,7 +232,7 @@ const AnimatedCounter: React.FC<{
 };
 
 export const Benchmarks: React.FC = () => {
-  const [viewMode, setViewMode] = useState<'benchmarks' | 'matrix'>('benchmarks');
+  const [viewMode, setViewMode] = useState<'benchmarks' | 'matrix'>('matrix');
   const [selectedCategory, setSelectedCategory] = useState<'memory' | 'speed' | 'ai' | 'privacy'>('memory');
   const [tabCount, setTabCount] = useState<number>(30);
   const prefersReducedMotion = useReducedMotion();
@@ -260,28 +260,15 @@ export const Benchmarks: React.FC = () => {
       <div className="mb-8 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-            EMPIRICAL VALIDATION & COMPARISON
+            ARCHITECTURE & FEATURE COMPARISON
           </span>
           <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-            Measured <span className="text-[#4338ca]">Superiority</span>.
+            Architectural <span className="text-[#4338ca]">Comparison</span>.
           </h2>
         </div>
 
         {/* View Mode Toggle Switcher */}
         <div className="flex w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-neutral-200 bg-neutral-100 p-1.5 scrollbar-none md:w-fit">
-          <button
-            type="button"
-            onClick={() => setViewMode('benchmarks')}
-            aria-pressed={viewMode === 'benchmarks'}
-            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[11px] font-semibold cursor-pointer transition-all duration-200 sm:px-4 sm:text-xs ${
-              viewMode === 'benchmarks'
-                ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
-                : 'text-neutral-600 hover:text-neutral-900'
-            }`}
-          >
-            <BarChart3 className="w-3.5 h-3.5" />
-            <span>Interactive Benchmarks</span>
-          </button>
           <button
             type="button"
             onClick={() => setViewMode('matrix')}
@@ -295,12 +282,28 @@ export const Benchmarks: React.FC = () => {
             <Layers className="w-3.5 h-3.5" />
             <span>Feature Matrix</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('benchmarks')}
+            aria-pressed={viewMode === 'benchmarks'}
+            className={`flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 font-mono text-[11px] font-semibold cursor-pointer transition-all duration-200 sm:px-4 sm:text-xs ${
+              viewMode === 'benchmarks'
+                ? 'bg-[#171717] text-[#fcfbf9] shadow-xs'
+                : 'text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Resource Simulation</span>
+          </button>
         </div>
       </div>
 
       {/* VIEW 1: INTERACTIVE BENCHMARKS & SLIDER */}
       {viewMode === 'benchmarks' && (
         <div>
+          <div className="mb-6 rounded-2xl border border-neutral-200 bg-neutral-50 p-4 text-xs text-neutral-600 leading-relaxed">
+            <span className="font-semibold text-neutral-900">Resource Model Note:</span> Figures below represent architectural estimates and in-memory microbenchmark baselines (background webview suspension, fast-path hash lookups, decoupled WebLLM neural chunks). Real-world browsing RAM scales with multimedia playback, open tabs, and GPU usage.
+          </div>
           <p className="sr-only" role="status" aria-live="polite">
             {currentCategory.title}: {currentCategory.highlightNumber} {currentCategory.highlightUnit}. {currentCategory.directionLabel}.
           </p>

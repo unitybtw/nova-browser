@@ -54,18 +54,18 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 > **Architecture & Engine Parity Note:** Nova Browser is powered by modern Chromium (Blink) and Google V8 via Electron 43. Core JavaScript loop execution, HTML parsing, and DOM rendering performance are on par with Google Chrome (engine parity). Nova's distinct speed and efficiency advantages come from architectural design: zero background Google telemetry/account sync services, an aggressive idle tab hibernation engine, network-level ad/tracker interception, and an on-demand decoupled bundle structure.
 
-### Head-to-Head Comparison Matrix
+### Head-to-Head Feature Matrix
 
-| Feature / Metric | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
+| Architectural Feature | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
 | :--- | :--- | :--- | :--- | :--- |
-| **RAM Optimization** | **Background Webview Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
-| **Startup JS Bundle** | **~435 KB (Decoupled Chunks)**| Full Browser Executable | Full Browser Executable | OS Integrated |
-| **Tab Hibernation Engine** | **Background Process Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS-managed |
-| **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud Leo (Subscription) | Apple Intelligence |
-| **Ad & Tracker Protection** | **Built-in Network Shield (EasyList)** | Not built-in (Unfiltered) | Brave Shields | Content Blockers |
-| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Sync Chain (Brave) | iCloud Keychain |
-| **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available |
-| **Telemetry & Privacy** | **Zero Telemetry** | Extensive tracking | Opt-out required | Telemetry enabled |
+| **Core Engine** | **Chromium 134 / Blink** | Chromium 134 / Blink | Chromium 134 / Blink | WebKit |
+| **AI Assistant** | **100% On-Device WebGPU (0 KB Sent)** | Cloud Gemini (Account required) | Cloud Leo (Paid tier) | Apple Intelligence |
+| **Model Context Protocol (MCP)** | **Native Built-in Server (Port 3020)** | Not available | Not available | Not available |
+| **Ad & Tracker Protection** | **Built-in Session Engine (EasyList)** | Not built-in (Extensions needed) | Brave Shields | Content Blockers |
+| **Background Tab Strategy** | **Background Activity Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
+| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
+| **Split View Browsing** | **Native Dual Synchronized Canvas** | Not built-in | Not built-in | macOS Split View |
+| **Telemetry & Analytics** | **Zero Telemetry (0 KB)** | Extensive telemetry | Opt-out required | Telemetry enabled |
 | **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | MPL 2.0 | Proprietary Core |
 
 ---
