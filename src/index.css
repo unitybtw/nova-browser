@@ -27,9 +27,25 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-slate-950: var(--nova-slate-950);
+  --color-slate-900: var(--nova-slate-900);
+  --color-slate-800: var(--nova-slate-800);
+  --color-slate-700: var(--nova-slate-700);
+  --color-slate-200: var(--nova-slate-200);
+  --color-slate-100: var(--nova-slate-100);
+  --color-slate-50: var(--nova-slate-50);
 }
 
 :root {
+  --nova-slate-950: #020617;
+  --nova-slate-900: #0f172a;
+  --nova-slate-800: #1e293b;
+  --nova-slate-700: #334155;
+  --nova-slate-200: #e2e8f0;
+  --nova-slate-100: #f1f5f9;
+  --nova-slate-50: #f8fafc;
+
   --background: #ffffff;
   --foreground: #09090b;
   --card: #ffffff;
@@ -61,11 +77,19 @@
 }
 
 .dark {
-  --background: #09090b;
+  --nova-slate-950: #07050d;
+  --nova-slate-900: #151122;
+  --nova-slate-800: #1e1b2e;
+  --nova-slate-700: #2d2842;
+  --nova-slate-200: #e2e8f0;
+  --nova-slate-100: #f1f5f9;
+  --nova-slate-50: #f8fafc;
+
+  --background: #151122;
   --foreground: #fafafa;
-  --card: #18181b;
+  --card: #1e1b2e;
   --card-foreground: #fafafa;
-  --popover: #18181b;
+  --popover: #1e1b2e;
   --popover-foreground: #fafafa;
   --primary: #fafafa;
   --primary-foreground: #18181b;
@@ -77,7 +101,7 @@
   --accent-foreground: #fafafa;
   --destructive: #7f1d1d;
   --destructive-foreground: #fafafa;
-  --border: #27272a;
+  --border: #2d2842;
   --input: #27272a;
   --ring: #d4d4d8;
 

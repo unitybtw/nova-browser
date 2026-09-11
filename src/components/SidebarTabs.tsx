@@ -793,7 +793,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           live page content forces a recomposite on every page repaint. */}
       <div 
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
       >
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}

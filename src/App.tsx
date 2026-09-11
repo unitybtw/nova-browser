@@ -933,87 +933,402 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const browserColorPreset = settings.browserColor || 'default';
     const isDark = document.documentElement.classList.contains('dark');
 
+    interface BrowserThemePalette {
+      slate950: string;
+      slate900: string;
+      slate800: string;
+      slate700: string;
+      slate200: string;
+      slate100: string;
+      slate50: string;
+      background: string;
+      card: string;
+      popover: string;
+      border: string;
+      frame: string;
+      header: string;
+      toolbar: string;
+      sidebar: string;
+      activeTab: string;
+      hover: string;
+    }
+
     const browserColorPresets: Record<string, {
-      dark: { frame: string; header: string; toolbar: string; sidebar: string; activeTab: string; border: string; card: string; hover: string };
-      light: { frame: string; header: string; toolbar: string; sidebar: string; activeTab: string; border: string; card: string; hover: string };
+      dark: BrowserThemePalette;
+      light: BrowserThemePalette;
     }> = {
       default: {
-        dark: { frame: '#151122', header: '#151122', toolbar: '#1e1b2e', sidebar: '#151122', activeTab: '#1e1b2e', border: 'rgba(255, 255, 255, 0.08)', card: '#1e1b2e', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#f1f5f9', header: '#f1f5f9', toolbar: '#ffffff', sidebar: '#f1f5f9', activeTab: '#ffffff', border: 'rgba(0, 0, 0, 0.08)', card: '#ffffff', hover: 'rgba(0, 0, 0, 0.05)' }
+        dark: {
+          slate950: '#07050d',
+          slate900: '#151122',
+          slate800: '#1e1b2e',
+          slate700: '#2d2842',
+          slate200: '#e2e8f0',
+          slate100: '#f1f5f9',
+          slate50: '#f8fafc',
+          background: '#151122',
+          card: '#1e1b2e',
+          popover: '#1e1b2e',
+          border: 'rgba(255, 255, 255, 0.08)',
+          frame: '#151122',
+          header: '#151122',
+          toolbar: '#1e1b2e',
+          sidebar: '#151122',
+          activeTab: '#1e1b2e',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#020617',
+          slate900: '#0f172a',
+          slate800: '#1e293b',
+          slate700: '#334155',
+          slate200: '#e2e8f0',
+          slate100: '#f1f5f9',
+          slate50: '#f8fafc',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(0, 0, 0, 0.08)',
+          frame: '#f1f5f9',
+          header: '#f1f5f9',
+          toolbar: '#ffffff',
+          sidebar: '#f1f5f9',
+          activeTab: '#ffffff',
+          hover: 'rgba(0, 0, 0, 0.05)'
+        }
       },
       midnight: {
-        dark: { frame: '#0a0f1d', header: '#0e1626', toolbar: '#162238', sidebar: '#0a0f1d', activeTab: '#162238', border: 'rgba(148, 163, 184, 0.12)', card: '#162238', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#eef3f9', header: '#e2ebf5', toolbar: '#ffffff', sidebar: '#eef3f9', activeTab: '#ffffff', border: 'rgba(148, 163, 184, 0.25)', card: '#ffffff', hover: 'rgba(15, 23, 42, 0.05)' }
+        dark: {
+          slate950: '#050811',
+          slate900: '#0a101f',
+          slate800: '#111b33',
+          slate700: '#1c2a4f',
+          slate200: '#cbd5e1',
+          slate100: '#e2e8f0',
+          slate50: '#f1f5f9',
+          background: '#0a101f',
+          card: '#111b33',
+          popover: '#111b33',
+          border: 'rgba(148, 163, 184, 0.12)',
+          frame: '#050811',
+          header: '#0a101f',
+          toolbar: '#111b33',
+          sidebar: '#050811',
+          activeTab: '#111b33',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#0f172a',
+          slate900: '#1e293b',
+          slate800: '#334155',
+          slate700: '#475569',
+          slate200: '#d8e2ee',
+          slate100: '#eaf0f8',
+          slate50: '#f4f7fb',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(148, 163, 184, 0.25)',
+          frame: '#eaf0f8',
+          header: '#e2ebf5',
+          toolbar: '#ffffff',
+          sidebar: '#eaf0f8',
+          activeTab: '#ffffff',
+          hover: 'rgba(15, 23, 42, 0.05)'
+        }
       },
       cyberpunk: {
-        dark: { frame: '#0d071a', header: '#140a28', toolbar: '#20103e', sidebar: '#0d071a', activeTab: '#20103e', border: 'rgba(192, 132, 252, 0.15)', card: '#20103e', hover: 'rgba(255, 255, 255, 0.07)' },
-        light: { frame: '#f7f2fe', header: '#ede3fc', toolbar: '#ffffff', sidebar: '#f7f2fe', activeTab: '#ffffff', border: 'rgba(168, 85, 247, 0.2)', card: '#ffffff', hover: 'rgba(88, 28, 135, 0.05)' }
+        dark: {
+          slate950: '#090314',
+          slate900: '#120726',
+          slate800: '#1d0d3d',
+          slate700: '#2f175e',
+          slate200: '#e9d5ff',
+          slate100: '#f3e8ff',
+          slate50: '#faf5ff',
+          background: '#120726',
+          card: '#1d0d3d',
+          popover: '#1d0d3d',
+          border: 'rgba(192, 132, 252, 0.15)',
+          frame: '#090314',
+          header: '#120726',
+          toolbar: '#1d0d3d',
+          sidebar: '#090314',
+          activeTab: '#1d0d3d',
+          hover: 'rgba(255, 255, 255, 0.07)'
+        },
+        light: {
+          slate950: '#1e1b4b',
+          slate900: '#2e1065',
+          slate800: '#3b0764',
+          slate700: '#581c87',
+          slate200: '#ede3fc',
+          slate100: '#f5eefd',
+          slate50: '#faf7fe',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(168, 85, 247, 0.2)',
+          frame: '#f5eefd',
+          header: '#ede3fc',
+          toolbar: '#ffffff',
+          sidebar: '#f5eefd',
+          activeTab: '#ffffff',
+          hover: 'rgba(88, 28, 135, 0.05)'
+        }
       },
       forest: {
-        dark: { frame: '#04140e', header: '#071f16', toolbar: '#0d3224', sidebar: '#04140e', activeTab: '#0d3224', border: 'rgba(52, 211, 153, 0.12)', card: '#0d3224', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#f0f7f4', header: '#e0f0e8', toolbar: '#ffffff', sidebar: '#f0f7f4', activeTab: '#ffffff', border: 'rgba(16, 185, 129, 0.2)', card: '#ffffff', hover: 'rgba(6, 78, 59, 0.05)' }
+        dark: {
+          slate950: '#020d09',
+          slate900: '#061a12',
+          slate800: '#0d2a1f',
+          slate700: '#154231',
+          slate200: '#a7f3d0',
+          slate100: '#d1fae5',
+          slate50: '#ecfdf5',
+          background: '#061a12',
+          card: '#0d2a1f',
+          popover: '#0d2a1f',
+          border: 'rgba(52, 211, 153, 0.14)',
+          frame: '#020d09',
+          header: '#061a12',
+          toolbar: '#0d2a1f',
+          sidebar: '#020d09',
+          activeTab: '#0d2a1f',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#022c22',
+          slate900: '#064e3b',
+          slate800: '#065f46',
+          slate700: '#047857',
+          slate200: '#d1fae5',
+          slate100: '#e6f7ef',
+          slate50: '#f2faf6',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(16, 185, 129, 0.2)',
+          frame: '#e6f7ef',
+          header: '#d9f2e6',
+          toolbar: '#ffffff',
+          sidebar: '#e6f7ef',
+          activeTab: '#ffffff',
+          hover: 'rgba(6, 78, 59, 0.05)'
+        }
       },
       crimson: {
-        dark: { frame: '#160509', header: '#21090f', toolbar: '#341019', sidebar: '#160509', activeTab: '#341019', border: 'rgba(244, 63, 94, 0.12)', card: '#341019', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#fcf1f3', header: '#f8dfe4', toolbar: '#ffffff', sidebar: '#fcf1f3', activeTab: '#ffffff', border: 'rgba(244, 63, 94, 0.2)', card: '#ffffff', hover: 'rgba(159, 18, 57, 0.05)' }
+        dark: {
+          slate950: '#120306',
+          slate900: '#1d070c',
+          slate800: '#2e0c15',
+          slate700: '#471321',
+          slate200: '#fecdd3',
+          slate100: '#ffe4e6',
+          slate50: '#fff1f2',
+          background: '#1d070c',
+          card: '#2e0c15',
+          popover: '#2e0c15',
+          border: 'rgba(244, 63, 94, 0.14)',
+          frame: '#120306',
+          header: '#1d070c',
+          toolbar: '#2e0c15',
+          sidebar: '#120306',
+          activeTab: '#2e0c15',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#4c0519',
+          slate900: '#881337',
+          slate800: '#9f1239',
+          slate700: '#be123c',
+          slate200: '#fce7ea',
+          slate100: '#fdf2f4',
+          slate50: '#fff5f7',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(244, 63, 94, 0.2)',
+          frame: '#fdf2f4',
+          header: '#fae3e7',
+          toolbar: '#ffffff',
+          sidebar: '#fdf2f4',
+          activeTab: '#ffffff',
+          hover: 'rgba(159, 18, 57, 0.05)'
+        }
       },
       warm: {
-        dark: { frame: '#140e0b', header: '#1d1410', toolbar: '#2c201a', sidebar: '#140e0b', activeTab: '#2c201a', border: 'rgba(217, 119, 6, 0.12)', card: '#2c201a', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#f8f4f0', header: '#eee6df', toolbar: '#ffffff', sidebar: '#f8f4f0', activeTab: '#ffffff', border: 'rgba(180, 83, 9, 0.2)', card: '#ffffff', hover: 'rgba(120, 53, 15, 0.05)' }
+        dark: {
+          slate950: '#0f0a07',
+          slate900: '#18110c',
+          slate800: '#261b13',
+          slate700: '#3b2b20',
+          slate200: '#fed7aa',
+          slate100: '#ffedd5',
+          slate50: '#fff7ed',
+          background: '#18110c',
+          card: '#261b13',
+          popover: '#261b13',
+          border: 'rgba(217, 119, 6, 0.14)',
+          frame: '#0f0a07',
+          header: '#18110c',
+          toolbar: '#261b13',
+          sidebar: '#0f0a07',
+          activeTab: '#261b13',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#451a03',
+          slate900: '#78350f',
+          slate800: '#92400e',
+          slate700: '#b45309',
+          slate200: '#f6ebe2',
+          slate100: '#fbf5ef',
+          slate50: '#fdfaf6',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(180, 83, 9, 0.2)',
+          frame: '#fbf5ef',
+          header: '#f4e8dc',
+          toolbar: '#ffffff',
+          sidebar: '#fbf5ef',
+          activeTab: '#ffffff',
+          hover: 'rgba(120, 53, 15, 0.05)'
+        }
       },
       ocean: {
-        dark: { frame: '#041217', header: '#071c24', toolbar: '#0d2d3a', sidebar: '#041217', activeTab: '#0d2d3a', border: 'rgba(6, 182, 212, 0.12)', card: '#0d2d3a', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#eef7f9', header: '#dff0f4', toolbar: '#ffffff', sidebar: '#eef7f9', activeTab: '#ffffff', border: 'rgba(6, 182, 212, 0.2)', card: '#ffffff', hover: 'rgba(14, 116, 144, 0.05)' }
+        dark: {
+          slate950: '#020d12',
+          slate900: '#051720',
+          slate800: '#0a2634',
+          slate700: '#113a4f',
+          slate200: '#a5f3fc',
+          slate100: '#cffafe',
+          slate50: '#ecfeff',
+          background: '#051720',
+          card: '#0a2634',
+          popover: '#0a2634',
+          border: 'rgba(6, 182, 212, 0.14)',
+          frame: '#020d12',
+          header: '#051720',
+          toolbar: '#0a2634',
+          sidebar: '#020d12',
+          activeTab: '#0a2634',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#083344',
+          slate900: '#164e63',
+          slate800: '#155e75',
+          slate700: '#0e7490',
+          slate200: '#cffafe',
+          slate100: '#e6f9fc',
+          slate50: '#f2fcfe',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(6, 182, 212, 0.2)',
+          frame: '#e6f9fc',
+          header: '#d9f5fa',
+          toolbar: '#ffffff',
+          sidebar: '#e6f9fc',
+          activeTab: '#ffffff',
+          hover: 'rgba(14, 116, 144, 0.05)'
+        }
       },
       sunset: {
-        dark: { frame: '#170b03', header: '#241206', toolbar: '#381e0c', sidebar: '#170b03', activeTab: '#381e0c', border: 'rgba(245, 158, 11, 0.14)', card: '#381e0c', hover: 'rgba(255, 255, 255, 0.06)' },
-        light: { frame: '#faf3ec', header: '#f5e6d8', toolbar: '#ffffff', sidebar: '#faf3ec', activeTab: '#ffffff', border: 'rgba(245, 158, 11, 0.22)', card: '#ffffff', hover: 'rgba(180, 83, 9, 0.05)' }
+        dark: {
+          slate950: '#110601',
+          slate900: '#1c0b02',
+          slate800: '#2e1305',
+          slate700: '#471f0a',
+          slate200: '#fed7aa',
+          slate100: '#ffedd5',
+          slate50: '#fff7ed',
+          background: '#1c0b02',
+          card: '#2e1305',
+          popover: '#2e1305',
+          border: 'rgba(245, 158, 11, 0.15)',
+          frame: '#110601',
+          header: '#1c0b02',
+          toolbar: '#2e1305',
+          sidebar: '#110601',
+          activeTab: '#2e1305',
+          hover: 'rgba(255, 255, 255, 0.06)'
+        },
+        light: {
+          slate950: '#451a03',
+          slate900: '#78350f',
+          slate800: '#92400e',
+          slate700: '#b45309',
+          slate200: '#fdecdb',
+          slate100: '#fdf3ea',
+          slate50: '#fef8f4',
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: 'rgba(245, 158, 11, 0.22)',
+          frame: '#fdf3ea',
+          header: '#fae7d4',
+          toolbar: '#ffffff',
+          sidebar: '#fdf3ea',
+          activeTab: '#ffffff',
+          hover: 'rgba(180, 83, 9, 0.05)'
+        }
       }
     };
 
-    let frameBg = '';
-    let headerBg = '';
-    let toolbarBg = '';
-    let sidebarBg = '';
-    let activeTabBg = '';
-    let borderSubtle = '';
-    let cardBg = '';
-    let hoverBg = '';
+    let activePalette: BrowserThemePalette;
 
     if (browserColorPreset === 'custom') {
       const customHex = (settings.customBrowserColor && /^#[0-9a-fA-F]{3,8}$/.test(settings.customBrowserColor))
         ? settings.customBrowserColor
         : '#6366f1';
       if (isDark) {
-        frameBg = `color-mix(in srgb, ${customHex} 18%, #08080c)`;
-        headerBg = `color-mix(in srgb, ${customHex} 25%, #0c0c12)`;
-        toolbarBg = `color-mix(in srgb, ${customHex} 38%, #14141e)`;
-        sidebarBg = `color-mix(in srgb, ${customHex} 20%, #08080c)`;
-        activeTabBg = `color-mix(in srgb, ${customHex} 38%, #14141e)`;
-        borderSubtle = `color-mix(in srgb, ${customHex} 30%, rgba(255, 255, 255, 0.08))`;
-        cardBg = `color-mix(in srgb, ${customHex} 35%, #14141e)`;
-        hoverBg = 'rgba(255, 255, 255, 0.06)';
+        activePalette = {
+          slate950: `color-mix(in srgb, ${customHex} 12%, #030305)`,
+          slate900: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+          slate800: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+          slate700: `color-mix(in srgb, ${customHex} 45%, #181824)`,
+          slate200: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
+          slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
+          slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
+          background: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+          card: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+          popover: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+          border: `color-mix(in srgb, ${customHex} 30%, rgba(255, 255, 255, 0.08))`,
+          frame: `color-mix(in srgb, ${customHex} 15%, #050508)`,
+          header: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+          toolbar: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+          sidebar: `color-mix(in srgb, ${customHex} 15%, #050508)`,
+          activeTab: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+          hover: 'rgba(255, 255, 255, 0.06)'
+        };
       } else {
-        frameBg = `color-mix(in srgb, ${customHex} 8%, #f8fafc)`;
-        headerBg = `color-mix(in srgb, ${customHex} 14%, #f1f5f9)`;
-        toolbarBg = '#ffffff';
-        sidebarBg = `color-mix(in srgb, ${customHex} 8%, #f8fafc)`;
-        activeTabBg = '#ffffff';
-        borderSubtle = `color-mix(in srgb, ${customHex} 25%, rgba(0, 0, 0, 0.1))`;
-        cardBg = '#ffffff';
-        hoverBg = `color-mix(in srgb, ${customHex} 10%, rgba(0, 0, 0, 0.04))`;
+        activePalette = {
+          slate950: `color-mix(in srgb, ${customHex} 30%, #0f172a)`,
+          slate900: `color-mix(in srgb, ${customHex} 25%, #1e293b)`,
+          slate800: `color-mix(in srgb, ${customHex} 20%, #334155)`,
+          slate700: `color-mix(in srgb, ${customHex} 15%, #475569)`,
+          slate200: `color-mix(in srgb, ${customHex} 15%, #e2e8f0)`,
+          slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
+          slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
+          background: '#ffffff',
+          card: '#ffffff',
+          popover: '#ffffff',
+          border: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
+          frame: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
+          header: `color-mix(in srgb, ${customHex} 14%, #f1f5f9)`,
+          toolbar: '#ffffff',
+          sidebar: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
+          activeTab: '#ffffff',
+          hover: 'rgba(0, 0, 0, 0.05)'
+        };
       }
     } else {
       const palette = browserColorPresets[browserColorPreset] || browserColorPresets.default;
-      const scheme = isDark ? palette.dark : palette.light;
-      frameBg = scheme.frame;
-      headerBg = scheme.header;
-      toolbarBg = scheme.toolbar;
-      sidebarBg = scheme.sidebar;
-      activeTabBg = scheme.activeTab;
-      borderSubtle = scheme.border;
-      cardBg = scheme.card;
-      hoverBg = scheme.hover;
+      activePalette = isDark ? palette.dark : palette.light;
     }
 
     const cssVariables = {
@@ -1038,14 +1353,25 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       '--color-accent-light': `color-mix(in srgb, ${hex} 20%, white)`,
       '--color-accent-dark': `color-mix(in srgb, ${hex} 60%, black)`,
       '--color-accent-text': '#ffffff',
-      '--nova-frame-bg': frameBg,
-      '--nova-header-bg': headerBg,
-      '--nova-toolbar-bg': toolbarBg,
-      '--nova-sidebar-bg': sidebarBg,
-      '--nova-active-tab-bg': activeTabBg,
-      '--nova-inactive-tab-hover-bg': hoverBg,
-      '--nova-border-subtle': borderSubtle,
-      '--nova-card-bg': cardBg
+      '--nova-slate-950': activePalette.slate950,
+      '--nova-slate-900': activePalette.slate900,
+      '--nova-slate-800': activePalette.slate800,
+      '--nova-slate-700': activePalette.slate700,
+      '--nova-slate-200': activePalette.slate200,
+      '--nova-slate-100': activePalette.slate100,
+      '--nova-slate-50': activePalette.slate50,
+      '--background': activePalette.background,
+      '--card': activePalette.card,
+      '--popover': activePalette.popover,
+      '--border': activePalette.border,
+      '--nova-frame-bg': activePalette.frame,
+      '--nova-header-bg': activePalette.header,
+      '--nova-toolbar-bg': activePalette.toolbar,
+      '--nova-sidebar-bg': activePalette.sidebar,
+      '--nova-active-tab-bg': activePalette.activeTab,
+      '--nova-inactive-tab-hover-bg': activePalette.hover,
+      '--nova-border-subtle': activePalette.border,
+      '--nova-card-bg': activePalette.card
     };
 
     // Apply directly to root style object for immediate reactivity
@@ -3275,7 +3601,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
         activeTab?.isIncognito
           ? 'bg-slate-950 dark:bg-[#0a0812]'
-          : 'bg-slate-100 dark:bg-[#151122]'
+          : 'bg-slate-100 dark:bg-slate-950'
       } transition-colors duration-300`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
@@ -3381,7 +3707,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
                 style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 border-r border-slate-200 dark:border-white/10"
+                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs
                   tabs={workspaceTabs}
@@ -3444,7 +3770,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           PERF: transition is scoped to the properties that actually change on
           sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
           the compositor watch every property of this full-size container. */}
-      <div className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      <div 
+        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : undefined}
+        className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
@@ -3549,6 +3877,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
       {/* MAIN BROWSER CONTENT */}
       <main 
+        id="primary-view-container"
+        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : undefined}
         className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden min-h-0"
         onDragOver={(e) => {
           const types = Array.from(e.dataTransfer?.types || []);
@@ -3700,7 +4030,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         {/* Secondary View (Split Screen) */}
         {secondaryTab && (
-          <div id="secondary-view-container" style={{ width: `${100 - splitRatio}%` }} className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0">
+          <div 
+            id="secondary-view-container" 
+            style={{ width: `${100 - splitRatio}%`, ...(!secondaryTab.isIncognito ? { backgroundColor: 'var(--nova-card-bg)' } : {}) }} 
+            className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0"
+          >
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
               <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
                 {secondaryTab.title || secondaryTab.url}

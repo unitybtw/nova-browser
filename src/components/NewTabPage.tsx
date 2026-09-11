@@ -500,11 +500,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       case 'fireflies':
       case 'nebula':
       case 'matrix':
-        return 'bg-[#0B0F19] text-white';
+        return 'bg-slate-950 text-white';
       case 'glass':
         return 'bg-slate-900/90 text-white backdrop-blur-xl';
       default:
-        return 'bg-[#0B0F19] text-white';
+        return 'bg-slate-950 text-slate-100';
     }
   };
 
@@ -679,14 +679,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               willChange: 'transform',
             }}
           />
-          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[#0B0F19]/60' : 'bg-white/50'}`}></div>
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-slate-950/60' : 'bg-white/50'}`}></div>
         </div>
       )}
 
       {/* Glass Prism Background */}
       {newTabBackground === 'glass' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-[#0a0d16]' : 'bg-slate-100'}`} />
+          <div className={`absolute inset-0 ${isDarkTheme ? 'bg-slate-950' : 'bg-slate-100'}`} />
           <div className="absolute -top-[30%] left-[10%] w-[60vw] h-[60vw] rounded-full bg-blue-600/15 blur-[120px]" />
           <div className="absolute -bottom-[30%] right-[10%] w-[60vw] h-[60vw] rounded-full bg-violet-600/15 blur-[120px]" />
           <div className="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:20px_20px]" />

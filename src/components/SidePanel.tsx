@@ -628,7 +628,7 @@ export const SidePanel = React.memo(({
           animate={{ width: 384, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="flex-shrink-0 relative h-full border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-[#151122]/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden"
+          className="flex-shrink-0 relative h-full border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden"
         >
           <div className="w-88 sm:w-96 h-full flex flex-col flex-1 overflow-hidden">
             {/* Header */}
@@ -1183,7 +1183,7 @@ export const SidePanel = React.memo(({
 
           {/* Modern Assistant UI Elements Composer Footer */}
           {isReady && (
-            <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-[#151122]/95 backdrop-blur-md">
+            <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-slate-900/95 backdrop-blur-md">
               {/* Global agent status pill */}
               {statusPill && (
                 <div className="mb-2">

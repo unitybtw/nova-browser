@@ -704,10 +704,6 @@ const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo
           <Plus className="w-3 h-3" />
         </motion.div>
       </div>
-
-      <span className="absolute top-1 right-2 text-[9px] font-mono text-slate-400/60 dark:text-slate-500/60 pointer-events-none uppercase tracking-wider">
-        live
-      </span>
     </div>
   );
 });
@@ -2004,7 +2000,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Tab Animation</h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select a tab opening physics preset and preview its live motion</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select a tab opening physics preset and preview its motion</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
