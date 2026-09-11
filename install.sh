@@ -10,6 +10,19 @@ ARCH=$(uname -m)
 RELEASES_API="https://api.github.com/repos/unitybtw/nova-browser/releases/latest"
 CHECKSUMS_URL=""
 
+# Secure isolated temporary working directory via mktemp
+TMP_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'nova-install')
+chmod 0700 "$TMP_DIR"
+
+MOUNT_DIR=""
+cleanup() {
+  if [ -n "$MOUNT_DIR" ] && [ -d "$MOUNT_DIR" ]; then
+    hdiutil detach "$MOUNT_DIR" -quiet 2>/dev/null || true
+  fi
+  rm -rf "$TMP_DIR"
+}
+trap cleanup EXIT INT TERM
+
 # Fetch the SHA256SUMS.txt URL from the latest release assets
 fetch_checksums_url() {
   local api_response
@@ -49,7 +62,6 @@ verify_sha256() {
     echo "The downloaded file does not match the official release." >&2
     echo "Do NOT install this binary. Please open an issue at:" >&2
     echo "  https://github.com/unitybtw/nova-browser/issues" >&2
-    rm -f "$file"
     exit 1
   fi
 
@@ -66,8 +78,8 @@ if [ "$OS" = "Darwin" ]; then
   fi
 
   DOWNLOAD_URL="https://github.com/unitybtw/nova-browser/releases/latest/download/${DMG_NAME}"
-  DEST="/tmp/${DMG_NAME}"
-  CHECKSUMS_LOCAL="/tmp/nova-browser-SHA256SUMS.txt"
+  DEST="${TMP_DIR}/${DMG_NAME}"
+  CHECKSUMS_LOCAL="${TMP_DIR}/SHA256SUMS.txt"
 
   echo "Fetching release metadata..."
   fetch_checksums_url
@@ -91,18 +103,18 @@ if [ "$OS" = "Darwin" ]; then
     else
       echo "Warning: $DMG_NAME not found in SHA256SUMS.txt — skipping verification." >&2
     fi
-    rm -f "$CHECKSUMS_LOCAL"
   fi
 
   echo "Mounting disk image..."
-  MOUNT_DIR=$(mktemp -d /tmp/nova-mount.XXXXXX)
+  MOUNT_DIR="${TMP_DIR}/mount"
+  mkdir -p "$MOUNT_DIR"
   hdiutil attach "$DEST" -mountpoint "$MOUNT_DIR" -nobrowse -quiet
 
   echo "Installing Nova Browser to /Applications..."
   cp -R "${MOUNT_DIR}/Nova Browser.app" /Applications/
 
   hdiutil detach "$MOUNT_DIR" -quiet
-  rm -rf "$MOUNT_DIR" "$DEST"
+  MOUNT_DIR=""
 
   echo ""
   echo "Nova Browser installed successfully to /Applications/Nova Browser.app"
@@ -124,8 +136,8 @@ if [ "$OS" = "Linux" ]; then
   APPIMAGE_NAME="Nova-Browser-${TARGET_ARCH}.AppImage"
   DOWNLOAD_URL="https://github.com/unitybtw/nova-browser/releases/latest/download/${APPIMAGE_NAME}"
   DEST="${HOME}/.local/bin/nova-browser"
-  DEST_TMP="${HOME}/.local/bin/nova-browser.tmp"
-  CHECKSUMS_LOCAL="/tmp/nova-browser-SHA256SUMS.txt"
+  DEST_TMP="${TMP_DIR}/${APPIMAGE_NAME}"
+  CHECKSUMS_LOCAL="${TMP_DIR}/SHA256SUMS.txt"
 
   mkdir -p "${HOME}/.local/bin"
 
@@ -157,7 +169,6 @@ if [ "$OS" = "Linux" ]; then
     else
       echo "Warning: $APPIMAGE_NAME not found in SHA256SUMS.txt — skipping verification." >&2
     fi
-    rm -f "$CHECKSUMS_LOCAL"
   fi
 
   # Atomic replacement: only move to final path after checksum passes
