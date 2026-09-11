@@ -94,17 +94,23 @@ export const Downloads: React.FC = () => {
           </div>
 
           <div>
-            <a
-              href="https://github.com/unitybtw/nova-browser/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
-            >
-              <Download className="w-4 h-4" aria-hidden="true" />
-              <span>Download DMG</span>
-            </a>
+            <div className="space-y-2">
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-2.5 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
+              >
+                <Download className="w-4 h-4" aria-hidden="true" />
+                <span>Apple Silicon (ARM64)</span>
+              </a>
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-x64.dmg"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98]"
+              >
+                <span>Intel x86 (x64)</span>
+              </a>
+            </div>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
-              Direct prebuilt DMG package for macOS
+              Direct prebuilt DMG packages for Apple Silicon & Intel
             </p>
             <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-mono text-emerald-600">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -223,15 +229,23 @@ export const Downloads: React.FC = () => {
           </div>
 
           <div>
-            <a
-              href="https://github.com/unitybtw/nova-browser/releases"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-3 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
-            >
-              <Download className="w-4 h-4" aria-hidden="true" />
-              <span>Download AppImage / .deb</span>
-            </a>
+            <div className="space-y-2">
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-x86_64.AppImage"
+                className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-2.5 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
+              >
+                <Download className="w-4 h-4" aria-hidden="true" />
+                <span>Download AppImage (x86_64)</span>
+              </a>
+              <a
+                href="https://github.com/unitybtw/nova-browser/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98]"
+              >
+                <span>Debian (.deb) & ARM64 Packages</span>
+              </a>
+            </div>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
               Native AppImage & Debian package
             </p>

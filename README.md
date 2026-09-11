@@ -15,7 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![Tests](https://img.shields.io/badge/Tests-52%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-564%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
@@ -284,6 +284,7 @@ graph TD
     subgraph Preload["Context Bridge (Preload Security)"]
         api["preload.ts (window.electronAPI)"]
         webstore["webstore-preload.ts (Web Store Bridge)"]
+        guest["guest-preload.ts (Sandboxed Webview Bridge)"]
     end
 
     subgraph Renderer["React 18 + TypeScript (Renderer Process)"]
@@ -294,7 +295,7 @@ graph TD
             memory["aiMemory.ts - Persistent Info Vault"]
             preview["AILinkPreview.tsx - Hover Preview"]
             worker["workers/aiWorker.ts - WebLLM Neural Runtime"]
-            translate["translationService.ts - Offline DOM Translator"]
+            translate["translationService.ts - DOM Translator Engine"]
             sidepanel["SidePanel.tsx - AI Assistant UI"]
         end
 
@@ -326,6 +327,9 @@ graph TD
     end
 
     main <-->|Secure IPC Bridge| api
+    main <-->|Chrome Web Store Bridge| webstore
+    main <-->|Sandbox Security Policy| guest
+    guest <-->|Guest DOM Protection| webview
     api <-->|Typed API Invocations| app
     app --> InternalPages
     app --> webview
