@@ -82,6 +82,8 @@ export interface UserSettings {
   fontSize: 'small' | 'medium' | 'large';
   accentColor: 'blue' | 'emerald' | 'purple' | 'rose' | 'amber' | 'custom';
   customAccentColor?: string;
+  browserColor?: 'default' | 'midnight' | 'cyberpunk' | 'forest' | 'crimson' | 'warm' | 'ocean' | 'sunset' | 'custom';
+  customBrowserColor?: string;
   showBookmarksBar: boolean;
   useVerticalTabs: boolean;
   mcpServerEnabled: boolean;
@@ -114,6 +116,8 @@ export const defaultSettings: UserSettings = {
   fontSize: 'medium',
   accentColor: 'blue',
   customAccentColor: '#3b82f6',
+  browserColor: 'default',
+  customBrowserColor: '#6366f1',
   showBookmarksBar: false,
   showTasksWidget: true,
   useVerticalTabs: false,

@@ -49,6 +49,15 @@
   --border: #e4e4e7;
   --input: #e4e4e7;
   --ring: #18181b;
+
+  --nova-frame-bg: #f1f5f9;
+  --nova-header-bg: #f1f5f9;
+  --nova-toolbar-bg: #ffffff;
+  --nova-sidebar-bg: #f1f5f9;
+  --nova-active-tab-bg: #ffffff;
+  --nova-inactive-tab-hover-bg: rgba(0, 0, 0, 0.05);
+  --nova-border-subtle: rgba(0, 0, 0, 0.08);
+  --nova-card-bg: #ffffff;
 }
 
 .dark {
@@ -71,6 +80,15 @@
   --border: #27272a;
   --input: #27272a;
   --ring: #d4d4d8;
+
+  --nova-frame-bg: #151122;
+  --nova-header-bg: #151122;
+  --nova-toolbar-bg: #1e1b2e;
+  --nova-sidebar-bg: #151122;
+  --nova-active-tab-bg: #1e1b2e;
+  --nova-inactive-tab-hover-bg: rgba(255, 255, 255, 0.06);
+  --nova-border-subtle: rgba(255, 255, 255, 0.08);
+  --nova-card-bg: #1e1b2e;
 }
 
 @layer utilities {

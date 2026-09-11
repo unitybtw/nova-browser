@@ -1889,6 +1889,103 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </section>
 
               <section>
+                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize the entire browser chrome, frame, navigation bar, and tab surfaces</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {[
+                    { id: 'default', name: 'Classic Slate', desc: 'Default Nova aesthetic', darkPreview: '#151122', lightPreview: '#f1f5f9', badge: 'Default' },
+                    { id: 'midnight', name: 'Midnight Navy', desc: 'Deep galactic space blue', darkPreview: '#0a0f1d', lightPreview: '#eef3f9' },
+                    { id: 'cyberpunk', name: 'Cyberpunk Violet', desc: 'Futuristic neon purple tone', darkPreview: '#0d071a', lightPreview: '#f7f2fe' },
+                    { id: 'forest', name: 'Emerald Forest', desc: 'Rich organic botanical green', darkPreview: '#04140e', lightPreview: '#f0f7f4' },
+                    { id: 'crimson', name: 'Crimson Ruby', desc: 'Velvet burgundy wine red', darkPreview: '#160509', lightPreview: '#fcf1f3' },
+                    { id: 'warm', name: 'Warm Mocha', desc: 'Cozy espresso coffee tone', darkPreview: '#140e0b', lightPreview: '#f8f4f0' },
+                    { id: 'ocean', name: 'Deep Ocean', desc: 'Calm abyssal teal & cyan', darkPreview: '#041217', lightPreview: '#eef7f9' },
+                    { id: 'sunset', name: 'Sunset Amber', desc: 'Warm dusk twilight glow', darkPreview: '#170b03', lightPreview: '#faf3ec' },
+                    { id: 'custom', name: 'Custom Color', desc: 'Choose your own hex color', darkPreview: settings.customBrowserColor || '#6366f1', lightPreview: settings.customBrowserColor || '#6366f1' }
+                  ].map(bc => {
+                    const isSelected = (settings.browserColor ?? 'default') === bc.id;
+                    return (
+                      <button
+                        key={bc.id}
+                        onClick={() => onUpdateSettings({ browserColor: bc.id as any })}
+                        className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col gap-3 text-left relative overflow-hidden ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-500/10 shadow-sm'
+                            : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
+                        }`}
+                      >
+                        {/* Mini browser mockup preview */}
+                        <div 
+                          className="w-full h-16 rounded-xl border border-black/10 dark:border-white/10 p-1.5 flex flex-col gap-1 overflow-hidden shadow-xs relative"
+                          style={{ backgroundColor: settings.theme === 'light' ? bc.lightPreview : bc.darkPreview }}
+                        >
+                          {/* Topbar mini header */}
+                          <div className="flex items-center gap-1 w-full h-4">
+                            <div className="w-1.5 h-1.5 rounded-full bg-red-400/80" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-amber-400/80" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
+                            <div className="ml-1.5 w-14 h-2.5 rounded-t bg-white/20 dark:bg-white/15" />
+                          </div>
+                          {/* Mini omnibox & content */}
+                          <div className="flex items-center gap-1 w-full h-3 px-1 rounded bg-black/10 dark:bg-white/10">
+                            <div className="w-2 h-1.5 rounded-xs bg-current opacity-30" />
+                            <div className="w-12 h-1 rounded-full bg-current opacity-20" />
+                          </div>
+                          <div className="flex-1 rounded bg-white/40 dark:bg-black/20" />
+                        </div>
+
+                        <div className="flex items-center justify-between w-full">
+                          <div>
+                            <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{bc.name}</span>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5">{bc.desc}</p>
+                          </div>
+                          {bc.badge && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full border border-blue-500/20 shrink-0">
+                              {bc.badge}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {settings.browserColor === 'custom' && (
+                  <div className="mt-4 p-4 rounded-2xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 flex flex-wrap items-center gap-4 animate-in fade-in slide-in-from-top-2">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Custom Browser Color Picker:</label>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="color" 
+                        value={settings.customBrowserColor || '#6366f1'}
+                        onChange={(e) => onUpdateSettings({ customBrowserColor: e.target.value })}
+                        className="w-10 h-10 rounded-xl cursor-pointer border-none p-0 bg-transparent"
+                      />
+                      <input
+                        type="text"
+                        value={settings.customBrowserColor || '#6366f1'}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (/^#[0-9a-fA-F]{0,8}$/.test(val)) {
+                            onUpdateSettings({ customBrowserColor: val });
+                          }
+                        }}
+                        className="w-28 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+                        placeholder="#6366f1"
+                      />
+                    </div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      The browser automatically calculates frame, toolbar, and tab surfaces with optimal contrast.
+                    </span>
+                  </div>
+                )}
+              </section>
+
+              <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
                 <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
                   {[

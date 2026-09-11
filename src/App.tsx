@@ -929,6 +929,93 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       hex = defaultColorMap[settings.accentColor];
     }
 
+    // Apply full browser UI colors via style injection
+    const browserColorPreset = settings.browserColor || 'default';
+    const isDark = document.documentElement.classList.contains('dark');
+
+    const browserColorPresets: Record<string, {
+      dark: { frame: string; header: string; toolbar: string; sidebar: string; activeTab: string; border: string; card: string; hover: string };
+      light: { frame: string; header: string; toolbar: string; sidebar: string; activeTab: string; border: string; card: string; hover: string };
+    }> = {
+      default: {
+        dark: { frame: '#151122', header: '#151122', toolbar: '#1e1b2e', sidebar: '#151122', activeTab: '#1e1b2e', border: 'rgba(255, 255, 255, 0.08)', card: '#1e1b2e', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#f1f5f9', header: '#f1f5f9', toolbar: '#ffffff', sidebar: '#f1f5f9', activeTab: '#ffffff', border: 'rgba(0, 0, 0, 0.08)', card: '#ffffff', hover: 'rgba(0, 0, 0, 0.05)' }
+      },
+      midnight: {
+        dark: { frame: '#0a0f1d', header: '#0e1626', toolbar: '#162238', sidebar: '#0a0f1d', activeTab: '#162238', border: 'rgba(148, 163, 184, 0.12)', card: '#162238', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#eef3f9', header: '#e2ebf5', toolbar: '#ffffff', sidebar: '#eef3f9', activeTab: '#ffffff', border: 'rgba(148, 163, 184, 0.25)', card: '#ffffff', hover: 'rgba(15, 23, 42, 0.05)' }
+      },
+      cyberpunk: {
+        dark: { frame: '#0d071a', header: '#140a28', toolbar: '#20103e', sidebar: '#0d071a', activeTab: '#20103e', border: 'rgba(192, 132, 252, 0.15)', card: '#20103e', hover: 'rgba(255, 255, 255, 0.07)' },
+        light: { frame: '#f7f2fe', header: '#ede3fc', toolbar: '#ffffff', sidebar: '#f7f2fe', activeTab: '#ffffff', border: 'rgba(168, 85, 247, 0.2)', card: '#ffffff', hover: 'rgba(88, 28, 135, 0.05)' }
+      },
+      forest: {
+        dark: { frame: '#04140e', header: '#071f16', toolbar: '#0d3224', sidebar: '#04140e', activeTab: '#0d3224', border: 'rgba(52, 211, 153, 0.12)', card: '#0d3224', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#f0f7f4', header: '#e0f0e8', toolbar: '#ffffff', sidebar: '#f0f7f4', activeTab: '#ffffff', border: 'rgba(16, 185, 129, 0.2)', card: '#ffffff', hover: 'rgba(6, 78, 59, 0.05)' }
+      },
+      crimson: {
+        dark: { frame: '#160509', header: '#21090f', toolbar: '#341019', sidebar: '#160509', activeTab: '#341019', border: 'rgba(244, 63, 94, 0.12)', card: '#341019', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#fcf1f3', header: '#f8dfe4', toolbar: '#ffffff', sidebar: '#fcf1f3', activeTab: '#ffffff', border: 'rgba(244, 63, 94, 0.2)', card: '#ffffff', hover: 'rgba(159, 18, 57, 0.05)' }
+      },
+      warm: {
+        dark: { frame: '#140e0b', header: '#1d1410', toolbar: '#2c201a', sidebar: '#140e0b', activeTab: '#2c201a', border: 'rgba(217, 119, 6, 0.12)', card: '#2c201a', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#f8f4f0', header: '#eee6df', toolbar: '#ffffff', sidebar: '#f8f4f0', activeTab: '#ffffff', border: 'rgba(180, 83, 9, 0.2)', card: '#ffffff', hover: 'rgba(120, 53, 15, 0.05)' }
+      },
+      ocean: {
+        dark: { frame: '#041217', header: '#071c24', toolbar: '#0d2d3a', sidebar: '#041217', activeTab: '#0d2d3a', border: 'rgba(6, 182, 212, 0.12)', card: '#0d2d3a', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#eef7f9', header: '#dff0f4', toolbar: '#ffffff', sidebar: '#eef7f9', activeTab: '#ffffff', border: 'rgba(6, 182, 212, 0.2)', card: '#ffffff', hover: 'rgba(14, 116, 144, 0.05)' }
+      },
+      sunset: {
+        dark: { frame: '#170b03', header: '#241206', toolbar: '#381e0c', sidebar: '#170b03', activeTab: '#381e0c', border: 'rgba(245, 158, 11, 0.14)', card: '#381e0c', hover: 'rgba(255, 255, 255, 0.06)' },
+        light: { frame: '#faf3ec', header: '#f5e6d8', toolbar: '#ffffff', sidebar: '#faf3ec', activeTab: '#ffffff', border: 'rgba(245, 158, 11, 0.22)', card: '#ffffff', hover: 'rgba(180, 83, 9, 0.05)' }
+      }
+    };
+
+    let frameBg = '';
+    let headerBg = '';
+    let toolbarBg = '';
+    let sidebarBg = '';
+    let activeTabBg = '';
+    let borderSubtle = '';
+    let cardBg = '';
+    let hoverBg = '';
+
+    if (browserColorPreset === 'custom') {
+      const customHex = (settings.customBrowserColor && /^#[0-9a-fA-F]{3,8}$/.test(settings.customBrowserColor))
+        ? settings.customBrowserColor
+        : '#6366f1';
+      if (isDark) {
+        frameBg = `color-mix(in srgb, ${customHex} 18%, #08080c)`;
+        headerBg = `color-mix(in srgb, ${customHex} 25%, #0c0c12)`;
+        toolbarBg = `color-mix(in srgb, ${customHex} 38%, #14141e)`;
+        sidebarBg = `color-mix(in srgb, ${customHex} 20%, #08080c)`;
+        activeTabBg = `color-mix(in srgb, ${customHex} 38%, #14141e)`;
+        borderSubtle = `color-mix(in srgb, ${customHex} 30%, rgba(255, 255, 255, 0.08))`;
+        cardBg = `color-mix(in srgb, ${customHex} 35%, #14141e)`;
+        hoverBg = 'rgba(255, 255, 255, 0.06)';
+      } else {
+        frameBg = `color-mix(in srgb, ${customHex} 8%, #f8fafc)`;
+        headerBg = `color-mix(in srgb, ${customHex} 14%, #f1f5f9)`;
+        toolbarBg = '#ffffff';
+        sidebarBg = `color-mix(in srgb, ${customHex} 8%, #f8fafc)`;
+        activeTabBg = '#ffffff';
+        borderSubtle = `color-mix(in srgb, ${customHex} 25%, rgba(0, 0, 0, 0.1))`;
+        cardBg = '#ffffff';
+        hoverBg = `color-mix(in srgb, ${customHex} 10%, rgba(0, 0, 0, 0.04))`;
+      }
+    } else {
+      const palette = browserColorPresets[browserColorPreset] || browserColorPresets.default;
+      const scheme = isDark ? palette.dark : palette.light;
+      frameBg = scheme.frame;
+      headerBg = scheme.header;
+      toolbarBg = scheme.toolbar;
+      sidebarBg = scheme.sidebar;
+      activeTabBg = scheme.activeTab;
+      borderSubtle = scheme.border;
+      cardBg = scheme.card;
+      hoverBg = scheme.hover;
+    }
+
     const cssVariables = {
       '--color-blue-50': `color-mix(in srgb, ${hex} 10%, white)`,
       '--color-blue-100': `color-mix(in srgb, ${hex} 20%, white)`,
@@ -950,7 +1037,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       '--color-accent-hover': `color-mix(in srgb, ${hex} 80%, black)`,
       '--color-accent-light': `color-mix(in srgb, ${hex} 20%, white)`,
       '--color-accent-dark': `color-mix(in srgb, ${hex} 60%, black)`,
-      '--color-accent-text': '#ffffff'
+      '--color-accent-text': '#ffffff',
+      '--nova-frame-bg': frameBg,
+      '--nova-header-bg': headerBg,
+      '--nova-toolbar-bg': toolbarBg,
+      '--nova-sidebar-bg': sidebarBg,
+      '--nova-active-tab-bg': activeTabBg,
+      '--nova-inactive-tab-hover-bg': hoverBg,
+      '--nova-border-subtle': borderSubtle,
+      '--nova-card-bg': cardBg
     };
 
     // Apply directly to root style object for immediate reactivity
@@ -990,7 +1085,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       mediaQuery.addEventListener('change', listener);
       return () => mediaQuery.removeEventListener('change', listener);
     }
-  }, [settings.theme, settings.accentColor, settings.customAccentColor]);
+  }, [settings.theme, settings.accentColor, settings.customAccentColor, settings.browserColor, settings.customBrowserColor]);
 
   // Apply Language and RTL Mode
   useEffect(() => {
@@ -2716,7 +2811,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (typeof raw.newTabBackground === 'string' && ['default', 'gradient', 'mesh', 'glass', 'unsplash', 'custom_url', 'aurora_waves', 'cyber_grid', 'hyper_space', 'fireflies', 'nebula', 'matrix'].includes(raw.newTabBackground)) safeSettings.newTabBackground = raw.newTabBackground;
           if (typeof raw.backgroundCustomUrl === 'string' && isSafeNavigationUrl(raw.backgroundCustomUrl)) safeSettings.backgroundCustomUrl = raw.backgroundCustomUrl;
           if (typeof raw.accentColor === 'string' && ['blue', 'emerald', 'purple', 'rose', 'amber', 'custom'].includes(raw.accentColor)) safeSettings.accentColor = raw.accentColor;
-          if (typeof raw.customAccentColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(raw.customAccentColor)) safeSettings.customAccentColor = raw.customAccentColor;
+          if (typeof raw.customAccentColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customAccentColor)) safeSettings.customAccentColor = raw.customAccentColor;
+          if (typeof raw.browserColor === 'string' && ['default', 'midnight', 'cyberpunk', 'forest', 'crimson', 'warm', 'ocean', 'sunset', 'custom'].includes(raw.browserColor)) safeSettings.browserColor = raw.browserColor as any;
+          if (typeof raw.customBrowserColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customBrowserColor)) safeSettings.customBrowserColor = raw.customBrowserColor;
           setSettings(prev => ({ ...prev, ...safeSettings }));
         }
       } catch (err) {
@@ -3173,11 +3270,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }
 
   return (
-    <div className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
-      activeTab?.isIncognito
-        ? 'bg-slate-950 dark:bg-[#0a0812]'
-        : 'bg-slate-100 dark:bg-[#151122]'
-    } transition-colors duration-300`}>
+    <div 
+      style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
+      className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
+        activeTab?.isIncognito
+          ? 'bg-slate-950 dark:bg-[#0a0812]'
+          : 'bg-slate-100 dark:bg-[#151122]'
+      } transition-colors duration-300`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
       <AnimatePresence initial={false}>
@@ -3281,6 +3380,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
+                style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
                 className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-[#151122]/98 border-r border-slate-200 dark:border-white/10"
               >
                 <SidebarTabs

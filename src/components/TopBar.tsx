@@ -273,6 +273,11 @@ const MemoizedTabItem = React.memo(({
       }}
       data-tab-id={tab.id}
       title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
+      style={
+        isActive && !isIncognito 
+          ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } 
+          : undefined
+      }
       className={`group flex items-center justify-between ${
         isPinned ? 'justify-center' : ''
       } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative overflow-hidden ${
@@ -514,7 +519,10 @@ const MemoizedTabItem = React.memo(({
 
       {/* Active Tab Bottom Cover (to blend with the toolbar below) */}
       {isActive && (
-        <div className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`} />
+        <div 
+          style={!isIncognito ? { backgroundColor: 'var(--nova-active-tab-bg)' } : undefined}
+          className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`} 
+        />
       )}
     </Reorder.Item>
   );
@@ -1539,7 +1547,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   return (
     <>
-    <header className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}>
+    <header 
+      style={!isIncognito ? { backgroundColor: 'var(--nova-header-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
+      className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
+    >
       {/* 
         ROW 1: Tabs & Window Controls spacer
       */}
@@ -1805,6 +1816,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         ROW 2: Toolbar (Nav, Omnibox, Extensions)
       */}
       <div 
+        style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
         className={`flex items-center px-3 py-1.5 gap-3 no-drag ${isIncognito ? 'bg-slate-800 border-b border-slate-700' : 'bg-white dark:bg-slate-800 dark:border-b dark:border-slate-700'}`}
       >
         {/* Navigation Buttons */}
@@ -2208,6 +2220,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       */}
       {showBookmarksBar && (
         <div 
+          style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
           className={`flex items-center px-3 py-1 gap-2 border-t overflow-x-auto no-scrollbar no-drag ${
             isIncognito ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800'
           }`}

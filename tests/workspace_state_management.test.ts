@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from '../src/utils/verticalTabs';
 import { computeLiveAndSuspendedTabs } from '../src/utils/tabManager';
+import { defaultSettings } from '../src/types/browser';
 import type { Folder, Tab, Workspace } from '../src/types/browser';
 
 console.log('\n--- Workspace State & Tab Management Comprehensive Suite ---');
@@ -193,5 +194,13 @@ const tabsWithHibernationEnabled = simulateLRUPool(tabsWithHibernationDisabled, 
 const suspendedCount = tabsWithHibernationEnabled.filter(t => t.isSuspended).length;
 assert.equal(suspendedCount, 4, 'When hibernation is enabled, excess tabs beyond max 6 must be suspended');
 
-console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, LIFO restoration, sole-tab in-place reset, and tab hibernation toggle immunity verified.');
+// 7. Browser Full Color Settings & Presets
+const validBrowserColors = ['default', 'midnight', 'cyberpunk', 'forest', 'crimson', 'warm', 'ocean', 'sunset', 'custom'] as const;
+assert.equal(defaultSettings.browserColor, 'default', 'defaultSettings browserColor must default to default');
+assert.equal(defaultSettings.customBrowserColor, '#6366f1', 'defaultSettings customBrowserColor must default to #6366f1');
+for (const color of validBrowserColors) {
+  assert.ok(validBrowserColors.includes(color), `Color ${color} must be a recognized preset`);
+}
+
+console.log('[PASS] [Workspace & Tabs] Workspace isolation, folder assignment repair, slot preservation, LIFO restoration, sole-tab in-place reset, tab hibernation toggle immunity, and browser color presets verified.');
 

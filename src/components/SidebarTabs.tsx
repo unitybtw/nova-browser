@@ -266,6 +266,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       }}
       onMouseEnter={(e) => onMouseEnter(tab, e)}
       onMouseLeave={onMouseLeave}
+      style={isActive ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
       className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none ${
         isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
       } ${
@@ -790,7 +791,10 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
-      <div className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans">
+      <div 
+        style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
+        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-[#151122] border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+      >
         
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
         <div 
