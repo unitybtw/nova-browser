@@ -3128,8 +3128,8 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
     if (safeStorage.isEncryptionAvailable()) {
       const encrypted = safeStorage.encryptString(value);
-      fs.writeFileSync(keyPath, encrypted, { mode: 0o600 });
-      try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
+      await fs.promises.writeFile(keyPath, encrypted, { mode: 0o600 });
+      try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
     } else {
       console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
       const getFallbackKey = (): Buffer => {
@@ -3156,9 +3156,9 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
       const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
       const tag = cipher.getAuthTag();
       const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
-      fs.writeFileSync(keyPath, payload, { mode: 0o600 });
+      await fs.promises.writeFile(keyPath, payload, { mode: 0o600 });
       if (process.platform !== 'win32') {
-        try { fs.chmodSync(keyPath, 0o600); } catch (_) {}
+        try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
       }
     }
     return true;
@@ -3173,8 +3173,8 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
-    if (fs.existsSync(keyPath)) {
-      const raw = fs.readFileSync(keyPath);
+    try {
+      const raw = await fs.promises.readFile(keyPath);
       if (safeStorage.isEncryptionAvailable()) {
         try {
           return safeStorage.decryptString(raw);
@@ -3199,6 +3199,8 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
       }
       // K-4: Fail closed: do NOT read unauthenticated plaintext
       return null;
+    } catch {
+      return null;
     }
   } catch (err) {
     console.error('Secure store get error:', err);
@@ -3211,9 +3213,9 @@ ipcMain.handle('secure-store-delete', async (event, key: string) => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
-    if (fs.existsSync(keyPath)) {
-      fs.unlinkSync(keyPath);
-    }
+    try {
+      await fs.promises.unlink(keyPath);
+    } catch (_) {}
     return true;
   } catch (err) {
     console.error('Secure store delete error:', err);
@@ -3242,7 +3244,7 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
       return { error: 'Value exceeds maximum allowed size of 10MB' };
     }
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
-    fs.writeFileSync(keyPath, value, 'utf-8');
+    await fs.promises.writeFile(keyPath, value, 'utf-8');
     
     if (key === 'adblocker_whitelist') {
       try {
@@ -3263,11 +3265,9 @@ ipcMain.handle('store-get', async (event, key: string) => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
-    if (fs.existsSync(keyPath)) {
-      return fs.readFileSync(keyPath, 'utf-8');
-    }
+    return await fs.promises.readFile(keyPath, 'utf-8');
   } catch (err) {
-    console.error('Store get error:', err);
+    // File not found or read error
   }
   return null;
 });

@@ -963,7 +963,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         }}
       />
       
-      {(settings.aiLinkPreviewEnabled ?? true) && (
+      {isActive && (settings.aiLinkPreviewEnabled ?? true) && (
         <AILinkPreview 
           url={aiPreview.url}
           x={aiPreview.x}

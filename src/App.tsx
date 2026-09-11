@@ -2606,24 +2606,25 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
     else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
 
-    // Persistence happens OUTSIDE the updater (StrictMode-safe): the updater
-    // stays pure and the same id set is used for both state and localStorage
-    // so the two writes stay atomic. Newer-than-cutoff items are deleted,
-    // older items are kept (e.g. "son 1 saat" deletes the last hour).
     const isNewerThanCutoff = (item: HistoryItem) => {
       const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
       return !isNaN(itemTime) && itemTime >= cutoff;
     };
 
-    const idsToDelete = new Set(history.filter(isNewerThanCutoff).map(item => item.id));
-    setHistory(prev => prev.filter(item => !idsToDelete.has(item.id)));
-    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => !idsToDelete.has(item.id)))); } catch (e) {}
-  }, [history]);
+    setHistory(prev => {
+      const next = prev.filter(item => !isNewerThanCutoff(item));
+      try { localStorage.setItem('browsing_history', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }, [setHistory]);
+
   const handleRemoveHistoryItem = useCallback((id: string) => {
-    const idsToDelete = new Set([id]);
-    setHistory(prev => prev.filter(item => !idsToDelete.has(item.id)));
-    try { localStorage.setItem('browsing_history', JSON.stringify(history.filter(item => !idsToDelete.has(item.id)))); } catch (e) {}
-  }, [history]);
+    setHistory(prev => {
+      const next = prev.filter(item => item.id !== id);
+      try { localStorage.setItem('browsing_history', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }, [setHistory]);
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
 
