@@ -1,106 +1,85 @@
-# Benchmark & Performance Empirical Methodology Report
+# Benchmark & Performance Report
 
-This document specifies the empirical benchmarking methodology, hardware and software test harness environments, and verifiable performance results for **Nova Browser**.
-
----
-
-## 1. Test Harness Hardware & Software Environment
-
-All benchmarks documented below were executed on standardized reference hardware to ensure reproducibility.
-
-### Hardware Specifications
-- **Model**: Apple MacBook Pro (16-inch, Nov 2023)
-- **Processor**: Apple M2 Max (12 cores: 8 performance cores @ 3.68 GHz, 4 efficiency cores @ 2.42 GHz)
-- **Memory**: 32 GB Unified LPDDR5 Memory (400 GB/s bandwidth)
-- **Storage**: 1 TB NVMe SSD (APFS encrypted filesystem, sequential read 5.3 GB/s)
-- **Display**: Built-in Liquid Retina XDR (3456 x 2234, 120 Hz ProMotion enabled)
-- **Power State**: AC connected, Battery at 100%, Low Power Mode disabled
-
-### Software Environment
-- **Operating System**: macOS Sonoma 14.6.1 (Darwin Kernel Version 23.6.0)
-- **Node.js Runtime**: v20.18.0 (ARM64)
-- **Electron Base**: 43.0.0
-- **Chromium Engine**: 134.0.6998.36
-- **V8 JavaScript VM**: 13.4.114.12
-- **Compiler / Bundler**: Vite 5.4.14 / esbuild 0.21.5 (Production minification with Terser)
-
-### Test Harness Source Artifacts
-- **Microbenchmark Suite**: [`tests/benchmark_suite.ts`](tests/benchmark_suite.ts)
-- **CDP Cold Start & Multi-Process Harness**: [`scripts/run_browser_benchmark.cjs`](scripts/run_browser_benchmark.cjs)
-- **Synthetic Fixture**: [`scripts/benchmark_fixture.html`](scripts/benchmark_fixture.html) (5,000 DOM nodes + 10,000 2D canvas draws + 2,000,000 numeric calculations)
-- **Speedometer 3.0 Runner**: [`scripts/speedometer_runner.ts`](scripts/speedometer_runner.ts)
+This document outlines the internal benchmarks, performance characteristics, bundle size analysis, and reproduction instructions for **Nova Browser**.
 
 ---
 
-## 2. Methodology & Statistical Protocol
+## 1. Engine & Architectural Overview
 
-To avoid variance from JIT warm-up cycles, dynamic CPU thermal throttling, and garbage collection pauses:
+Nova Browser is built on Electron 43, Chromium 134 (Blink), and Google V8. Because Nova shares the same underlying Chromium rendering and JavaScript execution engine as Google Chrome, core HTML parsing, DOM layout, and JIT-compiled JavaScript execution speeds are on par with standard Chromium releases.
 
-1. **Pre-Run Thermal Stabilization**: The test machine sits at idle for 60 seconds before each test run until CPU temperature drops below 42 degrees Celsius.
-2. **Profile Isolation**: Every benchmark execution spins up a fresh, unique temporary profile directory (`--user-data-dir=/tmp/nova-bench-${timestamp}`) to eliminate disk cache contamination and state carry-over.
-3. **Iteration Count**: Each metric is measured over **N = 10** independent cold runs.
-4. **Outlier Filtering**: Reported figures use a **10% trimmed mean** (excluding the single highest and single lowest outliers) accompanied by standard deviations.
-5. **Memory Measurement**: Process tree Resident Set Size (RSS) is computed by querying platform process accounting APIs across all descendant child processes (Browser main process, GPU process, utility network service, and webview renderers).
+Nova's design optimizations focus on reducing unnecessary overhead:
+- **Zero Background Telemetry**: No background telemetry beacons, crash reporters, or Google service pings running continuously.
+- **Background Tab Suspension**: Dormant tabs have their active rendering cycles paused, conserving CPU time and reducing inactive RAM footprint.
+- **In-Memory Network Filter**: Intercepts tracking and ad requests directly at the network session layer using `@cliqz/adblocker-electron` with EasyList filters.
+- **Decoupled Heavy Chunks**: The on-device WebLLM neural engine (~6 MB) is code-split and loaded asynchronously on demand rather than evaluated at initial startup.
 
 ---
 
-## 3. Real-Browser CDP Cold-Start & Rendering Results
+## 2. Test Environment & Reference Hardware
 
-Comparative measurements comparing clean-profile Google Chrome (version 134.0) with Nova Browser (Release Build 1.4.5).
+The benchmarks in this repository can be run on any development machine running macOS, Linux, or Windows.
 
-| Metric | Google Chrome (Clean Profile) | Nova Browser (Full App) | Nova Host Shell | Delta / Analysis |
+### Reference Hardware (Development Environment)
+- **Processor**: Apple Silicon (Apple M2, 8-core)
+- **Memory**: 16 GB Unified RAM
+- **Operating System**: macOS (Darwin arm64)
+- **Node.js Runtime**: v20+
+- **Electron Base**: 43.x / Chromium 134.x
+
+*(Note: Performance figures will vary based on user hardware, operating system, and the specific workload or web pages being loaded).*
+
+---
+
+## 3. In-Memory Microbenchmark Results
+
+Nova includes an automated microbenchmark suite ([`tests/benchmark_suite.ts`](tests/benchmark_suite.ts)) that measures internal data structure throughput, state transition speeds, and production bundle asset footprints.
+
+Run with: `npm run benchmark`
+
+| Benchmark Suite | Metric | Typical Measurement | Unit | Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **Engine Architecture** | Chromium 134 / V8 | Chromium 134 / V8 | Chromium 134 / V8 | Engine Parity (Identical Blink rendering pipeline) |
-| **JS Computation (2M Ops)** | 18.4 ± 1.2 ms | 17.1 ± 0.9 ms | 13.8 ± 0.6 ms | Within 95% confidence interval of V8 JIT warm-up |
-| **DOM Parsing (5K Nodes)** | 2.62 ± 0.14 ms | 2.44 ± 0.11 ms | 2.29 ± 0.08 ms | DOM parsing throughput identical within standard deviation |
-| **Canvas 2D Rendering** | 2.38 ± 0.12 ms | 2.29 ± 0.09 ms | 2.24 ± 0.07 ms | Direct Metal hardware rasterization parity |
-| **Cold Start RSS Memory** | 1,220 ± 45 MB | 638 ± 22 MB | 378 ± 14 MB | Nova excludes telemetry and background sync processes |
-| **RAM with 20 Tabs (Hibernated)** | 1,190 ± 60 MB | **418 ± 18 MB** | N/A | Nova Webview Pool enforces max 6 live webviews (active media tabs consume additional memory) |
-
-*Note on Host Shell: Nova Host Shell measures the isolated Electron runtime container prior to mounting the React UI application tree.*
-*Note on Tab Memory: Realistic memory usage scales with active multimedia playback (e.g. YouTube streams). Nova's pool conserves RAM by unmounting idle/hibernated background tabs.*
-
----
-
-## 4. In-Memory React State & Tab Virtualization Microbenchmarks
-
-Metrics evaluated using high-resolution monotonic timestamps (`performance.now()`) with 100,000 iterations per benchmark (`tests/benchmark_suite.ts`):
+| **Tab Operations** | 100 Tabs Creation Latency | ~0.08 | ms | In-memory instantiation and tracking of 100 tab data structures in V8 heap |
+| **Tab Operations** | Tab Allocation Throughput | ~1,200,000+ | ops/sec | Rate of tab state objects instantiated per second |
+| **Tab Hibernation** | Inactive Tabs Hibernation | ~0.02 | ms | State transition setting `isSuspended: true` for inactive tabs |
+| **Privacy Shield** | Fast Domain Check Latency | ~0.44 | µs / request | In-memory hash set tracker classification lookup |
+| **Privacy Shield** | Domain Check Throughput | ~2,200,000+ | checks/sec | Fast-path domain classifications evaluated per second |
+| **Memory Baseline** | V8 Node Heap Used | ~5.5 | MB | V8 runtime heap allocated for core benchmark structures |
+| **Bundle Optimization**| Core Startup JS Entry | ~435 | KB | Initial minified JavaScript evaluated at startup |
+| **Bundle Optimization**| Vendor UI & React Payload | ~726 | KB | React UI and vendor dependencies chunk |
+| **Bundle Optimization**| WebLLM Neural Runtime | Decoupled (0 KB) | - | MLC TVM neural engine chunk decoupled from initial bundle |
 
 > [!NOTE]
-> These microbenchmarks evaluate pure JavaScript heap object creation, state transitions, and hash lookups in the V8 engine. They do not simulate 100 full OS-level Chromium processes (which would consume several gigabytes of RAM). Live ad-blocking uses the full `@cliqz/adblocker-electron` engine with EasyList rules.
-
-| Metric | Measured Value | Unit | Method / Protocol |
-| :--- | :--- | :--- | :--- |
-| **100 Tab State Allocation** | 0.082 ± 0.004 | ms | In-memory batch instantiation of 100 tab data structures in V8 heap |
-| **Tab Allocation Throughput** | 1,204,224 | ops/sec | Object allocation rate in V8 young generation |
-| **94 Inactive Tabs Hibernation** | 0.014 ± 0.001 | ms | State transition setting `isSuspended: true` for pool eviction |
-| **Fast Domain Lookup Latency** | 0.467 ± 0.012 | µs / req | Hash Set domain lookup decision time (10 domain baseline) |
-| **Domain Lookup Throughput** | 2,139,644 | checks/sec | In-memory Set classification queries per second |
-| **Core JS Bundle Entry** | ~444 | KB | Initial startup JS parsed by V8 before UI paint |
-| **WebLLM Engine Chunk** | Decoupled (0 KB) | - | ~6.0 MB MLC neural engine loaded asynchronously on-demand |
+> Microbenchmarks evaluate isolated JavaScript runtime operations and heap allocations in Node.js/V8. They are useful for measuring algorithmic efficiency, but do not represent full multi-process browser memory (RSS) across active web pages, which naturally scales with web content, media playback, and DOM complexity.
 
 ---
 
-## 5. Step-by-Step Reproduction Instructions
+## 4. Real-World Memory & Resource Considerations
 
-To reproduce these benchmark numbers on your own machine:
+Like all Chromium-based desktop browsers, Nova operates using a multi-process architecture:
+- **Main Process**: Manages application lifecycle, window state, IPC bridge, native menus, and MCP server.
+- **Renderer Process**: Runs the React user interface, tab bar, and UI modals.
+- **GPU Process**: Handles hardware-accelerated rasterization and WebGPU compute.
+- **Webview Renderers**: Each active web page runs in an isolated Chromium sandbox.
 
-### Running Microbenchmarks
+### Memory Expectations
+- **Initial Cold Start**: Full browser process tree typically consumes ~300-500 MB RSS on initial launch.
+- **Active Browsing (Multiple Tabs)**: Active tabs with heavy JavaScript single-page applications or multimedia streams (e.g. YouTube, Twitch) will consume standard Chromium memory amounts (1-2+ GB).
+- **Background Tab Hibernation**: Nova flags idle background tabs as suspended to pause rendering loops and background timers, helping prevent idle tabs from steadily increasing memory usage over time.
+
+---
+
+## 5. Reproduction Commands
+
+To run the verification tests and microbenchmarks locally:
+
 ```bash
+# 1. Run internal microbenchmarks (V8 state throughput, bundle analysis)
 npm run benchmark
-```
 
-### Running Speedometer 3.0 Automated Suite
-```bash
-npm run benchmark:speedometer
-```
-
-### Running the CDP Multi-Process Browser Benchmark
-```bash
-node scripts/run_browser_benchmark.cjs
-```
-
-### Running Full Automated Regression & Verification Tests
-```bash
+# 2. Run the complete automated test suite (560+ tests)
 npm test
+
+# 3. Build production bundle and inspect chunk sizes
+npm run build
 ```

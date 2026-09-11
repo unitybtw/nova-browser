@@ -58,11 +58,11 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 | Feature / Metric | Nova Browser | Google Chrome | Brave Browser | Apple Safari 18 |
 | :--- | :--- | :--- | :--- | :--- |
-| **RAM Footprint (20 Tabs)** | **~420 MB** *(Hibernated)* | ~1,180 MB | ~920 MB | ~680 MB |
-| **Cold Start V8 Heap** | **31.2 MB (Decoupled Chunks)**| ~85.0 MB | ~78.0 MB | OS-managed |
-| **Tab Hibernation Engine** | **Idle Webview Unmounting** | Memory Saver (Tab Discard) | Partial hibernation | OS-managed |
+| **RAM Optimization** | **Background Webview Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
+| **Startup JS Bundle** | **~435 KB (Decoupled Chunks)**| Full Browser Executable | Full Browser Executable | OS Integrated |
+| **Tab Hibernation Engine** | **Background Process Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS-managed |
 | **AI Assistant Architecture** | **100% On-Device WebGPU** | Cloud Gemini (Paywalled) | Cloud Leo (Subscription) | Apple Intelligence |
-| **Ad & Tracker Decision Latency**| **0.46 µs (Network Filter)** | 11.2 ms (Unfiltered) | 0.35 ms (Brave Shield) | Content Blockers |
+| **Ad & Tracker Protection** | **Built-in Network Shield (EasyList)** | Not built-in (Unfiltered) | Brave Shields | Content Blockers |
 | **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)**| Google Account required | Sync Chain (Brave) | iCloud Keychain |
 | **Autonomous AI (MCP Server)**| **Native Built-in (Port 3020)**| Not available | Not available | Not available |
 | **Telemetry & Privacy** | **Zero Telemetry** | Extensive tracking | Opt-out required | Telemetry enabled |
@@ -72,20 +72,20 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on three concr
 
 ### Empirical Microbenchmark Measurements
 
-*Internal micro-benchmarks measuring React state dispatch, V8 heap allocation, and JS bundle budgets:*
+*Internal micro-benchmarks measuring React state dispatch, V8 heap allocation, and JS bundle budgets (`npm run benchmark`):*
 
 | Benchmark Suite | Metric | Measured Value | Unit | Architectural Description |
 | :--- | :--- | :--- | :--- | :--- |
-| **Tab State Operations** | 100 Tabs Creation Latency | **0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
-| **Tab Allocation** | Throughput | **1,204,224** | ops/sec | Number of virtual tab structures instantiated per second |
-| **Tab Hibernation State**| 94 Inactive Tabs Hibernation | **0.014** | ms | State transition setting isSuspended: true for pool eviction |
-| **Network Filter Decision**| Rule Match Latency | **0.46** | µs / request | In-memory Bloom filter lookup latency per network request |
-| **Network Filter Decision**| Lookup Throughput | **2,100,000+** | checks/sec | Network-level ad and tracker classification queries per second |
-| **V8 Heap Memory** | Heap Allocated | **31.26** | MB | Core JavaScript runtime heap allocation |
-| **Startup JS Bundle** | Core Entry Chunk | **440** | KB | Lightweight initial JS evaluated at browser launch |
+| **Tab State Operations** | 100 Tabs Creation Latency | **~0.08** | ms | Instantaneous state tracking and virtualized tab allocation |
+| **Tab Allocation** | Throughput | **1,200,000+** | ops/sec | Number of virtual tab structures instantiated per second |
+| **Tab Hibernation State**| Inactive Tabs Hibernation | **~0.02** | ms | State transition setting isSuspended: true for pool eviction |
+| **Network Filter Decision**| Fast Hash Lookup Latency | **~0.44** | µs / request | In-memory tracker domain hash set lookup latency |
+| **Network Filter Decision**| Lookup Throughput | **2,200,000+** | checks/sec | Fast-path domain classification queries per second |
+| **V8 Heap Memory** | Node Test Process Heap | **~5.5** | MB | Core JavaScript runtime heap allocation in microbenchmark |
+| **Startup JS Bundle** | Core Entry Chunk | **~435** | KB | Lightweight initial JS evaluated at browser launch |
 | **WebLLM Isolation** | Engine Chunk | **Decoupled (0 KB at start)** | - | 6 MB neural runtime loaded asynchronously on demand |
 
-> **Full Benchmark Methodology & Reproduction Guide:** See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for real CDP cold-start runs and reproduction commands.
+> **Full Benchmark Methodology & Reproduction Guide:** See [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md) for internal V8 benchmark reproduction commands and architecture analysis.
 
 ---
 
