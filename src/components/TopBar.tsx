@@ -149,19 +149,37 @@ const MemoizedTabItem = React.memo(({
   if (isSplitChild) return null;
 
   const isPinned = !!tab.isPinned;
+  const targetMinWidth = isPinned ? 38 : splitTab ? 260 : 120;
+  const targetMaxWidth = isPinned ? 38 : splitTab ? 420 : 240;
+  const targetPadding = isPinned ? 8 : splitTab ? 6 : 12;
 
   return (
     <Reorder.Item
       key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 0.94, y: 5 }}
-      animate={{ opacity: ghostTab?.id === tab.id ? 0.4 : 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.92, y: 3, transition: { duration: 0.20, ease: [0.22, 1, 0.36, 1] } }}
+      layout="position"
+      initial={{ opacity: 0, maxWidth: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0 }}
+      animate={{
+        opacity: ghostTab?.id === tab.id ? 0.4 : 1,
+        maxWidth: targetMaxWidth,
+        minWidth: targetMinWidth,
+        paddingLeft: targetPadding,
+        paddingRight: targetPadding
+      }}
+      exit={{
+        opacity: 0,
+        maxWidth: 0,
+        minWidth: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        marginLeft: 0,
+        marginRight: 0,
+        transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] }
+      }}
       transition={{
-        layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
-        scale: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
-        y: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
-        opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+        duration: 0.20,
+        ease: [0.4, 0, 0.2, 1],
+        layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] }
       }}
       whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
@@ -207,8 +225,8 @@ const MemoizedTabItem = React.memo(({
       data-tab-id={tab.id}
       title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
       className={`group flex items-center justify-between ${
-        isPinned ? 'px-2 min-w-[38px] max-w-[38px] justify-center' : splitTab ? 'px-1.5 min-w-[260px] max-w-[420px]' : 'px-3 min-w-[120px] max-w-[240px]'
-      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative ${
+        isPinned ? 'justify-center' : ''
+      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative overflow-hidden ${
         tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
         tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
         'h-[34px] rounded-t-xl border-t border-x'
@@ -1601,7 +1619,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
-            <AnimatePresence mode="popLayout" initial={hasMounted}>
+            <AnimatePresence initial={hasMounted}>
             {visibleTabs.map((tab: Tab) => {
               const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
               const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
@@ -1648,18 +1666,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <motion.div
               layout="position"
               transition={{
-                layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 }
+                duration: 0.20,
+                ease: [0.4, 0, 0.2, 1]
               }}
               className="flex items-center shrink-0 mb-1 ml-1 gap-0.5 no-drag z-10"
             >
               {/* New Tab Button */}
               <motion.button
                 layout="position"
-                whileHover={{ scale: 1.10 }}
-                whileTap={{ scale: 0.88 }}
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.92 }}
                 transition={{
-                  layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
-                  scale: { type: 'spring', stiffness: 400, damping: 22 }
+                  duration: 0.15,
+                  ease: [0.4, 0, 0.2, 1]
                 }}
                 onClick={() => onNewTab()}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
@@ -1669,23 +1688,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }`}
                 title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
               >
-                <motion.div
-                  whileHover={{ rotate: 90 }}
-                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                  className="flex items-center justify-center"
-                >
-                  <Plus className="w-4 h-4" />
-                </motion.div>
+                <Plus className="w-4 h-4" />
               </motion.button>
 
               {/* New Incognito Tab Button */}
               <motion.button
                 layout="position"
-                whileHover={{ scale: 1.10 }}
-                whileTap={{ scale: 0.88 }}
+                whileHover={{ scale: 1.06 }}
+                whileTap={{ scale: 0.92 }}
                 transition={{
-                  layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
-                  scale: { type: 'spring', stiffness: 400, damping: 22 }
+                  duration: 0.15,
+                  ease: [0.4, 0, 0.2, 1]
                 }}
                 onClick={onNewIncognitoTab}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
@@ -1695,13 +1708,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }`}
                 title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
               >
-                <motion.div
-                  whileHover={{ scale: 1.06, rotate: -10 }}
-                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
-                  className="flex items-center justify-center"
-                >
-                  <ShieldOff className="w-4 h-4" />
-                </motion.div>
+                <ShieldOff className="w-4 h-4" />
               </motion.button>
             </motion.div>
           </Reorder.Group>
