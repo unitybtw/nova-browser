@@ -8,6 +8,7 @@ import { UserSettings } from '../types/browser';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { generateId } from '../utils/idGenerator';
 import { useTranslation, getLocale } from '../services/i18n';
+import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
 
 interface Todo {
   id: string;
@@ -17,6 +18,7 @@ interface Todo {
 
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
+  onNewTab?: (url?: string) => void;
   searchEngine?: UserSettings['searchEngine'];
   privacyShield?: boolean;
   newTabBackground?: string;
@@ -125,6 +127,7 @@ const itemVariants: any = {
 
 export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({ 
   onNavigate,
+  onNewTab,
   searchEngine = 'google',
   privacyShield = true,
   newTabBackground = 'default',
@@ -162,7 +165,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter(d => d && typeof d.url === 'string' && isSafeNavigationUrl(d.url));
+          return parsed
+            .filter(d => d && typeof d.url === 'string')
+            .map(d => {
+              const url = normalizeNavigationUrl(d.url);
+              const domain = d.domain || getCleanDomain(url);
+              return { ...d, url, domain };
+            })
+            .filter(d => isSafeNavigationUrl(d.url));
         }
       }
     } catch (e) {}
@@ -352,22 +362,20 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   };
 
   const handleAddSpeedDial = () => {
-    if (!editingDial.name || !editingDial.url) return;
-    let url = editingDial.url.trim();
-    if (!/^https?:\/\//i.test(url)) {
-      url = 'https://' + url;
-    }
+    if (!editingDial.url) return;
+    const url = normalizeNavigationUrl(editingDial.url);
     if (!isSafeNavigationUrl(url)) return;
     try {
-      const parsed = new URL(url);
-      const domain = parsed.hostname;
+      const domain = getCleanDomain(url);
       if (!domain) return;
+      const rawName = (editingDial.name || '').trim();
+      const name = rawName || (domain.charAt(0).toUpperCase() + domain.slice(1));
       if (editingDial.index !== null) {
         const updated = [...speedDials];
-        updated[editingDial.index] = { name: editingDial.name, url, domain };
+        updated[editingDial.index] = { name, url, domain };
         setSpeedDials(updated);
       } else {
-        setSpeedDials([...speedDials, { name: editingDial.name, url, domain }]);
+        setSpeedDials([...speedDials, { name, url, domain }]);
       }
     } catch(e) {
       return;
@@ -375,6 +383,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
     setIsEditModalOpen(false);
     setEditingDial({ name: '', url: '', index: null });
+  };
+
+  const handleSpeedDialClick = (e: React.MouseEvent, rawUrl: string) => {
+    const url = normalizeNavigationUrl(rawUrl);
+    if (!url) return;
+    if (e.metaKey || e.ctrlKey || e.button === 1) {
+      e.preventDefault();
+      if (onNewTab) {
+        onNewTab(url);
+        return;
+      }
+    }
+    onNavigate(url);
   };
 
   const handleDeleteSpeedDial = (index: number) => {
@@ -944,15 +965,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 className="relative group w-[100px] sm:w-[110px]"
               >
                 <button
-                  onClick={() => onNavigate(dial.url)}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/80 dark:bg-white/[0.07] backdrop-blur-xl border-slate-200/80 dark:border-white/15 hover:bg-white dark:hover:bg-white/[0.14] hover:border-cyan-400/50 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group"
+                  onClick={(e) => handleSpeedDialClick(e, dial.url)}
+                  onAuxClick={(e) => { if (e.button === 1) handleSpeedDialClick(e, dial.url); }}
+                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/80 dark:bg-white/[0.07] backdrop-blur-xl border-slate-200/80 dark:border-white/15 hover:bg-white dark:hover:bg-white/[0.14] hover:border-cyan-400/50 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group select-none"
+                  title={dial.name}
                 >
                   <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800/90 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0 border border-slate-100 dark:border-white/10 group-hover:scale-105 transition-transform">
-                    <img 
-                      src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(dial.domain || dial.url)}&sz=64`}
-                      alt={dial.name}
-                      className="w-full h-full object-contain"
-                    />
+                    <SpeedDialIcon name={dial.name} url={dial.url} domain={dial.domain} />
                   </div>
                   <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-200 group-hover:text-cyan-500 dark:group-hover:text-cyan-300 transition-colors drop-shadow-2xs">{dial.name}</span>
                 </button>
@@ -1137,6 +1156,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   type="text" 
                   value={editingDial.name}
                   onChange={(e) => setEditingDial({ ...editingDial, name: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder="e.g. YouTube"
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm outline-none"
                 />
@@ -1147,6 +1167,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   type="text" 
                   value={editingDial.url}
                   onChange={(e) => setEditingDial({ ...editingDial, url: e.target.value })}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder="e.g. https://youtube.com"
                   className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm outline-none"
                 />

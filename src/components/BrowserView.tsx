@@ -793,6 +793,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           // Also call parent navigate if available
           if (onNavigate) onNavigate(url);
         }} 
+        onNewTab={onNewTab}
         searchEngine={searchEngine}
         privacyShield={privacyShield}
         newTabBackground={newTabBackground}
