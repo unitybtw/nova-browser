@@ -2704,6 +2704,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (typeof raw.useVerticalTabs === 'boolean') safeSettings.useVerticalTabs = raw.useVerticalTabs;
           if (typeof raw.fontSize === 'string' && ['small', 'medium', 'large'].includes(raw.fontSize)) safeSettings.fontSize = raw.fontSize;
           if (typeof raw.tabStyle === 'string' && ['rounded', 'square', 'floating'].includes(raw.tabStyle)) safeSettings.tabStyle = raw.tabStyle;
+          if (typeof raw.tabAnimation === 'string' && ['chrome', 'smooth', 'snappy', 'none'].includes(raw.tabAnimation)) safeSettings.tabAnimation = raw.tabAnimation;
           if (typeof raw.doNotTrack === 'boolean') safeSettings.doNotTrack = raw.doNotTrack;
           if (typeof raw.clearOnExit === 'boolean') safeSettings.clearOnExit = raw.clearOnExit;
           if (typeof raw.hardwareAcceleration === 'boolean') safeSettings.hardwareAcceleration = raw.hardwareAcceleration;
@@ -3375,6 +3376,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
                 tabStyle={settings.tabStyle}
+                tabAnimation={settings.tabAnimation}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}
                 onToggleBookmark={handleToggleBookmarkActive}

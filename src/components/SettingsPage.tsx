@@ -1857,6 +1857,38 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </section>
 
               <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tab Animation</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { id: 'chrome', name: 'Chrome (Native)', desc: 'Smooth horizontal width expansion & collapse', badge: 'Default' },
+                    { id: 'smooth', name: 'Fluid Spring', desc: 'Soft floating lift with cushioned spring physics' },
+                    { id: 'snappy', name: 'Snappy', desc: 'Crisp, high-velocity responsive motion' },
+                    { id: 'none', name: 'Instant (No Motion)', desc: 'Immediate tab opening for maximum speed' }
+                  ].map(ta => (
+                    <button
+                      key={ta.id}
+                      onClick={() => onUpdateSettings({ tabAnimation: ta.id as any })}
+                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-start justify-between gap-3 text-left ${
+                        (settings.tabAnimation ?? 'chrome') === ta.id
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100'
+                          : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{ta.name}</span>
+                        {ta.badge && (
+                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full border border-blue-500/20">
+                            {ta.badge}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{ta.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Accent Color</h2>
                 <div className="flex gap-4 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50">
                   {[

@@ -82,6 +82,7 @@ interface TopBarProps {
   bookmarks: Bookmark[];
   isSplitView?: boolean;
   tabStyle?: 'rounded' | 'square' | 'floating';
+  tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   isIncognito?: boolean;
   searchEngine: UserSettings['searchEngine'];
   onToggleBookmark: () => void;
@@ -141,7 +142,7 @@ interface TopBarProps {
 }
 
 const MemoizedTabItem = React.memo(({ 
-  tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, isIncognito,
+  tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, tabAnimation, isIncognito,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
   tabsLength, setGhostTab, onOpenContextMenu, onTabHover, onTabLeave
@@ -152,35 +153,83 @@ const MemoizedTabItem = React.memo(({
   const targetMinWidth = isPinned ? 38 : splitTab ? 260 : 120;
   const targetMaxWidth = isPinned ? 38 : splitTab ? 420 : 240;
   const targetPadding = isPinned ? 8 : splitTab ? 6 : 12;
+  const animPreset = tabAnimation || 'chrome';
+
+  const animationConfig = useMemo(() => {
+    switch (animPreset) {
+      case 'smooth':
+        return {
+          initial: { opacity: 0, y: 6, scale: 0.94, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
+          animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
+          exit: { opacity: 0, y: 4, scale: 0.92, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const } },
+          transition: {
+            layout: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            scale: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            y: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+          }
+        };
+      case 'snappy':
+        return {
+          initial: { opacity: 0, y: 3, scale: 0.98, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
+          animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
+          exit: { opacity: 0, scale: 0.96, transition: { duration: 0.12, ease: 'easeOut' as const } },
+          transition: {
+            type: 'spring' as const,
+            stiffness: 520,
+            damping: 34,
+            mass: 0.5,
+            layout: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+          }
+        };
+      case 'none':
+        return {
+          initial: { opacity: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0 },
+          animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0 },
+          exit: { opacity: 0, transition: { duration: 0 } },
+          transition: { duration: 0 }
+        };
+      case 'chrome':
+      default:
+        return {
+          initial: { opacity: 0, maxWidth: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0, scale: 1, y: 0 },
+          animate: {
+            opacity: ghostTab?.id === tab.id ? 0.4 : 1,
+            maxWidth: targetMaxWidth,
+            minWidth: targetMinWidth,
+            paddingLeft: targetPadding,
+            paddingRight: targetPadding,
+            scale: 1,
+            y: 0
+          },
+          exit: {
+            opacity: 0,
+            maxWidth: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            marginLeft: 0,
+            marginRight: 0,
+            transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+          },
+          transition: {
+            duration: 0.20,
+            ease: [0.4, 0, 0.2, 1] as const,
+            layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+          }
+        };
+    }
+  }, [animPreset, targetMaxWidth, targetMinWidth, targetPadding, ghostTab?.id, tab.id]);
 
   return (
     <Reorder.Item
       key={tab.id}
       value={tab}
       layout="position"
-      initial={{ opacity: 0, maxWidth: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0 }}
-      animate={{
-        opacity: ghostTab?.id === tab.id ? 0.4 : 1,
-        maxWidth: targetMaxWidth,
-        minWidth: targetMinWidth,
-        paddingLeft: targetPadding,
-        paddingRight: targetPadding
-      }}
-      exit={{
-        opacity: 0,
-        maxWidth: 0,
-        minWidth: 0,
-        paddingLeft: 0,
-        paddingRight: 0,
-        marginLeft: 0,
-        marginRight: 0,
-        transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] }
-      }}
-      transition={{
-        duration: 0.20,
-        ease: [0.4, 0, 0.2, 1],
-        layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] }
-      }}
+      initial={animationConfig.initial}
+      animate={animationConfig.animate}
+      exit={animationConfig.exit}
+      transition={animationConfig.transition}
       whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
         onTabLeave?.();
@@ -1143,6 +1192,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   isIncognito = false,
   useVerticalTabs = false,
   tabStyle = 'floating',
+  tabAnimation = 'chrome',
   searchEngine = 'google',
   onToggleBookmark,
   onOpenHistory,
@@ -1634,6 +1684,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   splitTab={splitTab}
                   ghostTab={ghostTab}
                   tabStyle={tabStyle}
+                  tabAnimation={tabAnimation}
                   isIncognito={isIncognito}
                   onTabDragStart={onTabDragStart}
                   onTabDrag={onTabDrag}
@@ -1665,10 +1716,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             {/* Action Buttons Container (New Tab & Private Tab) */}
             <motion.div
               layout="position"
-              transition={{
-                duration: 0.20,
-                ease: [0.4, 0, 0.2, 1]
-              }}
+              transition={
+                tabAnimation === 'smooth'
+                  ? { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 }
+                  : tabAnimation === 'snappy'
+                  ? { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+                  : tabAnimation === 'none'
+                  ? { duration: 0 }
+                  : { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+              }
               className="flex items-center shrink-0 mb-1 ml-1 gap-0.5 no-drag z-10"
             >
               {/* New Tab Button */}

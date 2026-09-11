@@ -90,6 +90,7 @@ export interface UserSettings {
   backgroundCustomUrl?: string;
   startupBehavior: 'newTab' | 'continue' | 'specificPages';
   tabStyle: 'rounded' | 'square' | 'floating';
+  tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   doNotTrack: boolean;
   clearOnExit: boolean;
   hardwareAcceleration: boolean;
@@ -121,6 +122,7 @@ export const defaultSettings: UserSettings = {
   backgroundCustomUrl: '',
   startupBehavior: 'newTab',
   tabStyle: 'floating',
+  tabAnimation: 'chrome',
   doNotTrack: true,
   clearOnExit: false,
   hardwareAcceleration: true,
