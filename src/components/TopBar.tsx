@@ -154,10 +154,10 @@ const MemoizedTabItem = React.memo(({
     <Reorder.Item
       key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 1, y: 2 }}
+      initial={{ opacity: 0, scale: 0.96, y: 4 }}
       animate={{ opacity: ghostTab?.id === tab.id ? 0.4 : 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 1, transition: { duration: 0.12, ease: 'easeOut' } }}
-      transition={{ type: 'spring', stiffness: 480, damping: 34, mass: 0.7 }}
+      exit={{ opacity: 0, scale: 0.94, y: 2, transition: { duration: 0.12, ease: 'easeOut' } }}
+      transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
       whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
         onTabLeave?.();
@@ -1254,6 +1254,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const tabsContainerRef = useRef<any>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const visibleTabs = useMemo(() => {
     const renderedSplitIds = new Set<string>();
@@ -1580,7 +1585,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
-            <AnimatePresence mode="popLayout" initial={false}>
+            <AnimatePresence mode="popLayout" initial={hasMounted}>
             {visibleTabs.map((tab: Tab) => {
               const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
               const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
