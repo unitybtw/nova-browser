@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { 
   Sparkles, 
   ShieldCheck, 
@@ -8,13 +8,13 @@ import {
   ArrowRight, 
   ExternalLink, 
   Calendar, 
-  Tag, 
   Search,
-  Filter,
   Layers,
-  ChevronRight
+  RefreshCw,
+  Globe
 } from 'lucide-react';
 import { CHANGELOG_DATA, ReleaseVersion, ChangelogItem } from '../data/changelog';
+import { fetchAutomatedChangelog } from '../services/changelogService';
 
 interface ChangelogPageProps {
   currentVersion?: string;
@@ -27,13 +27,41 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
   currentVersion = '1.4.6',
   onNavigate
 }) => {
-  const [selectedVersion, setSelectedVersion] = useState<string>(CHANGELOG_DATA[0]?.version || '1.4.6');
+  const [releases, setReleases] = useState<ReleaseVersion[]>(CHANGELOG_DATA);
+  const [selectedVersion, setSelectedVersion] = useState<string>(() => {
+    return CHANGELOG_DATA[0]?.version || '1.4.6';
+  });
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLive, setIsLive] = useState<boolean>(false);
+
+  const loadData = useCallback(async (force = false) => {
+    setIsLoading(true);
+    try {
+      const result = await fetchAutomatedChangelog(force);
+      if (result.releases && result.releases.length > 0) {
+        setReleases(result.releases);
+        setIsLive(result.isLive);
+        // If current selected version doesn't exist in new list, select the latest
+        if (!result.releases.some(r => r.version === selectedVersion)) {
+          setSelectedVersion(result.releases[0].version);
+        }
+      }
+    } catch (e) {
+      console.warn('[ChangelogPage] Error loading changelog:', e);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedVersion]);
+
+  useEffect(() => {
+    loadData(false);
+  }, []);
 
   const currentRelease = useMemo(() => {
-    return CHANGELOG_DATA.find(r => r.version === selectedVersion) || CHANGELOG_DATA[0];
-  }, [selectedVersion]);
+    return releases.find(r => r.version === selectedVersion) || releases[0] || CHANGELOG_DATA[0];
+  }, [releases, selectedVersion]);
 
   const filteredChanges = useMemo(() => {
     if (!currentRelease) return [];
@@ -97,6 +125,12 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-semibold">
                 v{currentVersion}
               </span>
+              {isLive && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                  <Globe className="w-2.5 h-2.5" />
+                  <span>GitHub Live Sync</span>
+                </span>
+              )}
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
               What's New in Nova Browser
@@ -107,6 +141,15 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              onClick={() => loadData(true)}
+              disabled={isLoading}
+              title="Check GitHub for latest release notes"
+              className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-500' : ''}`} />
+              <span className="hidden sm:inline">{isLoading ? 'Syncing...' : 'Sync Notes'}</span>
+            </button>
             {onNavigate && (
               <button
                 onClick={() => onNavigate('nova://newtab')}
@@ -133,12 +176,17 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
       <div className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left Sidebar: Version List */}
         <div className="lg:col-span-4 space-y-4">
-          <div className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 px-1">
-            Versions Timeline
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Versions Timeline
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono">
+              {releases.length} releases
+            </span>
           </div>
 
           <div className="space-y-2">
-            {CHANGELOG_DATA.map((release) => {
+            {releases.map((release) => {
               const isSelected = release.version === selectedVersion;
               const isInstalled = release.version === currentVersion;
               return (
@@ -209,7 +257,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                 </h3>
 
                 {/* Highlights */}
-                {currentRelease.highlights.length > 0 && (
+                {currentRelease.highlights && currentRelease.highlights.length > 0 && (
                   <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30">
                     <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-2.5 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />

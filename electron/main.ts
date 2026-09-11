@@ -2171,6 +2171,163 @@ rm -rf "\${TEMP_DIR}"
     };
   });
 
+  ipcMain.handle('get-changelog-releases', async (event, forceRefresh?: boolean) => {
+    if (!isTrustedSender(event)) return null;
+
+    const cachePath = path.join(app.getPath('userData'), 'changelog_cache.json');
+    const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+    // 1. Read cached releases if valid and not forcing refresh
+    if (!forceRefresh && fs.existsSync(cachePath)) {
+      try {
+        const cachedRaw = fs.readFileSync(cachePath, 'utf8');
+        const cached = JSON.parse(cachedRaw);
+        if (cached && Array.isArray(cached.releases) && (Date.now() - (cached.timestamp || 0) < CACHE_TTL_MS)) {
+          return cached.releases;
+        }
+      } catch (_) {}
+    }
+
+    // 2. Fetch fresh releases from GitHub API
+    try {
+      const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases?per_page=10', {
+        headers: { 'User-Agent': getStandardUserAgent() },
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (!res.ok) {
+        if (fs.existsSync(cachePath)) {
+          try {
+            const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+            if (cached && Array.isArray(cached.releases)) return cached.releases;
+          } catch (_) {}
+        }
+        return null;
+      }
+
+      const releases = await res.json();
+      if (!Array.isArray(releases)) return null;
+
+      const parsedReleases = [];
+
+      for (let i = 0; i < releases.length; i++) {
+        const r = releases[i];
+        if (r.draft) continue;
+
+        const prev = releases.slice(i + 1).find((x: any) => !x.draft && x.tag_name);
+        const tag = r.tag_name || '';
+        const version = tag.replace(/^v/, '');
+        const title = r.name || `Nova Browser v${version}`;
+
+        let dateStr = '';
+        if (r.published_at) {
+          try {
+            const d = new Date(r.published_at);
+            dateStr = d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          } catch (_) {
+            dateStr = r.published_at;
+          }
+        }
+
+        const changes: Array<{ category: 'feature' | 'fix' | 'security' | 'performance' | 'improvement'; text: string }> = [];
+
+        // Check if release body has markdown bullets
+        const lines = (r.body || '').split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            const rawText = trimmed.replace(/^[-*]\s+/, '').trim();
+            if (!rawText.toLowerCase().includes('full changelog') && !rawText.includes('sha256') && rawText.length > 5) {
+              const match = rawText.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+              if (match) {
+                const type = match[1].toLowerCase();
+                const scope = match[2] ? `[${match[2]}] ` : '';
+                const desc = match[3];
+                let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
+                if (type === 'feat') cat = 'feature';
+                else if (type === 'fix') cat = 'fix';
+                else if (type === 'perf') cat = 'performance';
+                else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
+                changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
+              } else {
+                changes.push({ category: 'improvement', text: rawText.charAt(0).toUpperCase() + rawText.slice(1) });
+              }
+            }
+          }
+        }
+
+        // If body has no bullets and there is a previous tag, query compare API to get commits
+        if (changes.length === 0 && prev?.tag_name) {
+          try {
+            const compRes = await fetch(`https://api.github.com/repos/unitybtw/nova-browser/compare/${prev.tag_name}...${tag}`, {
+              headers: { 'User-Agent': getStandardUserAgent() },
+              signal: AbortSignal.timeout(5000)
+            });
+            if (compRes.ok) {
+              const compData = await compRes.json();
+              if (Array.isArray(compData.commits)) {
+                for (const c of compData.commits) {
+                  const msg = (c.commit?.message || '').split('\n')[0].trim();
+                  if (!msg || msg.startsWith('Merge') || msg.startsWith('release:')) continue;
+                  const match = msg.match(/^([a-z]+)(?:\(([^)]+)\))?:\s*(.+)$/i);
+                  if (match) {
+                    const type = match[1].toLowerCase();
+                    const scope = match[2] ? `[${match[2]}] ` : '';
+                    const desc = match[3];
+                    let cat: 'feature' | 'fix' | 'security' | 'performance' | 'improvement' = 'improvement';
+                    if (type === 'feat') cat = 'feature';
+                    else if (type === 'fix') cat = 'fix';
+                    else if (type === 'perf') cat = 'performance';
+                    else if (type === 'security' || type === 'sec' || scope.toLowerCase().includes('security')) cat = 'security';
+                    changes.push({ category: cat, text: scope + desc.charAt(0).toUpperCase() + desc.slice(1) });
+                  } else {
+                    changes.push({ category: 'improvement', text: msg.charAt(0).toUpperCase() + msg.slice(1) });
+                  }
+                }
+              }
+            }
+          } catch (_) {}
+        }
+
+        const highlights: string[] = [];
+        for (const ch of changes) {
+          if (highlights.length < 4 && (ch.category === 'feature' || ch.category === 'security' || ch.category === 'fix')) {
+            highlights.push(ch.text);
+          }
+        }
+        if (highlights.length === 0) {
+          for (const ch of changes.slice(0, 3)) {
+            highlights.push(ch.text);
+          }
+        }
+
+        parsedReleases.push({
+          version,
+          date: dateStr || 'Recent',
+          title,
+          highlights,
+          changes
+        });
+      }
+
+      // Cache the parsed releases
+      try {
+        fs.writeFileSync(cachePath, JSON.stringify({ timestamp: Date.now(), releases: parsedReleases }, null, 2), 'utf8');
+      } catch (_) {}
+
+      return parsedReleases;
+    } catch (err) {
+      console.warn('[Changelog] Failed to fetch live releases from GitHub:', err);
+      if (fs.existsSync(cachePath)) {
+        try {
+          const cached = JSON.parse(fs.readFileSync(cachePath, 'utf8'));
+          if (cached && Array.isArray(cached.releases)) return cached.releases;
+        } catch (_) {}
+      }
+      return null;
+    }
+  });
+
   // Wait 15 seconds before background update check on startup to not slow down initialization
   setTimeout(() => {
     checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));

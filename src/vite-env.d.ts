@@ -135,6 +135,7 @@ interface ElectronAPI {
     platform: string;
     arch: string;
   } | null>;
+  getChangelogReleases: (forceRefresh?: boolean) => Promise<any[] | null>;
   checkForUpdates: () => Promise<{ success: boolean; version?: string; error?: string }>;
   getUpdateInfo: () => Promise<ElectronUpdateInfo | null>;
   downloadUpdate: (url?: string) => Promise<{ success: boolean; filePath?: string; version?: string; error?: string }>;
