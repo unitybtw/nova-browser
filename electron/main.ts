@@ -3562,6 +3562,7 @@ const MAX_TRANSLATION_TEXT_CHARS = 4000;
 const MAX_TRANSLATION_TOTAL_CHARS = 100_000;
 
 ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: [] };
   const input = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
   const rawTexts = Array.isArray(input.texts) ? input.texts : [];
   const safeTexts: string[] = [];
@@ -3577,7 +3578,6 @@ ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
     remainingChars -= text.length;
   }
 
-  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: safeTexts };
   if (safeTexts.length === 0) return { translations: [], success: true };
 
   const validLanguage = (value: unknown, fallback: string): string => {

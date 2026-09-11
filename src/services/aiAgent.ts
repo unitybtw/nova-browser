@@ -1407,7 +1407,9 @@ CRITICAL RULES:
         const script = `(async () => {
           let el = null;
           if (${safeAiId}) {
-            el = document.querySelector('[data-ai-id="' + ${safeAiId} + '"]');
+            try {
+              el = document.querySelector('[data-ai-id="' + (window.CSS && CSS.escape ? CSS.escape(${safeAiId}) : ${safeAiId}) + '"]');
+            } catch (_) {}
           }
           if (!el && ${safeFallbackText}) {
             const allEls = document.querySelectorAll('a, button, [role="button"], input[type="submit"], label');
@@ -1515,7 +1517,10 @@ CRITICAL RULES:
         const safeSubmit = escapeForJSTemplate(JSON.stringify(submit ?? false));
         const safeColorHex = escapeForJSTemplate(colorHex);
         const script = `(async () => {
-          const el = document.querySelector('[data-ai-id="' + ${safeAiId} + '"]');
+          let el = null;
+          try {
+            el = document.querySelector('[data-ai-id="' + (window.CSS && CSS.escape ? CSS.escape(${safeAiId}) : ${safeAiId}) + '"]');
+          } catch (_) {}
           if (!el) return { error: 'Input not found for ID: ' + ${safeAiId} };
           
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });

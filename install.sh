@@ -97,7 +97,7 @@ if [ "$OS" = "Darwin" ]; then
   curl -fsSL --progress-bar "$DOWNLOAD_URL" -o "$DEST"
 
   if [ -n "$CHECKSUMS_LOCAL" ] && [ -f "$CHECKSUMS_LOCAL" ]; then
-    EXPECTED=$(grep "$DMG_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
+    EXPECTED=$(grep -F "$DMG_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
     if [ -n "$EXPECTED" ]; then
       verify_sha256 "$DEST" "$EXPECTED"
     else
@@ -163,7 +163,7 @@ if [ "$OS" = "Linux" ]; then
   fi
 
   if [ -n "$CHECKSUMS_LOCAL" ] && [ -f "$CHECKSUMS_LOCAL" ]; then
-    EXPECTED=$(grep "$APPIMAGE_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
+    EXPECTED=$(grep -F "$APPIMAGE_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
     if [ -n "$EXPECTED" ]; then
       verify_sha256 "$DEST_TMP" "$EXPECTED"
     else
