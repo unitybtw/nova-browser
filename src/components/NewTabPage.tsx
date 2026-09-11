@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Calendar } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
@@ -33,6 +33,8 @@ interface NewTabPageProps {
 interface ClockProps {
   variants?: any;
   isActive?: boolean;
+  hasWallpaper?: boolean;
+  isDarkTheme?: boolean;
 }
 
 const getGreetingKey = (hour: number): string => {
@@ -41,7 +43,12 @@ const getGreetingKey = (hour: number): string => {
   return 'newtab.goodEvening';
 };
 
-export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = true }) => {
+export const Clock: React.FC<ClockProps> = React.memo(({ 
+  variants, 
+  isActive = true, 
+  hasWallpaper = false,
+  isDarkTheme = true 
+}) => {
   const { t, language } = useTranslation();
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
@@ -79,18 +86,47 @@ export const Clock: React.FC<ClockProps> = React.memo(({ variants, isActive = tr
     return t(getGreetingKey(currentTime.getHours()));
   }, [currentTime, t, language]);
 
+  // When a wallpaper is active or dark theme is enabled, canvas is dark and requires crystal-clear white styling
+  const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
+
   return (
     <motion.div 
       variants={variants} 
-      className="flex flex-col items-center justify-center text-center mb-2 select-none"
+      className="flex flex-col items-center justify-center text-center mb-2 select-none relative"
     >
-      <div className="flex items-center gap-1.5 mb-2 px-3.5 py-1 rounded-full bg-slate-900/10 dark:bg-white/10 backdrop-blur-xl border border-slate-900/10 dark:border-white/15 text-xs font-semibold tracking-wider text-slate-800 dark:text-cyan-300 shadow-sm">
+      {/* Date Badge Pill */}
+      <div 
+        className={`flex items-center gap-2 mb-2.5 px-4 py-1.5 rounded-full text-xs font-medium tracking-wide transition-all duration-300 ${
+          useDarkCanvasStyle
+            ? 'bg-black/35 hover:bg-black/50 text-white/95 border border-white/20 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10'
+            : 'bg-slate-900/10 hover:bg-slate-900/15 text-slate-800 border border-slate-900/15 backdrop-blur-md shadow-sm'
+        }`}
+      >
+        <Calendar className={`w-3.5 h-3.5 ${useDarkCanvasStyle ? 'text-cyan-300' : 'text-slate-600'} shrink-0`} />
         <span>{dateStr}</span>
       </div>
-      <h1 className="text-7xl md:text-8xl font-extralight tracking-tight text-slate-900 dark:text-white font-sans tabular-nums drop-shadow-[0_2px_12px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_4px_24px_rgba(0,0,0,0.8)]">
+
+      {/* Main Time Display with Crisp Layered Shadows */}
+      <h1 
+        className={`text-7xl md:text-8xl font-light tracking-tight font-sans tabular-nums transition-colors duration-300 ${
+          useDarkCanvasStyle
+            ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] drop-shadow-[0_10px_28px_rgba(0,0,0,0.65)]'
+            : 'text-slate-900 drop-shadow-[0_2px_12px_rgba(0,0,0,0.15)]'
+        }`}
+        style={useDarkCanvasStyle ? { textShadow: '0 2px 14px rgba(0, 0, 0, 0.45)' } : undefined}
+      >
         {timeStr}
       </h1>
-      <p className="text-xl md:text-2xl text-slate-700 dark:text-slate-200 font-light tracking-wide mt-1 drop-shadow-[0_1px_8px_rgba(0,0,0,0.15)] dark:drop-shadow-[0_2px_12px_rgba(0,0,0,0.7)]">
+
+      {/* Greeting Subtitle */}
+      <p 
+        className={`text-xl md:text-2xl font-medium tracking-wide mt-2 transition-colors duration-300 ${
+          useDarkCanvasStyle
+            ? 'text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.55)]'
+            : 'text-slate-700 drop-shadow-[0_1px_8px_rgba(0,0,0,0.15)]'
+        }`}
+        style={useDarkCanvasStyle ? { textShadow: '0 1px 8px rgba(0, 0, 0, 0.4)' } : undefined}
+      >
         {greeting}
       </p>
     </motion.div>
@@ -441,8 +477,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const isDarkTheme = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
+  const hasWallpaper = useMemo(() => {
+    return newTabBackground === 'unsplash' || 
+           newTabBackground === 'custom_url' || 
+           ['matrix', 'nebula', 'hyper_space', 'fireflies', 'cyber_grid', 'aurora_waves', 'mesh', 'glass'].includes(newTabBackground);
+  }, [newTabBackground]);
+
   const getBackgroundStyle = () => {
-    if (newTabBackground === 'unsplash' || newTabBackground === 'custom_url') {
+    if (hasWallpaper) {
       return 'text-white';
     }
     if (!isDarkTheme) {
@@ -548,7 +590,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             }}
           />
           <div className="absolute inset-0 bg-black/25"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/40"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/45"></div>
+          {/* Subtle central backlight behind clock & search widget for enhanced contrast on vibrant wallpapers */}
+          <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[360px] bg-black/25 blur-3xl rounded-full pointer-events-none" />
           
           {/* Daily 4K Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
@@ -594,8 +638,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               style={{ backgroundImage: `url('${safeBgCssUrl}')` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[1px]"></div>
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/50"></div>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/50"></div>
+          {/* Subtle central backlight behind clock & search widget */}
+          <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[360px] bg-black/25 blur-3xl rounded-full pointer-events-none" />
         </div>
       )}
 
@@ -851,7 +897,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
-        <Clock variants={shouldAnimate ? itemVariants : undefined} isActive={isActive} />
+        <Clock 
+          variants={shouldAnimate ? itemVariants : undefined} 
+          isActive={isActive} 
+          hasWallpaper={hasWallpaper}
+          isDarkTheme={isDarkTheme}
+        />
 
         {/* Omnibox / Search Form */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
@@ -935,16 +986,20 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           </AnimatePresence>
 
           {/* Privacy Indicator */}
-          <div className="flex items-center justify-between px-3 mt-2 text-xs font-medium text-slate-600 dark:text-slate-300 drop-shadow-sm">
+          <div className={`flex items-center justify-between px-3 mt-2 text-xs font-medium transition-colors ${
+            hasWallpaper || isDarkTheme 
+              ? 'text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]' 
+              : 'text-slate-600 dark:text-slate-300 drop-shadow-sm'
+          }`}>
             <div className="flex items-center gap-1.5">
               {privacyShield ? (
                 <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 drop-shadow-sm" />
                   <span>{t('newtab.shieldActive')}</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400 drop-shadow-sm" />
                   <span>{t('newtab.shieldDisabled')}</span>
                 </>
               ) }
@@ -1011,7 +1066,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setEditingDial({ name: '', url: '', index: null });
                     setIsEditModalOpen(true);
                   }}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed border-slate-300 dark:border-white/20 bg-white/40 dark:bg-white/[0.04] backdrop-blur-xl hover:border-cyan-500 dark:hover:border-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300 cursor-pointer shadow-xs"
+                  className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed cursor-pointer backdrop-blur-xl ${
+                    hasWallpaper
+                      ? (isDarkTheme
+                          ? 'border-white/25 bg-black/25 hover:bg-black/40 hover:border-cyan-400 text-white/90 hover:text-cyan-300 shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
+                          : 'border-white/60 bg-white/75 hover:bg-white/95 hover:border-cyan-500 text-slate-800 hover:text-cyan-600 shadow-md shadow-black/10')
+                      : 'border-slate-300 dark:border-white/20 bg-white/40 dark:bg-white/[0.04] hover:border-cyan-500 dark:hover:border-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300 shadow-xs'
+                  }`}
                 >
                   <Plus className="w-6 h-6" />
                   <span className="text-xs font-semibold">{t('nav.addShortcut')}</span>

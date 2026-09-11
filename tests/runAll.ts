@@ -46,3 +46,4 @@ import './ai_vram_anti_jank.test';
 import './tdz_initialization_safety.test';
 import './daily_wallpaper_sync.test';
 import './speed_dial_icons_links.test';
+import './newtab_wallpaper_contrast.test';
