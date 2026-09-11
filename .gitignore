@@ -10,6 +10,9 @@ dist-electron-builder
 build/*.app
 build/*.dmg
 build/*.exe
+build/*.AppImage
+build/*.deb
+release-files/
 
 # Environment variables
 .env
@@ -22,7 +25,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Test / benchmark artifacts
+# Test and benchmark local runtime JSON outputs (prevents local dumps from polluting git)
 benchmark-results.json
 SPEEDOMETER_REPORT.json
 *.tsbuildinfo
