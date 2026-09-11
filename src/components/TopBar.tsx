@@ -154,10 +154,15 @@ const MemoizedTabItem = React.memo(({
     <Reorder.Item
       key={tab.id}
       value={tab}
-      initial={{ opacity: 0, scale: 0.96, y: 4 }}
+      initial={{ opacity: 0, scale: 0.94, y: 5 }}
       animate={{ opacity: ghostTab?.id === tab.id ? 0.4 : 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.94, y: 2, transition: { duration: 0.12, ease: 'easeOut' } }}
-      transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
+      exit={{ opacity: 0, scale: 0.92, y: 3, transition: { duration: 0.20, ease: [0.22, 1, 0.36, 1] } }}
+      transition={{
+        layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
+        scale: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
+        y: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
+        opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+      }}
       whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
         onTabLeave?.();
@@ -417,13 +422,16 @@ const MemoizedTabItem = React.memo(({
             )}
 
             {!tab.isPinned && (
-              <button
+              <motion.button
+                whileHover={{ scale: 1.15 }}
+                whileTap={{ scale: 0.85 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 22 }}
                 onClick={(e) => {
                   e.stopPropagation();
                   onTabLeave?.();
                   onCloseTab(tab.id, e);
                 }}
-                className={`p-0.5 rounded-full transition-colors shrink-0 ${
+                className={`p-0.5 rounded-full transition-colors shrink-0 cursor-pointer ${
                   isActive
                     ? 'hover:bg-slate-200 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
                     : 'opacity-0 group-hover:opacity-100 hover:bg-slate-300 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
@@ -431,7 +439,7 @@ const MemoizedTabItem = React.memo(({
                 title="Close Tab"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </motion.button>
             )}
           </div>
         </>
@@ -1537,17 +1545,25 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
         {/* Tabs */}
         <div className="flex-1 relative flex items-center min-w-0">
-          {canScrollLeft && (
-            <button
-              onClick={() => scrollTabs('left')}
-              className={`absolute left-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
-                isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
-              }`}
-              title="Scroll Left"
-            >
-              <ChevronLeft className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <AnimatePresence>
+            {canScrollLeft && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.15 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => scrollTabs('left')}
+                className={`absolute left-0 z-30 p-1 rounded-r-lg shadow-md no-drag transition-colors ${
+                  isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title="Scroll Left"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </motion.button>
+            )}
+          </AnimatePresence>
 
           <Reorder.Group
             as="div"
@@ -1628,52 +1644,87 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             })}
             </AnimatePresence>
             
-            {/* New Tab Button */}
-            <motion.button
+            {/* Action Buttons Container (New Tab & Private Tab) */}
+            <motion.div
               layout="position"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
-              onClick={() => onNewTab()}
-              className={`p-1.5 mb-1 ml-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
-                isIncognito 
-                  ? 'text-slate-400 hover:bg-slate-700 hover:text-slate-200' 
-                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-              }`}
-              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+              transition={{
+                layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 }
+              }}
+              className="flex items-center shrink-0 mb-1 ml-1 gap-0.5 no-drag z-10"
             >
-              <Plus className="w-4 h-4" />
-            </motion.button>
+              {/* New Tab Button */}
+              <motion.button
+                layout="position"
+                whileHover={{ scale: 1.10 }}
+                whileTap={{ scale: 0.88 }}
+                transition={{
+                  layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
+                  scale: { type: 'spring', stiffness: 400, damping: 22 }
+                }}
+                onClick={() => onNewTab()}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
+                  isIncognito 
+                    ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200' 
+                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
+                }`}
+                title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+              >
+                <motion.div
+                  whileHover={{ rotate: 90 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                  className="flex items-center justify-center"
+                >
+                  <Plus className="w-4 h-4" />
+                </motion.div>
+              </motion.button>
 
-            {/* New Incognito Tab Button */}
-            <motion.button
-              layout="position"
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.92 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 32, mass: 0.6 }}
-              onClick={onNewIncognitoTab}
-              className={`p-1.5 mb-1 rounded-lg transition-colors shrink-0 no-drag cursor-pointer ${
-                isIncognito 
-                  ? 'text-slate-300 hover:bg-slate-700 hover:text-white' 
-                  : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-              }`}
-              title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
-            >
-              <ShieldOff className="w-4 h-4" />
-            </motion.button>
+              {/* New Incognito Tab Button */}
+              <motion.button
+                layout="position"
+                whileHover={{ scale: 1.10 }}
+                whileTap={{ scale: 0.88 }}
+                transition={{
+                  layout: { type: 'spring', stiffness: 260, damping: 26, mass: 0.7 },
+                  scale: { type: 'spring', stiffness: 400, damping: 22 }
+                }}
+                onClick={onNewIncognitoTab}
+                className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
+                  isIncognito 
+                    ? 'text-slate-300 hover:bg-slate-700/80 hover:text-white' 
+                    : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
+                }`}
+                title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
+              >
+                <motion.div
+                  whileHover={{ scale: 1.06, rotate: -10 }}
+                  transition={{ type: 'spring', stiffness: 320, damping: 20 }}
+                  className="flex items-center justify-center"
+                >
+                  <ShieldOff className="w-4 h-4" />
+                </motion.div>
+              </motion.button>
+            </motion.div>
           </Reorder.Group>
 
-          {canScrollRight && (
-            <button
-              onClick={() => scrollTabs('right')}
-              className={`absolute right-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
-                isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
-              }`}
-              title="Scroll Right"
-            >
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <AnimatePresence>
+            {canScrollRight && (
+              <motion.button
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.15 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={() => scrollTabs('right')}
+                className={`absolute right-0 z-30 p-1 rounded-l-lg shadow-md no-drag transition-colors ${
+                  isIncognito ? 'bg-slate-800/90 text-slate-200 hover:bg-slate-700' : 'bg-white/90 text-slate-700 hover:bg-slate-100 dark:bg-slate-800/90 dark:text-slate-200 dark:hover:bg-slate-700'
+                }`}
+                title="Scroll Right"
+              >
+                <ChevronRight className="w-3.5 h-3.5" />
+              </motion.button>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Spacer for Windows controls */}
