@@ -91,4 +91,25 @@ assert(sanitizeWallpaperPhoto(null) === null, 'Null object should return null');
 assert(sanitizeWallpaperPhoto({ imageUrl: 'invalid' }) === null, 'Invalid imageUrl should return null');
 console.log('[PASS] [Wallpaper-Sync-7] Wallpaper photo metadata sanitization and normalization verified.');
 
+// 8. Wallpaper Minimal Credit Title & Author Formatting
+function formatWallpaperCreditTitle(title: string): string {
+  return title
+    .replace(/^4k\s*(desktop\s*)?(wallpaper)?\s*(\((.*?)\))?/i, (_, _d, _w, _p, cat) => cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : '')
+    .replace(/\s*4k\s*(uhd)?$/i, '')
+    .trim() || title;
+}
+function formatWallpaperCreditAuthor(author: string): string {
+  return author
+    .replace(/\s*4k\s*curated$/i, '')
+    .trim() || author;
+}
+
+assert(formatWallpaperCreditTitle('4K Desktop Wallpaper (anime)') === 'Anime', 'Wallhaven category extraction failed');
+assert(formatWallpaperCreditTitle('Alpine Lake & Mountain Panorama 4K') === 'Alpine Lake & Mountain Panorama', '4K suffix strip failed');
+assert(formatWallpaperCreditTitle('Mount Fuji & Spring Blossom 4K UHD') === 'Mount Fuji & Spring Blossom', '4K UHD suffix strip failed');
+assert(formatWallpaperCreditAuthor('Wallhaven 4K Curated') === 'Wallhaven', 'Wallhaven 4K Curated strip failed');
+assert(formatWallpaperCreditAuthor('Luca Bravo') === 'Luca Bravo', 'Standard author name altered');
+console.log('[PASS] [Wallpaper-Sync-8] Wallpaper credit title and author minimal formatting verified.');
+
+
 

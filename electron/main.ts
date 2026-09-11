@@ -2768,10 +2768,11 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
           if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
             for (const item of whData.data.slice(0, 15)) {
               if (!isSafeHttpUrl(item.path)) continue;
+              const categoryLabel = item.category ? (item.category.charAt(0).toUpperCase() + item.category.slice(1)) : 'Curated';
               addPhoto({
                 id: `wh-${item.id}`,
-                title: `4K Desktop Wallpaper (${item.category || 'Landscape'})`,
-                author: 'Wallhaven 4K Curated',
+                title: `${categoryLabel} Artwork`,
+                author: 'Wallhaven',
                 authorUrl: isSafeHttpUrl(item.url) ? item.url : 'https://wallhaven.cc',
                 imageUrl: item.path,
                 thumbnailUrl: isSafeHttpUrl(item.thumbs?.large) ? item.thumbs.large : (isSafeHttpUrl(item.thumbs?.small) ? item.thumbs.small : item.path),

@@ -189,6 +189,22 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   // Resolved Daily 4K Ultra HD Wallpaper (only loads if wallpaper mode is active)
   const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto(newTabBackground === 'unsplash');
 
+  // Refined wallpaper metadata for minimal premium pill display
+  const formattedWallpaperTitle = useMemo(() => {
+    if (!unsplashPhoto?.title) return '';
+    return unsplashPhoto.title
+      .replace(/^4k\s*(desktop\s*)?(wallpaper)?\s*(\((.*?)\))?/i, (_, _d, _w, _p, cat) => cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : '')
+      .replace(/\s*4k\s*(uhd)?$/i, '')
+      .trim() || unsplashPhoto.title;
+  }, [unsplashPhoto?.title]);
+
+  const formattedWallpaperAuthor = useMemo(() => {
+    if (!unsplashPhoto?.author) return '';
+    return unsplashPhoto.author
+      .replace(/\s*4k\s*curated$/i, '')
+      .trim() || unsplashPhoto.author;
+  }, [unsplashPhoto?.author]);
+
   // Close suggestions on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -515,18 +531,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           
           {/* Daily 4K Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
-            <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2.5 text-white/90 hover:text-white text-xs bg-black/50 hover:bg-black/70 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/10 shadow-xl transition-all pointer-events-auto group">
-              <span className="px-1.5 py-0.5 text-[9px] font-bold bg-blue-500/30 text-blue-300 rounded border border-blue-400/30">4K UHD</span>
-              <span className="font-medium max-w-[220px] truncate">{unsplashPhoto.title}</span>
-              <span className="opacity-40">•</span>
-              <span className="opacity-80 max-w-[180px] truncate">{unsplashPhoto.author}</span>
+            <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
+              <span className="px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase font-mono bg-white/[0.08] group-hover:bg-white/[0.14] text-white/75 group-hover:text-white/95 rounded border border-white/10 transition-colors">
+                4K UHD
+              </span>
+              <span className="text-[11px] font-medium text-white/85 group-hover:text-white max-w-[200px] truncate tracking-tight transition-colors">
+                {formattedWallpaperTitle}
+              </span>
+              <span className="w-1 h-1 rounded-full bg-white/20 shrink-0" />
+              <span className="text-[11px] text-white/50 group-hover:text-white/75 max-w-[150px] truncate transition-colors font-normal">
+                {formattedWallpaperAuthor}
+              </span>
               <button
                 type="button"
                 onClick={shuffleWallpaper}
-                className="ml-1 p-1 hover:bg-white/20 rounded-full transition-colors flex items-center gap-1 text-white/90 hover:text-white"
+                className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 flex items-center justify-center focus:outline-none group/btn"
                 title={t('newtab.shuffleWallpaper')}
               >
-                <Shuffle className="w-3.5 h-3.5" />
+                <Shuffle className="w-3 h-3 group-hover/btn:rotate-180 transition-transform duration-500 ease-out" />
               </button>
             </div>
           )}
