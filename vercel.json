@@ -3,6 +3,7 @@
   "buildCommand": "npm --prefix website ci && npm --prefix website run build",
   "outputDirectory": "website/dist",
   "framework": "vite",
+  "ignoreCommand": "bash scripts/ignore-vercel-build.sh",
   "headers": [
     {
       "source": "/(.*)",

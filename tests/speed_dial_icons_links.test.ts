@@ -37,4 +37,15 @@ assert(!isSafeNavigationUrl(normalizeNavigationUrl('data:text/html,evil')), 'Dan
 assert(!isSafeNavigationUrl(normalizeNavigationUrl('blob:https://evil.com')), 'Dangerous blob: URL accepted');
 console.log('[PASS] [SpeedDial-3] Safe navigation verified for normalized URLs.');
 
+// 4. Vercel Build Ignore Configuration
+import fs from 'fs';
+import path from 'path';
+
+const vercelConfig = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../vercel.json'), 'utf-8'));
+assert(Boolean(vercelConfig.ignoreCommand), 'vercel.json missing ignoreCommand');
+assert(vercelConfig.ignoreCommand.includes('ignore-vercel-build.sh'), 'vercel.json ignoreCommand must invoke ignore-vercel-build.sh');
+assert(fs.existsSync(path.resolve(__dirname, '../scripts/ignore-vercel-build.sh')), 'scripts/ignore-vercel-build.sh not found');
+console.log('[PASS] [Vercel-Ignore-1] Vercel build ignore rule verified to prevent website redeploy on browser commits.');
+
 console.log('[PASS] All speed dial icon and link tests passed cleanly.');
+
