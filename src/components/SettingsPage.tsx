@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
-import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power, RotateCcw, Images } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Settings, Search, ShieldCheck, Download, Upload, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Play, Square, Copy, Check, Users, Zap, ExternalLink, Key, RefreshCw, Lock, Unlock, ShieldAlert, Keyboard, Puzzle, Loader2, X, Shuffle, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power, RotateCcw, Images, Plus } from 'lucide-react';
 import { UserSettings } from '../types/browser';
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
 import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } from '../utils/unsplash';
@@ -567,6 +567,150 @@ const BackgroundPreviewCard: React.FC<{
     </button>
   );
 };
+
+interface TabAnimationPreviewBoxProps {
+  preset: 'chrome' | 'smooth' | 'snappy' | 'none';
+  isActive: boolean;
+}
+
+const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo(({ preset, isActive }) => {
+  const [tabVisible, setTabVisible] = useState(true);
+
+  useEffect(() => {
+    let timeoutId: any;
+    let isMounted = true;
+
+    const cycle = (visible: boolean) => {
+      if (!isMounted) return;
+      setTabVisible(visible);
+      timeoutId = setTimeout(() => {
+        cycle(!visible);
+      }, visible ? 2000 : 750);
+    };
+
+    timeoutId = setTimeout(() => cycle(false), 2000);
+    return () => {
+      isMounted = false;
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
+  const handleRestart = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTabVisible(false);
+    setTimeout(() => setTabVisible(true), 100);
+  };
+
+  const animConfig = React.useMemo(() => {
+    switch (preset) {
+      case 'smooth':
+        return {
+          initial: { opacity: 0, y: 6, scale: 0.94, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
+          animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
+          exit: { opacity: 0, y: 4, scale: 0.92, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const } },
+          transition: {
+            layout: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            scale: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            y: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
+            opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+          },
+          buttonTransition: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 }
+        };
+      case 'snappy':
+        return {
+          initial: { opacity: 0, y: 3, scale: 0.98, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
+          animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
+          exit: { opacity: 0, scale: 0.96, transition: { duration: 0.12, ease: 'easeOut' as const } },
+          transition: {
+            type: 'spring' as const,
+            stiffness: 520,
+            damping: 34,
+            mass: 0.5,
+            layout: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+          },
+          buttonTransition: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+        };
+      case 'none':
+        return {
+          initial: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, scale: 1, y: 0 },
+          animate: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, scale: 1, y: 0 },
+          exit: { opacity: 0, transition: { duration: 0 } },
+          transition: { duration: 0 },
+          buttonTransition: { duration: 0 }
+        };
+      case 'chrome':
+      default:
+        return {
+          initial: { opacity: 0, width: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0, scale: 1, y: 0 },
+          animate: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, scale: 1, y: 0 },
+          exit: {
+            opacity: 0,
+            width: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+          },
+          transition: {
+            duration: 0.20,
+            ease: [0.4, 0, 0.2, 1] as const,
+            layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+          },
+          buttonTransition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+        };
+    }
+  }, [preset]);
+
+  return (
+    <div 
+      onMouseEnter={handleRestart}
+      className="w-full h-14 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/60 p-2 flex items-end overflow-hidden relative shadow-inner select-none"
+    >
+      <div className="flex items-center gap-1.5 w-full h-full">
+        {/* Base Tab 1 */}
+        <div className="h-7 px-2 rounded-md bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 shadow-xs flex items-center gap-1.5 shrink-0">
+          <div className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0" />
+          <div className="w-6 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
+        </div>
+
+        {/* Animated Tab 2 */}
+        <AnimatePresence>
+          {tabVisible && (
+            <motion.div
+              key="preview-tab"
+              initial={animConfig.initial}
+              animate={animConfig.animate}
+              exit={animConfig.exit}
+              transition={animConfig.transition}
+              className={`h-7 rounded-md flex items-center gap-1.5 shrink-0 overflow-hidden ${
+                isActive 
+                  ? 'bg-blue-500/20 border border-blue-500/40 text-blue-600 dark:text-blue-300 shadow-xs' 
+                  : 'bg-white/90 dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700 shadow-xs'
+              }`}
+            >
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-blue-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
+              <div className={`w-6 h-1.5 rounded-full shrink-0 ${isActive ? 'bg-blue-500/60' : 'bg-slate-300 dark:bg-slate-600'}`} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Action Button (+) Container */}
+        <motion.div
+          layout="position"
+          transition={animConfig.buttonTransition}
+          className="w-6 h-6 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-slate-300/80 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 cursor-pointer"
+          title="Replay animation"
+        >
+          <Plus className="w-3 h-3" />
+        </motion.div>
+      </div>
+
+      <span className="absolute top-1 right-2 text-[9px] font-mono text-slate-400/60 dark:text-slate-500/60 pointer-events-none uppercase tracking-wider">
+        live
+      </span>
+    </div>
+  );
+});
 
 export interface SettingsPageProps {
   url?: string;
@@ -1857,34 +2001,45 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </section>
 
               <section>
-                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Tab Animation</h2>
+                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Tab Animation</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select a tab opening physics preset and preview its live motion</p>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
                     { id: 'chrome', name: 'Chrome (Native)', desc: 'Smooth horizontal width expansion & collapse', badge: 'Default' },
                     { id: 'smooth', name: 'Fluid Spring', desc: 'Soft floating lift with cushioned spring physics' },
                     { id: 'snappy', name: 'Snappy', desc: 'Crisp, high-velocity responsive motion' },
                     { id: 'none', name: 'Instant (No Motion)', desc: 'Immediate tab opening for maximum speed' }
-                  ].map(ta => (
-                    <button
-                      key={ta.id}
-                      onClick={() => onUpdateSettings({ tabAnimation: ta.id as any })}
-                      className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-start justify-between gap-3 text-left ${
-                        (settings.tabAnimation ?? 'chrome') === ta.id
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100'
-                          : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{ta.name}</span>
-                        {ta.badge && (
-                          <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full border border-blue-500/20">
-                            {ta.badge}
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{ta.desc}</p>
-                    </button>
-                  ))}
+                  ].map(ta => {
+                    const isSelected = (settings.tabAnimation ?? 'chrome') === ta.id;
+                    return (
+                      <button
+                        key={ta.id}
+                        onClick={() => onUpdateSettings({ tabAnimation: ta.id as any })}
+                        className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-start justify-between gap-3 text-left ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-500/10 text-blue-900 dark:text-blue-100 shadow-sm'
+                            : 'border-slate-200 dark:border-slate-700/50 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/50'
+                        }`}
+                      >
+                        {/* Live Animation Preview Box */}
+                        <TabAnimationPreviewBox preset={ta.id as any} isActive={isSelected} />
+
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{ta.name}</span>
+                          {ta.badge && (
+                            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-full border border-blue-500/20">
+                              {ta.badge}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{ta.desc}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
 
