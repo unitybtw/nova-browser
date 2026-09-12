@@ -67,10 +67,11 @@ export const BrowserDemo: React.FC = () => {
         style={{
           width: scale < 1 ? `${BASE_WIDTH}px` : '100%',
           height: scale < 1 ? `${BASE_HEIGHT}px` : '100%',
-          transform: scale < 1 ? `scale(${scale})` : 'none',
+          transform: scale < 1 ? `scale(${scale})` : 'scale(1)',
           transformOrigin: 'top left',
+          isolation: 'isolate',
         }}
-        className="relative"
+        className="relative h-full w-full"
       >
         <App demo={WEBSITE_DEMO_OPTIONS} />
       </div>

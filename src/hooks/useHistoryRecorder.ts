@@ -4,18 +4,24 @@ import { generateId } from '../utils/idGenerator';
 import { safeParseArrayWithBackup } from '../utils/safeStorage';
 export type { HistoryItem };
 
+export interface UseHistoryRecorderOptions {
+  isDemo?: boolean;
+}
+
 /**
  * Owns the browsing-history domain: the history list state, its debounced
  * (~2s) localStorage persistence, and the navigation recorder invoked by tab
  * updates. Extracted as pure code motion from App.tsx.
  */
-export function useHistoryRecorder() {
+export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
+    if (options.isDemo) return [];
     const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('browsing_history') : null;
     return safeParseArrayWithBackup<HistoryItem>('browsing_history', raw, []);
   });
 
   useEffect(() => {
+    if (options.isDemo) return;
     const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
       try {
         localStorage.setItem('browsing_history', JSON.stringify(history));
@@ -30,13 +36,14 @@ export function useHistoryRecorder() {
       }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [history]);
+  }, [history, options.isDemo]);
 
   const historyRef = useRef(history);
   historyRef.current = history;
 
   /** Synchronous persist of the latest history snapshot (for beforeunload). */
   const flushHistory = useCallback(() => {
+    if (options.isDemo) return;
     try {
       localStorage.setItem('browsing_history', JSON.stringify(historyRef.current));
     } catch {
@@ -86,10 +93,12 @@ export function useHistoryRecorder() {
   const clearHistory = useCallback((timeframe: string = 'all') => {
     if (timeframe === 'all') {
       setHistory([]);
-      try {
-        localStorage.setItem('browsing_history', '[]');
-      } catch (err) {
-        console.warn('[History] Clear all history failed:', err);
+      if (!options.isDemo) {
+        try {
+          localStorage.setItem('browsing_history', '[]');
+        } catch (err) {
+          console.warn('[History] Clear all history failed:', err);
+        }
       }
       return;
     }
@@ -108,26 +117,30 @@ export function useHistoryRecorder() {
 
     setHistory(prev => {
       const next = prev.filter(item => !isNewerThanCutoff(item));
-      try {
-        localStorage.setItem('browsing_history', JSON.stringify(next));
-      } catch (err) {
-        console.warn('[History] Clear timeframe history failed:', err);
+      if (!options.isDemo) {
+        try {
+          localStorage.setItem('browsing_history', JSON.stringify(next));
+        } catch (err) {
+          console.warn('[History] Clear timeframe history failed:', err);
+        }
       }
       return next;
     });
-  }, []);
+  }, [options.isDemo]);
 
   const removeHistoryItem = useCallback((id: string) => {
     setHistory(prev => {
       const next = prev.filter(item => item.id !== id);
-      try {
-        localStorage.setItem('browsing_history', JSON.stringify(next));
-      } catch (err) {
-        console.warn('[History] Remove history item failed:', err);
+      if (!options.isDemo) {
+        try {
+          localStorage.setItem('browsing_history', JSON.stringify(next));
+        } catch (err) {
+          console.warn('[History] Remove history item failed:', err);
+        }
       }
       return next;
     });
-  }, []);
+  }, [options.isDemo]);
 
   return { history, setHistory, recordVisit, flushHistory, clearHistory, removeHistoryItem };
 }

@@ -5,8 +5,13 @@ import { safeParseArrayWithBackup } from '../utils/safeStorage';
 import { getElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
 
-export function useBookmarks() {
+export interface UseBookmarksOptions {
+  isDemo?: boolean;
+}
+
+export function useBookmarks(options: UseBookmarksOptions = {}) {
   const [bookmarks, setBookmarks] = useState<Bookmark[]>(() => {
+    if (options.isDemo) return [];
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('bookmarks') : null;
     return safeParseArrayWithBackup<Bookmark>('bookmarks', saved, []);
   });
@@ -16,6 +21,7 @@ export function useBookmarks() {
 
   // Save bookmarks to localStorage and Electron store (debounced 500ms)
   useEffect(() => {
+    if (options.isDemo) return;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(bookmarks);
@@ -33,7 +39,7 @@ export function useBookmarks() {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [bookmarks]);
+  }, [bookmarks, options.isDemo]);
 
   const handleToggleBookmark = useCallback((tab: Tab) => {
     if (!tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank') return;

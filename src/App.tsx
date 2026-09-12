@@ -279,6 +279,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   });
   
   const [activeTabId, setActiveTabId] = useState<string>(() => {
+    if (demoParams.isDemo) return tabs[0]?.id || '1';
     const saved = localStorage.getItem('active_tab_session');
     if (saved && tabs.some(t => t.id === saved)) {
       return saved;
@@ -388,6 +389,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const [vpnEnabled, setVpnEnabled] = useState(false);
   const [vpnLocations, setVpnLocations] = useState<VpnLocation[]>(() => {
+    if (demoParams.isDemo) return DEFAULT_VPN_LOCATIONS;
     try {
       const saved = localStorage.getItem('nova_vpn_locations');
       if (saved) {
@@ -415,26 +417,30 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const handleAddVpnLocation = useCallback((newLoc: VpnLocation) => {
     setVpnLocations(prev => {
       const updated = [...prev, newLoc];
-      try {
-        localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
-      } catch (err) {
-        logger.warn('App:VPN', 'Failed to persist new VPN location', err);
+      if (!demoParams.isDemo) {
+        try {
+          localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
+        } catch (err) {
+          logger.warn('App:VPN', 'Failed to persist new VPN location', err);
+        }
       }
       return updated;
     });
-  }, []);
+  }, [demoParams.isDemo]);
 
   const handleRemoveVpnLocation = useCallback((id: string) => {
     setVpnLocations(prev => {
       const updated = prev.filter(l => l.id !== id);
-      try {
-        localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
-      } catch (err) {
-        logger.warn('App:VPN', 'Failed to persist updated VPN locations after removal', err);
+      if (!demoParams.isDemo) {
+        try {
+          localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
+        } catch (err) {
+          logger.warn('App:VPN', 'Failed to persist updated VPN locations after removal', err);
+        }
       }
       return updated;
     });
-  }, []);
+  }, [demoParams.isDemo]);
 
   // The standalone demo URL can run the animated showcase. Embedded demos
   // (the marketing website passes demo options directly) must stay stable so
@@ -623,6 +629,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Sync settings with local storage and backend (debounced 500ms like tabs:
   // color picker drags must not write localStorage / IPC per pixel)
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(settings);
@@ -639,7 +646,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [settings]);
+  }, [settings, demoParams.isDemo]);
 
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
@@ -677,6 +684,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const customLocations = vpnLocations.filter(loc => loc.type === 'custom');
     try {
       localStorage.setItem('nova_vpn', JSON.stringify({ enabled: vpnEnabled, location: vpnLocation, customLocations }));
@@ -769,7 +777,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // History state + debounced (~2s) localStorage persistence + navigation
   // recorder that handleUpdateTab calls OUTSIDE the tabs updater
   // (extracted to useHistoryRecorder)
-  const { history, setHistory, recordVisit, flushHistory, clearHistory: handleClearHistory, removeHistoryItem: handleRemoveHistoryItem } = useHistoryRecorder();
+  const { history, setHistory, recordVisit, flushHistory, clearHistory: handleClearHistory, removeHistoryItem: handleRemoveHistoryItem } = useHistoryRecorder({ isDemo: demoParams.isDemo });
 
   const foldersRef = useRef(folders);
   useEffect(() => { foldersRef.current = folders; }, [folders]);
@@ -778,11 +786,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setBookmarks,
     bookmarksRef,
     handleToggleBookmark
-  } = useBookmarks();
+  } = useBookmarks({ isDemo: demoParams.isDemo });
 
   // Immediate flush on beforeunload to prevent session loss on abrupt browser close
   // (also flushes debounced settings/bookmarks/workspaces stores)
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const handleBeforeUnload = () => {
       try {
         const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
@@ -825,10 +834,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityHidden);
     };
-  }, [flushHistory]);
+  }, [flushHistory, demoParams.isDemo]);
 
   // Save session whenever tabs changes (Excluding Incognito Tabs)
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
     const timer = setTimeout(() => {
@@ -842,7 +852,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [tabs]);
+  }, [tabs, demoParams.isDemo]);
 
   // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
   useEffect(() => {
@@ -864,6 +874,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [tabs, activeTabId]);
 
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('active_tab_session', activeTabId);
@@ -872,7 +883,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [activeTabId]);
+  }, [activeTabId, demoParams.isDemo]);
 
   // Apply Theme Mode & Custom Accent
   useEffect(() => {
@@ -1402,6 +1413,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // or exceeded quota, restore session tabs, folders, workspaces, bookmarks and user settings
   // from Electron disk store.
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const restoreFromDisk = async () => {
       try {
         const electronStore = (window as any).electronAPI;
@@ -1606,7 +1618,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Tab Hibernation Checker Engine (Idle Timer)
   useEffect(() => {
     const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
-    if (!isHibernationEnabled) return;
+    if (!isHibernationEnabled || demoParams.isDemo) return;
     const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
 
     const interval = setInterval(() => {
@@ -3294,6 +3306,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Post-update startup check: Automatically open What's New changelog tab when browser is updated
   useEffect(() => {
+    if (demoParams.isDemo) return;
     const LAST_VERSION_KEY = 'nova_last_seen_version';
     let isCancelled = false;
 
@@ -3321,10 +3334,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     checkVersionAndOpenChangelog();
     return () => { isCancelled = true; };
-  }, [handleNewTab]);
+  }, [handleNewTab, demoParams.isDemo]);
 
   // Global Chrome Keyboard Shortcuts Listener
   useEffect(() => {
+    // When embedded as a website demo, do not hijack global window keyboard shortcuts
+    // (e.g. Cmd+W, Cmd+T, Cmd+R) from the user's real browser!
+    if (demoParams.isDemo && demoParams.feature === 'website') return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger shortcuts when typing in inputs/textareas
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
@@ -3542,7 +3559,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts]);
+  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
   const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
@@ -3962,6 +3979,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onRemoveHistoryItem={handleRemoveHistoryItem}
                   onClearDownloads={handleClearDownloads}
                   onPurgeMemory={handlePurgeMemory}
+                  isDemo={demoParams.isDemo}
                 />
               </div>
             );
@@ -4074,6 +4092,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onRemoveHistoryItem={handleRemoveHistoryItem}
               onClearDownloads={handleClearDownloads}
               onPurgeMemory={handlePurgeMemory}
+              isDemo={demoParams.isDemo}
             />
           </div>
         )}

@@ -31,6 +31,7 @@ interface NewTabPageProps {
   energySaverMode?: boolean;
   browserColor?: UserSettings['browserColor'];
   customBrowserColor?: string;
+  isDemo?: boolean;
 }
 
 interface ClockProps {
@@ -178,6 +179,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   energySaverMode = false,
   browserColor = 'default',
   customBrowserColor = '',
+  isDemo = false,
 }) => {
   const { t, language } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
@@ -340,13 +342,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   }, [query, isFocused, searchEngine, language]);
 
   useEffect(() => {
-    if (isIncognito) return; // Incognito: never persist
+    if (isIncognito || isDemo) return; // Incognito or Demo: never persist
     try {
       localStorage.setItem('nova_todos', JSON.stringify(todos));
     } catch (err) {
       logger.warn('NewTabPage', 'Failed to persist nova_todos to localStorage', err);
     }
-  }, [todos]);
+  }, [todos, isIncognito, isDemo]);
 
   const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -368,13 +370,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   };
 
   useEffect(() => {
-    if (isIncognito) return; // Incognito: never persist
+    if (isIncognito || isDemo) return; // Incognito or Demo: never persist
     try {
       localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
     } catch (err) {
       logger.warn('NewTabPage', 'Failed to persist nova_speed_dials to localStorage', err);
     }
-  }, [speedDials]);
+  }, [speedDials, isIncognito, isDemo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {

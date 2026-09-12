@@ -23,17 +23,20 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         { id: 'f2', name: 'Research Papers', isExpanded: false, workspaceId: 'default' }
       ];
     }
+    if (options.isDemo) return [];
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('folders_session') : null;
     return safeParseArrayWithBackup<Folder>('folders_session', saved, []);
   });
 
   const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
+    if (options.isDemo) return DEFAULT_WORKSPACES;
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('workspaces_session') : null;
     const parsed = safeParseArrayWithBackup<Workspace>('workspaces_session', saved, []);
     return parsed.length > 0 ? parsed : DEFAULT_WORKSPACES;
   });
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => {
+    if (options.isDemo) return 'default';
     return (typeof localStorage !== 'undefined' ? localStorage.getItem('active_workspace_session') : null) || 'default';
   });
 
@@ -45,6 +48,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
 
   // Debounced 500ms workspace persistence with error logging (no silent failure)
   useEffect(() => {
+    if (options.isDemo) return;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(workspaces);

@@ -69,6 +69,7 @@ interface BrowserViewProps {
   onExportData?: () => void;
   onImportData?: (file: File) => void;
   onPurgeMemory?: () => Promise<void> | void;
+  isDemo?: boolean;
 }
 
 export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
@@ -93,7 +94,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onClearDownloads,
   onExportData,
   onImportData,
-  onPurgeMemory
+  onPurgeMemory,
+  isDemo = false
 }) => {
   const webviewRef = useRef<any>(null);
 
@@ -806,6 +808,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         backgroundCustomUrl={settings.backgroundCustomUrl}
         showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
         isIncognito={isIncognito}
+        isDemo={isDemo}
         theme={settings.theme}
         energySaverMode={settings.energySaverMode}
         browserColor={settings.browserColor}
@@ -914,20 +917,93 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             allowpopups={"true" as any}
           />
+        ) : isDemo && tab?.url === 'https://github.com/unitybtw/nova-browser' ? (
+          <div className="w-full h-full bg-[#0d1117] text-[#c9d1d9] flex flex-col overflow-y-auto font-sans p-6 sm:p-8 select-none">
+            <div className="max-w-3xl mx-auto w-full flex flex-col gap-6 my-auto">
+              {/* GitHub Repo Header */}
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#30363d] pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                    N
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[#58a6ff] hover:underline font-semibold text-base cursor-pointer">unitybtw</span>
+                      <span className="text-[#8b949e]">/</span>
+                      <span className="text-[#58a6ff] font-bold text-base cursor-pointer">nova-browser</span>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full border border-[#30363d] text-[#8b949e] font-medium">Public</span>
+                    </div>
+                    <p className="text-xs text-[#8b949e] mt-0.5">An open source sovereign browser built with React and Electron</p>
+                  </div>
+                </div>
+                <a
+                  href="https://github.com/unitybtw/nova-browser"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-1.5 bg-[#238636] hover:bg-[#2ea043] text-white rounded-md text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm"
+                >
+                  <svg className="w-4 h-4 fill-current" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                  Star on GitHub
+                </a>
+              </div>
+
+              {/* Quick Feature Badges */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">Language</div>
+                  <div className="text-xs font-semibold text-[#f0f6fc] mt-1">TypeScript / React</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">License</div>
+                  <div className="text-xs font-semibold text-[#f0f6fc] mt-1">MIT Open Source</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">AI Engine</div>
+                  <div className="text-xs font-semibold text-[#58a6ff] mt-1">WebGPU On-Device</div>
+                </div>
+                <div className="bg-[#161b22] border border-[#30363d] rounded-lg p-3 text-center">
+                  <div className="text-[11px] text-[#8b949e]">Platform</div>
+                  <div className="text-xs font-semibold text-[#3fb950] mt-1">macOS / Windows / Linux</div>
+                </div>
+              </div>
+
+              {/* Web Demo Notice Banner */}
+              <div className="bg-gradient-to-r from-blue-950/40 to-indigo-950/30 border border-blue-500/30 rounded-lg p-3.5 text-xs leading-relaxed text-blue-200/90">
+                <span className="font-semibold text-blue-400">Interactive Marketing Demo: </span>
+                Third-party platforms like GitHub enforce <code className="bg-black/40 px-1 py-0.5 rounded text-indigo-300 font-mono text-[11px]">X-Frame-Options: DENY</code> in web browsers. In the desktop Nova app, all websites render natively with Chromium with no iframe restrictions.
+              </div>
+            </div>
+          </div>
         ) : (
-          <iframe
-            ref={webviewRef as any}
-            data-tab-id={tab.id}
-            src={getSafeUrl(tab?.url)}
-            className="w-full h-full border-none bg-white"
-            title={tab.title}
-            sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            onLoad={() => {
-              if (tab.isLoading) {
-                onUpdateTab(tab.id, { isLoading: false });
-              }
-            }}
-          />
+          <div className="w-full h-full relative">
+            <iframe
+              ref={webviewRef as any}
+              data-tab-id={tab.id}
+              src={getSafeUrl(tab?.url)}
+              className="w-full h-full border-none bg-white"
+              title={tab.title}
+              sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              referrerPolicy="no-referrer"
+              onLoad={() => {
+                if (tab.isLoading) {
+                  onUpdateTab(tab.id, { isLoading: false });
+                }
+              }}
+            />
+            {isDemo && tab?.url && tab.url.startsWith('http') && (
+              <div className="absolute bottom-3 right-3 z-30 pointer-events-auto">
+                <a
+                  href={tab.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-slate-900/90 hover:bg-slate-800 text-slate-200 border border-slate-700/80 rounded-lg text-xs flex items-center gap-1.5 shadow-xl transition-all backdrop-blur-sm"
+                >
+                  <span>Open in new tab</span>
+                  <span className="text-[10px]">↗</span>
+                </a>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
