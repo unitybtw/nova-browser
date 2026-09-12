@@ -21,7 +21,8 @@ import type {
   Bookmark, 
   Extension, 
   Workspace, 
-  ShortcutConfig 
+  ShortcutConfig,
+  SavedPassword 
 } from './types/browser';
 import { defaultSettings } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
@@ -43,7 +44,6 @@ import { isValidProxyUrl } from './utils/proxyValidation';
 import { matchesShortcut } from './utils/keyboardShortcuts';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useWorkspaces } from './hooks/useWorkspaces';
-import { useTabManager } from './hooks/useTabManager';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -90,6 +90,7 @@ import { tabThumbnailCache } from './services/thumbnailCache';
 import { syncService } from './services/syncService';
 import { orchestrator } from './services/agentOrchestrator';
 import { searchHistoryAndBookmarks, SearchableItem } from './utils/searchHistoryBookmarks';
+import { logger } from './utils/logger';
 
 const DEFAULT_VPN_LOCATION: VpnLocation = {
   id: 'direct',
@@ -404,7 +405,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (valid.length > 0) return valid;
         }
       }
-    } catch (e) {}
+    } catch (err) {
+      logger.warn('App:VPN', 'Failed to parse saved VPN locations', err);
+    }
     return DEFAULT_VPN_LOCATIONS;
   });
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(() => vpnLocations[0] || DEFAULT_VPN_LOCATION);
@@ -414,7 +417,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const updated = [...prev, newLoc];
       try {
         localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:VPN', 'Failed to persist new VPN location', err);
+      }
       return updated;
     });
   }, []);
@@ -424,7 +429,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const updated = prev.filter(l => l.id !== id);
       try {
         localStorage.setItem('nova_vpn_locations', JSON.stringify(updated.filter(l => l.type === 'custom')));
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:VPN', 'Failed to persist updated VPN locations after removal', err);
+      }
       return updated;
     });
   }, []);
@@ -621,7 +628,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         const serialized = JSON.stringify(settings);
         localStorage.setItem('user_settings', serialized);
         (window as any).electronAPI?.storeSet?.('user_settings', serialized);
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
+      }
       if (window.electronAPI?.setPrivacyShield) {
         window.electronAPI.setPrivacyShield(settings.privacyShield);
       }
@@ -661,13 +670,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             setVpnLocation(validLocations[0]);
           }
         }
-      } catch(e) {}
+      } catch (err) {
+        logger.warn('App:VPN', 'Failed to parse nova_vpn from localStorage', err);
+      }
     }
   }, []);
 
   useEffect(() => {
     const customLocations = vpnLocations.filter(loc => loc.type === 'custom');
-    localStorage.setItem('nova_vpn', JSON.stringify({ enabled: vpnEnabled, location: vpnLocation, customLocations }));
+    try {
+      localStorage.setItem('nova_vpn', JSON.stringify({ enabled: vpnEnabled, location: vpnLocation, customLocations }));
+    } catch (err) {
+      logger.warn('App:VPN', 'Failed to persist nova_vpn to localStorage', err);
+    }
     
     if (typeof window !== 'undefined' && (window as any).electronAPI?.setVpn) {
       const isValidProxy = Boolean(vpnLocation?.url) && isValidProxyUrl(vpnLocation.url);
@@ -754,7 +769,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // History state + debounced (~2s) localStorage persistence + navigation
   // recorder that handleUpdateTab calls OUTSIDE the tabs updater
   // (extracted to useHistoryRecorder)
-  const { history, setHistory, recordVisit, flushHistory } = useHistoryRecorder();
+  const { history, setHistory, recordVisit, flushHistory, clearHistory: handleClearHistory, removeHistoryItem: handleRemoveHistoryItem } = useHistoryRecorder();
 
   const foldersRef = useRef(folders);
   useEffect(() => { foldersRef.current = folders; }, [folders]);
@@ -796,7 +811,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
         flushHistory();
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:Lifecycle', 'Failed to save session state before unload', err);
+      }
     };
     const handleVisibilityHidden = () => {
       if (document.visibilityState === 'hidden') handleBeforeUnload();
@@ -819,7 +836,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         const serialized = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serialized);
         (window as any).electronAPI?.storeSet?.('session_tabs', serialized);
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:Session', 'Failed to persist session_tabs to storage', err);
+      }
     }, 500);
 
     return () => clearTimeout(timer);
@@ -848,21 +867,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('active_tab_session', activeTabId);
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:Session', 'Failed to persist active_tab_session to storage', err);
+      }
     }, 300);
     return () => clearTimeout(timer);
   }, [activeTabId]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        const serialized = JSON.stringify(folders);
-        localStorage.setItem('folders_session', serialized);
-        (window as any).electronAPI?.storeSet?.('folders_session', serialized);
-      } catch (e) {}
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [folders]);
 
   // Apply Theme Mode & Custom Accent
   useEffect(() => {
@@ -1407,7 +1417,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 setSettings(prev => ({ ...prev, ...parsed }));
                 localStorage.setItem('user_settings', diskSettings);
               }
-            } catch (_) {}
+            } catch (err) {
+              logger.warn('App:Storage', 'Failed to parse diskSettings from storage', err);
+            }
           }
         }
 
@@ -1421,7 +1433,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 setWorkspaces(parsed);
                 localStorage.setItem('workspaces_session', diskWorkspaces);
               }
-            } catch (_) {}
+            } catch (err) {
+              logger.warn('App:Storage', 'Failed to parse diskWorkspaces from storage', err);
+            }
           }
         }
 
@@ -1435,7 +1449,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 setFolders(parsed);
                 localStorage.setItem('folders_session', diskFolders);
               }
-            } catch (_) {}
+            } catch (err) {
+              logger.warn('App:Storage', 'Failed to parse diskFolders from storage', err);
+            }
           }
         }
 
@@ -1449,7 +1465,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 setBookmarks(parsed);
                 localStorage.setItem('bookmarks', diskBookmarks);
               }
-            } catch (_) {}
+            } catch (err) {
+              logger.warn('App:Storage', 'Failed to parse diskBookmarks from storage', err);
+            }
           }
         }
 
@@ -1463,11 +1481,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 setTabs(parsed);
                 localStorage.setItem('nova_session_tabs', diskTabs);
               }
-            } catch (_) {}
+            } catch (err) {
+              logger.warn('App:Storage', 'Failed to parse diskTabs from storage', err);
+            }
           }
         }
       } catch (err) {
-        console.warn('[Storage] Fallback restore from disk encountered an error:', err);
+        logger.warn('App:Storage', 'Fallback restore from disk encountered an error', err);
       }
     };
 
@@ -1477,11 +1497,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Cloud Sync Handler
   const handlePerformSync = useCallback(async () => {
     try {
-      let localPasswords: any[] = [];
+      let localPasswords: SavedPassword[] = [];
       try {
         const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
         if (rawP) localPasswords = JSON.parse(rawP);
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:Sync', 'Failed to retrieve or parse secure passwords for sync', err);
+      }
 
       const syncResult = await syncService.syncData({
         bookmarks,
@@ -1591,6 +1613,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const now = Date.now();
       const activeId = activeTabIdRef.current;
       const splitId = activeSplitTabIdRef.current;
+
+      // Pre-check on tabsRef before queueing a React state updater to avoid unnecessary re-evaluations
+      const hasIdleTabs = tabsRef.current.some(tab =>
+        tab.id !== activeId &&
+        (!splitId || tab.id !== splitId) &&
+        !tab.isPinned &&
+        !tab.isPlayingAudio &&
+        !tab.isSuspended &&
+        !tab.isLoading &&
+        now - (tab.lastAccessed || now) > timeoutMs
+      );
+      if (!hasIdleTabs) return;
+
       setTabs(prevTabs => {
         let changed = false;
         const updated = prevTabs.map(tab => {
@@ -2971,7 +3006,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else {
       const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
       if (iframe && iframe.contentWindow) {
-        try { iframe.contentWindow.history.back(); } catch(e) {}
+        try {
+          iframe.contentWindow.history.back();
+        } catch (err) {
+          logger.debug('App:Navigation', 'iframe history.back blocked or failed', err);
+        }
       }
     }
   }, [activeTabId]);
@@ -2983,7 +3022,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else {
       const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
       if (iframe && iframe.contentWindow) {
-        try { iframe.contentWindow.history.forward(); } catch(e) {}
+        try {
+          iframe.contentWindow.history.forward();
+        } catch (err) {
+          logger.debug('App:Navigation', 'iframe history.forward blocked or failed', err);
+        }
       }
     }
   }, [activeTabId]);
@@ -3001,40 +3044,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }
   }, [activeTabId]);
-
-  const handleClearHistory = useCallback((timeframe: string = 'all') => {
-    if (timeframe === 'all') {
-      setHistory([]);
-      try { localStorage.setItem('browsing_history', '[]'); } catch (e) {}
-      return;
-    }
-    
-    const now = Date.now();
-    let cutoff = now;
-    if (timeframe === 'hour') cutoff = now - 60 * 60 * 1000;
-    else if (timeframe === 'day') cutoff = now - 24 * 60 * 60 * 1000;
-    else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
-    else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
-
-    const isNewerThanCutoff = (item: HistoryItem) => {
-      const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
-      return !isNaN(itemTime) && itemTime >= cutoff;
-    };
-
-    setHistory(prev => {
-      const next = prev.filter(item => !isNewerThanCutoff(item));
-      try { localStorage.setItem('browsing_history', JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
-  }, [setHistory]);
-
-  const handleRemoveHistoryItem = useCallback((id: string) => {
-    setHistory(prev => {
-      const next = prev.filter(item => item.id !== id);
-      try { localStorage.setItem('browsing_history', JSON.stringify(next)); } catch (e) {}
-      return next;
-    });
-  }, [setHistory]);
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
 
@@ -3229,10 +3238,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (webview && webview.findInPage) {
       try {
         webview.findInPage(text, { forward, findNext: true, matchCase, wordStart: wholeWord });
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:FindInPage', 'Failed to findInPage in webview', err);
+      }
     } else {
       // Basic fallback for standard browser
-      try { (window as any).find(text, matchCase, !forward, true, wholeWord, false, false); } catch(e) {}
+      try {
+        (window as any).find(text, matchCase, !forward, true, wholeWord, false, false);
+      } catch (err) {
+        logger.debug('App:FindInPage', 'window.find fallback failed', err);
+      }
     }
   }, [activeTabId]);
 
@@ -3241,10 +3256,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (webview && webview.stopFindInPage) {
       try {
         webview.stopFindInPage('clearSelection');
-      } catch (e) {}
+      } catch (err) {
+        logger.warn('App:FindInPage', 'Failed to stopFindInPage in webview', err);
+      }
     } else {
       // Basic fallback for standard browser
-      try { window.getSelection()?.removeAllRanges(); } catch(e) {}
+      try {
+        window.getSelection()?.removeAllRanges();
+      } catch (err) {
+        logger.debug('App:FindInPage', 'Failed to clearSelection fallback', err);
+      }
     }
   }, [activeTabId]);
 

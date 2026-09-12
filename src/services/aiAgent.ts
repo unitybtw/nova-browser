@@ -792,7 +792,9 @@ class AIAgent {
     this.modelId = modelId;
     try {
       localStorage.setItem('nova_ai_model', modelId);
-    } catch {}
+    } catch (err) {
+      logger.warn('AIAgent:setModel', 'Failed to persist nova_ai_model to localStorage', err);
+    }
     await this.unload();
   }
 
@@ -814,7 +816,9 @@ class AIAgent {
           case 'blue': default: return '#3b82f6';
         }
       }
-    } catch(e) {}
+    } catch (err) {
+      logger.warn('AIAgent:getThemeColor', 'Failed to parse user_settings for theme color', err);
+    }
     return '#3b82f6';
   }
 
@@ -1216,13 +1220,17 @@ CRITICAL RULES:
       if (this.worker) {
         try {
           this.worker.terminate();
-        } catch {}
+        } catch (err) {
+          logger.warn('AIAgent:initEngine', 'Failed to terminate prior worker', err);
+        }
         this.worker = null;
       }
       if (this.engine) {
         try {
           await this.engine.unload?.();
-        } catch {}
+        } catch (err) {
+          logger.warn('AIAgent:initEngine', 'Failed to unload prior engine', err);
+        }
         this.engine = null;
       }
 
@@ -1234,7 +1242,9 @@ CRITICAL RULES:
         const storedModel = localStorage.getItem('nova_ai_model');
         this.modelId = this.resolveModelId(storedModel);
         localStorage.setItem('nova_ai_model', this.modelId);
-      } catch {}
+      } catch (err) {
+        logger.warn('AIAgent:initEngine', 'Failed to resolve or persist nova_ai_model', err);
+      }
 
       this.engine = await CreateWebWorkerMLCEngine(this.worker, this.modelId, {
         initProgressCallback,

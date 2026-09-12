@@ -386,7 +386,9 @@ class NovaSyncService {
             }
             return parsed;
           }
-        } catch {}
+        } catch (err) {
+          logger.warn('SyncService:readStoredUser', 'Failed to parse legacy user profile from localStorage', err);
+        }
       }
     }
     return null;
@@ -477,7 +479,9 @@ class NovaSyncService {
       try {
         const parsed = JSON.parse(secure);
         if (parsed && typeof parsed === 'object') return parsed;
-      } catch {}
+      } catch (err) {
+        logger.warn('SyncService:readUserRegistry', 'Failed to parse user registry from secure store', err);
+      }
     }
     // Session-scoped fallback (web builds without the OS secure store).
     const session = this.readSessionValue(STORAGE_KEYS.USER_REGISTRY);
@@ -485,7 +489,9 @@ class NovaSyncService {
       try {
         const parsed = JSON.parse(session);
         if (parsed && typeof parsed === 'object') return parsed;
-      } catch {}
+      } catch (err) {
+        logger.warn('SyncService:readUserRegistry', 'Failed to parse user registry from session store', err);
+      }
     }
     if (typeof localStorage !== 'undefined') {
       const legacy = localStorage.getItem(STORAGE_KEYS.USER_REGISTRY);
@@ -508,7 +514,9 @@ class NovaSyncService {
             }
             return parsed;
           }
-        } catch {}
+        } catch (err) {
+          logger.warn('SyncService:readUserRegistry', 'Failed to parse legacy user registry from localStorage', err);
+        }
       }
     }
     return {};

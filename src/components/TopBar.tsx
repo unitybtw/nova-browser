@@ -765,8 +765,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           }
         }
       } catch (err: any) {
-        if (err.name !== 'AbortError') {
-          // ignore network errors
+        if (err?.name !== 'AbortError') {
+          logger.debug('TopBar:suggestions', 'Non-fatal error while fetching search suggestions', err);
         }
       }
     };
@@ -1521,7 +1521,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       const urlToParse = currentUrl.includes('://') ? currentUrl : `http://${currentUrl}`;
       currentHostname = new URL(urlToParse).hostname;
     }
-  } catch(e) {}
+  } catch (err) {
+    logger.debug('TopBar:hostname', 'Failed to parse hostname from activeTab URL', err);
+  }
   const isWhitelisted = Array.isArray(adblockWhitelist) && Boolean(currentHostname) && adblockWhitelist.includes(currentHostname);
   
   const handleToggleWhitelist = async () => {

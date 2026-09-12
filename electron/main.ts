@@ -2292,17 +2292,9 @@ fi
         // Security: Block loopback, intranet, and link-local destinations to prevent SSRF and local service compromise
         const host = parsed.hostname.toLowerCase();
         const isPrivateOrLoopback = (() => {
-          if (
-            host === 'localhost' ||
-            host === '::1' ||
-            host === '[::1]' ||
-            host === '0.0.0.0' ||
-            host.endsWith('.local') ||
-            host.endsWith('.internal') ||
-            host.endsWith('.lan')
-          ) {
-            return true;
-          }
+          if (isLocalOrIntranetHost(host)) return true;
+          // Single-label hostnames (e.g. 'router', 'nas', 'intranet') resolve internally on LANs
+          if (!host.includes('.') || host.endsWith('.')) return true;
           if (/^0x[0-9a-f]+$/i.test(host) || /^\d+$/.test(host)) {
             return true;
           }
@@ -3332,8 +3324,10 @@ app.on('web-contents-created', (_event, wc) => {
       if (params.mediaType === 'video' || params.mediaType === 'audio') {
         const isVideo = params.mediaType === 'video';
         const flags = params.mediaFlags as any;
-        const mediaTarget = `(document.elementFromPoint(${params.x}, ${params.y})?.closest('video, audio') || document.querySelector('video:hover, audio:hover') || document.querySelector('video, audio'))`;
-        const videoTarget = `(document.elementFromPoint(${params.x}, ${params.y})?.closest('video') || document.querySelector('video:hover') || document.querySelector('video'))`;
+        const safeX = Number.isFinite(params.x) ? Math.round(params.x) : 0;
+        const safeY = Number.isFinite(params.y) ? Math.round(params.y) : 0;
+        const mediaTarget = `(document.elementFromPoint(${safeX}, ${safeY})?.closest('video, audio') || document.querySelector('video:hover, audio:hover') || document.querySelector('video, audio'))`;
+        const videoTarget = `(document.elementFromPoint(${safeX}, ${safeY})?.closest('video') || document.querySelector('video:hover') || document.querySelector('video'))`;
         if (flags) {
           if (flags.canPlay) {
             menu.append(new MenuItem({

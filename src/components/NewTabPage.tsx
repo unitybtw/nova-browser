@@ -9,6 +9,7 @@ import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils
 import { generateId } from '../utils/idGenerator';
 import { useTranslation, getLocale } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
+import { logger } from '../utils/logger';
 
 interface Todo {
   id: string;
@@ -215,7 +216,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             .filter(d => isSafeNavigationUrl(d.url));
         }
       }
-    } catch (e) {}
+    } catch (err) {
+      logger.warn('NewTabPage', 'Failed to parse nova_speed_dials from localStorage', err);
+    }
     return DEFAULT_SPEED_DIALS;
   });
 
@@ -231,7 +234,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
       }
-    } catch(e) {}
+    } catch (err) {
+      logger.warn('NewTabPage', 'Failed to parse nova_todos from localStorage', err);
+    }
     return [];
   });
   const [newTodo, setNewTodo] = useState('');
@@ -338,7 +343,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     if (isIncognito) return; // Incognito: never persist
     try {
       localStorage.setItem('nova_todos', JSON.stringify(todos));
-    } catch (e) {}
+    } catch (err) {
+      logger.warn('NewTabPage', 'Failed to persist nova_todos to localStorage', err);
+    }
   }, [todos]);
 
   const handleAddTodo = (e: React.FormEvent) => {
@@ -364,7 +371,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     if (isIncognito) return; // Incognito: never persist
     try {
       localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
-    } catch (e) {}
+    } catch (err) {
+      logger.warn('NewTabPage', 'Failed to persist nova_speed_dials to localStorage', err);
+    }
   }, [speedDials]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

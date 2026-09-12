@@ -83,5 +83,52 @@ export function useHistoryRecorder() {
     }
   }, []);
 
-  return { history, setHistory, recordVisit, flushHistory };
+  const clearHistory = useCallback((timeframe: string = 'all') => {
+    if (timeframe === 'all') {
+      setHistory([]);
+      try {
+        localStorage.setItem('browsing_history', '[]');
+      } catch (err) {
+        console.warn('[History] Clear all history failed:', err);
+      }
+      return;
+    }
+
+    const now = Date.now();
+    let cutoff = now;
+    if (timeframe === 'hour') cutoff = now - 60 * 60 * 1000;
+    else if (timeframe === 'day') cutoff = now - 24 * 60 * 60 * 1000;
+    else if (timeframe === 'week') cutoff = now - 7 * 24 * 60 * 60 * 1000;
+    else if (timeframe === 'month') cutoff = now - 28 * 24 * 60 * 60 * 1000;
+
+    const isNewerThanCutoff = (item: HistoryItem) => {
+      const itemTime = typeof item.timestamp === 'number' ? item.timestamp : Number(new Date(item.timestamp).getTime());
+      return !isNaN(itemTime) && itemTime >= cutoff;
+    };
+
+    setHistory(prev => {
+      const next = prev.filter(item => !isNewerThanCutoff(item));
+      try {
+        localStorage.setItem('browsing_history', JSON.stringify(next));
+      } catch (err) {
+        console.warn('[History] Clear timeframe history failed:', err);
+      }
+      return next;
+    });
+  }, []);
+
+  const removeHistoryItem = useCallback((id: string) => {
+    setHistory(prev => {
+      const next = prev.filter(item => item.id !== id);
+      try {
+        localStorage.setItem('browsing_history', JSON.stringify(next));
+      } catch (err) {
+        console.warn('[History] Remove history item failed:', err);
+      }
+      return next;
+    });
+  }, []);
+
+  return { history, setHistory, recordVisit, flushHistory, clearHistory, removeHistoryItem };
 }
+

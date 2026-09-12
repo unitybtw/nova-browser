@@ -58,9 +58,16 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
       } catch (err) {
         logger.warn('useWorkspaces', 'Failed to persist active_workspace_session to storage', err);
       }
+      try {
+        const serializedFolders = JSON.stringify(folders);
+        localStorage.setItem('folders_session', serializedFolders);
+        getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
+      } catch (err) {
+        logger.warn('useWorkspaces', 'Failed to persist folders to storage', err);
+      }
     }, 500);
     return () => clearTimeout(timer);
-  }, [workspaces, activeWorkspaceId]);
+  }, [workspaces, activeWorkspaceId, folders]);
 
   useEffect(() => {
     if (workspaces.length === 0) return;
