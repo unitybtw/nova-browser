@@ -96,6 +96,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.send('mcp-action-response', { id, result });
   },
   clearIncognitoSession: (tabId?: string) => ipcRenderer.invoke('clear-incognito-session', tabId),
+  // Security: Called by renderer when creating a new incognito tab so the main process can
+  // apply full permission/download/proxy hardening to the per-tab partition before content loads.
+  initIncognitoPartition: (tabId: string) => ipcRenderer.invoke('init-incognito-partition', tabId),
+  // Settings: reset all stored site permissions (remembered camera/mic/notifications grants)
+  resetRememberedPermissions: () => ipcRenderer.invoke('reset-remembered-permissions'),
+  getRememberedPermissionsCount: () => ipcRenderer.invoke('get-remembered-permissions-count'),
   clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),

@@ -172,6 +172,9 @@ export interface ElectronAPI {
   ) => () => void;
   respondMcpAction: (id: string, result: unknown) => void;
   clearIncognitoSession: (tabId?: string) => Promise<boolean>;
+  initIncognitoPartition: (tabId: string) => Promise<boolean>;
+  resetRememberedPermissions: () => Promise<boolean>;
+  getRememberedPermissionsCount: () => Promise<number>;
   clearAiModelsCache: () => Promise<boolean>;
   purgeSystemMemory: () => Promise<boolean>;
   secureStoreSet: (key: string, value: string) => Promise<boolean>;

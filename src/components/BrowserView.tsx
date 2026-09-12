@@ -182,6 +182,12 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     latestTabRef.current = tab;
   }, [tab]);
 
+  // Security: Harden per-tab incognito partition as soon as incognito tab mounts
+  useEffect(() => {
+    if (isIncognito && tab?.id) {
+      (window as any).electronAPI?.initIncognitoPartition?.(tab.id);
+    }
+  }, [isIncognito, tab?.id]);
 
   useEffect(() => {
     const webview = webviewRef.current;

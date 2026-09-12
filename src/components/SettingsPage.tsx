@@ -1108,6 +1108,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   } | null>(null);
   const [aiVramTimeout, setAiVramTimeout] = useState<number>(() => aiAgent.getAutoParkTimeoutMinutes());
   const [aiEngineLoaded, setAiEngineLoaded] = useState<boolean>(() => aiAgent.isEngineLoaded());
+  const [rememberedPermCount, setRememberedPermCount] = useState<number>(0);
+  const [resettingPerms, setResettingPerms] = useState(false);
+  const [resetPermsSuccess, setResetPermsSuccess] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'privacy' && window.electronAPI?.getRememberedPermissionsCount) {
+      window.electronAPI.getRememberedPermissionsCount().then((count: number) => {
+        setRememberedPermCount(count || 0);
+      }).catch(() => {});
+    }
+  }, [activeTab]);
+
+  const handleResetRememberedPermissions = async () => {
+    if (!window.electronAPI?.resetRememberedPermissions) return;
+    setResettingPerms(true);
+    try {
+      await window.electronAPI.resetRememberedPermissions();
+      setRememberedPermCount(0);
+      setResetPermsSuccess(true);
+      setTimeout(() => setResetPermsSuccess(false), 3000);
+    } catch (_) {}
+    setResettingPerms(false);
+  };
 
   useEffect(() => {
     if (window.electronAPI?.getAppVersion) {
@@ -2346,6 +2369,29 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 </div>
               </section>
 
+              <section>
+                <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Site Permissions</h2>
+                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Remembered Authorizations</div>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      Permissions granted to websites (camera, microphone, notifications, location) automatically expire after 30 days. You can revoke all remembered permissions immediately.
+                    </div>
+                    {rememberedPermCount > 0 && (
+                      <div className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+                        Active permissions remembered for <span className="font-semibold text-blue-500">{rememberedPermCount}</span> origin{rememberedPermCount > 1 ? 's' : ''}.
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleResetRememberedPermissions}
+                    disabled={resettingPerms}
+                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700/50 hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-700 dark:text-slate-200 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-500/30 rounded-xl text-xs font-semibold transition-colors shrink-0"
+                  >
+                    {resetPermsSuccess ? 'Permissions Cleared!' : resettingPerms ? 'Resetting...' : 'Reset All Permissions'}
+                  </button>
+                </div>
+              </section>
 
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Storage & Model Cache</h2>

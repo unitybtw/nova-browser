@@ -7,7 +7,23 @@ type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
 
 const activeDownloads = new Map<string, Electron.DownloadItem>();
+const MAX_KNOWN_DOWNLOAD_PATHS = 500;
 const knownDownloadPaths = new Set<string>();
+
+/**
+ * Inserts path into knownDownloadPaths using LRU eviction capped at MAX_KNOWN_DOWNLOAD_PATHS.
+ */
+function addKnownDownloadPath(targetPath: string): void {
+  if (knownDownloadPaths.has(targetPath)) {
+    // Re-insert to refresh LRU recency
+    knownDownloadPaths.delete(targetPath);
+  } else if (knownDownloadPaths.size >= MAX_KNOWN_DOWNLOAD_PATHS) {
+    const oldest = knownDownloadPaths.values().next().value;
+    if (oldest) knownDownloadPaths.delete(oldest);
+  }
+  knownDownloadPaths.add(targetPath);
+}
+
 // Tracks sessions that already have a 'will-download' handler so window recreation
 // doesn't stack duplicate listeners (which would duplicate download handling).
 const downloadsRegistered = new WeakSet<Electron.Session>();
@@ -23,9 +39,9 @@ let isTrustedSender: TrustedSenderCheck = () => false;
  */
 export function registerKnownDownloadPath(filePath: string): void {
   try {
-    knownDownloadPaths.add(fs.realpathSync(path.resolve(filePath)));
+    addKnownDownloadPath(fs.realpathSync(path.resolve(filePath)));
   } catch {
-    knownDownloadPaths.add(path.resolve(filePath));
+    addKnownDownloadPath(path.resolve(filePath));
   }
 }
 
@@ -145,9 +161,9 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       const finalPath = item.getSavePath();
       if (finalPath) {
         try {
-          knownDownloadPaths.add(fs.realpathSync(path.resolve(finalPath)));
+          addKnownDownloadPath(fs.realpathSync(path.resolve(finalPath)));
         } catch {
-          knownDownloadPaths.add(path.resolve(finalPath));
+          addKnownDownloadPath(path.resolve(finalPath));
         }
       }
     };

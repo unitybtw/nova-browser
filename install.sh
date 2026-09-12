@@ -31,6 +31,11 @@ fetch_checksums_url() {
     exit 1
   }
   CHECKSUMS_URL=$(echo "$api_response" | grep -o '"browser_download_url": *"[^"]*SHA256SUMS\.txt"' | grep -o 'https://[^"]*' | head -1)
+  if [ -z "$CHECKSUMS_URL" ]; then
+    echo "Error: Could not find SHA256SUMS.txt in latest release assets." >&2
+    echo "       Installation aborted: checksum manifest is required for verified installs." >&2
+    exit 1
+  fi
 }
 
 # Verify the SHA-256 checksum of a downloaded file
@@ -48,9 +53,9 @@ verify_sha256() {
   elif command -v shasum >/dev/null 2>&1; then
     actual_hash=$(shasum -a 256 "$file" | awk '{print $1}')
   else
-    echo "Warning: Neither sha256sum nor shasum is available. Skipping checksum verification." >&2
-    echo "  Install coreutils (macOS: brew install coreutils) for verified installs." >&2
-    return 0
+    echo "Error: Neither sha256sum nor shasum is available. Cannot verify checksum." >&2
+    echo "  Please install coreutils (macOS: brew install coreutils) or ensure shasum is in PATH." >&2
+    exit 1
   fi
 
   if [ "$actual_hash" != "$expected_hash" ]; then
@@ -85,25 +90,24 @@ if [ "$OS" = "Darwin" ]; then
   fetch_checksums_url
 
   echo "Downloading SHA-256 checksum manifest..."
-  if [ -n "$CHECKSUMS_URL" ]; then
-    curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_LOCAL"
-  else
-    echo "Warning: Could not find SHA256SUMS.txt in latest release assets." >&2
-    echo "         Proceeding without checksum verification." >&2
-    CHECKSUMS_LOCAL=""
+  if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_LOCAL"; then
+    echo "Error: Failed to download SHA256SUMS.txt from $CHECKSUMS_URL" >&2
+    exit 1
+  fi
+  if [ ! -s "$CHECKSUMS_LOCAL" ]; then
+    echo "Error: Checksum manifest at $CHECKSUMS_LOCAL is empty." >&2
+    exit 1
   fi
 
   echo "Downloading Nova Browser for macOS (${ARCH})..."
   curl -fsSL --progress-bar "$DOWNLOAD_URL" -o "$DEST"
 
-  if [ -n "$CHECKSUMS_LOCAL" ] && [ -f "$CHECKSUMS_LOCAL" ]; then
-    EXPECTED=$(grep -F "$DMG_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
-    if [ -n "$EXPECTED" ]; then
-      verify_sha256 "$DEST" "$EXPECTED"
-    else
-      echo "Warning: $DMG_NAME not found in SHA256SUMS.txt — skipping verification." >&2
-    fi
+  EXPECTED=$(grep -F "$DMG_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
+  if [ -z "$EXPECTED" ]; then
+    echo "Error: $DMG_NAME not found in SHA256SUMS.txt — aborting unverified install." >&2
+    exit 1
   fi
+  verify_sha256 "$DEST" "$EXPECTED"
 
   echo "Mounting disk image..."
   MOUNT_DIR="${TMP_DIR}/mount"
@@ -145,11 +149,13 @@ if [ "$OS" = "Linux" ]; then
   fetch_checksums_url
 
   echo "Downloading SHA-256 checksum manifest..."
-  if [ -n "$CHECKSUMS_URL" ]; then
-    curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_LOCAL"
-  else
-    echo "Warning: Could not find SHA256SUMS.txt in latest release assets." >&2
-    CHECKSUMS_LOCAL=""
+  if ! curl -fsSL "$CHECKSUMS_URL" -o "$CHECKSUMS_LOCAL"; then
+    echo "Error: Failed to download SHA256SUMS.txt from $CHECKSUMS_URL" >&2
+    exit 1
+  fi
+  if [ ! -s "$CHECKSUMS_LOCAL" ]; then
+    echo "Error: Checksum manifest at $CHECKSUMS_LOCAL is empty." >&2
+    exit 1
   fi
 
   echo "Downloading Nova Browser for Linux (${TARGET_ARCH})..."
@@ -162,14 +168,12 @@ if [ "$OS" = "Linux" ]; then
     exit 1
   fi
 
-  if [ -n "$CHECKSUMS_LOCAL" ] && [ -f "$CHECKSUMS_LOCAL" ]; then
-    EXPECTED=$(grep -F "$APPIMAGE_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
-    if [ -n "$EXPECTED" ]; then
-      verify_sha256 "$DEST_TMP" "$EXPECTED"
-    else
-      echo "Warning: $APPIMAGE_NAME not found in SHA256SUMS.txt — skipping verification." >&2
-    fi
+  EXPECTED=$(grep -F "$APPIMAGE_NAME" "$CHECKSUMS_LOCAL" | awk '{print $1}' | head -1)
+  if [ -z "$EXPECTED" ]; then
+    echo "Error: $APPIMAGE_NAME not found in SHA256SUMS.txt — aborting unverified install." >&2
+    exit 1
   fi
+  verify_sha256 "$DEST_TMP" "$EXPECTED"
 
   # Atomic replacement: only move to final path after checksum passes
   mv "$DEST_TMP" "$DEST"

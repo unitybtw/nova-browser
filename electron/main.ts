@@ -226,6 +226,8 @@ if (!app.isPackaged) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
+let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
 
 // Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
 function sendToMainWindow(channel: string, payload?: unknown) {
@@ -449,6 +451,15 @@ function createWindow() {
     console.warn('Blocked main window navigation to non-app path:', url);
   });
 
+  // Security: Block redirects to non-app paths on the main UI window
+  mainWindow.webContents.on('will-redirect', (event, url) => {
+    if (isTrustedAppOrigin(url)) {
+      return;
+    }
+    event.preventDefault();
+    console.warn('Blocked main window redirect to non-app path:', url);
+  });
+
   // Webviews do not receive a global preload. The narrowly-scoped Web Store
   // preload is assigned during attachment after the destination is validated.
 
@@ -462,7 +473,7 @@ function createWindow() {
   }
 
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
-  function applyPrivacyHeadersToSession(targetSession: Electron.Session) {
+  applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
     try {
       targetSession.setUserAgent(getStandardUserAgent());
     } catch (_) {}
@@ -1209,10 +1220,22 @@ app.whenReady().then(async () => {
 
   const MAX_PENDING_PERMISSIONS = 20;
   const pendingPermissions = new Map<string, PendingPermission>();
-  // Origin -> (Permission -> Boolean)
-  const rememberedPermissions = new Map<string, Map<string, boolean>>();
+  // Origin -> (Permission -> { allow, ts }) — TTL: 30 days
+  const PERMISSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+  const rememberedPermissions = new Map<string, Map<string, { allow: boolean; ts: number }>>();
   // Origin -> Rate limit record (max 5 requests per 10s)
   const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+
+  /** Purge all remembered permission entries older than PERMISSION_TTL_MS. */
+  function purgeExpiredRememberedPermissions(): void {
+    const cutoff = Date.now() - PERMISSION_TTL_MS;
+    for (const [origin, perms] of rememberedPermissions) {
+      for (const [perm, entry] of perms) {
+        if (entry.ts < cutoff) perms.delete(perm);
+      }
+      if (perms.size === 0) rememberedPermissions.delete(origin);
+    }
+  }
 
   ipcMain.handle('permission-response', async (_event, payload: unknown) => {
     // Security: only the trusted main window may resolve permission requests
@@ -1228,6 +1251,8 @@ app.whenReady().then(async () => {
       clearTimeout(pending.timeoutId);
       pendingPermissions.delete(requestId);
       if (remember && pending.origin) {
+        // Purge stale entries periodically (piggyback on writes for efficiency)
+        purgeExpiredRememberedPermissions();
         if (!rememberedPermissions.has(pending.origin)) {
           // Cap remembered origins to 200 to prevent unbounded memory growth in long sessions
           if (rememberedPermissions.size >= 200) {
@@ -1236,7 +1261,7 @@ app.whenReady().then(async () => {
           }
           rememberedPermissions.set(pending.origin, new Map());
         }
-        rememberedPermissions.get(pending.origin)!.set(pending.permission, allow);
+        rememberedPermissions.get(pending.origin)!.set(pending.permission, { allow, ts: Date.now() });
       }
       try {
         pending.callback(allow);
@@ -1248,7 +1273,7 @@ app.whenReady().then(async () => {
     return { success: false, error: 'Request not found or timed out' };
   });
 
-  const applyStrictSecurityToSession = (targetSession: Electron.Session) => {
+  applyStrictSecurityToSession = (targetSession: Electron.Session) => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
       
@@ -1299,11 +1324,17 @@ app.whenReady().then(async () => {
         }
       }
 
-      // Check remembered permissions for this origin
+      // Check remembered permissions for this origin (skip expired entries)
       if (origin && rememberedPermissions.has(origin)) {
         const originPerms = rememberedPermissions.get(origin)!;
         if (originPerms.has(permission)) {
-          return callback(originPerms.get(permission)!);
+          const entry = originPerms.get(permission)!;
+          if (Date.now() - entry.ts < PERMISSION_TTL_MS) {
+            return callback(entry.allow);
+          }
+          // Expired — remove and fall through to prompt user again
+          originPerms.delete(permission);
+          if (originPerms.size === 0) rememberedPermissions.delete(origin);
         }
       }
       
@@ -1374,17 +1405,35 @@ app.whenReady().then(async () => {
         return false;
       }
 
-      // For external websites, check if permission was previously remembered
+      // For external websites, check if permission was previously remembered (TTL enforced)
       if (requestingOrigin && rememberedPermissions.has(requestingOrigin)) {
         const originPerms = rememberedPermissions.get(requestingOrigin)!;
         if (originPerms.has(permission)) {
-          return originPerms.get(permission)!;
+          const entry = originPerms.get(permission)!;
+          if (Date.now() - entry.ts < PERMISSION_TTL_MS) return entry.allow;
+          // Expired — prune silently
+          originPerms.delete(permission);
+          if (originPerms.size === 0) rememberedPermissions.delete(requestingOrigin);
         }
       }
 
       return false;
     });
   };
+
+  // IPC: reset all remembered site permissions (used from Settings → Privacy)
+  ipcMain.handle('reset-remembered-permissions', (event) => {
+    if (!isTrustedSender(event)) return false;
+    rememberedPermissions.clear();
+    return true;
+  });
+
+  // IPC: get remembered permission origins count (used by Settings to show badge)
+  ipcMain.handle('get-remembered-permissions-count', (event) => {
+    if (!isTrustedSender(event)) return 0;
+    purgeExpiredRememberedPermissions();
+    return rememberedPermissions.size;
+  });
 
   applyStrictSecurityToSession(session.defaultSession);
   applyStrictSecurityToSession(session.fromPartition('incognito'));
@@ -2359,8 +2408,12 @@ fi
         const isOfficialNovaRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
           (pathname.startsWith('/unitybtw/nova-browser/releases') || pathname.includes('/unitybtw/nova-browser/releases/'));
 
-        if (!isOfficialNovaRelease && /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)$/i.test(pathname)) {
-          console.warn(`[Security] Blocked open-external for dangerous file extension: ${pathname}`);
+        const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
+        const queryHasDangerousExt = Array.from(parsed.searchParams.values()).some(val => DANGEROUS_EXT_REGEX.test(val.toLowerCase())) ||
+          Array.from(parsed.searchParams.keys()).some(key => DANGEROUS_EXT_REGEX.test(key.toLowerCase()));
+
+        if (!isOfficialNovaRelease && (DANGEROUS_EXT_REGEX.test(pathname) || queryHasDangerousExt)) {
+          console.warn(`[Security] Blocked open-external for dangerous file extension: ${parsed.href}`);
           return false;
         }
         await shell.openExternal(parsed.href);
@@ -3586,6 +3639,38 @@ ipcMain.handle('get-mcp-status', (event) => {
   };
 });
 
+// Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
+const hardenedIncognitoPartitions = new Set<string>();
+
+// Security: Init and harden a new per-tab incognito partition. Called by the renderer
+// immediately after creating a new incognito tab, before any navigation occurs.
+// Applies the same permission/download/proxy restrictions as defaultSession.
+ipcMain.handle('init-incognito-partition', async (event, tabId: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  if (typeof tabId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(tabId) || tabId.length > 64) return false;
+  const partitionName = `incognito-${tabId}`;
+  if (hardenedIncognitoPartitions.has(partitionName)) return true; // Already hardened
+  try {
+    const partSess = session.fromPartition(partitionName, { cache: false });
+    // Apply full security hardening (same as defaultSession)
+    applyStrictSecurityToSession(partSess);
+    // Apply privacy headers (DNT, GPC, user-agent)
+    applyPrivacyHeadersToSession(partSess);
+    // Register download handler for this partition
+    registerDownloadsManager(partSess);
+    // Apply ad blocker if enabled
+    if (isPrivacyShieldEnabled && blocker) {
+      try { blocker.enableBlockingInSession(partSess); } catch (e) { console.error(`[Security] Failed to enable ad blocking for partition ${partitionName}:`, e); }
+    }
+    hardenedIncognitoPartitions.add(partitionName);
+    console.log(`[Security] Hardened incognito partition: ${partitionName}`);
+    return true;
+  } catch (err) {
+    console.error(`[Security] Failed to harden incognito partition ${partitionName}:`, err);
+    return false;
+  }
+});
+
 // Clear incognito mode session — accepts optional tabId for per-tab partition isolation.
 // When tabId is provided, clears only that tab's in-memory partition (incognito-{tabId}).
 // When omitted, clears the legacy shared 'incognito' partition (backward compat).
@@ -3597,6 +3682,8 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       const sess = session.fromPartition(partitionName);
       await sess.clearStorageData();
       await sess.clearCache();
+      // Remove from hardened set so the next open of this tabId gets fresh hardening
+      hardenedIncognitoPartitions.delete(partitionName);
     } else {
       // Fallback: clear the legacy shared 'incognito' partition.
       const legacySess = session.fromPartition('incognito');
