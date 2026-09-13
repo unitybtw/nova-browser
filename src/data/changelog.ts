@@ -14,10 +14,55 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.4.7',
+    date: 'September 2026',
+    title: 'Split View Overhaul, Tab Engine Ergonomics & Customization',
+    badge: 'Latest Release',
+    highlights: [
+      'Redesigned split view with non-intrusive native header bars and zero website obstruction.',
+      'Unified persistent views container eliminating tab switch and split view reload churn.',
+      'Configurable full browser UI color customization and dynamic chrome frame theming.',
+      'Beta badges on Vertical Tabs, Browser Color, and Extensions with privacy-first default MCP settings.'
+    ],
+    changes: [
+      {
+        category: 'feature',
+        text: 'Integrated native 32px Split Pane Header Bar positioned above webviews with Left/Right badges, favicon, host information, and quick controls.'
+      },
+      {
+        category: 'fix',
+        text: 'Eliminated intrusive floating split-view badge overlay that covered website headers and interactive buttons.'
+      },
+      {
+        category: 'fix',
+        text: 'Resolved tab-switching reload churn by preserving webview DOM persistence with invisible visibility state.'
+      },
+      {
+        category: 'fix',
+        text: 'Restored direct webview initial URL binding ensuring websites load immediately without double navigation.'
+      },
+      {
+        category: 'feature',
+        text: 'Added Beta badge indicators to Vertical Tabs, Browser Color (Full UI Theme), and Extensions sections.'
+      },
+      {
+        category: 'security',
+        text: 'Defaulted MCP server to disabled out-of-the-box for enhanced privacy and user sovereignty.'
+      },
+      {
+        category: 'improvement',
+        text: 'Smoothed tab close and reorder transitions across all Chromium tab animation presets.'
+      },
+      {
+        category: 'fix',
+        text: 'Prevented invalid split screen drag overlays when dragging already merged tabs.'
+      }
+    ]
+  },
+  {
     version: '1.4.6',
     date: 'September 2026',
     title: 'Updater Bloat Prevention, Security Hardening & Integrity',
-    badge: 'Latest Release',
     highlights: [
       'Automatic cleanup of leftover installer packages, temporary downloads, and stale update directories.',
       'PBKDF2 key derivation upgraded to 600,000 rounds for sync and credential encryption.',

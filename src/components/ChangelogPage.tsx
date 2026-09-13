@@ -24,12 +24,12 @@ interface ChangelogPageProps {
 type CategoryFilter = 'all' | 'feature' | 'fix' | 'security' | 'performance';
 
 export const ChangelogPage: React.FC<ChangelogPageProps> = ({
-  currentVersion = '1.4.6',
+  currentVersion = '1.4.7',
   onNavigate
 }) => {
   const [releases, setReleases] = useState<ReleaseVersion[]>(CHANGELOG_DATA);
   const [selectedVersion, setSelectedVersion] = useState<string>(() => {
-    return CHANGELOG_DATA[0]?.version || '1.4.6';
+    return CHANGELOG_DATA[0]?.version || '1.4.7';
   });
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');

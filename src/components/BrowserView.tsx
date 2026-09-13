@@ -921,7 +921,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       >
         <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
           <ChangelogPage
-            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.6'}
+            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.7'}
             onNavigate={(url) => {
               if (onNavigate) {
                 onNavigate(url, tab.id);
