@@ -22,10 +22,18 @@ function dropToSplitScreen(
   side: 'left' | 'right' = 'right',
   activeWorkspaceId = 'default'
 ): { updatedTabs: Tab[]; newActiveTabId: string; primaryId: string; secondaryId: string } {
+  if (!droppedTabId) return { updatedTabs: currentTabs, newActiveTabId: activeTabId, primaryId: activeTabId, secondaryId: '' };
+
+  const alreadySplit = currentTabs.find(t => t.id === droppedTabId && t.splitWith);
+  if (alreadySplit) return { updatedTabs: currentTabs, newActiveTabId: activeTabId, primaryId: activeTabId, secondaryId: '' };
+
   let targetTabId = droppedTabId;
   let partnerTabId = activeTabId;
 
   if (droppedTabId === activeTabId) {
+    const currentActive = currentTabs.find(t => t.id === activeTabId);
+    if (currentActive?.splitWith) return { updatedTabs: currentTabs, newActiveTabId: activeTabId, primaryId: activeTabId, secondaryId: '' };
+
     const workspaceTabs = currentTabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
     const candidate = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
     if (!candidate) return { updatedTabs: currentTabs, newActiveTabId: activeTabId, primaryId: activeTabId, secondaryId: '' };
@@ -115,6 +123,19 @@ function dropToSplitScreen(
   const sorted2 = [...tabsAfterReorder].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
   assert.deepEqual(sorted2.map(t => t.id), ['1', '10', '20'], 'sortedTabs preserves identical DOM positions regardless of active/split state');
   console.log('[PASS] [SplitView-4] sortedTabs numeric sort stability guarantees zero DOM unmounts.');
+}
+
+// Test 5: Dragging an already split tab is ignored (zero re-split, zero indicator)
+{
+  const splitTabs = [makeTab('tab-1', 'default', 'tab-2'), makeTab('tab-2', 'default', 'tab-1'), makeTab('tab-3')];
+  // Attempt to drop tab-1 (which is already split with tab-2)
+  const result1 = dropToSplitScreen(splitTabs, 'tab-1', 'tab-1', 'right');
+  assert.deepEqual(result1.updatedTabs, splitTabs, 'Dropping already split active tab does nothing');
+
+  // Attempt to drop tab-2 (which is already split with tab-1)
+  const result2 = dropToSplitScreen(splitTabs, 'tab-1', 'tab-2', 'right');
+  assert.deepEqual(result2.updatedTabs, splitTabs, 'Dropping already split partner tab does nothing');
+  console.log('[PASS] [SplitView-5] Already split tabs are rejected from re-splitting or triggering overlays.');
 }
 
 console.log('ALL Split View & Webview Persistence tests passed with 100% success.\n');

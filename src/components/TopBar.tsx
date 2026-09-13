@@ -286,6 +286,10 @@ const MemoizedTabItem = React.memo(({
       key={tab.id}
       value={tab}
       layout="position"
+      drag={splitTab ? "x" : true}
+      dragDirectionLock={!!splitTab}
+      dragConstraints={splitTab ? { top: 0, bottom: 0 } : undefined}
+      dragElastic={splitTab ? 0 : 0.2}
       initial={wasJustUnsplit ? false : animationConfig.initial}
       animate={animationConfig.animate}
       exit={animationConfig.exit}
@@ -293,9 +297,12 @@ const MemoizedTabItem = React.memo(({
       whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
       onDragStart={() => {
         onTabLeave?.();
-        onTabDragStart?.();
+        if (!splitTab) {
+          onTabDragStart?.();
+        }
       }}
       onDrag={(e, info) => {
+        if (splitTab) return;
         onTabDrag?.(info.point.y, info.point.x);
         // Only show ghost indicator if dragged completely clear of the TopBar header (> 110px)
         if (info.point.y > 110) {
@@ -305,9 +312,11 @@ const MemoizedTabItem = React.memo(({
         }
       }}
       onDragEnd={(e, info) => {
-        onTabDragEnd?.();
+        if (!splitTab) {
+          onTabDragEnd?.();
+        }
         setGhostTab(null);
-        if (info.point.y > 110) {
+        if (info.point.y > 110 && !splitTab) {
           const side = info.point.x < window.innerWidth / 2 ? 'left' : 'right';
           onDropToSplitScreen?.(tab.id, side);
         }

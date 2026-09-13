@@ -3259,10 +3259,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const handleDropToSplitScreen = useCallback((droppedTabId: string, side: 'left' | 'right' = 'right') => {
     if (!droppedTabId) return;
 
+    // Disallow splitting if the dropped tab is already in split view
+    const alreadySplit = tabs.find(t => t.id === droppedTabId && t.splitWith);
+    if (alreadySplit) return;
+
     let targetTabId = droppedTabId;
     let partnerTabId = activeTabId;
 
     if (droppedTabId === activeTabId) {
+      const currentActive = tabs.find(t => t.id === activeTabId);
+      if (currentActive?.splitWith) return;
+
       const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
       const candidate = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
       if (!candidate) return;
@@ -3968,7 +3975,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           setIsDragOverMain(false);
           const tabId = e.dataTransfer.getData('text/plain');
           const draggedTab = tabs.find(t => t.id === tabId);
-          if (draggedTab && tabId !== activeTabId) {
+          if (draggedTab && tabId !== activeTabId && !draggedTab.splitWith) {
             const rect = e.currentTarget.getBoundingClientRect();
             const isLeft = (e.clientX - rect.left) < rect.width / 2;
             handleDropToSplitScreen(tabId, isLeft ? 'left' : 'right');
