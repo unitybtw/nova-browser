@@ -1451,11 +1451,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'passwords', label: 'Passwords', icon: Key },
-    { id: 'extensions', label: 'Extensions', icon: Puzzle },
+    { id: 'extensions', label: 'Extensions', icon: Puzzle, badge: 'Beta' },
     { id: 'advanced', label: 'Advanced', icon: Bot },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
-  ] as const;
+  ];
 
   return (
     <div 
@@ -1481,15 +1481,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
                   isActive 
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' 
                     : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800/50'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {tab.label}
+                <div className="flex items-center gap-3">
+                  <Icon className="w-4 h-4" />
+                  <span>{tab.label}</span>
+                </div>
+                {'badge' in tab && tab.badge && (
+                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-md">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -2110,7 +2117,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <section>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
+                        Beta
+                      </span>
+                    </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize the entire browser chrome, frame, navigation bar, and tab surfaces</p>
                   </div>
                 </div>
@@ -3060,7 +3072,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <Puzzle className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
+                          Beta
+                        </span>
+                      </div>
                       <p className="text-sm text-slate-500 dark:text-slate-400">Manage and configure your browser extensions.</p>
                     </div>
                   </div>

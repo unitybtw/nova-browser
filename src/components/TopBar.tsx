@@ -2073,7 +2073,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <button 
             onClick={onOpenExtensions}
             className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
-            title="Extensions"
+            title="Extensions (Beta)"
           >
             <Puzzle className="w-4 h-4" />
           </button>
