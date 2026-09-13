@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X } from 'lucide-react';
+import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
 // Downloads / history / permission domains were extracted into hooks under
@@ -4047,6 +4047,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   bottom: 0,
                   left: 0,
                   width: `${splitRatio}%`,
+                  ...(!tab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}),
                 };
               } else if (isSecondary) {
                 tabStyle = {
@@ -4080,83 +4081,137 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   }
                 }}
               >
-                {/* Secondary Split Tab Header / Controls */}
-                {isSecondary && (
-                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
-                    <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
-                      {tab.title || tab.url}
-                    </span>
+                {/* Split Pane Header Bar (Positioned ABOVE webview so 0% of web content is obstructed) */}
+                {Boolean(secondarySplitTab) && (isPrimary || isSecondary) && (
+                  <div
+                    onClick={() => {
+                      if (activeTabId !== tab.id) setActiveTabId(tab.id);
+                    }}
+                    className={`h-8 min-h-[32px] px-3 flex items-center justify-between border-b select-none transition-all shrink-0 z-20 cursor-pointer ${
+                      activeTabId === tab.id
+                        ? 'bg-slate-100/95 dark:bg-slate-800/95 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-100 shadow-xs'
+                        : 'bg-slate-50/80 dark:bg-slate-900/80 border-slate-200/70 dark:border-slate-800/70 text-slate-500 dark:text-slate-400 hover:bg-slate-100/60 dark:hover:bg-slate-800/60'
+                    }`}
+                  >
+                    {/* Left side: Pane Indicator + Favicon + Page Title + Hostname */}
+                    <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                      <span className={`px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded transition-colors shrink-0 ${
+                        activeTabId === tab.id
+                          ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/25'
+                          : 'bg-slate-200/60 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-transparent'
+                      }`}>
+                        {isPrimary ? 'Left' : 'Right'}
+                      </span>
 
-                    {/* Swap Left/Right */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (primarySplitTab && secondarySplitTab) {
-                          handleReorderTabs(primarySplitTab.id, secondarySplitTab.id);
-                        }
-                      }}
-                      className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                      title="Swap Left & Right"
-                    >
-                      <ArrowLeftRight className="w-3.5 h-3.5" />
-                    </button>
+                      {tab.favicon ? (
+                        <img 
+                          src={tab.favicon} 
+                          alt="" 
+                          className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" 
+                          onError={(e) => { (e.target as any).style.display = 'none'; }}
+                        />
+                      ) : (
+                        <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      )}
 
-                    {/* Unsplit / Separate Tabs */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (primarySplitTab && secondarySplitTab) {
-                          handleCloseSplitView(primarySplitTab.id, secondarySplitTab.id);
-                        } else {
-                          handleCloseSplitView();
-                        }
-                      }}
-                      className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                      title="Separate Tabs"
-                    >
-                      <Columns2 className="w-3.5 h-3.5" />
-                    </button>
+                      <span className="text-xs font-medium truncate max-w-[180px] sm:max-w-[240px]">
+                        {tab.title || tab.url || 'New Tab'}
+                      </span>
 
-                    {/* Close Tab */}
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleCloseTab(tab.id);
-                      }}
-                      className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
-                      title="Close Tab"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
+                      {/* Clean domain info */}
+                      {(() => {
+                        try {
+                          if (tab.url && !tab.url.startsWith('nova://') && !tab.url.startsWith('about:')) {
+                            const domain = new URL(tab.url).hostname.replace(/^www\./, '');
+                            if (domain && domain !== tab.title) {
+                              return (
+                                <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate hidden md:inline max-w-[120px]">
+                                  • {domain}
+                                </span>
+                              );
+                            }
+                          }
+                        } catch {}
+                        return null;
+                      })()}
+                    </div>
+
+                    {/* Right side: Split Controls */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Swap Left/Right */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (primarySplitTab && secondarySplitTab) {
+                            handleReorderTabs(primarySplitTab.id, secondarySplitTab.id);
+                          }
+                        }}
+                        className="p-1 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        title={isPrimary ? "Swap with Right Pane" : "Swap with Left Pane"}
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Exit Split View / Separate Tabs */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (primarySplitTab && secondarySplitTab) {
+                            handleCloseSplitView(primarySplitTab.id, secondarySplitTab.id);
+                          } else {
+                            handleCloseSplitView();
+                          }
+                        }}
+                        className="p-1 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 rounded text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                        title="Exit Split View"
+                      >
+                        <Columns2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Close Tab */}
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCloseTab(tab.id);
+                        }}
+                        className="p-1 hover:bg-red-500/15 rounded text-slate-400 hover:text-red-500 dark:hover:text-red-400 transition-colors cursor-pointer"
+                        title="Close Tab"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                <BrowserView 
-                  tab={tab} 
-                  onNavigate={(url, tabId) => handleNavigate(url, tabId || tab.id)}
-                  onUpdateTab={handleUpdateTab}
-                  onNewTab={(url, srcId) => handleNewTab(url, srcId || tab.id)}
-                  onActivate={handleSelectTab}
-                  onFoundInPage={handleFoundInPage}
-                  searchEngine={settings.searchEngine}
-                  privacyShield={settings.privacyShield}
-                  newTabBackground={settings.newTabBackground}
-                  disableTasksWidget={demoParams.feature === 'website'}
-                  settings={browserViewSettings}
-                  onUpdateSettings={handleUpdateSettings}
-                  onExportData={handleExportData}
-                  onImportData={handleImportData}
-                  isActive={tab.id === activeTabId || tab.id === splitTabId}
-                  onCloseTab={handleCloseTab}
-                  isIncognito={tab.isIncognito || false}
-                  history={typeof tab?.url === 'string' && tab.url.includes('nova://history') ? history : EMPTY_ARRAY}
-                  downloads={typeof tab?.url === 'string' && tab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
-                  onClearHistory={handleClearHistory}
-                  onRemoveHistoryItem={handleRemoveHistoryItem}
-                  onClearDownloads={handleClearDownloads}
-                  onPurgeMemory={handlePurgeMemory}
-                  isDemo={demoParams.isDemo}
-                />
+                {/* Webview Container: Flex-1 ensures webview occupies 100% of remaining height beneath header */}
+                <div className="flex-1 min-h-0 w-full relative">
+                  <BrowserView 
+                    tab={tab} 
+                    onNavigate={(url, tabId) => handleNavigate(url, tabId || tab.id)}
+                    onUpdateTab={handleUpdateTab}
+                    onNewTab={(url, srcId) => handleNewTab(url, srcId || tab.id)}
+                    onActivate={handleSelectTab}
+                    onFoundInPage={handleFoundInPage}
+                    searchEngine={settings.searchEngine}
+                    privacyShield={settings.privacyShield}
+                    newTabBackground={settings.newTabBackground}
+                    disableTasksWidget={demoParams.feature === 'website'}
+                    settings={browserViewSettings}
+                    onUpdateSettings={handleUpdateSettings}
+                    onExportData={handleExportData}
+                    onImportData={handleImportData}
+                    isActive={tab.id === activeTabId || tab.id === splitTabId}
+                    onCloseTab={handleCloseTab}
+                    isIncognito={tab.isIncognito || false}
+                    history={typeof tab?.url === 'string' && tab.url.includes('nova://history') ? history : EMPTY_ARRAY}
+                    downloads={typeof tab?.url === 'string' && tab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
+                    onClearHistory={handleClearHistory}
+                    onRemoveHistoryItem={handleRemoveHistoryItem}
+                    onClearDownloads={handleClearDownloads}
+                    onPurgeMemory={handlePurgeMemory}
+                    isDemo={demoParams.isDemo}
+                  />
+                </div>
               </div>
             );
           })}

@@ -2306,7 +2306,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   
                   <div className="p-5 flex items-center justify-between">
                     <div>
-                      <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Vertical Tabs</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Vertical Tabs</span>
+                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
+                          Beta
+                        </span>
+                      </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Display tabs on the left sidebar instead of the top</div>
                     </div>
                     <button
