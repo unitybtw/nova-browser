@@ -665,26 +665,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
-      {/* Default Clean Subtle Glow */}
-      {newTabBackground === 'default' && (
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {isDarkTheme ? (
-            <div 
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(ellipse 80% 80% at 50% 40%, color-mix(in srgb, var(--nova-accent, #3b82f6) 18%, transparent), transparent 75%)'
-              }}
-            />
-          ) : (
-            <div 
-              className="absolute inset-0"
-              style={{
-                background: 'radial-gradient(ellipse 80% 80% at 50% 30%, color-mix(in srgb, var(--nova-accent, #3b82f6) 15%, transparent), transparent 70%)'
-              }}
-            />
-          )}
-        </div>
-      )}
+      {/* Default Clean Minimalist Background (Pure, pristine canvas with zero distractions) */}
+      {newTabBackground === 'default' && null}
 
       {/* Vibrant Gradient Background.
           PERF: the drift animation must run on the COMPOSITOR (transform) —

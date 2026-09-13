@@ -266,6 +266,7 @@ const DailyWallpaperSection = () => {
 };
 
 const BACKGROUND_OPTIONS = [
+  { id: 'default', name: 'Clean Minimalist', badge: 'Default' },
   { id: 'aurora_waves', name: 'Aurora Waves', badge: '3D Wave' },
   { id: 'cyber_grid', name: 'Cyber Grid 3D', badge: '3D Neon' },
   { id: 'hyper_space', name: 'Hyper Space Stars', badge: 'Particles' },
@@ -275,7 +276,6 @@ const BACKGROUND_OPTIONS = [
   { id: 'gradient', name: 'Dynamic Gradient', badge: 'Fluid' },
   { id: 'mesh', name: 'Mesh Aurora', badge: 'Mesh Glow' },
   { id: 'glass', name: 'Dark Glass & Prism', badge: 'Prism Glass' },
-  { id: 'default', name: 'Clean Minimalist', badge: 'OLED Glow' },
   { id: 'unsplash', name: 'Daily 4K Wallpaper (Ultra HD)', badge: 'Ultra HD' },
   { id: 'custom_url', name: 'Video / Image URL', badge: 'Custom' },
 ];
@@ -513,13 +513,7 @@ const renderBackgroundAnimation = (id: string, isHovered: boolean, isSelected: b
     case 'default':
     default:
       return (
-        <div className="absolute inset-0 bg-gradient-to-b from-slate-900 via-[#0B0F19] to-slate-950 overflow-hidden">
-          <motion.div
-            animate={active ? { scale: [1, 1.25, 1], opacity: [0.25, 0.65, 0.25] } : { opacity: 0.3 }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-            className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_40%,rgba(59,130,246,0.25),transparent)]"
-          />
-        </div>
+        <div className="absolute inset-0 bg-[#0B0F19] overflow-hidden" />
       );
   }
 };
