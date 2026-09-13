@@ -105,11 +105,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     if (!u || u.startsWith('nova://')) return 'about:blank';
     return isSafeNavigationUrl(u) ? u : 'about:blank';
   };
-  const initialUrlRef = useRef<string>(getSafeUrl(tab?.url));
   const lastLoadedUrl = useRef<string>(tab?.url || '');
   const isWebviewReady = useRef<boolean>(false);
   if (tab?.isSuspended) {
-    initialUrlRef.current = getSafeUrl(tab?.url);
     lastLoadedUrl.current = '';
   }
 
@@ -979,7 +977,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
-            src={initialUrlRef.current}
+            src={getSafeUrl(tab.url)}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             allowpopups={"true" as any}
           />
