@@ -557,24 +557,35 @@ function createWindow() {
       targetSession.setUserAgent(getStandardUserAgent());
     } catch (_) {}
 
-    // Inject Do Not Track, Global Privacy Control & Chrome Web Store spoofing headers
+    // Inject Do Not Track, Global Privacy Control & authentic Chrome Client Hints
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
       
-      let isWebStoreUrl = false;
+      let isHttp = false;
       try {
         const parsedUrl = new URL(details.url);
-        if (parsedUrl.protocol === 'https:' && (parsedUrl.hostname === 'chrome.google.com' || parsedUrl.hostname === 'chromewebstore.google.com')) {
-          isWebStoreUrl = true;
-        }
+        isHttp = parsedUrl.protocol === 'https:' || parsedUrl.protocol === 'http:';
       } catch (_) {}
 
-      if (isWebStoreUrl) {
-        const chromeMajor = (process.versions.chrome || '134.0.0.0').split('.')[0] || '134';
+      if (isHttp) {
+        const chromeVer = process.versions.chrome || '134.0.0.0';
+        const chromeMajor = chromeVer.split('.')[0] || '134';
+        const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
+
+        // Always enforce clean, genuine Chrome User-Agent and Client Hints across all web requests
+        requestHeaders['User-Agent'] = getStandardUserAgent();
         requestHeaders['sec-ch-ua'] = `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`;
         requestHeaders['sec-ch-ua-mobile'] = '?0';
-        requestHeaders['sec-ch-ua-platform'] = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
-        requestHeaders['User-Agent'] = getStandardUserAgent();
+        requestHeaders['sec-ch-ua-platform'] = platformName;
+
+        if (requestHeaders['sec-ch-ua-full-version-list']) {
+          requestHeaders['sec-ch-ua-full-version-list'] = `"Not/A)Brand";v="8.0.0.0", "Chromium";v="${chromeVer}", "Google Chrome";v="${chromeVer}"`;
+        }
+
+        // Purge automation / webview leakage headers
+        if (requestHeaders['X-Requested-With']) {
+          delete requestHeaders['X-Requested-With'];
+        }
       }
 
       if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {

@@ -106,7 +106,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 35);
+    const timer = setTimeout(fetchSuggestions, 120);
     return () => {
       clearTimeout(timer);
       controller.abort();

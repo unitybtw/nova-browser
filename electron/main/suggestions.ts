@@ -9,6 +9,8 @@ const SUGGESTIONS_CACHE_MAX_ENTRIES = 400;
 interface SuggestionsCacheEntry { list: string[]; cachedAt: number; }
 const suggestionsCache = new Map<string, SuggestionsCacheEntry>();
 
+let googleRateLimitUntil = 0;
+
 function getSuggestionsFromCache(cacheKey: string): string[] | null {
   const entry = suggestionsCache.get(cacheKey);
   if (!entry) return null;
@@ -74,18 +76,33 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 
     const fetchGoogle = async (): Promise<string[]> => {
+      if (Date.now() < googleRateLimitUntil) {
+        return [];
+      }
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 650);
       try {
+        const chromeMajor = chromeVer.split('.')[0] || '134';
+        const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
         const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${lang}&gl=${country}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
             'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
+            'Accept-Language': acceptLanguage,
+            'sec-ch-ua': `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`,
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': platformName,
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'same-site'
           }
         });
         clearTimeout(timeout);
+        if (res.status === 429 || res.status === 403) {
+          googleRateLimitUntil = Date.now() + 60_000;
+          return [];
+        }
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {

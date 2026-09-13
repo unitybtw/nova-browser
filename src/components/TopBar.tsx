@@ -844,7 +844,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 35);
+    const timer = setTimeout(fetchSuggestions, 120);
     setSelectedIndex(-1);
     return () => {
       clearTimeout(timer);

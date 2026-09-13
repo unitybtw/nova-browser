@@ -675,7 +675,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       }
     };
 
-    const timer = setTimeout(fetchSuggestions, 35);
+    const timer = setTimeout(fetchSuggestions, 120);
     return () => {
       clearTimeout(timer);
       abortController.abort();

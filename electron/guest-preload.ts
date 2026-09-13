@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, webFrame } from 'electron';
 
 /**
  * Isolated guest preload script for general webview instances.
@@ -10,6 +10,149 @@ import { ipcRenderer } from 'electron';
 // Origin validation: only execute for secure HTTP/HTTPS web contexts
 const protocol = window.location.protocol;
 if (protocol === 'https:' || protocol === 'http:') {
+  // Synchronous Anti-BotGuard & Native Chrome Stealth Injection into Main World (World ID: 0)
+  try {
+    const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '134.0.0.0';
+    const majorVer = chromeVer.split('.')[0] || '134';
+    const plat = typeof process !== 'undefined' ? process.platform : 'darwin';
+    const arch = typeof process !== 'undefined' ? process.arch : 'x64';
+
+    let osUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    let platformName = 'macOS';
+    let platformVersion = '14.0.0';
+    let architecture = arch === 'arm64' ? 'arm' : 'x86';
+
+    if (plat === 'win32') {
+      osUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+      platformName = 'Windows';
+      platformVersion = '10.0.0';
+      architecture = 'x86';
+    } else if (plat === 'linux') {
+      osUserAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+      platformName = 'Linux';
+      platformVersion = '6.5.0';
+      architecture = 'x86';
+    }
+
+    const stealthScript = `
+      (() => {
+        // 1. Remove automation / webdriver flags
+        try {
+          Object.defineProperty(navigator, 'webdriver', {
+            get: () => false,
+            configurable: true
+          });
+          const navProto = Object.getPrototypeOf(navigator);
+          if (navProto && 'webdriver' in navProto) {
+            delete navProto.webdriver;
+          }
+        } catch (_) {}
+
+        // 2. Clean Chrome userAgentData (purge any Electron brand)
+        try {
+          const dynamicBrands = [
+            { brand: 'Not(A:Brand', version: '8' },
+            { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
+            { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
+          ];
+
+          Object.defineProperty(navigator, 'userAgent', {
+            get: () => ${JSON.stringify(osUserAgent)},
+            configurable: true
+          });
+
+          Object.defineProperty(navigator, 'vendor', {
+            get: () => 'Google Inc.',
+            configurable: true
+          });
+
+          Object.defineProperty(navigator, 'userAgentData', {
+            get: () => ({
+              brands: dynamicBrands,
+              mobile: false,
+              platform: ${JSON.stringify(platformName)},
+              getHighEntropyValues: async (hints) => ({
+                architecture: ${JSON.stringify(architecture)},
+                bitness: '64',
+                brands: dynamicBrands,
+                mobile: false,
+                model: '',
+                platform: ${JSON.stringify(platformName)},
+                platformVersion: ${JSON.stringify(platformVersion)},
+                uaFullVersion: ${JSON.stringify(chromeVer)}
+              })
+            }),
+            configurable: true
+          });
+        } catch (_) {}
+
+        // 3. Emulate authentic window.chrome runtime object
+        try {
+          if (!window.chrome) {
+            window.chrome = {};
+          }
+          if (!window.chrome.csi) {
+            window.chrome.csi = function() {
+              return {
+                startE: Date.now() - 120,
+                onloadT: Date.now(),
+                pageT: 120,
+                tran: 15
+              };
+            };
+          }
+          if (!window.chrome.loadTimes) {
+            window.chrome.loadTimes = function() {
+              const nowSec = Date.now() / 1000;
+              return {
+                requestTime: nowSec - 0.12,
+                startLoadTime: nowSec - 0.1,
+                commitLoadTime: nowSec - 0.05,
+                finishDocumentLoadTime: nowSec,
+                finishLoadTime: nowSec,
+                firstPaintTime: nowSec - 0.02,
+                firstPaintAfterLoadTime: 0,
+                navigationType: 'Other',
+                wasFetchedViaSpdy: true,
+                wasNpnNegotiated: true,
+                npnNegotiatedProtocol: 'h2',
+                wasAlternateProtocolAvailable: false,
+                connectionInfo: 'h2'
+              };
+            };
+          }
+          if (!window.chrome.app) {
+            window.chrome.app = {
+              isInstalled: false,
+              InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+              RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+              getDetails: function() { return null; },
+              getIsInstalled: function() { return false; },
+              installState: function() { return 'not_installed'; },
+              runningState: function() { return 'cannot_run'; }
+            };
+          }
+        } catch (_) {}
+
+        // 4. Ensure navigator.plugins is populated (Google checks for PDF plugins on desktop Chrome)
+        try {
+          if (navigator.plugins && navigator.plugins.length === 0) {
+            const fakePlugins = [
+              { name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+              { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
+              { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' }
+            ];
+            Object.defineProperty(navigator, 'plugins', {
+              get: () => fakePlugins,
+              configurable: true
+            });
+          }
+        } catch (_) {}
+      })();
+    `;
+
+    webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: stealthScript }]);
+  } catch (_) {}
   let lastEnteredUsername = '';
   let lastSubmitTime = 0;
   let lastSubmittedPayload = '';
