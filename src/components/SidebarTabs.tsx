@@ -243,9 +243,10 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
         setDragOverTabId(null);
         onTabDragEnd?.();
       }}
+      layout="position"
       initial={false}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0, marginBottom: -2 }}
+      exit={splitTab ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0 }}
       transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
       key={tab.id}
       onClick={() => onSelectTab(tab.id)}

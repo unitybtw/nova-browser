@@ -144,6 +144,7 @@ interface TopBarProps {
 
 const MemoizedTabItem = React.memo(({ 
   tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, tabAnimation, isIncognito,
+  wasJustUnsplit,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
   tabsLength, setGhostTab, onOpenContextMenu, onTabHover, onTabLeave
@@ -162,7 +163,10 @@ const MemoizedTabItem = React.memo(({
         return {
           initial: { opacity: 0, y: 6, scale: 0.94, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
           animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
-          exit: {
+          exit: splitTab ? {
+            opacity: 0,
+            transition: { duration: 0 }
+          } : {
             opacity: 0,
             y: 4,
             scale: 0.94,
@@ -171,7 +175,6 @@ const MemoizedTabItem = React.memo(({
             paddingLeft: 0,
             paddingRight: 0,
             marginLeft: 0,
-            marginRight: -4,
             borderLeftWidth: 0,
             borderRightWidth: 0,
             transition: {
@@ -182,7 +185,6 @@ const MemoizedTabItem = React.memo(({
               minWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
               paddingLeft: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
               paddingRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
-              marginRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
               borderLeftWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
               borderRightWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }
             }
@@ -198,7 +200,10 @@ const MemoizedTabItem = React.memo(({
         return {
           initial: { opacity: 0, y: 3, scale: 0.98, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
           animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
-          exit: {
+          exit: splitTab ? {
+            opacity: 0,
+            transition: { duration: 0 }
+          } : {
             opacity: 0,
             scale: 0.97,
             maxWidth: 0,
@@ -206,7 +211,6 @@ const MemoizedTabItem = React.memo(({
             paddingLeft: 0,
             paddingRight: 0,
             marginLeft: 0,
-            marginRight: -4,
             borderLeftWidth: 0,
             borderRightWidth: 0,
             transition: {
@@ -216,7 +220,6 @@ const MemoizedTabItem = React.memo(({
               minWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               paddingLeft: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               paddingRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              marginRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               borderLeftWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               borderRightWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
             }
@@ -247,14 +250,16 @@ const MemoizedTabItem = React.memo(({
             scale: 1,
             y: 0
           },
-          exit: {
+          exit: splitTab ? {
+            opacity: 0,
+            transition: { duration: 0 }
+          } : {
             opacity: 0,
             maxWidth: 0,
             minWidth: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginLeft: 0,
-            marginRight: -4,
             borderLeftWidth: 0,
             borderRightWidth: 0,
             transition: {
@@ -263,7 +268,6 @@ const MemoizedTabItem = React.memo(({
               minWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
               paddingLeft: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
               paddingRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
-              marginRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
               borderLeftWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
               borderRightWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
             }
@@ -275,14 +279,14 @@ const MemoizedTabItem = React.memo(({
           }
         };
     }
-  }, [animPreset, targetMaxWidth, targetMinWidth, targetPadding, ghostTab?.id, tab.id]);
+  }, [animPreset, targetMaxWidth, targetMinWidth, targetPadding, ghostTab?.id, tab.id, !!splitTab]);
 
   return (
     <Reorder.Item
       key={tab.id}
       value={tab}
       layout="position"
-      initial={animationConfig.initial}
+      initial={wasJustUnsplit ? false : animationConfig.initial}
       animate={animationConfig.animate}
       exit={animationConfig.exit}
       transition={animationConfig.transition}
@@ -584,6 +588,7 @@ const MemoizedTabItem = React.memo(({
   );
 }, (prevProps: any, nextProps: any) => {
   return (
+    prevProps.wasJustUnsplit === nextProps.wasJustUnsplit &&
     prevProps.isActive === nextProps.isActive &&
     prevProps.activeTabId === nextProps.activeTabId &&
     prevProps.splitTab?.id === nextProps.splitTab?.id &&
@@ -1391,6 +1396,26 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     setHasMounted(true);
   }, []);
 
+  const prevTabsRef = useRef<Tab[]>(tabs);
+  const justUnsplitTabIds = useMemo(() => {
+    const prev = prevTabsRef.current;
+    const currentIds = new Set(tabs.map(t => t.id));
+    const set = new Set<string>();
+    for (const cur of tabs) {
+      if (!cur.splitWith) {
+        const prevTab = prev.find(p => p.id === cur.id);
+        if (prevTab && prevTab.splitWith && !currentIds.has(prevTab.splitWith)) {
+          set.add(cur.id);
+        }
+      }
+    }
+    return set;
+  }, [tabs]);
+
+  useEffect(() => {
+    prevTabsRef.current = tabs;
+  }, [tabs]);
+
   const visibleTabs = useMemo(() => {
     const renderedSplitIds = new Set<string>();
     const result: Tab[] = [];
@@ -1750,6 +1775,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   tabStyle={tabStyle}
                   tabAnimation={tabAnimation}
                   isIncognito={isIncognito}
+                  wasJustUnsplit={justUnsplitTabIds.has(tab.id)}
                   onTabDragStart={onTabDragStart}
                   onTabDrag={onTabDrag}
                   onTabDragEnd={onTabDragEnd}

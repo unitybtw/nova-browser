@@ -52,8 +52,9 @@ interface BrowserViewProps {
   onUpdateTab: (id: string, updates: Partial<Tab>) => void;
   onCloseTab: (id: string) => void;
   isIncognito: boolean;
-  onNewTab?: (url?: string) => void;
-  onNavigate?: (url: string) => void;
+  onNewTab?: (url?: string, sourceTabId?: string) => void;
+  onNavigate?: (url: string, tabId?: string) => void;
+  onActivate?: (id: string) => void;
   onFoundInPage?: (activeMatchOrdinal: number, numberOfMatches: number) => void;
   searchEngine?: UserSettings['searchEngine'];
   privacyShield: boolean;
@@ -80,6 +81,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   isIncognito,
   onNewTab,
   onNavigate,
+  onActivate,
   onFoundInPage,
   searchEngine = 'google',
   privacyShield = true,
@@ -389,9 +391,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           return;
         }
         if (onNewTab) {
-          onNewTab(e.url);
+          onNewTab(e.url, tab?.id);
         } else if (onNavigate) {
-          onNavigate(e.url);
+          onNavigate(e.url, tab?.id);
         }
       }
     };
@@ -540,6 +542,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     webview.addEventListener('page-title-updated', handleTitleUpdate);
     webview.addEventListener('page-favicon-updated', handleFaviconUpdate);
     webview.addEventListener('new-window', handleNewWindow);
+    const handleFocus = () => {
+      if (tab?.id && onActivate) {
+        onActivate(tab.id);
+      }
+    };
+
+    webview.addEventListener('focus', handleFocus);
     webview.addEventListener('crashed', handleCrashed);
     webview.addEventListener('plugin-crashed', handleCrashed);
     webview.addEventListener('render-process-gone', handleRenderProcessGone);
@@ -560,6 +569,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return () => {
       clearTimeout(readyCheckTimer);
       isWebviewReady.current = false;
+      webview.removeEventListener('focus', handleFocus);
       webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('will-navigate', handleWillNavigate);
       webview.removeEventListener('did-start-navigation', handleStartNavigation);
@@ -581,7 +591,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-paused', handleMediaPaused);
       webview.removeEventListener('ipc-message', handleIpcMessage);
     };
-  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onFoundInPage, isNewTab]);
+  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -793,90 +803,137 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isNewTab) {
     return (
-      <NewTabPage 
-        isActive={isActive}
-        onNavigate={(url) => {
-          // Update the tab URL so BrowserView's useEffect fires loadURL
-          onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
-          // Also call parent navigate if available
-          if (onNavigate) onNavigate(url);
-        }} 
-        onNewTab={onNewTab}
-        searchEngine={searchEngine}
-        privacyShield={privacyShield}
-        newTabBackground={newTabBackground}
-        backgroundCustomUrl={settings.backgroundCustomUrl}
-        showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
-        isIncognito={isIncognito}
-        isDemo={isDemo}
-        theme={settings.theme}
-        energySaverMode={settings.energySaverMode}
-        browserColor={settings.browserColor}
-        customBrowserColor={settings.customBrowserColor}
-      />
+      <div 
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <NewTabPage 
+          isActive={isActive}
+          onNavigate={(url) => {
+            if (onNavigate) {
+              onNavigate(url, tab.id);
+            } else {
+              onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
+            }
+          }} 
+          onNewTab={(url) => {
+            if (onNewTab) onNewTab(url, tab.id);
+          }}
+          searchEngine={searchEngine}
+          privacyShield={privacyShield}
+          newTabBackground={newTabBackground}
+          backgroundCustomUrl={settings.backgroundCustomUrl}
+          showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
+          isIncognito={isIncognito}
+          isDemo={isDemo}
+          theme={settings.theme}
+          energySaverMode={settings.energySaverMode}
+          browserColor={settings.browserColor}
+          customBrowserColor={settings.customBrowserColor}
+        />
+      </div>
     );
   }
 
   if (isSettingsTab) {
     return (
-      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
-        <SettingsPage
-          url={tab.url}
-          settings={settings}
-          onUpdateSettings={onUpdateSettings || NOOP}
-          onExportData={onExportData}
-          onImportData={onImportData}
-          onClearHistory={onClearHistory}
-          onPurgeMemory={onPurgeMemory}
-        />
-      </Suspense>
+      <div 
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <SettingsPage
+            url={tab.url}
+            settings={settings}
+            onUpdateSettings={onUpdateSettings || NOOP}
+            onExportData={onExportData}
+            onImportData={onImportData}
+            onClearHistory={onClearHistory}
+            onPurgeMemory={onPurgeMemory}
+          />
+        </Suspense>
+      </div>
     );
   }
 
   if (isHistoryTab) {
     return (
-      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
-        <HistoryPage
-          history={history}
-          onNavigate={(url) => {
-            onUpdateTab(tab.id, { url, isLoading: true });
-            if (onNavigate) onNavigate(url);
-          }}
-          onClearHistory={onClearHistory || NOOP}
-          onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
-        />
-      </Suspense>
+      <div 
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <HistoryPage
+            history={history}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: true });
+              }
+            }}
+            onClearHistory={onClearHistory || NOOP}
+            onRemoveHistoryItem={onRemoveHistoryItem || NOOP}
+          />
+        </Suspense>
+      </div>
     );
   }
 
   if (isDownloadsTab) {
     return (
-      <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
-        <DownloadsPage
-          downloads={downloads}
-          onClearDownloads={onClearDownloads || NOOP}
-        />
-      </Suspense>
+      <div 
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-white dark:bg-slate-900" />}>
+          <DownloadsPage
+            downloads={downloads}
+            onClearDownloads={onClearDownloads || NOOP}
+          />
+        </Suspense>
+      </div>
     );
   }
 
   if (isChangelogTab) {
     return (
-      <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
-        <ChangelogPage
-          currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.6'}
-          onNavigate={(url) => {
-            onUpdateTab(tab.id, { url, isLoading: true });
-            if (onNavigate) onNavigate(url);
-          }}
-        />
-      </Suspense>
+      <div 
+        className="w-full h-full relative"
+        onMouseDownCapture={() => {
+          if (tab?.id && onActivate) onActivate(tab.id);
+        }}
+      >
+        <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
+          <ChangelogPage
+            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.6'}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: true });
+              }
+            }}
+          />
+        </Suspense>
+      </div>
     );
   }
 
   return (
     <div 
       style={!isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
+      onMouseDownCapture={() => {
+        if (tab?.id && onActivate) onActivate(tab.id);
+      }}
       className="w-full h-full relative bg-white dark:bg-slate-900 flex flex-col"
     >
       {/* Top Progress Bar (GPU Composited scaleX - Ultra Fast Responsive Feedback) */}

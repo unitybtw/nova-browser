@@ -2138,7 +2138,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, folderId } : tab));
   }, [folders]);
 
-  const handleNewTab = useCallback((url?: string | any) => {
+  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
@@ -2158,20 +2158,22 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     else if (finalUrl.startsWith('nova://downloads')) initialTitle = 'Downloads';
     else if (finalUrl.startsWith('nova://changelog') || finalUrl.startsWith('nova://whats-new')) initialTitle = "What's New";
 
-    // If current tab is an unnavigated empty "New Tab" and url is specific (e.g. settings, history),
+    // If target/current tab is an unnavigated empty "New Tab" and url is specific (e.g. settings, history),
     // navigate current tab instead of spawning a redundant new tab
-    const currentActive = tabsRef.current.find(t => t.id === activeTabIdRef.current);
-    const isCurrentBlank = currentActive && 
-      (currentActive.url === 'nova://newtab' || currentActive.url === 'about:blank' || !currentActive.url) &&
-      !currentActive.isLoading &&
-      !currentActive.canGoBack;
+    const targetSourceId = sourceTabId || activeTabIdRef.current;
+    const currentTarget = tabsRef.current.find(t => t.id === targetSourceId);
+    const isCurrentBlank = currentTarget && 
+      (currentTarget.url === 'nova://newtab' || currentTarget.url === 'about:blank' || !currentTarget.url) &&
+      !currentTarget.isLoading &&
+      !currentTarget.canGoBack;
 
     if (isCurrentBlank && finalUrl !== 'nova://newtab') {
-      setTabs(prev => prev.map(tab => tab.id === currentActive.id ? {
+      setTabs(prev => prev.map(tab => tab.id === currentTarget.id ? {
         ...tab,
         url: finalUrl,
         title: initialTitle
       } : tab));
+      setActiveTabId(currentTarget.id);
       return;
     }
     
@@ -2183,6 +2185,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       canGoBack: false,
       canGoForward: false,
       workspaceId: activeWorkspaceId,
+      isIncognito: currentTarget?.isIncognito || false,
       lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
@@ -2305,7 +2308,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [activeTabId]);
 
 
-  const handleNavigate = useCallback((url: string) => {
+  const handleNavigate = useCallback((url: string, explicitTabId?: string) => {
     if (!url || typeof url !== 'string') return;
     
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
@@ -2319,9 +2322,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       return;
     }
 
-    if (activeTabIdRef.current) {
-      tabThumbnailCache.remove(activeTabIdRef.current);
+    const prev = tabsRef.current;
+
+    if (prev.length === 0) {
+      const newTabId = generateId('tab');
+      setTabs([{
+        id: newTabId,
+        url,
+        title: 'New Tab',
+        isLoading: true,
+        canGoBack: false,
+        canGoForward: false
+      }]);
+      setActiveTabId(newTabId);
+      return;
     }
+
+    const targetTab = explicitTabId 
+      ? (prev.find(t => t.id === explicitTabId) || prev.find(t => t.id === activeTabId) || prev[0])
+      : (prev.find(t => t.id === activeTabId) || prev[0]);
+    const targetId = targetTab ? targetTab.id : (prev.find(t => t.id === activeTabId)?.id || prev[0].id);
+
+    tabThumbnailCache.remove(targetId);
 
     let newTitle: string | undefined = undefined;
     const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
@@ -2333,33 +2355,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     const isInternalPage = !!newTitle;
 
-    // All side effects (active-tab selection, webview reload) are computed from
-    // tabsRef OUTSIDE the setState updater so the updater stays pure
-    // (StrictMode double-invokes updater functions; calling setActiveTabId
-    // inside one is a render-phase update anti-pattern).
-    const prev = tabsRef.current;
-
-    if (prev.length === 0) {
-      const newTabId = generateId('tab');
-      setTabs([{
-        id: newTabId,
-        url,
-        title: newTitle || 'New Tab',
-        isLoading: !isInternalPage,
-        canGoBack: false,
-        canGoForward: false
-      }]);
-      setActiveTabId(newTabId);
-      return;
-    }
-
-    const activeTab = prev.find(t => t.id === activeTabId) || prev[0];
-    const targetId = activeTab ? activeTab.id : prev[0].id;
     if (targetId !== activeTabId) {
       setActiveTabId(targetId);
     }
 
-    if (activeTab && activeTab.url === url) {
+    if (targetTab && targetTab.url === url) {
       // URL is exactly the same, force a reload if it's a webview
       if (!isInternalPage) {
         const webview = document.querySelector(`webview[data-tab-id="${targetId}"]`) as any;
@@ -3593,8 +3593,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     showTasksWidget: isWebsiteDemo ? false : settings.showTasksWidget,
   }), [settings, isWebsiteDemo]);
 
-  // Compute second tab for split view (if available)
-  const secondaryTab = useMemo(() => splitTabId ? tabs.find(t => t.id === splitTabId) : undefined, [splitTabId, tabs]);
+  // Compute stable primary (left) and secondary (right) tabs for split view.
+  // Their physical positions remain stable based on tab order, even when activeTabId changes upon focus.
+  const { primarySplitTab, secondarySplitTab } = useMemo(() => {
+    if (!activeTab || !activeTab.splitWith) return { primarySplitTab: activeTab, secondarySplitTab: null };
+    const partner = tabs.find(t => t.id === activeTab.splitWith);
+    if (!partner) return { primarySplitTab: activeTab, secondarySplitTab: null };
+    const activeIdx = tabs.findIndex(t => t.id === activeTab.id);
+    const partnerIdx = tabs.findIndex(t => t.id === partner.id);
+    return activeIdx <= partnerIdx
+      ? { primarySplitTab: activeTab, secondarySplitTab: partner }
+      : { primarySplitTab: partner, secondarySplitTab: activeTab };
+  }, [activeTab, tabs]);
 
   const workspaceTabs = useMemo(() => tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default')), [tabs, activeWorkspaceId]);
 
@@ -3966,23 +3976,34 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         />
 
         {/* Primary View */}
-        <div id="primary-view-container" style={{ width: secondaryTab ? `${splitRatio}%` : undefined }} className={`h-full relative transition-none ${secondaryTab ? '' : 'flex-1 min-w-0'} flex flex-col min-h-0`}>
+        <div 
+          id="primary-view-container" 
+          style={{ width: secondarySplitTab ? `${splitRatio}%` : undefined }} 
+          className={`h-full relative transition-none ${secondarySplitTab ? '' : 'flex-1 min-w-0'} flex flex-col min-h-0`}
+          onMouseDownCapture={() => {
+            if (secondarySplitTab && primarySplitTab && activeTabId !== primarySplitTab.id) {
+              setActiveTabId(primarySplitTab.id);
+            }
+          }}
+        >
           {sortedTabs.map((tab) => {
-            if (secondaryTab && tab.id === secondaryTab.id) {
+            if (secondarySplitTab && tab.id === secondarySplitTab.id) {
               return null;
             }
+            const isTabVisible = secondarySplitTab ? tab.id === primarySplitTab?.id : tab.id === activeTabId;
             return (
               <div
                 key={tab.id}
                 className={`w-full h-full absolute inset-0 flex flex-col ${
-                  tab.id === activeTabId ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none hidden'
+                  isTabVisible ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none hidden'
                 }`}
               >
                 <BrowserView 
                   tab={tab} 
-                  onNavigate={handleNavigate}
+                  onNavigate={(url, tabId) => handleNavigate(url, tabId || tab.id)}
                   onUpdateTab={handleUpdateTab}
-                  onNewTab={handleNewTab}
+                  onNewTab={(url, srcId) => handleNewTab(url, srcId || tab.id)}
+                  onActivate={handleSelectTab}
                   onFoundInPage={handleFoundInPage}
                   searchEngine={settings.searchEngine}
                   privacyShield={settings.privacyShield}
@@ -4009,7 +4030,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         </div>
 
         {/* Resizer Handle */}
-        {secondaryTab && (
+        {secondarySplitTab && (
           <div 
             className="w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 bg-slate-200 dark:bg-slate-700 z-30 transition-colors flex items-center justify-center"
             onMouseDown={(e) => {
@@ -4049,22 +4070,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         )}
 
         {/* Secondary View (Split Screen) */}
-        {secondaryTab && (
+        {secondarySplitTab && (
           <div 
             id="secondary-view-container" 
-            style={{ width: `${100 - splitRatio}%`, ...(!secondaryTab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}) }} 
+            style={{ width: `${100 - splitRatio}%`, ...(!secondarySplitTab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}) }} 
             className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0"
+            onMouseDownCapture={() => {
+              if (activeTabId !== secondarySplitTab.id) {
+                setActiveTabId(secondarySplitTab.id);
+              }
+            }}
           >
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
               <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
-                {secondaryTab.title || secondaryTab.url}
+                {secondarySplitTab.title || secondarySplitTab.url}
               </span>
 
               {/* Swap Left/Right */}
               <button
-                onClick={() => {
-                  if (activeTabId && secondaryTab) {
-                    setActiveTabId(secondaryTab.id);
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (primarySplitTab && secondarySplitTab) {
+                    handleReorderTabs(primarySplitTab.id, secondarySplitTab.id);
                   }
                 }}
                 className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
@@ -4075,7 +4102,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
               {/* Unsplit / Separate Tabs */}
               <button
-                onClick={() => handleCloseSplitView()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (primarySplitTab && secondarySplitTab) {
+                    handleCloseSplitView(primarySplitTab.id, secondarySplitTab.id);
+                  } else {
+                    handleCloseSplitView();
+                  }
+                }}
                 className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
                 title="Separate Tabs"
               >
@@ -4084,7 +4118,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
               {/* Close Tab */}
               <button 
-                onClick={() => handleCloseTab(secondaryTab.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCloseTab(secondarySplitTab.id);
+                }}
                 className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
                 title="Close Tab"
               >
@@ -4092,10 +4129,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               </button>
             </div>
             <BrowserView 
-              tab={secondaryTab}
-              onNavigate={handleNavigate}
+              tab={secondarySplitTab}
+              onNavigate={(url, tabId) => handleNavigate(url, tabId || secondarySplitTab.id)}
               onUpdateTab={handleUpdateTab}
-              onNewTab={handleNewTab}
+              onNewTab={(url, srcId) => handleNewTab(url, srcId || secondarySplitTab.id)}
+              onActivate={handleSelectTab}
               onFoundInPage={handleFoundInPage}
               searchEngine={settings.searchEngine}
               privacyShield={settings.privacyShield}
@@ -4107,9 +4145,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onImportData={handleImportData}
               isActive={true}
               onCloseTab={handleCloseTab}
-              isIncognito={secondaryTab.isIncognito || false}
-              history={typeof secondaryTab?.url === 'string' && secondaryTab.url.includes('nova://history') ? history : EMPTY_ARRAY}
-              downloads={typeof secondaryTab?.url === 'string' && secondaryTab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
+              isIncognito={secondarySplitTab.isIncognito || false}
+              history={typeof secondarySplitTab?.url === 'string' && secondarySplitTab.url.includes('nova://history') ? history : EMPTY_ARRAY}
+              downloads={typeof secondarySplitTab?.url === 'string' && secondarySplitTab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
               onClearHistory={handleClearHistory}
               onRemoveHistoryItem={handleRemoveHistoryItem}
               onClearDownloads={handleClearDownloads}
