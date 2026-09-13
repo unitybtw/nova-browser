@@ -1516,24 +1516,45 @@ app.whenReady().then(async () => {
   applyStrictSecurityToSession(session.defaultSession);
   applyStrictSecurityToSession(session.fromPartition('incognito'));
 
-  // Initialize and auto-start MCP Server (default port 3020 with fallback)
+  // Initialize MCP Server (default port 3020 with fallback, default OFF)
   mcpServer = new BrowserMCPServer(3020);
   mcpServer.setMainWindow(mainWindow);
-  // Performance: don't block startup (extension loading below) on the MCP bind.
-  // Fire-and-forget keeps the rest of the startup order deterministic; a bind
-  // failure is logged but must not stall first paint.
-  const serverInstance = mcpServer;
-  serverInstance.start().then(() => {
-    const actualPort = serverInstance.getPort();
-    console.log(`[MCP] Server started on port ${actualPort}`);
-    // The renderer fetches MCP status once on mount, which can race this
-    // async bind — push the corrected state so the UI pill never sticks
-    // at OFFLINE while the server is actually listening.
-    sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
-  }).catch((err) => {
-    console.error('[MCP] Failed to start server:', err);
+
+  // MCP Server is OFF by default unless explicitly enabled in user settings
+  let shouldAutoStartMcp = false;
+  try {
+    const targetDir = process.env.PORTABLE_EXECUTABLE_DIR
+      ? path.join(process.env.PORTABLE_EXECUTABLE_DIR, 'NovaBrowserData')
+      : app.getPath('userData');
+    const userSettingsPath = path.join(targetDir, 'store_user_settings.json');
+    const legacySettingsPath = path.join(targetDir, 'store_settings.json');
+    const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
+    if (settingsFile) {
+      const rawContent = fs.readFileSync(settingsFile, 'utf-8');
+      const parsed = JSON.parse(rawContent);
+      const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+      if (settings && settings.mcpServerEnabled === true) {
+        shouldAutoStartMcp = true;
+      }
+    }
+  } catch (e) {
+    shouldAutoStartMcp = false;
+  }
+
+  if (shouldAutoStartMcp) {
+    const serverInstance = mcpServer;
+    serverInstance.start().then(() => {
+      const actualPort = serverInstance.getPort();
+      console.log(`[MCP] Server started on port ${actualPort}`);
+      sendToMainWindow('mcp-status-changed', { running: true, port: actualPort });
+    }).catch((err) => {
+      console.error('[MCP] Failed to start server:', err);
+      sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
+    });
+  } else {
+    // Notify renderer that MCP server is offline by default
     sendToMainWindow('mcp-status-changed', { running: false, port: 0 });
-  });
+  }
 
   function isNewerVersion(remote: string, current: string): boolean {
     const parse = (v: string) => v.replace(/^v/, '').split('.').map(n => parseInt(n, 10) || 0);

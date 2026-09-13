@@ -1309,8 +1309,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     const isRunning = mcpStatus?.running || false;
     if (isRunning) {
       await (window as any).electronAPI?.stopMcpServer?.();
+      onUpdateSettings({ mcpServerEnabled: false });
     } else {
       await (window as any).electronAPI?.startMcpServer?.();
+      onUpdateSettings({ mcpServerEnabled: true });
     }
     setTimeout(fetchMcpStatus, 300);
   };
