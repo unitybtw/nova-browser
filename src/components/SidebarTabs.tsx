@@ -245,8 +245,8 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       }}
       initial={false}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0, height: 0, marginTop: 0, marginBottom: 0 }}
-      transition={{ duration: 0.12, ease: 'easeOut' }}
+      exit={{ opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0, marginBottom: -2 }}
+      transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
       key={tab.id}
       onClick={() => onSelectTab(tab.id)}
       onKeyDown={(e) => {
@@ -267,7 +267,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       onMouseEnter={(e) => onMouseEnter(tab, e)}
       onMouseLeave={onMouseLeave}
       style={isActive ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
-      className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none ${
+      className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
         isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
       } ${
         isDragOver

@@ -162,25 +162,69 @@ const MemoizedTabItem = React.memo(({
         return {
           initial: { opacity: 0, y: 6, scale: 0.94, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
           animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
-          exit: { opacity: 0, y: 4, scale: 0.92, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const } },
+          exit: {
+            opacity: 0,
+            y: 4,
+            scale: 0.94,
+            maxWidth: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            marginLeft: 0,
+            marginRight: -4,
+            borderLeftWidth: 0,
+            borderRightWidth: 0,
+            transition: {
+              opacity: { duration: 0.10, ease: 'easeOut' },
+              y: { duration: 0.18, ease: 'easeOut' },
+              scale: { duration: 0.18, ease: 'easeOut' },
+              maxWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              minWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              paddingLeft: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              paddingRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              marginRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              borderLeftWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              borderRightWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }
+            }
+          },
           transition: {
-            layout: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            scale: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            y: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+            layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+            scale: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
+            y: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
+            opacity: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
           }
         };
       case 'snappy':
         return {
           initial: { opacity: 0, y: 3, scale: 0.98, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
           animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, y: 0, scale: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding },
-          exit: { opacity: 0, scale: 0.96, transition: { duration: 0.12, ease: 'easeOut' as const } },
+          exit: {
+            opacity: 0,
+            scale: 0.97,
+            maxWidth: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            marginLeft: 0,
+            marginRight: -4,
+            borderLeftWidth: 0,
+            borderRightWidth: 0,
+            transition: {
+              opacity: { duration: 0.08, ease: 'easeOut' },
+              scale: { duration: 0.12, ease: 'easeOut' },
+              maxWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              minWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              paddingLeft: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              paddingRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              marginRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              borderLeftWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              borderRightWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
+            }
+          },
           transition: {
-            type: 'spring' as const,
-            stiffness: 520,
-            damping: 34,
-            mass: 0.5,
-            layout: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+            duration: 0.14,
+            ease: [0.2, 0, 0, 1] as const,
+            layout: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
           }
         };
       case 'none':
@@ -210,13 +254,24 @@ const MemoizedTabItem = React.memo(({
             paddingLeft: 0,
             paddingRight: 0,
             marginLeft: 0,
-            marginRight: 0,
-            transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+            marginRight: -4,
+            borderLeftWidth: 0,
+            borderRightWidth: 0,
+            transition: {
+              opacity: { duration: 0.09, ease: 'easeOut' },
+              maxWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              minWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              paddingLeft: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              paddingRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              marginRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              borderLeftWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              borderRightWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
+            }
           },
           transition: {
             duration: 0.20,
-            ease: [0.4, 0, 0.2, 1] as const,
-            layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+            ease: [0.2, 0, 0, 1] as const,
+            layout: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
           }
         };
     }
@@ -1727,18 +1782,17 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               layout="position"
               transition={
                 tabAnimation === 'smooth'
-                  ? { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 }
+                  ? { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }
                   : tabAnimation === 'snappy'
-                  ? { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+                  ? { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
                   : tabAnimation === 'none'
                   ? { duration: 0 }
-                  : { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+                  : { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
               }
               className="flex items-center shrink-0 mb-1 ml-1 gap-0.5 no-drag z-10"
             >
               {/* New Tab Button */}
               <motion.button
-                layout="position"
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.92 }}
                 transition={{
@@ -1758,7 +1812,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
               {/* New Incognito Tab Button */}
               <motion.button
-                layout="position"
                 whileHover={{ scale: 1.06 }}
                 whileTap={{ scale: 0.92 }}
                 transition={{

@@ -607,28 +607,62 @@ const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo
         return {
           initial: { opacity: 0, y: 6, scale: 0.94, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
           animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
-          exit: { opacity: 0, y: 4, scale: 0.92, transition: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const } },
-          transition: {
-            layout: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            scale: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            y: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 },
-            opacity: { duration: 0.22, ease: [0.22, 1, 0.36, 1] as const }
+          exit: {
+            opacity: 0,
+            y: 4,
+            scale: 0.94,
+            width: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            marginRight: -4,
+            transition: {
+              opacity: { duration: 0.10, ease: 'easeOut' },
+              y: { duration: 0.18, ease: 'easeOut' },
+              scale: { duration: 0.18, ease: 'easeOut' },
+              width: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              minWidth: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              paddingLeft: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              paddingRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+              marginRight: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }
+            }
           },
-          buttonTransition: { type: 'spring' as const, stiffness: 260, damping: 26, mass: 0.7 }
+          transition: {
+            layout: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const },
+            scale: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
+            y: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
+            opacity: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
+          },
+          buttonTransition: { duration: 0.22, ease: [0.16, 1, 0.3, 1] as const }
         };
       case 'snappy':
         return {
           initial: { opacity: 0, y: 3, scale: 0.98, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
           animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6 },
-          exit: { opacity: 0, scale: 0.96, transition: { duration: 0.12, ease: 'easeOut' as const } },
-          transition: {
-            type: 'spring' as const,
-            stiffness: 520,
-            damping: 34,
-            mass: 0.5,
-            layout: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+          exit: {
+            opacity: 0,
+            scale: 0.97,
+            width: 0,
+            minWidth: 0,
+            paddingLeft: 0,
+            paddingRight: 0,
+            marginRight: -4,
+            transition: {
+              opacity: { duration: 0.08, ease: 'easeOut' },
+              scale: { duration: 0.12, ease: 'easeOut' },
+              width: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              minWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              paddingLeft: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              paddingRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              marginRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
+            }
           },
-          buttonTransition: { type: 'spring' as const, stiffness: 520, damping: 34, mass: 0.5 }
+          transition: {
+            duration: 0.14,
+            ease: [0.2, 0, 0, 1] as const,
+            layout: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
+          },
+          buttonTransition: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
         };
       case 'none':
         return {
@@ -649,14 +683,22 @@ const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo
             minWidth: 0,
             paddingLeft: 0,
             paddingRight: 0,
-            transition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+            marginRight: -4,
+            transition: {
+              opacity: { duration: 0.09, ease: 'easeOut' },
+              width: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              minWidth: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              paddingLeft: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              paddingRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const },
+              marginRight: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
+            }
           },
           transition: {
             duration: 0.20,
-            ease: [0.4, 0, 0.2, 1] as const,
-            layout: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+            ease: [0.2, 0, 0, 1] as const,
+            layout: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
           },
-          buttonTransition: { duration: 0.20, ease: [0.4, 0, 0.2, 1] as const }
+          buttonTransition: { duration: 0.20, ease: [0.2, 0, 0, 1] as const }
         };
     }
   }, [preset]);
