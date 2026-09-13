@@ -133,8 +133,8 @@ interface TopBarProps {
   onOpenAccount?: () => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
-  onTabDrag?: (y: number) => void;
-  onDropToSplitScreen?: (tabId: string) => void;
+  onTabDrag?: (y: number, x?: number) => void;
+  onDropToSplitScreen?: (tabId: string, side?: 'left' | 'right') => void;
   splitTabId?: string | null;
   onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
   permissionRequests?: PermissionRequest[];
@@ -296,7 +296,7 @@ const MemoizedTabItem = React.memo(({
         onTabDragStart?.();
       }}
       onDrag={(e, info) => {
-        onTabDrag?.(info.point.y);
+        onTabDrag?.(info.point.y, info.point.x);
         // Only show ghost indicator if dragged completely clear of the TopBar header (> 110px)
         if (info.point.y > 110) {
           setGhostTab({ id: tab.id, x: info.point.x, y: info.point.y });
@@ -307,8 +307,9 @@ const MemoizedTabItem = React.memo(({
       onDragEnd={(e, info) => {
         onTabDragEnd?.();
         setGhostTab(null);
-        if (info.point.y > 110 && tab.id !== activeTabId) {
-          onDropToSplitScreen?.(tab.id);
+        if (info.point.y > 110) {
+          const side = info.point.x < window.innerWidth / 2 ? 'left' : 'right';
+          onDropToSplitScreen?.(tab.id, side);
         }
       }}
       onClick={() => {

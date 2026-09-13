@@ -108,6 +108,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const initialUrlRef = useRef<string>(getSafeUrl(tab?.url));
   const lastLoadedUrl = useRef<string>(tab?.url || '');
   const isWebviewReady = useRef<boolean>(false);
+  if (tab?.isSuspended) {
+    initialUrlRef.current = getSafeUrl(tab?.url);
+    lastLoadedUrl.current = '';
+  }
 
   const isNewTab = React.useMemo(() => (
     !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
@@ -663,6 +667,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const wv = webviewRef.current as any;
     if (!wv) return;
 
+    // Prevent duplicate reload if this URL is already loaded
+    if (lastLoadedUrl.current === targetUrl) {
+      return;
+    }
+
     // Check if the webview is already at this URL to prevent duplicate navigation/refresh
     try {
       const currentWvUrl = wv.getURL?.();
@@ -970,7 +979,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
-            src={getSafeUrl(tab.url)}
+            src={initialUrlRef.current}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             allowpopups={"true" as any}
           />

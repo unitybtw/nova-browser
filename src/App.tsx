@@ -3250,19 +3250,58 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setIsDraggingTab(false);
     setIsDragOverMain(false);
   }, []);
-  const handleTabDrag = useCallback((y: number) => setIsDragOverMain(y > 60), []);
-  const handleDropToSplitScreen = useCallback((droppedTabId: string, side: 'left' | 'right' = 'right') => {
-    if (!droppedTabId || droppedTabId === activeTabId) return;
-    setTabs(prev => prev.map(t => {
-      if (t.id === activeTabId) return { ...t, splitWith: droppedTabId };
-      if (t.id === droppedTabId) return { ...t, splitWith: activeTabId };
-      if (t.splitWith === activeTabId || t.splitWith === droppedTabId) return { ...t, splitWith: undefined };
-      return t;
-    }));
-    if (side === 'left') {
-      setActiveTabId(droppedTabId);
+  const handleTabDrag = useCallback((y: number, x?: number) => {
+    setIsDragOverMain(y > 60);
+    if (typeof x === 'number') {
+      setSplitDragSide(x < window.innerWidth / 2 ? 'left' : 'right');
     }
-  }, [activeTabId]);
+  }, []);
+  const handleDropToSplitScreen = useCallback((droppedTabId: string, side: 'left' | 'right' = 'right') => {
+    if (!droppedTabId) return;
+
+    let targetTabId = droppedTabId;
+    let partnerTabId = activeTabId;
+
+    if (droppedTabId === activeTabId) {
+      const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
+      const candidate = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
+      if (!candidate) return;
+      targetTabId = candidate.id;
+      partnerTabId = activeTabId;
+    }
+
+    setTabs(prev => {
+      const activeT = prev.find(t => t.id === partnerTabId);
+      const droppedT = prev.find(t => t.id === targetTabId);
+      if (!activeT || !droppedT) return prev;
+
+      let updated = prev.map(t => {
+        if (t.id === partnerTabId) return { ...t, splitWith: targetTabId };
+        if (t.id === targetTabId) return { ...t, splitWith: partnerTabId };
+        if (t.splitWith === partnerTabId || t.splitWith === targetTabId) return { ...t, splitWith: undefined };
+        return t;
+      });
+
+      const pIdx = updated.findIndex(t => t.id === partnerTabId);
+      const tIdx = updated.findIndex(t => t.id === targetTabId);
+      if (side === 'left' && tIdx > pIdx) {
+        const item = updated.splice(tIdx, 1)[0];
+        const newPIdx = updated.findIndex(t => t.id === partnerTabId);
+        updated.splice(newPIdx, 0, item);
+      } else if (side === 'right' && tIdx < pIdx) {
+        const item = updated.splice(tIdx, 1)[0];
+        const newPIdx = updated.findIndex(t => t.id === partnerTabId);
+        updated.splice(newPIdx + 1, 0, item);
+      }
+      return updated;
+    });
+
+    if (side === 'left') {
+      setActiveTabId(targetTabId);
+    } else {
+      setActiveTabId(partnerTabId);
+    }
+  }, [activeTabId, tabs, activeWorkspaceId]);
   const handleToggleReaderMode = useCallback(() => setIsReaderModeOpen(prev => !prev), []);
   const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
   const handleOpenSpotlight = useCallback(() => setIsSpotlightOpen(true), []);
@@ -3975,29 +4014,116 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           onStopFind={handleStopFind}
         />
 
-        {/* Primary View */}
+        {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
         <div 
-          id="primary-view-container" 
-          style={{ width: secondarySplitTab ? `${splitRatio}%` : undefined }} 
-          className={`h-full relative transition-none ${secondarySplitTab ? '' : 'flex-1 min-w-0'} flex flex-col min-h-0`}
-          onMouseDownCapture={() => {
-            if (secondarySplitTab && primarySplitTab && activeTabId !== primarySplitTab.id) {
-              setActiveTabId(primarySplitTab.id);
-            }
-          }}
+          id="browser-views-container" 
+          className="h-full relative flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden"
         >
           {sortedTabs.map((tab) => {
-            if (secondarySplitTab && tab.id === secondarySplitTab.id) {
-              return null;
+            const isPrimary = secondarySplitTab ? tab.id === primarySplitTab?.id : tab.id === activeTabId;
+            const isSecondary = secondarySplitTab ? tab.id === secondarySplitTab?.id : false;
+            const isTabVisible = isPrimary || isSecondary;
+
+            let tabStyle: React.CSSProperties = {
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: '100%',
+            };
+
+            if (secondarySplitTab) {
+              if (isPrimary) {
+                tabStyle = {
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: 0,
+                  width: `${splitRatio}%`,
+                };
+              } else if (isSecondary) {
+                tabStyle = {
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  left: `${splitRatio}%`,
+                  width: `${100 - splitRatio}%`,
+                  ...(!tab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}),
+                };
+              }
             }
-            const isTabVisible = secondarySplitTab ? tab.id === primarySplitTab?.id : tab.id === activeTabId;
+
             return (
               <div
                 key={tab.id}
-                className={`w-full h-full absolute inset-0 flex flex-col ${
-                  isTabVisible ? 'opacity-100 z-10 pointer-events-auto' : 'opacity-0 z-0 pointer-events-none hidden'
+                id={`tab-view-${tab.id}`}
+                style={tabStyle}
+                className={`h-full flex flex-col transition-none ${
+                  isTabVisible
+                    ? 'opacity-100 z-10 pointer-events-auto visible'
+                    : 'opacity-0 z-0 pointer-events-none invisible'
                 }`}
+                onMouseDownCapture={() => {
+                  if (secondarySplitTab) {
+                    if (isSecondary && activeTabId !== secondarySplitTab.id) {
+                      setActiveTabId(secondarySplitTab.id);
+                    } else if (isPrimary && primarySplitTab && activeTabId !== primarySplitTab.id) {
+                      setActiveTabId(primarySplitTab.id);
+                    }
+                  }
+                }}
               >
+                {/* Secondary Split Tab Header / Controls */}
+                {isSecondary && (
+                  <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
+                    <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
+                      {tab.title || tab.url}
+                    </span>
+
+                    {/* Swap Left/Right */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (primarySplitTab && secondarySplitTab) {
+                          handleReorderTabs(primarySplitTab.id, secondarySplitTab.id);
+                        }
+                      }}
+                      className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      title="Swap Left & Right"
+                    >
+                      <ArrowLeftRight className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Unsplit / Separate Tabs */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (primarySplitTab && secondarySplitTab) {
+                          handleCloseSplitView(primarySplitTab.id, secondarySplitTab.id);
+                        } else {
+                          handleCloseSplitView();
+                        }
+                      }}
+                      className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
+                      title="Separate Tabs"
+                    >
+                      <Columns2 className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Close Tab */}
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCloseTab(tab.id);
+                      }}
+                      className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
+                      title="Close Tab"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
                 <BrowserView 
                   tab={tab} 
                   onNavigate={(url, tabId) => handleNavigate(url, tabId || tab.id)}
@@ -4027,135 +4153,60 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               </div>
             );
           })}
-        </div>
 
-        {/* Resizer Handle */}
-        {secondarySplitTab && (
-          <div 
-            className="w-1 cursor-col-resize hover:bg-blue-500 active:bg-blue-600 bg-slate-200 dark:bg-slate-700 z-30 transition-colors flex items-center justify-center"
-            onMouseDown={(e) => {
-              e.preventDefault();
-              const startX = e.pageX;
-              const startRatio = splitRatio;
-              
-              const handleMouseMove = (moveEvent: MouseEvent) => {
-                const deltaX = moveEvent.pageX - startX;
-                const containerWidth = document.body.clientWidth;
-                let newRatio = startRatio + (deltaX / containerWidth) * 100;
-                newRatio = Math.max(20, Math.min(80, newRatio)); // Limit to 20%-80%
+          {/* Split Screen Resizer Handle */}
+          {secondarySplitTab && (
+            <div 
+              id="split-resizer-handle"
+              style={{ left: `${splitRatio}%` }}
+              className="absolute top-0 bottom-0 w-1.5 -ml-[3px] cursor-col-resize hover:bg-blue-500 active:bg-blue-600 bg-slate-300/60 dark:bg-slate-700/60 z-30 transition-colors flex items-center justify-center select-none"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                const startX = e.pageX;
+                const startRatio = splitRatio;
                 
-                const primary = document.getElementById('primary-view-container');
-                const secondary = document.getElementById('secondary-view-container');
-                if (primary && secondary) {
-                  primary.style.width = `${newRatio}%`;
-                  secondary.style.width = `${100 - newRatio}%`;
-                }
-              };
-              
-              const handleMouseUp = (upEvent: MouseEvent) => {
-                document.removeEventListener('mousemove', handleMouseMove);
-                document.removeEventListener('mouseup', handleMouseUp);
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  const deltaX = moveEvent.pageX - startX;
+                  const container = document.getElementById('browser-views-container');
+                  const containerWidth = container ? container.clientWidth : document.body.clientWidth;
+                  let newRatio = startRatio + (deltaX / containerWidth) * 100;
+                  newRatio = Math.max(20, Math.min(80, newRatio));
+                  
+                  if (primarySplitTab) {
+                    const primEl = document.getElementById(`tab-view-${primarySplitTab.id}`);
+                    if (primEl) primEl.style.width = `${newRatio}%`;
+                  }
+                  if (secondarySplitTab) {
+                    const secEl = document.getElementById(`tab-view-${secondarySplitTab.id}`);
+                    if (secEl) {
+                      secEl.style.left = `${newRatio}%`;
+                      secEl.style.width = `${100 - newRatio}%`;
+                    }
+                  }
+                  const handleEl = document.getElementById('split-resizer-handle');
+                  if (handleEl) {
+                    handleEl.style.left = `${newRatio}%`;
+                  }
+                };
                 
-                const deltaX = upEvent.pageX - startX;
-                const containerWidth = document.body.clientWidth;
-                let finalRatio = startRatio + (deltaX / containerWidth) * 100;
-                finalRatio = Math.max(20, Math.min(80, finalRatio));
-                setSplitRatio(finalRatio);
-              };
-              
-              document.addEventListener('mousemove', handleMouseMove);
-              document.addEventListener('mouseup', handleMouseUp);
-            }}
-          />
-        )}
-
-        {/* Secondary View (Split Screen) */}
-        {secondarySplitTab && (
-          <div 
-            id="secondary-view-container" 
-            style={{ width: `${100 - splitRatio}%`, ...(!secondarySplitTab.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : {}) }} 
-            className="h-full relative bg-white dark:bg-slate-900 transition-none flex flex-col min-h-0"
-            onMouseDownCapture={() => {
-              if (activeTabId !== secondarySplitTab.id) {
-                setActiveTabId(secondarySplitTab.id);
-              }
-            }}
-          >
-            <div className="absolute top-2 right-2 z-20 flex items-center gap-1.5 bg-slate-900/85 px-2 py-1 rounded-xl shadow-xl border border-white/10 text-white">
-              <span className="text-[11px] font-medium max-w-[160px] truncate text-slate-200">
-                {secondarySplitTab.title || secondarySplitTab.url}
-              </span>
-
-              {/* Swap Left/Right */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (primarySplitTab && secondarySplitTab) {
-                    handleReorderTabs(primarySplitTab.id, secondarySplitTab.id);
-                  }
-                }}
-                className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Swap Left & Right"
-              >
-                <ArrowLeftRight className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Unsplit / Separate Tabs */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (primarySplitTab && secondarySplitTab) {
-                    handleCloseSplitView(primarySplitTab.id, secondarySplitTab.id);
-                  } else {
-                    handleCloseSplitView();
-                  }
-                }}
-                className="p-1 hover:bg-white/15 rounded text-slate-300 hover:text-white transition-colors cursor-pointer"
-                title="Separate Tabs"
-              >
-                <Columns2 className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Close Tab */}
-              <button 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCloseTab(secondarySplitTab.id);
-                }}
-                className="p-1 hover:bg-red-500/80 rounded text-red-400 hover:text-white transition-colors cursor-pointer"
-                title="Close Tab"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <BrowserView 
-              tab={secondarySplitTab}
-              onNavigate={(url, tabId) => handleNavigate(url, tabId || secondarySplitTab.id)}
-              onUpdateTab={handleUpdateTab}
-              onNewTab={(url, srcId) => handleNewTab(url, srcId || secondarySplitTab.id)}
-              onActivate={handleSelectTab}
-              onFoundInPage={handleFoundInPage}
-              searchEngine={settings.searchEngine}
-              privacyShield={settings.privacyShield}
-              newTabBackground={settings.newTabBackground}
-              disableTasksWidget={demoParams.feature === 'website'}
-              settings={browserViewSettings}
-              onUpdateSettings={handleUpdateSettings}
-              onExportData={handleExportData}
-              onImportData={handleImportData}
-              isActive={true}
-              onCloseTab={handleCloseTab}
-              isIncognito={secondarySplitTab.isIncognito || false}
-              history={typeof secondarySplitTab?.url === 'string' && secondarySplitTab.url.includes('nova://history') ? history : EMPTY_ARRAY}
-              downloads={typeof secondarySplitTab?.url === 'string' && secondarySplitTab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
-              onClearHistory={handleClearHistory}
-              onRemoveHistoryItem={handleRemoveHistoryItem}
-              onClearDownloads={handleClearDownloads}
-              onPurgeMemory={handlePurgeMemory}
-              isDemo={demoParams.isDemo}
+                const handleMouseUp = (upEvent: MouseEvent) => {
+                  document.removeEventListener('mousemove', handleMouseMove);
+                  document.removeEventListener('mouseup', handleMouseUp);
+                  
+                  const deltaX = upEvent.pageX - startX;
+                  const container = document.getElementById('browser-views-container');
+                  const containerWidth = container ? container.clientWidth : document.body.clientWidth;
+                  let finalRatio = startRatio + (deltaX / containerWidth) * 100;
+                  finalRatio = Math.max(20, Math.min(80, finalRatio));
+                  setSplitRatio(finalRatio);
+                };
+                
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+              }}
             />
-          </div>
-        )}
+          )}
+        </div>
 
         {/* AI Assistant Side Panel */}
         <React.Suspense fallback={null}>
