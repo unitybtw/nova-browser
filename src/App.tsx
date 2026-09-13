@@ -1266,59 +1266,58 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     };
 
-    let activePalette: BrowserThemePalette;
+    let activeDarkPalette: BrowserThemePalette;
+    let activeLightPalette: BrowserThemePalette;
 
     if (browserColorPreset === 'custom') {
       const customHex = (settings.customBrowserColor && /^#[0-9a-fA-F]{3,8}$/.test(settings.customBrowserColor))
         ? settings.customBrowserColor
         : '#6366f1';
-      if (isDark) {
-        activePalette = {
-          slate950: `color-mix(in srgb, ${customHex} 12%, #030305)`,
-          slate900: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
-          slate800: `color-mix(in srgb, ${customHex} 32%, #101017)`,
-          slate700: `color-mix(in srgb, ${customHex} 45%, #181824)`,
-          slate200: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
-          slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
-          slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
-          background: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
-          card: `color-mix(in srgb, ${customHex} 32%, #101017)`,
-          popover: `color-mix(in srgb, ${customHex} 32%, #101017)`,
-          border: `color-mix(in srgb, ${customHex} 30%, rgba(255, 255, 255, 0.08))`,
-          frame: `color-mix(in srgb, ${customHex} 15%, #050508)`,
-          header: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
-          toolbar: `color-mix(in srgb, ${customHex} 32%, #101017)`,
-          sidebar: `color-mix(in srgb, ${customHex} 15%, #050508)`,
-          activeTab: `color-mix(in srgb, ${customHex} 32%, #101017)`,
-          hover: 'rgba(255, 255, 255, 0.06)'
-        };
-      } else {
-        activePalette = {
-          slate950: `color-mix(in srgb, ${customHex} 30%, #0f172a)`,
-          slate900: `color-mix(in srgb, ${customHex} 25%, #1e293b)`,
-          slate800: `color-mix(in srgb, ${customHex} 20%, #334155)`,
-          slate700: `color-mix(in srgb, ${customHex} 15%, #475569)`,
-          slate200: `color-mix(in srgb, ${customHex} 15%, #e2e8f0)`,
-          slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
-          slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
-          background: '#ffffff',
-          card: '#ffffff',
-          popover: '#ffffff',
-          border: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
-          frame: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
-          header: `color-mix(in srgb, ${customHex} 14%, #f1f5f9)`,
-          toolbar: '#ffffff',
-          sidebar: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
-          activeTab: '#ffffff',
-          hover: 'rgba(0, 0, 0, 0.05)'
-        };
-      }
+      activeDarkPalette = {
+        slate950: `color-mix(in srgb, ${customHex} 12%, #030305)`,
+        slate900: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+        slate800: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+        slate700: `color-mix(in srgb, ${customHex} 45%, #181824)`,
+        slate200: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
+        slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
+        slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
+        background: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+        card: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+        popover: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+        border: `color-mix(in srgb, ${customHex} 30%, rgba(255, 255, 255, 0.08))`,
+        frame: `color-mix(in srgb, ${customHex} 15%, #050508)`,
+        header: `color-mix(in srgb, ${customHex} 22%, #08080c)`,
+        toolbar: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+        sidebar: `color-mix(in srgb, ${customHex} 15%, #050508)`,
+        activeTab: `color-mix(in srgb, ${customHex} 32%, #101017)`,
+        hover: 'rgba(255, 255, 255, 0.06)'
+      };
+      activeLightPalette = {
+        slate950: `color-mix(in srgb, ${customHex} 30%, #0f172a)`,
+        slate900: `color-mix(in srgb, ${customHex} 25%, #1e293b)`,
+        slate800: `color-mix(in srgb, ${customHex} 20%, #334155)`,
+        slate700: `color-mix(in srgb, ${customHex} 15%, #475569)`,
+        slate200: `color-mix(in srgb, ${customHex} 15%, #e2e8f0)`,
+        slate100: `color-mix(in srgb, ${customHex} 10%, #f1f5f9)`,
+        slate50: `color-mix(in srgb, ${customHex} 5%, #f8fafc)`,
+        background: '#ffffff',
+        card: '#ffffff',
+        popover: '#ffffff',
+        border: `color-mix(in srgb, ${customHex} 20%, #e2e8f0)`,
+        frame: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
+        header: `color-mix(in srgb, ${customHex} 14%, #f1f5f9)`,
+        toolbar: '#ffffff',
+        sidebar: `color-mix(in srgb, ${customHex} 8%, #f8fafc)`,
+        activeTab: '#ffffff',
+        hover: 'rgba(0, 0, 0, 0.05)'
+      };
     } else {
       const palette = browserColorPresets[browserColorPreset] || browserColorPresets.default;
-      activePalette = isDark ? palette.dark : palette.light;
+      activeDarkPalette = palette.dark;
+      activeLightPalette = palette.light;
     }
 
-    const cssVariables = {
+    const buildPaletteVariables = (palette: BrowserThemePalette, isDarkMode: boolean) => ({
       '--color-blue-50': `color-mix(in srgb, ${hex} 10%, white)`,
       '--color-blue-100': `color-mix(in srgb, ${hex} 20%, white)`,
       '--color-blue-200': `color-mix(in srgb, ${hex} 40%, white)`,
@@ -1340,30 +1339,50 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       '--color-accent-light': `color-mix(in srgb, ${hex} 20%, white)`,
       '--color-accent-dark': `color-mix(in srgb, ${hex} 60%, black)`,
       '--color-accent-text': '#ffffff',
-      '--nova-slate-950': activePalette.slate950,
-      '--nova-slate-900': activePalette.slate900,
-      '--nova-slate-800': activePalette.slate800,
-      '--nova-slate-700': activePalette.slate700,
-      '--nova-slate-200': activePalette.slate200,
-      '--nova-slate-100': activePalette.slate100,
-      '--nova-slate-50': activePalette.slate50,
-      '--background': activePalette.background,
-      '--card': activePalette.card,
-      '--popover': activePalette.popover,
-      '--border': activePalette.border,
-      '--nova-frame-bg': activePalette.frame,
-      '--nova-header-bg': activePalette.header,
-      '--nova-toolbar-bg': activePalette.toolbar,
-      '--nova-sidebar-bg': activePalette.sidebar,
-      '--nova-active-tab-bg': activePalette.activeTab,
-      '--nova-inactive-tab-hover-bg': activePalette.hover,
-      '--nova-border-subtle': activePalette.border,
-      '--nova-card-bg': activePalette.card
-    };
+      '--nova-slate-950': palette.slate950,
+      '--nova-slate-900': palette.slate900,
+      '--nova-slate-800': palette.slate800,
+      '--nova-slate-700': palette.slate700,
+      '--nova-slate-200': palette.slate200,
+      '--nova-slate-100': palette.slate100,
+      '--nova-slate-50': palette.slate50,
+      '--color-slate-950': palette.slate950,
+      '--color-slate-900': palette.slate900,
+      '--color-slate-800': palette.slate800,
+      '--color-slate-700': palette.slate700,
+      '--color-slate-200': palette.slate200,
+      '--color-slate-100': palette.slate100,
+      '--color-slate-50': palette.slate50,
+      '--background': palette.background,
+      '--foreground': isDarkMode ? '#fafafa' : '#09090b',
+      '--color-background': palette.background,
+      '--color-foreground': isDarkMode ? '#fafafa' : '#09090b',
+      '--card': palette.card,
+      '--color-card': palette.card,
+      '--card-foreground': isDarkMode ? '#fafafa' : '#09090b',
+      '--popover': palette.popover,
+      '--color-popover': palette.popover,
+      '--popover-foreground': isDarkMode ? '#fafafa' : '#09090b',
+      '--border': palette.border,
+      '--color-border': palette.border,
+      '--nova-frame-bg': palette.frame,
+      '--nova-header-bg': palette.header,
+      '--nova-toolbar-bg': palette.toolbar,
+      '--nova-sidebar-bg': palette.sidebar,
+      '--nova-active-tab-bg': palette.activeTab,
+      '--nova-inactive-tab-hover-bg': palette.hover,
+      '--nova-border-subtle': palette.border,
+      '--nova-card-bg': palette.card
+    });
+
+    const lightVars = buildPaletteVariables(activeLightPalette, false);
+    const darkVars = buildPaletteVariables(activeDarkPalette, true);
+    const activePalette = isDark ? activeDarkPalette : activeLightPalette;
+    const currentVars = isDark ? darkVars : lightVars;
 
     // Apply directly to root style object for immediate reactivity
     const rootStyle = document.documentElement.style;
-    for (const [key, value] of Object.entries(cssVariables)) {
+    for (const [key, value] of Object.entries(currentVars)) {
       rootStyle.setProperty(key, value);
     }
 
@@ -1376,7 +1395,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     
     accentStyleEl.textContent = `
       :root, html, body {
-        ${Object.entries(cssVariables).map(([k, v]) => `${k}: ${v};`).join('\n        ')}
+        ${Object.entries(lightVars).map(([k, v]) => `${k}: ${v} !important;`).join('\n        ')}
+      }
+      .dark, html.dark, body.dark, :is(.dark *), [data-theme="dark"] {
+        ${Object.entries(darkVars).map(([k, v]) => `${k}: ${v} !important;`).join('\n        ')}
       }
     `;
 

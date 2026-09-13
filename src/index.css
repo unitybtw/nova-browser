@@ -85,34 +85,34 @@
   --nova-slate-100: #f1f5f9;
   --nova-slate-50: #f8fafc;
 
-  --background: #151122;
+  --background: var(--nova-slate-900);
   --foreground: #fafafa;
-  --card: #1e1b2e;
+  --card: var(--nova-slate-800);
   --card-foreground: #fafafa;
-  --popover: #1e1b2e;
+  --popover: var(--nova-slate-800);
   --popover-foreground: #fafafa;
   --primary: #fafafa;
   --primary-foreground: #18181b;
-  --secondary: #27272a;
+  --secondary: var(--nova-slate-800);
   --secondary-foreground: #fafafa;
-  --muted: #27272a;
+  --muted: var(--nova-slate-800);
   --muted-foreground: #a1a1aa;
-  --accent: #27272a;
+  --accent: var(--nova-slate-800);
   --accent-foreground: #fafafa;
   --destructive: #7f1d1d;
   --destructive-foreground: #fafafa;
-  --border: #2d2842;
-  --input: #27272a;
+  --border: var(--nova-slate-700);
+  --input: var(--nova-slate-800);
   --ring: #d4d4d8;
 
-  --nova-frame-bg: #151122;
-  --nova-header-bg: #151122;
-  --nova-toolbar-bg: #1e1b2e;
-  --nova-sidebar-bg: #151122;
-  --nova-active-tab-bg: #1e1b2e;
+  --nova-frame-bg: var(--nova-slate-950);
+  --nova-header-bg: var(--nova-slate-900);
+  --nova-toolbar-bg: var(--nova-slate-800);
+  --nova-sidebar-bg: var(--nova-slate-950);
+  --nova-active-tab-bg: var(--nova-slate-800);
   --nova-inactive-tab-hover-bg: rgba(255, 255, 255, 0.06);
   --nova-border-subtle: rgba(255, 255, 255, 0.08);
-  --nova-card-bg: #1e1b2e;
+  --nova-card-bg: var(--nova-slate-800);
 }
 
 @layer utilities {

@@ -513,7 +513,10 @@ const renderBackgroundAnimation = (id: string, isHovered: boolean, isSelected: b
     case 'default':
     default:
       return (
-        <div className="absolute inset-0 bg-[#0B0F19] overflow-hidden" />
+        <div 
+          className="absolute inset-0 overflow-hidden transition-colors" 
+          style={{ backgroundColor: 'var(--nova-frame-bg)' }}
+        />
       );
   }
 };
