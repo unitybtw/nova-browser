@@ -310,6 +310,86 @@ function updateAdblockWhitelist(whitelist: string[]) {
   currentWhitelistFilters = newFilters;
 }
 
+// Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
+const hardenedIncognitoPartitions = new Set<string>();
+
+// Active Chromium proxy rules applied across default and all per-tab incognito sessions
+let activeChromiumProxyRules = 'direct://';
+
+function applyProxyToSession(targetSession: Electron.Session, rules: string) {
+  try {
+    targetSession.setProxy({ proxyRules: rules }).catch((e) => {
+      console.warn('[VPN] setProxy failed on session:', e);
+    });
+  } catch (e) {
+    console.warn('[VPN] setProxy exception on session:', e);
+  }
+}
+
+async function applyProxyToAllSessions(rules: string) {
+  activeChromiumProxyRules = rules;
+  const promises: Promise<void>[] = [
+    session.defaultSession.setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] defaultSession setProxy failed:', e)),
+    session.fromPartition('incognito').setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] incognito setProxy failed:', e)),
+  ];
+  for (const partName of hardenedIncognitoPartitions) {
+    try {
+      promises.push(session.fromPartition(partName, { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn(`[VPN] ${partName} setProxy failed:`, e)));
+    } catch (_) {}
+  }
+  await Promise.all(promises);
+}
+
+function applyAdBlockerToAllSessions(enable: boolean) {
+  if (!blocker) return;
+  const sessions = [session.defaultSession, session.fromPartition('incognito')];
+  for (const partName of hardenedIncognitoPartitions) {
+    try {
+      sessions.push(session.fromPartition(partName, { cache: false }));
+    } catch (_) {}
+  }
+  for (const sess of sessions) {
+    try {
+      if (enable) {
+        blocker.enableBlockingInSession(sess);
+      } else {
+        blocker.disableBlockingInSession(sess);
+      }
+    } catch (e) {
+      console.warn(`[AdBlocker] Failed to ${enable ? 'enable' : 'disable'} blocking in session:`, e);
+    }
+  }
+}
+
+function hardenIncognitoPartition(partitionName: string): boolean {
+  if (hardenedIncognitoPartitions.has(partitionName)) return true;
+  try {
+    const partSess = session.fromPartition(partitionName, { cache: false });
+    // Apply full security hardening (permissions handlers)
+    applyStrictSecurityToSession(partSess);
+    // Apply privacy headers (DNT, GPC, user-agent)
+    applyPrivacyHeadersToSession(partSess);
+    // Register download handler for this partition
+    registerDownloadsManager(partSess);
+    // Apply active proxy if VPN is enabled
+    if (activeChromiumProxyRules && activeChromiumProxyRules !== 'direct://') {
+      applyProxyToSession(partSess, activeChromiumProxyRules);
+    }
+    // Apply ad blocker if enabled
+    if (isPrivacyShieldEnabled && blocker) {
+      try { blocker.enableBlockingInSession(partSess); } catch (e) {
+        console.error(`[Security] Failed to enable ad blocking for partition ${partitionName}:`, e);
+      }
+    }
+    hardenedIncognitoPartitions.add(partitionName);
+    console.log(`[Security] Hardened incognito partition: ${partitionName}`);
+    return true;
+  } catch (err) {
+    console.error(`[Security] Failed to harden incognito partition ${partitionName}:`, err);
+    return false;
+  }
+}
+
 // Initialize AdBlocker in a dedicated function called after app.whenReady()
 // to prevent race conditions and invalid path resolution from top-level app.getPath('userData').
 function initAdBlocker() {
@@ -331,8 +411,7 @@ function initAdBlocker() {
     blocker = engine;
 
     if (isPrivacyShieldEnabled) {
-      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable adblocking in default session:', e); }
-      try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable adblocking in incognito session:', e); }
+      applyAdBlockerToAllSessions(true);
     }
 
     const pendingAdBlocks = new Map<number, number>();
@@ -1197,8 +1276,7 @@ app.whenReady().then(async () => {
 
       if (savedVpn?.enabled && isValidSecureProxy(savedVpn?.proxyRules)) {
         const rules = normalizeProxyForChromium(savedVpn.proxyRules);
-        session.defaultSession.setProxy({ proxyRules: rules }).catch(() => {});
-        session.fromPartition('incognito').setProxy({ proxyRules: rules }).catch(() => {});
+        applyProxyToAllSessions(rules);
       } else {
         // Cleartext, pac-script, malformed, or tampered proxy: purge corrupt/plaintext file
         try { fs.unlinkSync(vpnConfigPath); } catch (_) {}
@@ -2678,6 +2756,19 @@ app.on('web-contents-created', (_event, contents) => {
     webPreferences.sandbox = true;
     webPreferences.backgroundThrottling = true;
 
+    // Security: Validate partition to prevent unauthorized partitions (e.g. persist:admin)
+    const part = (webPreferences as any).partition || (params as any).partition;
+    if (part && typeof part === 'string') {
+      if (part !== '' && !/^incognito-[a-zA-Z0-9_-]+$/.test(part)) {
+        console.warn(`[Security] Blocked unauthorized webview partition: ${part}`);
+        event.preventDefault();
+        return;
+      }
+      if (part.startsWith('incognito-')) {
+        hardenIncognitoPartition(part);
+      }
+    }
+
     // Security: Only attach webstore-preload.cjs to authorized Chrome Web Store origins.
     // Untrusted third-party websites must never receive webstore APIs or privileges.
     let isAuthorizedWebstore = false;
@@ -2918,15 +3009,7 @@ app.on('window-all-closed', () => {
 ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
   if (!isTrustedSender(event)) return false;
   isPrivacyShieldEnabled = Boolean(enabled);
-  if (blocker) {
-    if (isPrivacyShieldEnabled) {
-      try { blocker.enableBlockingInSession(session.defaultSession); } catch (e) { console.error('Failed to enable ad blocking in default session:', e); }
-      try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch (e) { console.error('Failed to enable ad blocking in incognito session:', e); }
-    } else {
-      try { blocker.disableBlockingInSession(session.defaultSession); } catch(e) {}
-      try { blocker.disableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
-    }
-  }
+  applyAdBlockerToAllSessions(isPrivacyShieldEnabled);
   return isPrivacyShieldEnabled;
 });
 
@@ -3634,35 +3717,13 @@ ipcMain.handle('get-mcp-status', (event) => {
 });
 
 // Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
-const hardenedIncognitoPartitions = new Set<string>();
-
 // Security: Init and harden a new per-tab incognito partition. Called by the renderer
 // immediately after creating a new incognito tab, before any navigation occurs.
 // Applies the same permission/download/proxy restrictions as defaultSession.
 ipcMain.handle('init-incognito-partition', async (event, tabId: unknown) => {
   if (!isTrustedSender(event)) return false;
   if (typeof tabId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(tabId) || tabId.length > 64) return false;
-  const partitionName = `incognito-${tabId}`;
-  if (hardenedIncognitoPartitions.has(partitionName)) return true; // Already hardened
-  try {
-    const partSess = session.fromPartition(partitionName, { cache: false });
-    // Apply full security hardening (same as defaultSession)
-    applyStrictSecurityToSession(partSess);
-    // Apply privacy headers (DNT, GPC, user-agent)
-    applyPrivacyHeadersToSession(partSess);
-    // Register download handler for this partition
-    registerDownloadsManager(partSess);
-    // Apply ad blocker if enabled
-    if (isPrivacyShieldEnabled && blocker) {
-      try { blocker.enableBlockingInSession(partSess); } catch (e) { console.error(`[Security] Failed to enable ad blocking for partition ${partitionName}:`, e); }
-    }
-    hardenedIncognitoPartitions.add(partitionName);
-    console.log(`[Security] Hardened incognito partition: ${partitionName}`);
-    return true;
-  } catch (err) {
-    console.error(`[Security] Failed to harden incognito partition ${partitionName}:`, err);
-    return false;
-  }
+  return hardenIncognitoPartition(`incognito-${tabId}`);
 });
 
 // Clear incognito mode session — accepts optional tabId for per-tab partition isolation.
@@ -3679,7 +3740,17 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       // Remove from hardened set so the next open of this tabId gets fresh hardening
       hardenedIncognitoPartitions.delete(partitionName);
     } else {
-      // Fallback: clear the legacy shared 'incognito' partition.
+      // Clear all active per-tab incognito partitions
+      for (const partName of Array.from(hardenedIncognitoPartitions)) {
+        try {
+          const sess = session.fromPartition(partName);
+          await sess.clearStorageData();
+          await sess.clearCache();
+        } catch (_) {}
+      }
+      hardenedIncognitoPartitions.clear();
+
+      // Clear the legacy shared 'incognito' partition.
       const legacySess = session.fromPartition('incognito');
       await legacySess.clearStorageData();
       await legacySess.clearCache();
@@ -3929,10 +4000,7 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   // In Chromium, socks5:// already performs remote DNS resolution. Normalize to socks5://.
   const chromiumRules = (isEnabled && rawProxyUrl) ? normalizeProxyForChromium(rawProxyUrl) : 'direct://';
 
-  await Promise.all([
-    session.defaultSession.setProxy({ proxyRules: chromiumRules }),
-    session.fromPartition('incognito').setProxy({ proxyRules: chromiumRules }),
-  ]);
+  await applyProxyToAllSessions(chromiumRules);
   try {
     const vpnConfigPath = path.join(app.getPath('userData'), 'vpn_proxy.json');
     if (isEnabled && rawProxyUrl) {

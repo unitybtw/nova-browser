@@ -338,7 +338,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       
       try {
         popoverState.range.surroundContents(span);
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Could not surround range with highlight:', e);
+        setPopoverState({ visible: false, top: 0, left: 0, text: '' });
+        return;
+      }
     }
 
     setHighlights(updated);
@@ -381,10 +385,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
   // Extract sentences when content changes using smart Intl / regex sentence splitting
   useEffect(() => {
     if (contentRef.current) {
-      // Defense in depth: enforce rel/target on rendered article links (tabnabbing).
+      // Defense in depth: enforce rel/target on rendered article links (tabnabbing) and purge non-safe schemes.
       contentRef.current.querySelectorAll('a').forEach((a) => {
-        a.setAttribute('rel', 'noopener noreferrer');
-        a.setAttribute('target', '_blank');
+        const href = a.getAttribute('href');
+        if (href && !/^(?:https?|mailto|tel):/i.test(href)) {
+          a.removeAttribute('href');
+        } else {
+          a.setAttribute('rel', 'noopener noreferrer');
+          a.setAttribute('target', '_blank');
+        }
       });
       const text = contentRef.current.innerText || title;
       const parsed = splitIntoSentences(text);

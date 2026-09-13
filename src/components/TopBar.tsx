@@ -677,13 +677,16 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     return () => window.removeEventListener('nova:translate-tab-done', handleDone);
   }, [activeTab?.id]);
 
+  const handleTranslatePageRef = useRef(handleTranslatePage);
+  handleTranslatePageRef.current = handleTranslatePage;
+
   // Listen to main process context-menu trigger
   useEffect(() => {
     if (typeof (window as any).electronAPI?.onTriggerPageTranslation === 'function') {
       const unsub = (window as any).electronAPI.onTriggerPageTranslation((data: any) => {
         if (activeTab?.id) {
           setIsTranslateOpen(true);
-          handleTranslatePage(data?.targetLang || 'tr', 'auto');
+          handleTranslatePageRef.current(data?.targetLang || 'tr', 'auto');
         }
       });
       return () => unsub?.();

@@ -1265,6 +1265,10 @@ CRITICAL RULES:
 
     } catch (err: any) {
       console.error("Failed to initialize AI Engine:", err);
+      if (this.worker) {
+        try { this.worker.terminate(); } catch (_) {}
+        this.worker = null;
+      }
       this.engine = null;
       this.emitStatus('error', err?.message || String(err));
       throw err;
