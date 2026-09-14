@@ -45,7 +45,6 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
   // Update position when selected tab or navbar visibility changes
   useEffect(() => {
     if (visible) {
-      // Small tick to ensure element dimensions are laid out after visibility transition
       const timer = setTimeout(() => {
         updatePosition(selected);
       }, 30);
@@ -173,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     <>
       {/* 1. DESKTOP FLOATING SLIDETABS DOCK (md: and up) */}
       <header
-        className={`hidden md:flex fixed top-5 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`hidden md:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
@@ -181,64 +180,22 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           <ul
             ref={dockRef}
             onMouseLeave={() => updatePosition(selected)}
-            className="relative mx-auto flex w-fit items-center rounded-full border border-white/15 bg-[#0c0d12]/92 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+            className="relative mx-auto flex w-fit items-center rounded-full border-2 border-black bg-white p-1 shadow-2xl dark:border-white dark:bg-neutral-800"
           >
-            {/* Left Brand Badge */}
-            <button
-              type="button"
-              onClick={() => handleTabClick(0, '#top')}
-              className="flex items-center gap-2 pl-3 pr-3.5 py-1.5 mr-1 border-r border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
-              title="Nova Browser"
-            >
-              <img src="/logo.svg" alt="Nova" className="h-4.5 w-4.5 object-contain" />
-              <span className="font-display font-bold text-xs text-white">Nova</span>
-            </button>
-
-            {/* Navigation Tabs */}
             {NAV_TABS.map((tab, i) => (
-              <li
+              <Tab
                 key={tab.label}
                 ref={(el) => {
                   tabsRef.current[i] = el;
                 }}
+                setPosition={setPosition}
                 onClick={() => handleTabClick(i, tab.href)}
-                onMouseEnter={() => updatePosition(i)}
-                className={`relative z-10 block cursor-pointer px-3.5 py-1.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors duration-150 select-none whitespace-nowrap ${
-                  selected === i
-                    ? 'text-white font-bold'
-                    : 'text-neutral-400 hover:text-white'
-                }`}
               >
                 {tab.label}
-              </li>
+              </Tab>
             ))}
 
-            {/* Active Pill Spring Indicator */}
-            <motion.li
-              animate={{
-                left: position.left,
-                width: position.width,
-                opacity: position.opacity,
-              }}
-              transition={{
-                type: 'spring',
-                stiffness: 450,
-                damping: 32,
-              }}
-              className="absolute z-0 inset-y-1.5 rounded-full bg-[#4338ca] shadow-[0_2px_12px_rgba(67,56,202,0.45)] pointer-events-none"
-            />
-
-            {/* Right Quick Download Action */}
-            <div className="ml-1 pl-2.5 border-l border-white/10 flex items-center">
-              <a
-                href="#download"
-                onClick={() => handleTabClick(4, '#download')}
-                className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white font-mono text-[11px] font-semibold px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
-                <span>v1.4.7</span>
-              </a>
-            </div>
+            <Cursor position={position} />
           </ul>
         </div>
       </header>
@@ -339,6 +296,66 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
         </AnimatePresence>
       </header>
     </>
+  );
+};
+
+interface TabProps {
+  children: React.ReactNode;
+  setPosition: React.Dispatch<
+    React.SetStateAction<{ left: number; width: number; opacity: number }>
+  >;
+  onClick: () => void;
+}
+
+const Tab = React.forwardRef<HTMLLIElement, TabProps>(
+  ({ children, setPosition, onClick }, ref) => {
+    return (
+      <li
+        ref={ref}
+        onClick={onClick}
+        onTouchStart={() => {
+          if (!ref || typeof ref === 'function' || !ref.current) return;
+          setPosition({
+            left: ref.current.offsetLeft,
+            width: ref.current.offsetWidth,
+            opacity: 1,
+          });
+        }}
+        onMouseEnter={() => {
+          if (!ref || typeof ref === 'function' || !ref.current) return;
+          setPosition({
+            left: ref.current.offsetLeft,
+            width: ref.current.offsetWidth,
+            opacity: 1,
+          });
+        }}
+        className="relative z-10 block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference select-none whitespace-nowrap sm:px-4 sm:py-2 sm:text-xs sm:tracking-wider md:text-sm"
+      >
+        {children}
+      </li>
+    );
+  }
+);
+
+Tab.displayName = 'Tab';
+
+interface CursorProps {
+  position: { left: number; width: number; opacity: number };
+}
+
+const Cursor: React.FC<CursorProps> = ({ position }) => {
+  return (
+    <motion.li
+      animate={{
+        ...position,
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 450,
+        damping: 32,
+      }}
+      className="absolute z-0 inset-y-1 rounded-full bg-black dark:bg-white pointer-events-none"
+    />
   );
 };
 
