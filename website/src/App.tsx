@@ -24,18 +24,30 @@ export default function App() {
     }
 
     let scrollTicking = false;
+    let isScrollingTimer: ReturnType<typeof setTimeout> | null = null;
+    let lastPastManifesto: boolean | null = null;
+
+    const stopScrolling = () => {
+      document.body.classList.remove('is-scrolling');
+    };
+
     const updateScrollState = () => {
-      const isPastManifesto = window.scrollY > window.innerHeight * 0.35;
-      setShowNav(isPastManifesto);
-      if (isPastManifesto) {
-        document.documentElement.classList.remove('in-manifesto');
-      } else {
-        document.documentElement.classList.add('in-manifesto');
+      const isPast = window.scrollY > window.innerHeight * 0.35;
+      if (isPast !== lastPastManifesto) {
+        lastPastManifesto = isPast;
+        setShowNav(isPast);
+        document.documentElement.classList.toggle('in-manifesto', !isPast);
       }
       scrollTicking = false;
     };
 
     const handleScroll = () => {
+      if (!document.body.classList.contains('is-scrolling')) {
+        document.body.classList.add('is-scrolling');
+      }
+      if (isScrollingTimer) clearTimeout(isScrollingTimer);
+      isScrollingTimer = setTimeout(stopScrolling, 90);
+
       if (!scrollTicking) {
         scrollTicking = true;
         requestAnimationFrame(updateScrollState);
@@ -44,10 +56,14 @@ export default function App() {
 
     updateScrollState();
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scrollend', stopScrolling, { passive: true });
 
     return () => {
+      if (isScrollingTimer) clearTimeout(isScrollingTimer);
+      document.body.classList.remove('is-scrolling');
       document.documentElement.classList.remove('in-manifesto');
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scrollend', stopScrolling);
     };
   }, []);
 

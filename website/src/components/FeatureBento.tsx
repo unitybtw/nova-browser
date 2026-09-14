@@ -61,7 +61,7 @@ export const FeatureBento: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section id="features" className="mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
+    <section id="features" className="section-deferred mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
       <div className="mb-12 flex flex-col gap-5 sm:mb-16 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
@@ -86,7 +86,7 @@ export const FeatureBento: React.FC = () => {
             whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={prefersReducedMotion ? undefined : { duration: 0.7, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-            className={`luxury-card ${mod.span} rounded-2xl bg-white/85 border border-neutral-200/60 p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden backdrop-blur-sm`}
+            className={`luxury-card ${mod.span} rounded-2xl bg-white border border-neutral-200/60 p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden shadow-xs`}
           >
             <div>
               <div className="flex items-center justify-between mb-6">

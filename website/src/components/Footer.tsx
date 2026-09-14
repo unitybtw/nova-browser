@@ -10,7 +10,7 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-0">
+    <footer className="section-deferred relative w-full overflow-hidden bg-[#0c0d12] text-[#fcfbf9] font-sans mt-20 rounded-t-3xl border-t border-white/10 pt-16 pb-0">
       {/* Full-width Left-Right Aligned Content Container */}
       <div className="relative z-10 mx-auto w-full px-6 sm:px-10 lg:px-16">
         <div className="grid grid-cols-1 items-start gap-10 border-b border-white/10 pb-14 md:grid-cols-12 lg:gap-16">

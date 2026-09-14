@@ -255,7 +255,7 @@ export const Benchmarks: React.FC = () => {
   const savedPercentage = Math.round((savedMemoryEst / chromeMemoryEst) * 100);
 
   return (
-    <section id="benchmarks" className="mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
+    <section id="benchmarks" className="section-deferred mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
       <div className="mb-8 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
@@ -406,7 +406,7 @@ export const Benchmarks: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
             {/* Left Card: Metric Breakdown & Live Bar Comparison */}
-            <div className="luxury-card lg:col-span-8 rounded-3xl border border-neutral-200/60 bg-white/90 p-5 shadow-xs sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm">
+            <div className="luxury-card lg:col-span-8 rounded-3xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
@@ -536,7 +536,7 @@ export const Benchmarks: React.FC = () => {
             <p className="mt-1 text-xs text-neutral-500">Benchmark your real-world browsing workload against traditional browser process architecture.</p>
           </div>
 
-          <div className="luxury-card p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-white via-neutral-50/90 to-indigo-50/20 border border-[#e0e0e8] shadow-md backdrop-blur-sm relative overflow-hidden">
+          <div className="luxury-card p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-white via-neutral-50 to-indigo-50/30 border border-[#e0e0e8] shadow-md relative overflow-hidden">
             {/* Background Ambient Glow */}
             <div className="pointer-events-none absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
 

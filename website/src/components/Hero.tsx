@@ -21,11 +21,10 @@ export const Hero: React.FC = () => {
 
   return (
     <section className="relative isolate mx-auto flex max-w-7xl flex-col items-center px-4 pb-16 pt-16 text-center sm:px-6 sm:pb-24 sm:pt-24 md:pt-28">
-      {/* GPU-Accelerated Dynamic Ambient Bloom */}
+      {/* Ambient Radial Bloom */}
       <div
-        className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 h-[520px] w-full max-w-5xl -z-10 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(67,56,202,0.14),rgba(56,189,248,0.06)_50%,transparent_80%)] blur-3xl"
+        className="pointer-events-none absolute -top-28 left-1/2 -translate-x-1/2 h-[520px] w-full max-w-5xl -z-10 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,rgba(67,56,202,0.12),rgba(56,189,248,0.05)_45%,transparent_75%)]"
         aria-hidden="true"
-        style={{ willChange: 'opacity, transform', transform: 'translate3d(0,0,0)' }}
       />
 
       {/* 2. Kinetic Headline with Shimmering Indigo Accent */}

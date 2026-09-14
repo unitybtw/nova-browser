@@ -153,6 +153,14 @@ export const TextRevealCard: React.FC<TextRevealCardProps> = ({ className = "" }
 
     const loop = () => {
       if (!running) return;
+
+      // Yield GPU cycles to page compositor during active scroll
+      if (document.body.classList.contains('is-scrolling')) {
+        last = performance.now();
+        raf = requestAnimationFrame(loop);
+        return;
+      }
+
       const now = performance.now();
       const dt = Math.min(0.05, Math.max(0.001, (now - last) / 1000));
       last = now;
@@ -198,9 +206,7 @@ export const TextRevealCard: React.FC<TextRevealCardProps> = ({ className = "" }
         held += ((phase === "hold" ? 1 : 0) - held) * (1 - Math.pow(0.02, dt));
         const breathe = Math.sin(clock * 0.45) * 0.5 + 0.5;
         const s = 1 + held * breathe * 0.0015;
-        const b = 1 + held * (breathe - 0.5) * 0.012;
         gl.canvas.style.transform = `scale(${s.toFixed(4)})`;
-        gl.canvas.style.filter = `brightness(${b.toFixed(3)})`;
       }
 
       raf = requestAnimationFrame(loop);

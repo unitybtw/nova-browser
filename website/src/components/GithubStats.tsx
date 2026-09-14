@@ -137,7 +137,7 @@ export const GithubStats: React.FC = () => {
     <section
       ref={sectionRef}
       id="community"
-      className={`community-section mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-24${isSectionInView ? ' is-visible' : ''}`}
+      className={`section-deferred community-section mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-24${isSectionInView ? ' is-visible' : ''}`}
     >
       {/* Section Header */}
       <div className="mb-10 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-6">
@@ -163,7 +163,7 @@ export const GithubStats: React.FC = () => {
 
       {/* KPI Stats Grid */}
       <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
-        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               STARS
@@ -183,7 +183,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 2: Forks */}
-        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               FORKS
@@ -203,7 +203,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 3: License */}
-        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LICENSE
@@ -223,7 +223,7 @@ export const GithubStats: React.FC = () => {
         </div>
 
         {/* Metric 4: Latest Sync */}
-        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-4 shadow-xs backdrop-blur-sm sm:p-6">
+        <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
               LAST UPDATE
@@ -244,7 +244,7 @@ export const GithubStats: React.FC = () => {
       </div>
 
       {/* INTERACTIVE STAR GROWTH CHART */}
-      <div className="luxury-card mb-8 rounded-3xl border border-neutral-200/60 bg-white/90 p-6 shadow-xs backdrop-blur-sm sm:p-8">
+      <div className="luxury-card mb-8 rounded-3xl border border-neutral-200/60 bg-white p-6 shadow-xs sm:p-8">
         {/* Chart Header & Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-6 border-b border-neutral-100">
           <div>

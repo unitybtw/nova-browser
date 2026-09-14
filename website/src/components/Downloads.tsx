@@ -43,7 +43,7 @@ export const Downloads: React.FC = () => {
   };
 
   return (
-    <section id="download" className="mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
+    <section id="download" className="section-deferred mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
@@ -65,7 +65,7 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
         >
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -134,7 +134,7 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
         >
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
@@ -203,7 +203,7 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
+          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
         >
           <div>
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">

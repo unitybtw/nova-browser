@@ -142,13 +142,23 @@ section {
 }
 
 /* 120 FPS GPU Compositing Optimizations */
-.luxury-card,
-.luxury-button,
 .browser-demo,
 [data-canvas-card],
 canvas {
   transform: translateZ(0);
   backface-visibility: hidden;
+}
+
+/* Modern Web Guidance: Defer Offscreen Rendering (content-visibility: auto) */
+.section-deferred {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 850px;
+}
+
+/* Defer expensive hover calculations & style recalcs during fast scroll */
+body.is-scrolling,
+body.is-scrolling * {
+  pointer-events: none !important;
 }
 
 /* Modern Web Guidance: Physics-Based Deceleration & Spring Easing */
@@ -159,21 +169,21 @@ canvas {
 
 .luxury-card {
   position: relative;
-  will-change: transform, box-shadow;
-  transition: transform 300ms var(--ease-glide), box-shadow 300ms var(--ease-glide), border-color 250ms ease;
+  transition: transform 250ms var(--ease-glide), box-shadow 250ms var(--ease-glide), border-color 200ms ease;
 }
 
 .luxury-card:hover {
+  will-change: transform;
   border-color: rgba(99, 102, 241, 0.28);
   box-shadow: 0 16px 36px rgba(67, 56, 202, 0.09);
 }
 
 .luxury-button {
-  will-change: transform, box-shadow;
-  transition: transform 220ms var(--ease-glide), box-shadow 220ms var(--ease-glide), background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+  transition: transform 200ms var(--ease-glide), box-shadow 200ms var(--ease-glide), background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }
 
 .luxury-button:hover {
+  will-change: transform;
   box-shadow: 0 10px 24px rgba(67, 56, 202, 0.14);
 }
 

@@ -83,10 +83,28 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     };
   }, [selected, updatePosition]);
 
-  // Robust ScrollSpy that detects active section without dead zones or flickers
+  // Cached section offsets to eliminate layout thrashing during scroll
+  const sectionCacheRef = useRef<{ id: string; top: number }[]>([]);
+
+  // Robust, zero-thrash ScrollSpy that uses cached offsets during active scrolling
   useEffect(() => {
     const sectionIds = ['manifesto', 'features', 'community', 'benchmarks', 'download', 'faq'];
     let ticking = false;
+
+    const measureSections = () => {
+      const cache: { id: string; top: number }[] = [];
+      for (const id of sectionIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          cache.push({ id, top: el.offsetTop });
+        }
+      }
+      sectionCacheRef.current = cache;
+    };
+
+    measureSections();
+    const ro = new ResizeObserver(() => measureSections());
+    ro.observe(document.body);
 
     const updateActiveTab = () => {
       if (isClickScrollingRef.current) {
@@ -99,9 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
       const docHeight = document.documentElement.scrollHeight;
 
       // 1. Top of page / Manifesto zone
-      const manifestoEl = document.getElementById('manifesto') || document.getElementById('top');
-      const manifestoBottom = manifestoEl ? manifestoEl.offsetTop + manifestoEl.offsetHeight : viewportHeight;
-      if (scrollY < manifestoBottom - 260) {
+      if (scrollY < viewportHeight * 0.4) {
         setSelected(0);
         ticking = false;
         return;
@@ -114,13 +130,12 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
         return;
       }
 
-      // 3. Reverse traversal: lock onto the latest section that has entered the upper 38% of the viewport
+      // 3. Reverse traversal using cached positions (zero layout thrashing)
       const triggerPoint = scrollY + viewportHeight * 0.38;
-      for (let i = sectionIds.length - 1; i >= 1; i--) {
-        const el = document.getElementById(sectionIds[i]);
-        if (el) {
-          const top = el.offsetTop;
-          if (triggerPoint >= top) {
+      const cache = sectionCacheRef.current;
+      if (cache.length > 0) {
+        for (let i = cache.length - 1; i >= 1; i--) {
+          if (triggerPoint >= cache[i].top) {
             setSelected(i);
             ticking = false;
             return;
@@ -139,9 +154,20 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
       }
     };
 
+    const handleScrollEnd = () => {
+      measureSections();
+      updateActiveTab();
+    };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('scrollend', handleScrollEnd, { passive: true });
+    window.addEventListener('resize', measureSections, { passive: true });
+
     return () => {
+      ro.disconnect();
       window.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('scrollend', handleScrollEnd);
+      window.removeEventListener('resize', measureSections);
       if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
     };
   }, []);

@@ -56,7 +56,7 @@ export const Faq: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="mx-auto max-w-5xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-24">
+    <section id="faq" className="section-deferred mx-auto max-w-5xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-24">
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
@@ -77,7 +77,7 @@ export const Faq: React.FC = () => {
           return (
             <div
               key={faq.question}
-              className={`luxury-card rounded-2xl border transition-all duration-300 overflow-hidden bg-white/85 backdrop-blur-sm ${
+              className={`luxury-card rounded-2xl border transition-all duration-300 overflow-hidden bg-white ${
                 isOpen ? 'border-[#4338ca]/40 shadow-sm' : 'border-neutral-200/60 hover:border-neutral-300'
               }`}
             >
