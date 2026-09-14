@@ -42,7 +42,7 @@ export const TrustPillars: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <section className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 lg:py-24">
+    <section className="mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 lg:py-24">
       <div className="mb-10 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4338ca]">Built on your side</span>
@@ -60,7 +60,7 @@ export const TrustPillars: React.FC = () => {
               whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={prefersReducedMotion ? undefined : { duration: 0.6, delay: idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="luxury-card flex flex-col justify-between rounded-2xl border border-[#e5e5e5] bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
+              className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white/85 p-5 shadow-xs backdrop-blur-sm sm:p-7"
             >
               <div>
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 mb-5">

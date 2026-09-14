@@ -255,7 +255,7 @@ export const Benchmarks: React.FC = () => {
   const savedPercentage = Math.round((savedMemoryEst / chromeMemoryEst) * 100);
 
   return (
-    <section id="benchmarks" className="mx-auto max-w-7xl border-t border-[#e5e5e5] px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
+    <section id="benchmarks" className="mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
       {/* Section Header */}
       <div className="mb-8 flex flex-col gap-5 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
@@ -406,7 +406,7 @@ export const Benchmarks: React.FC = () => {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
             {/* Left Card: Metric Breakdown & Live Bar Comparison */}
-            <div className="luxury-card lg:col-span-8 rounded-3xl border border-[#e5e5e5] bg-white/90 p-5 shadow-xs sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm">
+            <div className="luxury-card lg:col-span-8 rounded-3xl border border-neutral-200/60 bg-white/90 p-5 shadow-xs sm:p-8 lg:p-10 flex flex-col justify-between relative overflow-hidden backdrop-blur-sm">
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
@@ -742,18 +742,18 @@ export const Benchmarks: React.FC = () => {
 
       {/* VIEW 2: FULL CAPABILITY & HEAD-TO-HEAD MATRIX */}
       {viewMode === 'matrix' && (
-        <div className="rounded-3xl bg-white border border-[#e5e5e5] shadow-xs overflow-hidden">
+        <div className="rounded-3xl bg-white border border-neutral-200/60 shadow-xs overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-[#e5e5e5] bg-neutral-50/70 font-mono text-xs uppercase text-neutral-500 tracking-wider">
+                <tr className="border-b border-neutral-200/60 bg-neutral-50/70 font-mono text-xs uppercase text-neutral-500 tracking-wider">
                   <th className="p-6 font-semibold w-1/3">Capability & Architecture</th>
                   <th className="p-6 font-bold text-[#4338ca] bg-indigo-50/50">Nova Browser</th>
                   <th className="p-6 font-semibold">Google Chrome</th>
                   <th className="p-6 font-semibold">Brave</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#e5e5e5] font-sans text-xs">
+              <tbody className="divide-y divide-neutral-200/60 font-sans text-xs">
                 {MATRIX_FEATURES.map((item, idx) => (
                   <tr key={idx} className="hover:bg-neutral-50/50 transition-colors">
                     <td className="p-6">
