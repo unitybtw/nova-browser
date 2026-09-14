@@ -36,19 +36,15 @@ if (protocol === 'https:' || protocol === 'http:') {
 
     const stealthScript = `
       (() => {
-        // 1. Remove automation / webdriver flags
+        // 1. Remove automation / webdriver flags from prototype
         try {
-          Object.defineProperty(navigator, 'webdriver', {
-            get: () => false,
-            configurable: true
-          });
-          const navProto = Object.getPrototypeOf(navigator);
-          if (navProto && 'webdriver' in navProto) {
+          const navProto = Navigator.prototype;
+          if ('webdriver' in navProto) {
             delete navProto.webdriver;
           }
         } catch (_) {}
 
-        // 2. Clean Chrome userAgentData (purge any Electron brand)
+        // 2. Clean Chrome userAgentData on prototype (purge any Electron brand)
         try {
           const dynamicBrands = [
             { brand: 'Not(A:Brand', version: '8' },
@@ -56,17 +52,7 @@ if (protocol === 'https:' || protocol === 'http:') {
             { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
           ];
 
-          Object.defineProperty(navigator, 'userAgent', {
-            get: () => ${JSON.stringify(osUserAgent)},
-            configurable: true
-          });
-
-          Object.defineProperty(navigator, 'vendor', {
-            get: () => 'Google Inc.',
-            configurable: true
-          });
-
-          Object.defineProperty(navigator, 'userAgentData', {
+          Object.defineProperty(Navigator.prototype, 'userAgentData', {
             get: () => ({
               brands: dynamicBrands,
               mobile: false,
@@ -80,7 +66,10 @@ if (protocol === 'https:' || protocol === 'http:') {
                 platform: ${JSON.stringify(platformName)},
                 platformVersion: ${JSON.stringify(platformVersion)},
                 uaFullVersion: ${JSON.stringify(chromeVer)}
-              })
+              }),
+              toJSON: function() {
+                return { brands: this.brands, mobile: this.mobile, platform: this.platform };
+              }
             }),
             configurable: true
           });
@@ -134,20 +123,7 @@ if (protocol === 'https:' || protocol === 'http:') {
           }
         } catch (_) {}
 
-        // 4. Ensure navigator.plugins is populated (Google checks for PDF plugins on desktop Chrome)
-        try {
-          if (navigator.plugins && navigator.plugins.length === 0) {
-            const fakePlugins = [
-              { name: 'PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-              { name: 'Chrome PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
-              { name: 'Chromium PDF Viewer', filename: 'internal-pdf-viewer', description: 'Portable Document Format' }
-            ];
-            Object.defineProperty(navigator, 'plugins', {
-              get: () => fakePlugins,
-              configurable: true
-            });
-          }
-        } catch (_) {}
+        
       })();
     `;
 
