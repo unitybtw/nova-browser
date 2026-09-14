@@ -7,9 +7,13 @@ export const ManifestoHero: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const handleScrollDown = () => {
-    const mainEl = document.getElementById('main-content');
-    if (mainEl) {
-      mainEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    if (window.__lenis && !prefersReducedMotion) {
+      window.__lenis.scrollTo('#main-content', { offset: 0, duration: 1.2 });
+    } else {
+      const mainEl = document.getElementById('main-content');
+      if (mainEl) {
+        mainEl.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+      }
     }
   };
 

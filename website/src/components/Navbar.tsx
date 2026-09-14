@@ -184,12 +184,20 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     }, 850);
 
     const targetId = href.slice(1);
-    if (targetId === 'top' || targetId === 'manifesto') {
-      window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    if (window.__lenis && !prefersReducedMotion) {
+      if (targetId === 'top' || targetId === 'manifesto') {
+        window.__lenis.scrollTo(0, { duration: 1.15 });
+      } else {
+        window.__lenis.scrollTo(`#${targetId}`, { offset: -70, duration: 1.15 });
+      }
     } else {
-      const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+      if (targetId === 'top' || targetId === 'manifesto') {
+        window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+      } else {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'start' });
+        }
       }
     }
   };

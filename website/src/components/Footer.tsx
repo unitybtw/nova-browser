@@ -6,7 +6,11 @@ export const Footer: React.FC = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    if (window.__lenis && !prefersReducedMotion) {
+      window.__lenis.scrollTo(0, { duration: 1.2 });
+    } else {
+      window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    }
   };
 
   return (

@@ -1,4 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
+import Lenis from 'lenis';
+import 'lenis/dist/lenis.css';
 import ManifestoHero from './components/ManifestoHero';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -21,6 +23,28 @@ export default function App() {
 
     if (!window.location.hash) {
       window.scrollTo(0, 0);
+    }
+
+    // Hardware-accelerated 120 Hz Butter-Smooth Momentum Scroll
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let lenis: Lenis | null = null;
+    let lenisRafId: number | null = null;
+
+    if (!reduced) {
+      lenis = new Lenis({
+        duration: 1.15,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+        wheelMultiplier: 1.0,
+        touchMultiplier: 1.25,
+      });
+      window.__lenis = lenis;
+
+      const raf = (time: number) => {
+        lenis?.raf(time);
+        lenisRafId = requestAnimationFrame(raf);
+      };
+      lenisRafId = requestAnimationFrame(raf);
     }
 
     let scrollTicking = false;
@@ -59,6 +83,11 @@ export default function App() {
     window.addEventListener('scrollend', stopScrolling, { passive: true });
 
     return () => {
+      if (lenisRafId) cancelAnimationFrame(lenisRafId);
+      if (lenis) {
+        lenis.destroy();
+        window.__lenis = undefined;
+      }
       if (isScrollingTimer) clearTimeout(isScrollingTimer);
       document.body.classList.remove('is-scrolling');
       document.documentElement.classList.remove('in-manifesto');

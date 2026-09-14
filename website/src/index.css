@@ -37,12 +37,35 @@ html, body {
   overflow-anchor: none;
 }
 
+/* Lenis Butter-Smooth 120 Hz Momentum Scrolling */
+html.lenis, html.lenis body {
+  height: auto;
+}
+
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+
+.lenis.lenis-smooth [data-lenis-prevent] {
+  overscroll-behavior: contain;
+}
+
+.lenis.lenis-stopped {
+  overflow: hidden;
+}
+
+.lenis.lenis-scrolling iframe {
+  pointer-events: none;
+}
+
 html {
   scrollbar-gutter: stable;
   background-color: #171717;
   scrollbar-width: thin;
   scrollbar-color: #6366f1 transparent;
   transition: scrollbar-color 500ms ease;
+  overscroll-behavior-y: none;
+  -webkit-overflow-scrolling: touch;
 }
 
 section[id] {
