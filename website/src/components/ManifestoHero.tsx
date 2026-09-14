@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { StampTypeCard } from './stamptype/StampTypeCard';
 
-export const ManifestoHero: React.FC = () => {
+export const ManifestoHero: React.FC = React.memo(() => {
   const prefersReducedMotion = useReducedMotion();
 
   const handleScrollDown = () => {
@@ -40,7 +40,7 @@ export const ManifestoHero: React.FC = () => {
         initial={prefersReducedMotion ? false : { opacity: 0, y: 15 }}
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
-        className="group absolute bottom-8 left-1/2 z-20 -translate-x-1/2 cursor-pointer p-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full bg-black/40 backdrop-blur-md border border-white/20 hover:border-white/60 hover:bg-black/60 transition-all shadow-lg"
+        className="group absolute bottom-8 left-1/2 z-20 -translate-x-1/2 cursor-pointer p-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full bg-[#12141c]/90 border border-white/20 hover:border-white/60 hover:bg-[#181b26] transition-colors shadow-lg"
         aria-label="Scroll down to main content"
       >
         <motion.div
@@ -60,6 +60,6 @@ export const ManifestoHero: React.FC = () => {
       </motion.button>
     </section>
   );
-};
+});
 
 export default ManifestoHero;

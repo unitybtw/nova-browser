@@ -7,7 +7,7 @@ interface StampTypeCardProps {
   className?: string;
 }
 
-export const StampTypeCard: React.FC<StampTypeCardProps> = ({
+export const StampTypeCard: React.FC<StampTypeCardProps> = React.memo(({
   bare = false,
   className = "",
 }) => {
@@ -108,6 +108,6 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = ({
       <canvas ref={canvasRef} className="h-full w-full block" />
     </div>
   );
-};
+});
 
 export default StampTypeCard;

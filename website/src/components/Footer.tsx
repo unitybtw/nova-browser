@@ -2,7 +2,7 @@ import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Github, ArrowUp } from 'lucide-react';
 
-export const Footer: React.FC = () => {
+export const Footer: React.FC = React.memo(() => {
   const prefersReducedMotion = useReducedMotion();
 
   const scrollToTop = () => {
@@ -154,6 +154,6 @@ export const Footer: React.FC = () => {
       </div>
     </footer>
   );
-};
+});
 
 export default Footer;

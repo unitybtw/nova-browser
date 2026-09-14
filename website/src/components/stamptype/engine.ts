@@ -127,6 +127,14 @@ export class StampType {
     const cycle = PASS_PITCH * this.worlds.length;
     const loop = (now: number) => {
       if (!this.running) return;
+
+      // Yield frame computation to browser compositor during active page scrolling
+      if (document.body.classList.contains('is-scrolling')) {
+        this.last = now;
+        this.raf = requestAnimationFrame(loop);
+        return;
+      }
+
       this.acc += Math.min(now - this.last, 250);
       this.last = now;
       const tick = Math.floor(this.acc / TICK_MS) % cycle;

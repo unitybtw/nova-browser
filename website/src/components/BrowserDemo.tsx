@@ -19,7 +19,7 @@ const BASE_HEIGHT = 600;
  * On mobile and tablet screens, a responsive scale-matrix preserves full desktop
  * fidelity without distorting or squishing the browser UI.
  */
-export const BrowserDemo: React.FC = () => {
+export const BrowserDemo: React.FC = React.memo(() => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
@@ -77,6 +77,6 @@ export const BrowserDemo: React.FC = () => {
       </div>
     </div>
   );
-};
+});
 
 export default BrowserDemo;

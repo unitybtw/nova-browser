@@ -206,7 +206,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     <>
       {/* 1. DESKTOP FLOATING SLIDETABS DOCK (md: and up) */}
       <header
-        className={`hidden md:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`hidden md:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
@@ -236,7 +236,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
       {/* 2. DEDICATED MOBILE HEADER & DRAWER (< md:) */}
       <header
-        className={`md:hidden fixed top-3 inset-x-3 z-50 pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`md:hidden fixed top-3 inset-x-3 z-50 pointer-events-none transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >

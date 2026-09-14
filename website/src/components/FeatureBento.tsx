@@ -57,7 +57,7 @@ const MODULES = [
   },
 ];
 
-export const FeatureBento: React.FC = () => {
+export const FeatureBento: React.FC = React.memo(() => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -134,6 +134,6 @@ export const FeatureBento: React.FC = () => {
       </motion.div>
     </section>
   );
-};
+});
 
 export default FeatureBento;

@@ -38,7 +38,7 @@ const PILLARS = [
   },
 ];
 
-export const TrustPillars: React.FC = () => {
+export const TrustPillars: React.FC = React.memo(() => {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -101,6 +101,6 @@ export const TrustPillars: React.FC = () => {
       </motion.div>
     </section>
   );
-};
+});
 
 export default TrustPillars;

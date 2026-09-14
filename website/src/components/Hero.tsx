@@ -7,7 +7,7 @@ const BrowserDemo = lazy(() => import('./BrowserDemo'));
 
 const EASE: BezierDefinition = [0.16, 1, 0.3, 1];
 
-export const Hero: React.FC = () => {
+export const Hero: React.FC = React.memo(() => {
   const prefersReducedMotion = useReducedMotion();
 
   const fadeUp = (delay: number) =>
@@ -96,6 +96,6 @@ export const Hero: React.FC = () => {
       </motion.div>
     </section>
   );
-};
+});
 
 export default Hero;
