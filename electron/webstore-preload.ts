@@ -146,35 +146,34 @@ if ((window as any).__novaPreloadInjected) {
 
   const mainWorldScript = `
     (() => {
-      const greaseChars = [' ', '(', ':', ')', '=', '/', ';', '_', '-', '.', '?'];
-      const c1 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
-      const c2 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
-      const greaseBrand = 'Not' + c1 + 'A' + c2 + 'Brand';
-      const greaseVersion = ['8', '24', '99'][Math.floor(Math.random() * 3)];
+      // 1. Remove automation / webdriver flags from prototype
+      try {
+        const navProto = Navigator.prototype;
+        if ('webdriver' in navProto) {
+          delete navProto.webdriver;
+        }
+      } catch (_) {}
 
-      const dynamicBrands = [
-        { brand: greaseBrand, version: greaseVersion },
-        { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
-        { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
-      ];
+      // 2. Clean Chrome userAgentData on prototype (purge any Electron brand)
+      try {
+        const greaseChars = [' ', '(', ':', ')', '=', '/', ';', '_', '-', '.', '?'];
+        const c1 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
+        const c2 = greaseChars[Math.floor(Math.random() * greaseChars.length)];
+        const greaseBrand = 'Not' + c1 + 'A' + c2 + 'Brand';
+        const greaseVersion = ['8', '24', '99'][Math.floor(Math.random() * 3)];
 
-      Object.defineProperty(navigator, 'userAgent', {
-        get: () => ${JSON.stringify(osUserAgent)},
-        configurable: true
-      });
+        const dynamicBrands = [
+          { brand: greaseBrand, version: greaseVersion },
+          { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
+          { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
+        ];
 
-      Object.defineProperty(navigator, 'vendor', {
-        get: () => 'Google Inc.',
-        configurable: true
-      });
-
-      Object.defineProperty(navigator, 'userAgentData', {
-        get: () => ({
-          brands: dynamicBrands,
-          mobile: false,
-          platform: ${JSON.stringify(platformName)},
-          getHighEntropyValues: async (hints) => {
-            return {
+        Object.defineProperty(Navigator.prototype, 'userAgentData', {
+          get: () => ({
+            brands: dynamicBrands,
+            mobile: false,
+            platform: ${JSON.stringify(platformName)},
+            getHighEntropyValues: async (hints) => ({
               architecture: ${JSON.stringify(architecture)},
               bitness: '64',
               brands: dynamicBrands,
@@ -183,11 +182,14 @@ if ((window as any).__novaPreloadInjected) {
               platform: ${JSON.stringify(platformName)},
               platformVersion: ${JSON.stringify(platformVersion)},
               uaFullVersion: ${JSON.stringify(chromeVer)}
-            };
-          }
-        }),
-        configurable: true
-      });
+            }),
+            toJSON: function() {
+              return { brands: this.brands, mobile: this.mobile, platform: this.platform };
+            }
+          }),
+          configurable: true
+        });
+      } catch (_) {}
 
     window.chrome = window.chrome || {};
     window.chrome.webstore = {
