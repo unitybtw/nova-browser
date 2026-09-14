@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Menu, X, Download, Github, ChevronRight } from 'lucide-react';
 
@@ -24,64 +24,112 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     opacity: 0,
   });
   const [selected, setSelected] = useState(0);
-  const tabsRef = useRef<(HTMLLIElement | null)[]>([]);
 
-  useEffect(() => {
-    const selectedTab = tabsRef.current[selected];
-    if (selectedTab) {
+  const tabsRef = useRef<(HTMLLIElement | null)[]>([]);
+  const dockRef = useRef<HTMLUListElement>(null);
+  const isClickScrollingRef = useRef(false);
+  const clickTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Measure tab and update pill indicator position
+  const updatePosition = useCallback((targetIndex: number) => {
+    const el = tabsRef.current[targetIndex];
+    if (el && el.offsetWidth > 0) {
       setPosition({
-        left: selectedTab.offsetLeft,
-        width: selectedTab.offsetWidth,
+        left: el.offsetLeft,
+        width: el.offsetWidth,
         opacity: 1,
       });
     }
-  }, [selected]);
+  }, []);
 
-  // Recalculate on window resize
+  // Update position when selected tab or navbar visibility changes
+  useEffect(() => {
+    if (visible) {
+      // Small tick to ensure element dimensions are laid out after visibility transition
+      const timer = setTimeout(() => {
+        updatePosition(selected);
+      }, 30);
+      return () => clearTimeout(timer);
+    }
+  }, [selected, visible, updatePosition]);
+
+  // Recalculate position on window resize and font load
   useEffect(() => {
     const handleResize = () => {
-      const selectedTab = tabsRef.current[selected];
-      if (selectedTab) {
-        setPosition({
-          left: selectedTab.offsetLeft,
-          width: selectedTab.offsetWidth,
-          opacity: 1,
-        });
-      }
+      updatePosition(selected);
       if (window.innerWidth >= 768) {
         setMobileMenuOpen(false);
       }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [selected]);
 
-  // ScrollSpy to update active tab when scrolling through sections
+    window.addEventListener('resize', handleResize);
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        updatePosition(selected);
+      });
+    }
+
+    let ro: ResizeObserver | null = null;
+    if (dockRef.current) {
+      ro = new ResizeObserver(() => {
+        updatePosition(selected);
+      });
+      ro.observe(dockRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      ro?.disconnect();
+    };
+  }, [selected, updatePosition]);
+
+  // Robust ScrollSpy that detects active section without dead zones or flickers
   useEffect(() => {
     const sectionIds = ['manifesto', 'features', 'community', 'benchmarks', 'download', 'faq'];
     let ticking = false;
 
     const updateActiveTab = () => {
+      if (isClickScrollingRef.current) {
+        ticking = false;
+        return;
+      }
+
       const scrollY = window.scrollY;
-      if (scrollY < 240) {
+      const viewportHeight = window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
+
+      // 1. Top of page / Manifesto zone
+      const manifestoEl = document.getElementById('manifesto') || document.getElementById('top');
+      const manifestoBottom = manifestoEl ? manifestoEl.offsetTop + manifestoEl.offsetHeight : viewportHeight;
+      if (scrollY < manifestoBottom - 260) {
         setSelected(0);
         ticking = false;
         return;
       }
 
-      const scrollPos = scrollY + 160;
-      for (let i = 1; i < sectionIds.length; i++) {
+      // 2. Bottom of page lock (FAQ section reached)
+      if (scrollY + viewportHeight >= docHeight - 120) {
+        setSelected(sectionIds.length - 1);
+        ticking = false;
+        return;
+      }
+
+      // 3. Reverse traversal: lock onto the latest section that has entered the upper 38% of the viewport
+      const triggerPoint = scrollY + viewportHeight * 0.38;
+      for (let i = sectionIds.length - 1; i >= 1; i--) {
         const el = document.getElementById(sectionIds[i]);
         if (el) {
-          const rect = el.getBoundingClientRect();
-          const top = rect.top + scrollY;
-          const height = rect.height;
-          if (scrollPos >= top && scrollPos < top + height) {
+          const top = el.offsetTop;
+          if (triggerPoint >= top) {
             setSelected(i);
-            break;
+            ticking = false;
+            return;
           }
         }
       }
+
+      setSelected(0);
       ticking = false;
     };
 
@@ -93,12 +141,23 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+    };
   }, []);
 
   const handleTabClick = (index: number, href: string) => {
     setSelected(index);
     setMobileMenuOpen(false);
+
+    // Lock ScrollSpy while smooth scrolling executes to eliminate erratic jumping
+    isClickScrollingRef.current = true;
+    if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+    clickTimeoutRef.current = setTimeout(() => {
+      isClickScrollingRef.current = false;
+    }, 850);
+
     const targetId = href.slice(1);
     if (targetId === 'top' || targetId === 'manifesto') {
       window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
@@ -114,38 +173,72 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     <>
       {/* 1. DESKTOP FLOATING SLIDETABS DOCK (md: and up) */}
       <header
-        className={`hidden md:flex fixed top-6 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`hidden md:flex fixed top-5 left-1/2 -translate-x-1/2 z-50 items-center justify-center pointer-events-none transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
         <div className="pointer-events-auto">
           <ul
-            onMouseLeave={() => {
-              const selectedTab = tabsRef.current[selected];
-              if (selectedTab) {
-                setPosition({
-                  left: selectedTab.offsetLeft,
-                  width: selectedTab.offsetWidth,
-                  opacity: 1,
-                });
-              }
-            }}
-            className="relative mx-auto flex w-fit items-center rounded-full border-2 border-black bg-white p-1 shadow-2xl dark:border-white dark:bg-neutral-800"
+            ref={dockRef}
+            onMouseLeave={() => updatePosition(selected)}
+            className="relative mx-auto flex w-fit items-center rounded-full border border-white/15 bg-[#0c0d12]/92 p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.55)] backdrop-blur-xl"
           >
+            {/* Left Brand Badge */}
+            <button
+              type="button"
+              onClick={() => handleTabClick(0, '#top')}
+              className="flex items-center gap-2 pl-3 pr-3.5 py-1.5 mr-1 border-r border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
+              title="Nova Browser"
+            >
+              <img src="/logo.svg" alt="Nova" className="h-4.5 w-4.5 object-contain" />
+              <span className="font-display font-bold text-xs text-white">Nova</span>
+            </button>
+
+            {/* Navigation Tabs */}
             {NAV_TABS.map((tab, i) => (
-              <Tab
+              <li
                 key={tab.label}
                 ref={(el) => {
                   tabsRef.current[i] = el;
                 }}
-                setPosition={setPosition}
                 onClick={() => handleTabClick(i, tab.href)}
+                onMouseEnter={() => updatePosition(i)}
+                className={`relative z-10 block cursor-pointer px-3.5 py-1.5 font-mono text-xs font-semibold uppercase tracking-wider transition-colors duration-150 select-none whitespace-nowrap ${
+                  selected === i
+                    ? 'text-white font-bold'
+                    : 'text-neutral-400 hover:text-white'
+                }`}
               >
                 {tab.label}
-              </Tab>
+              </li>
             ))}
 
-            <Cursor position={position} />
+            {/* Active Pill Spring Indicator */}
+            <motion.li
+              animate={{
+                left: position.left,
+                width: position.width,
+                opacity: position.opacity,
+              }}
+              transition={{
+                type: 'spring',
+                stiffness: 450,
+                damping: 32,
+              }}
+              className="absolute z-0 inset-y-1.5 rounded-full bg-[#4338ca] shadow-[0_2px_12px_rgba(67,56,202,0.45)] pointer-events-none"
+            />
+
+            {/* Right Quick Download Action */}
+            <div className="ml-1 pl-2.5 border-l border-white/10 flex items-center">
+              <a
+                href="#download"
+                onClick={() => handleTabClick(4, '#download')}
+                className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 text-white font-mono text-[11px] font-semibold px-3.5 py-1.5 rounded-full transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <span>v1.4.7</span>
+              </a>
+            </div>
           </ul>
         </div>
       </header>
@@ -174,7 +267,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           <div className="flex items-center gap-2">
             <a
               href="#download"
-              onClick={() => setMobileMenuOpen(false)}
+              onClick={() => handleTabClick(4, '#download')}
               className="inline-flex items-center gap-1 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-[11px] font-semibold px-3 py-1.5 rounded-full transition-colors"
             >
               <Download className="w-3 h-3" />
@@ -224,7 +317,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               <div className="pt-2 border-t border-white/10 flex flex-col gap-2.5">
                 <a
                   href="#download"
-                  onClick={() => setMobileMenuOpen(false)}
+                  onClick={() => handleTabClick(4, '#download')}
                   className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white text-[#0c0d12] font-mono text-xs font-bold uppercase tracking-wider shadow-md hover:bg-neutral-100 transition-colors"
                 >
                   <Download className="w-4 h-4" />
@@ -249,64 +342,5 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
   );
 };
 
-interface TabProps {
-  children: React.ReactNode;
-  setPosition: React.Dispatch<
-    React.SetStateAction<{ left: number; width: number; opacity: number }>
-  >;
-  onClick: () => void;
-}
-
-const Tab = React.forwardRef<HTMLLIElement, TabProps>(
-  ({ children, setPosition, onClick }, ref) => {
-    return (
-      <li
-        ref={ref}
-        onClick={onClick}
-        onTouchStart={() => {
-          if (!ref || typeof ref === 'function' || !ref.current) return;
-          setPosition({
-            left: ref.current.offsetLeft,
-            width: ref.current.offsetWidth,
-            opacity: 1,
-          });
-        }}
-        onMouseEnter={() => {
-          if (!ref || typeof ref === 'function' || !ref.current) return;
-          setPosition({
-            left: ref.current.offsetLeft,
-            width: ref.current.offsetWidth,
-            opacity: 1,
-          });
-        }}
-        className="relative z-10 block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference select-none whitespace-nowrap sm:px-4 sm:py-2 sm:text-xs sm:tracking-wider md:text-sm"
-      >
-        {children}
-      </li>
-    );
-  }
-);
-
-Tab.displayName = 'Tab';
-
-interface CursorProps {
-  position: { left: number; width: number; opacity: number };
-}
-
-const Cursor: React.FC<CursorProps> = ({ position }) => {
-  return (
-    <motion.li
-      animate={{
-        ...position,
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 450,
-        damping: 32,
-      }}
-      className="absolute z-0 h-6.5 top-0.5 rounded-full bg-black dark:bg-white sm:h-8.5 sm:top-1 md:h-9 pointer-events-none"
-    />
-  );
-};
-
 export default Navbar;
+
