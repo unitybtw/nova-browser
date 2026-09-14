@@ -262,7 +262,7 @@ function isTrustedAppOrigin(urlStr: string): boolean {
     // the privileged main window. Never treat arbitrary nova:/devtools: URLs as
     // an app origin; doing so would let a crafted URL inherit app privileges.
     if (parsed.protocol === 'nova:') {
-      const allowedHost = ['newtab', 'settings', 'history', 'downloads'].includes(parsed.hostname);
+      const allowedHost = ['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new'].includes(parsed.hostname);
       const allowedSettingsHash = parsed.hostname === 'settings' &&
         (!parsed.hash || ['#extensions', '#mcp'].includes(parsed.hash));
       return allowedHost && !parsed.pathname && !parsed.search &&
@@ -2806,21 +2806,31 @@ app.on('web-contents-created', (_event, contents) => {
 
     // Security: Only attach webstore-preload.cjs to authorized Chrome Web Store origins.
     // Untrusted third-party websites must never receive webstore APIs or privileges.
+    // Enforce strict protocol confinement on webview src: only allow http(s), about:blank,
+    // or valid chrome-extension. Block file:, javascript:, data:, vbscript:, blob:, etc.
     let isAuthorizedWebstore = false;
-    try {
-      if (params.src) {
+    if (params.src) {
+      try {
         const parsed = new URL(params.src);
-        if (parsed.protocol === 'javascript:' || parsed.protocol === 'data:' || parsed.protocol === 'file:') {
-          console.warn(`[Security] Blocked dangerous webview scheme in src: ${parsed.protocol}`);
+        const allowedProtocols = ['http:', 'https:'];
+        const isAllowedAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
+        const isAllowedExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname);
+
+        if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
+            parsed.username || parsed.password) {
+          console.warn(`[Security] Blocked unauthorized webview scheme in src: ${params.src}`);
           event.preventDefault();
           return;
         }
+
         if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')) {
           isAuthorizedWebstore = true;
         }
+      } catch {
+        console.warn(`[Security] Blocked malformed webview src: ${params.src}`);
+        event.preventDefault();
+        return;
       }
-    } catch {
-      // Invalid URL format
     }
 
     if (isAuthorizedWebstore) {
@@ -3380,21 +3390,27 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 2. Link Actions
       if (params.linkURL) {
-        menu.append(new MenuItem({
-          label: labels.openLinkNewTab,
-          click: () => sendToMainWindow('new-tab', params.linkURL)
-        }));
-        menu.append(new MenuItem({
-          label: labels.openLinkNewIncognitoTab,
-          click: () => sendToMainWindow('new-incognito-tab', params.linkURL)
-        }));
-        menu.append(new MenuItem({
-          label: labels.saveLinkAs,
-          click: () => {
-            markNextDownloadAsSaveAs();
-            wc.downloadURL(params.linkURL);
-          }
-        }));
+        const isHttpLink = params.linkURL.startsWith('http://') || params.linkURL.startsWith('https://');
+        const isAllowedLinkScheme = isHttpLink || params.linkURL.startsWith('chrome-extension://');
+        if (isAllowedLinkScheme) {
+          menu.append(new MenuItem({
+            label: labels.openLinkNewTab,
+            click: () => sendToMainWindow('new-tab', params.linkURL)
+          }));
+          menu.append(new MenuItem({
+            label: labels.openLinkNewIncognitoTab,
+            click: () => sendToMainWindow('new-incognito-tab', params.linkURL)
+          }));
+        }
+        if (isHttpLink) {
+          menu.append(new MenuItem({
+            label: labels.saveLinkAs,
+            click: () => {
+              markNextDownloadAsSaveAs();
+              wc.downloadURL(params.linkURL);
+            }
+          }));
+        }
         menu.append(new MenuItem({
           label: labels.copyLinkAddress,
           click: () => clipboard.writeText(params.linkURL)
@@ -3404,31 +3420,40 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 3. Image Actions
       if (params.srcURL && params.mediaType === 'image') {
-        menu.append(new MenuItem({
-          label: labels.openImageNewTab,
-          click: () => sendToMainWindow('new-tab', params.srcURL)
-        }));
-        menu.append(new MenuItem({
-          label: labels.saveImageAs,
-          click: () => {
-            markNextDownloadAsSaveAs();
-            wc.downloadURL(params.srcURL);
-          }
-        }));
+        const isSafeImageScheme = params.srcURL.startsWith('http://') ||
+          params.srcURL.startsWith('https://') ||
+          params.srcURL.startsWith('blob:') ||
+          params.srcURL.startsWith('data:image/');
+
+        if (isSafeImageScheme) {
+          menu.append(new MenuItem({
+            label: labels.openImageNewTab,
+            click: () => sendToMainWindow('new-tab', params.srcURL)
+          }));
+          menu.append(new MenuItem({
+            label: labels.saveImageAs,
+            click: () => {
+              markNextDownloadAsSaveAs();
+              wc.downloadURL(params.srcURL);
+            }
+          }));
+        }
         menu.append(new MenuItem({
           label: labels.copyImage,
           click: () => {
             try {
               wc.copyImageAt(params.x, params.y);
             } catch {
-              clipboard.writeText(params.srcURL);
+              if (isSafeImageScheme) clipboard.writeText(params.srcURL);
             }
           }
         }));
-        menu.append(new MenuItem({
-          label: labels.copyImageAddress,
-          click: () => clipboard.writeText(params.srcURL)
-        }));
+        if (isSafeImageScheme) {
+          menu.append(new MenuItem({
+            label: labels.copyImageAddress,
+            click: () => clipboard.writeText(params.srcURL)
+          }));
+        }
         if (params.srcURL && (params.srcURL.startsWith('http://') || params.srcURL.startsWith('https://'))) {
           menu.append(new MenuItem({
             label: labels.searchImageLens,
@@ -3484,18 +3509,25 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({ type: 'separator' }));
         }
         if (params.srcURL) {
-          menu.append(new MenuItem({
-            label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
-            click: () => {
-              markNextDownloadAsSaveAs();
-              wc.downloadURL(params.srcURL);
-            }
-          }));
-          menu.append(new MenuItem({
-            label: isVideo ? labels.copyVideoAddress : labels.copyAudioAddress,
-            click: () => clipboard.writeText(params.srcURL)
-          }));
-          menu.append(new MenuItem({ type: 'separator' }));
+          const isSafeMediaScheme = params.srcURL.startsWith('http://') ||
+            params.srcURL.startsWith('https://') ||
+            params.srcURL.startsWith('blob:') ||
+            params.srcURL.startsWith('data:video/') ||
+            params.srcURL.startsWith('data:audio/');
+          if (isSafeMediaScheme) {
+            menu.append(new MenuItem({
+              label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
+              click: () => {
+                markNextDownloadAsSaveAs();
+                wc.downloadURL(params.srcURL);
+              }
+            }));
+            menu.append(new MenuItem({
+              label: isVideo ? labels.copyVideoAddress : labels.copyAudioAddress,
+              click: () => clipboard.writeText(params.srcURL)
+            }));
+            menu.append(new MenuItem({ type: 'separator' }));
+          }
         }
       }
 

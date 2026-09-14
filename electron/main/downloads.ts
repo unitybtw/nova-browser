@@ -149,6 +149,25 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     const totalBytes = item.getTotalBytes();
     activeDownloads.set(downloadId, item);
 
+    // Security: Enforce allowed download schemes (http, https, blob, data).
+    // Disallow file:, javascript:, and internal browser schemes from initiating downloads.
+    const itemUrl = item.getURL();
+    try {
+      const parsedUrl = new URL(itemUrl);
+      const allowedDownloadProtocols = ['http:', 'https:', 'blob:', 'data:'];
+      if (!allowedDownloadProtocols.includes(parsedUrl.protocol)) {
+        console.warn(`[Security] Blocked download with disallowed protocol: ${parsedUrl.protocol}`);
+        item.cancel();
+        activeDownloads.delete(downloadId);
+        return;
+      }
+    } catch {
+      console.warn(`[Security] Blocked download with malformed URL: ${itemUrl}`);
+      item.cancel();
+      activeDownloads.delete(downloadId);
+      return;
+    }
+
     // Auto-install CRX extensions from Chrome Web Store
     if (filename.endsWith('.crx')) {
       item.cancel();
