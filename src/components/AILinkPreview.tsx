@@ -45,7 +45,7 @@ function setCachedPreview(url: string, preview: PreviewData): void {
   }
 }
 
-export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen }) => {
+export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x, y, isOpen }) => {
   const [data, setData] = useState<PreviewData | null>(null);
   const [loadingText, setLoadingText] = useState<string>('');
   const [displayedSummary, setDisplayedSummary] = useState<string>('');
@@ -283,4 +283,4 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = ({ url, x, y, isOpen 
       )}
     </AnimatePresence>
   );
-};
+});

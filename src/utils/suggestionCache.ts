@@ -12,6 +12,9 @@ export function getClientCachedSuggestions(key: string, locale = 'default'): str
     clientCache.delete(clean);
     return null;
   }
+  // LRU touch: re-insert so frequently accessed suggestions remain cached
+  clientCache.delete(clean);
+  clientCache.set(clean, entry);
   return [...entry.list];
 }
 
@@ -22,9 +25,10 @@ export function setClientCachedSuggestions(key: string, list: string[], locale =
   // Validate that all items are valid strings
   const sanitizedList = list.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
 
-  if (clientCache.size >= MAX_CACHE_SIZE) {
+  if (!clientCache.has(clean) && clientCache.size >= MAX_CACHE_SIZE) {
     const oldest = clientCache.keys().next().value;
     if (oldest) clientCache.delete(oldest);
   }
+  clientCache.delete(clean);
   clientCache.set(clean, { list: sanitizedList, timestamp: Date.now() });
 }

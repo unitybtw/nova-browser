@@ -12,7 +12,7 @@ interface PasswordPromptModalProps {
   isUpdate?: boolean;
 }
 
-export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
+export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = React.memo(({
   isOpen,
   onClose,
   onSave,
@@ -151,4 +151,4 @@ export const PasswordPromptModal: React.FC<PasswordPromptModalProps> = ({
       )}
     </AnimatePresence>
   );
-};
+});

@@ -50,7 +50,7 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export const DownloadToast: React.FC<DownloadToastProps> = ({ downloads }) => {
+export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloads }) => {
   const [activeToast, setActiveToast] = useState<DownloadItem | null>(null);
   const [speed, setSpeed] = useState<string>('');
   const lastProgressRef = useRef<{ bytes: number; time: number }>({ bytes: 0, time: Date.now() });
@@ -224,4 +224,4 @@ export const DownloadToast: React.FC<DownloadToastProps> = ({ downloads }) => {
       )}
     </AnimatePresence>
   );
-};
+});

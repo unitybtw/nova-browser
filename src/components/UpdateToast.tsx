@@ -11,7 +11,7 @@ function formatBytes(bytes: number, decimals = 1): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-export const UpdateToast: React.FC = () => {
+export const UpdateToast: React.FC = React.memo(() => {
   const [isVisible, setIsVisible] = useState(false);
   const [version, setVersion] = useState('');
   const [releaseName, setReleaseName] = useState('');
@@ -207,5 +207,5 @@ export const UpdateToast: React.FC = () => {
       )}
     </AnimatePresence>
   );
-};
+});
 

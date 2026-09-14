@@ -43,7 +43,7 @@ interface TabContextMenuProps {
   totalTabs: number;
 }
 
-export const TabContextMenu: React.FC<TabContextMenuProps> = ({
+export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
   menuState,
   onClose,
   onNewTabRight,
@@ -251,4 +251,4 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = ({
       )}
     </AnimatePresence>
   );
-};
+});

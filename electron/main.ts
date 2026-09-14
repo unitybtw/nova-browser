@@ -551,10 +551,17 @@ function createWindow() {
     try { blocker.disableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
   }
 
+  const cachedChromeVer = process.versions.chrome || '134.0.0.0';
+  const cachedChromeMajor = cachedChromeVer.split('.')[0] || '134';
+  const cachedPlatformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
+  const cachedStandardUserAgent = getStandardUserAgent();
+  const cachedSecChUa = `"Not/A)Brand";v="8", "Chromium";v="${cachedChromeMajor}", "Google Chrome";v="${cachedChromeMajor}"`;
+  const cachedSecChUaFullVersionList = `"Not/A)Brand";v="8.0.0.0", "Chromium";v="${cachedChromeVer}", "Google Chrome";v="${cachedChromeVer}"`;
+
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
     try {
-      targetSession.setUserAgent(getStandardUserAgent());
+      targetSession.setUserAgent(cachedStandardUserAgent);
     } catch (_) {}
 
     // Inject Do Not Track, Global Privacy Control & authentic Chrome Client Hints
@@ -568,18 +575,14 @@ function createWindow() {
       } catch (_) {}
 
       if (isHttp) {
-        const chromeVer = process.versions.chrome || '134.0.0.0';
-        const chromeMajor = chromeVer.split('.')[0] || '134';
-        const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
-
         // Always enforce clean, genuine Chrome User-Agent and Client Hints across all web requests
-        requestHeaders['User-Agent'] = getStandardUserAgent();
-        requestHeaders['sec-ch-ua'] = `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`;
+        requestHeaders['User-Agent'] = cachedStandardUserAgent;
+        requestHeaders['sec-ch-ua'] = cachedSecChUa;
         requestHeaders['sec-ch-ua-mobile'] = '?0';
-        requestHeaders['sec-ch-ua-platform'] = platformName;
+        requestHeaders['sec-ch-ua-platform'] = cachedPlatformName;
 
         if (requestHeaders['sec-ch-ua-full-version-list']) {
-          requestHeaders['sec-ch-ua-full-version-list'] = `"Not/A)Brand";v="8.0.0.0", "Chromium";v="${chromeVer}", "Google Chrome";v="${chromeVer}"`;
+          requestHeaders['sec-ch-ua-full-version-list'] = cachedSecChUaFullVersionList;
         }
 
         // Purge automation / webview leakage headers

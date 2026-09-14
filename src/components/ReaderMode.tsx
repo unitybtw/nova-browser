@@ -32,7 +32,7 @@ interface ReaderModeProps {
   onClose: () => void;
 }
 
-export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, onClose }) => {
+export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, isActive, onClose }) => {
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -1189,4 +1189,4 @@ export const ReaderMode: React.FC<ReaderModeProps> = ({ url, tabId, isActive, on
       )}
     </AnimatePresence>
   );
-};
+});

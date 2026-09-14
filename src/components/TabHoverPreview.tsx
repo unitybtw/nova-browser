@@ -23,7 +23,7 @@ export interface TabHoverPreviewProps {
   visible: boolean;
 }
 
-export const TabHoverPreview: React.FC<TabHoverPreviewProps> = ({
+export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
   tab,
   rect,
   position = 'bottom',
@@ -205,4 +205,4 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = ({
     </AnimatePresence>,
     document.body
   );
-};
+});
