@@ -143,11 +143,28 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     hostname: string;
   } | null>(null);
 
-  const handleSelectAutofill = useCallback((account: { username: string; password: string }) => {
+  const handleSelectAutofill = useCallback((account: { username: string; password: string }, expectedHostname?: string) => {
     const webview = webviewRef.current;
     if (webview && !(typeof webview.isDestroyed === 'function' && webview.isDestroyed())) {
+      let currentHostname = '';
       try {
-        webview.send('fill-credentials', { username: account.username, password: account.password });
+        const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+        currentHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+      } catch (_) {}
+
+      // Security: verify target hostname has not changed since autofill menu was displayed
+      if (expectedHostname && currentHostname !== expectedHostname) {
+        console.warn(`[Security] Autofill aborted: target hostname changed from ${expectedHostname} to ${currentHostname}`);
+        setAutofillMenu(null);
+        return;
+      }
+
+      try {
+        webview.send('fill-credentials', {
+          username: account.username,
+          password: account.password,
+          expectedHostname: expectedHostname || currentHostname
+        });
       } catch (_) {}
     }
     setAutofillMenu(null);
@@ -383,15 +400,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleNewWindow = (e: any) => {
-      if (e.url) {
-        // Security: only allow safe HTTP/HTTPS URLs from new-window events.
-        // Reject javascript:, data:, vbscript:, file: and other dangerous protocols.
-        try {
-          const parsed = new URL(e.url);
-          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return;
-        } catch {
-          return;
-        }
+      if (e.url && typeof e.url === 'string' && isSafeNavigationUrl(e.url)) {
         if (onNewTab) {
           onNewTab(e.url, tab?.id);
         } else if (onNavigate) {
@@ -484,20 +493,28 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         handlePasswordDetected(hostname, username, password);
       } else if (e.channel === 'login-field-focused' && e.args?.[0]) {
         if (!latestSettingsRef.current?.passwordManagerEnabled) return;
+        let actualHostname = '';
+        try {
+          const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+          actualHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+        } catch (_) {}
+
         const data = e.args[0];
         const hostname = data.hostname || '';
-        if (!hostname) return;
+        // Security: strictly reject autofill queries where reported hostname does not match active webview origin
+        if (!hostname || !actualHostname || actualHostname !== hostname) return;
+
         (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
           if (!raw) return;
           try {
             const all = JSON.parse(raw);
-            const matching = all.filter((p: any) => p.hostname === hostname && p.username && p.password);
+            const matching = all.filter((p: any) => p.hostname === actualHostname && p.username && p.password);
             if (matching.length > 0) {
               setAutofillMenu({
                 isOpen: true,
                 rect: data.rect,
                 accounts: matching,
-                hostname
+                hostname: actualHostname
               });
             }
           } catch (_) {}
@@ -1095,7 +1112,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  handleSelectAutofill(acc);
+                  handleSelectAutofill(acc, autofillMenu.hostname);
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
               >

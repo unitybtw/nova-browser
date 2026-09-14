@@ -80,11 +80,42 @@ import { isIP } from 'net';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
-import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath } from './main/downloads.js';
+import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
+
+/**
+ * Validates URLs for context-menu media saving and address copying.
+ * Verifies that blob: URLs have valid http(s) origins and that data: URLs
+ * strictly contain safe raster/vector media MIME types without scriptable vectors.
+ */
+function isSafeMediaDownloadUrl(urlStr: string, allowedTypes: ('image' | 'video' | 'audio')[]): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false;
+  try {
+    const parsed = new URL(urlStr);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return !parsed.username && !parsed.password;
+    }
+    if (parsed.protocol === 'blob:') {
+      try {
+        const inner = new URL(parsed.pathname);
+        return ['http:', 'https:'].includes(inner.protocol) && !inner.username && !inner.password;
+      } catch {
+        return false;
+      }
+    }
+    if (parsed.protocol === 'data:') {
+      const mime = parsed.pathname.split(';')[0].split(',')[0].toLowerCase().trim();
+      return allowedTypes.some(type => mime.startsWith(`${type}/`)) &&
+        !mime.includes('svg') && !mime.includes('html') && !mime.includes('javascript');
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
 
 // Reusable helper: check if hostname belongs to localhost, intranet, or private networks
 export function isLocalOrIntranetHost(hostname: string): boolean {
@@ -2219,6 +2250,19 @@ fi
       if (!isOfficialHost || parsed.protocol !== 'https:') {
         return { success: false, error: 'Untrusted update download URL' };
       }
+      // Security: Updates must strictly originate from the official repository
+      if ((parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com') &&
+          !parsed.pathname.startsWith('/unitybtw/nova-browser/')) {
+        return { success: false, error: 'Untrusted update repository: updates must originate from unitybtw/nova-browser' };
+      }
+      if (customUrl && typeof customUrl === 'string') {
+        const parsedCustom = new URL(customUrl.trim());
+        if (parsedCustom.protocol !== 'https:' ||
+            (parsedCustom.hostname !== 'github.com' && parsedCustom.hostname !== 'www.github.com') ||
+            !parsedCustom.pathname.startsWith('/unitybtw/nova-browser/')) {
+          return { success: false, error: 'Untrusted custom update URL: must originate from official unitybtw/nova-browser repository' };
+        }
+      }
       const isReleaseWebpage = parsed.pathname.includes('/releases/tag/') || parsed.pathname.endsWith('/releases/latest');
       if (isReleaseWebpage && !assetName) {
         try {
@@ -2244,6 +2288,24 @@ fi
         throw new Error(`Download HTTP error: ${response.status} ${response.statusText}`);
       }
 
+      // Security: verify redirect URL destination remains confined to official GitHub / release asset CDN hosts
+      if (response.url) {
+        try {
+          const finalUrl = new URL(response.url);
+          const isOfficialFinal = finalUrl.protocol === 'https:' && (
+            finalUrl.hostname === 'github.com' ||
+            finalUrl.hostname === 'www.github.com' ||
+            finalUrl.hostname === 'objects.githubusercontent.com' ||
+            finalUrl.hostname.endsWith('.githubusercontent.com')
+          );
+          if (!isOfficialFinal) {
+            throw new Error(`Untrusted redirect destination for update download: ${finalUrl.hostname}`);
+          }
+        } catch (urlErr: any) {
+          throw new Error(`Invalid update redirect destination: ${urlErr?.message || urlErr}`);
+        }
+      }
+
       const totalBytes = Number(response.headers.get('content-length')) || 0;
       const parsedUrl = new URL(targetUrl);
       const defaultExt = process.platform === 'darwin' ? 'dmg' : process.platform === 'win32' ? 'exe' : 'AppImage';
@@ -2251,6 +2313,7 @@ fi
       if (process.platform === 'darwin' && !filename.toLowerCase().endsWith('.dmg') && !filename.toLowerCase().endsWith('.zip')) {
         filename = `${filename}.dmg`;
       }
+      const safeFilename = sanitizeDownloadFilename(filename);
       const updatesDir = path.join(app.getPath('userData'), 'updates');
       if (!fs.existsSync(updatesDir)) {
         fs.mkdirSync(updatesDir, { recursive: true });
@@ -2265,7 +2328,10 @@ fi
           }
         } catch (_) {}
       }
-      const targetFilePath = path.join(updatesDir, filename);
+      const targetFilePath = path.join(updatesDir, safeFilename);
+      if (!path.resolve(targetFilePath).startsWith(path.resolve(updatesDir) + path.sep)) {
+        throw new Error('Invalid update filename: path escapes updates directory');
+      }
       tempFilePath = `${targetFilePath}.download_${Date.now()}`;
 
       const fileStream = fs.createWriteStream(tempFilePath);
@@ -3420,16 +3486,16 @@ app.on('web-contents-created', (_event, wc) => {
 
       // 3. Image Actions
       if (params.srcURL && params.mediaType === 'image') {
-        const isSafeImageScheme = params.srcURL.startsWith('http://') ||
-          params.srcURL.startsWith('https://') ||
-          params.srcURL.startsWith('blob:') ||
-          params.srcURL.startsWith('data:image/');
+        const isSafeImage = isSafeMediaDownloadUrl(params.srcURL, ['image']);
+        const isHttpImage = params.srcURL.startsWith('http://') || params.srcURL.startsWith('https://');
 
-        if (isSafeImageScheme) {
-          menu.append(new MenuItem({
-            label: labels.openImageNewTab,
-            click: () => sendToMainWindow('new-tab', params.srcURL)
-          }));
+        if (isSafeImage) {
+          if (isHttpImage) {
+            menu.append(new MenuItem({
+              label: labels.openImageNewTab,
+              click: () => sendToMainWindow('new-tab', params.srcURL)
+            }));
+          }
           menu.append(new MenuItem({
             label: labels.saveImageAs,
             click: () => {
@@ -3444,17 +3510,17 @@ app.on('web-contents-created', (_event, wc) => {
             try {
               wc.copyImageAt(params.x, params.y);
             } catch {
-              if (isSafeImageScheme) clipboard.writeText(params.srcURL);
+              if (isSafeImage) clipboard.writeText(params.srcURL);
             }
           }
         }));
-        if (isSafeImageScheme) {
+        if (isSafeImage) {
           menu.append(new MenuItem({
             label: labels.copyImageAddress,
             click: () => clipboard.writeText(params.srcURL)
           }));
         }
-        if (params.srcURL && (params.srcURL.startsWith('http://') || params.srcURL.startsWith('https://'))) {
+        if (isHttpImage) {
           menu.append(new MenuItem({
             label: labels.searchImageLens,
             click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
@@ -3509,12 +3575,8 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({ type: 'separator' }));
         }
         if (params.srcURL) {
-          const isSafeMediaScheme = params.srcURL.startsWith('http://') ||
-            params.srcURL.startsWith('https://') ||
-            params.srcURL.startsWith('blob:') ||
-            params.srcURL.startsWith('data:video/') ||
-            params.srcURL.startsWith('data:audio/');
-          if (isSafeMediaScheme) {
+          const isSafeMedia = isSafeMediaDownloadUrl(params.srcURL, [isVideo ? 'video' : 'audio']);
+          if (isSafeMedia) {
             menu.append(new MenuItem({
               label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
               click: () => {
