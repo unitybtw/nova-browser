@@ -1231,7 +1231,8 @@ function cleanStaleUpdateArtifacts(): void {
               entry.startsWith('Nova Browser.app.staging_') ||
               entry.startsWith('Nova Browser.app.backup_')
             ) {
-              const orphanPath = path.join(dir, entry);
+              const orphanPath = path.resolve(dir, entry);
+              if (!orphanPath.startsWith(dir + path.sep)) continue;
               try {
                 if (fs.existsSync(lsregisterPath)) {
                   try {
@@ -5362,9 +5363,9 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
   if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
   if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
 
-  // Limit text length to 500,000 chars to avoid memory exhaustion
-  if (text.length > 500000) {
-    text = text.substring(0, 500000);
+  // Limit text length to 100,000 chars to avoid memory exhaustion
+  if (text.length > 100000) {
+    text = text.substring(0, 100000);
   }
 
   // Invalidate any in-flight request BEFORE killing it: its close handler runs

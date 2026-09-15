@@ -238,9 +238,9 @@ async function run() {
     }
   }
 
-  assert.equal(testValidateUpdateUrl('https://github.com/unitybtw/nova-browser/releases/download/v1.4.7/Nova-Browser-1.4.7.dmg'), true);
+  assert.equal(testValidateUpdateUrl('https://github.com/unitybtw/nova-browser/releases/download/v1.4.8/Nova-Browser-1.4.8.dmg'), true);
   assert.equal(testValidateUpdateUrl('https://objects.githubusercontent.com/github-production-release-asset-2e65be/asset.dmg'), true);
-  assert.equal(testValidateUpdateUrl('https://github.com/evil-attacker/nova-browser/releases/download/v1.4.7/Nova.dmg'), false);
+  assert.equal(testValidateUpdateUrl('https://github.com/evil-attacker/nova-browser/releases/download/v1.4.8/Nova.dmg'), false);
   assert.equal(testValidateUpdateUrl('https://evil-server.com/Nova-Browser-Setup.exe'), false);
   assert.equal(testValidateUpdateUrl('http://github.com/unitybtw/nova-browser/releases/v1.0'), false);
 

@@ -2426,13 +2426,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) { 
                     const rect = el.getBoundingClientRect();
                     el.click(); 
                     return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                   }
-                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
+                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
                 } catch (err) {
                   return { success: false, error: "Invalid selector or DOM error: " + String(err) };
                 }
@@ -2454,19 +2454,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) { 
                     const rect = el.getBoundingClientRect();
-                    el.value = ${JSON.stringify(args.text)};
+                    el.value = ${JSON.stringify(safeArgs.text)};
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
-                    if (${args.pressEnter === true ? 'true' : 'false'}) {
+                    if (${safeArgs.pressEnter === true ? 'true' : 'false'}) {
                       const enterEvent = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true });
                       el.dispatchEvent(enterEvent);
                     }
                     return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                   }
-                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(args.selector)} };
+                  return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
                 } catch (err) {
                   return { success: false, error: "Invalid selector or DOM error: " + String(err) };
                 }
@@ -2475,7 +2475,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             if (result && result.success) {
               const bounds = activeWebview.getBoundingClientRect();
               window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: args.text }
+                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: safeArgs.text }
               }));
               return "Successfully typed text."; 
             }
@@ -2490,16 +2490,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));
 
         case 'browser_switch_tab':
-          const tabExists = tabs.some(t => t.id === args.tabId);
+          const tabExists = tabs.some(t => t.id === safeArgs.tabId);
           if (tabExists) {
-            setActiveTabId(args.tabId);
-            return `Switched to tab ${args.tabId}`;
+            setActiveTabId(safeArgs.tabId);
+            return `Switched to tab ${safeArgs.tabId}`;
           }
-          return `Error: Tab ${args.tabId} not found.`;
+          return `Error: Tab ${safeArgs.tabId} not found.`;
 
         case 'browser_close_tab':
-          mcpHandlersRef.current.handleCloseTab(args.tabId);
-          return `Closed tab ${args.tabId}`;
+          mcpHandlersRef.current.handleCloseTab(safeArgs.tabId);
+          return `Closed tab ${safeArgs.tabId}`;
 
         case 'browser_screenshot':
           if (activeWebview && activeWebview.capturePage) {
@@ -2509,8 +2509,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           return "Error: Could not take screenshot.";
 
         case 'browser_scroll': {
-          const direction = String(args.direction || 'down');
-          const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(args.amount) || 500)));
+          const direction = String(safeArgs.direction || 'down');
+          const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(safeArgs.amount) || 500)));
           if (activeWebview && activeWebview.executeJavaScript) {
             if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
             else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
@@ -2522,7 +2522,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         }
 
         case 'browser_new_tab': {
-          const newUrl = args.url || 'nova://newtab';
+          const newUrl = safeArgs.url || 'nova://newtab';
           if (!isSafeNavigationUrl(newUrl)) {
             return `Error: Navigation blocked for unsafe URL scheme: ${newUrl}`;
           }
@@ -2561,13 +2561,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) {
                     el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
                     el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
                     return "Hovered over element";
                   }
-                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }
@@ -2581,9 +2581,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) { el.focus(); return "Focused element"; }
-                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }
@@ -2597,13 +2597,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el && el.tagName === 'SELECT') {
-                    el.value = ${JSON.stringify(args.value)};
+                    el.value = ${JSON.stringify(safeArgs.value)};
                     el.dispatchEvent(new Event('change', { bubbles: true }));
-                    return "Selected option: " + ${JSON.stringify(args.value)};
+                    return "Selected option: " + ${JSON.stringify(safeArgs.value)};
                   }
-                  return "Error: Select element not found: " + ${JSON.stringify(args.selector)};
+                  return "Error: Select element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }
@@ -2617,7 +2617,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const selector = ${JSON.stringify(args.selector || null)};
+                  const selector = ${JSON.stringify(safeArgs.selector || null)};
                   let target = null;
                   if (selector) {
                     try {
@@ -2626,7 +2626,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     } catch (_) {}
                   }
                   if (!target) target = document.activeElement || document.body;
-                  const key = ${JSON.stringify(args.key)};
+                  const key = ${JSON.stringify(safeArgs.key)};
                   const keyMap = { 'Enter': 13, 'Tab': 9, 'Escape': 27, 'Space': 32, 'ArrowUp': 38, 'ArrowDown': 40, 'ArrowLeft': 37, 'ArrowRight': 39, 'Backspace': 8, 'Delete': 46 };
                   const keyCode = keyMap[key] || (key && key.charCodeAt ? key.charCodeAt(0) : 0);
                   ['keydown','keypress','keyup'].forEach(t => {
@@ -2646,9 +2646,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) return el.innerText || el.textContent || '';
-                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }
@@ -2662,9 +2662,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             return await activeWebview.executeJavaScript(`
               (() => {
                 try {
-                  const el = document.querySelector(${JSON.stringify(args.selector)});
+                  const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); return "Scrolled to element"; }
-                  return "Error: Element not found: " + ${JSON.stringify(args.selector)};
+                  return "Error: Element not found: " + ${JSON.stringify(safeArgs.selector)};
                 } catch (err) {
                   return "Error: Invalid selector or DOM error: " + String(err);
                 }

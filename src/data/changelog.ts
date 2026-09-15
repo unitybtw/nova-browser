@@ -14,10 +14,59 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.4.8',
+    date: 'September 2026',
+    title: 'Google Bot-Detection Stealth, Security Hardening & 120Hz Fluid Motion',
+    badge: 'Latest Release',
+    highlights: [
+      'Authentic Client Hints, navigator prototype sanitization, and stealth scripts eliminating Google bot-detection / reCAPTCHA loops.',
+      'Comprehensive security hardening: repository update confinement, download filename/origin sanitization, and autofill isolation.',
+      'Performance leaps: precomputed request headers, modal/toast memoization, and true LRU search suggestion caching.',
+      'Silky 120Hz Lenis momentum scrolling, GPU canvas pausing, and zero-leak lightweight architecture.'
+    ],
+    changes: [
+      {
+        category: 'security',
+        text: 'Eliminated Google reCAPTCHA loops by enforcing authentic Client Hints headers, navigator prototype stealth, and removing navigator.webdriver fingerprints.'
+      },
+      {
+        category: 'security',
+        text: 'Confined updater download repository strictly to official unitybtw/nova-browser releases with redirect domain validation.'
+      },
+      {
+        category: 'security',
+        text: 'Hardened download managers with filename sanitization against path traversal and DOS device stem collisions (e.g. CON.tar.gz).'
+      },
+      {
+        category: 'security',
+        text: 'Isolated autofill credential dispatcher verifying destination hostnames strictly match expected origins.'
+      },
+      {
+        category: 'security',
+        text: 'Sanitized context menu media URLs, webview src protocols, and download manager scheme enforcement.'
+      },
+      {
+        category: 'performance',
+        text: 'Precomputed User-Agent and Client Hints headers outside onBeforeSendHeaders hot path to minimize network overhead.'
+      },
+      {
+        category: 'performance',
+        text: 'Wrapped modals and toasts in React.memo (AILinkPreview, PasswordPromptModal, ReaderMode, DownloadToast, UpdateToast, TabContextMenu).'
+      },
+      {
+        category: 'performance',
+        text: 'Refactored search suggestions to true LRU eviction cache with on-read promotion.'
+      },
+      {
+        category: 'improvement',
+        text: 'Eliminated 6MB WebLLM bundle leak on marketing site and enabled 120Hz Lenis smooth scrolling with zero-thrash ScrollSpy.'
+      }
+    ]
+  },
+  {
     version: '1.4.7',
     date: 'September 2026',
     title: 'Split View Overhaul, Tab Engine Ergonomics & Customization',
-    badge: 'Latest Release',
     highlights: [
       'Redesigned split view with non-intrusive native header bars and zero website obstruction.',
       'Unified persistent views container eliminating tab switch and split view reload churn.',

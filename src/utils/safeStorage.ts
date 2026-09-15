@@ -26,7 +26,10 @@ export function backupCorruptData(key: string, raw: string): void {
       }
 
       // Date.now() alone collides within the same millisecond — add entropy.
-      const backupKey = `${prefix}${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const entropy = typeof crypto !== 'undefined' && crypto.getRandomValues
+        ? Array.from(crypto.getRandomValues(new Uint8Array(4)), b => b.toString(16).padStart(2, '0')).join('')
+        : Math.random().toString(36).slice(2);
+      const backupKey = `${prefix}${Date.now()}-${entropy}`;
       localStorage.setItem(backupKey, raw);
       console.warn(`[safeStorage] Corrupt data detected for "${key}". Preserved backup at "${backupKey}".`);
     }

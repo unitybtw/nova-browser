@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron';
+import { randomBytes } from 'crypto';
 
 // Security: MCP browser_* tools are forwarded to the renderer over an
 // 'mcp-action-request' IPC and awaited on a channel gated by isTrustedSender()
@@ -47,7 +48,7 @@ export function requestRendererMcpAction(win: BrowserWindow | null, toolName: st
       reject(new Error('Nova Browser window is not available'));
       return;
     }
-    const id = Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 10);
+    const id = Date.now().toString(36) + '_' + randomBytes(8).toString('hex');
     const timer = setTimeout(() => {
       pendingMcpActions.delete(id);
       reject(new Error(`MCP action '${toolName}' timed out waiting for renderer response`));
