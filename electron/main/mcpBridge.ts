@@ -26,7 +26,7 @@ let isTrustedSender: TrustedSenderCheck = () => false;
  */
 export function initMcpBridge(trustedSenderCheck: TrustedSenderCheck): void {
   isTrustedSender = trustedSenderCheck;
-  ipcMain.on('mcp-action-response', (event: Electron.IpcMainEvent, payload: { id?: unknown; result?: unknown }) => {
+  ipcMain.on('mcp-action-response', (event: Electron.IpcMainEvent, payload: { id?: unknown; result?: unknown; error?: unknown }) => {
     if (!isTrustedSender(event)) return;
     const id = payload?.id;
     if (typeof id !== 'string') return;
@@ -34,6 +34,16 @@ export function initMcpBridge(trustedSenderCheck: TrustedSenderCheck): void {
     if (!pending) return;
     pendingMcpActions.delete(id);
     clearTimeout(pending.timer);
+
+    if (payload?.error) {
+      pending.reject(new Error(typeof payload.error === 'string' ? payload.error : JSON.stringify(payload.error)));
+      return;
+    }
+    if (payload?.result && typeof payload.result === 'object' && 'error' in (payload.result as Record<string, unknown>)) {
+      const errVal = (payload.result as Record<string, unknown>).error;
+      pending.reject(new Error(typeof errVal === 'string' ? errVal : JSON.stringify(errVal)));
+      return;
+    }
     pending.resolve(payload.result);
   });
 }

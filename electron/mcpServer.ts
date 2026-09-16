@@ -796,11 +796,13 @@ export class BrowserMCPServer {
 
           try {
             const result = await this.executeTool(toolName, args);
+            const isError = typeof result === 'string' && result.startsWith('Error:');
             const responsePayload = {
               jsonrpc: '2.0',
               id: body.id,
               result: {
-                content: [{ type: 'text', text: result }]
+                content: [{ type: 'text', text: result }],
+                ...(isError ? { isError: true } : {})
               }
             };
             respondToClient(responsePayload);

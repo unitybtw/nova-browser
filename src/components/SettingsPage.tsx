@@ -755,6 +755,7 @@ export interface SettingsPageProps {
   onImportData?: (file: File) => void;
   onClearHistory?: () => void;
   onPurgeMemory?: () => Promise<void> | void;
+  onPerformSync?: (mergedData: any) => Promise<void> | void;
 }
 
 interface UpdateInfo {
@@ -1121,7 +1122,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onExportData,
   onImportData,
   onClearHistory,
-  onPurgeMemory
+  onPurgeMemory,
+  onPerformSync
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
   const [isPurgingMemory, setIsPurgingMemory] = useState(false);
@@ -1780,7 +1782,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                               const rawW = localStorage.getItem('workspaces_session');
                               const rawS = localStorage.getItem('user_settings');
 
-                              await syncService.syncData({
+                              const syncRes = await syncService.syncData({
                                 bookmarks: safeParseArray(rawB),
                                 folders: safeParseArray(rawF),
                                 history: safeParseArray(rawH),
@@ -1788,6 +1790,35 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                                 settings: safeParseObject(rawS, {} as any),
                                 workspaces: safeParseArray(rawW)
                               });
+
+                              if (syncRes && syncRes.mergedData) {
+                                const md = syncRes.mergedData;
+                                if (md.bookmarks) {
+                                  localStorage.setItem('bookmarks', JSON.stringify(md.bookmarks));
+                                  (window as any).electronAPI?.storeSet?.('bookmarks', JSON.stringify(md.bookmarks));
+                                }
+                                if (md.folders) {
+                                  localStorage.setItem('folders_session', JSON.stringify(md.folders));
+                                  (window as any).electronAPI?.storeSet?.('folders_session', JSON.stringify(md.folders));
+                                }
+                                if (md.history) {
+                                  localStorage.setItem('browsing_history', JSON.stringify(md.history));
+                                }
+                                if (md.workspaces) {
+                                  localStorage.setItem('workspaces_session', JSON.stringify(md.workspaces));
+                                  (window as any).electronAPI?.storeSet?.('workspaces_session', JSON.stringify(md.workspaces));
+                                }
+                                if (md.settings) {
+                                  localStorage.setItem('user_settings', JSON.stringify(md.settings));
+                                  (window as any).electronAPI?.storeSet?.('user_settings', JSON.stringify(md.settings));
+                                }
+                                if (md.passwords && (window as any).electronAPI?.secureStoreSet) {
+                                  await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(md.passwords));
+                                }
+                                if (onPerformSync) {
+                                  await onPerformSync(md);
+                                }
+                              }
 
                               setSyncMsg('Sync completed successfully!');
                               setTimeout(() => setSyncMsg(null), 3000);

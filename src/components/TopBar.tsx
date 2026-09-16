@@ -1335,6 +1335,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     tab: null,
     tabIndex: -1
   });
+
+  const handleOpenContextMenu = useCallback((targetTab: Tab, index: number, e: React.MouseEvent) => {
+    setTabContextMenu({
+      isOpen: true,
+      x: e.clientX,
+      y: e.clientY,
+      tab: targetTab,
+      tabIndex: index
+    });
+  }, []);
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const [ghostTab, setGhostTab] = useState<{ id: string; x: number; y: number } | null>(null);
@@ -1791,7 +1801,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onTabDragEnd={onTabDragEnd}
                   onDropToSplitScreen={onDropToSplitScreen}
                   onSelectTab={onSelectTab}
-                  onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                  onCloseSplit={onCloseSplit}
                   onToggleMuteTab={onToggleMuteTab}
                   onTogglePip={onTogglePip}
                   onCloseTab={onCloseTab}
@@ -1799,15 +1809,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   setGhostTab={setGhostTab}
                   onTabHover={handleTabHover}
                   onTabLeave={handleTabLeave}
-                  onOpenContextMenu={(targetTab: Tab, index: number, e: React.MouseEvent) => {
-                    setTabContextMenu({
-                      isOpen: true,
-                      x: e.clientX,
-                      y: e.clientY,
-                      tab: targetTab,
-                      tabIndex: index
-                    });
-                  }}
+                  onOpenContextMenu={handleOpenContextMenu}
                 />
               );
             })}
@@ -2417,6 +2419,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;
   if (prevProps.isSplitView !== nextProps.isSplitView) return false;
   if (prevProps.tabStyle !== nextProps.tabStyle) return false;
+  if (prevProps.tabAnimation !== nextProps.tabAnimation) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;

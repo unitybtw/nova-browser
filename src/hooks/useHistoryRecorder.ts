@@ -2,10 +2,24 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Tab, HistoryItem } from '../types/browser';
 import { generateId } from '../utils/idGenerator';
 import { safeParseArrayWithBackup } from '../utils/safeStorage';
+import { logger } from '../utils/logger';
 export type { HistoryItem };
 
 export interface UseHistoryRecorderOptions {
   isDemo?: boolean;
+}
+
+function normalizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    let pathname = parsed.pathname;
+    if (pathname.length > 1 && pathname.endsWith('/')) {
+      parsed.pathname = pathname.slice(0, -1);
+    }
+    return parsed.href;
+  } catch {
+    return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
+  }
 }
 
 /**
@@ -26,12 +40,12 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
       try {
         localStorage.setItem('browsing_history', JSON.stringify(history));
       } catch {
-        console.warn('[History] Persist failed (quota?) — retrying with trimmed snapshot.');
+        logger.warn('useHistoryRecorder', 'Persist failed (quota?) — retrying with trimmed snapshot.');
         try {
           // History is newest-first: keep the newer half, drop the older half.
           localStorage.setItem('browsing_history', JSON.stringify(history.slice(0, Math.ceil(history.length / 2))));
         } catch {
-          console.warn('[History] Trimmed persist also failed; keeping in-memory history.');
+          logger.warn('useHistoryRecorder', 'Trimmed persist also failed; keeping in-memory history.');
         }
       }
     }, 2000);
@@ -47,12 +61,12 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
     try {
       localStorage.setItem('browsing_history', JSON.stringify(historyRef.current));
     } catch {
-      console.warn('[History] Flush failed (quota?) — retrying with trimmed snapshot.');
+      logger.warn('useHistoryRecorder', 'Flush failed (quota?) — retrying with trimmed snapshot.');
       try {
         const snap = historyRef.current;
         localStorage.setItem('browsing_history', JSON.stringify(snap.slice(0, Math.ceil(snap.length / 2))));
       } catch {
-        console.warn('[History] Trimmed flush also failed; keeping in-memory history.');
+        logger.warn('useHistoryRecorder', 'Trimmed flush also failed; keeping in-memory history.');
       }
     }
   }, []);
@@ -69,21 +83,42 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
     // Add to history if title or url loaded and not blank/newtab AND NOT INCOGNITO
     if (!updated.isIncognito && (updates.title || updates.url)) {
       const targetUrl = updated.url;
-      if (targetUrl && targetUrl !== 'nova://newtab' && targetUrl !== 'about:blank' && !targetUrl.startsWith('chrome://')) {
+      if (
+        targetUrl &&
+        !targetUrl.startsWith('nova://') &&
+        !targetUrl.startsWith('about:') &&
+        !targetUrl.startsWith('chrome://')
+      ) {
+        const normTarget = normalizeUrl(targetUrl);
         setHistory(hPrev => {
-          // If same URL was just recorded, update title/favicon if improved
-          if (hPrev.length > 0 && hPrev[0]?.url === targetUrl) {
-            if (updated.title && hPrev[0].title !== updated.title) {
-              return [{ ...hPrev[0], title: updated.title, favicon: updated.favicon || hPrev[0].favicon }, ...hPrev.slice(1)];
+          const now = Date.now();
+          const recentThreshold = 10000; // 10 seconds window for interleaved tabs
+          const recentIdx = hPrev.slice(0, 10).findIndex(item => {
+            const itemTime = typeof item.timestamp === 'number' ? item.timestamp : 0;
+            return normalizeUrl(item.url) === normTarget && (now - itemTime) < recentThreshold;
+          });
+
+          if (recentIdx !== -1) {
+            const existing = hPrev[recentIdx];
+            if (updated.title && existing.title !== updated.title) {
+              const updatedItem = {
+                ...existing,
+                title: updated.title,
+                favicon: updated.favicon || existing.favicon
+              };
+              const next = [...hPrev];
+              next[recentIdx] = updatedItem;
+              return next;
             }
             return hPrev;
           }
+
           return [{
             id: generateId('hist'),
             url: targetUrl,
             title: updated.title || targetUrl,
             favicon: updated.favicon,
-            timestamp: Date.now()
+            timestamp: now
           }, ...hPrev.slice(0, 299)]; // keep last 300 (matches sync cap)
         });
       }
@@ -97,7 +132,7 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
         try {
           localStorage.setItem('browsing_history', '[]');
         } catch (err) {
-          console.warn('[History] Clear all history failed:', err);
+          logger.warn('useHistoryRecorder', 'Clear all history failed', err);
         }
       }
       return;
@@ -121,7 +156,7 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
         try {
           localStorage.setItem('browsing_history', JSON.stringify(next));
         } catch (err) {
-          console.warn('[History] Clear timeframe history failed:', err);
+          logger.warn('useHistoryRecorder', 'Clear timeframe history failed', err);
         }
       }
       return next;
@@ -135,7 +170,7 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
         try {
           localStorage.setItem('browsing_history', JSON.stringify(next));
         } catch (err) {
-          console.warn('[History] Remove history item failed:', err);
+          logger.warn('useHistoryRecorder', 'Remove history item failed', err);
         }
       }
       return next;

@@ -2844,6 +2844,21 @@ fi
   // Cmd+F is covered by the Edit menu accelerator ("Find in Page...").
 });
 
+/**
+ * Restricts subframe navigation strictly to safe schemes: http:, https:, and about:blank.
+ */
+export function isSafeSubframeNavigation(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  try {
+    const parsed = new URL(url);
+    const isSafeHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
+    const isSafeAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
+    return isSafeHttp || isSafeAboutBlank;
+  } catch {
+    return false;
+  }
+}
+
 app.on('web-contents-created', (_event, contents) => {
   // Security: Force secure webPreferences for any <webview> tags
   contents.on('will-attach-webview', (event, webPreferences, params) => {
@@ -2953,6 +2968,18 @@ app.on('web-contents-created', (_event, contents) => {
     contents.once('destroyed', () => {
       (contents as any).removeListener('audio-state-changed', audioListener);
     });
+
+    // Security: Restrict subframe navigation strictly to safe schemes: http:, https:, and about:blank
+    contents.on('will-frame-navigate', (event: any) => {
+      if (event && !event.isMainFrame) {
+        const frameUrl = typeof event.url === 'string' ? event.url : '';
+        if (!isSafeSubframeNavigation(frameUrl)) {
+          event.preventDefault();
+          console.warn('[Security] Blocked unauthorized subframe navigation to:', frameUrl);
+        }
+      }
+    });
+
     contents.on('will-navigate', (e, navigationUrl) => {
       // 0. Prevent dangerous protocols, local file access, and internal
       // about: pages from being loaded inside untrusted webviews.
@@ -3369,6 +3396,69 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   }
 });
 
+/**
+ * Opens a dedicated sandboxed window to safely view page source without
+ * routing dangerous view-source: schemes through renderer navigation.
+ */
+export async function openPageSourceViewer(currentUrl: string, wc?: any): Promise<BrowserWindow | null> {
+  if (!currentUrl || typeof currentUrl !== 'string') return null;
+
+  let isInternalPage = false;
+  let isViewSource = false;
+  try {
+    const parsed = new URL(currentUrl);
+    isInternalPage = parsed.protocol.startsWith('nova');
+    isViewSource = parsed.protocol === 'view-source:';
+  } catch {
+    isInternalPage = currentUrl.toLowerCase().startsWith('nova');
+    isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
+  }
+
+  if (isInternalPage || isViewSource) return null;
+
+  let htmlSource = '';
+  if (wc && typeof wc.executeJavaScript === 'function') {
+    try {
+      htmlSource = await wc.executeJavaScript('document.documentElement.outerHTML');
+    } catch {}
+  }
+
+  if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
+    try {
+      const resp = await fetch(currentUrl);
+      htmlSource = await resp.text();
+    } catch {}
+  }
+
+  const sourceWin = new BrowserWindow({
+    title: `Source: ${currentUrl}`,
+    width: 1000,
+    height: 700,
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+    }
+  });
+
+  sourceWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  sourceWin.webContents.on('will-navigate', (navEvt) => navEvt.preventDefault());
+
+  await sourceWin.loadURL('about:blank');
+  await sourceWin.webContents.executeJavaScript(`
+    document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
+    document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
+    const pre = document.createElement('pre');
+    pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
+    pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
+    document.body.appendChild(pre);
+  `);
+
+  return sourceWin;
+}
+
 // Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
 app.on('web-contents-created', (_event, wc) => {
   wc.removeAllListeners('context-menu');
@@ -3685,22 +3775,12 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.viewSource,
           accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
-          click: () => {
+          click: async () => {
             const currentUrl = wc.getURL();
-            // Fix: internal pages use the `nova:` protocol (rendered as nova://newtab etc.).
-            // Block view-source for ANY nova-prefixed protocol, not just the literal 'nova://' prefix.
-            let isInternalPage = false;
-            let isViewSource = false;
             try {
-              const parsed = new URL(currentUrl);
-              isInternalPage = parsed.protocol.startsWith('nova');
-              isViewSource = parsed.protocol === 'view-source:';
-            } catch {
-              isInternalPage = currentUrl.toLowerCase().startsWith('nova');
-              isViewSource = currentUrl.toLowerCase().startsWith('view-source:');
-            }
-            if (currentUrl && !isViewSource && !isInternalPage) {
-              sendToMainWindow('new-tab', `view-source:${currentUrl}`);
+              await openPageSourceViewer(currentUrl, wc);
+            } catch (err) {
+              console.error('[View Source] Failed to open source viewer:', err);
             }
           }
         }));

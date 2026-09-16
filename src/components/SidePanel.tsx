@@ -137,7 +137,15 @@ export const SidePanel = React.memo(({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const attachmentIdRef = useRef(0);
   const attachmentHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasSpeechRecognition = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+  useEffect(() => {
+    return () => {
+      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+      if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const unsubscribe = orchestrator.subscribe(actions => {
@@ -1040,7 +1048,11 @@ export const SidePanel = React.memo(({
                             onClick={() => {
                               navigator.clipboard.writeText(textContent);
                               setCopiedIdx(idx);
-                              setTimeout(() => setCopiedIdx(null), 2000);
+                              if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+                              copiedTimerRef.current = setTimeout(() => {
+                                setCopiedIdx(null);
+                                copiedTimerRef.current = null;
+                              }, 2000);
                             }}
                             className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-100 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
                             title="Copy Text"

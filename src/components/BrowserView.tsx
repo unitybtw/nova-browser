@@ -70,6 +70,7 @@ interface BrowserViewProps {
   onExportData?: () => void;
   onImportData?: (file: File) => void;
   onPurgeMemory?: () => Promise<void> | void;
+  onPerformSync?: (mergedData: any) => Promise<void> | void;
   isDemo?: boolean;
 }
 
@@ -97,6 +98,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onExportData,
   onImportData,
   onPurgeMemory,
+  onPerformSync,
   isDemo = false
 }) => {
   const webviewRef = useRef<any>(null);
@@ -142,6 +144,23 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     accounts: Array<{ username: string; password: string }>;
     hostname: string;
   } | null>(null);
+  const autofillBlurTimerRef = useRef<any>(null);
+
+  const [crashInfo, setCrashInfo] = useState<{ crashed: boolean; reason?: string }>({ crashed: false });
+
+  const handleReloadAfterCrash = useCallback(() => {
+    setCrashInfo({ crashed: false });
+    const wv = webviewRef.current;
+    if (wv && typeof wv.reload === 'function') {
+      try {
+        wv.reload();
+        return;
+      } catch (_) {}
+    }
+    if (tab?.id && tab?.url && onNavigate) {
+      onNavigate(tab.url, tab.id);
+    }
+  }, [tab?.id, tab?.url, onNavigate]);
 
   const handleSelectAutofill = useCallback((account: { username: string; password: string }, expectedHostname?: string) => {
     const webview = webviewRef.current;
@@ -265,8 +284,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           const updates: Partial<Tab> = { 
             isLoading: true,
             isTranslated: false,
-            translatedLang: undefined
+            translatedLang: undefined,
+            isPlayingAudio: false
           };
+          setCrashInfo({ crashed: false });
           if (targetUrl && targetUrl !== 'about:blank') {
             lastLoadedUrl.current = targetUrl;
             updates.url = targetUrl;
@@ -400,7 +421,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleNewWindow = (e: any) => {
-      if (e.url && typeof e.url === 'string' && isSafeNavigationUrl(e.url)) {
+      if (e && typeof e.preventDefault === 'function') {
+        e.preventDefault();
+      }
+      // When running in Electron, setWindowOpenHandler in main process handles
+      // window opening and routes it to new-tab IPC. Avoid duplicate tab creation.
+      if (typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup) {
+        return;
+      }
+      if (e?.url && typeof e.url === 'string' && isSafeNavigationUrl(e.url)) {
         if (onNewTab) {
           onNewTab(e.url, tab?.id);
         } else if (onNavigate) {
@@ -410,6 +439,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleCrashed = () => {
+      isWebviewReady.current = false;
+      setCrashInfo({ crashed: true, reason: 'crashed' });
       if (tab?.id) {
         onUpdateTab(tab.id, { isLoading: false, title: 'Page Crashed' });
         console.error('[Webview] Crashed on tab:', tab.id, 'URL:', tab?.url);
@@ -417,8 +448,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleRenderProcessGone = (e: any) => {
+      isWebviewReady.current = false;
+      const reason = e?.details?.reason || e?.reason || 'crashed';
+      setCrashInfo({ crashed: true, reason });
       if (tab?.id) {
-        const reason = e?.details?.reason || e?.reason || 'crashed';
         onUpdateTab(tab.id, { isLoading: false, title: `Page Crashed (${reason})` });
         console.error('[Webview] Render process gone:', reason, 'Exit code:', e?.details?.exitCode || e?.exitCode);
       }
@@ -520,8 +553,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           } catch (_) {}
         }).catch(() => {});
       } else if (e.channel === 'login-field-blurred') {
-        setTimeout(() => {
+        if (autofillBlurTimerRef.current) clearTimeout(autofillBlurTimerRef.current);
+        autofillBlurTimerRef.current = setTimeout(() => {
           setAutofillMenu(prev => (prev?.isOpen ? { ...prev, isOpen: false } : null));
+          autofillBlurTimerRef.current = null;
         }, 300);
       } else if (e.channel === 'nova-link-hover' && e.args?.[0]) {
         if (latestSettingsRef.current?.aiLinkPreviewEnabled === false || !latestIsActiveRef.current) return;
@@ -587,6 +622,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     return () => {
       clearTimeout(readyCheckTimer);
+      if (autofillBlurTimerRef.current) {
+        clearTimeout(autofillBlurTimerRef.current);
+        autofillBlurTimerRef.current = null;
+      }
       isWebviewReady.current = false;
       webview.removeEventListener('focus', handleFocus);
       webview.removeEventListener('dom-ready', handleDomReady);
@@ -878,6 +917,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             onImportData={onImportData}
             onClearHistory={onClearHistory}
             onPurgeMemory={onPurgeMemory}
+            onPerformSync={onPerformSync}
           />
         </Suspense>
       </div>
@@ -988,6 +1028,19 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       </AnimatePresence>
 
       <div className="flex-1 w-full h-full relative overflow-hidden flex flex-col min-h-0">
+        {crashInfo.crashed && (
+          <div className="absolute inset-x-0 top-0 z-50 bg-red-950/95 border-b border-red-500/40 text-red-200 px-4 py-3 flex items-center justify-between shadow-lg backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-white text-sm">This tab has crashed ({crashInfo.reason || 'render process gone'}).</span>
+            </div>
+            <button
+              onClick={handleReloadAfterCrash}
+              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-semibold rounded transition-colors shadow-sm cursor-pointer"
+            >
+              Reload
+            </button>
+          </div>
+        )}
         {/* Electron Webview Tag for Native Browser Experience */}
         {typeof window !== 'undefined' && (window as any).electronAPI && !(window as any).electronAPI.isWebMockup ? (
           <webview
@@ -996,7 +1049,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
             src={getSafeUrl(tab.url)}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
-            allowpopups={"true" as any}
+            webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes"
           />
         ) : isDemo && tab?.url === 'https://github.com/unitybtw/nova-browser' ? (
           <div className="w-full h-full bg-[#0d1117] text-[#c9d1d9] flex flex-col overflow-y-auto font-sans p-6 sm:p-8 select-none">

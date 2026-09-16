@@ -17,6 +17,7 @@ export const AICursorOverlay: React.FC = () => {
 
   useEffect(() => {
     let hideTimeout: NodeJS.Timeout;
+    const rippleTimers = new Set<NodeJS.Timeout>();
 
     const handleAICursor = (e: Event) => {
       const customEvent = e as CustomEvent<AICursorEvent>;
@@ -26,9 +27,11 @@ export const AICursorOverlay: React.FC = () => {
       if (customEvent.detail.action === 'click') {
         const id = generateId('ripple');
         setRipples(prev => [...prev, { id, x: customEvent.detail.x, y: customEvent.detail.y }]);
-        setTimeout(() => {
+        const rippleTimer = setTimeout(() => {
           setRipples(prev => prev.filter(r => r.id !== id));
+          rippleTimers.delete(rippleTimer);
         }, 1000);
+        rippleTimers.add(rippleTimer);
       }
 
       clearTimeout(hideTimeout);
@@ -41,6 +44,8 @@ export const AICursorOverlay: React.FC = () => {
     return () => {
       window.removeEventListener('ai-cursor', handleAICursor);
       clearTimeout(hideTimeout);
+      rippleTimers.forEach(t => clearTimeout(t));
+      rippleTimers.clear();
     };
   }, []);
 

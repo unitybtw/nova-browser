@@ -761,13 +761,13 @@ class NovaSyncService {
             filter: `user_id=eq.${this.currentUser.id}`
           },
           () => {
-            console.log('[NovaSync] Remote sync change received via Realtime WebSocket');
+            logger.info('SyncService', 'Remote sync change received via Realtime WebSocket');
             this.scheduleRealtimeNotify();
           }
         )
         .subscribe();
     } catch (e) {
-      console.warn('[NovaSync] Realtime subscribe failed:', e);
+      logger.warn('SyncService', 'Realtime subscribe failed:', e);
     }
   }
 
@@ -1304,11 +1304,33 @@ class NovaSyncService {
 
       if (remoteBundle) {
         if (prefs.syncBookmarks && remoteBundle.bookmarks) {
-          const localMap = new Map(localData.bookmarks.map(b => [b.id, b]));
-          remoteBundle.bookmarks.forEach(rb => {
-            if (!localMap.has(rb.id)) localMap.set(rb.id, rb);
+          const normalizeBmUrl = (u: string) => {
+            try {
+              const p = new URL(u);
+              let path = p.pathname;
+              if (path.length > 1 && path.endsWith('/')) {
+                p.pathname = path.slice(0, -1);
+              }
+              return p.href.toLowerCase();
+            } catch {
+              return (u.length > 1 && u.endsWith('/') ? u.slice(0, -1) : u).toLowerCase();
+            }
+          };
+
+          const localUrlMap = new Map<string, Bookmark>();
+          const localIdMap = new Map<string, Bookmark>();
+          localData.bookmarks.forEach(b => {
+            localUrlMap.set(normalizeBmUrl(b.url), b);
+            localIdMap.set(b.id, b);
           });
-          mergedBookmarks = Array.from(localMap.values());
+          remoteBundle.bookmarks.forEach(rb => {
+            const norm = normalizeBmUrl(rb.url);
+            if (!localUrlMap.has(norm) && !localIdMap.has(rb.id)) {
+              localUrlMap.set(norm, rb);
+              localIdMap.set(rb.id, rb);
+            }
+          });
+          mergedBookmarks = Array.from(localUrlMap.values());
         }
 
         if (prefs.syncBookmarks && remoteBundle.folders) {
@@ -1325,7 +1347,11 @@ class NovaSyncService {
             const key = rh.id || `${rh.url}_${rh.timestamp}`;
             if (!historyMap.has(key)) historyMap.set(key, rh);
           });
-          mergedHistory = Array.from(historyMap.values()).sort((a, b) => b.timestamp - a.timestamp);
+          mergedHistory = Array.from(historyMap.values())
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, 300);
+        } else {
+          mergedHistory = mergedHistory.slice(0, 300);
         }
 
         if (prefs.syncPasswords && remoteBundle.encryptedPasswords && remoteBundle.passwordsSalt && remoteBundle.passwordsIv && this.masterKey) {

@@ -785,7 +785,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     bookmarks,
     setBookmarks,
     bookmarksRef,
-    handleToggleBookmark
+    handleToggleBookmark,
+    flushBookmarks
   } = useBookmarks({ isDemo: demoParams.isDemo });
 
   // Immediate flush on beforeunload to prevent session loss on abrupt browser close
@@ -819,6 +820,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         (window as any).electronAPI?.storeSet?.('workspaces_session', serializedWorkspaces);
 
         localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
+        flushBookmarks();
         flushHistory();
       } catch (err) {
         logger.warn('App:Lifecycle', 'Failed to save session state before unload', err);
@@ -1529,8 +1531,27 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, []);
 
   // Cloud Sync Handler
-  const handlePerformSync = useCallback(async () => {
+  const handlePerformSync = useCallback(async (providedMergedData?: any) => {
     try {
+      if (providedMergedData) {
+        if (providedMergedData.bookmarks && Array.isArray(providedMergedData.bookmarks)) {
+          setBookmarks(providedMergedData.bookmarks);
+        }
+        if (providedMergedData.folders && Array.isArray(providedMergedData.folders)) {
+          setFolders(providedMergedData.folders);
+        }
+        if (providedMergedData.history && Array.isArray(providedMergedData.history)) {
+          setHistory(providedMergedData.history);
+        }
+        if (providedMergedData.settings && typeof providedMergedData.settings === 'object') {
+          setSettings(prev => ({ ...prev, ...providedMergedData.settings }));
+        }
+        if (providedMergedData.workspaces && Array.isArray(providedMergedData.workspaces)) {
+          setWorkspaces(providedMergedData.workspaces);
+        }
+        return;
+      }
+
       let localPasswords: SavedPassword[] = [];
       try {
         const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
@@ -1742,6 +1763,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
+      if (targetTab?.isIncognito && (window as any).electronAPI?.clearIncognitoSession) {
+        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
+        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+      }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
@@ -1769,6 +1794,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
 
     if (prevTabs.length <= 1) {
+      if (targetTab?.isIncognito && (window as any).electronAPI?.clearIncognitoSession) {
+        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
+        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+      }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         setClosedTabsStack(stack => [...stack, targetTab]);
       }
@@ -1801,8 +1830,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       if (partnerTab) {
         setActiveTabId(partnerTab.id);
       } else {
-        const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
-        setActiveTabId(newTabs[nextActiveIdx].id);
+        const targetWs = targetTab?.workspaceId || activeWs;
+        const remainingWsTabs = newTabs.filter(t => (t.workspaceId || 'default') === targetWs);
+        if (remainingWsTabs.length > 0) {
+          const wsTargetIdx = workspaceTabs.findIndex(t => t.id === id);
+          const nextWsIdx = Math.min(Math.max(0, wsTargetIdx), remainingWsTabs.length - 1);
+          setActiveTabId(remainingWsTabs[nextWsIdx].id);
+        } else {
+          const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
+          setActiveTabId(newTabs[nextActiveIdx].id);
+        }
       }
     }
 
@@ -1853,7 +1890,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       isLoading: false,
       canGoBack: false,
       canGoForward: false,
-      isPinned: false
+      isPinned: false,
+      splitWith: undefined
     };
     const newTabs = [...prev];
     newTabs.splice(idx + 1, 0, newTab);
@@ -1866,11 +1904,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       const target = prev.find(t => t.id === tabId);
       if (!target) return prev;
       const willPin = !target.isPinned;
+      const targetWs = target.workspaceId || 'default';
       const updated = prev.map(t => t.id === tabId ? { ...t, isPinned: willPin } : t);
-      // Re-sort: pinned tabs at the start
-      const pinned = updated.filter(t => t.isPinned);
-      const unpinned = updated.filter(t => !t.isPinned);
-      return [...pinned, ...unpinned];
+      // Re-sort only within the target workspace, preserving workspace boundaries
+      const wsTabs = updated.filter(t => (t.workspaceId || 'default') === targetWs);
+      const wsPinned = wsTabs.filter(t => t.isPinned);
+      const wsUnpinned = wsTabs.filter(t => !t.isPinned);
+      const sortedWsTabs = [...wsPinned, ...wsUnpinned];
+
+      let wsIdx = 0;
+      return updated.map(t => {
+        if ((t.workspaceId || 'default') === targetWs) {
+          return sortedWsTabs[wsIdx++];
+        }
+        return t;
+      });
     });
   }, []);
 
@@ -1879,10 +1927,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const prev = tabsRef.current;
     const target = prev.find(t => t.id === tabId);
     if (!target) return;
-    // Preserve pinned tabs and target tab
-    const toKeep = prev.filter(t => t.id === tabId || t.isPinned);
-    const toClose = prev.filter(t => t.id !== tabId && !t.isPinned);
+    const targetWs = target.workspaceId || 'default';
+    const toClose = prev.filter(t => (t.workspaceId || 'default') === targetWs && t.id !== tabId && !t.isPinned);
+    toClose.forEach(t => tabThumbnailCache.remove(t.id));
     setClosedTabsStack(stack => [...stack, ...toClose]);
+    const toKeep = prev.filter(t => !toClose.some(c => c.id === t.id));
     setActiveTabId(tabId);
     setTabs(toKeep);
   }, []);
@@ -1890,19 +1939,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const handleCloseTabsToRight = useCallback((index: number) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
     const prev = tabsRef.current;
-    if (index < 0 || index >= prev.length - 1) return;
-    const toKeep = prev.slice(0, index + 1);
-    const toClose = prev.slice(index + 1).filter(t => !t.isPinned);
-    const pinnedToRight = prev.slice(index + 1).filter(t => t.isPinned);
-    setClosedTabsStack(stack => [...stack, ...toClose]);
-    const nextTabs = [...toKeep, ...pinnedToRight];
+    const activeWs = activeWorkspaceIdRef.current || 'default';
+    const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
+    if (index < 0 || index >= wsTabs.length - 1) return;
+    const targetTab = wsTabs[index];
+    const tabsToClose = wsTabs.slice(index + 1).filter(t => !t.isPinned);
+    const closeIds = new Set(tabsToClose.map(t => t.id));
+    closeIds.forEach(id => tabThumbnailCache.remove(id));
+    setClosedTabsStack(stack => [...stack, ...tabsToClose]);
+    const nextTabs = prev.filter(t => !closeIds.has(t.id));
     if (!nextTabs.some(t => t.id === activeTabIdRef.current)) {
-      setActiveTabId(prev[index].id);
+      setActiveTabId(targetTab.id);
     }
     setTabs(nextTabs);
   }, []);
 
   const handleNewTabRight = useCallback((index: number) => {
+    const prev = tabsRef.current;
+    const activeWs = activeWorkspaceIdRef.current || 'default';
+    const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
+    const targetTab = (index >= 0 && index < wsTabs.length) ? wsTabs[index] : (index >= 0 && index < prev.length ? prev[index] : undefined);
+    const targetWs = targetTab?.workspaceId || activeWs;
+
     const newId = generateId('tab');
     const newTab: Tab = {
       id: newId,
@@ -1911,12 +1969,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       isLoading: false,
       canGoBack: false,
       canGoForward: false,
-      lastAccessed: Date.now()
+      lastAccessed: Date.now(),
+      workspaceId: targetWs
     };
-    setTabs(prev => {
-      const newTabs = [...prev];
-      const targetIndex = index >= 0 && index < prev.length ? index + 1 : prev.length;
-      newTabs.splice(targetIndex, 0, newTab);
+    setTabs(prevTabs => {
+      const newTabs = [...prevTabs];
+      if (targetTab) {
+        const globalIdx = newTabs.findIndex(t => t.id === targetTab.id);
+        if (globalIdx !== -1) {
+          newTabs.splice(globalIdx + 1, 0, newTab);
+          return newTabs;
+        }
+      }
+      newTabs.push(newTab);
       return newTabs;
     });
     setActiveTabId(newId);
@@ -1955,10 +2020,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const stack = closedTabsStackRef.current;
     if (stack.length === 0) return;
     const lastTab = stack[stack.length - 1];
-    setTabs(prev => [...prev, lastTab]);
-    setActiveTabId(lastTab.id);
+    let tabToRestore = lastTab;
+    if (tabsRef.current.some(t => t.id === lastTab.id)) {
+      tabToRestore = { ...lastTab, id: generateId('tab') };
+    }
+    const tabWs = tabToRestore.workspaceId || 'default';
+    if (tabWs !== (activeWorkspaceIdRef.current || 'default')) {
+      setActiveWorkspaceId(tabWs);
+    }
+    setTabs(prev => [...prev, tabToRestore]);
+    setActiveTabId(tabToRestore.id);
     setClosedTabsStack(stack.slice(0, -1));
-  }, []);
+  }, [setActiveWorkspaceId]);
 
 
 
@@ -2338,10 +2411,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       return;
     }
 
+    const currentActiveId = activeTabIdRef.current;
     const targetTab = explicitTabId 
-      ? (prev.find(t => t.id === explicitTabId) || prev.find(t => t.id === activeTabId) || prev[0])
-      : (prev.find(t => t.id === activeTabId) || prev[0]);
-    const targetId = targetTab ? targetTab.id : (prev.find(t => t.id === activeTabId)?.id || prev[0].id);
+      ? (prev.find(t => t.id === explicitTabId) || prev.find(t => t.id === currentActiveId) || prev[0])
+      : (prev.find(t => t.id === currentActiveId) || prev[0]);
+    const targetId = targetTab ? targetTab.id : (prev.find(t => t.id === currentActiveId)?.id || prev[0].id);
 
     tabThumbnailCache.remove(targetId);
 
@@ -2355,7 +2429,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     const isInternalPage = !!newTitle;
 
-    if (targetId !== activeTabId) {
+    if (targetId !== currentActiveId) {
       setActiveTabId(targetId);
     }
 
@@ -2375,7 +2449,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       isLoading: !isInternalPage,
       ...(newTitle ? { title: newTitle } : {})
     } : t));
-  }, [activeTabId]);
+  }, []);
 
   // Latest-data & latest-handler refs: let the MCP/AI-context effect below keep
   // a stable [] dependency list (instead of rebuilding executeMcpAction and
@@ -2413,7 +2487,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
-                let text = document.body.innerText;
+                let text = (document.body?.innerText || document.documentElement?.innerText || '');
                 const links = Array.from(document.querySelectorAll('a')).map(a => a.href).filter(Boolean);
                 return JSON.stringify({ text: text.substring(0, 10000), links: links.slice(0, 50) });
               })();
@@ -2489,13 +2563,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         case 'browser_list_tabs':
           return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));
 
-        case 'browser_switch_tab':
-          const tabExists = tabs.some(t => t.id === safeArgs.tabId);
-          if (tabExists) {
+        case 'browser_switch_tab': {
+          const target = tabs.find(t => t.id === safeArgs.tabId);
+          if (target) {
+            const targetWs = target.workspaceId || 'default';
+            if (targetWs !== (activeWorkspaceIdRef.current || 'default')) {
+              setActiveWorkspaceId(targetWs);
+            }
             setActiveTabId(safeArgs.tabId);
             return `Switched to tab ${safeArgs.tabId}`;
           }
           return `Error: Tab ${safeArgs.tabId} not found.`;
+        }
 
         case 'browser_close_tab':
           mcpHandlersRef.current.handleCloseTab(safeArgs.tabId);
@@ -4187,9 +4266,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 <div className="flex-1 min-h-0 w-full relative">
                   <BrowserView 
                     tab={tab} 
-                    onNavigate={(url, tabId) => handleNavigate(url, tabId || tab.id)}
+                    onNavigate={handleNavigate}
                     onUpdateTab={handleUpdateTab}
-                    onNewTab={(url, srcId) => handleNewTab(url, srcId || tab.id)}
+                    onNewTab={handleNewTab}
                     onActivate={handleSelectTab}
                     onFoundInPage={handleFoundInPage}
                     searchEngine={settings.searchEngine}
@@ -4209,6 +4288,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     onRemoveHistoryItem={handleRemoveHistoryItem}
                     onClearDownloads={handleClearDownloads}
                     onPurgeMemory={handlePurgeMemory}
+                    onPerformSync={handlePerformSync}
                     isDemo={demoParams.isDemo}
                   />
                 </div>

@@ -1261,7 +1261,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                                   tabsLength={tabs.length}
                                   onSelectTab={onSelectTab}
                                   onCloseTab={onCloseTab}
-                                  onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                                  onCloseSplit={onCloseSplit}
                                   onToggleMuteTab={onToggleMuteTab}
                                   onTabDragStart={onTabDragStart}
                                   onTabDragEnd={onTabDragEnd}
@@ -1311,7 +1311,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     tabsLength={tabs.length}
                     onSelectTab={onSelectTab}
                     onCloseTab={onCloseTab}
-                    onCloseSplit={() => onCloseSplit?.(tab.id, splitTab?.id)}
+                    onCloseSplit={onCloseSplit}
                     onToggleMuteTab={onToggleMuteTab}
                     onTabDragStart={onTabDragStart}
                     onTabDragEnd={onTabDragEnd}

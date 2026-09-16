@@ -135,6 +135,7 @@ class TTSService {
   private _isSpeaking = false;
   private currentSessionId = 0;
   private listeners: Set<(isSpeaking: boolean) => void> = new Set();
+  private pendingVoicesListener: (() => void) | null = null;
 
   public subscribe(listener: (isSpeaking: boolean) => void): () => void {
     this.listeners.add(listener);
@@ -256,10 +257,18 @@ class TTSService {
       };
 
       if (window.speechSynthesis.getVoices().length === 0) {
+        if (this.pendingVoicesListener) {
+          window.speechSynthesis.removeEventListener('voiceschanged', this.pendingVoicesListener);
+          this.pendingVoicesListener = null;
+        }
         const onVoices = () => {
-          window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+          if (this.pendingVoicesListener === onVoices) {
+            window.speechSynthesis.removeEventListener('voiceschanged', onVoices);
+            this.pendingVoicesListener = null;
+          }
           if (sessionId === this.currentSessionId) speakNext();
         };
+        this.pendingVoicesListener = onVoices;
         window.speechSynthesis.addEventListener('voiceschanged', onVoices);
       } else {
         speakNext();
@@ -269,6 +278,10 @@ class TTSService {
 
   public stop() {
     this.currentSessionId++;
+    if (this.pendingVoicesListener && typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.removeEventListener('voiceschanged', this.pendingVoicesListener);
+      this.pendingVoicesListener = null;
+    }
     if (typeof window !== 'undefined' && (window as any).electronAPI?.nativeTtsStop) {
       (window as any).electronAPI.nativeTtsStop().catch(() => {});
     }

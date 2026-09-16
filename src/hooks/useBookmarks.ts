@@ -59,10 +59,29 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
     });
   }, []);
 
+  /** Synchronous persist of the latest bookmarks snapshot (matching flushHistory). */
+  const flushBookmarks = useCallback(() => {
+    if (options.isDemo) return;
+    try {
+      const serialized = JSON.stringify(bookmarksRef.current);
+      localStorage.setItem('bookmarks', serialized);
+      getElectronAPI()?.storeSet?.('bookmarks', serialized);
+    } catch (err) {
+      logger.warn('useBookmarks', 'Flush failed (quota?) — retrying with trimmed snapshot', err);
+      try {
+        const trimmed = JSON.stringify(bookmarksRef.current.slice(-100));
+        localStorage.setItem('bookmarks', trimmed);
+      } catch (retryErr) {
+        logger.error('useBookmarks', 'Trimmed flush also failed', retryErr);
+      }
+    }
+  }, [options.isDemo]);
+
   return {
     bookmarks,
     setBookmarks,
     bookmarksRef,
-    handleToggleBookmark
+    handleToggleBookmark,
+    flushBookmarks
   };
 }
