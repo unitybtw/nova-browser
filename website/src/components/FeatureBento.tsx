@@ -93,7 +93,7 @@ export const FeatureBento: React.FC = React.memo(() => {
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-200 group-hover:border-[#4338ca]/20 group-hover:bg-[#4338ca] group-hover:text-white">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
-                <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
+                <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
                   {mod.tag}
                 </span>
               </div>
@@ -113,7 +113,7 @@ export const FeatureBento: React.FC = React.memo(() => {
             </div>
 
             <div className="mt-8 flex items-center justify-between border-t border-neutral-200/50 pt-6 font-mono text-xs">
-              <span className="font-semibold text-neutral-400">// SOVEREIGN ARCHITECTURE</span>
+              <span className="font-semibold text-neutral-600">// SOVEREIGN ARCHITECTURE</span>
               <div className="flex items-center gap-1 text-[#4338ca] font-bold">
                 <span>{mod.stats}</span>
               </div>

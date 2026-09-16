@@ -118,10 +118,16 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <Suspense fallback={<div className="min-h-[240px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
+        <Suspense fallback={<div className="min-h-[200px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
           <GithubStats />
+        </Suspense>
+        <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
           <Benchmarks />
+        </Suspense>
+        <Suspense fallback={<div className="min-h-[240px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
           <Downloads />
+        </Suspense>
+        <Suspense fallback={<div className="min-h-[160px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
           <Faq />
         </Suspense>
       </main>

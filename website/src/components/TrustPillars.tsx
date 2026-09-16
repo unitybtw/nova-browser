@@ -67,7 +67,7 @@ export const TrustPillars: React.FC = React.memo(() => {
                   <div className="p-2.5 rounded-xl bg-neutral-100 text-[#4338ca] border border-neutral-200/60">
                     <Icon className="w-5 h-5" />
                   </div>
-                  <span className="max-w-[58%] text-right font-mono text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                  <span className="max-w-[58%] text-right font-mono text-[10px] font-bold uppercase tracking-wider text-neutral-600">
                     {item.tag}
                   </span>
                 </div>
@@ -81,7 +81,7 @@ export const TrustPillars: React.FC = React.memo(() => {
               </div>
 
               <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between font-mono text-[11px]">
-                <span className="text-neutral-400">Standard:</span>
+                <span className="text-neutral-600 font-medium">Standard:</span>
                 <span className="text-[#4338ca] font-bold">{item.stat}</span>
               </div>
             </motion.div>

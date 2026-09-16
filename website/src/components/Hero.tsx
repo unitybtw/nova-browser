@@ -33,7 +33,7 @@ export const Hero: React.FC = React.memo(() => {
         className="max-w-5xl font-display text-[clamp(3rem,7.5vw,5.75rem)] font-black leading-[0.98] tracking-[-0.04em] text-[#171717]"
       >
         Thought at the Speed of{' '}
-        <span className="relative inline-block text-[#4338ca] bg-gradient-to-r from-[#4338ca] via-[#6366f1] to-[#3b82f6] bg-clip-text text-transparent">
+        <span className="relative inline-block text-[#4338ca]">
           Thought.
         </span>
       </motion.h1>

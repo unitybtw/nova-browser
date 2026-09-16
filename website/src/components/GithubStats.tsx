@@ -165,7 +165,7 @@ export const GithubStats: React.FC = () => {
       <div className="mb-8 grid grid-cols-2 gap-3 sm:gap-6 lg:grid-cols-4">
         <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <span className="font-mono text-[10px] font-bold text-neutral-600 uppercase tracking-wider">
               STARS
             </span>
             <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
@@ -176,7 +176,7 @@ export const GithubStats: React.FC = () => {
             <div className="font-display font-black text-3xl sm:text-4xl text-[#171717]">
               {activeData.stars}
             </div>
-            <span className={`font-mono text-[10px] font-semibold mt-1 inline-block ${repoStatus === 'live' ? 'text-emerald-600' : 'text-neutral-500'}`}>
+            <span className={`font-mono text-[10px] font-semibold mt-1 inline-block ${repoStatus === 'live' ? 'text-emerald-600' : 'text-neutral-600'}`}>
               {repoStatus === 'live' ? 'Public API synchronized' : repoStatus === 'loading' ? 'Loading public data…' : 'Verified release metrics'}
             </span>
           </div>
@@ -185,7 +185,7 @@ export const GithubStats: React.FC = () => {
         {/* Metric 2: Forks */}
         <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <span className="font-mono text-[10px] font-bold text-neutral-600 uppercase tracking-wider">
               FORKS
             </span>
             <div className="p-2 rounded-xl bg-indigo-50 text-[#4338ca]">
@@ -196,7 +196,7 @@ export const GithubStats: React.FC = () => {
             <div className="font-display font-black text-3xl sm:text-4xl text-[#171717]">
               {activeData.forks}
             </div>
-            <span className="font-mono text-[10px] text-neutral-400 mt-1 inline-block">
+            <span className="font-mono text-[10px] text-neutral-600 font-medium mt-1 inline-block">
               Community Forks
             </span>
           </div>
@@ -205,7 +205,7 @@ export const GithubStats: React.FC = () => {
         {/* Metric 3: License */}
         <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <span className="font-mono text-[10px] font-bold text-neutral-600 uppercase tracking-wider">
               LICENSE
             </span>
             <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600">
@@ -216,7 +216,7 @@ export const GithubStats: React.FC = () => {
             <div className="font-display font-black text-2xl sm:text-3xl text-[#171717]">
               MIT
             </div>
-            <span className="font-mono text-[10px] text-neutral-400 mt-1 inline-block">
+            <span className="font-mono text-[10px] text-neutral-600 font-medium mt-1 inline-block">
               100% Permissive
             </span>
           </div>
@@ -225,7 +225,7 @@ export const GithubStats: React.FC = () => {
         {/* Metric 4: Latest Sync */}
         <div className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-4 shadow-xs sm:p-6">
           <div className="flex items-center justify-between mb-4">
-            <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+            <span className="font-mono text-[10px] font-bold text-neutral-600 uppercase tracking-wider">
               LAST UPDATE
             </span>
             <div className="p-2 rounded-xl bg-neutral-100 text-neutral-700">
@@ -236,7 +236,7 @@ export const GithubStats: React.FC = () => {
             <div className="font-display font-bold text-lg sm:text-xl text-[#171717] truncate">
               {activeData.updatedAt}
             </div>
-            <span className="font-mono text-[10px] text-neutral-400 mt-1 inline-block">
+            <span className="font-mono text-[10px] text-neutral-600 font-medium mt-1 inline-block">
               Active Commits
             </span>
           </div>
@@ -253,12 +253,10 @@ export const GithubStats: React.FC = () => {
               <span>Star velocity overview</span>
             </div>
             <h3 className="font-display font-bold text-xl text-[#171717]">
-              Star Velocity & Milestone Curve
+              Release Milestones & Star Growth
             </h3>
-            <p className="mt-1 max-w-lg text-xs leading-relaxed text-neutral-500">
-              {repoStatus === 'live'
-                ? "Live trajectory calculated from the repository's verified public star growth."
-                : "Illustrative trajectory curve based on verified release milestones and community star velocity."}
+            <p className="mt-1 max-w-lg text-xs leading-relaxed text-neutral-600">
+              Verified release milestones and synchronized public repository star trajectory.
             </p>
           </div>
 
@@ -354,7 +352,8 @@ export const GithubStats: React.FC = () => {
               return (
                 <g
                   key={idx}
-                  className="cursor-pointer"
+                  className="cursor-pointer focus:outline-none"
+                  tabIndex={0}
                   role="button"
                   aria-label={`${p.date}: ${p.stars} stars`}
                   onMouseEnter={selectPoint}
@@ -371,8 +370,8 @@ export const GithubStats: React.FC = () => {
                   <circle
                     cx={x}
                     cy={y}
-                    r={isHovered ? 6 : 4}
-                    className="fill-white stroke-[#4338ca] stroke-2 transition-all"
+                    r={isHovered ? 7 : 4}
+                    className={`fill-white stroke-[#4338ca] transition-all ${isHovered ? 'stroke-[3px]' : 'stroke-2'}`}
                   />
                   {/* Larger hit area for pointer and touch users */}
                   <circle
@@ -388,7 +387,7 @@ export const GithubStats: React.FC = () => {
           </svg>
 
           {/* X-Axis Labels */}
-          <div className="flex justify-between px-6 pt-2 font-mono text-[11px] text-neutral-400">
+          <div className="flex justify-between px-6 pt-2 font-mono text-[11px] text-neutral-600 font-medium">
             {points.map((p, idx) => (
               <span key={idx}>{p.date}</span>
             ))}

@@ -309,7 +309,7 @@ export const Benchmarks: React.FC = () => {
           </p>
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">1. Choose a metric</p>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-600">1. Choose a metric</p>
               <p className="mt-1 text-xs text-neutral-500">Each category measures a different browser behavior.</p>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-neutral-500 shadow-xs">
@@ -386,7 +386,7 @@ export const Benchmarks: React.FC = () => {
               </div>
             </div>
             <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-xs">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-400">How to read the result</p>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-neutral-600">How to read the result</p>
               <div className="mt-2 flex items-center gap-2">
                 <span className={`inline-flex h-7 w-7 items-center justify-center rounded-lg ${currentCategory.lowerIsBetter ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-[#4338ca]'}`}>
                   {currentCategory.lowerIsBetter ? '↓' : '↑'}
@@ -399,10 +399,10 @@ export const Benchmarks: React.FC = () => {
 
           <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-400">2. Compare the results</p>
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-neutral-600">2. Compare the results</p>
               <p className="mt-1 text-xs text-neutral-500">For each metric, the better result is shown as the longer bar.</p>
             </div>
-            <span className="font-mono text-[10px] text-neutral-400">Relative performance view</span>
+            <span className="font-mono text-[10px] text-neutral-600">Relative performance view</span>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-16">
             {/* Left Card: Metric Breakdown & Live Bar Comparison */}
@@ -410,7 +410,7 @@ export const Benchmarks: React.FC = () => {
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                   <div>
-                    <span className="font-mono text-[11px] font-bold text-neutral-400 uppercase tracking-wider block mb-1">
+                    <span className="font-mono text-[11px] font-bold text-neutral-600 uppercase tracking-wider block mb-1">
                       {currentCategory.subtitle}
                     </span>
                     <h3 className="font-display text-2xl sm:text-3xl font-bold text-[#171717]">
@@ -486,11 +486,11 @@ export const Benchmarks: React.FC = () => {
               </div>
 
               <div className="mt-8 border-t border-neutral-100 pt-5">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-neutral-400">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-neutral-600">
                   <span>// Criteria: {currentCategory.lowerIsBetter ? 'Lower is Better' : 'Higher is Better'}</span>
                   <span>Standardized benchmark view</span>
                 </div>
-                <p className="mt-3 text-[11px] leading-relaxed text-neutral-400">{currentCategory.benchmarkNote}</p>
+                <p className="mt-3 text-[11px] leading-relaxed text-neutral-600">{currentCategory.benchmarkNote}</p>
               </div>
             </div>
 
@@ -599,7 +599,7 @@ export const Benchmarks: React.FC = () => {
                     {/* Floating Tooltip following slider position */}
                     <div
                       className="absolute -top-7 -translate-x-1/2 pointer-events-none transition-all duration-75 ease-out z-10"
-                      style={{ left: `${((tabCount - 5) / 95) * 100}%` }}
+                      style={{ left: `clamp(28px, ${((tabCount - 5) / 95) * 100}%, calc(100% - 28px))` }}
                     >
                       <div className="bg-[#4338ca] text-white font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full shadow-md whitespace-nowrap relative">
                         <AnimatedCounter value={tabCount} suffix=" Tabs" />
@@ -616,14 +616,14 @@ export const Benchmarks: React.FC = () => {
                       value={tabCount}
                       aria-valuetext={`${tabCount} open tabs; estimated Nova memory ${novaMemoryEst} megabytes versus Chrome ${chromeMemoryEst} megabytes`}
                       onChange={(e) => setTabCount(parseInt(e.target.value, 10))}
-                      className="w-full h-3 bg-neutral-200 rounded-full appearance-none cursor-pointer accent-[#4338ca] transition-all focus:outline-none focus:ring-2 focus:ring-[#4338ca]/30"
+                      className="w-full h-3 bg-neutral-200 rounded-full appearance-none cursor-pointer accent-[#4338ca] transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
                       style={{
                         background: `linear-gradient(to right, #4338ca 0%, #6366f1 ${((tabCount - 5) / 95) * 100}%, #e5e5e5 ${((tabCount - 5) / 95) * 100}%, #e5e5e5 100%)`
                       }}
                     />
                   </div>
 
-                  <div className="flex justify-between font-mono text-[10px] text-neutral-400 mt-2 font-medium">
+                  <div className="flex justify-between font-mono text-[10px] text-neutral-600 mt-2 font-medium">
                     <span>5 Tabs (Light)</span>
                     <span>50 Tabs (Dev)</span>
                     <span>100 Tabs (Extreme)</span>
@@ -663,7 +663,7 @@ export const Benchmarks: React.FC = () => {
                     <span className="font-mono text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
                       Hibernated
                     </span>
-                    <span className="font-mono text-[10px] text-neutral-400">
+                    <span className="font-mono text-[10px] text-neutral-600 font-medium">
                       Background suspended
                     </span>
                   </div>
@@ -673,7 +673,7 @@ export const Benchmarks: React.FC = () => {
                 <div
                   className="p-6 rounded-2xl bg-white border border-neutral-200 shadow-xs flex flex-col justify-between relative overflow-hidden hover:border-neutral-300 transition-colors"
                 >
-                  <span className="font-mono text-[10px] font-bold text-neutral-400 uppercase tracking-wider">
+                  <span className="font-mono text-[10px] font-bold text-neutral-600 uppercase tracking-wider">
                     Google Chrome
                   </span>
 
@@ -681,7 +681,7 @@ export const Benchmarks: React.FC = () => {
                     <div className="font-display text-3xl sm:text-4xl font-extrabold text-neutral-700 tracking-tight flex items-baseline gap-1">
                       <span>~</span>
                       <AnimatedCounter value={chromeMemoryEst / 1024} decimals={1} />
-                      <span className="text-sm font-sans font-normal text-neutral-400">GB</span>
+                      <span className="text-sm font-sans font-normal text-neutral-500">GB</span>
                     </div>
                     {/* Visual Meter Bar */}
                     <div className="w-full bg-neutral-100 rounded-full h-1.5 mt-2 overflow-hidden">
@@ -747,26 +747,26 @@ export const Benchmarks: React.FC = () => {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-neutral-200/60 bg-neutral-50/70 font-mono text-xs uppercase text-neutral-500 tracking-wider">
-                  <th className="p-6 font-semibold w-1/3">Capability & Architecture</th>
-                  <th className="p-6 font-bold text-[#4338ca] bg-indigo-50/50">Nova Browser</th>
-                  <th className="p-6 font-semibold">Google Chrome</th>
-                  <th className="p-6 font-semibold">Brave</th>
+                  <th className="px-4 py-3.5 sm:p-6 font-semibold w-1/3">Capability & Architecture</th>
+                  <th className="px-4 py-3.5 sm:p-6 font-bold text-[#4338ca] bg-indigo-50/50">Nova Browser</th>
+                  <th className="px-4 py-3.5 sm:p-6 font-semibold">Google Chrome</th>
+                  <th className="px-4 py-3.5 sm:p-6 font-semibold">Brave</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-200/60 font-sans text-xs">
                 {MATRIX_FEATURES.map((item, idx) => (
                   <tr key={idx} className="hover:bg-neutral-50/50 transition-colors">
-                    <td className="p-6">
+                    <td className="px-4 py-3.5 sm:p-6">
                       <div className="font-display font-bold text-sm text-[#171717] mb-1">
                         {item.feature}
                       </div>
-                      <div className="text-neutral-500 leading-relaxed max-w-sm font-sans">
+                      <div className="text-neutral-600 leading-relaxed max-w-sm font-sans">
                         {item.sub}
                       </div>
                     </td>
 
                     {/* Nova Column */}
-                    <td className="p-6 bg-indigo-50/30 font-mono font-bold text-[#4338ca]">
+                    <td className="px-4 py-3.5 sm:p-6 bg-indigo-50/30 font-mono font-bold text-[#4338ca]">
                       <div className="flex items-center gap-1.5">
                         <Check className="w-4 h-4 text-emerald-600 shrink-0" />
                         <span>{item.nova}</span>
@@ -774,17 +774,17 @@ export const Benchmarks: React.FC = () => {
                     </td>
 
                     {/* Chrome Column */}
-                    <td className="p-6 font-mono text-neutral-600">
+                    <td className="px-4 py-3.5 sm:p-6 font-mono text-neutral-600">
                       <div className="flex items-center gap-1.5">
-                        <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <Minus className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                         <span>{item.chrome}</span>
                       </div>
                     </td>
 
                     {/* Brave Column */}
-                    <td className="p-6 font-mono text-neutral-600">
+                    <td className="px-4 py-3.5 sm:p-6 font-mono text-neutral-600">
                       <div className="flex items-center gap-1.5">
-                        <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                        <Minus className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
                         <span>{item.brave}</span>
                       </div>
                     </td>

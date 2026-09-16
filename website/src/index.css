@@ -9,7 +9,7 @@
   --color-accent-dark: var(--nova-accent-dark, var(--color-blue-700));
   --color-accent-text: var(--nova-accent-text, #ffffff);
 
-  --font-serif: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-display: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
@@ -177,10 +177,9 @@ canvas {
   contain-intrinsic-size: auto none auto 850px;
 }
 
-/* Defer expensive hover calculations & style recalcs during fast scroll */
-body.is-scrolling,
-body.is-scrolling * {
-  pointer-events: none !important;
+/* Defer expensive hover calculations during fast scroll without invalidating full DOM tree */
+body.is-scrolling {
+  pointer-events: none;
 }
 
 /* Modern Web Guidance: Physics-Based Deceleration & Spring Easing */

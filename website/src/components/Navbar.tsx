@@ -210,20 +210,40 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex items-center gap-2 rounded-full border-2 border-black bg-white p-1.5 shadow-2xl dark:border-white dark:bg-neutral-800">
+          {/* Brand Mark */}
+          <a
+            href="#top"
+            onClick={(e) => {
+              e.preventDefault();
+              handleTabClick(0, '#top');
+            }}
+            className="flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-full text-black dark:text-white hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+            aria-label="Nova Browser Home"
+          >
+            <img src="/logo.svg" alt="Nova logo" className="h-5 w-5 object-contain" />
+            <span className="font-display font-extrabold text-sm tracking-tight hidden lg:inline">
+              Nova
+            </span>
+          </a>
+
+          {/* Navigation Tabs List */}
           <ul
             ref={dockRef}
             onMouseLeave={() => updatePosition(selected)}
-            className="relative mx-auto flex w-fit items-center rounded-full border-2 border-black bg-white p-1 shadow-2xl dark:border-white dark:bg-neutral-800"
+            className="relative flex items-center"
+            role="menubar"
           >
             {NAV_TABS.map((tab, i) => (
               <Tab
                 key={tab.label}
+                href={tab.href}
                 ref={(el) => {
                   tabsRef.current[i] = el;
                 }}
                 setPosition={setPosition}
                 onClick={() => handleTabClick(i, tab.href)}
+                onFocus={() => updatePosition(i)}
               >
                 {tab.label}
               </Tab>
@@ -231,12 +251,26 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
             <Cursor position={position} />
           </ul>
+
+          {/* Action Button: Download CTA */}
+          <a
+            href="#download"
+            onClick={(e) => {
+              e.preventDefault();
+              handleTabClick(4, '#download');
+            }}
+            className="inline-flex items-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+          >
+            <Download className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Download</span>
+          </a>
         </div>
       </header>
 
       {/* 2. DEDICATED MOBILE HEADER & DRAWER (< md:) */}
       <header
-        className={`md:hidden fixed top-3 inset-x-3 z-50 pointer-events-none transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        style={{ top: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+        className={`md:hidden fixed inset-x-3 z-50 pointer-events-none transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
@@ -246,7 +280,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           <button
             type="button"
             onClick={() => handleTabClick(0, '#top')}
-            className="flex items-center gap-2.5 focus:outline-none cursor-pointer"
+            className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
           >
             <img src="/logo.svg" alt="Nova" className="h-6 w-6 object-contain" />
             <span className="font-display font-extrabold text-base tracking-tight text-white">
@@ -259,9 +293,9 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
             <a
               href="#download"
               onClick={() => handleTabClick(4, '#download')}
-              className="inline-flex items-center gap-1 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-[11px] font-semibold px-3 py-1.5 rounded-full transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold min-h-[44px] px-3.5 py-2 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
             >
-              <Download className="w-3 h-3" />
+              <Download className="w-3.5 h-3.5" />
               <span>Get</span>
             </a>
 
@@ -270,7 +304,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={mobileMenuOpen}
-              className="p-1.5 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors focus:outline-none cursor-pointer"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -285,7 +319,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
               exit={prefersReducedMotion ? undefined : { opacity: 0, y: -10, scale: 0.98 }}
               transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="pointer-events-auto mt-2 rounded-2xl bg-[#0c0d12]/96 border border-white/15 backdrop-blur-xl p-5 shadow-2xl text-white space-y-4"
+              className="pointer-events-auto mt-2 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl bg-[#0c0d12]/96 border border-white/15 backdrop-blur-xl p-5 shadow-2xl text-white space-y-4"
             >
               <nav className="flex flex-col space-y-1">
                 {NAV_TABS.map((tab, idx) => (
@@ -293,7 +327,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                     key={tab.label}
                     type="button"
                     onClick={() => handleTabClick(idx, tab.href)}
-                    className={`flex items-center justify-between w-full px-3.5 py-2.5 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer text-left ${
+                    className={`flex items-center justify-between w-full min-h-[44px] px-3.5 py-2.5 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
                       selected === idx
                         ? 'bg-[#4338ca] text-white font-bold'
                         : 'text-neutral-300 hover:bg-white/5 hover:text-white'
@@ -309,7 +343,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                 <a
                   href="#download"
                   onClick={() => handleTabClick(4, '#download')}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-white text-[#0c0d12] font-mono text-xs font-bold uppercase tracking-wider shadow-md hover:bg-neutral-100 transition-colors"
+                  className="flex items-center justify-center gap-2 w-full min-h-[44px] py-3 rounded-xl bg-white text-[#0c0d12] font-mono text-xs font-bold uppercase tracking-wider shadow-md hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
                 >
                   <Download className="w-4 h-4" />
                   <span>Download Nova Free</span>
@@ -319,7 +353,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                   href="https://github.com/unitybtw/nova-browser"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 font-mono text-xs transition-colors"
+                  className="flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
                 >
                   <Github className="w-4 h-4" />
                   <span>GitHub Repository</span>
@@ -335,37 +369,48 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
 interface TabProps {
   children: React.ReactNode;
+  href: string;
   setPosition: React.Dispatch<
     React.SetStateAction<{ left: number; width: number; opacity: number }>
   >;
   onClick: () => void;
+  onFocus?: () => void;
 }
 
 const Tab = React.forwardRef<HTMLLIElement, TabProps>(
-  ({ children, setPosition, onClick }, ref) => {
+  ({ children, href, setPosition, onClick, onFocus }, ref) => {
+    const handleActivate = () => {
+      if (!ref || typeof ref === 'function' || !ref.current) return;
+      setPosition({
+        left: ref.current.offsetLeft,
+        width: ref.current.offsetWidth,
+        opacity: 1,
+      });
+    };
+
     return (
       <li
         ref={ref}
-        onClick={onClick}
-        onTouchStart={() => {
-          if (!ref || typeof ref === 'function' || !ref.current) return;
-          setPosition({
-            left: ref.current.offsetLeft,
-            width: ref.current.offsetWidth,
-            opacity: 1,
-          });
-        }}
-        onMouseEnter={() => {
-          if (!ref || typeof ref === 'function' || !ref.current) return;
-          setPosition({
-            left: ref.current.offsetLeft,
-            width: ref.current.offsetWidth,
-            opacity: 1,
-          });
-        }}
-        className="relative z-10 block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference select-none whitespace-nowrap sm:px-4 sm:py-2 sm:text-xs sm:tracking-wider md:text-sm"
+        role="none"
+        onTouchStart={handleActivate}
+        onMouseEnter={handleActivate}
+        className="relative z-10 block select-none whitespace-nowrap"
       >
-        {children}
+        <a
+          href={href}
+          role="menuitem"
+          onClick={(e) => {
+            e.preventDefault();
+            onClick();
+          }}
+          onFocus={() => {
+            handleActivate();
+            onFocus?.();
+          }}
+          className="block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] sm:px-3 sm:py-1.5 sm:text-xs sm:tracking-wider md:text-sm"
+        >
+          {children}
+        </a>
       </li>
     );
   }
@@ -378,16 +423,22 @@ interface CursorProps {
 }
 
 const Cursor: React.FC<CursorProps> = ({ position }) => {
+  const prefersReducedMotion = useReducedMotion();
   return (
     <motion.li
+      aria-hidden="true"
       animate={{
         ...position,
       }}
-      transition={{
-        type: 'spring',
-        stiffness: 450,
-        damping: 32,
-      }}
+      transition={
+        prefersReducedMotion
+          ? { duration: 0 }
+          : {
+              type: 'spring',
+              stiffness: 450,
+              damping: 32,
+            }
+      }
       className="absolute z-0 inset-y-1 rounded-full bg-black dark:bg-white pointer-events-none"
     />
   );

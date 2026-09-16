@@ -72,7 +72,7 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
                 <Apple className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
                 v1.4.8 // APPLE SILICON & INTEL
               </span>
             </div>
@@ -141,7 +141,7 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
                 <Monitor className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
                 v1.4.8 // X64
               </span>
             </div>
@@ -210,7 +210,7 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
                 <Terminal className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-400 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
                 v1.4.8 // LINUX
               </span>
             </div>
@@ -352,7 +352,7 @@ export const Downloads: React.FC = () => {
             )}
           </button>
         </div>
-        <p aria-live="polite" className="mt-3 min-h-4 text-center font-mono text-[10px] text-neutral-400">
+        <p aria-live="polite" className="mt-3 min-h-4 text-center font-mono text-[10px] text-neutral-600">
           {copyError || (copiedTab === activeCliTab ? 'Command copied to clipboard.' : 'Select the command or copy it with one click.')}
         </p>
       </motion.div>
@@ -376,7 +376,7 @@ export const Downloads: React.FC = () => {
         >
           <ShieldCheck className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform" />
           <span className="group-hover:underline">SHA-256 VERIFIED</span>
-          <ExternalLink className="w-3 h-3 text-neutral-400 group-hover:text-emerald-600" />
+          <ExternalLink className="w-3 h-3 text-neutral-500 group-hover:text-emerald-600" />
         </a>
         <div className="flex items-center gap-2">
           <Github className="w-4 h-4 text-[#4338ca]" />
