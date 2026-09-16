@@ -30,10 +30,7 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = React.memo(({
       }
 
       const hidden = document.hidden;
-      const rect = canvas.getBoundingClientRect();
-      const inView = rect.bottom > 0 && rect.top < window.innerHeight;
-
-      if (inView && !hidden) {
+      if (isVisible && !hidden) {
         engine.start();
       } else {
         engine.stop();

@@ -1,9 +1,8 @@
-import React, { lazy, Suspense } from 'react';
+import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import type { BezierDefinition } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
-
-const BrowserDemo = lazy(() => import('./BrowserDemo'));
+import BrowserDemo from './BrowserDemo';
 
 const EASE: BezierDefinition = [0.16, 1, 0.3, 1];
 
@@ -83,16 +82,7 @@ export const Hero: React.FC = React.memo(() => {
           aria-hidden="true"
         />
 
-        <Suspense
-          fallback={
-            <div
-              className="browser-demo aspect-[16/10] w-full min-h-[220px] max-h-[760px] overflow-hidden rounded-xl border border-slate-700/80 bg-[#151122] shadow-[0_20px_60px_rgba(15,23,42,0.32)] sm:min-h-[380px] sm:rounded-[18px] md:min-h-[520px]"
-              aria-label="Nova Browser demo loading"
-            />
-          }
-        >
-          <BrowserDemo />
-        </Suspense>
+        <BrowserDemo />
       </motion.div>
     </section>
   );

@@ -32,11 +32,6 @@
   --nova-terminal: #0c0d12;
 }
 
-/* Globally disable Chrome's scroll anchoring */
-html, body {
-  overflow-anchor: none;
-}
-
 /* Lenis Butter-Smooth 120 Hz Momentum Scrolling */
 html.lenis, html.lenis body {
   height: auto;
@@ -63,23 +58,12 @@ html {
   background-color: #171717;
   scrollbar-width: thin;
   scrollbar-color: #6366f1 transparent;
-  transition: scrollbar-color 500ms ease;
   overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
 }
 
 section[id] {
   scroll-margin-top: 5.5rem;
-}
-
-html.in-manifesto {
-  scrollbar-color: transparent transparent;
-}
-
-html.in-manifesto ::-webkit-scrollbar-thumb {
-  background: transparent !important;
-  box-shadow: none !important;
-  border-color: transparent !important;
 }
 
 ::-webkit-scrollbar {
@@ -171,10 +155,9 @@ canvas {
   backface-visibility: hidden;
 }
 
-/* Modern Web Guidance: Defer Offscreen Rendering (content-visibility: auto) */
+/* Section structural styling without dynamic layout shifts */
 .section-deferred {
-  content-visibility: auto;
-  contain-intrinsic-size: auto none auto 850px;
+  position: relative;
 }
 
 /* Modern Web Guidance: Physics-Based Deceleration & Spring Easing */

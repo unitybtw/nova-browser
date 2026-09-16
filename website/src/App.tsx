@@ -1,4 +1,4 @@
-import { useEffect, useState, lazy, Suspense } from 'react';
+import { useEffect, useState } from 'react';
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
 import ManifestoHero from './components/ManifestoHero';
@@ -6,12 +6,11 @@ import Navbar from './components/Navbar';
 import Hero from './components/Hero';
 import TrustPillars from './components/TrustPillars';
 import FeatureBento from './components/FeatureBento';
+import GithubStats from './components/GithubStats';
+import Benchmarks from './components/Benchmarks';
+import Downloads from './components/Downloads';
+import Faq from './components/Faq';
 import Footer from './components/Footer';
-
-const GithubStats = lazy(() => import('./components/GithubStats'));
-const Benchmarks = lazy(() => import('./components/Benchmarks'));
-const Downloads = lazy(() => import('./components/Downloads'));
-const Faq = lazy(() => import('./components/Faq'));
 
 export default function App() {
   const [showNav, setShowNav] = useState(false);
@@ -32,11 +31,12 @@ export default function App() {
 
     if (!reduced) {
       lenis = new Lenis({
-        duration: 1.15,
+        duration: 1.0,
         easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
         smoothWheel: true,
         wheelMultiplier: 1.0,
-        touchMultiplier: 1.25,
+        touchMultiplier: 1.0,
+        autoResize: true,
       });
       window.__lenis = lenis;
 
@@ -60,7 +60,6 @@ export default function App() {
       if (isPast !== lastPastManifesto) {
         lastPastManifesto = isPast;
         setShowNav(isPast);
-        document.documentElement.classList.toggle('in-manifesto', !isPast);
       }
       scrollTicking = false;
     };
@@ -88,7 +87,6 @@ export default function App() {
       }
       if (isScrollingTimer) clearTimeout(isScrollingTimer);
       window.__isScrolling = false;
-      document.documentElement.classList.remove('in-manifesto');
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scrollend', stopScrolling);
     };
@@ -116,18 +114,10 @@ export default function App() {
         <Hero />
         <TrustPillars />
         <FeatureBento />
-        <Suspense fallback={<div className="min-h-[200px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
-          <GithubStats />
-        </Suspense>
-        <Suspense fallback={<div className="min-h-[300px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
-          <Benchmarks />
-        </Suspense>
-        <Suspense fallback={<div className="min-h-[240px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
-          <Downloads />
-        </Suspense>
-        <Suspense fallback={<div className="min-h-[160px] flex items-center justify-center text-neutral-400 font-mono text-xs" />}>
-          <Faq />
-        </Suspense>
+        <GithubStats />
+        <Benchmarks />
+        <Downloads />
+        <Faq />
       </main>
 
       {/* Deep Obsidian Sovereign Footer */}

@@ -58,12 +58,8 @@ export const BrowserDemo: React.FC = React.memo(() => {
   return (
     <div
       ref={containerRef}
-      style={{
-        ...(containerHeight ? { height: `${containerHeight}px` } : {}),
-        contentVisibility: 'auto',
-        containIntrinsicSize: '960px 600px',
-      }}
-      className={`browser-demo relative w-full overflow-hidden rounded-xl border border-slate-700/80 bg-[#151122] shadow-[0_20px_60px_rgba(15,23,42,0.32)] transition-all sm:rounded-[18px] ${
+      style={containerHeight ? { height: `${containerHeight}px` } : undefined}
+      className={`browser-demo relative w-full overflow-hidden rounded-xl border border-slate-700/80 bg-[#151122] shadow-[0_20px_60px_rgba(15,23,42,0.32)] transition-[border-color,box-shadow] duration-300 sm:rounded-[18px] ${
         scale === 1 ? 'aspect-[16/10] max-h-[760px] min-h-[520px]' : ''
       }`}
     >
