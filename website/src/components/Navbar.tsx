@@ -24,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     opacity: 0,
   });
   const [selected, setSelected] = useState(0);
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   const tabsRef = useRef<(HTMLLIElement | null)[]>([]);
   const dockRef = useRef<HTMLUListElement>(null);
@@ -174,6 +175,8 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
   const handleTabClick = (index: number, href: string) => {
     setSelected(index);
+    setHoveredIndex(null);
+    updatePosition(index);
     setMobileMenuOpen(false);
 
     // Lock ScrollSpy while smooth scrolling executes to eliminate erratic jumping
@@ -202,6 +205,8 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     }
   };
 
+  const activeIndex = hoveredIndex !== null ? hoveredIndex : selected;
+
   return (
     <>
       {/* 1. DESKTOP FLOATING SLIDETABS DOCK (md: and up) */}
@@ -210,7 +215,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           visible ? 'translate-y-0 opacity-100' : '-translate-y-12 opacity-0'
         }`}
       >
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border-2 border-black bg-white p-1.5 shadow-2xl dark:border-white dark:bg-neutral-800">
+        <div className="pointer-events-auto flex items-center gap-1.5 lg:gap-2 rounded-full border border-white/15 bg-[#0c0d12]/92 p-1.5 shadow-2xl backdrop-blur-xl text-white">
           {/* Brand Mark */}
           <a
             href="#top"
@@ -218,19 +223,25 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               e.preventDefault();
               handleTabClick(0, '#top');
             }}
-            className="flex items-center gap-2 pl-2.5 pr-2 py-1 rounded-full text-black dark:text-white hover:opacity-80 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+            className="flex items-center gap-2 pl-3 pr-2 py-1 rounded-full text-white hover:text-white/80 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
             aria-label="Nova Browser Home"
           >
             <img src="/logo.svg" alt="Nova logo" className="h-5 w-5 object-contain" />
-            <span className="font-display font-extrabold text-sm tracking-tight hidden lg:inline">
+            <span className="font-display font-extrabold text-sm tracking-tight hidden lg:inline text-white">
               Nova
             </span>
           </a>
 
+          {/* Subtle Divider */}
+          <div className="h-4 w-px bg-white/15" aria-hidden="true" />
+
           {/* Navigation Tabs List */}
           <ul
             ref={dockRef}
-            onMouseLeave={() => updatePosition(selected)}
+            onMouseLeave={() => {
+              setHoveredIndex(null);
+              updatePosition(selected);
+            }}
             className="relative flex items-center"
             role="menubar"
           >
@@ -241,9 +252,26 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                 ref={(el) => {
                   tabsRef.current[i] = el;
                 }}
-                setPosition={setPosition}
-                onClick={() => handleTabClick(i, tab.href)}
-                onFocus={() => updatePosition(i)}
+                isHighlighted={position.opacity > 0 && activeIndex === i}
+                onMouseEnter={() => {
+                  setHoveredIndex(i);
+                  updatePosition(i);
+                }}
+                onTouchStart={() => {
+                  setHoveredIndex(i);
+                  updatePosition(i);
+                }}
+                onClick={() => {
+                  handleTabClick(i, tab.href);
+                }}
+                onFocus={() => {
+                  setHoveredIndex(i);
+                  updatePosition(i);
+                }}
+                onBlur={() => {
+                  setHoveredIndex(null);
+                  updatePosition(selected);
+                }}
               >
                 {tab.label}
               </Tab>
@@ -252,6 +280,9 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
             <Cursor position={position} />
           </ul>
 
+          {/* Subtle Divider */}
+          <div className="h-4 w-px bg-white/15" aria-hidden="true" />
+
           {/* Action Button: Download CTA */}
           <a
             href="#download"
@@ -259,7 +290,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               e.preventDefault();
               handleTabClick(4, '#download');
             }}
-            className="inline-flex items-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
           >
             <Download className="w-3.5 h-3.5" aria-hidden="true" />
             <span>Download</span>
@@ -370,30 +401,22 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 interface TabProps {
   children: React.ReactNode;
   href: string;
-  setPosition: React.Dispatch<
-    React.SetStateAction<{ left: number; width: number; opacity: number }>
-  >;
+  isHighlighted: boolean;
+  onMouseEnter: () => void;
+  onTouchStart: () => void;
   onClick: () => void;
-  onFocus?: () => void;
+  onFocus: () => void;
+  onBlur: () => void;
 }
 
 const Tab = React.forwardRef<HTMLLIElement, TabProps>(
-  ({ children, href, setPosition, onClick, onFocus }, ref) => {
-    const handleActivate = () => {
-      if (!ref || typeof ref === 'function' || !ref.current) return;
-      setPosition({
-        left: ref.current.offsetLeft,
-        width: ref.current.offsetWidth,
-        opacity: 1,
-      });
-    };
-
+  ({ children, href, isHighlighted, onMouseEnter, onTouchStart, onClick, onFocus, onBlur }, ref) => {
     return (
       <li
         ref={ref}
         role="none"
-        onTouchStart={handleActivate}
-        onMouseEnter={handleActivate}
+        onTouchStart={onTouchStart}
+        onMouseEnter={onMouseEnter}
         className="relative z-10 block select-none whitespace-nowrap"
       >
         <a
@@ -403,11 +426,13 @@ const Tab = React.forwardRef<HTMLLIElement, TabProps>(
             e.preventDefault();
             onClick();
           }}
-          onFocus={() => {
-            handleActivate();
-            onFocus?.();
-          }}
-          className="block cursor-pointer px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-tight text-white mix-blend-difference rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] sm:px-3 sm:py-1.5 sm:text-xs sm:tracking-wider md:text-sm"
+          onFocus={onFocus}
+          onBlur={onBlur}
+          className={`block cursor-pointer px-2.5 py-1 font-mono text-[11px] uppercase tracking-tight rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] sm:px-3 sm:py-1.5 sm:text-xs sm:tracking-wider md:text-sm ${
+            isHighlighted
+              ? 'text-[#0c0d12] font-bold'
+              : 'text-neutral-300 hover:text-white font-medium'
+          }`}
         >
           {children}
         </a>
@@ -439,7 +464,7 @@ const Cursor: React.FC<CursorProps> = ({ position }) => {
               damping: 32,
             }
       }
-      className="absolute z-0 inset-y-1 rounded-full bg-black dark:bg-white pointer-events-none"
+      className="absolute z-0 inset-y-1 rounded-full bg-white shadow-sm pointer-events-none"
     />
   );
 };
