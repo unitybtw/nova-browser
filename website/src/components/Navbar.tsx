@@ -86,6 +86,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
   // Cached section offsets to eliminate layout thrashing during scroll
   const sectionCacheRef = useRef<{ id: string; top: number }[]>([]);
+  const docHeightRef = useRef<number>(0);
 
   // Robust, zero-thrash ScrollSpy that uses cached offsets during active scrolling
   useEffect(() => {
@@ -101,11 +102,16 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
         }
       }
       sectionCacheRef.current = cache;
+      docHeightRef.current = document.documentElement.scrollHeight;
     };
 
     measureSections();
-    const ro = new ResizeObserver(() => measureSections());
-    ro.observe(document.body);
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => {
+        measureSections();
+      });
+    }
 
     const updateActiveTab = () => {
       if (isClickScrollingRef.current) {
@@ -115,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
 
       const scrollY = window.scrollY;
       const viewportHeight = window.innerHeight;
-      const docHeight = document.documentElement.scrollHeight;
+      const docHeight = docHeightRef.current || document.documentElement.scrollHeight;
 
       // 1. Top of page / Manifesto zone
       if (scrollY < viewportHeight * 0.4) {
@@ -165,7 +171,6 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
     window.addEventListener('resize', measureSections, { passive: true });
 
     return () => {
-      ro.disconnect();
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scrollend', handleScrollEnd);
       window.removeEventListener('resize', measureSections);

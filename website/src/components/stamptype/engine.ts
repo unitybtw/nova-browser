@@ -129,7 +129,7 @@ export class StampType {
       if (!this.running) return;
 
       // Yield frame computation to browser compositor during active page scrolling
-      if (document.body.classList.contains('is-scrolling')) {
+      if (window.__isScrolling || window.__lenis?.isScrolling) {
         this.last = now;
         this.raf = requestAnimationFrame(loop);
         return;

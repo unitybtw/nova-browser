@@ -177,11 +177,6 @@ canvas {
   contain-intrinsic-size: auto none auto 850px;
 }
 
-/* Defer expensive hover calculations during fast scroll without invalidating full DOM tree */
-body.is-scrolling {
-  pointer-events: none;
-}
-
 /* Modern Web Guidance: Physics-Based Deceleration & Spring Easing */
 :root {
   --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);

@@ -74,6 +74,7 @@ export class BlurReveal {
   private target = 1;
   private edge: [number, number, number] = [1, 1, 1];
   private seed = Math.random() * 100;
+  private holdDrawn = false;
 
   private ro?: ResizeObserver;
 
@@ -176,6 +177,7 @@ export class BlurReveal {
     this.progress = 0;
     this.vel = 0;
     this.target = 1;
+    this.holdDrawn = false;
     this.raf = requestAnimationFrame(this.loop);
   }
 
@@ -189,6 +191,13 @@ export class BlurReveal {
     if (!this.running) return;
     this.now = performance.now();
 
+    // Yield frame computation to browser compositor during active page scrolling
+    if (window.__isScrolling || window.__lenis?.isScrolling) {
+      this.last = this.now;
+      this.raf = requestAnimationFrame(this.loop);
+      return;
+    }
+
     const dt = Math.min(0.05, Math.max(0.001, (this.now - this.last) / 1000));
     this.last = this.now;
     this.clock += dt;
@@ -200,12 +209,14 @@ export class BlurReveal {
       if (this.progress >= REVEALED_AT) {
         this.phase = "hold";
         this.phaseStart = this.now;
+        this.holdDrawn = false;
       }
     } else if (this.phase === "hold") {
       if (this.now - this.phaseStart >= HOLD_MS) {
         this.phase = "out";
         this.phaseStart = this.now;
         this.target = 0;
+        this.holdDrawn = false;
       }
     } else {
       if (this.progress <= GONE_AT && this.now - this.phaseStart >= OUT_HOLD_MS) {
@@ -217,15 +228,23 @@ export class BlurReveal {
         this.progress = 0;
         this.vel = 0;
         this.target = 1;
+        this.holdDrawn = false;
       }
     }
 
     const clampP = Math.max(0, Math.min(1, this.progress));
-    if (this.useGL && this.gl) {
-      this.gl.draw(clampP, MAX_BLUR, this.edge, this.clock, this.W / Math.max(1, this.H), this.seed);
-    } else if (this.fallback) {
-      this.fallback.style.opacity = String(clampP);
-      this.fallback.style.filter = `blur(${(1 - clampP) * 10}px)`;
+    const canSkipDraw = this.phase === "hold" && clampP >= 0.999 && this.holdDrawn;
+
+    if (!canSkipDraw) {
+      if (this.useGL && this.gl) {
+        this.gl.draw(clampP, MAX_BLUR, this.edge, this.clock, this.W / Math.max(1, this.H), this.seed);
+      } else if (this.fallback) {
+        this.fallback.style.opacity = String(clampP);
+        this.fallback.style.filter = `blur(${(1 - clampP) * 10}px)`;
+      }
+      if (this.phase === "hold" && clampP >= 0.999) {
+        this.holdDrawn = true;
+      }
     }
 
     this.raf = requestAnimationFrame(this.loop);

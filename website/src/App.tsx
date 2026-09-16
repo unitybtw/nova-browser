@@ -52,7 +52,7 @@ export default function App() {
     let lastPastManifesto: boolean | null = null;
 
     const stopScrolling = () => {
-      document.body.classList.remove('is-scrolling');
+      window.__isScrolling = false;
     };
 
     const updateScrollState = () => {
@@ -66,9 +66,7 @@ export default function App() {
     };
 
     const handleScroll = () => {
-      if (!document.body.classList.contains('is-scrolling')) {
-        document.body.classList.add('is-scrolling');
-      }
+      window.__isScrolling = true;
       if (isScrollingTimer) clearTimeout(isScrollingTimer);
       isScrollingTimer = setTimeout(stopScrolling, 90);
 
@@ -89,7 +87,7 @@ export default function App() {
         window.__lenis = undefined;
       }
       if (isScrollingTimer) clearTimeout(isScrollingTimer);
-      document.body.classList.remove('is-scrolling');
+      window.__isScrolling = false;
       document.documentElement.classList.remove('in-manifesto');
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('scrollend', stopScrolling);

@@ -81,7 +81,7 @@ export const CodeTrailCard: React.FC<CodeTrailCardProps> = ({
     let hidden = false;
 
     const push = () => {
-      if (document.body.classList.contains('is-scrolling')) return;
+      if (window.__isScrolling || window.__lenis?.isScrolling) return;
       const born = buildRow();
       born.pos = { ...headTarget };
       born.slot = 0;
@@ -100,7 +100,7 @@ export const CodeTrailCard: React.FC<CodeTrailCardProps> = ({
       if (!running) return;
 
       // Yield frame computation to browser compositor during active page scrolling
-      if (document.body.classList.contains('is-scrolling')) {
+      if (window.__isScrolling || window.__lenis?.isScrolling) {
         last = now;
         raf = requestAnimationFrame(frame);
         return;

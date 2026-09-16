@@ -155,7 +155,7 @@ export const TextRevealCard: React.FC<TextRevealCardProps> = ({ className = "" }
       if (!running) return;
 
       // Yield GPU cycles to page compositor during active scroll
-      if (document.body.classList.contains('is-scrolling')) {
+      if (window.__isScrolling || window.__lenis?.isScrolling) {
         last = performance.now();
         raf = requestAnimationFrame(loop);
         return;
