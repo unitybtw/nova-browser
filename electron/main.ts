@@ -82,8 +82,6 @@ import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
-import { initTranslation } from './main/translation.js';
-import { initTts } from './main/tts.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
@@ -4416,8 +4414,161 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
   return { error: 'Too many redirects' };
 });
 
-// One-Click Page Translation handlers (translate-text-batch, detect-language) live in main/translation.ts
-initTranslation(isTrustedSender, getStandardUserAgent);
+async function translateTextWithGoogle(text: string, sourceLang: string = 'auto', targetLang: string = 'tr'): Promise<string> {
+  const url = `https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=${encodeURIComponent(sourceLang)}&tl=${encodeURIComponent(targetLang)}&dt=t&q=${encodeURIComponent(text)}`;
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': getStandardUserAgent(),
+    },
+    signal: AbortSignal.timeout(8000)
+  });
+  if (!res.ok) {
+    throw new Error(`Translation failed with status ${res.status}`);
+  }
+  const data = await res.json();
+  if (Array.isArray(data) && Array.isArray(data[0])) {
+    return data[0].map((item: any) => item[0] || '').join('');
+  }
+  return text;
+}
+
+async function detectLanguageWithGoogle(sampleText: string): Promise<string> {
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=dict-chrome-ex&sl=auto&tl=en&dt=t&q=${encodeURIComponent(sampleText.slice(0, 300))}`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': getStandardUserAgent(),
+      },
+      signal: AbortSignal.timeout(6000)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && typeof data[2] === 'string') {
+        return data[2]; // e.g. 'en', 'de', 'es', 'fr', 'tr', 'ru', 'ja'
+      }
+    }
+  } catch (err) {
+    console.warn('[Translate] Language detection error:', err);
+  }
+  return 'auto';
+}
+
+function escapeHtmlForTranslation(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function unescapeHtmlForTranslation(str: string): string {
+  return str
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ');
+}
+
+// IPC Handlers for One-Click Page Translation
+const MAX_TRANSLATION_ITEMS = 500;
+const MAX_TRANSLATION_TEXT_CHARS = 4000;
+const MAX_TRANSLATION_TOTAL_CHARS = 100_000;
+
+ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized', translations: [] };
+  const input = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+  const rawTexts = Array.isArray(input.texts) ? input.texts : [];
+  const safeTexts: string[] = [];
+  let remainingChars = MAX_TRANSLATION_TOTAL_CHARS;
+
+  for (const rawText of rawTexts.slice(0, MAX_TRANSLATION_ITEMS)) {
+    if (typeof rawText !== 'string' || remainingChars <= 0) {
+      safeTexts.push('');
+      continue;
+    }
+    const text = rawText.slice(0, Math.min(MAX_TRANSLATION_TEXT_CHARS, remainingChars));
+    safeTexts.push(text);
+    remainingChars -= text.length;
+  }
+
+  if (safeTexts.length === 0) return { translations: [], success: true };
+
+  const validLanguage = (value: unknown, fallback: string): string => {
+    if (typeof value !== 'string' || !/^[a-zA-Z]{2,12}(?:[-_][a-zA-Z0-9]{2,12})?$/.test(value)) {
+      return fallback;
+    }
+    return value;
+  };
+  const sLang = validLanguage(input.sourceLang, 'auto');
+  const tLang = validLanguage(input.targetLang, 'tr');
+  const texts = safeTexts;
+
+  try {
+    const results: string[] = [...texts];
+    
+    // Group into HTML payload chunks of ~1600 chars or ~35 elements
+    const chunks: { indices: number[]; payload: string }[] = [];
+    let currentIndices: number[] = [];
+    let currentPayload = '';
+
+    for (let i = 0; i < texts.length; i++) {
+      const txt = texts[i] || '';
+      if (!txt.trim()) continue;
+      
+      const itemHtml = `<p id="${i}">${escapeHtmlForTranslation(txt)}</p>`;
+      if (currentIndices.length >= 35 || (currentPayload.length + itemHtml.length > 1600 && currentIndices.length > 0)) {
+        chunks.push({ indices: currentIndices, payload: currentPayload });
+        currentIndices = [i];
+        currentPayload = itemHtml;
+      } else {
+        currentIndices.push(i);
+        currentPayload += itemHtml;
+      }
+    }
+
+    if (currentIndices.length > 0) {
+      chunks.push({ indices: currentIndices, payload: currentPayload });
+    }
+
+    // Process chunks concurrently (up to 3 at a time)
+    const CONCURRENCY = 3;
+    for (let i = 0; i < chunks.length; i += CONCURRENCY) {
+      const batch = chunks.slice(i, i + CONCURRENCY);
+      await Promise.all(batch.map(async (chunk) => {
+        try {
+          const rawTranslated = await translateTextWithGoogle(chunk.payload, sLang, tLang);
+          const regex = /<p id="?(\d+)"?>([\s\S]*?)<\/p>/gi;
+          let match;
+          while ((match = regex.exec(rawTranslated)) !== null) {
+            const idx = parseInt(match[1], 10);
+            const content = unescapeHtmlForTranslation(match[2].trim());
+            if (idx >= 0 && idx < results.length && content) {
+              results[idx] = content;
+            }
+          }
+        } catch (err: any) {
+          console.warn('[Translate] Chunk translation failed:', err.message);
+        }
+      }));
+      if (i + CONCURRENCY < chunks.length) {
+        await new Promise(r => setTimeout(r, 60));
+      }
+    }
+
+    return { translations: results, success: true };
+  } catch (err: any) {
+    console.error('[Translate] Batch translation error:', err);
+    return { error: err.message || 'Translation failed', translations: texts, success: false };
+  }
+});
+
+ipcMain.handle('detect-language', async (event, sampleText: string) => {
+  if (!isTrustedSender(event)) return 'auto';
+  if (!sampleText || typeof sampleText !== 'string') return 'auto';
+  return await detectLanguageWithGoogle(sampleText);
+});
 
 // Autocomplete Suggestions handler (providers + LRU cache + staggered fallback live in main/suggestions.ts)
 initSuggestions(isTrustedSender);
@@ -5252,8 +5403,183 @@ ipcMain.handle('review-extension-permissions', async (event, extensionId: string
   return { allowed: true, remember: checkboxChecked };
 });
 
-// --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) live in main/tts.ts ---
-initTts(isTrustedSender);
+// --- NATIVE OS TEXT-TO-SPEECH (macOS High Fidelity) ---
+let activeTtsProcess: child_process.ChildProcess | null = null;
+// Generation counter: each speak request invalidates the previous one so a
+// killed request's close-handler can never spawn a fallback that talks over
+// the newer request.
+let ttsGeneration = 0;
+
+// Performance: async execFile so a slow `/usr/bin/say` can never block the Electron main process
+const execFileAsync = promisify(child_process.execFile);
+
+ipcMain.handle('native-tts-get-voices', async (event) => {
+  if (!isTrustedSender(event)) return [];
+  if (process.platform === 'darwin') {
+    try {
+      const { stdout } = await execFileAsync('/usr/bin/say', ['-v', '?'], { encoding: 'utf8', timeout: 5000 });
+      const lines = stdout.split('\n');
+      const list: { name: string; lang: string; description: string }[] = [];
+      for (const line of lines) {
+        const match = line.match(/^([^\t#]+?)\s+([a-zA-Z]{2}_[a-zA-Z0-9]+)\s+#\s*(.*)$/);
+        if (match) {
+          list.push({
+            name: match[1].trim(),
+            lang: match[2].replace('_', '-'),
+            description: match[3].trim()
+          });
+        }
+      }
+      return list;
+    } catch (e) {
+      console.error('Failed to get macOS native voices:', e);
+      return [];
+    }
+  }
+  return [];
+});
+
+ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: string, rate?: number, lang?: string) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  if (!text || typeof text !== 'string') return { success: false, error: 'Invalid text' };
+
+  // Limit text length to 100,000 chars to avoid memory exhaustion
+  if (text.length > 100000) {
+    text = text.substring(0, 100000);
+  }
+
+  // Invalidate any in-flight request BEFORE killing it: its close handler runs
+  // on a future tick, so bumping the generation first guarantees it observes
+  // the mismatch and never spawns a voice-fallback over this request.
+  const myGeneration = ++ttsGeneration;
+
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill();
+    } catch (_) {}
+    activeTtsProcess = null;
+  }
+
+  if (process.platform === 'darwin') {
+    return new Promise((resolve) => {
+      // Robustness: hard overall cap so a hung `say` process can never leave this
+      // handler pending forever. Single shared deadline across voice-fallback retries.
+      let settled = false;
+      let sayTimedOut = false;
+      const sayTimeout = setTimeout(() => {
+        sayTimedOut = true;
+        if (activeTtsProcess) {
+          try { activeTtsProcess.kill(); } catch (_) {}
+          activeTtsProcess = null;
+        }
+      }, 120000);
+      const finish = (result: { success: boolean; error?: string }) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(sayTimeout);
+        resolve(result);
+      };
+
+      // Security: Sanitize voice name strictly against command flag injection
+      let cleanVoice: string | null = null;
+      if (voiceName && typeof voiceName === 'string') {
+        const rawName = voiceName.split('(')[0].trim();
+        if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
+          cleanVoice = rawName;
+        }
+      }
+
+      // If no voice specified, determine best default by language
+      if (!cleanVoice && lang && typeof lang === 'string') {
+        const prefix = lang.toLowerCase().split('-')[0];
+        if (prefix === 'tr') cleanVoice = 'Yelda';
+        else if (prefix === 'de') cleanVoice = 'Anna';
+        else if (prefix === 'fr') cleanVoice = 'Thomas';
+        else if (prefix === 'es') cleanVoice = 'Mónica';
+        else if (prefix === 'it') cleanVoice = 'Alice';
+        else if (prefix === 'ja') cleanVoice = 'Kyoko';
+        else if (prefix === 'ru') cleanVoice = 'Milena';
+        else cleanVoice = 'Samantha';
+      }
+
+      const args: string[] = [];
+      if (cleanVoice) {
+        args.push('-v', cleanVoice);
+      }
+      
+      if (rate && typeof rate === 'number' && Number.isFinite(rate)) {
+        const clampedRate = Math.max(0.5, Math.min(2.5, rate));
+        const wpm = Math.round(175 * clampedRate);
+        args.push('-r', String(wpm));
+      }
+
+      const runSay = (commandArgs: string[]) => {
+        try {
+          const proc = child_process.spawn('/usr/bin/say', commandArgs, {
+            stdio: ['pipe', 'ignore', 'pipe']
+          });
+          activeTtsProcess = proc;
+
+          // Robustness: drain stderr so pipe backpressure can never stall the process
+          if (proc.stderr) {
+            proc.stderr.on('data', () => {});
+          }
+
+          if (proc.stdin) {
+            proc.stdin.on('error', () => {});
+            try {
+              proc.stdin.write(text, 'utf8');
+              proc.stdin.end();
+            } catch (_) {}
+          }
+
+          proc.on('close', (code) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            if (myGeneration !== ttsGeneration) {
+              // A newer speak request or stop request superseded this one.
+              finish({ success: false, error: 'Superseded or stopped' });
+            } else if (sayTimedOut) {
+              finish({ success: false, error: 'Speech synthesis timed out' });
+            } else if (code === 0) {
+              finish({ success: true });
+            } else if (code !== null && commandArgs.includes('-v') && myGeneration === ttsGeneration) {
+              // Only fallback if not cancelled/stopped and custom voice failed
+              const fallbackArgs = commandArgs.filter((a, i) => a !== '-v' && commandArgs[i - 1] !== '-v');
+              runSay(fallbackArgs);
+            } else {
+              finish({ success: false, error: `Process exited with code ${code}` });
+            }
+          });
+
+          proc.on('error', (err) => {
+            if (activeTtsProcess === proc) activeTtsProcess = null;
+            finish({ success: false, error: err.message });
+          });
+        } catch (err: any) {
+          activeTtsProcess = null;
+          finish({ success: false, error: err.message });
+        }
+      };
+
+      runSay(args);
+    });
+  }
+
+  return { success: false, error: 'Native TTS is only available on macOS' };
+});
+
+ipcMain.handle('native-tts-stop', async (event) => {
+  if (!isTrustedSender(event)) return false;
+  ttsGeneration++; // Increment generation to invalidate any in-flight processes and close handlers
+  if (activeTtsProcess) {
+    try {
+      activeTtsProcess.kill('SIGKILL');
+    } catch (_) {}
+    activeTtsProcess = null;
+    return true;
+  }
+  return false;
+});
 
 // Sliding-window rate limit state for show-confirm-dialog (dialog flood protection)
 const CONFIRM_DIALOG_LIMIT = 5;
