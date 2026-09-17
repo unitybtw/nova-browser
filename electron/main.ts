@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'cross-fetch';
@@ -189,6 +189,7 @@ app.commandLine.appendSwitch('enable-accelerated-video-decode');
 app.commandLine.appendSwitch('enable-quic');
 app.commandLine.appendSwitch('enable-tcp-fast-open');
 app.commandLine.appendSwitch('enable-fast-unload');
+app.commandLine.appendSwitch('num-raster-threads', '4');
 
 // Platform-tailored high-performance graphics optimizations
 if (process.platform === 'darwin') {
@@ -3465,7 +3466,6 @@ app.on('web-contents-created', (_event, wc) => {
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
     if (wc.getType() === 'webview') {
-      const { Menu, MenuItem, clipboard, dialog } = require('electron');
       const menu = new Menu();
 
       const labels = {
@@ -3995,6 +3995,17 @@ ipcMain.handle('purge-system-memory', async (event) => {
     const defaultSess = session.defaultSession;
     await defaultSess.clearCache();
     await defaultSess.clearHostResolverCache();
+    await defaultSess.clearAuthCache();
+
+    // Deep purge memory cache for any active incognito partitions
+    for (const partName of hardenedIncognitoPartitions) {
+      try {
+        const partSess = session.fromPartition(partName);
+        await partSess.clearCache();
+        await partSess.clearHostResolverCache();
+      } catch (_) {}
+    }
+
     if (typeof (global as any).gc === 'function') {
       (global as any).gc();
     }

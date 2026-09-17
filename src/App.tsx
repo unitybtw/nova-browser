@@ -4306,12 +4306,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 e.preventDefault();
                 const startX = e.pageX;
                 const startRatio = splitRatio;
-                
-                const handleMouseMove = (moveEvent: MouseEvent) => {
-                  const deltaX = moveEvent.pageX - startX;
-                  const container = document.getElementById('browser-views-container');
-                  const containerWidth = container ? container.clientWidth : document.body.clientWidth;
-                  let newRatio = startRatio + (deltaX / containerWidth) * 100;
+                const container = document.getElementById('browser-views-container');
+                const cachedContainerWidth = Math.max(1, container ? container.clientWidth : document.body.clientWidth);
+                let rafId: number | null = null;
+                let latestPageX = startX;
+
+                const updateDOM = () => {
+                  rafId = null;
+                  const deltaX = latestPageX - startX;
+                  let newRatio = startRatio + (deltaX / cachedContainerWidth) * 100;
                   newRatio = Math.max(20, Math.min(80, newRatio));
                   
                   if (primarySplitTab) {
@@ -4330,15 +4333,24 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     handleEl.style.left = `${newRatio}%`;
                   }
                 };
+
+                const handleMouseMove = (moveEvent: MouseEvent) => {
+                  latestPageX = moveEvent.pageX;
+                  if (rafId === null) {
+                    rafId = requestAnimationFrame(updateDOM);
+                  }
+                };
                 
                 const handleMouseUp = (upEvent: MouseEvent) => {
+                  if (rafId !== null) {
+                    cancelAnimationFrame(rafId);
+                    rafId = null;
+                  }
                   document.removeEventListener('mousemove', handleMouseMove);
                   document.removeEventListener('mouseup', handleMouseUp);
                   
                   const deltaX = upEvent.pageX - startX;
-                  const container = document.getElementById('browser-views-container');
-                  const containerWidth = container ? container.clientWidth : document.body.clientWidth;
-                  let finalRatio = startRatio + (deltaX / containerWidth) * 100;
+                  let finalRatio = startRatio + (deltaX / cachedContainerWidth) * 100;
                   finalRatio = Math.max(20, Math.min(80, finalRatio));
                   setSplitRatio(finalRatio);
                 };

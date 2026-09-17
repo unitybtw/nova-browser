@@ -419,6 +419,31 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       )}
     </motion.div>
   );
+}, (prev: SidebarTabItemProps, next: SidebarTabItemProps): boolean => {
+  return (
+    prev.isActive === next.isActive &&
+    prev.isDragOver === next.isDragOver &&
+    prev.isNested === next.isNested &&
+    prev.activeTabId === next.activeTabId &&
+    prev.tabsLength === next.tabsLength &&
+    prev.tab.id === next.tab.id &&
+    prev.tab.url === next.tab.url &&
+    prev.tab.title === next.tab.title &&
+    prev.tab.favicon === next.tab.favicon &&
+    prev.tab.isLoading === next.tab.isLoading &&
+    prev.tab.isMuted === next.tab.isMuted &&
+    prev.tab.isPlayingAudio === next.tab.isPlayingAudio &&
+    prev.tab.isSuspended === next.tab.isSuspended &&
+    prev.tab.isPinned === next.tab.isPinned &&
+    prev.tab.splitWith === next.tab.splitWith &&
+    prev.splitTab?.id === next.splitTab?.id &&
+    prev.splitTab?.title === next.splitTab?.title &&
+    prev.splitTab?.url === next.splitTab?.url &&
+    prev.splitTab?.favicon === next.splitTab?.favicon &&
+    prev.splitTab?.isLoading === next.splitTab?.isLoading &&
+    prev.splitTab?.isMuted === next.splitTab?.isMuted &&
+    prev.splitTab?.isPlayingAudio === next.splitTab?.isPlayingAudio
+  );
 });
 
 export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
@@ -480,6 +505,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverRect, setHoverRect] = useState<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
+  const hoveredTabRef = useRef<Tab | null>(null);
+  const hoverRectRef = useRef<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
 
@@ -707,23 +734,31 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   // every parent render (and hover position updates bail out when unchanged).
   const handleMouseEnter = useCallback((tab: Tab, e: React.MouseEvent) => {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setHoverRect({
+    const newRect = {
       top: rect.top,
       left: rect.left,
       width: rect.width,
       height: rect.height,
       right: rect.right,
       bottom: rect.bottom
-    });
+    };
+    hoverRectRef.current = newRect;
+    setHoverRect(newRect);
 
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     hoverTimeoutRef.current = setTimeout(() => {
+      hoveredTabRef.current = tab;
       setHoveredTab(tab);
     }, 200);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
-    if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    hoveredTabRef.current = null;
+    hoverRectRef.current = null;
     setHoveredTab(null);
     setHoverRect(null);
   }, []);
@@ -731,7 +766,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   // Auto-dismiss preview immediately if the hovered tab was closed or removed
   useEffect(() => {
     if (hoveredTab && !tabs.some(t => t.id === hoveredTab.id)) {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      hoveredTabRef.current = null;
+      hoverRectRef.current = null;
       setHoveredTab(null);
       setHoverRect(null);
     }
@@ -740,9 +780,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   // Global dismiss listeners on scroll, click, or window blur
   useEffect(() => {
     const dismiss = () => {
-      if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-      setHoveredTab(null);
-      setHoverRect(null);
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+        hoverTimeoutRef.current = null;
+      }
+      // PERF: Only dispatch state updates if a preview is currently active/open
+      if (hoveredTabRef.current !== null || hoverRectRef.current !== null) {
+        hoveredTabRef.current = null;
+        hoverRectRef.current = null;
+        setHoveredTab(null);
+        setHoverRect(null);
+      }
     };
 
     window.addEventListener('pointerdown', dismiss);

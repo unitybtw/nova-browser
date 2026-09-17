@@ -10,6 +10,72 @@ interface HistoryPageProps {
   onRemoveHistoryItem: (id: string) => void;
 }
 
+interface HistoryRowItemProps {
+  item: HistoryItem;
+  formatTime: (ts: number) => string;
+  onNavigate: (url: string) => void;
+  onRemoveHistoryItem: (id: string) => void;
+}
+
+const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
+  item,
+  formatTime,
+  onNavigate,
+  onRemoveHistoryItem
+}) => {
+  const [faviconFailed, setFaviconFailed] = useState(false);
+
+  return (
+    <div 
+      className="group flex items-center justify-between p-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
+    >
+      <div className="flex-1 flex items-center gap-3.5 min-w-0">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-900/60 flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0 overflow-hidden">
+          {item.favicon && !faviconFailed ? (
+            <img 
+              src={item.favicon} 
+              className="w-4 h-4 rounded-sm object-contain" 
+              alt="" 
+              onError={() => setFaviconFailed(true)}
+            />
+          ) : (
+            <Globe className="w-4 h-4" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <p 
+              onClick={() => onNavigate(item.url)}
+              className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+              title={item.title || item.url}
+            >
+              {item.title || item.url}
+            </p>
+            <button
+              onClick={() => onNavigate(item.url)}
+              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-500 transition-opacity"
+              title="Open URL"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5" title={item.url}>{item.url}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 shrink-0 pl-4">
+        <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{formatTime(item.timestamp)}</span>
+        <button
+          onClick={() => onRemoveHistoryItem(item.id)}
+          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          title="Remove from history"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+});
+
 export const HistoryPage: React.FC<HistoryPageProps> = ({
   history,
   onNavigate,
@@ -20,7 +86,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearTimeframe, setClearTimeframe] = useState('all');
-  const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
 
   const filteredHistory = useMemo(() => {
     if (!searchTerm.trim()) return history;
@@ -67,14 +132,6 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
 
   const formatTime = (timestamp: number) => {
     return formatTimeI18n(timestamp);
-  };
-
-  const handleFaviconError = (id: string) => {
-    setFailedFavicons(prev => {
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
   };
 
   return (
@@ -188,55 +245,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                 </div>
 
                 <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {items.map((item, idx) => (
-                    <div 
+                  {items.map((item) => (
+                    <HistoryRowItem
                       key={item.id}
-                      className="group flex items-center justify-between p-3.5 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors"
-                    >
-                      <div className="flex-1 flex items-center gap-3.5 min-w-0">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-900/60 flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0 overflow-hidden">
-                          {item.favicon && !failedFavicons.has(item.id) ? (
-                            <img 
-                              src={item.favicon} 
-                              className="w-4 h-4 rounded-sm object-contain" 
-                              alt="" 
-                              onError={() => handleFaviconError(item.id)}
-                            />
-                          ) : (
-                            <Globe className="w-4 h-4" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <p 
-                              onClick={() => onNavigate(item.url)}
-                              className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate cursor-pointer hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
-                              title={item.title || item.url}
-                            >
-                              {item.title || item.url}
-                            </p>
-                            <button
-                              onClick={() => onNavigate(item.url)}
-                              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-500 transition-opacity"
-                              title="Open URL"
-                            >
-                              <ArrowUpRight className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                          <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5" title={item.url}>{item.url}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 shrink-0 pl-4">
-                        <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{formatTime(item.timestamp)}</span>
-                        <button
-                          onClick={() => onRemoveHistoryItem(item.id)}
-                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                          title="Remove from history"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                      item={item}
+                      formatTime={formatTime}
+                      onNavigate={onNavigate}
+                      onRemoveHistoryItem={onRemoveHistoryItem}
+                    />
                   ))}
                 </div>
               </div>

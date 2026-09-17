@@ -1521,7 +1521,10 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     const container = tabsContainerRef.current;
     if (container) {
       if (container.scrollWidth <= container.clientWidth) return;
-      if (e.deltaY !== 0) {
+      // Trackpad sends native deltaX for horizontal scrolling. Adding deltaY on top
+      // causes jarring jitter and scroll jumping. Only translate deltaY to horizontal
+      // scrolling when there is zero horizontal delta (i.e. physical vertical mouse wheel).
+      if (Math.abs(e.deltaX) === 0 && e.deltaY !== 0) {
         container.scrollLeft += e.deltaY;
       }
     }
