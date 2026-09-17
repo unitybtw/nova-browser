@@ -75,13 +75,22 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       const rawW = localStorage.getItem('workspaces_session');
       const rawS = localStorage.getItem('user_settings');
 
+      const safeJsonParse = <T,>(val: string | null | undefined, fallback: T): T => {
+        if (!val) return fallback;
+        try {
+          return JSON.parse(val);
+        } catch {
+          return fallback;
+        }
+      };
+
       const code = await syncService.generateSyncChainCode({
-        bookmarks: rawB ? JSON.parse(rawB) : [],
-        folders: rawF ? JSON.parse(rawF) : [],
-        history: rawH ? JSON.parse(rawH) : [],
-        passwords: rawP ? JSON.parse(rawP) : [],
-        settings: rawS ? JSON.parse(rawS) : ({} as any),
-        workspaces: rawW ? JSON.parse(rawW) : []
+        bookmarks: safeJsonParse(rawB, []),
+        folders: safeJsonParse(rawF, []),
+        history: safeJsonParse(rawH, []),
+        passwords: safeJsonParse(rawP, []),
+        settings: safeJsonParse(rawS, {} as any),
+        workspaces: safeJsonParse(rawW, [])
       });
 
       setGeneratedCode(code);

@@ -2314,31 +2314,35 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             isIncognito ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800'
           }`}
         >
-          {(Array.isArray(bookmarks) && bookmarks.length > 0 ? bookmarks : [
-            { id: 'bm_google', title: 'Google', url: 'https://google.com', addedAt: Date.now() },
-            { id: 'bm_github', title: 'GitHub', url: 'https://github.com', addedAt: Date.now() },
-            { id: 'bm_youtube', title: 'YouTube', url: 'https://youtube.com', addedAt: Date.now() },
-            { id: 'bm_wikipedia', title: 'Wikipedia', url: 'https://wikipedia.org', addedAt: Date.now() },
-            { id: 'bm_reddit', title: 'Reddit', url: 'https://reddit.com', addedAt: Date.now() }
-          ] as unknown as Bookmark[]).map(bookmark => (
-            <button
-              key={bookmark.id}
-              onClick={() => onNavigate(bookmark.url)}
-              className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[12px] max-w-[150px] group ${
-                isIncognito 
-                  ? 'hover:bg-slate-700 text-slate-300' 
-                  : 'hover:bg-slate-200/70 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
-              }`}
-              title={bookmark.url}
-            >
-              {bookmark.favicon ? (
-                <img src={bookmark.favicon} className="w-3.5 h-3.5 rounded-sm" />
-              ) : (
-                <Globe className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
-              )}
-              <span className="truncate font-medium">{bookmark.title}</span>
-            </button>
-          ))}
+          {Array.isArray(bookmarks) && bookmarks.length > 0 ? (
+            bookmarks.map(bookmark => (
+              <button
+                key={bookmark.id}
+                onClick={() => onNavigate(bookmark.url)}
+                className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[12px] max-w-[150px] group ${
+                  isIncognito 
+                    ? 'hover:bg-slate-700 text-slate-300' 
+                    : 'hover:bg-slate-200/70 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
+                }`}
+                title={bookmark.url}
+              >
+                {bookmark.favicon ? (
+                  <img 
+                    src={bookmark.favicon} 
+                    className="w-3.5 h-3.5 rounded-sm" 
+                    onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <Globe className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                )}
+                <span className="truncate font-medium">{bookmark.title}</span>
+              </button>
+            ))
+          ) : (
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 italic px-2 py-0.5 select-none">
+              Bookmarks will appear here. Press ⌘D to bookmark the current page.
+            </span>
+          )}
         </div>
       )}
     </header>

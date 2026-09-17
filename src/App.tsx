@@ -27,8 +27,6 @@ import type {
 import { defaultSettings } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
 import { FindInPage } from './components/FindInPage';
-import { SpotlightOmnibox } from './components/SpotlightOmnibox';
-import { VpnPopover } from './components/VpnPopover';
 import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
 import { AICursorOverlay } from './components/AICursorOverlay';
@@ -77,6 +75,8 @@ const WorkspaceManager = lazyWithRetry(() => import('./components/WorkspaceManag
 const HelpModal = lazyWithRetry(() => import('./components/HelpModal').then(m => ({ default: m.HelpModal })));
 const AccountModal = lazyWithRetry(() => import('./components/AccountModal').then(m => ({ default: m.AccountModal })));
 const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
+const SpotlightOmnibox = lazyWithRetry(() => import('./components/SpotlightOmnibox').then(m => ({ default: m.SpotlightOmnibox })));
+const VpnPopover = lazyWithRetry(() => import('./components/VpnPopover').then(m => ({ default: m.VpnPopover })));
 
 // VpnPopover requires an anchorRef prop, but no element ever attaches to it
 // (the VPN toggle lives inside TopBar's more-menu, which is unmounted while
@@ -4362,17 +4362,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         </React.Suspense>
       </main>
       {/* SPOTLIGHT OMNIBOX */}
-      <SpotlightOmnibox
-        isOpen={isSpotlightOpen}
-        onClose={handleCloseSpotlight}
-        tabs={tabs}
-        activeTabId={activeTabId}
-        searchEngine={settings.searchEngine}
-        onSelectTab={handleSpotlightSelectTab}
-        onNewTab={handleNewTab}
-        onCloseTab={handleCloseTab}
-        onNavigate={handleNavigate}
-      />
+      <React.Suspense fallback={null}>
+        {isSpotlightOpen && (
+          <SpotlightOmnibox
+            isOpen={isSpotlightOpen}
+            onClose={handleCloseSpotlight}
+            tabs={tabs}
+            activeTabId={activeTabId}
+            searchEngine={settings.searchEngine}
+            onSelectTab={handleSpotlightSelectTab}
+            onNewTab={handleNewTab}
+            onCloseTab={handleCloseTab}
+            onNavigate={handleNavigate}
+          />
+        )}
+      </React.Suspense>
 
       {/* EXTENSIONS MODAL */}
       <React.Suspense fallback={null}>
@@ -4416,18 +4420,22 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       </React.Suspense>
 
       {/* VPN POPOVER */}
-      <VpnPopover
-        isOpen={isVpnPopoverOpen}
-        onClose={handleCloseVpnPopover}
-        isEnabled={vpnEnabled}
-        onToggle={setVpnEnabled}
-        selectedLocation={vpnLocation}
-        locations={vpnLocations}
-        onSelectLocation={setVpnLocation}
-        onAddLocation={handleAddVpnLocation}
-        onRemoveLocation={handleRemoveVpnLocation}
-        anchorRef={VPN_ANCHOR_REF}
-      />
+      <React.Suspense fallback={null}>
+        {isVpnPopoverOpen && (
+          <VpnPopover
+            isOpen={isVpnPopoverOpen}
+            onClose={handleCloseVpnPopover}
+            isEnabled={vpnEnabled}
+            onToggle={setVpnEnabled}
+            selectedLocation={vpnLocation}
+            locations={vpnLocations}
+            onSelectLocation={setVpnLocation}
+            onAddLocation={handleAddVpnLocation}
+            onRemoveLocation={handleRemoveVpnLocation}
+            anchorRef={VPN_ANCHOR_REF}
+          />
+        )}
+      </React.Suspense>
 
       </div>
 

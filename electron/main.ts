@@ -4786,7 +4786,9 @@ ipcMain.handle('list-extensions', async (event) => {
 
   // Sync with session extensions
   try {
-    const sessionExts = session.defaultSession.getAllExtensions();
+    const sessionExts = (session.defaultSession.extensions?.getAllExtensions
+      ? session.defaultSession.extensions.getAllExtensions()
+      : (session.defaultSession as any).getAllExtensions());
     for (const se of sessionExts) {
       if (!loadedExtensions.some(e => e.id === se.id)) {
         loadedExtensions.push(se);
@@ -4831,7 +4833,10 @@ ipcMain.handle('list-extensions', async (event) => {
           if (sizes.length > 0) {
             const rawIconRel = manifest.icons[sizes[0]];
             if (typeof rawIconRel === 'string') {
-              const baseDir = path.resolve(e.path);
+              let baseDir = path.resolve(e.path);
+              try {
+                baseDir = fs.realpathSync(baseDir);
+              } catch (_) {}
               const resolvedIconPath = path.resolve(baseDir, rawIconRel);
               const normalizedBase = baseDir + path.sep;
               if (resolvedIconPath.startsWith(normalizedBase) && fs.existsSync(resolvedIconPath)) {
