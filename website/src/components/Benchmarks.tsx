@@ -482,37 +482,53 @@ export const Benchmarks: React.FC = () => {
                   <th className="px-6 py-4 font-semibold text-neutral-600 w-2/12">Brave Browser</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200/60 font-sans text-xs">
+              <motion.tbody 
+                initial={prefersReducedMotion ? false : "hidden"}
+                animate={prefersReducedMotion ? "visible" : "visible"}
+                variants={{
+                  hidden: { opacity: 0 },
+                  visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+                }}
+                className="divide-y divide-neutral-200/60 font-sans text-xs"
+              >
                 {filteredFeatures.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-neutral-50/60 transition-colors">
+                  <motion.tr 
+                    key={idx} 
+                    variants={{
+                      hidden: { opacity: 0, y: 15 },
+                      visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }
+                    }}
+                    className="group hover:bg-neutral-50/60 transition-colors relative"
+                  >
                     {/* Feature Vector & Rationale */}
-                    <td className="px-6 py-4.5">
+                    <td className="px-6 py-5">
                       <div className="flex items-center gap-2">
-                        <span className="font-display font-bold text-sm text-[#171717]">
+                        <span className="font-display font-bold text-[15px] text-[#171717] group-hover:text-[#4338ca] transition-colors">
                           {item.feature}
                         </span>
                         {item.highlightBadge && (
-                          <span className="font-mono text-[10px] font-semibold text-[#4338ca] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                          <span className="font-mono text-[9px] font-bold text-[#4338ca] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full uppercase tracking-wider">
                             {item.highlightBadge}
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 text-neutral-600 leading-relaxed max-w-lg font-sans">
+                      <p className="mt-1.5 text-neutral-600 leading-relaxed max-w-lg font-sans">
                         {item.sub}
                       </p>
                     </td>
 
                     {/* Nova Column (Elevated Flagship) */}
-                    <td className="px-6 py-4.5 bg-indigo-50/25 border-x border-indigo-100">
-                      <div className="flex items-start gap-2">
-                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                    <td className="px-6 py-5 bg-gradient-to-br from-indigo-50/40 to-indigo-50/10 border-x border-indigo-100/60 relative overflow-hidden">
+                      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-r from-indigo-500/0 via-indigo-500/5 to-indigo-500/0" />
+                      <div className="flex items-start gap-2.5 relative z-10">
+                        <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_0_12px_rgba(67,56,202,0.3)]">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                         </div>
                         <div>
-                          <div className="font-mono font-bold text-sm text-[#4338ca]">
+                          <div className="font-mono font-bold text-[13px] text-[#4338ca]">
                             {item.nova}
                           </div>
-                          <div className="text-[11px] text-neutral-600 mt-0.5 font-sans">
+                          <div className="text-[11px] text-neutral-500 mt-0.5 font-sans font-medium">
                             {item.novaNote}
                           </div>
                         </div>
@@ -520,40 +536,54 @@ export const Benchmarks: React.FC = () => {
                     </td>
 
                     {/* Google Chrome Column */}
-                    <td className="px-6 py-4.5 font-mono text-neutral-600">
-                      <div className="flex items-center gap-1.5 text-neutral-700">
-                        <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                        <span>{item.chrome}</span>
+                    <td className="px-6 py-5 font-mono text-neutral-500 group-hover:text-neutral-700 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Minus className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+                        <span className="text-[12px]">{item.chrome}</span>
                       </div>
                     </td>
 
                     {/* Brave Column */}
-                    <td className="px-6 py-4.5 font-mono text-neutral-600">
-                      <div className="flex items-center gap-1.5 text-neutral-700">
-                        <Minus className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                        <span>{item.brave}</span>
+                    <td className="px-6 py-5 font-mono text-neutral-500 group-hover:text-neutral-700 transition-colors">
+                      <div className="flex items-center gap-2">
+                        <Minus className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+                        <span className="text-[12px]">{item.brave}</span>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))}
-              </tbody>
+              </motion.tbody>
             </table>
           </div>
 
           {/* Mobile Card Presentation (< md:) */}
-          <div className="md:hidden space-y-3">
+          <motion.div 
+            initial={prefersReducedMotion ? false : "hidden"}
+            animate={prefersReducedMotion ? "visible" : "visible"}
+            variants={{
+              hidden: { opacity: 0 },
+              visible: { opacity: 1, transition: { staggerChildren: 0.05 } }
+            }}
+            className="md:hidden space-y-3"
+          >
             {filteredFeatures.map((item, idx) => (
-              <div
+              <motion.div
                 key={idx}
-                className="rounded-2xl border border-neutral-200/80 bg-white p-4.5 shadow-xs space-y-3"
+                variants={{
+                  hidden: { opacity: 0, y: 15 },
+                  visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.22, 1, 0.36, 1] } }
+                }}
+                className="group/mob relative overflow-hidden rounded-2xl border border-neutral-200/80 bg-white p-4.5 shadow-xs space-y-3 hover:border-indigo-500/30 transition-all"
               >
-                <div>
+                <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-indigo-500/5 blur-2xl transition-opacity duration-500 opacity-0 group-hover/mob:opacity-100" aria-hidden="true" />
+                
+                <div className="relative z-10">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-display font-bold text-sm text-[#171717]">
+                    <span className="font-display font-bold text-[15px] text-[#171717] group-hover/mob:text-[#4338ca] transition-colors">
                       {item.feature}
                     </span>
                     {item.highlightBadge && (
-                      <span className="font-mono text-[9px] font-semibold text-[#4338ca] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                      <span className="font-mono text-[9px] font-bold text-[#4338ca] bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full uppercase tracking-wider group-hover/mob:bg-[#4338ca] group-hover/mob:text-white transition-colors">
                         {item.highlightBadge}
                       </span>
                     )}
@@ -564,21 +594,21 @@ export const Benchmarks: React.FC = () => {
                 </div>
 
                 {/* Comparative Chips */}
-                <div className="space-y-2 pt-1 border-t border-neutral-100">
+                <div className="relative z-10 space-y-2 pt-1 border-t border-neutral-100 group-hover/mob:border-indigo-100/50 transition-colors">
                   {/* Nova */}
-                  <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-2.5 flex items-start gap-2">
-                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <div className="rounded-xl border border-indigo-100 bg-gradient-to-br from-indigo-50/60 to-indigo-50/10 p-2.5 flex items-start gap-2 shadow-[0_0_12px_rgba(67,56,202,0.03)]">
+                    <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_0_8px_rgba(67,56,202,0.3)]">
                       <Check className="w-2.5 h-2.5 stroke-[3]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
                         <span className="font-mono text-[10px] font-bold uppercase tracking-wider text-[#4338ca]">Nova Browser</span>
-                        <span className="font-mono text-[9px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.5 rounded">Leader</span>
+                        <span className="font-mono text-[9px] text-white font-semibold bg-[#4338ca] px-1.5 py-0.5 rounded uppercase tracking-wider">Sovereign</span>
                       </div>
-                      <div className="font-mono font-bold text-xs text-[#171717] mt-0.5">
+                      <div className="font-mono font-bold text-xs text-[#171717] mt-1">
                         {item.nova}
                       </div>
-                      <div className="text-[10px] text-neutral-600 mt-0.5">
+                      <div className="text-[10px] text-neutral-500 mt-0.5 font-medium">
                         {item.novaNote}
                       </div>
                     </div>
@@ -586,24 +616,24 @@ export const Benchmarks: React.FC = () => {
 
                   {/* Chrome & Brave row */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-xl border border-neutral-200/70 bg-neutral-50/70 p-2">
+                    <div className="rounded-xl border border-neutral-200/70 bg-neutral-50/70 p-2.5 group-hover/mob:bg-neutral-50 transition-colors">
                       <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-wider block">Chrome</span>
-                      <span className="font-mono text-[11px] text-neutral-700 mt-0.5 block leading-tight">
+                      <span className="font-mono text-[11px] text-neutral-700 mt-1 block leading-tight font-medium">
                         {item.chrome}
                       </span>
                     </div>
 
-                    <div className="rounded-xl border border-neutral-200/70 bg-neutral-50/70 p-2">
+                    <div className="rounded-xl border border-neutral-200/70 bg-neutral-50/70 p-2.5 group-hover/mob:bg-neutral-50 transition-colors">
                       <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-wider block">Brave</span>
-                      <span className="font-mono text-[11px] text-neutral-700 mt-0.5 block leading-tight">
+                      <span className="font-mono text-[11px] text-neutral-700 mt-1 block leading-tight font-medium">
                         {item.brave}
                       </span>
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Matrix Footnote */}
           <div className="rounded-2xl border border-neutral-200/80 bg-neutral-50/70 p-4 flex items-start gap-3 text-xs text-neutral-600 leading-relaxed font-sans">
