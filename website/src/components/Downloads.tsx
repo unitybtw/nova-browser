@@ -65,14 +65,15 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
+          className="luxury-card group/dlcard relative overflow-hidden flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs hover:border-indigo-500/30 sm:p-7"
         >
-          <div>
+          <div className="pointer-events-none absolute -bottom-20 -right-20 h-48 w-48 rounded-full bg-indigo-500/5 blur-3xl transition-opacity duration-500 opacity-0 group-hover/dlcard:opacity-100" aria-hidden="true" />
+          <div className="relative z-10">
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
+              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Apple className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
                 v1.4.8 // APPLE SILICON & INTEL
               </span>
             </div>
@@ -93,7 +94,7 @@ export const Downloads: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          <div className="relative z-10">
             <div className="space-y-2">
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg"
@@ -134,14 +135,15 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
+          className="luxury-card group/dlcard relative overflow-hidden flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs hover:border-indigo-500/30 sm:p-7"
         >
-          <div>
+          <div className="pointer-events-none absolute -bottom-20 -right-20 h-48 w-48 rounded-full bg-indigo-500/5 blur-3xl transition-opacity duration-500 opacity-0 group-hover/dlcard:opacity-100" aria-hidden="true" />
+          <div className="relative z-10">
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
+              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Monitor className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
                 v1.4.8 // X64
               </span>
             </div>
@@ -162,7 +164,7 @@ export const Downloads: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          <div className="relative z-10">
             <div className="space-y-2">
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest"
@@ -203,14 +205,15 @@ export const Downloads: React.FC = () => {
           whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
           viewport={{ once: true, amount: 0.2 }}
           transition={prefersReducedMotion ? undefined : { duration: 0.65, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="luxury-card group flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
+          className="luxury-card group/dlcard relative overflow-hidden flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs hover:border-indigo-500/30 sm:p-7"
         >
-          <div>
+          <div className="pointer-events-none absolute -bottom-20 -right-20 h-48 w-48 rounded-full bg-indigo-500/5 blur-3xl transition-opacity duration-500 opacity-0 group-hover/dlcard:opacity-100" aria-hidden="true" />
+          <div className="relative z-10">
             <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
-              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717]">
+              <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Terminal className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full">
+              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
                 v1.4.8 // LINUX
               </span>
             </div>
@@ -231,7 +234,7 @@ export const Downloads: React.FC = () => {
             </div>
           </div>
 
-          <div>
+          <div className="relative z-10">
             <div className="space-y-2">
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-x86_64.AppImage"

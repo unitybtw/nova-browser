@@ -85,15 +85,17 @@ export const FeatureBento: React.FC = React.memo(() => {
             initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
             whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={prefersReducedMotion ? undefined : { duration: 0.7, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
-            className={`luxury-card ${mod.span} rounded-2xl bg-white border border-neutral-200/60 p-8 sm:p-10 flex flex-col justify-between group relative overflow-hidden shadow-xs`}
+            className={`luxury-card ${mod.span} rounded-2xl bg-white border border-neutral-200/60 p-8 sm:p-10 flex flex-col justify-between group/bento relative overflow-hidden shadow-xs hover:border-indigo-500/30`}
           >
-            <div>
+            {/* Subtle hover gradient flare */}
+            <div className="pointer-events-none absolute -left-32 -top-32 h-64 w-64 rounded-full bg-indigo-500/5 blur-3xl transition-opacity duration-700 opacity-0 group-hover/bento:opacity-100" aria-hidden="true" />
+            
+            <div className="relative z-10">
               <div className="flex items-center justify-between mb-6">
-                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-200 group-hover:border-[#4338ca]/20 group-hover:bg-[#4338ca] group-hover:text-white">
+                <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-300 group-hover/bento:border-[#4338ca]/20 group-hover/bento:bg-[#4338ca] group-hover/bento:text-white">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
-                <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200">
+                <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200 transition-colors duration-300 group-hover/bento:bg-indigo-50 group-hover/bento:text-[#4338ca] group-hover/bento:border-indigo-100">
                   {mod.tag}
                 </span>
               </div>
@@ -112,7 +114,7 @@ export const FeatureBento: React.FC = React.memo(() => {
               )}
             </div>
 
-            <div className="mt-8 flex items-center justify-between border-t border-neutral-200/50 pt-6 font-mono text-xs">
+            <div className="relative z-10 mt-8 flex items-center justify-between border-t border-neutral-200/50 pt-6 font-mono text-xs transition-colors duration-300 group-hover/bento:border-indigo-100">
               <span className="font-semibold text-neutral-600">// SOVEREIGN ARCHITECTURE</span>
               <div className="flex items-center gap-1 text-[#4338ca] font-bold">
                 <span>{mod.stats}</span>

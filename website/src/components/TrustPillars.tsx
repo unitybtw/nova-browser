@@ -60,29 +60,34 @@ export const TrustPillars: React.FC = React.memo(() => {
               whileInView={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={prefersReducedMotion ? undefined : { duration: 0.6, delay: idx * 0.08, ease: [0.22, 1, 0.36, 1] }}
-              className="luxury-card flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs sm:p-7"
+              className="luxury-card group/card relative flex flex-col justify-between rounded-2xl border border-neutral-200/60 bg-white p-5 shadow-xs hover:border-indigo-500/30 hover:shadow-indigo-500/5 sm:p-7 overflow-hidden"
             >
-              <div>
-              <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 mb-5">
-                  <div className="p-2.5 rounded-xl bg-neutral-100 text-[#4338ca] border border-neutral-200/60">
-                    <Icon className="w-5 h-5" />
+              {/* Subtle hover gradient flare */}
+              <div className="pointer-events-none absolute -right-20 -top-20 h-40 w-40 rounded-full bg-indigo-500/5 blur-3xl transition-opacity duration-500 opacity-0 group-hover/card:opacity-100" aria-hidden="true" />
+              
+              <div className="relative z-10 flex h-full flex-col justify-between">
+                <div>
+                  <div className="flex min-w-0 flex-wrap items-center justify-between gap-3 mb-5">
+                    <div className="p-2.5 rounded-xl bg-neutral-100 text-[#4338ca] border border-neutral-200/60 transition-colors duration-300 group-hover/card:bg-[#4338ca] group-hover/card:text-white">
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <span className="max-w-[58%] text-right font-mono text-[10px] font-bold uppercase tracking-wider text-neutral-600 transition-colors duration-300 group-hover/card:text-[#4338ca]">
+                      {item.tag}
+                    </span>
                   </div>
-                  <span className="max-w-[58%] text-right font-mono text-[10px] font-bold uppercase tracking-wider text-neutral-600">
-                    {item.tag}
-                  </span>
+
+                  <h3 className="font-display font-bold text-lg text-[#171717] mb-2 leading-snug transition-colors duration-300 group-hover/card:text-[#4338ca]">
+                    {item.title}
+                  </h3>
+                  <p className="font-sans text-xs text-neutral-600 leading-relaxed">
+                    {item.description}
+                  </p>
                 </div>
 
-                <h3 className="font-display font-bold text-lg text-[#171717] mb-2 leading-snug">
-                  {item.title}
-                </h3>
-                <p className="font-sans text-xs text-neutral-600 leading-relaxed">
-                  {item.description}
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between font-mono text-[11px]">
-                <span className="text-neutral-600 font-medium">Standard:</span>
-                <span className="text-[#4338ca] font-bold">{item.stat}</span>
+                <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between font-mono text-[11px] transition-colors duration-300 group-hover/card:border-indigo-100">
+                  <span className="text-neutral-600 font-medium">Standard:</span>
+                  <span className="text-[#4338ca] font-bold">{item.stat}</span>
+                </div>
               </div>
             </motion.div>
           );

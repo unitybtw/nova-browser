@@ -78,7 +78,7 @@ export const Hero: React.FC = React.memo(() => {
       >
         {/* Soft Ambient Halo behind Mockup */}
         <div
-          className="pointer-events-none absolute -inset-2 -z-10 rounded-[24px] bg-gradient-to-b from-indigo-500/15 via-sky-500/10 to-transparent blur-xl transition-opacity duration-500"
+          className="pointer-events-none absolute -inset-6 -z-10 rounded-[32px] bg-gradient-to-b from-indigo-500/40 via-cyan-500/20 to-transparent blur-3xl opacity-60 animate-glow-pulse transition-opacity duration-700"
           aria-hidden="true"
         />
 
