@@ -190,6 +190,14 @@ canvas {
   border: 1px solid var(--nova-border);
 }
 
+/* Force hardware acceleration for heavy backdrop and glow effects */
+.blur-3xl, .blur-2xl {
+  will-change: opacity, transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
 /* Luxury animations for Navbar */
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
@@ -201,12 +209,15 @@ canvas {
 }
 
 @keyframes glow-pulse {
-  0%, 100% { opacity: 0.4; transform: scale(1); }
-  50% { opacity: 0.9; transform: scale(1.08); }
+  0%, 100% { opacity: 0.4; transform: scale(1) translateZ(0); }
+  50% { opacity: 0.9; transform: scale(1.08) translateZ(0); }
 }
 
 .animate-glow-pulse {
-  animation: glow-pulse 3s ease-in-out infinite;
+  animation: glow-pulse 4s ease-in-out infinite;
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
 }
 
 @keyframes blink-cursor {

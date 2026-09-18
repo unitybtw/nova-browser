@@ -25,33 +25,37 @@ export const BrowserDemo: React.FC = React.memo(() => {
   const [containerHeight, setContainerHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
+    let rafId: number | null = null;
+    
     const updateDimensions = () => {
       if (!containerRef.current) return;
       const width = containerRef.current.clientWidth;
       if (width < BASE_WIDTH) {
         const s = width / BASE_WIDTH;
-        setScale(s);
-        setContainerHeight(Math.round(BASE_HEIGHT * s));
+        // Check difference to avoid unnecessary state updates
+        setScale((prev) => (Math.abs(prev - s) > 0.001 ? s : prev));
+        setContainerHeight((prev) => {
+          const newHeight = Math.round(BASE_HEIGHT * s);
+          return prev !== newHeight ? newHeight : prev;
+        });
       } else {
-        setScale(1);
-        setContainerHeight(undefined);
+        setScale((prev) => (prev !== 1 ? 1 : prev));
+        setContainerHeight((prev) => (prev !== undefined ? undefined : prev));
       }
     };
 
-    updateDimensions();
-
     const ro = new ResizeObserver(() => {
-      updateDimensions();
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(updateDimensions);
     });
 
     if (containerRef.current) {
       ro.observe(containerRef.current);
     }
 
-    window.addEventListener('resize', updateDimensions);
     return () => {
       ro.disconnect();
-      window.removeEventListener('resize', updateDimensions);
+      if (rafId) cancelAnimationFrame(rafId);
     };
   }, []);
 
