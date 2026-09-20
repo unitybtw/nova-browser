@@ -92,31 +92,15 @@ import { syncService } from './services/syncService';
 import { orchestrator } from './services/agentOrchestrator';
 import { searchHistoryAndBookmarks, SearchableItem } from './utils/searchHistoryBookmarks';
 import { logger } from './utils/logger';
-
-const DEFAULT_VPN_LOCATION: VpnLocation = {
-  id: 'direct',
-  name: 'Direct Connection',
-  url: '',
-  type: 'free',
-};
-
-const DEFAULT_VPN_LOCATIONS: VpnLocation[] = [
-  { id: 'direct', name: 'Direct Connection', url: '', type: 'free' },
-  { id: 'local-socks', name: 'Local SOCKS5 (127.0.0.1:1080)', url: 'socks5://127.0.0.1:1080', type: 'custom' },
-  { id: 'tor-socks', name: 'Tor Proxy (127.0.0.1:9050)', url: 'socks5://127.0.0.1:9050', type: 'custom' },
-];
-
-const EMPTY_ARRAY: never[] = [];
-
-const normalizeAIActionPayload = (detail: unknown): string => {
-  if (typeof detail === 'string') return detail.trim();
-  if (!detail || typeof detail !== 'object') return '';
-  const payload = detail as Record<string, unknown>;
-  for (const key of ['action', 'prompt', 'text', 'query']) {
-    if (typeof payload[key] === 'string' && payload[key].trim()) return payload[key].trim();
-  }
-  return '';
-};
+import {
+  DEFAULT_VPN_LOCATION,
+  DEFAULT_VPN_LOCATIONS,
+  EMPTY_ARRAY,
+  normalizeAIActionPayload,
+  getDemoParams,
+  isMac,
+  isWindows,
+} from './utils/appConstants';
 
 // Bag of latest event handler identities for mount-time IPC listeners.
 // Listeners registered once with [] deps would otherwise capture stale
@@ -140,33 +124,6 @@ type AppEventHandlers = {
   handleGoBack: () => void;
   handleGoForward: () => void;
 };
-
-type DemoParams = {
-  isDemo: boolean;
-  feature: string;
-  bg: string;
-  theme: 'dark' | 'light';
-  tabs: string;
-  showTasksWidget?: boolean;
-};
-
-// Demo mode query parameter inspection
-const getDemoParams = (): DemoParams => {
-  if (typeof window === 'undefined') return { isDemo: false, feature: 'default', bg: 'default', theme: 'dark', tabs: 'horizontal' };
-  const params = new URLSearchParams(window.location.search);
-  return {
-    isDemo: params.get('demo') === 'true',
-    feature: params.get('feature') || 'default',
-    bg: params.get('bg') || 'default',
-    theme: ((params.get('theme') === 'light' ? 'light' : 'dark') as 'dark' | 'light'),
-    tabs: params.get('tabs') || 'horizontal'
-  };
-};
-
-// Platform detection constants (module-level to prevent TDZ issues in hooks and initializers)
-const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent);
-const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.platform || navigator.userAgent) && !/Android/i.test(navigator.userAgent);
 
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const demoParams = useMemo(() => {
