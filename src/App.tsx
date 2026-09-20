@@ -47,6 +47,7 @@ import { usePanels } from './hooks/usePanels';
 import { useThemeLanguage } from './hooks/useThemeLanguage';
 import { useOnboarding } from './hooks/useOnboarding';
 import { useExtensions } from './hooks/useExtensions';
+import { useAppSync } from './hooks/useAppSync';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -93,7 +94,6 @@ const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
 import { aiAgent } from './services/aiAgent';
 import { tabThumbnailCache } from './services/thumbnailCache';
-import { syncService } from './services/syncService';
 import { orchestrator } from './services/agentOrchestrator';
 import { searchHistoryAndBookmarks, SearchableItem } from './utils/searchHistoryBookmarks';
 import { logger } from './utils/logger';
@@ -757,82 +757,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     restoreFromDisk();
   }, []);
 
-  // Cloud Sync Handler
-  const handlePerformSync = useCallback(async (providedMergedData?: any) => {
-    try {
-      if (providedMergedData) {
-        if (providedMergedData.bookmarks && Array.isArray(providedMergedData.bookmarks)) {
-          setBookmarks(providedMergedData.bookmarks);
-        }
-        if (providedMergedData.folders && Array.isArray(providedMergedData.folders)) {
-          setFolders(providedMergedData.folders);
-        }
-        if (providedMergedData.history && Array.isArray(providedMergedData.history)) {
-          setHistory(providedMergedData.history);
-        }
-        if (providedMergedData.settings && typeof providedMergedData.settings === 'object') {
-          setSettings(prev => ({ ...prev, ...providedMergedData.settings }));
-        }
-        if (providedMergedData.workspaces && Array.isArray(providedMergedData.workspaces)) {
-          setWorkspaces(providedMergedData.workspaces);
-        }
-        return;
-      }
-
-      let localPasswords: SavedPassword[] = [];
-      try {
-        const rawP = await getElectronAPI()?.secureStoreGet?.('passwords');
-        if (rawP) localPasswords = JSON.parse(rawP);
-      } catch (err) {
-        logger.warn('App:Sync', 'Failed to retrieve or parse secure passwords for sync', err);
-      }
-
-      const syncResult = await syncService.syncData({
-        bookmarks,
-        folders,
-        history,
-        passwords: localPasswords,
-        settings,
-        workspaces
-      });
-
-      if (syncResult && syncResult.mergedData) {
-        const { mergedData } = syncResult;
-        setBookmarks(mergedData.bookmarks);
-        setFolders(mergedData.folders);
-        setHistory(mergedData.history);
-        setSettings(mergedData.settings);
-        setWorkspaces(mergedData.workspaces);
-
-        if (mergedData.passwords && getElectronAPI()?.secureStoreSet) {
-          await getElectronAPI()?.secureStoreSet('passwords', JSON.stringify(mergedData.passwords));
-        }
-      }
-    } catch (err) {
-      console.error('[NovaSync] Sync execution failed:', err);
-      throw err;
-    }
-  }, [bookmarks, folders, history, settings, workspaces]);
-
-  // Background auto-sync on initial app load if already authenticated
-  useEffect(() => {
-    const status = syncService.getStatus();
-    if (status.isLoggedIn) {
-      const timer = setTimeout(() => {
-        handlePerformSync().catch(() => {});
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
-  }, [handlePerformSync]);
-
-  // Realtime Supabase change listener across other active devices
-  useEffect(() => {
-    const unsubscribe = syncService.onRemoteChange(() => {
-      console.log('[NovaSync] Triggering background pull for remote changes');
-      handlePerformSync().catch(() => {});
-    });
-    return () => { unsubscribe(); };
-  }, [handlePerformSync]);
+  // Cloud sync handler + background auto-sync + realtime listener
+  const { handlePerformSync } = useAppSync({
+    bookmarks,
+    folders,
+    history,
+    settings,
+    workspaces,
+    setBookmarks,
+    setFolders,
+    setHistory,
+    setSettings,
+    setWorkspaces,
+  });
 
   // Kapalı-sekme-geri-al (undo close) stack'i — hook'a taşındı, davranış aynen korunur.
   // Tab oluşturma (id-collision/workspace switch/setTabs) hook'a taşınmadı;
