@@ -57,6 +57,9 @@ import { useFolders } from './hooks/useFolders';
 import { useSplitView } from './hooks/useSplitView';
 import { useAppDataBackup } from './hooks/useAppDataBackup';
 import { useScreenshots } from './hooks/useScreenshots';
+import { useWebviewNavigation } from './hooks/useWebviewNavigation';
+import { useDemoShowcase } from './hooks/useDemoShowcase';
+import { useSettings } from './hooks/useSettings';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -365,81 +368,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   } = useVpn({ isDemo: demoParams.isDemo });
 
   // The standalone demo URL can run the animated showcase. Embedded demos
-  // (the marketing website passes demo options directly) must stay stable so
-  // visitors can interact with the real browser UI without tabs changing
-  // underneath them.
-  useEffect(() => {
-    if (!demoParams.isDemo || demoOptions || (demoParams.feature !== 'default' && demoParams.feature !== 'tour')) return;
-
-    let cycle = 0;
-    const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
-    const schedule = (callback: () => void, delay: number) => {
-      const timer = setTimeout(() => {
-        pendingTimers.delete(timer);
-        callback();
-      }, delay);
-      pendingTimers.add(timer);
-    };
-
-    const runCycle = () => {
-      if (cycle === 0) {
-        // Scene 1: arXiv AI Research + AI Sidepanel + Glowing Cursor
-        setTabs([
-          { id: '1', url: 'https://arxiv.org/list/cs.AI/recent', title: 'arXiv / cs.AI Research', isLoading: false, canGoBack: false, canGoForward: false },
-          { id: '2', url: 'nova://newtab', title: 'New Tab', isLoading: false, canGoBack: false, canGoForward: false }
-        ]);
-        setActiveTabId('1');
-        setIsSidePanelOpen(true);
-
-        schedule(() => {
-          window.dispatchEvent(new CustomEvent('ai-cursor', {
-            detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'move' }
-          }));
-        }, 800);
-
-        schedule(() => {
-          window.dispatchEvent(new CustomEvent('ai-cursor', {
-            detail: { x: Math.round(window.innerWidth * 0.35), y: 160, action: 'click' }
-          }));
-        }, 2200);
-      } else if (cycle === 1) {
-        // Scene 2: New Tab Page with Clock, Tasks, Speed Dials
-        setIsSidePanelOpen(false);
-        setActiveTabId('2');
-
-        schedule(() => {
-          window.dispatchEvent(new CustomEvent('ai-cursor', {
-            detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'move' }
-          }));
-        }, 800);
-
-        schedule(() => {
-          window.dispatchEvent(new CustomEvent('ai-cursor', {
-            detail: { x: Math.round(window.innerWidth * 0.5), y: 230, action: 'click' }
-          }));
-        }, 2000);
-      } else if (cycle === 2) {
-        // Scene 3: Dual Split Screen Multitasking (React 19 & Tailwind CSS)
-        setIsSidePanelOpen(false);
-        setTabs([
-          { id: '1', url: 'https://react.dev/reference/react', title: 'React 19 Docs', isLoading: false, canGoBack: false, canGoForward: false, splitWith: '2' },
-          { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, canGoBack: false, canGoForward: false, splitWith: '1' }
-        ]);
-        setActiveTabId('1');
-      }
-
-      cycle = (cycle + 1) % 3;
-    };
-
-    runCycle();
-    const interval = setInterval(runCycle, 6500);
-
-    return () => {
-      clearInterval(interval);
-      pendingTimers.forEach(timer => clearTimeout(timer));
-      pendingTimers.clear();
-    };
-  }, [demoParams.isDemo]);
+  // (the marketing website passes demo options directly) must stay stable.
+  useDemoShowcase({
+    isDemo: demoParams.isDemo,
+    demoOptions,
+    feature: demoParams.feature,
+    setTabs,
+    setActiveTabId,
+    setIsSidePanelOpen,
+  });
 
   // (extensions fetch + subscription useExtensions'a taşındı — yukarıda.)
 
@@ -467,51 +404,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // (aşağıda, settings/bookmarks'tan sonra: callback'ler setSettings/setBookmarks
   // kullanır; hook call order değişimi güvenli — tüm hook'lar koşulsuz).
 
-  // User settings
-  const [settings, setSettings] = useState<UserSettings>(() => {
-    const initialSettings: UserSettings = {
-      ...defaultSettings,
-      theme: demoParams.isDemo ? demoParams.theme : defaultSettings.theme,
-      showTasksWidget: demoParams.showTasksWidget ?? (demoParams.feature === 'website' ? false : defaultSettings.showTasksWidget ?? true),
-      useVerticalTabs: demoParams.isDemo
-        ? demoParams.feature === 'website'
-          ? false
-          : demoParams.tabs === 'vertical'
-        : defaultSettings.useVerticalTabs,
-      newTabBackground: (demoParams.bg as any) || (demoParams.feature === 'vertical_tabs' ? 'cyber_grid' : demoParams.feature === 'ai' ? 'nebula' : defaultSettings.newTabBackground),
-      shortcuts: {
-        ...defaultSettings.shortcuts,
-        downloads: { key: 'j', shift: isMac, meta: true },
-        findInPage: { key: 'f', shift: false, meta: true },
-      }
-    };
-
-    if (demoParams.isDemo) {
-      return initialSettings;
-    }
-
-    const saved = localStorage.getItem('user_settings');
-    const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
-    const merged = { ...initialSettings, ...parsed };
-    // Migration: ensure macOS users have shift: true for downloads shortcut if they had the legacy default shift: false
-    // Preserve custom user settings: do NOT overwrite if the user has explicitly customized their shortcuts
-    const isCustomized = localStorage.getItem('shortcuts_customized') === 'true';
-    if (!isCustomized && isMac && merged.shortcuts?.downloads && merged.shortcuts.downloads.key === 'j' && merged.shortcuts.downloads.shift === false) {
-      const migrated = localStorage.getItem('shortcuts_v2_migrated');
-      if (!migrated) {
-        merged.shortcuts = {
-          ...merged.shortcuts,
-          downloads: { key: 'j', shift: true, meta: true }
-        };
-        try {
-          localStorage.setItem('shortcuts_v2_migrated', 'true');
-        } catch (_) {}
-      }
-    }
-    return merged;
+  // User settings & shortcuts migration (extracted to useSettings)
+  const {
+    settings,
+    setSettings,
+    settingsRef,
+    handleUpdateSettings,
+  } = useSettings({
+    isDemo: demoParams.isDemo,
+    demoTheme: demoParams.theme,
+    showTasksWidget: demoParams.showTasksWidget,
+    demoFeature: demoParams.feature,
+    demoTabs: demoParams.tabs,
+    demoBg: demoParams.bg,
+    isMac,
   });
-  const settingsRef = useRef(settings);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
 
 
 
@@ -865,53 +772,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleOpenFindInPage = useCallback(() => setIsFindInPageOpen(prev => !prev), []);
 
-  const handleGoBack = useCallback(() => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.canGoBack && webview.canGoBack()) {
-      webview.goBack();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe && iframe.contentWindow) {
-        try {
-          iframe.contentWindow.history.back();
-        } catch (err) {
-          logger.debug('App:Navigation', 'iframe history.back blocked or failed', err);
-        }
-      }
-    }
-  }, [activeTabId]);
-
-  const handleGoForward = useCallback(() => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.canGoForward && webview.canGoForward()) {
-      webview.goForward();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe && iframe.contentWindow) {
-        try {
-          iframe.contentWindow.history.forward();
-        } catch (err) {
-          logger.debug('App:Navigation', 'iframe history.forward blocked or failed', err);
-        }
-      }
-    }
-  }, [activeTabId]);
-
-  const handleReload = useCallback(() => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.reload) {
-      webview.reload();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe) {
-        const currentSrc = iframe.src;
-        iframe.src = 'about:blank';
-        setTimeout(() => { if (iframe) iframe.src = currentSrc; }, 50);
-      }
-    }
-  }, [activeTabId]);
-
-  const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
+  // Webview navigation operations (extracted to useWebviewNavigation)
+  const {
+    handleGoBack,
+    handleGoForward,
+    handleReload,
+  } = useWebviewNavigation({ activeTabId });
 
   // App data export & import (extracted to useAppDataBackup)
   const { handleExportData, handleImportData } = useAppDataBackup({

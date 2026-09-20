@@ -2,7 +2,6 @@ import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Key } from 'lucide-react';
 import { Tab, HistoryItem, UserSettings } from '../types/browser';
-import { NewTabPage } from './NewTabPage';
 import { PasswordPromptModal } from './PasswordPromptModal';
 import type { DownloadItemPage } from './DownloadsPage';
 import { AILinkPreview } from './AILinkPreview';
@@ -14,6 +13,7 @@ import {
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
+const NewTabPage = lazy(() => import('./NewTabPage').then(m => ({ default: m.NewTabPage })));
 const SettingsPage = lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
 const HistoryPage = lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
 const DownloadsPage = lazy(() => import('./DownloadsPage').then(m => ({ default: m.DownloadsPage })));
@@ -872,30 +872,32 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           if (tab?.id && onActivate) onActivate(tab.id);
         }}
       >
-        <NewTabPage 
-          isActive={isActive}
-          onNavigate={(url) => {
-            if (onNavigate) {
-              onNavigate(url, tab.id);
-            } else {
-              onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
-            }
-          }} 
-          onNewTab={(url) => {
-            if (onNewTab) onNewTab(url, tab.id);
-          }}
-          searchEngine={searchEngine}
-          privacyShield={privacyShield}
-          newTabBackground={newTabBackground}
-          backgroundCustomUrl={settings.backgroundCustomUrl}
-          showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
-          isIncognito={isIncognito}
-          isDemo={isDemo}
-          theme={settings.theme}
-          energySaverMode={settings.energySaverMode}
-          browserColor={settings.browserColor}
-          customBrowserColor={settings.customBrowserColor}
-        />
+        <Suspense fallback={<div className="w-full h-full bg-slate-900" />}>
+          <NewTabPage 
+            isActive={isActive}
+            onNavigate={(url) => {
+              if (onNavigate) {
+                onNavigate(url, tab.id);
+              } else {
+                onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
+              }
+            }} 
+            onNewTab={(url) => {
+              if (onNewTab) onNewTab(url, tab.id);
+            }}
+            searchEngine={searchEngine}
+            privacyShield={privacyShield}
+            newTabBackground={newTabBackground}
+            backgroundCustomUrl={settings.backgroundCustomUrl}
+            showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
+            isIncognito={isIncognito}
+            isDemo={isDemo}
+            theme={settings.theme}
+            energySaverMode={settings.energySaverMode}
+            browserColor={settings.browserColor}
+            customBrowserColor={settings.customBrowserColor}
+          />
+        </Suspense>
       </div>
     );
   }
