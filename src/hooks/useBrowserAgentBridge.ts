@@ -82,6 +82,7 @@ export function useBrowserAgentBridge({
           return "Error: No active webview available.";
 
         case 'browser_click':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
@@ -110,6 +111,8 @@ export function useBrowserAgentBridge({
           return "Error: No active webview.";
 
         case 'browser_type':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
+          const textToType = typeof safeArgs.text === 'string' ? safeArgs.text : String(safeArgs.text ?? '');
           if (activeWebview && activeWebview.executeJavaScript) {
             const result = await activeWebview.executeJavaScript(`
               (() => {
@@ -117,7 +120,7 @@ export function useBrowserAgentBridge({
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
                   if (el) { 
                     const rect = el.getBoundingClientRect();
-                    el.value = ${JSON.stringify(safeArgs.text)};
+                    el.value = ${JSON.stringify(textToType)};
                     el.dispatchEvent(new Event('input', { bubbles: true }));
                     el.dispatchEvent(new Event('change', { bubbles: true }));
                     if (${safeArgs.pressEnter === true ? 'true' : 'false'}) {
@@ -135,7 +138,7 @@ export function useBrowserAgentBridge({
             if (result && result.success) {
               const bounds = activeWebview.getBoundingClientRect();
               window.dispatchEvent(new CustomEvent('ai-cursor', {
-                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: safeArgs.text }
+                detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: textToType }
               }));
               return "Successfully typed text."; 
             }
@@ -150,6 +153,7 @@ export function useBrowserAgentBridge({
           return JSON.stringify(tabs.map(t => ({ id: t.id, title: t.title, url: t.url, isActive: t.id === activeTabId })));
 
         case 'browser_switch_tab': {
+          if (!safeArgs.tabId || typeof safeArgs.tabId !== 'string') return "Error: Missing or invalid 'tabId' parameter";
           const target = tabs.find(t => t.id === safeArgs.tabId);
           if (target) {
             const targetWs = target.workspaceId || 'default';
@@ -163,6 +167,7 @@ export function useBrowserAgentBridge({
         }
 
         case 'browser_close_tab':
+          if (!safeArgs.tabId || typeof safeArgs.tabId !== 'string') return "Error: Missing or invalid 'tabId' parameter";
           mcpHandlersRef.current.handleCloseTab(safeArgs.tabId);
           return `Closed tab ${safeArgs.tabId}`;
 
@@ -222,6 +227,7 @@ export function useBrowserAgentBridge({
         }
 
         case 'browser_hover':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
@@ -242,6 +248,7 @@ export function useBrowserAgentBridge({
           return "Error: No active webview.";
 
         case 'browser_focus':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
@@ -258,6 +265,7 @@ export function useBrowserAgentBridge({
           return "Error: No active webview.";
 
         case 'browser_select_option':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
@@ -307,6 +315,7 @@ export function useBrowserAgentBridge({
           return "Error: No active webview.";
 
         case 'browser_get_element_text':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
@@ -323,6 +332,7 @@ export function useBrowserAgentBridge({
           return "Error: No active webview.";
 
         case 'browser_scroll_to_element':
+          if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) return "Error: Missing or invalid 'selector' parameter";
           if (activeWebview && activeWebview.executeJavaScript) {
             return await activeWebview.executeJavaScript(`
               (() => {
@@ -340,19 +350,20 @@ export function useBrowserAgentBridge({
 
         case 'browser_zoom':
           if (activeWebview && activeWebview.setZoomLevel) {
-            activeWebview.setZoomLevel(args.level || 0);
-            return `Zoom level set to ${args.level}`;
+            const zoomLevel = Number(safeArgs.level) || 0;
+            activeWebview.setZoomLevel(zoomLevel);
+            return `Zoom level set to ${zoomLevel}`;
           }
           return "Error: No active webview.";
 
         case 'browser_mute_tab': {
-          const mute = Boolean(args.mute);
+          const mute = Boolean(safeArgs.mute);
           setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isMuted: mute } : t));
           return mute ? "Tab muted" : "Tab unmuted";
         }
 
         case 'browser_pin_tab': {
-          const pin = Boolean(args.pin);
+          const pin = Boolean(safeArgs.pin);
           setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, isPinned: pin } : t));
           return pin ? "Tab pinned" : "Tab unpinned";
         }

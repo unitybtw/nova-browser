@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type {
   Bookmark,
@@ -114,25 +114,28 @@ export function useAppSync({
     }
   }, [bookmarks, folders, history, settings, workspaces, setBookmarks, setFolders, setHistory, setSettings, setWorkspaces]);
 
+  const handlePerformSyncRef = useRef(handlePerformSync);
+  handlePerformSyncRef.current = handlePerformSync;
+
   // Background auto-sync on initial app load if already authenticated
   useEffect(() => {
     const status = syncService.getStatus();
     if (status.isLoggedIn) {
       const timer = setTimeout(() => {
-        handlePerformSync().catch(() => {});
+        handlePerformSyncRef.current().catch(() => {});
       }, 2500);
       return () => clearTimeout(timer);
     }
-  }, [handlePerformSync]);
+  }, []);
 
   // Realtime Supabase change listener across other active devices
   useEffect(() => {
     const unsubscribe = syncService.onRemoteChange(() => {
       console.log('[NovaSync] Triggering background pull for remote changes');
-      handlePerformSync().catch(() => {});
+      handlePerformSyncRef.current().catch(() => {});
     });
     return () => { unsubscribe(); };
-  }, [handlePerformSync]);
+  }, []);
 
   return { handlePerformSync };
 }

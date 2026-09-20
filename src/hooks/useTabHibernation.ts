@@ -93,7 +93,7 @@ export function useTabHibernation({
     }, 30000); // Check every 30s
 
     return () => clearInterval(interval);
-  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes]);
+  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, isDemo]);
 
   // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion only when hibernation is enabled
   // Staggered wake-up ref: tracks the interval used to gradually restore suspended tabs

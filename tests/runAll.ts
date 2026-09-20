@@ -56,3 +56,4 @@ import './safe_storage_resilience.test';
 import './id_generator_entropy.test';
 import './permission_prompts_lifecycle.test';
 import './history_recorder_lifecycle.test';
+import './hook_architecture_hardening.test';

@@ -20,6 +20,8 @@ export interface UseClosedTabsOptions {
  *   hook'a taşınmadı; `onReopen` callback'i olarak App.tsx'ten alınır.
  * - Tüm okumalar ref snapshot üzerinden (StrictMode-safe), updater'lar pure.
  */
+const MAX_CLOSED_TABS = 50;
+
 export function useClosedTabs({ onReopen }: UseClosedTabsOptions = {}) {
   const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
   const closedTabsStackRef = useRef(closedTabsStack);
@@ -30,13 +32,13 @@ export function useClosedTabs({ onReopen }: UseClosedTabsOptions = {}) {
 
   const pushClosedTab = useCallback((tab: Tab) => {
     if (tab.isIncognito) return;
-    setClosedTabsStack(stack => [...stack, tab]);
+    setClosedTabsStack(stack => [...stack, tab].slice(-MAX_CLOSED_TABS));
   }, []);
 
   const pushClosedTabs = useCallback((tabs: Tab[]) => {
     const visibleTabs = tabs.filter(t => !t.isIncognito);
     if (visibleTabs.length === 0) return;
-    setClosedTabsStack(stack => [...stack, ...visibleTabs]);
+    setClosedTabsStack(stack => [...stack, ...visibleTabs].slice(-MAX_CLOSED_TABS));
   }, []);
 
   const clearClosedTabs = useCallback(() => {

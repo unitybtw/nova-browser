@@ -71,7 +71,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [workspaces, activeWorkspaceId, folders]);
+  }, [workspaces, activeWorkspaceId, folders, options.isDemo]);
 
   useEffect(() => {
     if (workspaces.length === 0) return;

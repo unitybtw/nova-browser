@@ -69,7 +69,7 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
         logger.warn('useHistoryRecorder', 'Trimmed flush also failed; keeping in-memory history.');
       }
     }
-  }, []);
+  }, [options.isDemo]);
 
   /**
    * Records a navigation visit derived from a merged tab snapshot. Callers

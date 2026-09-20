@@ -34,7 +34,9 @@ export function useFolders({
   }, [setFolders]);
 
   const handleRenameFolder = useCallback((folderId: string, name: string) => {
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name } : f));
+    const trimmed = (name || '').trim();
+    if (!trimmed) return;
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name: trimmed.slice(0, 100) } : f));
   }, [setFolders]);
 
   const handleDeleteFolder = useCallback((folderId: string) => {

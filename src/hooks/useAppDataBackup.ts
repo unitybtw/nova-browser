@@ -2,6 +2,8 @@ import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Bookmark, HistoryItem, UserSettings } from '../types/browser';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
+import { generateId } from '../utils/idGenerator';
+import { showAlert } from '../utils/confirmDialog';
 
 export interface UseAppDataBackupOptions {
   bookmarks: Bookmark[];
@@ -45,18 +47,45 @@ export function useAppDataBackup({
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
+        let importedSomething = false;
+
         if (data.bookmarks && Array.isArray(data.bookmarks)) {
-          const sanitizedBookmarks = data.bookmarks.filter((b: any) =>
-            b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
-          );
-          setBookmarks(sanitizedBookmarks);
+          const sanitizedBookmarks: Bookmark[] = data.bookmarks
+            .filter((b: any) =>
+              b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
+            )
+            .map((b: any) => ({
+              id: typeof b.id === 'string' && b.id ? b.id : generateId('bm'),
+              title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
+              url: b.url,
+              timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
+              favicon: typeof b.favicon === 'string' && (b.favicon.startsWith('https://') || b.favicon.startsWith('data:image/')) ? b.favicon : undefined,
+            }));
+          if (sanitizedBookmarks.length > 0) {
+            setBookmarks(sanitizedBookmarks);
+            importedSomething = true;
+          }
         }
+
         if (data.history && Array.isArray(data.history)) {
-          const sanitizedHistory = data.history.filter((h: any) =>
-            h && typeof h === 'object' && typeof h.url === 'string' && isSafeNavigationUrl(h.url)
-          );
-          setHistory(sanitizedHistory);
+          const sanitizedHistory: HistoryItem[] = data.history
+            .filter((h: any) =>
+              h && typeof h === 'object' && typeof h.url === 'string' && isSafeNavigationUrl(h.url)
+            )
+            .map((h: any) => ({
+              id: typeof h.id === 'string' && h.id ? h.id : generateId('hist'),
+              title: typeof h.title === 'string' ? h.title.slice(0, 500) : 'Visited Page',
+              url: h.url,
+              timestamp: typeof h.timestamp === 'number' ? h.timestamp : Date.now(),
+              visitCount: typeof h.visitCount === 'number' ? h.visitCount : 1,
+              typedCount: typeof h.typedCount === 'number' ? h.typedCount : 0,
+            }));
+          if (sanitizedHistory.length > 0) {
+            setHistory(sanitizedHistory);
+            importedSomething = true;
+          }
         }
+
         if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
           const raw = data.settings;
           const safeSettings: Partial<UserSettings> = {};
@@ -82,9 +111,17 @@ export function useAppDataBackup({
           if (typeof raw.browserColor === 'string' && ['default', 'midnight', 'cyberpunk', 'forest', 'crimson', 'warm', 'ocean', 'sunset', 'custom'].includes(raw.browserColor)) safeSettings.browserColor = raw.browserColor as any;
           if (typeof raw.customBrowserColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customBrowserColor)) safeSettings.customBrowserColor = raw.customBrowserColor;
           setSettings(prev => ({ ...prev, ...safeSettings }));
+          importedSomething = true;
+        }
+
+        if (importedSomething) {
+          void showAlert({ title: 'Import Data', message: 'Backup successfully imported!' });
+        } else {
+          void showAlert({ title: 'Import Data', message: 'No valid data found in backup file.' });
         }
       } catch (err) {
         console.error('Backup import error:', err);
+        void showAlert({ title: 'Import Data', message: 'Failed to import backup: Invalid JSON or corrupted file.' });
       }
     };
     reader.readAsText(file);

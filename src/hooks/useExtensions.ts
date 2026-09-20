@@ -33,17 +33,22 @@ export function useExtensions() {
   }, []);
 
   const handleToggleExtension = useCallback(async (id: string) => {
-    const ext = extensions.find(e => e.id === id);
-    const nextEnabled = ext?.enabled === false ? true : false;
-    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
+    let nextEnabled = false;
+    setExtensions(prev => {
+      const ext = prev.find(e => e.id === id);
+      nextEnabled = ext?.enabled === false ? true : false;
+      return prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e);
+    });
     try {
       if (getElectronAPI()?.toggleExtension) {
         await getElectronAPI()?.toggleExtension(id, nextEnabled);
       }
     } catch (e) {
       console.error('Failed to toggle extension:', e);
+      // Revert optimistic update on failure
+      setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: !nextEnabled } : e));
     }
-  }, [extensions]);
+  }, []);
 
   const handleRemoveExtension = useCallback(async (id: string) => {
     const confirmed = await showConfirm({

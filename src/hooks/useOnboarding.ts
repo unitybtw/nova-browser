@@ -58,6 +58,9 @@ export function useOnboarding(options: UseOnboardingOptions = {}) {
 
   const handleOnboardingComplete = useCallback((prefs: OnboardingPrefs) => {
     setShowOnboarding(false);
+    try {
+      localStorage.setItem('nova_onboarding_complete', 'true');
+    } catch (_) {}
     onUpdateSettingsRef.current?.(prefs);
     if (prefs.importedBookmarks && prefs.importedBookmarks.length > 0) {
       onImportBookmarksRef.current?.(prefs.importedBookmarks);

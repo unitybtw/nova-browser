@@ -309,7 +309,9 @@ export function useTabOperations({
       canGoBack: false,
       canGoForward: false,
       lastAccessed: Date.now(),
-      workspaceId: targetWs
+      workspaceId: targetWs,
+      // Fix: inherit incognito status from target tab to prevent privacy leakage
+      isIncognito: targetTab?.isIncognito || false
     };
     setTabs(prevTabs => {
       const newTabs = [...prevTabs];
@@ -384,10 +386,12 @@ export function useTabOperations({
       !currentTarget.canGoBack;
 
     if (isCurrentBlank && finalUrl !== 'nova://newtab' && (opts?.reuseBlank ?? true)) {
+      const isInternalPage = finalUrl.startsWith('nova://') || finalUrl === 'about:blank';
       setTabs(prev => prev.map(tab => tab.id === currentTarget.id ? {
         ...tab,
         url: finalUrl,
-        title: initialTitle
+        title: initialTitle,
+        isLoading: !isInternalPage
       } : tab));
       setActiveTabId(currentTarget.id);
       return;

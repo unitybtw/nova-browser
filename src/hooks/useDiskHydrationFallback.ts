@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { logger } from '../utils/logger';
 
 export interface UseDiskHydrationFallbackOptions {
@@ -105,8 +106,13 @@ export function useDiskHydrationFallback({
             try {
               const parsed = JSON.parse(diskTabs);
               if (Array.isArray(parsed) && parsed.length > 0) {
-                setTabs(parsed);
-                localStorage.setItem('nova_session_tabs', diskTabs);
+                const safeTabs = parsed.filter((t: any) =>
+                  t && typeof t === 'object' && typeof t.id === 'string' && (!t.url || isSafeNavigationUrl(t.url))
+                );
+                if (safeTabs.length > 0) {
+                  setTabs(safeTabs);
+                  localStorage.setItem('nova_session_tabs', JSON.stringify(safeTabs));
+                }
               }
             } catch (err) {
               logger.warn('App:Storage', 'Failed to parse diskTabs from storage', err);

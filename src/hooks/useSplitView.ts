@@ -71,13 +71,15 @@ export function useSplitView({
           canGoBack: false,
           canGoForward: false,
           workspaceId: activeWorkspaceId,
-          splitWith: activeTabId
+          splitWith: activeTabId,
+          isIncognito: activeTab?.isIncognito || false,
+          lastAccessed: Date.now()
         };
         setTabs(prev => [...prev.map(t => t.id === activeTabId ? { ...t, splitWith: newId } : t), newTab]);
       }
       setSplitRatio?.(50);
     }
-  }, [splitTabId, tabs, activeWorkspaceId, activeTabId, handleCloseSplitView, setTabs, setSplitRatio]);
+  }, [splitTabId, tabs, activeWorkspaceId, activeTabId, activeTab, handleCloseSplitView, setTabs, setSplitRatio]);
 
   return {
     splitTabId,
