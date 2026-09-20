@@ -10,6 +10,8 @@ import { backupCorruptData, safeParseArrayWithBackup, safeParseObjectWithBackup 
 import { showConfirm, showAlert } from '../utils/confirmDialog';
 import { getLocale } from '../services/i18n';
 import { aiAgent } from '../services/aiAgent';
+import { TabAnimationPreviewBox } from './settings/TabAnimationPreviewBox';
+import { ToggleSwitch } from './settings/ToggleSwitch';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -564,189 +566,6 @@ const BackgroundPreviewCard: React.FC<{
     </button>
   );
 };
-
-interface TabAnimationPreviewBoxProps {
-  preset: 'chrome' | 'smooth' | 'snappy' | 'none';
-  isActive: boolean;
-}
-
-const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo(({ preset, isActive }) => {
-  const [tabVisible, setTabVisible] = useState(true);
-
-  useEffect(() => {
-    let timeoutId: any;
-    let isMounted = true;
-
-    const cycle = (visible: boolean) => {
-      if (!isMounted) return;
-      setTabVisible(visible);
-      timeoutId = setTimeout(() => {
-        cycle(!visible);
-      }, visible ? 2000 : 750);
-    };
-
-    timeoutId = setTimeout(() => cycle(false), 2000);
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-    };
-  }, []);
-
-  const handleRestart = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setTabVisible(false);
-    setTimeout(() => setTabVisible(true), 100);
-  };
-
-  const animConfig = React.useMemo(() => {
-    switch (preset) {
-      case 'smooth':
-        return {
-          initial: { opacity: 0, y: 4, scale: 0.96, width: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0, marginRight: -4 },
-          animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, marginRight: 0 },
-          exit: {
-            opacity: 0,
-            y: 4,
-            scale: 0.96,
-            width: 0,
-            minWidth: 0,
-            paddingLeft: 0,
-            paddingRight: 0,
-            marginRight: -4,
-            transition: {
-              opacity: { duration: 0.08, ease: 'easeOut' },
-              y: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
-              scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
-              width: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
-              minWidth: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
-              paddingLeft: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
-              paddingRight: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
-              marginRight: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
-            }
-          },
-          transition: {
-            duration: 0.20,
-            ease: [0.16, 1, 0.3, 1] as const,
-            layout: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
-          },
-          buttonTransition: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
-        };
-      case 'snappy':
-        return {
-          initial: { opacity: 0, y: 2, scale: 0.98, width: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0, marginRight: -4 },
-          animate: { opacity: 1, y: 0, scale: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, marginRight: 0 },
-          exit: {
-            opacity: 0,
-            scale: 0.98,
-            width: 0,
-            minWidth: 0,
-            paddingLeft: 0,
-            paddingRight: 0,
-            marginRight: -4,
-            transition: {
-              opacity: { duration: 0.06, ease: 'easeOut' },
-              scale: { duration: 0.12, ease: [0.2, 0, 0, 1] as const },
-              width: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              minWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              paddingLeft: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              paddingRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              marginRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
-            }
-          },
-          transition: {
-            duration: 0.14,
-            ease: [0.2, 0, 0, 1] as const,
-            layout: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
-          },
-          buttonTransition: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
-        };
-      case 'none':
-        return {
-          initial: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, scale: 1, y: 0, marginRight: 0 },
-          animate: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, scale: 1, y: 0, marginRight: 0 },
-          exit: { opacity: 0, transition: { duration: 0 } },
-          transition: { duration: 0 },
-          buttonTransition: { duration: 0 }
-        };
-      case 'chrome':
-      default:
-        return {
-          initial: { opacity: 0, width: 0, minWidth: 0, paddingLeft: 0, paddingRight: 0, marginRight: -4, scale: 1, y: 0 },
-          animate: { opacity: 1, width: 56, minWidth: 56, paddingLeft: 6, paddingRight: 6, marginRight: 0, scale: 1, y: 0 },
-          exit: {
-            opacity: 0,
-            width: 0,
-            minWidth: 0,
-            paddingLeft: 0,
-            paddingRight: 0,
-            marginRight: -4,
-            scale: 1,
-            y: 0,
-            transition: {
-              opacity: { duration: 0.08, ease: 'easeOut' },
-              width: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
-              minWidth: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
-              paddingLeft: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
-              paddingRight: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
-              marginRight: { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
-            }
-          },
-          transition: {
-            duration: 0.18,
-            ease: [0.2, 0, 0, 1] as const,
-            layout: { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
-          },
-          buttonTransition: { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
-        };
-    }
-  }, [preset]);
-
-  return (
-    <div 
-      onMouseEnter={handleRestart}
-      className="w-full h-14 rounded-xl bg-slate-100/90 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-700/60 p-2 flex items-end overflow-hidden relative shadow-inner select-none"
-    >
-      <div className="flex items-center gap-1.5 w-full h-full">
-        {/* Base Tab 1 */}
-        <div className="h-7 px-2 rounded-md bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700 shadow-xs flex items-center gap-1.5 shrink-0">
-          <div className="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 shrink-0" />
-          <div className="w-6 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-        </div>
-
-        {/* Animated Tab 2 */}
-        <AnimatePresence>
-          {tabVisible && (
-            <motion.div
-              key="preview-tab"
-              initial={animConfig.initial}
-              animate={animConfig.animate}
-              exit={animConfig.exit}
-              transition={animConfig.transition}
-              className={`h-7 rounded-md flex items-center gap-1.5 shrink-0 overflow-hidden ${
-                isActive 
-                  ? 'bg-blue-500/20 border border-blue-500/40 text-blue-600 dark:text-blue-300 shadow-xs' 
-                  : 'bg-white/90 dark:bg-slate-800/90 border border-slate-200/70 dark:border-slate-700 shadow-xs'
-              }`}
-            >
-              <div className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-blue-500' : 'bg-slate-400 dark:bg-slate-500'}`} />
-              <div className={`w-6 h-1.5 rounded-full shrink-0 ${isActive ? 'bg-blue-500/60' : 'bg-slate-300 dark:bg-slate-600'}`} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Action Button (+) Container */}
-        <motion.div
-          layout="position"
-          transition={animConfig.buttonTransition}
-          className="w-6 h-6 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-slate-300/80 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0 cursor-pointer"
-          title="Replay animation"
-        >
-          <Plus className="w-3 h-3" />
-        </motion.div>
-      </div>
-    </div>
-  );
-});
 
 export interface SettingsPageProps {
   url?: string;
@@ -2328,12 +2147,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Bookmarks Bar</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show favorite sites below address bar</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ showBookmarksBar: !settings.showBookmarksBar })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.showBookmarksBar ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.showBookmarksBar ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.showBookmarksBar}
+                      onToggle={() => onUpdateSettings({ showBookmarksBar: !settings.showBookmarksBar })}
+                    />
                   </div>
                   
                   <div className="p-5 flex items-center justify-between">
@@ -2346,12 +2163,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Display tabs on the left sidebar instead of the top</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ useVerticalTabs: !settings.useVerticalTabs })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.useVerticalTabs ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.useVerticalTabs ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.useVerticalTabs}
+                      onToggle={() => onUpdateSettings({ useVerticalTabs: !settings.useVerticalTabs })}
+                    />
                   </div>
                   
                   <div className="p-5 flex items-center justify-between">
@@ -2359,12 +2174,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Tasks Widget</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show tasks and to-do list on the New Tab Page</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.showTasksWidget !== false ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.showTasksWidget !== false ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.showTasksWidget !== false}
+                      onToggle={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
+                    />
                   </div>
                 </div>
               </section>
@@ -2409,12 +2222,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Send a "Do Not Track" request</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Request that your browsing traffic is not tracked</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ doNotTrack: !settings.doNotTrack })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.doNotTrack ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.doNotTrack ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.doNotTrack}
+                      onToggle={() => onUpdateSettings({ doNotTrack: !settings.doNotTrack })}
+                    />
                   </div>
                   
                   <div className="p-5 flex items-center justify-between">
@@ -2422,12 +2233,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Clear cookies on exit</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Clear cookies and site data when you close all windows</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.clearOnExit ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.clearOnExit ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.clearOnExit}
+                      onToggle={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
+                    />
                   </div>
                 </div>
               </section>
@@ -2589,12 +2398,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">AI Link Preview (Hover Summaries)</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Automatically reads and summarizes links when you hover over them. (Uses local WebLLM)</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ aiLinkPreviewEnabled: !settings.aiLinkPreviewEnabled })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.aiLinkPreviewEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.aiLinkPreviewEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.aiLinkPreviewEnabled}
+                      onToggle={() => onUpdateSettings({ aiLinkPreviewEnabled: !settings.aiLinkPreviewEnabled })}
+                      activeColorClass="bg-indigo-500"
+                    />
                   </div>
 
                   {/* Password Manager */}
@@ -2603,12 +2411,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Password Manager</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Offer to save and autofill passwords on websites. Credentials are encrypted on this device.</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.passwordManagerEnabled ? 'bg-indigo-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.passwordManagerEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.passwordManagerEnabled}
+                      onToggle={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
+                      activeColorClass="bg-indigo-500"
+                    />
                   </div>
                 </div>
               </section>
@@ -2622,12 +2429,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Automatic Tab Hibernation (Memory Saver)</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unloads inactive background tabs from RAM to keep the browser lightning fast</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ tabHibernationEnabled: !(settings.tabHibernationEnabled ?? true) })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(settings.tabHibernationEnabled ?? true) ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${(settings.tabHibernationEnabled ?? true) ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={(settings.tabHibernationEnabled ?? true)}
+                      onToggle={() => onUpdateSettings({ tabHibernationEnabled: !(settings.tabHibernationEnabled ?? true) })}
+                    />
                   </div>
 
                   {(settings.tabHibernationEnabled ?? true) && (
@@ -2655,12 +2460,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Energy Saver Mode (Battery & CPU)</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Throttles heavy background canvas shaders and limits particle effects to extend laptop battery life</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ energySaverMode: !(settings.energySaverMode ?? false) })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.energySaverMode ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.energySaverMode ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.energySaverMode}
+                      onToggle={() => onUpdateSettings({ energySaverMode: !(settings.energySaverMode ?? false) })}
+                      activeColorClass="bg-emerald-500"
+                    />
                   </div>
 
                   {/* Link Preload & DNS Prefetching */}
@@ -2669,12 +2473,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">DNS Prefetching & Link Pre-warming (Speed Booster)</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pre-resolves domain names and opens anticipatory sockets on link hover for instant page loads</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ preloadDnsEnabled: !(settings.preloadDnsEnabled ?? true) })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(settings.preloadDnsEnabled ?? true) ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${(settings.preloadDnsEnabled ?? true) ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={(settings.preloadDnsEnabled ?? true)}
+                      onToggle={() => onUpdateSettings({ preloadDnsEnabled: !(settings.preloadDnsEnabled ?? true) })}
+                    />
                   </div>
 
                   {/* Smooth Scrolling Engine */}
@@ -2683,12 +2485,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Hardware-Accelerated Smooth Scrolling</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Interpolates page scrolling with GPU composited physics for high refresh rate monitors</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ smoothScrollingEnabled: !(settings.smoothScrollingEnabled ?? true) })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${(settings.smoothScrollingEnabled ?? true) ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${(settings.smoothScrollingEnabled ?? true) ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={(settings.smoothScrollingEnabled ?? true)}
+                      onToggle={() => onUpdateSettings({ smoothScrollingEnabled: !(settings.smoothScrollingEnabled ?? true) })}
+                    />
                   </div>
 
                   {/* Instant Memory Purge Action */}
@@ -2741,12 +2541,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Use hardware acceleration</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Use GPU to render web pages faster (requires restart)</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ hardwareAcceleration: !settings.hardwareAcceleration })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.hardwareAcceleration ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.hardwareAcceleration ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.hardwareAcceleration}
+                      onToggle={() => onUpdateSettings({ hardwareAcceleration: !settings.hardwareAcceleration })}
+                    />
                   </div>
                   
                   <div className="p-5 flex items-center justify-between">
@@ -2754,12 +2552,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Developer Mode</div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Enable "Inspect Element" in right-click menu and advanced tools</div>
                     </div>
-                    <button
-                      onClick={() => onUpdateSettings({ developerMode: !settings.developerMode })}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.developerMode ? 'bg-blue-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                    >
-                      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${settings.developerMode ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                    <ToggleSwitch
+                      checked={settings.developerMode}
+                      onToggle={() => onUpdateSettings({ developerMode: !settings.developerMode })}
+                    />
                   </div>
                 </div>
               </section>
