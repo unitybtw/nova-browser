@@ -44,6 +44,7 @@ import { useVpn } from './hooks/useVpn';
 import { useWorkspaces } from './hooks/useWorkspaces';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useClosedTabs } from './hooks/useClosedTabs';
+import { usePanels } from './hooks/usePanels';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -265,12 +266,36 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     activeWorkspaceIdRef
   } = useWorkspaces({ isDemo: demoParams.isDemo, demoFeature: demoParams.feature });
 
-  const [isShareOpen, setIsShareOpen] = useState(false);
-  const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
+  // Panel/modal visibility booleans live in usePanels; names are destructured
+  // 1:1 so every reader below (IPC, shortcuts, handlers, JSX) is untouched.
+  // screenshotDataUrl + helpInitialTab stay here: they are payload state, not
+  // visibility booleans, owned by the screenshot capture / help openers below.
+  const {
+    isShareOpen,
+    setIsShareOpen,
+    isScreenshotOpen,
+    setIsScreenshotOpen,
+    isWorkspaceManagerOpen,
+    setIsWorkspaceManagerOpen,
+    isHelpOpen,
+    setIsHelpOpen,
+    isAccountModalOpen,
+    setIsAccountModalOpen,
+    isSidePanelOpen,
+    setIsSidePanelOpen,
+    isReaderModeOpen,
+    setIsReaderModeOpen,
+    isFindInPageOpen,
+    setIsFindInPageOpen,
+    isSpotlightOpen,
+    setIsSpotlightOpen,
+    isExtensionsOpen,
+    setIsExtensionsOpen,
+    isSidebarCollapsed,
+    setIsSidebarCollapsed,
+    closeAllModals: closePanelModals,
+  } = usePanels({ initialSidePanelOpen: demoParams.isDemo && demoParams.feature === 'ai' });
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
-  const [isWorkspaceManagerOpen, setIsWorkspaceManagerOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
 
   useEffect(() => {
@@ -299,10 +324,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setTabs(prevTabs => repairTabFolderAssignments(prevTabs, folders));
   }, [folders]);
 
-  // AI Assistant State
-  const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => {
-    return demoParams.isDemo && demoParams.feature === 'ai';
-  });
+  // AI Assistant State (isSidePanelOpen lives in usePanels above)
   const [pendingAIActions, setPendingAIActions] = useState<Array<{ id: number; text: string }>>([]);
   const pendingAIActionIdRef = useRef(0);
   const queueAIAction = useCallback((detail: unknown) => {
@@ -318,18 +340,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setPendingAIActions(current => current.filter(action => action.id !== id));
   }, []);
 
-  const [isReaderModeOpen, setIsReaderModeOpen] = useState(false);
-  const [isFindInPageOpen, setIsFindInPageOpen] = useState(false);
-  const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
+  // isReaderModeOpen / isFindInPageOpen / isSpotlightOpen / isExtensionsOpen
+  // live in usePanels above. isVpnPopoverOpen stays local: it is closed by
+  // closeAllModals below, so the composed closer keeps the original set.
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);
-  const [isExtensionsOpen, setIsExtensionsOpen] = useState(false);
   const [extensions, setExtensions] = useState<Extension[]>([]);
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
   const [isDraggingTab, setIsDraggingTab] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // isSidebarCollapsed lives in usePanels above.
   const [isHoverRevealing, setIsHoverRevealing] = useState(false);
   const hoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -458,16 +479,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     };
   }, []);
 
+  // Composed closer: hook-owned panels first (original relative order kept
+  // inside usePanels: share → screenshot → spotlight → extensions → help →
+  // account), then the App-local VPN popover. The pre-refactor order was
+  // share → screenshot → spotlight → vpnPopover → extensions → help → account;
+  // all are independent batched setState(false) calls so the rendered result
+  // is identical.
   const closeAllModals = useCallback(() => {
-    setIsShareOpen(false);
-    setIsScreenshotOpen(false);
-    setIsSpotlightOpen(false);
+    closePanelModals();
     setIsVpnPopoverOpen(false);
-    setIsExtensionsOpen(false);
-    setIsHelpOpen(false);
-    setIsAccountModalOpen(false);
-  }, []);
+  }, [closePanelModals]);
 
+  // Stays in App (not in usePanels): it must close the App-local vpnPopover
+  // through closeAllModals above, so moving it would change behavior.
   const openModal = useCallback((modalName: 'share' | 'spotlight' | 'extensions') => {
     closeAllModals();
     if (modalName === 'share') setIsShareOpen(true);
