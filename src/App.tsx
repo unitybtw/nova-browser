@@ -45,6 +45,8 @@ import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useClosedTabs } from './hooks/useClosedTabs';
 import { usePanels } from './hooks/usePanels';
 import { useThemeLanguage } from './hooks/useThemeLanguage';
+import { useOnboarding } from './hooks/useOnboarding';
+import { useExtensions } from './hooks/useExtensions';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -345,7 +347,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // closeAllModals below, so the composed closer keeps the original set.
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);
-  const [extensions, setExtensions] = useState<Extension[]>([]);
+  // Extension listesi: state + mount fetch + onExtensionChanged aboneliği
+  // useExtensions'ta. Tüketiciler App'te kaldı: handleToggleExtension /
+  // handleRemoveExtension + ExtensionsModal props. TopBar ve ExtensionsSection
+  // kendi local fetch'lerine sahip (dokunulmadı).
+  const { extensions, setExtensions } = useExtensions();
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
@@ -453,31 +459,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     };
   }, [demoParams.isDemo]);
 
-  // Load extensions on mount
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      try {
-        if (window.electronAPI?.listExtensions) {
-          const loaded = await window.electronAPI.listExtensions();
-          setExtensions(loaded || []);
-        }
-      } catch (err) {
-        console.error('Failed to load extensions', err);
-      }
-    };
-    fetchExtensions();
-    
-    let cleanup: (() => void) | undefined;
-    if (window.electronAPI?.onExtensionChanged) {
-      cleanup = window.electronAPI.onExtensionChanged(() => {
-        fetchExtensions();
-      });
-    }
-
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, []);
+  // (extensions fetch + subscription useExtensions'a taşındı — yukarıda.)
 
   // Composed closer: hook-owned panels first (original relative order kept
   // inside usePanels: share → screenshot → spotlight → extensions → help →
@@ -499,23 +481,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     else if (modalName === 'extensions') setIsExtensionsOpen(true);
   }, [closeAllModals]);
 
-  // Onboarding state
-  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
-    if (demoParams.isDemo) return false;
-    const isCompleted = localStorage.getItem('nova_onboarding_complete') === 'true';
-    const hasUserSettings = localStorage.getItem('user_settings') !== null;
-    if (!hasUserSettings) {
-      return true;
-    }
-    return !isCompleted;
-  });
-
-  useEffect(() => {
-    (window as any).openOnboarding = () => setShowOnboarding(true);
-    return () => {
-      delete (window as any).openOnboarding;
-    };
-  }, []);
+  // Onboarding state + ilk-açılış kontrolü + complete handler useOnboarding'da
+  // (aşağıda, settings/bookmarks'tan sonra: callback'ler setSettings/setBookmarks
+  // kullanır; hook call order değişimi güvenli — tüm hook'lar koşulsuz).
 
   // User settings
   const [settings, setSettings] = useState<UserSettings>(() => {
@@ -636,6 +604,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     handleToggleBookmark,
     flushBookmarks
   } = useBookmarks({ isDemo: demoParams.isDemo });
+
+  // Onboarding: showOnboarding state + ilk-açılış kontrolü + window.openOnboarding
+  // + handleOnboardingComplete hook'ta. Settings/bookmarks yazma gövdeleri
+  // App'ten birebir taşındı (sadece yer değişti: callback olarak burada).
+  const { showOnboarding, handleOnboardingComplete } = useOnboarding({
+    isDemo: demoParams.isDemo,
+    onUpdateSettings: (prefs) => setSettings(s => ({
+      ...s,
+      theme: prefs.theme,
+      searchEngine: prefs.searchEngine,
+      privacyShield: prefs.privacyShield
+    })),
+    onImportBookmarks: (imported) => setBookmarks(prev => [...prev, ...imported]),
+  });
 
   // Session persistence writes (debounced settings/tabs/active-tab + beforeunload
   // flush-all) extracted to useSessionPersistence — order/timing/keys preserved 1:1.
@@ -2486,21 +2468,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setActiveTabId(tabId);
   }, []);
 
-  const handleOnboardingComplete = useCallback((prefs: any) => {
-    setShowOnboarding(false);
-    setSettings(s => ({
-      ...s,
-      theme: prefs.theme,
-      searchEngine: prefs.searchEngine,
-      privacyShield: prefs.privacyShield
-    }));
-    if (prefs.importedBookmarks && prefs.importedBookmarks.length > 0) {
-      setBookmarks(prev => {
-        const newBookmarks = [...prev, ...prefs.importedBookmarks!];
-        return newBookmarks;
-      });
-    }
-  }, []);
+  // handleOnboardingComplete useOnboarding'dan gelir (yukarıda); settings merge +
+  // importedBookmarks append callback'leri hook'a taşındı, davranış birebir aynı.
 
   const handleFoundInPage = useCallback((idx: number, count: number) => setFindMatches({ index: idx, count }), []);
   const handleCloseFindInPage = useCallback(() => setIsFindInPageOpen(false), []);
