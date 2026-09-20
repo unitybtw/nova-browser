@@ -106,7 +106,7 @@ import {
 // Listeners registered once with [] deps would otherwise capture stale
 // mount-time closures; they read handlersRef.current instead (see below).
 type AppEventHandlers = {
-  handleNewTab: (url?: string | any) => void;
+  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean }) => void;
   handleNewIncognitoTab: (url?: string) => void;
   handleCloseTab: (id: string, e?: React.MouseEvent) => void;
   handleReopenClosedTab: () => void;
@@ -1409,6 +1409,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (id === activeTabIdRef.current && !tabsRef.current.find(t => t.id === id)?.isSuspended) {
       return;
     }
+    if (!tabsRef.current.some(t => t.id === id)) return;
     setActiveTabId(id);
     setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
   }, []);
@@ -1467,7 +1468,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
       if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
         getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
-        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        const remainingIncognitoTabs = prevTabs.some(t => t.isIncognito && t.id !== id);
+        if (!remainingIncognitoTabs) {
+          getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        }
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         pushClosedTab(targetTab);
@@ -1486,6 +1490,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             favicon: undefined,
             splitWith: undefined,
             isPinned: false,
+            folderId: undefined,
+            zoomFactor: undefined,
+            isMuted: false,
             lastAccessed: Date.now()
           };
         }
@@ -1498,7 +1505,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (prevTabs.length <= 1) {
       if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
         getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
-        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        const remainingIncognitoTabs = prevTabs.some(t => t.isIncognito && t.id !== id);
+        if (!remainingIncognitoTabs) {
+          getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        }
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         pushClosedTab(targetTab);
@@ -1513,6 +1523,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         favicon: undefined,
         splitWith: undefined,
         isPinned: false,
+        folderId: undefined,
+        zoomFactor: undefined,
+        isMuted: false,
         lastAccessed: Date.now()
       })));
       return;
@@ -1793,7 +1806,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         } else if (command === 'downloads') {
           handlersRef.current.handleOpenDownloads();
         } else if (command === 'whats-new' || command === 'changelog') {
-          handlersRef.current.handleNewTab('nova://changelog');
+          handlersRef.current.handleNewTab('nova://changelog', undefined, { reuseBlank: false });
         } else if (command === 'bookmark') {
           handlersRef.current.handleToggleBookmarkActive();
         } else if (command === 'toggle-bookmarks-bar') {
@@ -1813,7 +1826,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     if (window.electronAPI?.onNewTab) {
       cleanupNewTab = window.electronAPI.onNewTab((_event: any, url: string) => {
-        handlersRef.current.handleNewTab(url);
+        handlersRef.current.handleNewTab(url, undefined, { reuseBlank: false });
       });
     }
 
@@ -1844,7 +1857,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const handleOpenSidePanel = () => setIsSidePanelOpen(true);
     const handleOpenWorkspaceManager = () => setIsWorkspaceManagerOpen(true);
     const handleOpenAccountModal = () => setIsAccountModalOpen(true);
-    const handleOpenChangelog = () => handlersRef.current.handleNewTab('nova://changelog');
+    const handleOpenChangelog = () => handlersRef.current.handleNewTab('nova://changelog', undefined, { reuseBlank: false });
     
     window.addEventListener('ai-quick-action', handleQuickAIAction);
     window.addEventListener('open-ai-sidepanel', handleOpenSidePanel);
@@ -1900,7 +1913,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, folderId } : tab));
   }, [folders]);
 
-  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string) => {
+  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean }) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
@@ -1929,7 +1942,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       !currentTarget.isLoading &&
       !currentTarget.canGoBack;
 
-    if (isCurrentBlank && finalUrl !== 'nova://newtab') {
+    if (isCurrentBlank && finalUrl !== 'nova://newtab' && (opts?.reuseBlank ?? true)) {
       setTabs(prev => prev.map(tab => tab.id === currentTarget.id ? {
         ...tab,
         url: finalUrl,
@@ -1947,6 +1960,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       canGoBack: false,
       canGoForward: false,
       workspaceId: activeWorkspaceId,
+      // intentional: matches Chrome (new tabs inherit incognito mode)
       isIncognito: currentTarget?.isIncognito || false,
       lastAccessed: Date.now()
     };
@@ -2094,9 +2108,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         title: 'New Tab',
         isLoading: true,
         canGoBack: false,
-        canGoForward: false
+        canGoForward: false,
+        workspaceId: activeWorkspaceIdRef.current
       }]);
       setActiveTabId(newTabId);
+      return;
+    }
+
+    if (explicitTabId && !prev.some(t => t.id === explicitTabId)) {
+      logger.warn('App:Navigation', 'handleNavigate: unknown explicitTabId, ignoring', explicitTabId);
       return;
     }
 
@@ -2680,13 +2700,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleOpenDownloads = useCallback(() => {
     closeAllModals();
-    const existing = tabs.find(t => t.url === 'nova://downloads');
+    const existing = tabsRef.current.find(t => t.url === 'nova://downloads');
     if (existing) {
       setActiveTabId(existing.id);
     } else {
       handleNewTab('nova://downloads');
     }
-  }, [tabs, handleNewTab, closeAllModals]);
+  }, [handleNewTab, closeAllModals]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
 
@@ -3160,7 +3180,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         const lastSeen = localStorage.getItem(LAST_VERSION_KEY);
         // If lastSeen exists and differs from current version, browser was just updated!
         if (lastSeen && lastSeen !== currentVer) {
-          handleNewTab('nova://changelog');
+          handleNewTab('nova://changelog', undefined, { reuseBlank: false });
         }
         localStorage.setItem(LAST_VERSION_KEY, currentVer);
       } catch (e) {

@@ -11,7 +11,9 @@ export interface UseClosedTabsOptions {
  *
  * - Stack state + LIFO sıra aynen korunur (push sona ekler, reopen sondan pop'lar).
  * - Cap/limit yoktu, eklenmedi (unbounded).
- * - Incognito filtresi yoktu, eklenmedi (incognito sekmeler de stack'e girer).
+ * - Incognito sekmeler stack'e girmez (Chrome/Firefox parity: gizli sekmeler
+ *   Ctrl+Shift+T ile geri açılmaz). Filtre tek yer olarak burada uygulanır,
+ *   call-site guard'larına gerek yoktur.
  * - Boş `nova://newtab` eleme filtresi hook'ta değil, push call-site'larında
  *   (`handleCloseTab` içindeki guard'lar) aynen durur.
  * - Tab oluşturma (`setTabs`/`setActiveTabId`/workspace switch/id-collision)
@@ -27,11 +29,14 @@ export function useClosedTabs({ onReopen }: UseClosedTabsOptions = {}) {
   onReopenRef.current = onReopen;
 
   const pushClosedTab = useCallback((tab: Tab) => {
+    if (tab.isIncognito) return;
     setClosedTabsStack(stack => [...stack, tab]);
   }, []);
 
   const pushClosedTabs = useCallback((tabs: Tab[]) => {
-    setClosedTabsStack(stack => [...stack, ...tabs]);
+    const visibleTabs = tabs.filter(t => !t.isIncognito);
+    if (visibleTabs.length === 0) return;
+    setClosedTabsStack(stack => [...stack, ...visibleTabs]);
   }, []);
 
   const clearClosedTabs = useCallback(() => {
