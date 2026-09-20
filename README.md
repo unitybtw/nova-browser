@@ -15,7 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
-  [![Tests](https://img.shields.io/badge/Tests-564%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-640%2B%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
@@ -272,13 +272,13 @@ Nova Browser employs a multi-process Electron architecture with context isolatio
 graph TD
     subgraph Electron["Electron (Main Process)"]
         main["main.ts - App Lifecycle & IPC Dispatcher"]
-        mcp["BrowserMCPServer (Port 3020) & mcpBridge.ts"]
+        mcp["mcpServer.ts - Native MCP Server (Port 3020)"]
         adblock["AdBlocker & Privacy Shield (Network Layer Filter)"]
-        security["Security Engine (SSRF & Phishing Defense)"]
-        crx["crxInstaller.ts (Chrome Web Store Engine)"]
-        downloads["downloads.ts (Downloads Manager)"]
-        keychain["safeStorage Engine (OS Keychain Store)"]
-        tts["Native OS TTS Engine (OS Speech API)"]
+        security["proxySecurity.ts - SSRF & Phishing Defense"]
+        crx["crxInstaller.ts - Chrome Web Store Engine"]
+        downloads["downloads.ts - Downloads Manager"]
+        keychain["safeStorage Engine - OS Keychain Store"]
+        tts["tts.ts - Native OS Speech Synthesis Bridge"]
     end
 
     subgraph Preload["Context Bridge (Preload Security)"]
@@ -288,22 +288,31 @@ graph TD
     end
 
     subgraph Renderer["React 18 + TypeScript (Renderer Process)"]
-        app["App.tsx - Tab & State Management"]
-        
+        app["App.tsx - Coordinator Shell"]
+
+        subgraph ModularHooks["Modular Hooks Architecture (src/hooks/)"]
+            tabOps["useTabOperations.ts - Tab CRUD & Virtualization"]
+            appIpc["useAppIpc.ts - Central IPC Hub & Listeners"]
+            agentBridge["useBrowserAgentBridge.ts - ReAct Agent & Cursor"]
+            workspaces["useWorkspaces.ts & useFolders.ts - Organization"]
+            splitView["useSplitView.ts - Dual-View Canvas"]
+            syncHook["useAppSync.ts & useAppDataBackup.ts - Sync & Backup"]
+            hibernation["useTabHibernation.ts - Memory & Tab Eviction"]
+        end
+
         subgraph AISubsystem["AI & Neural Subsystem"]
             agent["aiAgent.ts - ReAct Engine & Intent Parser"]
             memory["aiMemory.ts - Persistent Info Vault"]
-            preview["AILinkPreview.tsx - Hover Preview"]
+            cursor["AICursorOverlay.tsx - Glowing Agent Cursor"]
+            preview["AILinkPreview.tsx - Hover Preview & Summary"]
             worker["workers/aiWorker.ts - WebLLM Neural Runtime"]
-            translate["translationService.ts - DOM Translator Engine"]
-            sidepanel["SidePanel.tsx - AI Assistant UI"]
+            sidepanel["SidePanel.tsx - AI Assistant & Tool Tracing"]
         end
 
-        subgraph CoreWorkspaces["Workspaces & Vertical Tabs"]
-            tabManager["tabManager.ts - Tab Hibernation Engine"]
-            vtabs["verticalTabs.ts - Workspace & Grouping"]
-            thumb["thumbnailCache.ts - Viewport Snapshots"]
-            sync["syncService.ts - E2EE Cloud Sync Engine"]
+        subgraph CoreUI["Views, Tabs & Navigation"]
+            browserView["BrowserView.tsx - Sandboxed Webview Host"]
+            sidebarTabs["SidebarTabs.tsx & TopBar.tsx"]
+            spotlight["SpotlightOmnibox.tsx - Command Palette"]
         end
 
         subgraph InternalPages["Internal Views & Pages"]
@@ -314,8 +323,6 @@ graph TD
             reader["ReaderMode.tsx (Reader Mode View)"]
             extModal["ExtensionsModal.tsx (Extensions Manager)"]
         end
-        
-        webview["Webview Host - Sandboxed Webpages"]
     end
 
     subgraph Cloud["Cloud Infrastructure"]
@@ -323,41 +330,43 @@ graph TD
     end
 
     subgraph External["External AI Agents (MCP Clients)"]
-        claude["Claude Desktop / Cursor / Antigravity"]
+        claude["Claude Desktop / Cursor / Windsurf / Antigravity"]
     end
 
     main <-->|Secure IPC Bridge| api
     main <-->|Chrome Web Store Bridge| webstore
     main <-->|Sandbox Security Policy| guest
-    guest <-->|Guest DOM Protection| webview
+    guest <-->|Guest DOM Protection| browserView
     api <-->|Typed API Invocations| app
+    app --> ModularHooks
+    app --> CoreUI
     app --> InternalPages
-    app --> webview
     app --> AISubsystem
-    app --> CoreWorkspaces
-    
+
+    ModularHooks <--> CoreUI
     agent <-->|Off-thread Web Worker| worker
     agent <-->|Read and Write| memory
+    agent --> cursor
     agent --> preview
-    agent --> translate
-    
-    sync <-->|Encrypted WebSocket AES-GCM| supabase
-    
+
+    syncHook <-->|Encrypted WebSocket AES-256-GCM| supabase
+
     main --> adblock
     main --> security
     main --> crx
     main --> downloads
     main --> keychain
     main --> tts
-    
+
     claude <-->|JSON-RPC over SSE Port 3020| mcp
-    mcp <-->|CDP and Main Process Bridge| webview
-    
+    mcp <-->|CDP & Main Process Bridge| browserView
+
     style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
     style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
     style Renderer fill:#0f172a,stroke:#61DAFB,stroke-width:2px,color:#fff
+    style ModularHooks fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#fff
     style AISubsystem fill:#1e1b4b,stroke:#818cf8,stroke-width:1.5px,color:#fff
-    style CoreWorkspaces fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#fff
+    style CoreUI fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#fff
     style InternalPages fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#fff
     style Cloud fill:#042f2e,stroke:#059669,stroke-width:2px,color:#fff
     style External fill:#172554,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -365,23 +374,31 @@ graph TD
 
 ### Architectural Subsystem Breakdown
 
-1. **Main Process Security Shell (`electron/main.ts`)**:
-   - **Process Sandboxing**: Sandboxed webviews with `contextIsolation: true`, `nodeIntegration: false`, and strict `isTrustedSender` senderFrame verification on every IPC channel.
-   - **Privacy Shield & AdBlock**: High-performance network request interception via Chromium session hooks and `@cliqz/adblocker-electron`, backed by an in-memory hash set phishing filter with automatic SSRF and private IP blocking.
-   - **Chrome Web Store Engine (`crxInstaller.ts`)**: Direct CRX package retrieval, zip-slip path traversal neutralization, and permission review gate before installation.
-   - **Native Hardware & OS Integration**: macOS Metal / Windows GPU flags, native OS Text-to-Speech synthesis, and `safeStorage` OS keychain password encryption.
+1. **Main Process & Security Isolation (`electron/main.ts`, `electron/mcpServer.ts`, `electron/main/`)**:
+   - **Process Sandboxing & IPC Guards**: Sandboxed webviews run with `contextIsolation: true` and `nodeIntegration: false`. Every IPC channel strictly enforces `isTrustedSender(event)` verification (validating sender frame, origin, and protocol) to prevent untrusted guests or rogue frames from invoking privileged host operations.
+   - **Network Privacy Shield & AdBlock**: High-performance network request interception via Chromium session webRequest hooks and `@cliqz/adblocker-electron` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters). Backed by an in-memory hash set phishing filter and SSRF defenses that automatically block private RFC 1918, link-local, and loopback IP spoofing.
+   - **Chrome Web Store Engine (`crxInstaller.ts`)**: Direct CRX3 package retrieval, zip-slip path traversal neutralization, manifest permission auditing, and user review gate before extension installation.
+   - **Hardware & OS Integration**: Native GPU acceleration (Metal API on macOS with 120Hz ProMotion, Direct3D/Vulkan on Windows & Linux), native OS Text-to-Speech synthesis (`tts.ts`), and OS keychain password encryption via `safeStorage`.
 
-2. **Decoupled AI & Neural Runtime (`src/services/aiAgent.ts`, `src/workers/aiWorker.ts`)**:
-   - **WebGPU Neural Execution**: Runs local LLMs (Llama 3.2 3B, Phi 3.5 Vision, Qwen 2.5 0.5B) inside an isolated Web Worker (`aiWorker.ts`), completely decoupled from the main UI bundle (0 KB initial startup load).
-   - **Natural Language Intent Engine**: Instant natural language parsing for direct browser navigation, history searching, tab management, and 3-bullet page summaries without burning LLM generation tokens.
-   - **Autonomous ReAct Agent & MCP Server**: Local Model Context Protocol server (Port 3020) enabling external AI clients (Claude Desktop, Cursor, Antigravity) to navigate, query, click, and inspect live DOM trees.
-   - **Memory Vault (`aiMemory.ts`)**: Persistent preference extraction, category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`), and automatic chronological task history tracking with storage quota recovery.
+2. **Modular React Renderer & Hook Architecture (`src/App.tsx`, `src/hooks/`)**:
+   - **Coordinator Shell (`App.tsx`)**: Decoupled top-level coordinator shell that delegates business logic, state machines, and event subscriptions across 27 specialized custom hooks in `src/hooks/`.
+   - **Tab & Window Operations (`useTabOperations.ts`, `useSplitView.ts`)**: Manages tab lifecycles, virtual ordering, pin/unpin, tab cloning, and dual-view split screen geometry with drag-to-resize divider and fractional split persistence.
+   - **Central IPC Hub (`useAppIpc.ts`)**: Centralizes all Electron IPC listeners (downloads, zoom, bookmarks, shortcuts, updates) with guaranteed listener cleanup and unmount teardown, preventing event leaks.
+   - **Workspace & Grouping Hierarchy (`useWorkspaces.ts`, `useFolders.ts`)**: Contextual workspace isolation with color tagging, nested folder structures, and tab group collapsing.
+   - **Data Resilience (`useAppDataBackup.ts`, `useSessionPersistence.ts`, `useDiskHydrationFallback.ts`)**: Atomic local state persistence, automatic session recovery, and sanitized JSON backup export/import.
 
-3. **Client-Side E2EE Sync Engine (`src/services/syncService.ts`)**:
-   - **Zero-Knowledge Cryptography**: All passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
-   - **1-Click Device Pairing**: Human-readable pairing codes (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without accounts or central servers.
+3. **Decoupled AI & Neural Runtime (`src/services/aiAgent.ts`, `src/workers/aiWorker.ts`, `electron/mcpServer.ts`)**:
+   - **WebGPU Neural Execution**: Runs local quantized LLMs (Llama 3.2 3B, Phi 3.5 Vision, Qwen 2.5) inside an isolated Web Worker (`aiWorker.ts`), completely decoupled from the main UI bundle (0 KB initial startup impact, code-split into `web-llm-*.js`).
+   - **Natural Language Intent Engine**: Instant natural language parsing for direct browser navigation, history searching, tab grouping, and 3-bullet page distillation without burning LLM generation tokens.
+   - **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server with Bearer token authentication (`X-MCP-Token`) and DNS rebinding protection, enabling external coding agents (Claude Desktop, Cursor, Windsurf, Antigravity) to navigate, query, click DOM nodes, and stream logs.
+   - **Autonomous ReAct Agent & Visual Cursor**: Multi-step reasoning loop with live DOM tree inspection and a virtual glowing cursor (`AICursorOverlay.tsx`) for real-time visual execution tracking.
+   - **Memory Vault (`aiMemory.ts`)**: Categorized persistent memory (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`) with LRU eviction and quota-safe storage management.
 
-4. **Performance & Tab Virtualization (`src/utils/tabManager.ts`, `src/components/BrowserView.tsx`)**:
+4. **Client-Side E2EE Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
+   - **Zero-Knowledge Cryptography**: Passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) with cryptographic salt and 256-bit AES-GCM before transmission.
+   - **Sovereign 1-Click Device Pairing**: High-entropy pairing codes (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without centralized user accounts or plaintext storage.
+
+5. **Performance & Tab Virtualization (`src/utils/tabManager.ts`, `src/hooks/useTabHibernation.ts`, `src/components/BrowserView.tsx`)**:
    - **Tab Hibernation Engine**: Dormant background tabs (>10 min idle) automatically unmount their active webview rendering pipelines while preserving navigation state, keeping 50+ tabs under 600 MB RAM.
    - **Dual-View Split Screen**: Synchronized parallel browsing with drag-to-resize divider and independent scrolling contexts.
 
@@ -422,7 +439,7 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 - [x] Reader Mode with High-Fidelity Native OS Text-to-Speech (TTS)
 - [x] Local Offline LLM Integration (Web-LLM / WebGPU)
 - [x] Persistent Info Vault & Task History Tracking
-- [x] Comprehensive Automated Test Suite (52 Regression, Security & Empirical Tests)
+- [x] Comprehensive Automated Test Suite (48 Test Suites, 640+ Regression, Security & Empirical Tests)
 - [ ] Mobile Companion Application
 
 ---
