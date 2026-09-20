@@ -64,6 +64,7 @@ import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { getLocale } from '../services/i18n';
+import { getElectronAPI } from '../utils/electronBridge';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -789,8 +790,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
   // Listen to main process context-menu trigger
   useEffect(() => {
-    if (typeof (window as any).electronAPI?.onTriggerPageTranslation === 'function') {
-      const unsub = (window as any).electronAPI.onTriggerPageTranslation((data: any) => {
+    if (typeof getElectronAPI()?.onTriggerPageTranslation === 'function') {
+      const unsub = getElectronAPI()?.onTriggerPageTranslation((data: any) => {
         if (activeTab?.id) {
           setIsTranslateOpen(true);
           handleTranslatePageRef.current(data?.targetLang || 'tr', 'auto');
@@ -852,8 +853,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     const fetchSuggestions = async () => {
       try {
         const clientLocale = getLocale();
-        if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
-          const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
+        if (typeof window !== 'undefined' && getElectronAPI()?.getSuggestions) {
+          const results = await getElectronAPI()?.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
               setClientCachedSuggestions(cacheKey, results);
@@ -1592,8 +1593,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   useEffect(() => {
     const fetchWhitelist = async () => {
       try {
-        if ((window as any).electronAPI?.storeGet) {
-          const val = await (window as any).electronAPI.storeGet('adblocker_whitelist');
+        if (getElectronAPI()?.storeGet) {
+          const val = await getElectronAPI()?.storeGet('adblocker_whitelist');
           if (val) {
             const parsed = JSON.parse(val);
             setAdblockWhitelist(Array.isArray(parsed) ? parsed : []);
@@ -1609,8 +1610,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   // Fetch MCP status on mount and listen for client changes
   useEffect(() => {
     const fetchMcp = async () => {
-      if ((window as any).electronAPI?.getMcpStatus) {
-        const s = await (window as any).electronAPI.getMcpStatus();
+      if (getElectronAPI()?.getMcpStatus) {
+        const s = await getElectronAPI()?.getMcpStatus();
         setMcpRunning(s?.running || false);
         setMcpClientCount(s?.clientCount || 0);
       }
@@ -1618,13 +1619,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     fetchMcp();
     let cleanup: (() => void) | void;
     let cleanupStatus: (() => void) | void;
-    if ((window as any).electronAPI?.onMcpClientChanged) {
-      cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
+    if (getElectronAPI()?.onMcpClientChanged) {
+      cleanup = getElectronAPI()?.onMcpClientChanged((_: any, data: any) => {
         setMcpClientCount(data.count);
       });
     }
-    if ((window as any).electronAPI?.onMcpStatusChanged) {
-      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, isRunning: boolean) => {
+    if (getElectronAPI()?.onMcpStatusChanged) {
+      cleanupStatus = getElectronAPI()?.onMcpStatusChanged((_: any, isRunning: boolean) => {
         setMcpRunning(isRunning);
       });
     }
@@ -1639,8 +1640,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   useEffect(() => {
     const fetchExtensions = async () => {
       try {
-        if ((window as any).electronAPI?.listExtensions) {
-          const list = await (window as any).electronAPI.listExtensions();
+        if (getElectronAPI()?.listExtensions) {
+          const list = await getElectronAPI()?.listExtensions();
           setExtensions(list || []);
         }
       } catch (err) {
@@ -1651,8 +1652,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     fetchExtensions();
     
     let cleanup: (() => void) | undefined;
-    if ((window as any).electronAPI?.onExtensionChanged) {
-      cleanup = (window as any).electronAPI.onExtensionChanged(() => {
+    if (getElectronAPI()?.onExtensionChanged) {
+      cleanup = getElectronAPI()?.onExtensionChanged(() => {
         fetchExtensions();
       });
     }
@@ -1690,8 +1691,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       : [...currentList, currentHostname];
     
     setAdblockWhitelist(newWhitelist);
-    if ((window as any).electronAPI?.storeSet) {
-      await (window as any).electronAPI.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
+    if (getElectronAPI()?.storeSet) {
+      await getElectronAPI()?.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
     }
     onReload();
   };
@@ -2025,8 +2026,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 if (ext.popupUrl) {
                   const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
                   const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                  if ((window as any).electronAPI?.openExtensionPopup) {
-                    (window as any).electronAPI.openExtensionPopup(
+                  if (getElectronAPI()?.openExtensionPopup) {
+                    getElectronAPI()?.openExtensionPopup(
                       url,
                       { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
                       {
@@ -2123,8 +2124,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   const rect = e.currentTarget.getBoundingClientRect();
                   const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
                   const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                  if ((window as any).electronAPI?.openExtensionPopup) {
-                    (window as any).electronAPI.openExtensionPopup(
+                  if (getElectronAPI()?.openExtensionPopup) {
+                    getElectronAPI()?.openExtensionPopup(
                       url,
                       { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
                       activeTab ? {

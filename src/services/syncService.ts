@@ -144,7 +144,7 @@ async function pbkdf2Bits(password: string, salt: Uint8Array, iterations: number
     ['deriveBits']
   );
   const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: salt as any, iterations, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: salt as BufferSource, iterations, hash: 'SHA-256' },
     material,
     outputBytes * 8
   );
@@ -259,7 +259,7 @@ class NovaSyncService {
    * of running it synchronously during service construction (module import).
    */
   private scheduleSupabaseInit(): void {
-    const idleApi = typeof window !== 'undefined' ? (window as any) : null;
+    const idleApi = typeof window !== 'undefined' ? (window as unknown as { requestIdleCallback?: (callback: () => void, options?: { timeout: number }) => void }) : null;
     if (typeof idleApi?.requestIdleCallback === 'function') {
       idleApi.requestIdleCallback(() => { void this.ensureSupabaseListener(); }, { timeout: 3000 });
     } else if (typeof window !== 'undefined') {
@@ -885,7 +885,7 @@ class NovaSyncService {
     return crypto.subtle.deriveKey(
       {
         name: 'PBKDF2',
-        salt: salt as any,
+        salt: salt as BufferSource,
         iterations: 100_000,
         hash: 'SHA-256',
       },
@@ -959,7 +959,7 @@ class NovaSyncService {
         void this.subscribeToRealtime();
         this.notify();
         return newUser;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('[NovaSync] Supabase registration failed:', err);
         // Never silently downgrade to a local account when Supabase IS
         // configured: syncData() rejects non-UUID ids, so the user would
@@ -1077,7 +1077,7 @@ class NovaSyncService {
         void this.subscribeToRealtime();
         this.notify();
         return loggedUser;
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn('[NovaSync] Supabase login failed:', err);
         // Symmetric with register(): do not fall through to the local
         // zero-config registry when Supabase IS configured — that would
@@ -1476,9 +1476,9 @@ class NovaSyncService {
         },
         syncedItemsCount: syncedCounts
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.isSyncing = false;
-      this.lastError = err.message || 'Sync failed';
+      this.lastError = err instanceof Error ? (err.message || 'Sync failed') : 'Sync failed';
       this.notify();
       throw err;
     }

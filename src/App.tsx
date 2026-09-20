@@ -693,7 +693,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       logger.warn('App:VPN', 'Failed to persist nova_vpn to localStorage', err);
     }
     
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.setVpn) {
+    if (typeof window !== 'undefined' && getElectronAPI()?.setVpn) {
       const isValidProxy = Boolean(vpnLocation?.url) && isValidProxyUrl(vpnLocation.url);
       if (vpnEnabled && !isValidProxy) {
         // K2: keep UI truthful — IPC below sends enabled:false, so the
@@ -701,23 +701,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         console.warn("Proxy URL rejected: Secure proxy required (https:// or socks5:// only)");
         setVpnEnabled(false);
       }
-      (window as any).electronAPI.setVpn({ 
-        enabled: vpnEnabled && isValidProxy, 
-        proxyUrl: isValidProxy ? vpnLocation.url : '' 
-      }).then((res: boolean | { error?: string } | void) => {
+      getElectronAPI()?.setVpn({
+        enabled: vpnEnabled && isValidProxy,
+        proxyUrl: isValidProxy ? vpnLocation.url : ''
+      })?.then((res: boolean | { error?: string } | void) => {
         if (typeof res === 'object' && res !== null && 'error' in res && (res as { error?: string }).error) {
           console.error("Failed to set proxy via electron:", (res as { error?: string }).error);
         } else if (res === false && vpnEnabled && isValidProxy) {
           console.error("Failed to set proxy via electron");
         }
-      }).catch((err: unknown) => {
+      })?.catch((err: unknown) => {
         console.error("Failed to set proxy via electron:", err);
       });
     }
   }, [vpnEnabled, vpnLocation, vpnLocations]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlockedBatch) {
+    if (typeof window !== 'undefined' && getElectronAPI()?.onAdBlockedBatch) {
       const removeListener = getElectronAPI()?.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
         setTabs(prev => {
           let changed = false;
@@ -742,7 +742,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Listen for native Chromium webview audio state updates from Electron main process
   useEffect(() => {
-    if (typeof window !== 'undefined' && (window as any).electronAPI?.onTabAudioChanged) {
+    if (typeof window !== 'undefined' && getElectronAPI()?.onTabAudioChanged) {
       const removeListener = getElectronAPI()?.onTabAudioChanged((_event: any, { webContentsId, isPlayingAudio }: { webContentsId: number; isPlayingAudio: boolean }) => {
         setTabs(prevTabs => {
           let changed = false;
@@ -1441,7 +1441,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (demoParams.isDemo) return;
     const restoreFromDisk = async () => {
       try {
-        const electronStore = (window as any).electronAPI;
+        const electronStore = getElectronAPI();
         if (!electronStore?.storeGet) return;
 
         // Restore settings if missing from localStorage
@@ -1764,9 +1764,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
-      if (targetTab?.isIncognito && (window as any).electronAPI?.clearIncognitoSession) {
-        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
-        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+      if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
+        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
+        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         setClosedTabsStack(stack => [...stack, targetTab]);
@@ -1795,9 +1795,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
 
     if (prevTabs.length <= 1) {
-      if (targetTab?.isIncognito && (window as any).electronAPI?.clearIncognitoSession) {
-        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
-        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+      if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
+        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
+        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         setClosedTabsStack(stack => [...stack, targetTab]);
@@ -1847,12 +1847,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     // If closing an incognito tab, always clear that tab's specific partition immediately.
     // If no more incognito tabs remain, also clear the legacy shared partition for safety.
     if (targetTab?.isIncognito) {
-      if ((window as any).electronAPI?.clearIncognitoSession) {
-        (window as any).electronAPI.clearIncognitoSession(targetTab.id).catch((e: any) => console.error(e));
+      if (getElectronAPI()?.clearIncognitoSession) {
+        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
       }
       const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
-      if (!remainingIncognitoTabs && (window as any).electronAPI?.clearIncognitoSession) {
-        (window as any).electronAPI.clearIncognitoSession().catch((e: any) => console.error(e));
+      if (!remainingIncognitoTabs && getElectronAPI()?.clearIncognitoSession) {
+        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
       }
     }
 
@@ -3021,9 +3021,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (webview) {
       try {
         let dataUrl: string | null = null;
-        if (typeof webview.getWebContentsId === 'function' && (window as any).electronAPI?.captureTabThumbnail) {
+        if (typeof webview.getWebContentsId === 'function' && getElectronAPI()?.captureTabThumbnail) {
            const wcId = webview.getWebContentsId();
-           dataUrl = await (window as any).electronAPI.captureTabThumbnail(wcId);
+           dataUrl = await getElectronAPI()?.captureTabThumbnail(wcId) ?? null;
         } else if (typeof webview.capturePage === 'function') {
            const image = await webview.capturePage();
            dataUrl = image.toDataURL();
@@ -3051,10 +3051,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleCaptureFullPage = useCallback(async () => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && typeof webview.getWebContentsId === 'function' && (window as any).electronAPI?.captureFullPage) {
+    if (webview && typeof webview.getWebContentsId === 'function' && getElectronAPI()?.captureFullPage) {
       try {
         const wcId = webview.getWebContentsId();
-        const dataUrl = await (window as any).electronAPI.captureFullPage(wcId);
+        const dataUrl = await getElectronAPI()?.captureFullPage(wcId) ?? null;
         return dataUrl;
       } catch (err) {
         console.error('Full page screenshot failed:', err);
@@ -3254,7 +3254,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const nextEnabled = ext?.enabled === false ? true : false;
     setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
     try {
-      if ((window as any).electronAPI?.toggleExtension) {
+      if (getElectronAPI()?.toggleExtension) {
         await getElectronAPI()?.toggleExtension(id, nextEnabled);
       }
     } catch (e) {
@@ -3271,7 +3271,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     });
     if (confirmed) {
       try {
-        const res = await (window as any).electronAPI?.removeExtension?.(id);
+        const res = await getElectronAPI()?.removeExtension?.(id);
         if (res?.error) {
           console.error('Failed to remove extension:', res.error);
           return;
