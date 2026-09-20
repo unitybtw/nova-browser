@@ -24,6 +24,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
 }) => {
   const { t } = useTranslation();
   const [filterText, setFilterText] = useState('');
+  const [visibleCount, setVisibleCount] = useState(100);
 
   const formatBytes = (bytes: number) => {
     if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
@@ -55,7 +56,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
             </div>
             <div>
               <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">{t('downloads.title')}</h1>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{downloads.length} total items</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{t('downloads.totalItems', { count: downloads.length })}</p>
             </div>
           </div>
           <div className="flex items-center gap-2.5">
@@ -77,7 +78,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
             <input
               type="text"
               value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
+              onChange={(e) => { setFilterText(e.target.value); setVisibleCount(100); }}
               placeholder={t('downloads.searchPlaceholder')}
               className="flex-1 bg-transparent text-xs font-medium outline-none text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500"
             />
@@ -97,7 +98,8 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                 </p>
               </div>
             ) : (
-              filteredDownloads.map((item, idx) => {
+              <>
+                {filteredDownloads.slice(0, visibleCount).map((item, idx) => {
                 const percent = item.totalBytes > 0 
                   ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
                   : 0;
@@ -189,14 +191,23 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
                             onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}
                             className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 transition-colors"
                           >
-                            Open file
+                            {t('downloads.openFile')}
                           </button>
                         </div>
                       )}
                     </div>
                   </div>
                 );
-              })
+              })}
+                {filteredDownloads.length > visibleCount && (
+                  <button
+                    onClick={() => setVisibleCount((c) => c + 100)}
+                    className="w-full py-2.5 text-xs font-semibold text-cyan-600 dark:text-cyan-400 bg-slate-50/60 dark:bg-slate-800/40 border border-slate-200/80 dark:border-white/5 rounded-2xl hover:bg-white dark:hover:bg-slate-800/80 transition-colors"
+                  >
+                    {t('common.showMore', { remaining: filteredDownloads.length - visibleCount })}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>

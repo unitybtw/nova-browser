@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { CHANGELOG_DATA, ReleaseVersion, ChangelogItem } from '../data/changelog';
 import { fetchAutomatedChangelog } from '../services/changelogService';
+import { useTranslation } from '../services/i18n';
 
 interface ChangelogPageProps {
   currentVersion?: string;
@@ -35,6 +36,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isLive, setIsLive] = useState<boolean>(false);
+  const { t } = useTranslation();
 
   const loadData = useCallback(async (force = false) => {
     setIsLoading(true);
@@ -120,7 +122,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                 <Layers className="w-5 h-5" />
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
-                Release Notes
+                {t('changelog.releaseNotes')}
               </span>
               <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 font-semibold">
                 v{currentVersion}
@@ -133,10 +135,10 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               )}
             </div>
             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
-              What's New in Nova Browser
+              {t('changelog.title')}
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Explore recent features, security enhancements, and performance fixes in your installed version.
+              {t('changelog.subtitle')}
             </p>
           </div>
 
@@ -148,14 +150,14 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-500' : ''}`} />
-              <span className="hidden sm:inline">{isLoading ? 'Syncing...' : 'Sync Notes'}</span>
+              <span className="hidden sm:inline">{isLoading ? t('changelog.syncing') : t('changelog.syncNotes')}</span>
             </button>
             {onNavigate && (
               <button
                 onClick={() => onNavigate('nova://newtab')}
                 className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer"
               >
-                <span>Start Browsing</span>
+                <span>{t('changelog.startBrowsing')}</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             )}
@@ -165,7 +167,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               rel="noopener noreferrer"
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
-              <span>GitHub Releases</span>
+              <span>{t('changelog.githubReleases')}</span>
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
@@ -178,7 +180,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
         <div className="lg:col-span-4 space-y-4">
           <div className="flex items-center justify-between px-1">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-              Versions Timeline
+              {t('changelog.versionsTimeline')}
             </span>
             <span className="text-[11px] text-slate-400 font-mono">
               {releases.length} releases
@@ -301,7 +303,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search in changes..."
+                    placeholder={t('changelog.searchPlaceholder')}
                     className="w-full pl-8 pr-3 py-1.5 rounded-xl text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                   />
                 </div>
@@ -336,7 +338,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                   })
                 ) : (
                   <div className="p-8 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-center text-slate-400 dark:text-slate-500 text-xs">
-                    No changes found matching the selected filter.
+                    {t('changelog.noChanges')}
                   </div>
                 )}
               </div>

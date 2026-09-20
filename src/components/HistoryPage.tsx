@@ -24,6 +24,7 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
   onRemoveHistoryItem
 }) => {
   const [faviconFailed, setFaviconFailed] = useState(false);
+  const { t } = useTranslation();
 
   return (
     <div 
@@ -54,7 +55,7 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
             <button
               onClick={() => onNavigate(item.url)}
               className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-500 transition-opacity"
-              title="Open URL"
+              title={t('history.openUrl')}
             >
               <ArrowUpRight className="w-3.5 h-3.5" />
             </button>
@@ -67,7 +68,7 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
         <button
           onClick={() => onRemoveHistoryItem(item.id)}
           className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-          title="Remove from history"
+          title={t('history.removeFromHistory')}
         >
           <Trash2 className="w-4 h-4" />
         </button>
@@ -86,6 +87,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearTimeframe, setClearTimeframe] = useState('all');
+  const [visibleCount, setVisibleCount] = useState(100);
 
   const filteredHistory = useMemo(() => {
     if (!searchTerm.trim()) return history;
@@ -177,7 +179,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               <div className="space-y-4 mb-8">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    {t('settings.appearance')}
+                    {t('history.timeframe')}
                   </label>
                   <select 
                     value={clearTimeframe}
@@ -218,7 +220,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
           <input
             type="text"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => { setSearchTerm(e.target.value); setVisibleCount(100); }}
             placeholder={t('history.searchPlaceholder')}
             className="w-full h-12 bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 rounded-2xl pl-11 pr-4 focus:outline-none focus:ring-2 focus:ring-cyan-500 dark:focus:ring-cyan-500/50 shadow-sm transition-shadow text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 backdrop-blur-md"
           />
@@ -236,27 +238,46 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
               <p className="text-base font-medium text-slate-500 dark:text-slate-400">{t('history.noHistory')}</p>
             </div>
           ) : (
-            groupedHistory.map(([groupLabel, items]) => (
-              <div key={groupLabel} className="space-y-2">
-                <div className="flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  <Calendar className="w-3.5 h-3.5" />
-                  <span>{groupLabel}</span>
-                  <span className="text-[10px] font-normal text-slate-400">({items.length})</span>
-                </div>
+            <>
+              {(() => {
+                let rendered = 0;
+                return groupedHistory.map(([groupLabel, items]) => {
+                  const remaining = visibleCount - rendered;
+                  if (remaining <= 0) return null;
+                  const visibleItems = items.slice(0, remaining);
+                  rendered += visibleItems.length;
+                  return (
+                    <div key={groupLabel} className="space-y-2">
+                      <div className="flex items-center gap-2 px-2 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        <Calendar className="w-3.5 h-3.5" />
+                        <span>{groupLabel}</span>
+                        <span className="text-[10px] font-normal text-slate-400">({items.length})</span>
+                      </div>
 
-                <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {items.map((item) => (
-                    <HistoryRowItem
-                      key={item.id}
-                      item={item}
-                      formatTime={formatTime}
-                      onNavigate={onNavigate}
-                      onRemoveHistoryItem={onRemoveHistoryItem}
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
+                      <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl overflow-hidden shadow-sm divide-y divide-slate-100 dark:divide-slate-700/50">
+                        {visibleItems.map((item) => (
+                          <HistoryRowItem
+                            key={item.id}
+                            item={item}
+                            formatTime={formatTime}
+                            onNavigate={onNavigate}
+                            onRemoveHistoryItem={onRemoveHistoryItem}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+              {filteredHistory.length > visibleCount && (
+                <button
+                  onClick={() => setVisibleCount((c) => c + 100)}
+                  className="w-full py-2.5 text-sm font-semibold text-cyan-600 dark:text-cyan-400 bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors shadow-sm"
+                >
+                  {t('common.showMore', { remaining: filteredHistory.length - visibleCount })}
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

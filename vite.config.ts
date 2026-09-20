@@ -13,6 +13,11 @@ const HARDENED_PROD_CSP = [
   "worker-src 'self' blob:",
   // Google Fonts (loaded via <link> in index.html) must stay allowed — the
   // header CSP in electron/main.ts allows them too; policies intersect.
+  // NOTE (CSP parity): electron/main.ts prod header (style-src 'self' ...) 'unsafe-inline'
+  // içermez, ancak `grep -rn "style=" src/` 100+ React `style={...}` + tema <style>
+  // enjeksiyonu gösteriyor (yaygın kullanım). Kaldırılırsa dinamik tema/pozisyon
+  // stilleri kırılır, bu yüzden prod meta'da tutuldu — dokunulmadı.
+  // Eşitlemek için önce inline stiller class-based CSS'e taşınmalı.
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com",

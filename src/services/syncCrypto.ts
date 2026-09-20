@@ -73,7 +73,11 @@ export async function decryptSyncPayload<T>(envelope: EncryptedSyncEnvelope, pas
     key,
     base64ToBytes(envelope.ciphertext)
   );
-  return JSON.parse(textDecoder.decode(plaintext)) as T;
+  try {
+    return JSON.parse(textDecoder.decode(plaintext)) as T;
+  } catch {
+    throw new Error('Invalid encrypted sync payload: wrong passphrase or corrupted vault');
+  }
 }
 
 export function createPairingToken(): string {

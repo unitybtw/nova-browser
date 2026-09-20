@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, ChevronUp, ChevronDown, X } from 'lucide-react';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useTranslation } from '../services/i18n';
 
 interface FindInPageProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
   const [searchText, setSearchText] = useState('');
   const [matchCase, setMatchCase] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
+  const { t } = useTranslation();
   
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,7 +98,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
               value={searchText}
               onChange={handleChange}
               onKeyDown={handleKeyDown}
-              placeholder="Find in page..."
+              placeholder={t('find.placeholder')}
               className={`flex-1 bg-transparent py-1.5 text-sm outline-none transition-colors placeholder-slate-400 dark:placeholder-slate-500 ${noMatches ? 'text-red-500' : 'text-slate-800 dark:text-slate-200'}`}
               autoFocus
             />
@@ -114,7 +116,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
                   triggerSearch(searchText, true, !matchCase, wholeWord);
                 }}
                 className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors ${matchCase ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                title="Match Case"
+                title={t('find.matchCase')}
               >
                 Aa
               </button>
@@ -124,7 +126,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
                   triggerSearch(searchText, true, matchCase, !wholeWord);
                 }}
                 className={`w-7 h-7 flex items-center justify-center rounded-md text-xs font-bold transition-colors mr-1 ${wholeWord ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
-                title="Whole Word"
+                title={t('find.wholeWord')}
               >
                 W
               </button>
@@ -136,7 +138,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
               whileTap={{ scale: 0.9 }}
               onClick={() => triggerSearch(searchText, false)}
               className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Previous (Shift+Enter)"
+              title={t('find.previous')}
             >
               <ChevronUp className="w-4 h-4" />
             </motion.button>
@@ -144,7 +146,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
               whileTap={{ scale: 0.9 }}
               onClick={() => triggerSearch(searchText, true)}
               className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-              title="Next (Enter)"
+              title={t('find.next')}
             >
               <ChevronDown className="w-4 h-4" />
             </motion.button>
@@ -154,7 +156,7 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
             whileTap={{ scale: 0.9 }}
             onClick={handleClose}
             className="p-2 ml-1 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors shrink-0"
-            title="Close (Escape)"
+            title={t('find.close')}
           >
             <X className="w-4 h-4" />
           </motion.button>

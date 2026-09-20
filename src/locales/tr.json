@@ -14,7 +14,8 @@
     "forward": "İleri",
     "reload": "Yenile",
     "copy": "Kopyala",
-    "copied": "Kopyalandı"
+    "copied": "Kopyalandı",
+    "showMore": "Daha fazla göster ({remaining} kayıt kaldı)"
   },
   "nav": {
     "newTab": "Yeni Sekme",
@@ -130,7 +131,10 @@
     "lastHour": "Son bir saat",
     "last24Hours": "Son 24 saat",
     "last7DaysOption": "Son 7 gün",
-    "allTime": "Tüm zamanlar"
+    "allTime": "Tüm zamanlar",
+    "openUrl": "URL'yi Aç",
+    "removeFromHistory": "Geçmişten kaldır",
+    "timeframe": "Zaman aralığı"
   },
   "downloads": {
     "title": "İndirilenler",
@@ -146,6 +150,28 @@
     "completed": "Tamamlandı",
     "cancelled": "İptal Edildi",
     "interrupted": "Kesintiye Uğradı",
-    "progressing": "İndiriliyor..."
+    "progressing": "İndiriliyor...",
+    "totalItems": "{count} öğe",
+    "openFile": "Dosyayı Aç"
+  },
+  "find": {
+    "placeholder": "Sayfada bul...",
+    "matchCase": "Büyük/Küçük Harf Eşleştir",
+    "wholeWord": "Tam Sözcük",
+    "previous": "Önceki (Shift+Enter)",
+    "next": "Sonraki (Enter)",
+    "close": "Kapat (Escape)"
+  },
+  "changelog": {
+    "releaseNotes": "Sürüm Notları",
+    "title": "Nova Browser'da Yenilikler",
+    "subtitle": "Yüklü sürümünüzdeki son özellikleri, güvenlik iyileştirmelerini ve performans düzeltmelerini keşfedin.",
+    "syncNotes": "Notları Eşitle",
+    "syncing": "Eşitleniyor...",
+    "startBrowsing": "Göz Atmaya Başla",
+    "githubReleases": "GitHub Sürümleri",
+    "versionsTimeline": "Sürümler Zaman Çizelgesi",
+    "searchPlaceholder": "Değişikliklerde ara...",
+    "noChanges": "Seçili filtreyle eşleşen değişiklik bulunamadı."
   }
 }

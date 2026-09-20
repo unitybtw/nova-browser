@@ -14,7 +14,8 @@
     "forward": "Forward",
     "reload": "Reload",
     "copy": "Copy",
-    "copied": "Copied"
+    "copied": "Copied",
+    "showMore": "Show more ({remaining} remaining)"
   },
   "nav": {
     "newTab": "New Tab",
@@ -130,7 +131,10 @@
     "lastHour": "Last hour",
     "last24Hours": "Last 24 hours",
     "last7DaysOption": "Last 7 days",
-    "allTime": "All time"
+    "allTime": "All time",
+    "openUrl": "Open URL",
+    "removeFromHistory": "Remove from history",
+    "timeframe": "Time range"
   },
   "downloads": {
     "title": "Downloads",
@@ -146,6 +150,28 @@
     "completed": "Completed",
     "cancelled": "Cancelled",
     "interrupted": "Interrupted",
-    "progressing": "Downloading..."
+    "progressing": "Downloading...",
+    "totalItems": "{count} total items",
+    "openFile": "Open file"
+  },
+  "find": {
+    "placeholder": "Find in page...",
+    "matchCase": "Match Case",
+    "wholeWord": "Whole Word",
+    "previous": "Previous (Shift+Enter)",
+    "next": "Next (Enter)",
+    "close": "Close (Escape)"
+  },
+  "changelog": {
+    "releaseNotes": "Release Notes",
+    "title": "What's New in Nova Browser",
+    "subtitle": "Explore recent features, security enhancements, and performance fixes in your installed version.",
+    "syncNotes": "Sync Notes",
+    "syncing": "Syncing...",
+    "startBrowsing": "Start Browsing",
+    "githubReleases": "GitHub Releases",
+    "versionsTimeline": "Versions Timeline",
+    "searchPlaceholder": "Search in changes...",
+    "noChanges": "No changes found matching the selected filter."
   }
 }

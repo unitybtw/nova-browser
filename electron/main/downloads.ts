@@ -1,7 +1,11 @@
-import { app, ipcMain, shell } from 'electron';
+import { app, dialog, ipcMain, shell } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+
+// Kaynak: electron/main.ts:2584 (open-external tehlikeli uzantı kontrolü) ile aynı regex.
+// Import yerine kopya kullanıldı çünkü main.ts composition root (döngüsel bağımlılık riski).
+const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
 
 type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
@@ -89,7 +93,7 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
     return false;
   });
 
-  ipcMain.handle('open-download', (event, pathStr: string) => {
+  ipcMain.handle('open-download', async (event, pathStr: string) => {
     if (!isTrustedSender(event)) return false;
     if (!pathStr || typeof pathStr !== 'string') return false;
     const downloadsPath = app.getPath('downloads');
@@ -102,7 +106,19 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       const isUnderDownloads = normPath.startsWith(normDownloads);
       const isKnown = knownDownloadPaths.has(realPath) || (process.platform === 'win32' && Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath));
       if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
-        shell.openPath(realPath);
+        if (DANGEROUS_EXT_REGEX.test(realPath)) {
+          const { response } = await dialog.showMessageBox({
+            type: 'warning',
+            buttons: ['Cancel', 'Open'],
+            defaultId: 0,
+            cancelId: 0,
+            title: 'Potentially dangerous file',
+            message: `This file (${path.basename(realPath)}) could harm your computer. Do you want to open it?`,
+            detail: realPath,
+          });
+          if (response !== 1) return false;
+        }
+        await shell.openPath(realPath);
         return true;
       }
     } catch (err) {

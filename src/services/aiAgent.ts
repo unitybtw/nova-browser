@@ -733,7 +733,7 @@ class AIAgent {
    */
   public async parkModel(): Promise<void> {
     if (!this.engine && !this.worker) return;
-    console.log('[AI Agent] Parking resident model to reclaim VRAM for GPU compositor.');
+    logger.debug('AIAgent:parkModel', 'Parking resident model to reclaim VRAM for GPU compositor');
     if (this.idleParkTimer) {
       clearTimeout(this.idleParkTimer);
       this.idleParkTimer = null;
@@ -1349,7 +1349,7 @@ CRITICAL RULES:
     // Security: never log tool args — they can carry form field values,
     // search queries and other user-typed data that would leak into terminal
     // logs. Log only the tool name.
-    console.log(`[AI Agent] Executing tool: ${functionName}`);
+    logger.debug('AIAgent:handleToolCall', `Executing tool: ${functionName}`);
 
     if (!this.actionContext) {
       return JSON.stringify({ error: "Action context not set. Browser APIs unavailable." });
@@ -1457,7 +1457,14 @@ CRITICAL RULES:
 
       else if (functionName === "get_page_url") {
         const data = await this.actionContext.onExecuteScript(`JSON.stringify({ url: window.location.href, title: document.title });`);
-        result = { success: true, ...JSON.parse(data) };
+        let parsed: any = {};
+        try {
+          parsed = typeof data === 'string' ? JSON.parse(data) : (data ?? {});
+        } catch (e) {
+          console.warn('[AI Agent] Failed to parse get_page_url result:', e);
+          parsed = {};
+        }
+        result = { success: true, ...parsed };
       }
 
       else if (functionName === "click_element") {
@@ -1772,7 +1779,7 @@ ${JSON.stringify(inputs)}
 
 Output a JSON array of objects with { "selector": "...", "value": "..." } for fields you can confidently fill. Output ONLY the JSON array, nothing else.`;
 
-        console.log('[AI Agent] Auto-filling form...');
+        logger.debug('AIAgent:handleToolCall', 'Auto-filling form');
         
         const completion = await this.engine!.chat.completions.create({
           messages: [{ role: "user", content: prompt }],

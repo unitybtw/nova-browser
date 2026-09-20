@@ -800,11 +800,18 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     }
   }, [activeTab?.id]);
 
+  // İçeriğe duyarlı stabilize key: aynı sayıda farklı istekleri kaçırma.
+  // String primitive karşılaştırıldığı için içeriği değişmedikçe effect tetiklenmez (infinite loop yok).
+  const relevantPermissionRequestsKey = useMemo(
+    () => relevantPermissionRequests.map(r => `${r.requestId}|${r.permission}|${r.origin}|${r.url}|${r.webContentsId ?? ''}`).join(','),
+    [relevantPermissionRequests]
+  );
+
   useEffect(() => {
     if (relevantPermissionRequests.length > 0) {
       setIsPermissionPromptDismissed(false);
     }
-  }, [relevantPermissionRequests.length]);
+  }, [relevantPermissionRequestsKey]);
 
   useEffect(() => {
     return () => {
@@ -2061,7 +2068,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4 text-cyan-400" />}
               {(!isWhitelisted && (activeTab?.blockedAdsCount || 0) > 0) && (
                 <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
-                  {activeTab!.blockedAdsCount}
+                  {activeTab?.blockedAdsCount ?? 0}
                 </span>
               )}
             </button>

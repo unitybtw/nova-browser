@@ -42,6 +42,7 @@ import { isValidProxyUrl } from './utils/proxyValidation';
 import { matchesShortcut } from './utils/keyboardShortcuts';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useWorkspaces } from './hooks/useWorkspaces';
+import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
 const lazyWithRetry = <T extends React.ComponentType<any>>(
@@ -634,7 +635,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       try {
         const serialized = JSON.stringify(settings);
         localStorage.setItem('user_settings', serialized);
-        (window as any).electronAPI?.storeSet?.('user_settings', serialized);
+        getElectronAPI()?.storeSet?.('user_settings', serialized);
       } catch (err) {
         logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
       }
@@ -642,7 +643,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         window.electronAPI.setPrivacyShield(settings.privacyShield);
       }
       if (window.electronAPI?.setDoNotTrack) {
-        (window as any).electronAPI.setDoNotTrack(settings.doNotTrack ?? true);
+        getElectronAPI()?.setDoNotTrack(settings.doNotTrack ?? true);
       }
     }, 500);
     return () => clearTimeout(timer);
@@ -717,7 +718,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI?.onAdBlockedBatch) {
-      const removeListener = (window as any).electronAPI.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
+      const removeListener = getElectronAPI()?.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
         setTabs(prev => {
           let changed = false;
           const updated = prev.map(t => {
@@ -735,14 +736,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           return changed ? updated : prev;
         });
       });
-      return () => removeListener();
+      return () => removeListener?.();
     }
   }, []);
 
   // Listen for native Chromium webview audio state updates from Electron main process
   useEffect(() => {
     if (typeof window !== 'undefined' && (window as any).electronAPI?.onTabAudioChanged) {
-      const removeListener = (window as any).electronAPI.onTabAudioChanged((_event: any, { webContentsId, isPlayingAudio }: { webContentsId: number; isPlayingAudio: boolean }) => {
+      const removeListener = getElectronAPI()?.onTabAudioChanged((_event: any, { webContentsId, isPlayingAudio }: { webContentsId: number; isPlayingAudio: boolean }) => {
         setTabs(prevTabs => {
           let changed = false;
           const updated = prevTabs.map(tab => {
@@ -798,26 +799,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
         const serializedTabs = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serializedTabs);
-        (window as any).electronAPI?.storeSet?.('session_tabs', serializedTabs);
+        getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
         if (activeTabIdRef.current) {
           localStorage.setItem('active_tab_session', activeTabIdRef.current);
-          (window as any).electronAPI?.storeSet?.('active_tab_session', activeTabIdRef.current);
+          getElectronAPI()?.storeSet?.('active_tab_session', activeTabIdRef.current);
         }
         const serializedFolders = JSON.stringify(foldersRef.current);
         localStorage.setItem('folders_session', serializedFolders);
-        (window as any).electronAPI?.storeSet?.('folders_session', serializedFolders);
+        getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
 
         const serializedSettings = JSON.stringify(settingsRef.current);
         localStorage.setItem('user_settings', serializedSettings);
-        (window as any).electronAPI?.storeSet?.('user_settings', serializedSettings);
+        getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
 
         const serializedBookmarks = JSON.stringify(bookmarksRef.current);
         localStorage.setItem('bookmarks', serializedBookmarks);
-        (window as any).electronAPI?.storeSet?.('bookmarks', serializedBookmarks);
+        getElectronAPI()?.storeSet?.('bookmarks', serializedBookmarks);
 
         const serializedWorkspaces = JSON.stringify(workspacesRef.current);
         localStorage.setItem('workspaces_session', serializedWorkspaces);
-        (window as any).electronAPI?.storeSet?.('workspaces_session', serializedWorkspaces);
+        getElectronAPI()?.storeSet?.('workspaces_session', serializedWorkspaces);
 
         localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
         flushBookmarks();
@@ -847,7 +848,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       try {
         const serialized = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serialized);
-        (window as any).electronAPI?.storeSet?.('session_tabs', serialized);
+        getElectronAPI()?.storeSet?.('session_tabs', serialized);
       } catch (err) {
         logger.warn('App:Session', 'Failed to persist session_tabs to storage', err);
       }
@@ -1405,8 +1406,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     `;
 
     // Apply to Electron nativeTheme for webviews
-    if ((window as any).electronAPI?.setTheme) {
-      (window as any).electronAPI.setTheme(settings.theme || 'system');
+    if (getElectronAPI()?.setTheme) {
+      getElectronAPI()?.setTheme(settings.theme || 'system');
     }
 
     // Listen for system theme changes if using system
@@ -1554,7 +1555,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
       let localPasswords: SavedPassword[] = [];
       try {
-        const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+        const rawP = await getElectronAPI()?.secureStoreGet?.('passwords');
         if (rawP) localPasswords = JSON.parse(rawP);
       } catch (err) {
         logger.warn('App:Sync', 'Failed to retrieve or parse secure passwords for sync', err);
@@ -1577,8 +1578,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setSettings(mergedData.settings);
         setWorkspaces(mergedData.workspaces);
 
-        if (mergedData.passwords && (window as any).electronAPI?.secureStoreSet) {
-          await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(mergedData.passwords));
+        if (mergedData.passwords && getElectronAPI()?.secureStoreSet) {
+          await getElectronAPI()?.secureStoreSet('passwords', JSON.stringify(mergedData.passwords));
         }
       }
     } catch (err) {
@@ -1650,8 +1651,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
     // 4. Invoke native Electron session cache purge & host resolver trim
     try {
-      if ((window as any).electronAPI?.purgeSystemMemory) {
-        await (window as any).electronAPI.purgeSystemMemory();
+      if (getElectronAPI()?.purgeSystemMemory) {
+        await getElectronAPI()?.purgeSystemMemory();
       }
     } catch (err) {
       console.error('Purge system memory error:', err);
@@ -2128,14 +2129,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       });
     }
 
-    if ((window as any).electronAPI?.onNewIncognitoTab) {
-      cleanupNewIncognitoTab = (window as any).electronAPI.onNewIncognitoTab((_event: any, url: string) => {
+    if (getElectronAPI()?.onNewIncognitoTab) {
+      cleanupNewIncognitoTab = getElectronAPI()?.onNewIncognitoTab((_event: any, url?: string) => {
         handlersRef.current.handleNewIncognitoTab(url);
       });
     }
 
-    if ((window as any).electronAPI?.onQuickAIAction) {
-      cleanupQuickAI = (window as any).electronAPI.onQuickAIAction((_event: any, text: string) => {
+    if (getElectronAPI()?.onQuickAIAction) {
+      cleanupQuickAI = getElectronAPI()?.onQuickAIAction((_event: any, text: string) => {
         queueAIAction(`Explain or summarize this selection:\n\n"${typeof text === 'string' ? text : ''}"`);
       });
     }
@@ -2144,8 +2145,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       queueAIAction((event as CustomEvent).detail);
     };
     let cleanupExtInstall: (() => void) | void;
-    if ((window as any).electronAPI?.onExtensionInstalledSilently) {
-      cleanupExtInstall = (window as any).electronAPI.onExtensionInstalledSilently((_event: any, data: any) => {
+    if (getElectronAPI()?.onExtensionInstalledSilently) {
+      cleanupExtInstall = getElectronAPI()?.onExtensionInstalledSilently((_event: any, data: any) => {
         if (data.success) {
           void showAlert({ title: 'Extensions', message: `Extension successfully installed: ${data.name}` });
         }
@@ -3254,7 +3255,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
     try {
       if ((window as any).electronAPI?.toggleExtension) {
-        await (window as any).electronAPI.toggleExtension(id, nextEnabled);
+        await getElectronAPI()?.toggleExtension(id, nextEnabled);
       }
     } catch (e) {
       console.error('Failed to toggle extension:', e);

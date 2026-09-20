@@ -2854,7 +2854,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 {(mcpStatus?.clients?.length || 0) > 0 && (
                   <div className="border-t border-slate-200 dark:border-slate-700 pt-4 space-y-2">
                     <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Connected Clients</p>
-                    {mcpStatus!.clients.map((c: any) => (
+                    {mcpStatus?.clients?.map((c: any) => (
                       <div key={c.id} className="flex items-center gap-2 text-sm">
                         <div className="w-2 h-2 rounded-full bg-green-400" />
                         <span className="text-slate-700 dark:text-slate-300 truncate">{c.userAgent}</span>
@@ -2862,7 +2862,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                           {Math.round((Date.now() - c.connectedAt) / 1000)}s ago
                         </span>
                       </div>
-                    ))}
+                    )) ?? null}
                   </div>
                 )}
               </div>
