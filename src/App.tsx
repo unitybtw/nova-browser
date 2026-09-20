@@ -43,6 +43,7 @@ import { useBookmarks } from './hooks/useBookmarks';
 import { useVpn } from './hooks/useVpn';
 import { useWorkspaces } from './hooks/useWorkspaces';
 import { useSessionPersistence } from './hooks/useSessionPersistence';
+import { useClosedTabs } from './hooks/useClosedTabs';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -1369,9 +1370,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     return () => { unsubscribe(); };
   }, [handlePerformSync]);
 
-  const [closedTabsStack, setClosedTabsStack] = useState<Tab[]>([]);
-  const closedTabsStackRef = useRef(closedTabsStack);
-  closedTabsStackRef.current = closedTabsStack;
+  // Kapalı-sekme-geri-al (undo close) stack'i — hook'a taşındı, davranış aynen korunur.
+  // Tab oluşturma (id-collision/workspace switch/setTabs) hook'a taşınmadı;
+  // onReopen callback'i olarak burada kalır.
+  const {
+    closedTabsStack,
+    pushClosedTab,
+    pushClosedTabs,
+    reopenLastClosed,
+  } = useClosedTabs({
+    onReopen: (lastTab) => {
+      let tabToRestore = lastTab;
+      if (tabsRef.current.some(t => t.id === lastTab.id)) {
+        tabToRestore = { ...lastTab, id: generateId('tab') };
+      }
+      const tabWs = tabToRestore.workspaceId || 'default';
+      if (tabWs !== (activeWorkspaceIdRef.current || 'default')) {
+        setActiveWorkspaceId(tabWs);
+      }
+      setTabs(prev => [...prev, tabToRestore]);
+      setActiveTabId(tabToRestore.id);
+    },
+  });
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
@@ -1450,7 +1470,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
-        setClosedTabsStack(stack => [...stack, targetTab]);
+        pushClosedTab(targetTab);
       }
       // Reset sole tab in place without unmounting or regenerating tab ID.
       // This prevents animation glitching, unmount/remount churn, and rightward drift.
@@ -1481,7 +1501,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
-        setClosedTabsStack(stack => [...stack, targetTab]);
+        pushClosedTab(targetTab);
       }
       setTabs(prev => prev.map(t => ({
         ...t,
@@ -1504,7 +1524,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       .map(t => t.splitWith === id ? { ...t, splitWith: undefined } : t);
 
     if (targetTab) {
-      setClosedTabsStack(stack => [...stack, targetTab]);
+      pushClosedTab(targetTab);
     }
 
     if (activeTabIdRef.current === id && newTabs.length > 0) {
@@ -1538,7 +1558,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
 
     setTabs(newTabs);
-  }, [activeWorkspaceId]);
+  }, [activeWorkspaceId, pushClosedTab]);
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
@@ -1612,11 +1632,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const targetWs = target.workspaceId || 'default';
     const toClose = prev.filter(t => (t.workspaceId || 'default') === targetWs && t.id !== tabId && !t.isPinned);
     toClose.forEach(t => tabThumbnailCache.remove(t.id));
-    setClosedTabsStack(stack => [...stack, ...toClose]);
+    pushClosedTabs(toClose);
     const toKeep = prev.filter(t => !toClose.some(c => c.id === t.id));
     setActiveTabId(tabId);
     setTabs(toKeep);
-  }, []);
+  }, [pushClosedTabs]);
 
   const handleCloseTabsToRight = useCallback((index: number) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
@@ -1628,13 +1648,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     const tabsToClose = wsTabs.slice(index + 1).filter(t => !t.isPinned);
     const closeIds = new Set(tabsToClose.map(t => t.id));
     closeIds.forEach(id => tabThumbnailCache.remove(id));
-    setClosedTabsStack(stack => [...stack, ...tabsToClose]);
+    pushClosedTabs(tabsToClose);
     const nextTabs = prev.filter(t => !closeIds.has(t.id));
     if (!nextTabs.some(t => t.id === activeTabIdRef.current)) {
       setActiveTabId(targetTab.id);
     }
     setTabs(nextTabs);
-  }, []);
+  }, [pushClosedTabs]);
 
   const handleNewTabRight = useCallback((index: number) => {
     const prev = tabsRef.current;
@@ -1697,23 +1717,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     }
   }, [activeTabId]);
 
+  // Pop + restore: stack hook'ta, tab oluşturma onReopen callback'inde (yukarıda).
   const handleReopenClosedTab = useCallback(() => {
-    // Read the stack from the ref OUTSIDE any updater (StrictMode-safe)
-    const stack = closedTabsStackRef.current;
-    if (stack.length === 0) return;
-    const lastTab = stack[stack.length - 1];
-    let tabToRestore = lastTab;
-    if (tabsRef.current.some(t => t.id === lastTab.id)) {
-      tabToRestore = { ...lastTab, id: generateId('tab') };
-    }
-    const tabWs = tabToRestore.workspaceId || 'default';
-    if (tabWs !== (activeWorkspaceIdRef.current || 'default')) {
-      setActiveWorkspaceId(tabWs);
-    }
-    setTabs(prev => [...prev, tabToRestore]);
-    setActiveTabId(tabToRestore.id);
-    setClosedTabsStack(stack.slice(0, -1));
-  }, [setActiveWorkspaceId]);
+    reopenLastClosed();
+  }, [reopenLastClosed]);
 
 
 
