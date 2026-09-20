@@ -1,14 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { Extension } from '../types/browser';
+import { getElectronAPI } from '../utils/electronBridge';
+import { showConfirm } from '../utils/confirmDialog';
 
-/**
- * Extension listesi: App.tsx'ten birebir taşıma (pure code motion).
- *
- * - `extensions` state + mount'ta `listExtensions` fetch aynen korunur.
- * - `onExtensionChanged` aboneliği + unmount cleanup aynen korunur.
- * - Toggle/remove mantığı App'te kaldı (sadece `setExtensions` döner);
- *   TopBar / ExtensionsSection kendi local fetch'lerini korur (dokunulmadı).
- */
 export function useExtensions() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
 
@@ -38,5 +32,44 @@ export function useExtensions() {
     };
   }, []);
 
-  return { extensions, setExtensions };
+  const handleToggleExtension = useCallback(async (id: string) => {
+    const ext = extensions.find(e => e.id === id);
+    const nextEnabled = ext?.enabled === false ? true : false;
+    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
+    try {
+      if (getElectronAPI()?.toggleExtension) {
+        await getElectronAPI()?.toggleExtension(id, nextEnabled);
+      }
+    } catch (e) {
+      console.error('Failed to toggle extension:', e);
+    }
+  }, [extensions]);
+
+  const handleRemoveExtension = useCallback(async (id: string) => {
+    const confirmed = await showConfirm({
+      title: 'Remove Extension',
+      message: 'Are you sure you want to remove this extension?',
+      confirmLabel: 'Remove',
+      cancelLabel: 'Cancel'
+    });
+    if (confirmed) {
+      try {
+        const res = await getElectronAPI()?.removeExtension?.(id);
+        if (res?.error) {
+          console.error('Failed to remove extension:', res.error);
+          return;
+        }
+        setExtensions(prev => prev.filter(e => e.id !== id));
+      } catch (e) {
+        console.error('Failed to remove extension:', e);
+      }
+    }
+  }, []);
+
+  return {
+    extensions,
+    setExtensions,
+    handleToggleExtension,
+    handleRemoveExtension,
+  };
 }

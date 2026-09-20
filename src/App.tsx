@@ -53,6 +53,10 @@ import { useZoom } from './hooks/useZoom';
 import { useBrowserAgentBridge } from './hooks/useBrowserAgentBridge';
 import { useTabOperations } from './hooks/useTabOperations';
 import { useAppIpc, type AppEventHandlers } from './hooks/useAppIpc';
+import { useFolders } from './hooks/useFolders';
+import { useSplitView } from './hooks/useSplitView';
+import { useAppDataBackup } from './hooks/useAppDataBackup';
+import { useScreenshots } from './hooks/useScreenshots';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -279,7 +283,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setIsSidebarCollapsed,
     closeAllModals: closePanelModals,
   } = usePanels({ initialSidePanelOpen: demoParams.isDemo && demoParams.feature === 'ai' });
-  const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
 
   useEffect(() => {
@@ -329,11 +332,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // closeAllModals below, so the composed closer keeps the original set.
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);
-  // Extension listesi: state + mount fetch + onExtensionChanged aboneliği
-  // useExtensions'ta. Tüketiciler App'te kaldı: handleToggleExtension /
-  // handleRemoveExtension + ExtensionsModal props. TopBar ve ExtensionsSection
-  // kendi local fetch'lerine sahip (dokunulmadı).
-  const { extensions, setExtensions } = useExtensions();
+  // Extension listesi & operations: useExtensions'a taşındı.
+  const { extensions, setExtensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
@@ -644,12 +644,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
-  const splitTabId = useMemo(() => {
-    if (!activeTab || !activeTab.splitWith) return null;
-    const partner = tabs.find(t => t.id === activeTab.splitWith);
-    return partner ? partner.id : null;
-  }, [activeTab, tabs]);
-  activeSplitTabIdRef.current = splitTabId;
+  const {
+    splitTabId,
+    handleCloseSplitView,
+    handleToggleSplitView,
+  } = useSplitView({
+    activeTab,
+    activeTabId,
+    tabs,
+    activeWorkspaceId,
+    setTabs,
+    activeSplitTabIdRef,
+    setSplitRatio,
+  });
 
   // Tab CRUD & lifecycle operations (extracted to useTabOperations)
   const {
@@ -729,39 +736,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setTabs,
   });
 
-  // Folder Management
-  const handleCreateFolder = useCallback(() => {
-    const newFolder: Folder = {
-      id: generateId('folder'),
-      name: 'New Folder',
-      isExpanded: true,
-      workspaceId: activeWorkspaceId
-    };
-    setFolders(prev => [...prev, newFolder]);
-  }, [activeWorkspaceId]);
-
-  const handleToggleFolder = useCallback((folderId: string) => {
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, isExpanded: !f.isExpanded } : f));
-  }, []);
-
-  const handleRenameFolder = useCallback((folderId: string, name: string) => {
-    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name } : f));
-  }, []);
-
-  const handleDeleteFolder = useCallback((folderId: string) => {
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-    // Remove folderId from all tabs that were in this folder
-    setTabs(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: undefined } : t));
-  }, []);
-
-  const handleMoveTabToFolder = useCallback((tabId: string, folderId?: string) => {
-    const targetTab = tabsRef.current.find(tab => tab.id === tabId);
-    if (!targetTab) return;
-
-    if (!canMoveTabToFolder(targetTab, folderId, folders)) return;
-
-    setTabs(prev => prev.map(tab => tab.id === tabId ? { ...tab, folderId } : tab));
-  }, [folders]);
+  // Folder Management (extracted to useFolders)
+  const {
+    handleCreateFolder,
+    handleToggleFolder,
+    handleRenameFolder,
+    handleDeleteFolder,
+    handleMoveTabToFolder,
+  } = useFolders({
+    folders,
+    setFolders,
+    activeWorkspaceId,
+    tabsRef,
+    setTabs,
+  });
 
 
 
@@ -863,102 +851,19 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [closeAllModals]);
 
   const handleOpenShare = useCallback(() => openModal('share'), [openModal]);
-  const handleTakeScreenshot = useCallback(async () => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview) {
-      try {
-        let dataUrl: string | null = null;
-        if (typeof webview.getWebContentsId === 'function' && getElectronAPI()?.captureTabThumbnail) {
-           const wcId = webview.getWebContentsId();
-           dataUrl = await getElectronAPI()?.captureTabThumbnail(wcId) ?? null;
-        } else if (typeof webview.capturePage === 'function') {
-           const image = await webview.capturePage();
-           dataUrl = image.toDataURL();
-        }
-        
-        if (dataUrl) {
-          setScreenshotDataUrl(dataUrl);
-          setIsScreenshotOpen(true);
-        } else {
-          void showAlert({ title: 'Screenshot', message: "Failed to capture screenshot. The page might not be fully loaded." });
-        }
-      } catch (err) {
-        console.error('Screenshot capture failed:', err);
-      }
-    } else {
-      // Check if it's an internal page by looking at activeTab url
-      const tab = tabs.find(t => t.id === activeTabId);
-      if (tab?.url?.startsWith('nova://')) {
-         void showAlert({ title: 'Screenshot', message: "Screenshots cannot be taken on internal pages (Settings, New Tab, etc.)." });
-      } else {
-         void showAlert({ title: 'Screenshot', message: "Screenshot feature is only available in the desktop app." });
-      }
-    }
-  }, [activeTabId, tabs]);
 
-  const handleCaptureFullPage = useCallback(async () => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && typeof webview.getWebContentsId === 'function' && getElectronAPI()?.captureFullPage) {
-      try {
-        const wcId = webview.getWebContentsId();
-        const dataUrl = await getElectronAPI()?.captureFullPage(wcId) ?? null;
-        return dataUrl;
-      } catch (err) {
-        console.error('Full page screenshot failed:', err);
-        return null;
-      }
-    }
-    return null;
-  }, [activeTabId]);
+  // Screenshot capture operations (extracted to useScreenshots)
+  const {
+    screenshotDataUrl,
+    handleTakeScreenshot,
+    handleCaptureFullPage,
+  } = useScreenshots({
+    activeTabId,
+    tabs,
+    setIsScreenshotOpen,
+  });
+
   const handleOpenFindInPage = useCallback(() => setIsFindInPageOpen(prev => !prev), []);
-  
-  const handleCloseSplitView = useCallback((tab1Id?: string, tab2Id?: string) => {
-    setTabs(prev => prev.map(t => {
-      if (tab1Id || tab2Id) {
-        if (
-          t.id === tab1Id || 
-          t.id === tab2Id || 
-          (tab1Id && t.splitWith === tab1Id) || 
-          (tab2Id && t.splitWith === tab2Id)
-        ) {
-          return { ...t, splitWith: undefined };
-        }
-      } else if (t.id === activeTabId || (splitTabId && t.id === splitTabId) || t.splitWith === activeTabId) {
-        return { ...t, splitWith: undefined };
-      }
-      return t;
-    }));
-  }, [activeTabId, splitTabId]);
-
-  const handleToggleSplitView = useCallback(() => {
-    if (splitTabId) {
-      handleCloseSplitView();
-    } else {
-      const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
-      const otherTab = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
-      if (otherTab) {
-        setTabs(prev => prev.map(t => {
-          if (t.id === activeTabId) return { ...t, splitWith: otherTab.id };
-          if (t.id === otherTab.id) return { ...t, splitWith: activeTabId };
-          return t;
-        }));
-      } else {
-        const newId = generateId('tab');
-        const newTab: Tab = {
-          id: newId,
-          url: 'nova://newtab',
-          title: 'New Tab',
-          isLoading: false,
-          canGoBack: false,
-          canGoForward: false,
-          workspaceId: activeWorkspaceId,
-          splitWith: activeTabId
-        };
-        setTabs(prev => [...prev.map(t => t.id === activeTabId ? { ...t, splitWith: newId } : t), newTab]);
-      }
-      setSplitRatio(50);
-    }
-  }, [splitTabId, tabs, activeWorkspaceId, activeTabId, handleCloseSplitView]);
 
   const handleGoBack = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
@@ -1008,75 +913,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => setSettings(prev => ({ ...prev, ...newSettings })), []);
 
-  const handleExportData = useCallback(() => {
-    const backup = {
-      version: '1.0',
-      timestamp: Date.now(),
-      bookmarks,
-      history,
-      settings
-    };
-    const jsonStr = JSON.stringify(backup, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `nova_browser_backup_${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [bookmarks, history, settings]);
-
-  const handleImportData = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        if (data.bookmarks && Array.isArray(data.bookmarks)) {
-          const sanitizedBookmarks = data.bookmarks.filter((b: any) =>
-            b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
-          );
-          setBookmarks(sanitizedBookmarks);
-        }
-        if (data.history && Array.isArray(data.history)) {
-          const sanitizedHistory = data.history.filter((h: any) =>
-            h && typeof h === 'object' && typeof h.url === 'string' && isSafeNavigationUrl(h.url)
-          );
-          setHistory(sanitizedHistory);
-        }
-        if (data.settings && typeof data.settings === 'object' && !Array.isArray(data.settings)) {
-          const raw = data.settings;
-          const safeSettings: Partial<UserSettings> = {};
-          if (typeof raw.theme === 'string' && ['dark', 'light', 'system'].includes(raw.theme)) safeSettings.theme = raw.theme;
-          if (typeof raw.searchEngine === 'string' && ['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'yahoo'].includes(raw.searchEngine)) safeSettings.searchEngine = raw.searchEngine;
-          if (typeof raw.privacyShield === 'boolean') safeSettings.privacyShield = raw.privacyShield;
-          if (typeof raw.useVerticalTabs === 'boolean') safeSettings.useVerticalTabs = raw.useVerticalTabs;
-          if (typeof raw.fontSize === 'string' && ['small', 'medium', 'large'].includes(raw.fontSize)) safeSettings.fontSize = raw.fontSize;
-          if (typeof raw.tabStyle === 'string' && ['rounded', 'square', 'floating'].includes(raw.tabStyle)) safeSettings.tabStyle = raw.tabStyle;
-          if (typeof raw.tabAnimation === 'string' && ['chrome', 'smooth', 'snappy', 'none'].includes(raw.tabAnimation)) safeSettings.tabAnimation = raw.tabAnimation;
-          if (typeof raw.doNotTrack === 'boolean') safeSettings.doNotTrack = raw.doNotTrack;
-          if (typeof raw.clearOnExit === 'boolean') safeSettings.clearOnExit = raw.clearOnExit;
-          if (typeof raw.hardwareAcceleration === 'boolean') safeSettings.hardwareAcceleration = raw.hardwareAcceleration;
-          if (typeof raw.tabHibernationEnabled === 'boolean') safeSettings.tabHibernationEnabled = raw.tabHibernationEnabled;
-          if (typeof raw.aiLinkPreviewEnabled === 'boolean') safeSettings.aiLinkPreviewEnabled = raw.aiLinkPreviewEnabled;
-          if (typeof raw.energySaverMode === 'boolean') safeSettings.energySaverMode = raw.energySaverMode;
-          if (typeof raw.preloadDnsEnabled === 'boolean') safeSettings.preloadDnsEnabled = raw.preloadDnsEnabled;
-          if (typeof raw.smoothScrollingEnabled === 'boolean') safeSettings.smoothScrollingEnabled = raw.smoothScrollingEnabled;
-          if (typeof raw.newTabBackground === 'string' && ['default', 'gradient', 'mesh', 'glass', 'unsplash', 'custom_url', 'aurora_waves', 'cyber_grid', 'hyper_space', 'fireflies', 'nebula', 'matrix'].includes(raw.newTabBackground)) safeSettings.newTabBackground = raw.newTabBackground;
-          if (typeof raw.backgroundCustomUrl === 'string' && isSafeNavigationUrl(raw.backgroundCustomUrl)) safeSettings.backgroundCustomUrl = raw.backgroundCustomUrl;
-          if (typeof raw.accentColor === 'string' && ['blue', 'emerald', 'purple', 'rose', 'amber', 'custom'].includes(raw.accentColor)) safeSettings.accentColor = raw.accentColor;
-          if (typeof raw.customAccentColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customAccentColor)) safeSettings.customAccentColor = raw.customAccentColor;
-          if (typeof raw.browserColor === 'string' && ['default', 'midnight', 'cyberpunk', 'forest', 'crimson', 'warm', 'ocean', 'sunset', 'custom'].includes(raw.browserColor)) safeSettings.browserColor = raw.browserColor as any;
-          if (typeof raw.customBrowserColor === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(raw.customBrowserColor)) safeSettings.customBrowserColor = raw.customBrowserColor;
-          setSettings(prev => ({ ...prev, ...safeSettings }));
-        }
-      } catch (err) {
-        console.error('Backup import error:', err);
-      }
-    };
-    reader.readAsText(file);
-  }, []);
+  // App data export & import (extracted to useAppDataBackup)
+  const { handleExportData, handleImportData } = useAppDataBackup({
+    bookmarks,
+    history,
+    settings,
+    setBookmarks,
+    setHistory,
+    setSettings,
+  });
 
   const handleCloseShare = useCallback(() => setIsShareOpen(false), []);
   const handleCloseSpotlight = useCallback(() => setIsSpotlightOpen(false), []);
@@ -1094,40 +939,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const handleExpandSidebar = useCallback(() => {
     setIsSidebarCollapsed(false);
     setIsHoverRevealing(false);
-  }, []);
-
-  const handleToggleExtension = useCallback(async (id: string) => {
-    const ext = extensions.find(e => e.id === id);
-    const nextEnabled = ext?.enabled === false ? true : false;
-    setExtensions(prev => prev.map(e => e.id === id ? { ...e, enabled: nextEnabled } : e));
-    try {
-      if (getElectronAPI()?.toggleExtension) {
-        await getElectronAPI()?.toggleExtension(id, nextEnabled);
-      }
-    } catch (e) {
-      console.error('Failed to toggle extension:', e);
-    }
-  }, [extensions]);
-
-  const handleRemoveExtension = useCallback(async (id: string) => {
-    const confirmed = await showConfirm({
-      title: 'Remove Extension',
-      message: 'Are you sure you want to remove this extension?',
-      confirmLabel: 'Remove',
-      cancelLabel: 'Cancel'
-    });
-    if (confirmed) {
-      try {
-        const res = await getElectronAPI()?.removeExtension?.(id);
-        if (res?.error) {
-          console.error('Failed to remove extension:', res.error);
-          return;
-        }
-        setExtensions(prev => prev.filter(e => e.id !== id));
-      } catch (e) {
-        console.error('Failed to remove extension:', e);
-      }
-    }
   }, []);
 
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
