@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Lenis from 'lenis';
 import 'lenis/dist/lenis.css';
+import { FluteProjectPreview } from './flute/ProjectPreview';
 import ManifestoHero from './components/ManifestoHero';
 import Navbar from './components/Navbar';
 import Hero from './components/Hero';
@@ -93,35 +94,37 @@ export default function App() {
   }, []);
 
   return (
-    <div
-      id="top"
-      className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white bg-[#0c0d12]"
-    >
-      {/* Floating Centered Kinetic SlideTabs Navbar */}
-      <Navbar visible={showNav} />
-
-      <ManifestoHero />
-
+    <FluteProjectPreview enabled={import.meta.env.DEV}>
       <div
-        className="relative w-full h-24 sm:h-36 -mt-1 pointer-events-none z-10 overflow-hidden bg-gradient-to-b from-[#171717] via-[#1a1c26] to-[#fcfbf9]"
-        aria-hidden="true"
+        id="top"
+        className="nova-page relative min-h-screen overflow-x-hidden selection:bg-[#4338ca] selection:text-white bg-[#0c0d12]"
       >
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-500/05 to-transparent" />
+        {/* Floating Centered Kinetic SlideTabs Navbar */}
+        <Navbar visible={showNav} />
+
+        <ManifestoHero />
+
+        <div
+          className="relative w-full h-24 sm:h-36 -mt-1 pointer-events-none z-10 overflow-hidden bg-gradient-to-b from-[#171717] via-[#1a1c26] to-[#fcfbf9]"
+          aria-hidden="true"
+        >
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-500/20 via-sky-500/05 to-transparent" />
+        </div>
+
+        {/* Main Light Canvas Section */}
+        <main id="main-content" className="relative z-10 bg-[#fcfbf9] pb-6">
+          <Hero />
+          <TrustPillars />
+          <FeatureBento />
+          <GithubStats />
+          <Benchmarks />
+          <Downloads />
+          <Faq />
+        </main>
+
+        {/* Deep Obsidian Sovereign Footer */}
+        <Footer />
       </div>
-
-      {/* Main Light Canvas Section */}
-      <main id="main-content" className="relative z-10 bg-[#fcfbf9] pb-6">
-        <Hero />
-        <TrustPillars />
-        <FeatureBento />
-        <GithubStats />
-        <Benchmarks />
-        <Downloads />
-        <Faq />
-      </main>
-
-      {/* Deep Obsidian Sovereign Footer */}
-      <Footer />
-    </div>
+    </FluteProjectPreview>
   );
 }

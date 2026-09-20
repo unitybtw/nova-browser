@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "id": "flagship-reveal",
+  "title": "Nova Browser — Flagship 3D Commercial",
+  "description": "Cinematic 3D commercial of Nova Browser featuring real browser UI, dramatic camera travel, focal rack-focus and English kinetic callouts.",
+  "definition": {
+    "scene": {
+      "version": 3,
+      "camera": {
+        "x": -180,
+        "y": -80,
+        "z": -180,
+        "perspective": 1400,
+        "rotateX": 12,
+        "rotateY": -22,
+        "rotateZ": 0
+      },
+      "focus": {
+        "distance": 1350,
+        "fStop": 5.6,
+        "focalLength": 85,
+        "maxBlur": 8
+      },
+      "nodes": [
+        {
+          "id": "browser-hero",
+          "transform": {
+            "x": 0,
+            "y": 0,
+            "z": 0,
+            "rotateX": 0,
+            "rotateY": 0,
+            "rotateZ": 0,
+            "scale": 1
+          }
+        }
+      ]
+    },
+    "motion": {
+      "durationMs": 7000,
+      "speed": 1.0,
+      "tracks": [
+        {
+          "target": { "kind": "camera" },
+          "property": "x",
+          "keyframes": [
+            { "timeMs": 0, "value": -180, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 110, "easing": "cinematic" },
+            { "timeMs": 5200, "value": -30, "easing": "cinematic" },
+            { "timeMs": 7000, "value": 0, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "camera" },
+          "property": "y",
+          "keyframes": [
+            { "timeMs": 0, "value": -80, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 35, "easing": "cinematic" },
+            { "timeMs": 5200, "value": -20, "easing": "cinematic" },
+            { "timeMs": 7000, "value": -35, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "camera" },
+          "property": "z",
+          "keyframes": [
+            { "timeMs": 0, "value": -180, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 380, "easing": "cinematic" },
+            { "timeMs": 5200, "value": 140, "easing": "cinematic" },
+            { "timeMs": 7000, "value": 50, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "camera" },
+          "property": "rotateX",
+          "keyframes": [
+            { "timeMs": 0, "value": 12, "easing": "cinematic" },
+            { "timeMs": 2800, "value": -5, "easing": "cinematic" },
+            { "timeMs": 5200, "value": 4, "easing": "cinematic" },
+            { "timeMs": 7000, "value": 6, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "camera" },
+          "property": "rotateY",
+          "keyframes": [
+            { "timeMs": 0, "value": -22, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 15, "easing": "cinematic" },
+            { "timeMs": 5200, "value": -7, "easing": "cinematic" },
+            { "timeMs": 7000, "value": -3, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "focus" },
+          "property": "distance",
+          "keyframes": [
+            { "timeMs": 0, "value": 1350, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 820, "easing": "cinematic" },
+            { "timeMs": 5200, "value": 1200, "easing": "cinematic" },
+            { "timeMs": 7000, "value": 1350, "easing": "cinematic" }
+          ]
+        },
+        {
+          "target": { "kind": "focus" },
+          "property": "fStop",
+          "keyframes": [
+            { "timeMs": 0, "value": 5.6, "easing": "cinematic" },
+            { "timeMs": 2800, "value": 2.2, "easing": "cinematic" },
+            { "timeMs": 5200, "value": 4.0, "easing": "cinematic" },
+            { "timeMs": 7000, "value": 5.0, "easing": "cinematic" }
+          ]
+        }
+      ]
+    },
+    "width": 1440,
+    "height": 920
+  }
+}
