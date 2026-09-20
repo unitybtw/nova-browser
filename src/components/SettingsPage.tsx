@@ -7,13 +7,15 @@ import { useLiveUnsplashPhoto, resolveUnsplashPhoto, getUnsplashThumbnailUrl } f
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
 
 import { backupCorruptData, safeParseArrayWithBackup, safeParseObjectWithBackup } from '../utils/safeStorage';
-import { showConfirm, showAlert } from '../utils/confirmDialog';
+import { showConfirm } from '../utils/confirmDialog';
 import { getLocale } from '../services/i18n';
 import { aiAgent } from '../services/aiAgent';
 import { TabAnimationPreviewBox } from './settings/TabAnimationPreviewBox';
 import { ToggleSwitch } from './settings/ToggleSwitch';
 import { UpdateWidget } from './settings/UpdateWidget';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './settings/BackgroundPreviewCard';
+import { ShortcutsSection } from './settings/ShortcutsSection';
+import { ExtensionsSection } from './settings/ExtensionsSection';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -293,8 +295,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
   const [isPurgingMemory, setIsPurgingMemory] = useState(false);
   const [purgedFeedback, setPurgedFeedback] = useState(false);
-  const [editingShortcut, setEditingShortcut] = useState<string | null>(null);
-  const [shortcutInputValue, setShortcutInputValue] = useState('');
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -416,8 +416,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     }
   };
 
-  const [extensions, setExtensions] = useState<any[]>([]);
-
   const fetchMcpStatus = useCallback(async () => {
     if ((window as any).electronAPI?.getMcpStatus) {
       const status = await (window as any).electronAPI.getMcpStatus();
@@ -434,11 +432,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if ((window as any).electronAPI?.getMcpToolSettings) {
       setDisabledTools(await (window as any).electronAPI.getMcpToolSettings());
     }
-    
-    // Fetch extensions
-    if ((window as any).electronAPI?.listExtensions) {
-      setExtensions(await (window as any).electronAPI.listExtensions() || []);
-    }
   }, []);
 
   useEffect(() => {
@@ -446,7 +439,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
     let cleanup: (() => void) | void;
     let cleanupStatus: (() => void) | void;
-    let cleanupExt: (() => void) | void;
     if ((window as any).electronAPI?.onMcpClientChanged) {
       cleanup = (window as any).electronAPI.onMcpClientChanged((_: any, data: any) => {
         setMcpStatus(prev => prev ? { ...prev, clientCount: data.count, clients: data.clients } : null);
@@ -457,18 +449,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         setMcpStatus(prev => prev ? { ...prev, running: isRunning } : { running: isRunning, port: 3020, clientCount: 0, clients: [] });
       });
     }
-    if ((window as any).electronAPI?.onExtensionChanged) {
-      cleanupExt = (window as any).electronAPI.onExtensionChanged(async () => {
-        if ((window as any).electronAPI?.listExtensions) {
-          const list = await (window as any).electronAPI.listExtensions();
-          setExtensions(list || []);
-        }
-      });
-    }
     return () => {
       if (typeof cleanup === 'function') cleanup();
       if (typeof cleanupStatus === 'function') cleanupStatus();
-      if (typeof cleanupExt === 'function') cleanupExt();
     };
   }, [fetchMcpStatus]);
 
@@ -517,39 +500,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if ((window as any).electronAPI?.setMcpToolEnabled) {
       await (window as any).electronAPI.setMcpToolEnabled(toolName, currentlyDisabled); // true means enable it, false means disable it
       fetchMcpStatus();
-    }
-  };
-
-  const handleToggleExtension = async (extId: string, currentEnabled: boolean) => {
-    try {
-      const nextState = !currentEnabled;
-      if ((window as any).electronAPI?.toggleExtension) {
-        await (window as any).electronAPI.toggleExtension(extId, nextState);
-      }
-      setExtensions(prev => prev.map(e => e.id === extId ? { ...e, enabled: nextState } : e));
-    } catch (e) {
-      console.error('Failed to toggle extension:', e);
-    }
-  };
-
-  const handleRemoveExtension = async (ext: any) => {
-    const confirmed = await showConfirm({
-      title: 'Remove Extension',
-      message: `Are you sure you want to remove "${ext.name}"?`,
-      confirmLabel: 'Remove',
-      cancelLabel: 'Cancel'
-    });
-    if (confirmed) {
-      try {
-        const res = await (window as any).electronAPI?.removeExtension?.(ext.id);
-        if (res?.error) {
-          console.error('Failed to remove extension:', res.error);
-          return;
-        }
-        setExtensions(prev => prev.filter(e => e.id !== ext.id));
-      } catch (e) {
-        console.error('Failed to remove extension:', e);
-      }
     }
   };
 
@@ -2113,306 +2063,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* SHORTCUTS */}
           {activeTab === 'shortcuts' && (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <section>
-                <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
-                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Keyboard Shortcuts</h2>
-                  <button 
-                    onClick={() => {
-                      try {
-                        localStorage.removeItem('shortcuts_customized');
-                        localStorage.setItem('shortcuts_v2_migrated', 'true');
-                      } catch (_) {}
-                      onUpdateSettings({ 
-                        shortcuts: {
-                          newTab: { key: 't', shift: false, meta: true },
-                          reopenTab: { key: 't', shift: true, meta: true },
-                          closeTab: { key: 'w', shift: false, meta: true },
-                          newIncognito: { key: 'n', shift: true, meta: true },
-                          reload: { key: 'r', shift: false, meta: true },
-                          omnibox: { key: 'k', shift: false, meta: true },
-                          bookmark: { key: 'd', shift: false, meta: true },
-                          history: { key: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')) ? 'y' : 'h', shift: false, meta: true },
-                          downloads: { key: 'j', shift: (typeof navigator !== 'undefined' && navigator.userAgent.includes('Mac')), meta: true },
-                          findInPage: { key: 'f', shift: false, meta: true },
-                        }
-                      });
-                    }}
-                    className="text-xs text-blue-500 hover:text-blue-600 font-medium"
-                  >
-                    Reset Defaults
-                  </button>
-                </div>
-                
-                <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 divide-y divide-slate-100 dark:divide-slate-700/50">
-                  {[
-                    { id: 'newTab', label: 'New Tab' },
-                    { id: 'reopenTab', label: 'Reopen Closed Tab' },
-                    { id: 'closeTab', label: 'Close Active Tab' },
-                    { id: 'newIncognito', label: 'New Incognito Window' },
-                    { id: 'reload', label: 'Reload Page' },
-                    { id: 'omnibox', label: 'Focus Address Bar' },
-                    { id: 'bookmark', label: 'Bookmark Page' },
-                    { id: 'history', label: 'Open History' },
-                    { id: 'downloads', label: 'Open Downloads' },
-                    { id: 'findInPage', label: 'Find in Page' },
-                  ].map(action => {
-                    const currentBinding = settings.shortcuts?.[action.id as keyof typeof settings.shortcuts] || { key: '?', meta: true };
-                    
-                    const formatBinding = (b: { key: string, shift?: boolean, meta?: boolean }) => {
-                      let str = '';
-                      if (b.meta) str += '⌘/Ctrl + ';
-                      if (b.shift) str += 'Shift + ';
-                      str += b.key.toUpperCase();
-                      return str;
-                    };
-
-                    const isEditing = editingShortcut === action.id;
-
-                    const handleSave = () => {
-                      if (shortcutInputValue.trim()) {
-                        const input = shortcutInputValue.trim();
-                        const newBinding = {
-                          key: input.toLowerCase(),
-                          shift: input.toLowerCase() !== input,
-                          meta: true
-                        };
-                        try {
-                          localStorage.setItem('shortcuts_customized', 'true');
-                          localStorage.setItem('shortcuts_v2_migrated', 'true');
-                        } catch (_) {}
-                        onUpdateSettings({
-                          shortcuts: {
-                            ...settings.shortcuts,
-                            [action.id]: newBinding
-                          } as any
-                        });
-                      }
-                      setEditingShortcut(null);
-                      setShortcutInputValue('');
-                    };
-
-                    return (
-                      <div key={action.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 group hover:bg-slate-50 dark:hover:bg-slate-700/20 rounded-xl transition-colors">
-                        <div>
-                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">{action.label}</p>
-                          <p className="text-xs text-slate-500">ID: {action.id}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs font-mono text-slate-500">⌘/Ctrl +</span>
-                              <input 
-                                type="text"
-                                autoFocus
-                                maxLength={2}
-                                value={shortcutInputValue}
-                                onChange={e => setShortcutInputValue(e.target.value)}
-                                onKeyDown={e => {
-                                  if (e.key === 'Enter') handleSave();
-                                  if (e.key === 'Escape') setEditingShortcut(null);
-                                }}
-                                onBlur={handleSave}
-                                placeholder="Key..."
-                                className="w-16 px-2 py-1 bg-white dark:bg-slate-900 border border-blue-500 rounded-lg text-xs font-mono outline-none"
-                              />
-                            </div>
-                          ) : (
-                            <>
-                              <div className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-mono font-medium text-slate-600 dark:text-slate-300 shadow-sm min-w-[100px] text-center">
-                                {formatBinding(currentBinding)}
-                              </div>
-                              <button
-                                onClick={() => {
-                                  setShortcutInputValue(currentBinding.shift ? currentBinding.key.toUpperCase() : currentBinding.key.toLowerCase());
-                                  setEditingShortcut(action.id);
-                                }}
-                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
-                                title="Edit Shortcut"
-                              >
-                                <Keyboard className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            </div>
+            <ShortcutsSection shortcuts={settings.shortcuts} onUpdateSettings={onUpdateSettings} />
           )}
 
           {activeTab === 'extensions' && (
-            <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <section className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
-                    <div className="p-2 bg-accent/20 dark:bg-accent/20 text-accent-hover dark:text-accent rounded-xl shadow-inner">
-                      <Puzzle className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
-                        <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
-                          Beta
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Manage and configure your browser extensions.</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={async () => {
-                        try {
-                          if ((window as any).electronAPI?.selectExtensionFolder && (window as any).electronAPI?.installExtension) {
-                            const result = await (window as any).electronAPI.selectExtensionFolder();
-                            if (!result.canceled && result.folderPath) {
-                              const installRes = await (window as any).electronAPI.installExtension(result.folderPath);
-                              if (installRes.error) {
-                                void showAlert({ title: 'Extensions', message: 'Failed to load extension: ' + installRes.error });
-                              } else {
-                                const list = await (window as any).electronAPI.listExtensions();
-                                setExtensions(list || []);
-                              }
-                            }
-                          }
-                        } catch (e: any) {
-                          console.error(e);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <Upload className="w-3.5 h-3.5" />
-                      Load Unpacked
-                    </button>
-                    <button
-                      onClick={() => {
-                        window.open('https://chromewebstore.google.com/', '_blank');
-                      }}
-                      className="px-3 py-1.5 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      Chrome Web Store
-                    </button>
-                  </div>
-                </div>
-
-                {/* Extension Management */}
-                {(!extensions || extensions.length === 0) ? (
-                  <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-8 flex flex-col items-center justify-center text-center space-y-4 shadow-xs">
-                    <div className="w-16 h-16 bg-slate-100 dark:bg-slate-900 rounded-full flex items-center justify-center text-slate-400">
-                      <Puzzle className="w-8 h-8" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-medium text-slate-800 dark:text-slate-200">No extensions installed</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mt-2">
-                        Install extensions from the Chrome Web Store or load an unpacked extension folder from your machine.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 pt-2">
-                      <button
-                        onClick={() => window.open('https://chromewebstore.google.com/', '_blank')}
-                        className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-semibold hover:opacity-95 shadow-md transition-all flex items-center gap-2 cursor-pointer"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                        Explore Chrome Web Store
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
-                    <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-                      {extensions.map((ext: any) => (
-                        <div key={ext.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                          <div className="flex items-center gap-4 flex-1 min-w-0">
-                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/50 dark:border-white/5">
-                              {ext.iconData ? (
-                                <img src={ext.iconData} alt={ext.name} className="w-7 h-7 object-contain" />
-                              ) : (
-                                <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm font-bold uppercase">
-                                  {ext.name ? ext.name.charAt(0) : <Puzzle className="w-5 h-5" />}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm truncate">{ext.name}</span>
-                                {ext.version && (
-                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-mono">
-                                    v{ext.version}
-                                  </span>
-                                )}
-                                {ext.enabled !== false ? (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-medium">
-                                    Active
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20 font-medium">
-                                    Disabled
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{ext.description || 'No description available'}</div>
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono mt-1 select-all">ID: {ext.id}</div>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                            {/* Toggle Extension Enable/Disable */}
-                            <button
-                              onClick={() => handleToggleExtension(ext.id, ext.enabled !== false)}
-                              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ext.enabled !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
-                              title={ext.enabled !== false ? 'Disable Extension' : 'Enable Extension'}
-                            >
-                              <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${ext.enabled !== false ? 'translate-x-5' : 'translate-x-0'}`} />
-                            </button>
-
-                            {ext.popupUrl && (
-                              <button
-                                onClick={(e) => {
-                                  const rect = e.currentTarget.getBoundingClientRect();
-                                  const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
-                                  const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                                  if ((window as any).electronAPI?.openExtensionPopup) {
-                                    (window as any).electronAPI.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-                                  }
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Open Extension Popup"
-                              >
-                                <Play className="w-3.5 h-3.5 fill-current" />
-                                <span>Popup</span>
-                              </button>
-                            )}
-                            {ext.optionsUrl && (
-                              <button
-                                onClick={() => {
-                                  const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
-                                  window.open(`chrome-extension://${ext.id}/${cleanOptions}`, '_blank');
-                                }}
-                                className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
-                                title="Open Options"
-                              >
-                                <Settings className="w-3.5 h-3.5" />
-                                <span>Options</span>
-                              </button>
-                            )}
-                            <button 
-                              onClick={() => handleRemoveExtension(ext)}
-                              className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                              title={`Remove ${ext.name}`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </section>
-            </div>
+            <ExtensionsSection />
           )}
 
         </div>
