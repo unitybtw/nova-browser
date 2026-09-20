@@ -42,6 +42,7 @@ import { isValidProxyUrl } from './utils/proxyValidation';
 import { matchesShortcut } from './utils/keyboardShortcuts';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useWorkspaces } from './hooks/useWorkspaces';
+import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { getElectronAPI } from './utils/electronBridge';
 
 // Performance: Lazy load heavy modals and panels with resilient retry mechanism
@@ -584,28 +585,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // Sync settings with local storage and backend (debounced 500ms like tabs:
-  // color picker drags must not write localStorage / IPC per pixel)
-  useEffect(() => {
-    if (demoParams.isDemo) return;
-    const timer = setTimeout(() => {
-      try {
-        const serialized = JSON.stringify(settings);
-        localStorage.setItem('user_settings', serialized);
-        getElectronAPI()?.storeSet?.('user_settings', serialized);
-      } catch (err) {
-        logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
-      }
-      if (window.electronAPI?.setPrivacyShield) {
-        window.electronAPI.setPrivacyShield(settings.privacyShield);
-      }
-      if (window.electronAPI?.setDoNotTrack) {
-        getElectronAPI()?.setDoNotTrack(settings.doNotTrack ?? true);
-      }
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [settings, demoParams.isDemo]);
-
   useEffect(() => {
     const savedVpn = localStorage.getItem('nova_vpn');
     if (savedVpn) {
@@ -747,72 +726,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     flushBookmarks
   } = useBookmarks({ isDemo: demoParams.isDemo });
 
-  // Immediate flush on beforeunload to prevent session loss on abrupt browser close
-  // (also flushes debounced settings/bookmarks/workspaces stores)
-  useEffect(() => {
-    if (demoParams.isDemo) return;
-    const handleBeforeUnload = () => {
-      try {
-        const sessionTabs = tabsRef.current.filter(t => !t.isIncognito);
-        const serializedTabs = JSON.stringify(sessionTabs);
-        localStorage.setItem('nova_session_tabs', serializedTabs);
-        getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
-        if (activeTabIdRef.current) {
-          localStorage.setItem('active_tab_session', activeTabIdRef.current);
-          getElectronAPI()?.storeSet?.('active_tab_session', activeTabIdRef.current);
-        }
-        const serializedFolders = JSON.stringify(foldersRef.current);
-        localStorage.setItem('folders_session', serializedFolders);
-        getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
-
-        const serializedSettings = JSON.stringify(settingsRef.current);
-        localStorage.setItem('user_settings', serializedSettings);
-        getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
-
-        const serializedBookmarks = JSON.stringify(bookmarksRef.current);
-        localStorage.setItem('bookmarks', serializedBookmarks);
-        getElectronAPI()?.storeSet?.('bookmarks', serializedBookmarks);
-
-        const serializedWorkspaces = JSON.stringify(workspacesRef.current);
-        localStorage.setItem('workspaces_session', serializedWorkspaces);
-        getElectronAPI()?.storeSet?.('workspaces_session', serializedWorkspaces);
-
-        localStorage.setItem('active_workspace_session', activeWorkspaceIdRef.current);
-        flushBookmarks();
-        flushHistory();
-      } catch (err) {
-        logger.warn('App:Lifecycle', 'Failed to save session state before unload', err);
-      }
-    };
-    const handleVisibilityHidden = () => {
-      if (document.visibilityState === 'hidden') handleBeforeUnload();
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityHidden);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityHidden);
-    };
-  }, [flushHistory, demoParams.isDemo]);
-
-  // Save session whenever tabs changes (Excluding Incognito Tabs)
-  useEffect(() => {
-    if (demoParams.isDemo) return;
-    const sessionTabs = tabs
-      .filter(t => !t.isIncognito);
-    const timer = setTimeout(() => {
-      try {
-        const serialized = JSON.stringify(sessionTabs);
-        localStorage.setItem('nova_session_tabs', serialized);
-        getElectronAPI()?.storeSet?.('session_tabs', serialized);
-      } catch (err) {
-        logger.warn('App:Session', 'Failed to persist session_tabs to storage', err);
-      }
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [tabs, demoParams.isDemo]);
+  // Session persistence writes (debounced settings/tabs/active-tab + beforeunload
+  // flush-all) extracted to useSessionPersistence — order/timing/keys preserved 1:1.
+  useSessionPersistence({
+    tabs,
+    settings,
+    activeTabId,
+    tabsRef,
+    activeTabIdRef,
+    foldersRef,
+    settingsRef,
+    bookmarksRef,
+    workspacesRef,
+    activeWorkspaceIdRef,
+    flushHistory,
+    flushBookmarks,
+    isDemo: demoParams.isDemo,
+  });
 
   // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
   useEffect(() => {
@@ -832,18 +762,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       setActiveTabId(tabs[0].id);
     }
   }, [tabs, activeTabId]);
-
-  useEffect(() => {
-    if (demoParams.isDemo) return;
-    const timer = setTimeout(() => {
-      try {
-        localStorage.setItem('active_tab_session', activeTabId);
-      } catch (err) {
-        logger.warn('App:Session', 'Failed to persist active_tab_session to storage', err);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [activeTabId, demoParams.isDemo]);
 
   // Apply Theme Mode & Custom Accent
   useEffect(() => {
