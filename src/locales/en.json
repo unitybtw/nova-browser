@@ -172,6 +172,16 @@
     "githubReleases": "GitHub Releases",
     "versionsTimeline": "Versions Timeline",
     "searchPlaceholder": "Search in changes...",
-    "noChanges": "No changes found matching the selected filter."
+    "noChanges": "No changes found matching the selected filter.",
+    "liveSync": "GitHub Live Sync",
+    "releasesCount": "{count} releases",
+    "current": "Current",
+    "keyHighlights": "Key Highlights",
+    "allChanges": "All Changes",
+    "categoryFeature": "Feature",
+    "categoryFix": "Fix",
+    "categorySecurity": "Security",
+    "categoryPerformance": "Performance",
+    "categoryImprovement": "Improvement"
   }
 }

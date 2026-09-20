@@ -278,7 +278,7 @@ class NovaSyncService {
   private ensureSupabaseListener(): Promise<void> {
     if (!this.supabaseInitPromise) {
       this.supabaseInitPromise = this.initSupabaseListener().catch(e => {
-        console.warn('[NovaSync] Supabase listener init skipped:', e);
+        logger.warn('SyncService:ensureSupabaseListener', 'Supabase listener init skipped', e);
         this.supabaseInitPromise = null;
       });
     }
@@ -332,7 +332,7 @@ class NovaSyncService {
     try {
       if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
     } catch {
-      console.warn(`[NovaSync] sessionStorage unavailable — "${key}" kept memory-only for this session.`);
+      logger.warn('SyncService:writeSessionValue', `sessionStorage unavailable — "${key}" kept memory-only for this session.`);
     }
   }
 
@@ -382,7 +382,7 @@ class NovaSyncService {
               // session-scoped storage and scrub it from localStorage.
               this.writeSessionValue(STORAGE_KEYS.USER, legacy);
               localStorage.removeItem(STORAGE_KEYS.USER);
-              console.warn('[NovaSync] Migrated legacy plaintext user profile from localStorage to session-only storage.');
+              logger.warn('SyncService:readStoredUser', 'Migrated legacy plaintext user profile from localStorage to session-only storage.');
             }
             return parsed;
           }
@@ -420,7 +420,7 @@ class NovaSyncService {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEYS.USER);
       }
-      console.warn('[NovaSync] Web build without secure store: user profile kept session-only, not persisted.');
+      logger.warn('SyncService:writeStoredUser', 'Web build without secure store: user profile kept session-only, not persisted.');
     }
   }
 
@@ -443,7 +443,7 @@ class NovaSyncService {
           // never linger as plaintext in localStorage.
           this.writeSessionValue(STORAGE_KEYS.TOKEN, legacy);
           localStorage.removeItem(STORAGE_KEYS.TOKEN);
-          console.warn('[NovaSync] Migrated legacy plaintext auth token from localStorage to session-only storage.');
+          logger.warn('SyncService:readStoredToken', 'Migrated legacy plaintext auth token from localStorage to session-only storage.');
         }
         return legacy;
       }
@@ -510,7 +510,7 @@ class NovaSyncService {
               // scrub it from localStorage.
               this.writeSessionValue(STORAGE_KEYS.USER_REGISTRY, legacy);
               localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
-              console.warn('[NovaSync] Migrated legacy plaintext account registry from localStorage to session-only storage.');
+              logger.warn('SyncService:readUserRegistry', 'Migrated legacy plaintext account registry from localStorage to session-only storage.');
             }
             return parsed;
           }
@@ -539,7 +539,7 @@ class NovaSyncService {
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEYS.USER_REGISTRY);
       }
-      console.warn('[NovaSync] Web build without secure store: account registry kept session-only, not persisted.');
+      logger.warn('SyncService:writeUserRegistry', 'Web build without secure store: account registry kept session-only, not persisted.');
     }
   }
 
@@ -602,7 +602,7 @@ class NovaSyncService {
           }
         }
       } catch (e) {
-        console.warn('[NovaSync] Failed to restore master key from secure store:', e);
+        logger.warn('SyncService:restoreMasterKeysForUser', 'Failed to restore master key from secure store', e);
       }
     })();
   }
@@ -672,7 +672,7 @@ class NovaSyncService {
           this.lastSyncedAt = parsed.lastSyncedAt || null;
         }
       } catch (e) {
-        console.error('[NovaSync] Failed to restore sync status:', e);
+        logger.error('SyncService:loadSession', 'Failed to restore sync status', e);
       }
     }
 
@@ -700,11 +700,11 @@ class NovaSyncService {
         this.currentUser = null;
         this.token = null;
         this.removeSessionValue(STORAGE_KEYS.USER);
-        console.warn('[NovaSync] Stored profile found without an auth token — staying logged out.');
+        logger.warn('SyncService:restoreSessionAsync', 'Stored profile found without an auth token — staying logged out.');
         this.notify();
       }
     } catch (e) {
-      console.error('[NovaSync] Failed to restore sync session:', e);
+      logger.error('SyncService:restoreSessionAsync', 'Failed to restore sync session', e);
     }
   }
 
@@ -728,7 +728,7 @@ class NovaSyncService {
           };
           this.token = session.access_token;
           void this.writeStoredUser(this.currentUser).catch(err => {
-            console.warn('[NovaSync] Failed to persist user profile:', err);
+            logger.warn('SyncService:initSupabaseListener', 'Failed to persist user profile', err);
           });
           // The JWT is persisted by supabase-js through the secure storage
           // adapter — deliberately no localStorage token mirror here.
@@ -740,7 +740,7 @@ class NovaSyncService {
         }
       });
     } catch (e) {
-      console.warn('[NovaSync] Supabase listener init skipped:', e);
+      logger.warn('SyncService:initSupabaseListener', 'Supabase listener init skipped', e);
     }
   }
 
@@ -779,7 +779,7 @@ class NovaSyncService {
         try {
           fn();
         } catch (e) {
-          console.warn('[NovaSync] Remote sync listener failed:', e);
+          logger.warn('SyncService:scheduleRealtimeNotify', 'Remote sync listener failed', e);
         }
       });
     }, 1000);
@@ -835,7 +835,7 @@ class NovaSyncService {
       iv = base64ToBytes(ivStr);
       encryptedData = base64ToBytes(ciphertext);
     } catch (err) {
-      console.error('[NovaSync] E2EE decryption failed:', err);
+      logger.error('SyncService:decryptPasswords', 'E2EE decryption failed', err);
       throw new Error('Incorrect master password or corrupted sync payload');
     }
 
@@ -860,10 +860,10 @@ class NovaSyncService {
           legacyKey,
           encryptedData
         );
-        console.info('[NovaSync] Password blob decrypted with legacy PBKDF2 parameters (100k)');
+        logger.info('SyncService:decryptPasswords', 'Password blob decrypted with legacy PBKDF2 parameters (100k)');
         return JSON.parse(new TextDecoder().decode(decrypted));
       } catch (legacyErr) {
-        console.error('[NovaSync] E2EE decryption failed:', legacyErr);
+        logger.error('SyncService:decryptPasswords', 'E2EE decryption failed', legacyErr);
         throw new Error('Incorrect master password or corrupted sync payload');
       }
     }
@@ -947,7 +947,7 @@ class NovaSyncService {
         try {
           await supabase.auth.updateUser({ data: { sync_key_salt: saltB64 } });
         } catch (metaErr) {
-          console.warn('[NovaSync] Could not persist sync key salt to user metadata:', metaErr);
+          logger.warn('SyncService:register', 'Could not persist sync key salt to user metadata', metaErr);
         }
         await this.acquireSyncKey(password, saltB64);
         this.persistMasterKeyBestEffort();
@@ -960,7 +960,7 @@ class NovaSyncService {
         this.notify();
         return newUser;
       } catch (err: unknown) {
-        console.warn('[NovaSync] Supabase registration failed:', err);
+        logger.warn('SyncService:register', 'Supabase registration failed', err);
         // Never silently downgrade to a local account when Supabase IS
         // configured: syncData() rejects non-UUID ids, so the user would
         // believe cloud sync works and then hit errors on first sync.
@@ -1061,7 +1061,7 @@ class NovaSyncService {
           try {
             await supabase.auth.updateUser({ data: { sync_key_salt: saltB64 } });
           } catch (metaErr) {
-            console.warn('[NovaSync] Could not persist sync key salt to user metadata:', metaErr);
+            logger.warn('SyncService:login', 'Could not persist sync key salt to user metadata', metaErr);
           }
         }
         // Memory-only fallback so envelopes still encrypted under the raw
@@ -1078,7 +1078,7 @@ class NovaSyncService {
         this.notify();
         return loggedUser;
       } catch (err: unknown) {
-        console.warn('[NovaSync] Supabase login failed:', err);
+        logger.warn('SyncService:login', 'Supabase login failed', err);
         // Symmetric with register(): do not fall through to the local
         // zero-config registry when Supabase IS configured — that would
         // silently sign the user into a non-syncing local account.
@@ -1182,7 +1182,7 @@ class NovaSyncService {
       ...prefs
     };
     void this.writeStoredUser(this.currentUser).catch(err => {
-      console.warn('[NovaSync] Failed to persist preference change:', err);
+      logger.warn('SyncService:updatePreferences', 'Failed to persist preference change', err);
     });
     this.notify();
   }
@@ -1254,14 +1254,14 @@ class NovaSyncService {
 
         if (error) {
           remoteUnusable = true;
-          console.warn('[NovaSync] Failed to fetch remote vault:', error);
+          logger.warn('SyncService:syncData', 'Failed to fetch remote vault', error);
         } else if (data && !data.envelope) {
           // A row exists but carries no envelope (legacy schema: plain
           // bookmarks/history columns). It must NOT be treated as "no remote
           // data", or the local-only merge below would be pushed and clobber
           // the legacy remote state.
           remoteUnusable = true;
-          console.warn('Remote vault row has no envelope (legacy format) — aborting push');
+          logger.warn('SyncService:syncData', 'Remote vault row has no envelope (legacy format) — aborting push');
         } else if (data?.envelope) {
           try {
             remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, this.masterKey);
@@ -1275,20 +1275,20 @@ class NovaSyncService {
               try {
                 remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, legacyKey);
                 this.usedLegacyKeyThisSync = true;
-                console.info('[NovaSync] Vault decrypted with legacy key; re-encrypting under dedicated sync key');
+                logger.info('SyncService:syncData', 'Vault decrypted with legacy key; re-encrypting under dedicated sync key');
               } catch {
                 remoteUnusable = true;
-                console.warn('[NovaSync] Failed to decrypt remote vault with current and legacy keys — aborting push');
+                logger.warn('SyncService:syncData', 'Failed to decrypt remote vault with current and legacy keys — aborting push');
               }
             } else {
               remoteUnusable = true;
-              console.warn('[NovaSync] Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
+              logger.warn('SyncService:syncData', 'Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
             }
           }
         }
       } catch (e) {
         remoteUnusable = true;
-        console.warn('[NovaSync] Remote vault lookup failed:', e);
+        logger.warn('SyncService:syncData', 'Remote vault lookup failed', e);
       }
 
       if (remoteUnusable) {
@@ -1391,10 +1391,10 @@ class NovaSyncService {
                 });
                 mergedPasswords = Array.from(passMap.values());
               } catch (legacyErr) {
-                console.warn('[NovaSync] Skipping password decrypt (current and legacy keys failed):', legacyErr);
+                logger.warn('SyncService:syncData', 'Skipping password decrypt (current and legacy keys failed)', legacyErr);
               }
             } else {
-              console.warn('[NovaSync] Skipping password decrypt:', e);
+              logger.warn('SyncService:syncData', 'Skipping password decrypt', e);
             }
           }
         }

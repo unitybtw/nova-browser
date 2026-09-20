@@ -172,6 +172,16 @@
     "githubReleases": "GitHub Sürümleri",
     "versionsTimeline": "Sürümler Zaman Çizelgesi",
     "searchPlaceholder": "Değişikliklerde ara...",
-    "noChanges": "Seçili filtreyle eşleşen değişiklik bulunamadı."
+    "noChanges": "Seçili filtreyle eşleşen değişiklik bulunamadı.",
+    "liveSync": "GitHub Canlı Eşitleme",
+    "releasesCount": "{count} sürüm",
+    "current": "Güncel",
+    "keyHighlights": "Öne Çıkanlar",
+    "allChanges": "Tüm Değişiklikler",
+    "categoryFeature": "Özellik",
+    "categoryFix": "Düzeltme",
+    "categorySecurity": "Güvenlik",
+    "categoryPerformance": "Performans",
+    "categoryImprovement": "İyileştirme"
   }
 }

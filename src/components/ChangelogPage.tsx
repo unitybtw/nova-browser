@@ -79,35 +79,50 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
     switch (cat) {
       case 'feature':
         return {
-          label: 'Feature',
+          label: t('changelog.categoryFeature'),
           icon: Sparkles,
           className: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20'
         };
       case 'security':
         return {
-          label: 'Security',
+          label: t('changelog.categorySecurity'),
           icon: ShieldCheck,
           className: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
         };
       case 'fix':
         return {
-          label: 'Fix',
+          label: t('changelog.categoryFix'),
           icon: Bug,
           className: 'bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/20'
         };
       case 'performance':
         return {
-          label: 'Performance',
+          label: t('changelog.categoryPerformance'),
           icon: Zap,
           className: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20'
         };
       case 'improvement':
       default:
         return {
-          label: 'Improvement',
+          label: t('changelog.categoryImprovement'),
           icon: CheckCircle2,
           className: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20'
         };
+    }
+  };
+
+  const getFilterLabel = (cat: CategoryFilter) => {
+    switch (cat) {
+      case 'all':
+        return t('changelog.allChanges');
+      case 'feature':
+        return t('changelog.categoryFeature');
+      case 'fix':
+        return t('changelog.categoryFix');
+      case 'security':
+        return t('changelog.categorySecurity');
+      case 'performance':
+        return t('changelog.categoryPerformance');
     }
   };
 
@@ -130,7 +145,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               {isLive && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                   <Globe className="w-2.5 h-2.5" />
-                  <span>GitHub Live Sync</span>
+                  <span>{t('changelog.liveSync')}</span>
                 </span>
               )}
             </div>
@@ -146,7 +161,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
             <button
               onClick={() => loadData(true)}
               disabled={isLoading}
-              title="Check GitHub for latest release notes"
+              title={t('changelog.syncNotes')}
               className="px-3 py-2 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-500' : ''}`} />
@@ -183,7 +198,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
               {t('changelog.versionsTimeline')}
             </span>
             <span className="text-[11px] text-slate-400 font-mono">
-              {releases.length} releases
+              {t('changelog.releasesCount', { count: releases.length })}
             </span>
           </div>
 
@@ -208,7 +223,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                     <div className="flex items-center gap-1.5">
                       {isInstalled && (
                         <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          Current
+                          {t('changelog.current')}
                         </span>
                       )}
                       {release.badge && !isInstalled && (
@@ -244,7 +259,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                     </h2>
                     {currentRelease.version === currentVersion && (
                       <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        Installed & Active
+                        {t('changelog.current')}
                       </span>
                     )}
                   </div>
@@ -263,7 +278,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                   <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/30">
                     <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 mb-2.5 flex items-center gap-1.5">
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>Key Highlights</span>
+                      <span>{t('changelog.keyHighlights')}</span>
                     </div>
                     <ul className="space-y-1.5">
                       {currentRelease.highlights.map((highlight, idx) => (
@@ -291,7 +306,7 @@ export const ChangelogPage: React.FC<ChangelogPageProps> = ({
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                       }`}
                     >
-                      {cat === 'all' ? 'All Changes' : cat}
+                      {getFilterLabel(cat)}
                     </button>
                   ))}
                 </div>

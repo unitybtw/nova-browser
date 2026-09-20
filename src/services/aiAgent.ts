@@ -609,7 +609,7 @@ class AIAgent {
         cb({ ...this.lastStatus });
       } catch (e) {
         // A faulty subscriber must never break the agent loop
-        console.error('[AI Agent] Status subscriber threw:', e);
+        logger.error('AIAgent:emitStatus', 'Status subscriber threw', e);
       }
     });
   }
@@ -621,7 +621,7 @@ class AIAgent {
       try {
         this.engine.interruptGenerate();
       } catch (e) {
-        console.warn('[AI Agent] interruptGenerate error:', e);
+        logger.warn('AIAgent:interrupt', 'interruptGenerate error', e);
       }
     }
     this.emitStatus('idle');
@@ -722,7 +722,7 @@ class AIAgent {
 
     this.idleParkTimer = setTimeout(() => {
       if (this.lastStatus.state === 'idle' && !this.isInitializing) {
-        this.parkModel().catch(err => console.warn('[AI Agent] Auto-park error:', err));
+        this.parkModel().catch(err => logger.warn('AIAgent:resetIdleParkTimer', 'Auto-park error', err));
       }
     }, mins * 60 * 1000);
   }
@@ -771,7 +771,7 @@ class AIAgent {
       try {
         await this.engine.unload?.();
       } catch (e) {
-        console.warn('[AI Agent] Engine unload warning:', e);
+        logger.warn('AIAgent:unload', 'Engine unload warning', e);
       }
       this.engine = null;
     }
@@ -779,7 +779,7 @@ class AIAgent {
       try {
         this.worker.terminate();
       } catch (e) {
-        console.warn('[AI Agent] Worker termination error:', e);
+        logger.warn('AIAgent:unload', 'Worker termination error', e);
       }
       this.worker = null;
     }
@@ -1264,7 +1264,7 @@ CRITICAL RULES:
       this.resetIdleParkTimer();
 
     } catch (err: any) {
-      console.error("Failed to initialize AI Engine:", err);
+      logger.error('AIAgent:initEngine', 'Failed to initialize AI Engine', err);
       if (this.worker) {
         try { this.worker.terminate(); } catch (_) {}
         this.worker = null;
@@ -1339,7 +1339,7 @@ CRITICAL RULES:
         args = toolCall.function.arguments;
       }
     } catch (e) {
-      console.error('[AI Agent] Failed to parse tool call arguments:', e);
+      logger.error('AIAgent:handleToolCall', 'Failed to parse tool call arguments', e);
       args = {};
     }
     if (!args || typeof args !== 'object') {
@@ -1449,7 +1449,7 @@ CRITICAL RULES:
           }
         } catch (e) {
           // Element inventory is best-effort; page text alone is still useful
-          console.warn('[AI Agent] DOM scan failed:', e);
+          logger.warn('AIAgent:handleToolCall', 'DOM scan failed', e);
         }
 
         result = { success: true, text: text + elementsSection };
@@ -1461,7 +1461,7 @@ CRITICAL RULES:
         try {
           parsed = typeof data === 'string' ? JSON.parse(data) : (data ?? {});
         } catch (e) {
-          console.warn('[AI Agent] Failed to parse get_page_url result:', e);
+          logger.warn('AIAgent:handleToolCall', 'Failed to parse get_page_url result', e);
           parsed = {};
         }
         result = { success: true, ...parsed };
@@ -1926,7 +1926,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "speak_text") {
         const { text, lang = 'tr-TR' } = args;
-        tts.speak(text, lang).catch(console.error);
+        tts.speak(text, lang).catch((err) => logger.error('AIAgent:handleToolCall', 'TTS speak failed', err));
         result = { success: true, speaking: true, chars: text.length };
       }
 
@@ -2064,12 +2064,12 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         }
         // Empty constrained output: treat as a soft failure and retry via the
         // legacy path below rather than burning a corrective round-trip.
-        console.warn('[AI Agent] Constrained decoding returned empty output; using legacy path.');
+        logger.warn('AIAgent:generateAgentTurn', 'Constrained decoding returned empty output; using legacy path.');
       } catch (e) {
         if (!isActive()) {
           return { text: 'Islem durduruldu.', constrained: false };
         }
-        console.warn('[AI Agent] Constrained decoding failed; falling back to free-text:', e);
+        logger.warn('AIAgent:generateAgentTurn', 'Constrained decoding failed; falling back to free-text', e);
         this.constrainedUnsupported = true;
       }
     }
@@ -2364,7 +2364,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         const executeTool = async (name: string, args: any, assistantEcho: string): Promise<void> => {
           const sig = `${name}:${JSON.stringify(args || {})}`;
           if (executedToolSignatures.includes(sig)) {
-            console.warn(`[AI Agent] Repeated tool call detected: ${sig}. Forcing final answer.`);
+            logger.warn('AIAgent:chat', `Repeated tool call detected: ${name}. Forcing final answer.`);
             internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
             internalMessages.push({
               role: 'user',
@@ -2378,7 +2378,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           if (name === 'auto_fill_form') {
             const hasFormIntent = /(form|doldur|kayıt|giris|input|fill)/i.test(userQuery);
             if (!hasFormIntent) {
-              console.warn('[AI Agent] auto_fill_form hallucinated on general conversation; prompting reply.');
+              logger.warn('AIAgent:chat', 'auto_fill_form hallucinated on general conversation; prompting reply.');
               internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
               internalMessages.push({
                 role: 'user',
@@ -2533,7 +2533,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       
       return result;
     } catch (e) {
-      console.warn('[aiAgent] Summarize failed, falling back to clean text extraction:', e);
+      logger.warn('AIAgent:summarize', 'Summarize failed, falling back to clean text extraction', e);
       throw e;
     } finally {
       this.resetIdleParkTimer();
