@@ -13,7 +13,6 @@
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@number-flow/react": "^0.6.2",
     "@tailwindcss/vite": "^4.0.0",
-    "@webprodigies/flute": "^0.1.2",
     "clsx": "^2.1.1",
     "framer-motion": "^12.4.7",
     "gsap": "^3.15.0",
@@ -29,7 +28,6 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.4",
-    "playwright": "^1.63.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.5"
   }
