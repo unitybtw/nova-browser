@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Cpu } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Download, Eye, Lock, Cpu } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
@@ -39,6 +39,114 @@ const MAX_PENDING_FILES = 4;
 const MAX_TEXT_FILE_BYTES = 256 * 1024;
 /** Read-time truncation budget; the engine truncates further per file. */
 const TEXT_FILE_READ_CAP_CHARS = 200 * 1024;
+
+interface ModelPickerListProps {
+  selectedModelId: string;
+  onSelect: (modelId: string) => void;
+}
+
+function ModelPickerList({ selectedModelId, onSelect }: ModelPickerListProps) {
+  const models = AVAILABLE_AI_MODELS;
+  const selectedIndex = Math.max(0, models.findIndex(model => model.id === selectedModelId));
+  const itemRefs = useRef(new Map<number, HTMLButtonElement>());
+
+  const selectRelative = (direction: -1 | 1, moveFocus = false) => {
+    const nextIndex = (selectedIndex + direction + models.length) % models.length;
+    onSelect(models[nextIndex].id);
+    if (moveFocus) {
+      requestAnimationFrame(() => itemRefs.current.get(nextIndex)?.focus());
+    }
+  };
+
+  return (
+    <div className="min-w-0" role="radiogroup" aria-label="Choose an AI model">
+      <div className="flex flex-col gap-2">
+        {models.map((model, index) => {
+          const isSelected = index === selectedIndex;
+          return (
+            <motion.button
+              key={model.id}
+              type="button"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${model.name}, ${model.size}, ${model.description}`}
+              tabIndex={isSelected ? 0 : -1}
+              ref={element => {
+                if (element) itemRefs.current.set(index, element);
+                else itemRefs.current.delete(index);
+              }}
+              onClick={() => onSelect(model.id)}
+              onKeyDown={event => {
+                const key = event.key;
+                const direction =
+                  key === 'ArrowDown' || key === 'ArrowRight' ? 1
+                  : key === 'ArrowUp' || key === 'ArrowLeft' ? -1 : 0;
+                if (key === 'Home') {
+                  event.preventDefault();
+                  onSelect(models[0].id);
+                  requestAnimationFrame(() => itemRefs.current.get(0)?.focus());
+                  return;
+                }
+                if (key === 'End') {
+                  event.preventDefault();
+                  onSelect(models[models.length - 1].id);
+                  requestAnimationFrame(() => itemRefs.current.get(models.length - 1)?.focus());
+                  return;
+                }
+                if (!direction) return;
+                event.preventDefault();
+                selectRelative(direction as -1 | 1, true);
+              }}
+              initial={false}
+              whileTap={{ scale: 0.985 }}
+              className={`flex w-full min-w-0 items-start gap-3 rounded-2xl border p-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ${
+                isSelected
+                  ? 'border-accent/70 bg-accent/[0.07] shadow-[0_10px_24px_-18px_rgba(59,130,246,0.9)] dark:bg-accent/10'
+                  : 'border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700/70 dark:bg-slate-800/60 dark:hover:border-slate-600 dark:hover:bg-slate-800'
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition-colors ${
+                  isSelected
+                    ? 'bg-accent text-white'
+                    : 'border-2 border-slate-300 dark:border-slate-600'
+                }`}
+              >
+                {isSelected && <Check className="h-3 w-3" strokeWidth={3.5} />}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1">
+                  <span className="truncate text-[13px] font-semibold leading-snug text-slate-800 dark:text-slate-100">
+                    {model.name}
+                  </span>
+                  {model.isDefault && (
+                    <span className="rounded-full bg-accent/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-accent">
+                      Recommended
+                    </span>
+                  )}
+                  {model.vision && (
+                    <span className="flex items-center gap-0.5 rounded-full bg-violet-500/15 px-1.5 py-px text-[9px] font-bold uppercase tracking-wide text-violet-600 dark:text-violet-300">
+                      <Eye className="h-2.5 w-2.5" aria-hidden="true" />
+                      Vision
+                    </span>
+                  )}
+                </span>
+                <span className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                  {model.description}
+                </span>
+              </span>
+              <span className="shrink-0 pt-0.5 text-[11px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                {model.size}
+              </span>
+            </motion.button>
+          );
+        })}
+      </div>
+      <span className="sr-only">Selected: {models[selectedIndex]?.name}</span>
+    </div>
+  );
+}
 
 const ATTACH_INPUT_ACCEPT = 'image/*,.txt,.md,.json,.csv,.js,.ts,.html,.css,.xml,.yml,.yaml';
 
@@ -913,76 +1021,65 @@ export const SidePanel = React.memo(({
                 )}
               </div>
             ) : !isReady ? (
-              <div className="flex flex-col items-center justify-center h-full text-center space-y-4 py-2">
-                <Bot className="w-10 h-10 text-accent animate-pulse" />
-                <div className="space-y-2 w-full px-2">
-                  <h3 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">Lightweight & Fast AI Engine</h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Runs locally and ultra-fast on WebGPU via ReAct architecture.</p>
-                  
-                  {/* Model Selector Cards */}
+              <div className="flex h-full min-h-0 flex-col items-stretch justify-start overflow-y-auto px-4 py-5 text-left">
+                <div className="mx-auto flex w-full max-w-[340px] flex-col gap-4">
+                  <div>
+                    <h3 className="text-base font-semibold leading-snug text-slate-800 dark:text-slate-100">Choose your model</h3>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">AI runs locally on your device.</p>
+                  </div>
+
                   {!isInitializing && (
-                    <div className="flex flex-col gap-2 my-3 text-left">
-                      {AVAILABLE_AI_MODELS.map((model) => {
-                        const isSelected = selectedModelId === model.id;
-                        return (
-                          <div
-                            key={model.id}
-                            onClick={() => {
-                              setSelectedModelId(model.id);
-                              aiAgent.setModel(model.id);
-                            }}
-                            className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
-                              isSelected
-                                ? 'border-accent bg-accent/10 dark:bg-accent/20 shadow-xs ring-1 ring-accent'
-                                : 'border-slate-200/80 dark:border-slate-700/80 bg-white dark:bg-slate-800/60 hover:border-slate-300 dark:hover:border-slate-600'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
-                                {model.name}
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400">
-                                  {model.size}
-                                </span>
-                                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-md bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400">
-                                  {model.speed}
-                                </span>
-                              </div>
-                            </div>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                              {model.description}
-                            </p>
-                          </div>
-                        );
-                      })}
+                    <ModelPickerList
+                      selectedModelId={selectedModelId}
+                      onSelect={modelId => {
+                        setSelectedModelId(modelId);
+                        aiAgent.setModel(modelId);
+                      }}
+                    />
+                  )}
+
+                  {!isInitializing && (
+                    <div className="flex items-center gap-4 rounded-xl border border-slate-200/70 bg-slate-50/80 px-3 py-2.5 dark:border-slate-700/60 dark:bg-slate-800/50">
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <Download className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                        <span className="truncate">One-time download</span>
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <Cpu className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                        <span className="truncate">Runs on WebGPU</span>
+                      </span>
+                      <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+                        <Lock className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                        <span className="truncate">Stays on device</span>
+                      </span>
                     </div>
                   )}
 
-                  {isInitializing ? (
-                    <div className="space-y-2 mt-4">
-                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden shadow-inner">
-                        <div 
-                          className="bg-accent h-full transition-all duration-300 ease-out"
-                          style={{ width: `${progress}%` }}
-                        />
+                  <div className="pb-2">
+                    {isInitializing ? (
+                      <div className="space-y-2" role="status" aria-live="polite">
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                          <div
+                            className="h-full bg-accent transition-all duration-300 ease-out"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <p className="truncate text-xs font-medium text-slate-600 dark:text-slate-300">{progressText}</p>
                       </div>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">{progressText}</p>
-                    </div>
-                  ) : (
-                    <div className="mt-3 space-y-2">
-                      {initError && (
-                        <p className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{initError}</p>
-                      )}
-                      <button
-                        onClick={handleInit}
-                        className="px-4 py-2.5 w-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold rounded-xl transition-all shadow-md active:scale-95 flex items-center justify-center gap-2"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        Start AI ({AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.size || '~800 MB'})
-                      </button>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="space-y-2.5">
+                        {initError && (
+                          <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:bg-red-900/20 dark:text-red-300">{initError}</p>
+                        )}
+                        <button
+                          onClick={handleInit}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-white active:scale-[0.99] dark:focus-visible:ring-offset-slate-900"
+                        >
+                          Start AI ({AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.size || '~800 MB'})
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -1436,4 +1533,3 @@ export const SidePanel = React.memo(({
     </AnimatePresence>
   );
 });
-
