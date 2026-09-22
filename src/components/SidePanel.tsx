@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Download, Cpu } from 'lucide-react';
+import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Cpu } from 'lucide-react';
 import { Button } from './ui/button';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Progress } from './ui/progress';
 import ReactMarkdown from 'react-markdown';
@@ -44,90 +44,66 @@ const MAX_TEXT_FILE_BYTES = 256 * 1024;
 /** Read-time truncation budget; the engine truncates further per file. */
 const TEXT_FILE_READ_CAP_CHARS = 200 * 1024;
 
-interface ModelSetupCardProps {
-  selectedModelId: string;
-  onSelectModel: (modelId: string) => void;
-  onStart: () => void;
-  isInitializing: boolean;
-  progress: number;
-  progressText: string;
-  initError: string;
-}
-
-/** Inline engine setup shown inside the chat until a model is downloaded and ready. */
-function ModelSetupCard({
-  selectedModelId,
-  onSelectModel,
-  onStart,
-  isInitializing,
+/** Premium inline bubble shown in the chat flow while the engine downloads. */
+function ModelDownloadBubble({
+  modelName,
+  modelSize,
   progress,
   progressText,
-  initError,
-}: ModelSetupCardProps) {
-  const selected = AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId) ?? AVAILABLE_AI_MODELS[0];
+}: {
+  modelName: string;
+  modelSize: string;
+  progress: number;
+  progressText: string;
+}) {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2.5">
-          <Avatar>
-            <AvatarFallback>
-              <Bot className="h-3.5 w-3.5" aria-hidden="true" />
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex min-w-0 flex-col">
-            <CardTitle>Download a model to start</CardTitle>
-            <CardDescription>AI runs 100% locally on your device.</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Model
-          </span>
-          <span className="relative block">
-            <select
-              value={selected.id}
-              disabled={isInitializing}
-              onChange={e => onSelectModel(e.target.value)}
-              aria-label="Choose an AI model"
-              className="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3 pr-9 text-[13px] font-medium text-slate-800 outline-none transition-colors hover:border-slate-300 focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-slate-600"
-            >
-              {AVAILABLE_AI_MODELS.map(m => (
-                <option key={m.id} value={m.id}>
-                  {m.name} — {m.description} ({m.size})
-                </option>
-              ))}
-            </select>
-            <ChevronDown
+    <motion.div
+      initial={{ opacity: 0, y: 12, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="flex flex-col items-start gap-1.5"
+    >
+      <div className="flex items-center gap-1.5 px-1 text-xs font-semibold text-cyan-600 dark:text-cyan-400">
+        <Avatar className="h-5 w-5">
+          <AvatarFallback>
+            <Sparkles className="h-3 w-3" aria-hidden="true" />
+          </AvatarFallback>
+        </Avatar>
+        <span>Nova Assistant</span>
+      </div>
+      <div className="relative w-full max-w-[92%] overflow-hidden rounded-2xl rounded-tl-xs border border-cyan-500/25 bg-white shadow-[0_16px_40px_-24px_rgba(34,211,238,0.55)] dark:border-cyan-400/20 dark:bg-slate-800/90">
+        <div aria-hidden="true" className="shimmer pointer-events-none absolute inset-0 rounded-2xl" />
+        <div className="relative flex items-center gap-3 px-4 pt-3.5">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+            <motion.span
               aria-hidden="true"
-              className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-violet-500 opacity-90"
+              animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
             />
+            <motion.span
+              aria-hidden="true"
+              className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-violet-500 blur-md opacity-60"
+              animate={{ opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
+            />
+            <Bot className="relative h-5 w-5 text-white" aria-hidden="true" />
           </span>
-        </label>
-        {isInitializing ? (
-          <div className="flex flex-col gap-2" role="status" aria-live="polite">
-            <Progress value={progress} />
-            <p className="truncate text-xs font-medium text-slate-600 dark:text-slate-300">{progressText}</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {initError && (
-              <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-xs leading-relaxed text-red-700 dark:bg-red-900/20 dark:text-red-300">
-                {initError}
-              </p>
-            )}
-            <Button accent onClick={onStart} className="w-full" size="lg">
-              <Download aria-hidden="true" />
-              Download & Start ({selected.size})
-            </Button>
-            <p className="text-center text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">
-              One-time download · Stored on device · Works offline
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+          <span className="flex min-w-0 flex-col">
+            <span className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">
+              Downloading {modelName}
+            </span>
+            <span className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
+              {modelSize} · first run only
+            </span>
+          </span>
+        </div>
+        <div className="relative flex flex-col gap-1.5 px-4 py-3.5" role="status" aria-live="polite">
+          <Progress value={progress} />
+          <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">{progressText}</p>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1005,19 +981,26 @@ export const SidePanel = React.memo(({
               </div>
             ) : (
               <>
-                {!isReady && (
-                  <ModelSetupCard
-                    selectedModelId={selectedModelId}
-                    onSelectModel={modelId => {
-                      setSelectedModelId(modelId);
-                      aiAgent.setModel(modelId);
-                    }}
-                    onStart={handleInit}
-                    isInitializing={isInitializing}
+                {isInitializing && (
+                  <ModelDownloadBubble
+                    modelName={(AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2').split('(')[0].trim()}
+                    modelSize={AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.size || '~1.7 GB'}
                     progress={progress}
                     progressText={progressText}
-                    initError={initError}
                   />
+                )}
+                {initError && !isReady && !isInitializing && (
+                  <Card className="border-red-200/70 dark:border-red-900/40">
+                    <CardContent className="flex flex-col gap-2.5 pt-4">
+                      <p role="alert" className="text-xs leading-relaxed text-red-700 dark:text-red-300">
+                        {initError}
+                      </p>
+                      <Button variant="outline" size="sm" onClick={handleInit} className="self-start">
+                        <RefreshCw aria-hidden="true" />
+                        Retry download
+                      </Button>
+                    </CardContent>
+                  </Card>
                 )}
                 {messages.filter(m => m.role !== 'system' && m.role !== 'tool' && (m.role === 'user' || (m.content && String(m.content).trim().length > 0))).map((msg, idx) => {
                   const isUser = msg.role === 'user';
@@ -1320,7 +1303,7 @@ export const SidePanel = React.memo(({
                       handleSubmit(e);
                     }
                   }}
-                  placeholder={isListening ? "Listening..." : !isReady ? "Type a message — the model downloads first..." : "Ask Nova Agent anything or give instructions..."}
+                  placeholder={isListening ? "Listening..." : "Ask Nova Agent anything or give instructions..."}
                   rows={Math.min(4, Math.max(1, input.split('\n').length))}
                   disabled={isLoading || isListening}
                   className="w-full resize-none bg-transparent px-3.5 pt-3 pb-1 text-[13.5px] leading-relaxed text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none max-h-32 overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
