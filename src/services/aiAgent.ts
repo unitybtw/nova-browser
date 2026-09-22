@@ -186,7 +186,6 @@ export interface AIModelOption {
   id: string;
   name: string;
   size: string;
-  speed: string;
   description: string;
   isDefault?: boolean;
   /** True only for multimodal models that accept image content parts. */
@@ -197,26 +196,23 @@ export interface AIModelOption {
 export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   {
     id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
-    name: "Llama 3.2 3B (Recommended)",
+    name: "Llama 3.2 3B",
     size: "~1.7 GB",
-    speed: "Fast",
-    description: "Balanced reasoning, fluent English assistant",
+    description: "General-purpose text model.",
     isDefault: true
   },
   {
     id: "Phi-3.5-vision-instruct-q4f16_1-MLC",
-    name: "Phi 3.5 Vision (Multimodal)",
+    name: "Phi 3.5 Vision",
     size: "~2.4 GB",
-    speed: "Standard",
-    description: "Multimodal model with visual and screenshot analysis",
+    description: "Image and screenshot analysis.",
     vision: true
   },
   {
     id: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC",
-    name: "Qwen 2.5 0.5B (Ultra Light)",
+    name: "Qwen 2.5 0.5B",
     size: "~350 MB",
-    speed: "Ultra Fast",
-    description: "Lowest resource usage, instant download"
+    description: "Smallest download among these models."
   }
 ];
 
@@ -784,6 +780,9 @@ class AIAgent {
       this.worker = null;
     }
     this.isInitializing = false;
+    // Drop any in-flight init so a model switch during download starts fresh
+    // instead of resolving the stale promise for the previous model.
+    this.initPromise = null;
     this.emitStatus('idle');
   }
 

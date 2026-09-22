@@ -39,6 +39,8 @@ interface PendingFileAttachment {
 
 const MAX_PENDING_IMAGES = 4;
 const MAX_PENDING_FILES = 4;
+/** Images larger than this are rejected before base64 decode (memory guard). */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 /** Text files larger than this are rejected outright. */
 const MAX_TEXT_FILE_BYTES = 256 * 1024;
 /** Read-time truncation budget; the engine truncates further per file. */
@@ -197,7 +199,11 @@ export const SidePanel = React.memo(({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<ChatCompletionMessageParam[]>(messages);
-  messagesRef.current = messages;
+  // Mirror latest messages for async callbacks (effect, not render, to stay
+  // safe under concurrent rendering).
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
   const requestIdRef = useRef(0);
   const isSubmittingRef = useRef(false);
   const recognitionRef = useRef<any>(null);
@@ -209,6 +215,8 @@ export const SidePanel = React.memo(({
 
   useEffect(() => {
     return () => {
+      requestIdRef.current += 1;
+      aiAgent.interrupt();
       if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
       if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
     };
@@ -330,11 +338,21 @@ export const SidePanel = React.memo(({
   }, []);
 
   const addFilesToAttachments = useCallback(async (incoming: FileList | File[]) => {
+    // No new chips while a turn is running — success clears the tray, so
+    // mid-stream adds would otherwise be silently discarded.
+    if (isSubmittingRef.current) {
+      showAttachmentHint('Wait for the current answer to finish');
+      return;
+    }
     const files = Array.from(incoming);
     if (files.length === 0) return;
     const skipped: string[] = [];
 
-    const imageCandidates = files.filter(isImageFile);
+    const sizedImages = files.filter(isImageFile).filter(f => f.size <= MAX_IMAGE_BYTES);
+    if (sizedImages.length < files.filter(isImageFile).length) {
+      skipped.push('Images larger than 5 MB were skipped');
+    }
+    const imageCandidates = sizedImages;
     const textCandidates = files.filter(f => !imageCandidates.includes(f) && isTextFile(f));
     const unsupported = files.filter(f => !imageCandidates.includes(f) && !textCandidates.includes(f));
     if (unsupported.length > 0) {
@@ -388,8 +406,10 @@ export const SidePanel = React.memo(({
     }
     if (readFailures > 0) skipped.push('Failed to read some files');
 
-    if (newImages.length > 0) setPendingImages(prev => [...prev, ...newImages]);
-    if (newFiles.length > 0) setPendingFiles(prev => [...prev, ...newFiles]);
+    // Cap inside the updater too: rapid double-drop/paste can otherwise
+    // exceed the limit computed from the stale closure above.
+    if (newImages.length > 0) setPendingImages(prev => [...prev, ...newImages].slice(0, MAX_PENDING_IMAGES));
+    if (newFiles.length > 0) setPendingFiles(prev => [...prev, ...newFiles].slice(0, MAX_PENDING_FILES));
     if (skipped.length > 0) showAttachmentHint(skipped.slice(0, 2).join(' · '));
   }, [pendingImages.length, pendingFiles.length, showAttachmentHint]);
 
@@ -524,6 +544,7 @@ export const SidePanel = React.memo(({
     setMessages(newMessages);
     setIsLoading(true);
     setStreamingText('');
+    let streamedSoFar = '';
 
     try {
       if (!aiAgent.isReady()) {
@@ -538,7 +559,6 @@ export const SidePanel = React.memo(({
         return;
       }
 
-      let streamedSoFar = '';
       let lastRenderTime = 0;
       const THROTTLE_MS = 80; // Only update UI max ~12 times a second to prevent React freezing
 
@@ -552,7 +572,16 @@ export const SidePanel = React.memo(({
         }
       }, attachments);
 
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current) {
+        // Stopped mid-stream: keep the partial answer instead of dropping it.
+        if (streamedSoFar.trim()) {
+          const partialMessages = [...newMessages, { role: 'assistant', content: `${streamedSoFar}\n\n*(stopped)*` } as ChatCompletionMessageParam];
+          messagesRef.current = partialMessages;
+          setMessages(partialMessages);
+        }
+        setStreamingText('');
+        return;
+      }
       const cleanMessages = updatedMessages.filter(m => m.role !== 'tool');
       messagesRef.current = cleanMessages;
       setStreamingText('');
@@ -564,7 +593,16 @@ export const SidePanel = React.memo(({
         setPendingFiles([]);
       }
     } catch (err: any) {
-      if (requestId !== requestIdRef.current) return;
+      if (requestId !== requestIdRef.current) {
+        if (streamedSoFar.trim()) {
+          const partialMessages = [...newMessages, { role: 'assistant', content: `${streamedSoFar}\n\n*(stopped)*` } as ChatCompletionMessageParam];
+          messagesRef.current = partialMessages;
+          setMessages(partialMessages);
+        }
+        setStreamingText('');
+        return;
+      }
+      setStreamingText('');
       console.error('[AI Chat Error]', err);
       const rawMsg = err?.message ?? err?.toString() ?? '';
       let errMsg: string;
@@ -592,6 +630,7 @@ export const SidePanel = React.memo(({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingRef.current) return;
     const hasPendingAttachments = pendingImages.length > 0 || pendingFiles.length > 0;
     if ((!input.trim() && !hasPendingAttachments) || isLoading) return;
     const currentInput = input;
@@ -625,14 +664,27 @@ export const SidePanel = React.memo(({
   const handleAIActionRef = useRef(handleAIAction);
   handleAIActionRef.current = handleAIAction;
 
+  // Quick actions carry the pending chips with them so attachments are
+  // never silently left behind in the tray.
+  const handleQuickPrompt = useCallback((promptText: string) => {
+    const images = pendingImages.map(img => img.dataUrl);
+    const files = pendingFiles.map(f => ({ name: f.name, text: f.text }));
+    const hasPendingAttachments = images.length > 0 || files.length > 0;
+    handleAIActionRef.current(promptText, hasPendingAttachments ? { images, files } : undefined);
+  }, [pendingImages, pendingFiles]);
+
   // App owns the quick-action queue so actions are not lost while this lazy
   // panel is mounting. Consume each queued item exactly once when idle.
+  const lastConsumedActionRef = useRef<string | null>(null);
   useEffect(() => {
     const action = pendingActions[0];
     if (!action || isLoading || isSubmittingRef.current) return;
+    const key = `${action.id}:${action.text}`;
+    if (lastConsumedActionRef.current === key) return;
+    lastConsumedActionRef.current = key;
     onPendingActionConsumed?.(action.id);
     handleAIActionRef.current(action.text);
-  }, [pendingActions[0]?.id, isLoading, onPendingActionConsumed]);
+  }, [pendingActions[0]?.id, (pendingActions[0] as { text?: string } | undefined)?.text, isLoading, onPendingActionConsumed]);
 
   // Whether the selected model can ingest image content parts (drives the
   // inline hint under pending image chips; sending is never blocked here —
@@ -1067,7 +1119,7 @@ export const SidePanel = React.memo(({
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              navigator.clipboard.writeText(textContent);
+                              navigator.clipboard.writeText(textContent).catch(() => {});
                               setCopiedIdx(idx);
                               if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
                               copiedTimerRef.current = setTimeout(() => {
@@ -1186,7 +1238,7 @@ export const SidePanel = React.memo(({
                 ))}
 
                 {/* Quick Action Starter Prompts */}
-                {isReady && messages.length <= 1 && !isLoading && (
+                {isReady && !isLoading && (messages.length === 0 || (messages.length === 1 && messages[0].role === 'assistant')) && (
                   <Card className="mt-2 p-3">
                     <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Quick Actions</span>
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1201,7 +1253,7 @@ export const SidePanel = React.memo(({
                           key={i}
                           variant="outline"
                           size="sm"
-                          onClick={() => handleAIAction(promptText)}
+                          onClick={() => handleQuickPrompt(promptText)}
                         >
                           {promptText}
                         </Button>
@@ -1216,8 +1268,7 @@ export const SidePanel = React.memo(({
           </div>
 
           {/* Composer */}
-          {(
-            <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-slate-900/95 backdrop-blur-md">
+          <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-slate-900/95 backdrop-blur-md">
               {/* Global agent status pill */}
               {statusPill && (
                 <div className="mb-2">
@@ -1289,6 +1340,12 @@ export const SidePanel = React.memo(({
                     </div>
                   ))}
                 </div>
+              )}
+              {pendingImages.length > 0 && !selectedModelSupportsVision && (
+                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                  <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                  This model can't see images — switch to Phi 3.5 Vision below to analyze them.
+                </p>
               )}
 
               {/* Main Composer Box */}
@@ -1451,7 +1508,6 @@ export const SidePanel = React.memo(({
                 }}
               />
             </div>
-          )}
           </div>
         </motion.div>
       )}
