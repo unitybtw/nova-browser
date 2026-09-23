@@ -146,6 +146,7 @@
     "dev": "npm run build:electron && concurrently \"vite\" \"electron .\""
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.21",
     "@cliqz/adblocker-electron": "^1.34.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.29.0",

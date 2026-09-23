@@ -16,10 +16,10 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
     version: '1.4.8',
     date: 'September 2026',
-    title: 'Google Bot-Detection Stealth, Security Hardening & 120Hz Fluid Motion',
+    title: 'Security Hardening, Browser Identity & 120Hz Fluid Motion',
     badge: 'Latest Release',
     highlights: [
-      'Authentic Client Hints, navigator prototype sanitization, and stealth scripts eliminating Google bot-detection / reCAPTCHA loops.',
+      'Browser requests now keep Chromium’s native user-agent and Client Hints consistent.',
       'Comprehensive security hardening: repository update confinement, download filename/origin sanitization, and autofill isolation.',
       'Performance leaps: precomputed request headers, modal/toast memoization, and true LRU search suggestion caching.',
       'Silky 120Hz Lenis momentum scrolling, GPU canvas pausing, and zero-leak lightweight architecture.'
@@ -27,7 +27,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     changes: [
       {
         category: 'security',
-        text: 'Eliminated Google reCAPTCHA loops by enforcing authentic Client Hints headers, navigator prototype stealth, and removing navigator.webdriver fingerprints.'
+        text: 'Removed fabricated Chrome fingerprints and let Chromium provide its native user-agent and Client Hints.'
       },
       {
         category: 'security',

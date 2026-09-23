@@ -116,6 +116,18 @@ export interface UserSettings {
   language?: 'en' | 'tr' | 'ar' | 'de';
 }
 
+export function detectSystemLanguage(): 'en' | 'tr' | 'ar' | 'de' {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.language) {
+      const code = navigator.language.slice(0, 2).toLowerCase();
+      if (code === 'tr' || code === 'de' || code === 'ar' || code === 'en') {
+        return code;
+      }
+    }
+  } catch (_) {}
+  return 'tr';
+}
+
 export const defaultSettings: UserSettings = {
   searchEngine: 'google',
   privacyShield: true,
@@ -145,7 +157,7 @@ export const defaultSettings: UserSettings = {
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
   defaultTranslationLanguage: 'tr',
-  language: 'en',
+  language: detectSystemLanguage(),
   shortcuts: {
     newTab: { key: 't', shift: false, meta: true },
     reopenTab: { key: 't', shift: true, meta: true },

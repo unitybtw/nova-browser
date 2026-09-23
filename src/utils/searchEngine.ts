@@ -1,5 +1,6 @@
 import { UserSettings } from '../types/browser';
 import { DANGEROUS_PROTOCOLS } from './safeNavigation';
+import { getLanguage } from '../services/i18n';
 
 const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;
 
@@ -69,16 +70,23 @@ export function isValidUrlOrDomain(input: string): boolean {
   return isDomain;
 }
 
-export function formatSearchUrl(query: string, engine: UserSettings['searchEngine'] = 'google'): string {
+export function formatSearchUrl(
+  query: string,
+  engine: UserSettings['searchEngine'] = 'google',
+  lang?: string
+): string {
   const trimmed = query.trim();
   if (!trimmed) return '';
+
+  const activeLang = lang ? lang.toLowerCase() : '';
 
   // Security: reject all dangerous and non-navigable protocols immediately.
   // Prevents javascript:alert(1) from being navigated to if it somehow reaches here.
   if (DANGEROUS_PROTOCOLS.some(p => trimmed.toLowerCase().startsWith(p))) {
     // Treat as a search query instead of navigating to dangerous URL
     const q = encodeURIComponent(trimmed);
-    return `https://www.google.com/search?q=${q}`;
+    const langParam = activeLang ? `&hl=${activeLang}` : '';
+    return `https://www.google.com/search?q=${q}${langParam}`;
   }
 
   // Safe internal browser schemes
@@ -107,22 +115,30 @@ export function formatSearchUrl(query: string, engine: UserSettings['searchEngin
     return 'https://' + trimmed;
   }
 
-  // Otherwise treat as search engine query
+  // Otherwise treat as localized search engine query
   const q = encodeURIComponent(trimmed);
   switch (engine) {
-    case 'duckduckgo':
-      return `https://duckduckgo.com/?q=${q}`;
-    case 'brave':
-      return `https://search.brave.com/search?q=${q}`;
+    case 'duckduckgo': {
+      if (!activeLang) return `https://duckduckgo.com/?q=${q}`;
+      const ddgLocaleMap: Record<string, string> = { tr: 'tr-tr', de: 'de-de', ar: 'xa-ar', en: 'us-en' };
+      const kl = ddgLocaleMap[activeLang] || `${activeLang}-${activeLang}`;
+      return `https://duckduckgo.com/?q=${q}&kl=${kl}`;
+    }
+    case 'brave': {
+      if (!activeLang) return `https://search.brave.com/search?q=${q}`;
+      const braveCountryMap: Record<string, string> = { tr: 'tr', de: 'de', en: 'us' };
+      const country = braveCountryMap[activeLang] || activeLang;
+      return `https://search.brave.com/search?q=${q}&country=${country}`;
+    }
     case 'bing':
-      return `https://www.bing.com/search?q=${q}`;
+      return activeLang ? `https://www.bing.com/search?q=${q}&setlang=${activeLang}` : `https://www.bing.com/search?q=${q}`;
     case 'ecosia':
-      return `https://www.ecosia.org/search?q=${q}`;
+      return activeLang ? `https://www.ecosia.org/search?q=${q}&lang=${activeLang}` : `https://www.ecosia.org/search?q=${q}`;
     case 'yahoo':
-      return `https://search.yahoo.com/search?p=${q}`;
+      return activeLang ? `https://search.yahoo.com/search?p=${q}&vl=lang_${activeLang}` : `https://search.yahoo.com/search?p=${q}`;
     case 'google':
     default:
-      return `https://www.google.com/search?q=${q}`;
+      return activeLang ? `https://www.google.com/search?q=${q}&hl=${activeLang}` : `https://www.google.com/search?q=${q}`;
   }
 }
 

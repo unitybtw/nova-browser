@@ -57,3 +57,4 @@ import './id_generator_entropy.test';
 import './permission_prompts_lifecycle.test';
 import './history_recorder_lifecycle.test';
 import './hook_architecture_hardening.test';
+import './search_localization_captcha.test';

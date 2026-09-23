@@ -260,6 +260,8 @@ export interface ElectronAPI {
   onBlockedSite: (
     callback: (event: null, data: { url: string; reason: string }) => void
   ) => () => void;
+  // App Locale / Language sync
+  setAppLanguage: (lang: string) => Promise<{ success: boolean; acceptLanguages: string }>;
 }
 
 declare global {
