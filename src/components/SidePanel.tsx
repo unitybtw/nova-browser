@@ -1,1513 +1,729 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, X, Send, Bot, Brain, Trash2, Plus, Loader2, RefreshCw, Volume2, VolumeX, Mic, MicOff, Square, ShieldAlert, Check, Paperclip, Copy, FileText, Wrench, AlertCircle, ChevronDown, Cpu } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card, CardContent } from './ui/card';
-import { Avatar, AvatarFallback } from './ui/avatar';
-import { Progress } from './ui/progress';
+import { motion } from 'framer-motion';
 import {
-  PromptInput,
-  PromptInputTextarea,
-  PromptInputActions,
-  PromptInputAction,
-} from './ui/prompt-input';
-import {
-  ChatContainerRoot,
-  ChatContainerContent,
-  ChatContainerScrollAnchor,
-} from './ui/chat-container';
-import { ScrollButton } from './ui/scroll-button';
-import { PromptSuggestion } from './ui/prompt-suggestion';
-import { TypingLoader } from './ui/loader';
+  Sparkles,
+  X,
+  Copy,
+  Check,
+  RotateCcw,
+  Volume2,
+  VolumeX,
+  Globe,
+  Loader2,
+  ChevronDown,
+  Brain,
+  Compass,
+  Layers,
+  Search,
+  Zap,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { aiAgent, AVAILABLE_AI_MODELS, AiError, AgentStatus, ChatAttachments } from '../services/aiAgent';
-import { aiMemory, MemoryItem, TaskSummary } from '../services/aiMemory';
+import type { Tab } from '../types/browser';
+import {
+  aiAgent,
+  AVAILABLE_AI_MODELS,
+  detectDirectIntent,
+} from '../services/aiAgent';
 import { tts } from '../services/tts';
-import { orchestrator, QueuedAction } from '../services/agentOrchestrator';
-import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
-import { showConfirm } from '../utils/confirmDialog';
 import { getLocale } from '../services/i18n';
+import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
+import { PromptInput } from './ui/ai-chat-input';
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  reasoning?: {
+    text: string;
+    durationMs?: number;
+  };
+  attachments?: Array<{
+    name: string;
+    url: string;
+  }>;
+}
 
 interface SidePanelProps {
   isOpen: boolean;
   onClose: () => void;
+  activeTab?: Tab;
   isDemo?: boolean;
   pendingActions?: Array<{ id: number; text: string }>;
   onPendingActionConsumed?: (id: number) => void;
 }
 
-/** Image waiting to be sent with the next chat turn (data URL form). */
-interface PendingImageAttachment {
-  id: string;
-  name: string;
-  dataUrl: string;
-}
-
-/** Text file waiting to be sent with the next chat turn. */
-interface PendingFileAttachment {
-  id: string;
-  name: string;
-  text: string;
-}
-
-const MAX_PENDING_IMAGES = 4;
-const MAX_PENDING_FILES = 4;
-/** Images larger than this are rejected before base64 decode (memory guard). */
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-/** Text files larger than this are rejected outright. */
-const MAX_TEXT_FILE_BYTES = 256 * 1024;
-/** Read-time truncation budget; the engine truncates further per file. */
-const TEXT_FILE_READ_CAP_CHARS = 200 * 1024;
-
-/** Premium inline bubble shown in the chat flow while the engine downloads. */
-function ModelDownloadBubble({
-  modelName,
-  modelSize,
-  progress,
-  progressText,
-}: {
-  modelName: string;
-  modelSize: string;
-  progress: number;
-  progressText: string;
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.98 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="flex flex-col items-start gap-1.5"
-    >
-      <div className="flex items-center gap-1.5 px-1 text-xs font-semibold text-cyan-600 dark:text-cyan-400">
-        <Avatar className="h-5 w-5">
-          <AvatarFallback>
-            <Sparkles className="h-3 w-3" aria-hidden="true" />
-          </AvatarFallback>
-        </Avatar>
-        <span>Nova Assistant</span>
-      </div>
-      <div className="relative w-full max-w-[92%] overflow-hidden rounded-2xl rounded-tl-xs border border-cyan-500/25 bg-white shadow-[0_16px_40px_-24px_rgba(34,211,238,0.55)] dark:border-cyan-400/20 dark:bg-slate-800/90">
-        <div aria-hidden="true" className="shimmer pointer-events-none absolute inset-0 rounded-2xl" />
-        <div className="relative flex items-center gap-3 px-4 pt-3.5">
-          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
-            <motion.span
-              aria-hidden="true"
-              className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-violet-500 opacity-90"
-              animate={{ scale: [1, 1.08, 1], rotate: [0, 4, -4, 0] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <motion.span
-              aria-hidden="true"
-              className="absolute inset-0 rounded-2xl bg-gradient-to-br from-cyan-400 via-sky-500 to-violet-500 blur-md opacity-60"
-              animate={{ opacity: [0.4, 0.8, 0.4] }}
-              transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
-            />
-            <Bot className="relative h-5 w-5 text-white" aria-hidden="true" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="truncate text-[13px] font-semibold text-slate-800 dark:text-slate-100">
-              Downloading {modelName}
-            </span>
-            <span className="text-[11px] tabular-nums text-slate-500 dark:text-slate-400">
-              {modelSize} · first run only
-            </span>
-          </span>
-        </div>
-        <div className="relative flex flex-col gap-1.5 px-4 py-3.5" role="status" aria-live="polite">
-          <Progress value={progress} />
-          <p className="truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">{progressText}</p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
-
-const ATTACH_INPUT_ACCEPT = 'image/*,.txt,.md,.json,.csv,.js,.ts,.html,.css,.xml,.yml,.yaml';
-
-const safeMarkdownUrlTransform = (url: string): string => {
-  if (!url) return '';
-  // Normalize, strip control chars and zero-width spaces that could evade prefix checks
-  const clean = String(url).trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
-  if (
-    clean.startsWith('javascript:') ||
-    clean.startsWith('data:') ||
-    clean.startsWith('vbscript:') ||
-    clean.startsWith('file:') ||
-    clean.startsWith('blob:')
-  ) {
-    return '';
-  }
-  try {
-    const parsed = new URL(url, 'https://dummy.local');
-    if (parsed.protocol === 'https:' || parsed.protocol === 'http:' || parsed.protocol === 'mailto:' || parsed.protocol === 'tel:') {
-      return url;
-    }
-  } catch {}
-  return '';
-};
-
-const isImageFile = (file: File) =>
-  file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name);
-
-const isTextFile = (file: File) =>
-  file.type.startsWith('text/') || /\.(txt|md|json|csv|js|ts|html|css|xml|yml|yaml)$/i.test(file.name);
-
-const readFileAsDataUrl = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
-
-const readFileAsText = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read file'));
-    reader.readAsText(file);
-  });
-
-export const SidePanel = React.memo(({ 
-  isOpen, 
+export const SidePanel = React.memo(({
+  isOpen,
   onClose,
-  isDemo: demoMode = false,
+  activeTab,
+  isDemo = false,
   pendingActions = [],
   onPendingActionConsumed,
 }: SidePanelProps) => {
-  const isDemo = demoMode || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('demo') === 'true');
-  const [messages, setMessages] = useState<ChatCompletionMessageParam[]>(() => {
+  const isTr = getLocale() === 'tr-TR';
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
     if (isDemo) {
       return [
-        { role: 'user', content: 'Summarize this page locally. What should I know?' },
-        { role: 'assistant', content: '**Here is the local summary.**\n\nNova Browser keeps the current page context on your device while Nova AI extracts the key points.\n\n- **Local WebGPU inference** — no cloud model request.\n- **Current-tab context** — summarize without leaving the browser.\n- **Private by design** — your prompt and page context stay local.' }
+        {
+          role: 'user',
+          content: isTr ? 'Bu sayfayı özetle' : 'Summarize this page',
+        },
+        {
+          role: 'assistant',
+          content: isTr
+            ? '### Sayfa Özeti\nNova Browser, yerel WebGPU hızlandırmalı yapay zeka ile verilerinizi cihazınızdan çıkarmadan çalışır.\n\n- **Gizlilik:** Sayfa içeriği ve sorgularınız dış sunuculara iletilmez.\n- **Sekme Yönetimi:** Sekmeleri gruplayabilir, arayabilir ve dondurabilirsiniz.'
+            : '### Page Summary\nNova Browser runs local WebGPU-accelerated AI entirely on your device without transmitting data.\n\n- **Privacy:** Page contents and prompts never leave your machine.\n- **Tab Management:** Group, search, and hibernate tabs automatically.',
+        },
       ];
     }
     return [];
   });
-  const [input, setInput] = useState('');
+
   const [selectedModelId, setSelectedModelId] = useState<string>(() => aiAgent.getModel());
+  const [isReady, setIsReady] = useState(() => isDemo || aiAgent.isReady());
   const [isInitializing, setIsInitializing] = useState(false);
-  const [isReady, setIsReady] = useState(isDemo);
-  const [progress, setProgress] = useState(0);
-  const [progressText, setProgressText] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [downloadStatusText, setDownloadStatusText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
-  const [showMemoryVault, setShowMemoryVault] = useState(false);
-  const [memories, setMemories] = useState<MemoryItem[]>([]);
-  const [tasks, setTasks] = useState<TaskSummary[]>([]);
-  const [vaultTab, setVaultTab] = useState<'memory' | 'tasks'>('memory');
-  const [newFact, setNewFact] = useState('');
-  const [newCategory, setNewCategory] = useState<'preference' | 'fact' | 'instruction'>('preference');
-  const [initError, setInitError] = useState('');
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [queuedActions, setQueuedActions] = useState<QueuedAction[]>([]);
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>({ state: 'idle' });
-  const [pendingImages, setPendingImages] = useState<PendingImageAttachment[]>([]);
-  const [pendingFiles, setPendingFiles] = useState<PendingFileAttachment[]>([]);
-  const [attachmentHint, setAttachmentHint] = useState('');
-  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
-  const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-  // Scrolling is owned by prompt-kit's stick-to-bottom container below.
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const messagesRef = useRef<ChatCompletionMessageParam[]>(messages);
-  // Mirror latest messages for async callbacks (effect, not render, to stay
-  // safe under concurrent rendering).
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [expandedReasoning, setExpandedReasoning] = useState<Record<number, boolean>>({});
+
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesRef = useRef<ChatMessage[]>(messages);
+  const requestIdRef = useRef<number>(0);
+
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-  const requestIdRef = useRef(0);
-  const isSubmittingRef = useRef(false);
-  const recognitionRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const attachmentIdRef = useRef(0);
-  const attachmentHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hasSpeechRecognition = typeof window !== 'undefined' && Boolean((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
-  useEffect(() => {
-    return () => {
-      requestIdRef.current += 1;
-      aiAgent.interrupt();
-      if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-      if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
-    };
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = orchestrator.subscribe(actions => {
-      setQueuedActions(actions);
-      
-      // Auto-clear completed/failed/denied actions after 3 seconds to prevent memory leak
-      const completedActions = actions.filter(a => a.state === 'completed' || a.state === 'failed' || a.state === 'denied');
-      if (completedActions.length > 50) {
-        // Remove only terminal actions — clearQueue() would also wipe executing
-        // actions, making their subsequent updateActionState calls no-ops.
-        orchestrator.pruneCompleted();
-      }
+  const scrollToBottom = useCallback((smooth = true) => {
+    messagesEndRef.current?.scrollIntoView({
+      behavior: smooth ? 'smooth' : 'auto',
+      block: 'end',
     });
-    return () => { unsubscribe(); };
-  }, []);
-
-  // Global agent lifecycle status; onStatus() emits the current state
-  // immediately on subscribe and returns the unsubscribe function.
-  useEffect(() => {
-    return aiAgent.onStatus(setAgentStatus);
-  }, []);
-
-  // When SidePanel closes, ensure the idle park timer runs to reclaim VRAM
-  useEffect(() => {
-    if (!isOpen) {
-      aiAgent.resetIdleParkTimer();
-    }
-  }, [isOpen]);
-
-  const getOrCreateRecognition = useCallback(() => {
-    if (recognitionRef.current) return recognitionRef.current;
-    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognitionClass) return null;
-    try {
-      const rec = new SpeechRecognitionClass();
-      rec.continuous = true;
-      rec.interimResults = true;
-      rec.lang = 'en-US';
-
-      rec.onresult = (event: any) => {
-        let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          }
-        }
-        if (finalTranscript) {
-          setInput(prev => (prev ? prev + ' ' : '') + finalTranscript);
-        }
-      };
-      rec.onerror = () => setIsListening(false);
-      rec.onend = () => setIsListening(false);
-
-      recognitionRef.current = rec;
-      return rec;
-    } catch (err) {
-      console.error('Failed to initialize SpeechRecognition:', err);
-      return null;
-    }
   }, []);
 
   useEffect(() => {
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {}
-        recognitionRef.current.onresult = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.onend = null;
-        recognitionRef.current = null;
-      }
-    };
-  }, []);
-
-  // Push-to-Talk Handlers (Lazy Initialization on Click)
-  const handleMouseDownMic = useCallback(() => {
-    const rec = getOrCreateRecognition();
-    if (!rec) return;
-    try {
-      rec.start();
-      setIsListening(true);
-    } catch (e) { console.error(e); }
-  }, [getOrCreateRecognition]);
-
-  const handleMouseUpMic = useCallback(() => {
-    if (!recognitionRef.current) return;
-    try {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } catch (e) { console.error(e); }
-  }, []);
-
-  // Subscribe to TTS state changes
-  useEffect(() => {
-    return tts.subscribe(setIsSpeaking);
-  }, []);
-
-  // -----------------------------------------------------------------------
-  // Attachments: picker / drag & drop / paste share one processing path.
-  // -----------------------------------------------------------------------
-
-  // Transient inline hint (panel has no global toast system)
-  const showAttachmentHint = useCallback((message: string) => {
-    setAttachmentHint(message);
-    if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
-    attachmentHintTimerRef.current = setTimeout(() => {
-      attachmentHintTimerRef.current = null;
-      setAttachmentHint('');
-    }, 3000);
-  }, []);
-
-  useEffect(() => () => {
-    if (attachmentHintTimerRef.current) clearTimeout(attachmentHintTimerRef.current);
-  }, []);
-
-  const addFilesToAttachments = useCallback(async (incoming: FileList | File[]) => {
-    // No new chips while a turn is running — success clears the tray, so
-    // mid-stream adds would otherwise be silently discarded.
-    if (isSubmittingRef.current) {
-      showAttachmentHint('Wait for the current answer to finish');
-      return;
+    if (isOpen) {
+      scrollToBottom(false);
     }
-    const files = Array.from(incoming);
-    if (files.length === 0) return;
-    const skipped: string[] = [];
-
-    const sizedImages = files.filter(isImageFile).filter(f => f.size <= MAX_IMAGE_BYTES);
-    if (sizedImages.length < files.filter(isImageFile).length) {
-      skipped.push('Images larger than 5 MB were skipped');
-    }
-    const imageCandidates = sizedImages;
-    const textCandidates = files.filter(f => !imageCandidates.includes(f) && isTextFile(f));
-    const unsupported = files.filter(f => !imageCandidates.includes(f) && !textCandidates.includes(f));
-    if (unsupported.length > 0) {
-      skipped.push(`Unsupported file type: ${unsupported[0].name}`);
-    }
-
-    // Enforce pending caps; accept what fits and tell the user about the rest
-    const imageSlots = Math.max(0, MAX_PENDING_IMAGES - pendingImages.length);
-    const acceptedImages = imageCandidates.slice(0, imageSlots);
-    if (imageCandidates.length > acceptedImages.length) {
-      skipped.push(`Maximum ${MAX_PENDING_IMAGES} images allowed`);
-    }
-
-    const sizedTextFiles = textCandidates.filter(f => f.size <= MAX_TEXT_FILE_BYTES);
-    if (sizedTextFiles.length < textCandidates.length) {
-      skipped.push('Files larger than 256 KB were skipped');
-    }
-    const fileSlots = Math.max(0, MAX_PENDING_FILES - pendingFiles.length);
-    const acceptedFiles = sizedTextFiles.slice(0, fileSlots);
-    if (sizedTextFiles.length > acceptedFiles.length) {
-      skipped.push(`Maximum ${MAX_PENDING_FILES} files allowed`);
-    }
-
-    let readFailures = 0;
-    const newImages: PendingImageAttachment[] = [];
-    for (const file of acceptedImages) {
-      try {
-        newImages.push({
-          id: `img-${attachmentIdRef.current++}`,
-          name: file.name,
-          dataUrl: await readFileAsDataUrl(file),
-        });
-      } catch (err) {
-        console.error('[SidePanel] Image read failed:', file.name, err);
-        readFailures++;
-      }
-    }
-
-    const newFiles: PendingFileAttachment[] = [];
-    for (const file of acceptedFiles) {
-      try {
-        newFiles.push({
-          id: `file-${attachmentIdRef.current++}`,
-          name: file.name,
-          text: (await readFileAsText(file)).slice(0, TEXT_FILE_READ_CAP_CHARS),
-        });
-      } catch (err) {
-        console.error('[SidePanel] File read failed:', file.name, err);
-        readFailures++;
-      }
-    }
-    if (readFailures > 0) skipped.push('Failed to read some files');
-
-    // Cap inside the updater too: rapid double-drop/paste can otherwise
-    // exceed the limit computed from the stale closure above.
-    if (newImages.length > 0) setPendingImages(prev => [...prev, ...newImages].slice(0, MAX_PENDING_IMAGES));
-    if (newFiles.length > 0) setPendingFiles(prev => [...prev, ...newFiles].slice(0, MAX_PENDING_FILES));
-    if (skipped.length > 0) showAttachmentHint(skipped.slice(0, 2).join(' · '));
-  }, [pendingImages.length, pendingFiles.length, showAttachmentHint]);
-
-  // Ref mirror so the window-level paste listener always calls the latest
-  // closure without re-registering on every attachment change.
-  const addFilesRef = useRef(addFilesToAttachments);
-  addFilesRef.current = addFilesToAttachments;
-
-  // Paste images from the clipboard; plain text paste stays untouched.
-  useEffect(() => {
-    if (!isOpen || !isReady) return;
-    const handlePaste = (e: ClipboardEvent) => {
-      const files = e.clipboardData?.files;
-      if (!files || files.length === 0) return;
-      if (!Array.from(files).some(f => f.type.startsWith('image/'))) return;
-      e.preventDefault();
-      addFilesRef.current(files);
-    };
-    window.addEventListener('paste', handlePaste);
-    return () => window.removeEventListener('paste', handlePaste);
-  }, [isOpen, isReady]);
-
-  const removePendingImage = useCallback((id: string) => {
-    setPendingImages(prev => prev.filter(img => img.id !== id));
-  }, []);
-
-  const removePendingFile = useCallback((id: string) => {
-    setPendingFiles(prev => prev.filter(f => f.id !== id));
-  }, []);
+  }, [isOpen, scrollToBottom]);
 
   useEffect(() => {
-    if (showMemoryVault) {
-      setMemories(aiMemory.getMemories());
-      setTasks(aiMemory.getTaskHistory());
-    }
-  }, [showMemoryVault]);
+    scrollToBottom(true);
+  }, [messages, streamingText, scrollToBottom]);
 
+  // Sync agent status
+  useEffect(() => {
+    const unsub = aiAgent.onStatus((status) => {
+      setIsReady(aiAgent.isReady());
+      setIsInitializing(status.state === 'loading_model');
+    });
+    return () => unsub();
+  }, []);
+
+  // Listen to pending actions from outside
+  useEffect(() => {
+    if (pendingActions && pendingActions.length > 0) {
+      const action = pendingActions[0];
+      handleSendPrompt(action.text);
+      onPendingActionConsumed?.(action.id);
+    }
+  }, [pendingActions, onPendingActionConsumed]);
+
+  // Model download / init handler
   const handleInit = useCallback(async () => {
     if (isReady || isInitializing) return;
     setIsInitializing(true);
-    setInitError('');
+    setDownloadProgress(0);
+    setDownloadStatusText(isTr ? 'AI Modeli hazırlanıyor...' : 'Preparing AI model...');
     try {
       await aiAgent.init((p, text) => {
-        setProgress(p);
-        setProgressText(text);
+        setDownloadProgress(p);
+        setDownloadStatusText(text);
       });
       setIsReady(true);
-      // Do not wipe an existing conversation when initialization is triggered
-      // automatically by the first message.
-      if (messagesRef.current.length === 0) {
-        const welcome: ChatCompletionMessageParam[] = [{
-          role: 'assistant',
-          content: 'Hello! I am ready to control your browser, analyze pages, or answer your questions. What would you like me to do?'
-        }];
-        messagesRef.current = welcome;
-        setMessages(welcome);
-      }
     } catch (err: any) {
-      console.error(err);
-      setInitError('Failed to initialize AI engine. Please try again.');
-      setProgressText('Initialization failed.');
+      console.error('[SidePanel] Init error:', err);
+      const errMsg = err?.message || String(err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: isTr
+            ? `⚠️ **AI Modeli Başlatılamadı:** ${errMsg}\n\nLütfen WebGPU desteğini ve internet bağlantınızı kontrol edip tekrar deneyin.`
+            : `⚠️ **Failed to start AI model:** ${errMsg}\n\nPlease check your WebGPU settings and connection, then try again.`,
+        },
+      ]);
     } finally {
       setIsInitializing(false);
     }
-  }, [isReady, isInitializing]);
+  }, [isReady, isInitializing, isTr]);
 
-  const handleClearAICache = async () => {
-    const confirmed = await showConfirm({
-      title: 'Clear AI Cache',
-      message: 'Clear downloaded AI models and temporary cache to free up disk space?',
-      confirmLabel: 'Clear Cache',
-      cancelLabel: 'Cancel'
-    });
-    if (!confirmed) return;
-    try {
-      if (typeof window !== 'undefined' && 'caches' in window) {
-        const keys = await window.caches.keys();
-        for (const k of keys) {
-          await window.caches.delete(k);
+  // Send message flow
+  const handleSendPrompt = useCallback(
+    async (
+      textToSend?: string,
+      meta?: { model?: string; effort?: string; attachments?: File[] }
+    ) => {
+      const prompt = (textToSend || '').trim();
+      if (!prompt || isLoading) return;
+
+      const userAttachments =
+        meta?.attachments && meta.attachments.length > 0
+          ? meta.attachments.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }))
+          : undefined;
+
+      const userMessage: ChatMessage = {
+        role: 'user',
+        content: prompt,
+        attachments: userAttachments,
+      };
+      const nextMessages = [...messagesRef.current, userMessage];
+      setMessages(nextMessages);
+      messagesRef.current = nextMessages;
+
+      setIsLoading(true);
+      setStreamingText('');
+      const startTime = Date.now();
+      setStreamStartTime(startTime);
+
+      const requestId = ++requestIdRef.current;
+
+      try {
+        // 1. Direct zero-latency browser actions
+        const directIntent = detectDirectIntent(prompt);
+        if (directIntent) {
+          const directAssistantMsg: ChatMessage = {
+            role: 'assistant',
+            content: directIntent.directReply || (isTr ? 'İşlem tamamlandı.' : 'Action completed.'),
+          };
+          setMessages([...nextMessages, directAssistantMsg]);
+          messagesRef.current = [...nextMessages, directAssistantMsg];
+          setIsLoading(false);
+          setStreamingText('');
+          return;
         }
-      }
-      if ((window as any).electronAPI?.clearAiModelsCache) {
-        await (window as any).electronAPI.clearAiModelsCache();
-      }
-      setMessages([{ role: 'assistant', content: 'AI model cache and temporary files were successfully deleted from your computer.' }]);
-      messagesRef.current = [{ role: 'assistant', content: 'AI model cache and temporary files were successfully deleted from your computer.' }];
-      setIsReady(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
-  const handleAIAction = async (text: string, attachments?: ChatAttachments) => {
-    const normalizedText = typeof text === 'string' ? text.trim() : '';
-    const hasAttachments = Boolean(
-      attachments && ((attachments.images?.length ?? 0) > 0 || (attachments.files?.length ?? 0) > 0)
-    );
-    if ((!normalizedText && !hasAttachments) || isSubmittingRef.current) return;
+        // 2. Ensure engine initialized
+        if (!aiAgent.isReady()) {
+          await handleInit();
+        }
 
-    isSubmittingRef.current = true;
-    const requestId = ++requestIdRef.current;
-
-    // Attachment-only turns still need visible content in the user bubble
-    let userContent = normalizedText;
-    if (!userContent && hasAttachments) {
-      const kinds = [
-        ...((attachments!.images?.length ?? 0) > 0 ? ['image'] : []),
-        ...((attachments!.files?.length ?? 0) > 0 ? ['file'] : []),
-      ];
-      userContent = `(attached ${kinds.join(' and ')})`;
-    }
-
-    const userMsg: ChatCompletionMessageParam = { role: 'user', content: userContent };
-    const newMessages = [...messagesRef.current, userMsg];
-    messagesRef.current = newMessages;
-    setMessages(newMessages);
-    setIsLoading(true);
-    setStreamingText('');
-    let streamedSoFar = '';
-
-    try {
-      if (!aiAgent.isReady()) {
-        await handleInit();
-      }
-
-      if (requestId !== requestIdRef.current) return;
-      if (!aiAgent.isReady()) {
-        const fallbackMessages = [...newMessages, { role: 'assistant', content: 'AI engine is not initialized. Click "Start AI" and try again.' } as ChatCompletionMessageParam];
-        messagesRef.current = fallbackMessages;
-        setMessages(fallbackMessages);
-        return;
-      }
-
-      let lastRenderTime = 0;
-      const THROTTLE_MS = 80; // Only update UI max ~12 times a second to prevent React freezing
-
-      const updatedMessages = await aiAgent.chat(newMessages, (chunk) => {
         if (requestId !== requestIdRef.current) return;
-        streamedSoFar += chunk;
-        const now = performance.now();
-        if (now - lastRenderTime > THROTTLE_MS) {
-          setStreamingText(streamedSoFar);
-          lastRenderTime = now;
+
+        if (!aiAgent.isReady()) {
+          setMessages([
+            ...nextMessages,
+            {
+              role: 'assistant',
+              content: isTr
+                ? 'AI motoru hazır değil. Lütfen modelin yüklenmesini bekleyin veya üstteki **AI Başlat** butonuna tıklayın.'
+                : 'AI engine is not ready. Please wait for model download or click **Start AI** in the header.',
+            },
+          ]);
+          setIsLoading(false);
+          return;
         }
-      }, attachments);
 
-      if (requestId !== requestIdRef.current) {
-        // Stopped mid-stream: keep the partial answer instead of dropping it.
-        if (streamedSoFar.trim()) {
-          const partialMessages = [...newMessages, { role: 'assistant', content: `${streamedSoFar}\n\n*(stopped)*` } as ChatCompletionMessageParam];
-          messagesRef.current = partialMessages;
-          setMessages(partialMessages);
+        // 3. WebLLM Streaming
+        let accumulated = '';
+        let lastRender = 0;
+        const THROTTLE = 60; // 60ms throttle for silky 60fps streaming
+
+        const agentResult = await aiAgent.chat(
+          nextMessages.map((m) => ({
+            role: m.role,
+            content: m.content,
+          })) as ChatCompletionMessageParam[],
+          (chunk) => {
+            if (requestId !== requestIdRef.current) return;
+            accumulated += chunk;
+            const now = performance.now();
+            if (now - lastRender > THROTTLE) {
+              setStreamingText(accumulated);
+              lastRender = now;
+            }
+          }
+        );
+
+        if (requestId !== requestIdRef.current) return;
+
+        // Parse reasoning (<think> tags from DeepSeek/Qwen)
+        let cleanContent = accumulated;
+        let reasoningText: string | undefined;
+
+        const thinkStart = accumulated.indexOf('<think>');
+        if (thinkStart !== -1) {
+          const thinkEnd = accumulated.indexOf('</think>');
+          if (thinkEnd !== -1) {
+            reasoningText = accumulated.substring(thinkStart + 7, thinkEnd).trim();
+            cleanContent = (accumulated.substring(0, thinkStart) + accumulated.substring(thinkEnd + 8)).trim();
+          }
         }
-        setStreamingText('');
-        return;
-      }
-      const cleanMessages = updatedMessages.filter(m => m.role !== 'tool');
-      messagesRef.current = cleanMessages;
-      setStreamingText('');
-      setMessages(cleanMessages);
-      setMemories(aiMemory.getMemories());
-      // Chips are cleared only on success so a failed turn can be retried
-      if (attachments) {
-        setPendingImages([]);
-        setPendingFiles([]);
-      }
-    } catch (err: any) {
-      if (requestId !== requestIdRef.current) {
-        if (streamedSoFar.trim()) {
-          const partialMessages = [...newMessages, { role: 'assistant', content: `${streamedSoFar}\n\n*(stopped)*` } as ChatCompletionMessageParam];
-          messagesRef.current = partialMessages;
-          setMessages(partialMessages);
+
+        const finalAssistantMsg: ChatMessage = {
+          role: 'assistant',
+          content: cleanContent || accumulated || (isTr ? 'Yanıt üretilemedi.' : 'No response generated.'),
+          reasoning: reasoningText
+            ? {
+                text: reasoningText,
+                durationMs: Date.now() - startTime,
+              }
+            : undefined,
+        };
+
+        const finalMessages = [...nextMessages, finalAssistantMsg];
+        setMessages(finalMessages);
+        messagesRef.current = finalMessages;
+      } catch (err: any) {
+        console.error('[SidePanel] Chat error:', err);
+        setMessages([
+          ...nextMessages,
+          {
+            role: 'assistant',
+            content: isTr
+              ? `Bir hata oluştu: ${err?.message || 'Bilinmeyen hata'}`
+              : `An error occurred: ${err?.message || 'Unknown error'}`,
+          },
+        ]);
+      } finally {
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+          setStreamingText('');
+          setStreamStartTime(null);
         }
-        setStreamingText('');
-        return;
       }
-      setStreamingText('');
-      console.error('[AI Chat Error]', err);
-      const rawMsg = err?.message ?? err?.toString() ?? '';
-      let errMsg: string;
-      if (err instanceof AiError && err.code === 'vision_required') {
-        errMsg = 'Images could not be processed: selected model does not support visual content. Select "Phi 3.5 Vision" from the model list to analyze images.';
-      } else if (rawMsg.includes('Engine not initialized')) {
-        errMsg = 'AI engine is not loaded yet. Click "Start AI" and try again.';
-      } else if (rawMsg.includes('ContentTypeError')) {
-        errMsg = 'Message format error occurred. Please reset the chat and try again.';
-      } else if (rawMsg) {
-        errMsg = `Error: ${rawMsg}`;
-      } else {
-        errMsg = 'An unknown error occurred. Check the console.';
-      }
-      const errorMessages = [...newMessages, { role: 'assistant', content: errMsg } as ChatCompletionMessageParam];
-      messagesRef.current = errorMessages;
-      setMessages(errorMessages);
-    } finally {
-      if (requestId === requestIdRef.current) {
-        isSubmittingRef.current = false;
-        setIsLoading(false);
-      }
-    }
-  };
-
-  const handleSubmit = async (e?: { preventDefault(): void }) => {
-    e?.preventDefault();
-    if (isSubmittingRef.current) return;
-    const hasPendingAttachments = pendingImages.length > 0 || pendingFiles.length > 0;
-    if ((!input.trim() && !hasPendingAttachments) || isLoading) return;
-    const currentInput = input;
-    const images = pendingImages.map(img => img.dataUrl);
-    const files = pendingFiles.map(f => ({ name: f.name, text: f.text }));
-    setInput('');
-    await handleAIAction(currentInput, hasPendingAttachments ? { images, files } : undefined);
-  };
-
-  const handleStop = useCallback(() => {
-    requestIdRef.current += 1;
-    isSubmittingRef.current = false;
-    aiAgent.interrupt();
-    tts.stop();
-    orchestrator.clearQueue();
-    setIsLoading(false);
-    setStreamingText('');
-  }, []);
-
-  const handleResetChat = useCallback(() => {
-    requestIdRef.current += 1;
-    isSubmittingRef.current = false;
-    aiAgent.interrupt();
-    const resetMessages: ChatCompletionMessageParam[] = [{ role: 'assistant', content: 'Chat reset. How can I help you?' }];
-    messagesRef.current = resetMessages;
-    setMessages(resetMessages);
-    setStreamingText('');
-    setIsLoading(false);
-  }, []);
-
-  const handleAIActionRef = useRef(handleAIAction);
-  handleAIActionRef.current = handleAIAction;
-
-  // Quick actions carry the pending chips with them so attachments are
-  // never silently left behind in the tray.
-  const handleQuickPrompt = useCallback((promptText: string) => {
-    const images = pendingImages.map(img => img.dataUrl);
-    const files = pendingFiles.map(f => ({ name: f.name, text: f.text }));
-    const hasPendingAttachments = images.length > 0 || files.length > 0;
-    handleAIActionRef.current(promptText, hasPendingAttachments ? { images, files } : undefined);
-  }, [pendingImages, pendingFiles]);
-
-  // App owns the quick-action queue so actions are not lost while this lazy
-  // panel is mounting. Consume each queued item exactly once when idle.
-  const lastConsumedActionRef = useRef<string | null>(null);
-  useEffect(() => {
-    const action = pendingActions[0];
-    if (!action || isLoading || isSubmittingRef.current) return;
-    const key = `${action.id}:${action.text}`;
-    if (lastConsumedActionRef.current === key) return;
-    lastConsumedActionRef.current = key;
-    onPendingActionConsumed?.(action.id);
-    handleAIActionRef.current(action.text);
-  }, [pendingActions[0]?.id, (pendingActions[0] as { text?: string } | undefined)?.text, isLoading, onPendingActionConsumed]);
-
-  // Whether the selected model can ingest image content parts (drives the
-  // inline hint under pending image chips; sending is never blocked here —
-  // the engine throws the typed AiError instead).
-  const selectedModelSupportsVision = Boolean(
-    AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.vision
+    },
+    [isLoading, handleInit, isTr]
   );
 
-  // Global agent status pill content (Feature: single state line above input)
-  const statusPill: { icon: React.ReactNode; label: string; detail?: string; classes: string } | null = (() => {
-    switch (agentStatus.state) {
-      case 'loading_model':
-        return {
-          icon: <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
-          label: 'Loading model',
-          detail: agentStatus.detail,
-          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
-        };
-      case 'thinking':
-        // Thinking state is cleanly rendered inside the message stream typing bubble
-        return null;
-      case 'acting':
-        return {
-          icon: <Wrench className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0 animate-bounce" />,
-          label: 'Executing action',
-          detail: agentStatus.detail,
-          classes: 'bg-cyan-50/80 dark:bg-cyan-950/30 border-cyan-300 dark:border-cyan-500/30 text-cyan-700 dark:text-cyan-300',
-        };
-      case 'waiting_approval':
-        return {
-          icon: <ShieldAlert className="w-3.5 h-3.5 flex-shrink-0" />,
-          label: 'Waiting for approval',
-          classes: 'bg-amber-50 dark:bg-amber-900/10 border-amber-300 dark:border-amber-500/40 text-amber-600 dark:text-amber-400',
-        };
-      case 'parked':
-        return {
-          icon: <Cpu className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />,
-          label: 'Model parked (VRAM freed)',
-          detail: 'GPU memory restored to web browsing tabs',
-          classes: 'bg-white dark:bg-slate-800/80 border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300',
-        };
-      case 'error':
-        return {
-          icon: <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />,
-          label: agentStatus.detail || 'An error occurred',
-          classes: 'bg-red-50 dark:bg-red-900/20 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400',
-        };
-      default:
-        return null;
+  const handleStop = useCallback(() => {
+    requestIdRef.current++;
+    setIsLoading(false);
+    if (streamingText.trim()) {
+      const stoppedMsg: ChatMessage = {
+        role: 'assistant',
+        content: `${streamingText}\n\n*(durduruldu / stopped)*`,
+      };
+      setMessages((prev) => [...prev, stoppedMsg]);
     }
-  })();
+    setStreamingText('');
+    setStreamStartTime(null);
+  }, [streamingText]);
 
-  // Download % parsed from the loading detail ("42% Fetching..."); null when
-  // not trivially parseable, in which case no progress bar is rendered.
-  const loadProgressPct = agentStatus.state === 'loading_model'
-    ? (() => {
-        const match = agentStatus.detail?.match(/(\d+)%/);
-        if (!match) return null;
-        return Math.min(100, Math.max(0, parseInt(match[1], 10)));
-      })()
-    : null;
+  const handleCopy = useCallback((text: string, idx: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(() => setCopiedIdx(null), 2000);
+  }, []);
+
+  // Subscribe to TTS speaking state
+  useEffect(() => {
+    return tts.subscribe((speaking) => setIsSpeaking(speaking));
+  }, []);
+
+  const handleSpeak = useCallback((text: string) => {
+    if (isSpeaking) {
+      tts.stop();
+    } else {
+      tts.speak(text);
+    }
+  }, [isSpeaking]);
+
+  const handleResetChat = useCallback(() => {
+    setMessages([]);
+    messagesRef.current = [];
+    setStreamingText('');
+  }, []);
+
+  const handleSelectModel = useCallback(async (modelId: string) => {
+    if (modelId === selectedModelId && isReady) return;
+
+    setSelectedModelId(modelId);
+    setIsReady(false);
+    setIsInitializing(true);
+    setDownloadProgress(0);
+    try {
+      await aiAgent.setModel(modelId);
+      await aiAgent.init((p, text) => {
+        setDownloadProgress(p);
+        setDownloadStatusText(text);
+      });
+      setIsReady(true);
+    } catch (err: any) {
+      console.error('[SidePanel] Model switch error:', err);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [selectedModelId, isReady]);
+
+  if (!isOpen) return null;
+
+  const currentModel = AVAILABLE_AI_MODELS.find((m) => m.id === selectedModelId) || AVAILABLE_AI_MODELS[0];
+  const hasActiveWebPage = activeTab && activeTab.url && !activeTab.url.startsWith('nova://') && activeTab.url !== 'about:blank';
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <motion.div
-          initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 384, opacity: 1 }}
-          exit={{ width: 0, opacity: 0 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="flex-shrink-0 relative h-full border-l border-slate-200 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden"
-        >
-          <div className="w-88 sm:w-96 h-full flex flex-col flex-1 overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3.5 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/[0.02] backdrop-blur-md">
-              <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100">
-                <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20">
-                  <Sparkles className="w-4 h-4" />
-                </div>
-                <h2 className="font-semibold text-sm">Browser AI</h2>
+    <motion.aside
+      initial={{ width: 0, opacity: 0 }}
+      animate={{ width: 420, opacity: 1 }}
+      exit={{ width: 0, opacity: 0 }}
+      transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+      style={{ width: 420, minWidth: 420, maxWidth: 420 }}
+      className="flex-shrink-0 w-[420px] min-w-[420px] max-w-[420px] relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden select-none"
+    >
+      {/* 1. TOP CONTROLS (Seamless, unified without separate background tone or brand clutter) */}
+      <div className="flex flex-col px-3.5 pt-3 pb-1 shrink-0">
+        <div className="flex items-center justify-between min-h-[30px]">
+          {/* Left: Model download progress if loading */}
+          <div className="flex items-center gap-2">
+            {isInitializing && (
+              <div className="flex items-center gap-1.5 text-xs text-cyan-600 dark:text-cyan-400 font-medium">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span className="text-[11px] font-mono">{downloadProgress > 0 ? `${downloadProgress}%` : ''}</span>
               </div>
-              <div className="flex items-center gap-1.5">
-                {aiAgent.isEngineLoaded() ? (
-                  <button
-                    onClick={async () => {
-                      await aiAgent.parkModel();
-                      setIsReady(false);
-                    }}
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-medium bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border border-cyan-500/20 transition-all cursor-pointer"
-                    title="Resident model is loaded in VRAM. Click to park and release GPU memory to tabs."
-                  >
-                    <Cpu className="w-3 h-3" />
-                    <span>~{aiAgent.getVramEstimate()}MB</span>
-                    <span className="text-[9px] opacity-75 underline ml-0.5">Park</span>
-                  </button>
-                ) : (
-                  <span
-                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-medium bg-slate-100 dark:bg-white/5 text-slate-400 border border-slate-200/60 dark:border-white/10"
-                    title="Model is parked. 0 MB VRAM used. Wakes up automatically when prompted."
-                  >
-                    <Cpu className="w-3 h-3" />
-                    <span>0MB Parked</span>
-                  </span>
-                )}
-                <button
-                  onClick={() => setShowMemoryVault(!showMemoryVault)}
-                className={`p-1.5 rounded-lg transition-colors ${showMemoryVault ? 'bg-accent/20 dark:bg-accent-dark/50 text-accent-hover' : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
-                title="AI Persistent Memory Panel"
-              >
-                <Brain className="w-4 h-4" />
-              </button>
-              {isReady && messages.length > 0 && !isLoading && (
-                <button
-                  onClick={handleResetChat}
-                  className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-                  title="Reset Chat"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-              )}
-              {!isLoading && (
-                <button
-                  onClick={handleClearAICache}
-                  className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors"
-                  title="Purge Downloaded AI Cache & Free Disk Space"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-              {isSpeaking ? (
-                <button
-                  onClick={() => tts.stop()}
-                  className="p-1.5 rounded-lg bg-orange-100 dark:bg-orange-900/30 text-orange-500 animate-pulse transition-colors"
-                  title="Stop Reading"
-                >
-                  <VolumeX className="w-4 h-4" />
-                </button>
-              ) : null}
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+            )}
           </div>
 
-          {/* Body */}
-          <ChatContainerRoot
-            className={`relative flex-1 p-4 transition-colors ${
-              isDraggingFiles && isReady && !showMemoryVault ? 'ring-2 ring-inset ring-cyan-400 bg-cyan-50/50 dark:bg-cyan-500/5 rounded-xl' : ''
-            }`}
-            onDragOver={(e) => {
-              if (!isReady || showMemoryVault) return;
-              e.preventDefault();
-              setIsDraggingFiles(true);
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                setIsDraggingFiles(false);
-              }
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDraggingFiles(false);
-              if (!isReady || showMemoryVault) return;
-              if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-                addFilesToAttachments(e.dataTransfer.files);
-              }
-            }}
-          >
-            <ChatContainerContent className="gap-4">
-            {/* Memory Vault Overlay */}
-            {showMemoryVault ? (
-              <div className="flex-1 flex flex-col overflow-y-auto">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                      <Brain className="w-4 h-4 text-accent" /> AI Memory Vault
-                    </h3>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">Persistent user preferences and task history</p>
-                  </div>
-                  {((vaultTab === 'memory' && memories.length > 0) || (vaultTab === 'tasks' && tasks.length > 0)) && (
-                    <button
-                      onClick={() => {
-                        if (vaultTab === 'memory') {
-                          aiMemory.clearAllMemories();
-                          setMemories([]);
-                        } else {
-                          aiMemory.clearAllTasks();
-                          setTasks([]);
-                        }
-                      }}
-                      className="text-[10px] px-2 py-1 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors font-medium flex items-center gap-1"
-                      title={vaultTab === 'memory' ? "Clear all memories" : "Clear all tasks"}
-                    >
-                      <Trash2 className="w-3 h-3" /> Clear All
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-lg mb-4">
-                  <button
-                    onClick={() => {
-                      setVaultTab('memory');
-                      setMemories(aiMemory.getMemories());
-                    }}
-                    className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'memory' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                  >
-                    Persistent Info ({memories.length})
-                  </button>
-                  <button
-                    onClick={() => {
-                      setVaultTab('tasks');
-                      setTasks(aiMemory.getTaskHistory());
-                    }}
-                    className={`flex-1 py-1 text-xs font-medium rounded-md transition-colors ${vaultTab === 'tasks' ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-800 dark:text-slate-200' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                  >
-                    Task History ({tasks.length})
-                  </button>
-                </div>
-
-                {vaultTab === 'memory' ? (
-                  <>
-                    <form 
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        if (!newFact.trim()) return;
-                        aiMemory.addMemory(newFact.trim(), newCategory, false);
-                        setMemories(aiMemory.getMemories());
-                        setNewFact('');
-                      }}
-                      className="flex flex-col gap-2 mb-4"
-                    >
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={newFact}
-                          onChange={(e) => setNewFact(e.target.value)}
-                          placeholder="Add memory info (e.g. 'Keep answers short')"
-                          className="flex-1 px-3 py-1.5 text-xs rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent"
-                        />
-                        <button
-                          type="submit"
-                          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-xl text-xs font-medium transition-all flex items-center justify-center"
-                          title="Save memory"
-                        >
-                          <Plus className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] text-slate-400">Category:</span>
-                        {(['preference', 'fact', 'instruction'] as const).map((cat) => (
-                          <button
-                            key={cat}
-                            type="button"
-                            onClick={() => setNewCategory(cat)}
-                            className={`text-[10px] capitalize px-2 py-0.5 rounded-md transition-colors ${
-                              newCategory === cat
-                                ? 'bg-accent/15 text-accent font-semibold border border-accent/30'
-                                : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-                            }`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    </form>
-
-                    {/* Memory List */}
-                    <div className="flex-1 space-y-2 overflow-y-auto">
-                      {memories.length === 0 ? (
-                        <div className="text-center py-8 text-xs text-slate-400">
-                          No saved memories yet. The AI will automatically learn as you converse.
-                        </div>
-                      ) : (
-                        memories.map((m) => (
-                          <div 
-                            key={m.id}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 flex items-start justify-between gap-2 shadow-2xs group"
-                          >
-                            <div className="flex flex-col gap-1 flex-1">
-                              <span className={`self-start text-[9px] uppercase px-1.5 py-0.5 rounded-md font-semibold tracking-wider ${
-                                m.category === 'preference'
-                                  ? 'bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-400 border border-sky-200 dark:border-sky-800'
-                                  : m.category === 'instruction'
-                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800'
-                                  : 'bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-800'
-                              }`}>
-                                {m.category}
-                              </span>
-                              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                                {m.fact}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() => {
-                                aiMemory.deleteMemory(m.id);
-                                setMemories(aiMemory.getMemories());
-                              }}
-                              className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Delete this memory"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 space-y-2 overflow-y-auto">
-                    {tasks.length === 0 ? (
-                      <div className="text-center py-8 text-xs text-slate-400">
-                        No completed task history yet. As the AI browses and executes actions, tasks will appear here.
-                      </div>
-                    ) : (
-                      tasks.map((t) => (
-                        <div 
-                          key={t.id}
-                          className="p-3 bg-white dark:bg-slate-800 rounded-xl border border-slate-200/60 dark:border-slate-700/60 shadow-2xs group flex items-start justify-between gap-2"
-                        >
-                          <div className="flex flex-col gap-1 flex-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] text-slate-400 font-medium">Task Record</span>
-                              <span className="text-[9px] text-slate-400">{new Date(t.timestamp).toLocaleTimeString(getLocale(), { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                              {t.summary}
-                            </p>
-                          </div>
-                          <button
-                            onClick={() => {
-                              aiMemory.deleteTask(t.id);
-                              setTasks(aiMemory.getTaskHistory());
-                            }}
-                            className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity self-center"
-                            title="Delete task record"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                {isInitializing && (
-                  <ModelDownloadBubble
-                    modelName={(AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2').split('(')[0].trim()}
-                    modelSize={AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.size || '~1.7 GB'}
-                    progress={progress}
-                    progressText={progressText}
-                  />
-                )}
-                {initError && !isReady && !isInitializing && (
-                  <Card className="border-red-200/70 dark:border-red-900/40">
-                    <CardContent className="flex flex-col gap-2.5 pt-4">
-                      <p role="alert" className="text-xs leading-relaxed text-red-700 dark:text-red-300">
-                        {initError}
-                      </p>
-                      <Button variant="outline" size="sm" onClick={handleInit} className="self-start">
-                        <RefreshCw aria-hidden="true" />
-                        Retry download
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
-                {messages.filter(m => m.role !== 'system' && m.role !== 'tool' && (m.role === 'user' || (m.content && String(m.content).trim().length > 0))).map((msg, idx) => {
-                  const isUser = msg.role === 'user';
-                  const textContent = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content, null, 2);
-                  const isCopied = copiedIdx === idx;
-
-                  return (
-                    <motion.div
-                      key={idx}
-                      initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.2 }}
-                      className={`flex flex-col gap-1.5 ${isUser ? 'items-end' : 'items-start'}`}
-                    >
-                      <div className="flex items-center gap-1.5 px-1 text-xs text-slate-400 dark:text-slate-500 font-medium">
-                        {isUser ? (
-                          <span>You</span>
-                        ) : (
-                          <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
-                            <Avatar className="h-5 w-5">
-                              <AvatarFallback>
-                                <Sparkles className="h-3 w-3" aria-hidden="true" />
-                              </AvatarFallback>
-                            </Avatar>
-                            <span>Nova Assistant</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className={`max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm transition-all ${
-                        isUser 
-                          ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-tr-xs font-normal' 
-                          : 'bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs'
-                      }`}>
-                        {isUser ? (
-                          <span className="whitespace-pre-wrap break-words">{textContent}</span>
-                        ) : (
-                          <ReactMarkdown 
-                            remarkPlugins={[remarkGfm]}
-                            urlTransform={safeMarkdownUrlTransform}
-                            components={{
-                              a: ({ href, children, ...props }) => {
-                                const cleanHref = String(href || '').trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
-                                const isDangerous = !cleanHref || cleanHref.startsWith('javascript:') || cleanHref.startsWith('data:') || cleanHref.startsWith('vbscript:') || cleanHref.startsWith('file:') || cleanHref.startsWith('blob:');
-                                if (isDangerous) {
-                                  return <span className="underline opacity-60">{children}</span>;
-                                }
-                                return (
-                                  <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-500 underline hover:text-cyan-400" {...props}>
-                                    {children}
-                                  </a>
-                                );
-                              }
-                            }}
-                          >
-                            {textContent}
-                          </ReactMarkdown>
-                        )}
-                      </div>
-
-                      {!isUser && (
-                        <div className="flex items-center gap-1 px-1 mt-0.5">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(textContent).catch(() => {});
-                              setCopiedIdx(idx);
-                              if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
-                              copiedTimerRef.current = setTimeout(() => {
-                                setCopiedIdx(null);
-                                copiedTimerRef.current = null;
-                              }, 2000);
-                            }}
-                            title="Copy Text"
-                          >
-                            {isCopied ? <Check className="text-emerald-500" /> : <Copy />}
-                            <span>{isCopied ? 'Copied' : 'Copy'}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => tts.speak(textContent)}
-                            title="Read Aloud"
-                          >
-                            <Volume2 />
-                            <span>Read Aloud</span>
-                          </Button>
-                        </div>
-                      )}
-                    </motion.div>
-                  );
-                })}
-                
-                {/* Live streaming bubble */}
-                {isLoading && streamingText ? (
-                  <motion.div
-                    key="streaming"
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-1.5 items-start"
-                  >
-                    <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Nova Assistant</span>
-                    </div>
-                    <div className="max-w-[92%] rounded-2xl px-4 py-3.5 text-[13.5px] leading-relaxed overflow-hidden shadow-sm bg-white dark:bg-slate-800/90 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80 prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1.5 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900/90 prose-pre:border prose-pre:border-slate-200 dark:prose-pre:border-slate-700 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        urlTransform={safeMarkdownUrlTransform}
-                        components={{
-                          a: ({ href, children, ...props }) => {
-                            const cleanHref = String(href || '').trim().toLowerCase().replace(/[\x00-\x1f\s\u200b-\u200d\ufeff]/g, '');
-                            const isDangerous = !cleanHref || cleanHref.startsWith('javascript:') || cleanHref.startsWith('data:') || cleanHref.startsWith('vbscript:') || cleanHref.startsWith('file:') || cleanHref.startsWith('blob:');
-                            if (isDangerous) {
-                              return <span className="underline opacity-60">{children}</span>;
-                            }
-                            return (
-                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-500 underline hover:text-cyan-400" {...props}>
-                                {children}
-                              </a>
-                            );
-                          }
-                        }}
-                      >{streamingText}</ReactMarkdown>
-                    </div>
-                  </motion.div>
-                ) : isLoading ? (
-                  <motion.div
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-1.5 items-start"
-                  >
-                    <div className="flex items-center gap-1.5 px-1 text-xs text-cyan-600 dark:text-cyan-400 font-semibold">
-                      <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-                      <span>Nova Assistant</span>
-                    </div>
-                    <div className="rounded-2xl px-4 py-3 bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-tl-xs shadow-2xs flex items-center gap-2.5">
-                      <TypingLoader size="sm" className="[&_div]:bg-cyan-500" />
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">Thinking...</span>
-                    </div>
-                  </motion.div>
-                ) : null}
-
-                {/* Action approval gate: non read-only tool calls wait here for
-                    an explicit user decision before the agent may run them. */}
-                {queuedActions.filter(a => a.state === 'pending').map(action => (
-                  <motion.div
-                    key={action.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col gap-2 p-3 bg-amber-50/90 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/40 rounded-2xl shadow-sm"
-                  >
-                    <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 text-xs font-semibold">
-                      <ShieldAlert className="w-4 h-4 text-amber-500" />
-                      Action Approval Required
-                    </div>
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300">
-                      Assistant requests permission to execute browser action:
-                    </p>
-                    <div className="text-[10px] font-mono text-slate-600 dark:text-slate-300 break-all bg-white dark:bg-slate-900 p-2 rounded-xl border border-amber-200 dark:border-amber-800/40">
-                      <span className="font-bold text-amber-600 dark:text-amber-400">{action.toolName}</span>: {JSON.stringify(action.args)}
-                    </div>
-                    <div className="flex gap-2 mt-1">
-                      <button
-                        onClick={() => orchestrator.approveAction(action.id)}
-                        className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <Check className="w-3.5 h-3.5" /> Approve
-                      </button>
-                      <button
-                        onClick={() => orchestrator.denyAction(action.id)}
-                        className="flex-1 px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-700 hover:bg-red-500 hover:text-white text-slate-700 dark:text-slate-200 transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
-                      >
-                        <X className="w-3.5 h-3.5" /> Deny
-                      </button>
-                    </div>
-                  </motion.div>
-                ))}
-
-                {/* Quick Action Starter Prompts */}
-                {isReady && !isLoading && (messages.length === 0 || (messages.length === 1 && messages[0].role === 'assistant')) && (
-                  <Card className="mt-2 p-3">
-                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Quick Actions</span>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {[
-                        'Summarize this page',
-                        'Extract key insights',
-                        'Translate to English',
-                        'List action items',
-                        'Take screenshot'
-                      ].map((promptText, i) => (
-                        <PromptSuggestion
-                          key={i}
-                          size="sm"
-                          className="rounded-xl"
-                          onClick={() => handleQuickPrompt(promptText)}
-                        >
-                          {promptText}
-                        </PromptSuggestion>
-                      ))}
-                    </div>
-                  </Card>
-                )}
-
-                <ChatContainerScrollAnchor />
-              </>
-            )}
-          </ChatContainerContent>
-          <ScrollButton className="absolute bottom-4 right-4 z-10 shadow-lg" />
-        </ChatContainerRoot>
-
-          {/* Composer */}
-          <div className="p-3 border-t border-slate-200/80 dark:border-white/10 bg-slate-50/90 dark:bg-slate-900/95 backdrop-blur-md">
-              {/* Global agent status pill */}
-              {statusPill && (
-                <div className="mb-2">
-                  <motion.div
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs ${statusPill.classes}`}
-                  >
-                    {statusPill.icon}
-                    <span className="font-medium flex-shrink-0">{statusPill.label}</span>
-                    {statusPill.detail && (
-                      <span className="truncate opacity-80" title={statusPill.detail}>{statusPill.detail}</span>
-                    )}
-                  </motion.div>
-                  {loadProgressPct !== null && (
-                    <div className="mt-1 h-0.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
-                      <div
-                        className="h-full bg-cyan-500 transition-all duration-300 ease-out"
-                        style={{ width: `${loadProgressPct}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Transient inline hint */}
-              {attachmentHint && (
-                <p className="mb-2 text-[10px] text-red-500 dark:text-red-400 font-medium">{attachmentHint}</p>
-              )}
-
-              {/* Attachment Tray */}
-              {(pendingImages.length > 0 || pendingFiles.length > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mb-2 p-1.5 bg-white dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700 rounded-xl">
-                  {pendingImages.map(img => (
-                    <div key={img.id} className="relative group flex-shrink-0">
-                      <img
-                        src={img.dataUrl}
-                        alt={img.name}
-                        title={img.name}
-                        className="h-10 w-10 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removePendingImage(img.id)}
-                        className="absolute -top-1 -right-1 p-0.5 rounded-full bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-800 hover:bg-red-500 hover:text-white transition-colors"
-                        title="Remove attachment"
-                      >
-                        <X className="w-2.5 h-2.5" />
-                      </button>
-                    </div>
-                  ))}
-                  {pendingFiles.map(f => (
-                    <div
-                      key={f.id}
-                      className="flex items-center gap-1 pl-2 pr-1 py-1 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 max-w-[130px]"
-                    >
-                      <FileText className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
-                      <span className="text-[10px] font-medium text-slate-600 dark:text-slate-300 truncate" title={f.name}>
-                        {f.name}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => removePendingFile(f.id)}
-                        className="p-0.5 text-slate-400 hover:text-red-500 transition-colors flex-shrink-0 cursor-pointer"
-                        title="Remove attachment"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {pendingImages.length > 0 && !selectedModelSupportsVision && (
-                <p className="mb-2 flex items-center gap-1.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
-                  <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
-                  This model can't see images — switch to Phi 3.5 Vision below to analyze them.
-                </p>
-              )}
-
-              {/* Main Composer Box */}
-              <PromptInput
-                value={input}
-                onValueChange={setInput}
-                onSubmit={() => handleSubmit()}
-                isLoading={isLoading}
-                maxHeight={128}
-                disabled={isLoading || isListening}
-                className="rounded-2xl border-slate-200/90 bg-white shadow-sm focus-within:border-cyan-500/60 focus-within:ring-2 focus-within:ring-cyan-500/15 dark:border-slate-700/90 dark:bg-slate-900/95 dark:focus-within:border-cyan-400/60"
+          {/* Right Action Buttons */}
+          <div className="flex items-center gap-1 ml-auto">
+            {messages.length > 0 && !isLoading && (
+              <button
+                type="button"
+                onClick={handleResetChat}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                title={isTr ? 'Sohbeti Temizle' : 'Reset Chat'}
               >
-                <PromptInputTextarea
-                  placeholder={isListening ? "Listening..." : "Ask Nova Agent anything or give instructions..."}
-                  className="max-h-32 px-3.5 pt-3 pb-1 text-[13.5px] leading-relaxed text-slate-800 placeholder:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-                />
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
 
-                {/* Bottom Controls Bar */}
-                <PromptInputActions className="justify-between px-2 pb-1.5">
-                  <div className="flex items-center gap-1.5">
-                    {/* Model Picker Pill */}
-                    <div className="relative">
-                      <PromptInputAction tooltip="Select Model">
-                        <button
-                          type="button"
-                          onClick={() => setIsModelDropdownOpen(prev => !prev)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-all cursor-pointer border border-slate-200/60 dark:border-slate-700/60"
-                        >
-                          <Bot className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
-                          <span className="font-semibold text-[10px]">
-                            {(AVAILABLE_AI_MODELS.find(m => m.id === selectedModelId)?.name || 'Llama 3.2').split('(')[0].trim()}
-                          </span>
-                          <ChevronDown className="w-3 h-3 text-slate-400 shrink-0" />
-                        </button>
-                      </PromptInputAction>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              title={isTr ? 'Kapat' : 'Close'}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
 
-                      {isModelDropdownOpen && (
-                        <div className="absolute bottom-full left-0 mb-2 z-50 w-56 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 p-1.5 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
-                          <div className="text-[10px] font-semibold text-slate-400 px-2 py-1 uppercase tracking-wider">AI Models</div>
-                          {AVAILABLE_AI_MODELS.map(m => (
-                            <button
-                              key={m.id}
-                              type="button"
-                              onClick={async () => {
-                                const newModelId = m.id;
-                                setSelectedModelId(newModelId);
-                                setIsModelDropdownOpen(false);
-                                if (newModelId !== aiAgent.getModel()) {
-                                  aiAgent.setModel(newModelId);
-                                  setIsReady(false);
-                                  setIsInitializing(true);
-                                  setInitError('');
-                                  try {
-                                    await aiAgent.init((p, text) => {
-                                      setProgress(p);
-                                      setProgressText(text);
-                                    });
-                                    setIsReady(true);
-                                    const modelReadyMessages = [...messagesRef.current, { role: 'assistant', content: `AI model switched to **${m.name}** and ready.` } as ChatCompletionMessageParam];
-                                    messagesRef.current = modelReadyMessages;
-                                    setMessages(modelReadyMessages);
-                                  } catch (err: any) {
-                                    setInitError('Failed to load model: ' + (err?.message || 'Error'));
-                                  } finally {
-                                    setIsInitializing(false);
-                                  }
-                                }
-                              }}
-                              className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
-                                selectedModelId === m.id
-                                  ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
-                                  : 'hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'
-                              }`}
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium text-[11px]">{m.name.split('(')[0].trim()}</span>
-                                <span className="text-[9px] text-slate-400">{m.description.slice(0, 30)}...</span>
-                              </div>
-                              <span className="text-[9px] font-mono font-medium px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">{m.size}</span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+        {/* Active Tab Context Bar */}
+        {hasActiveWebPage && (
+          <div className="mt-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2 shadow-2xs backdrop-blur-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+              <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+              <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300 truncate" title={activeTab.title || activeTab.url}>
+                {activeTab.title || activeTab.url}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => handleSendPrompt(isTr ? 'Bu sayfayı özetle' : 'Summarize this page')}
+              className="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              {isTr ? '✦ Özetle' : '✦ Summarize'}
+            </button>
+          </div>
+        )}
+      </div>
 
-                    {/* File Attachment Button */}
-                    <PromptInputAction tooltip="Attach Image or File">
-                      <button
-                        type="button"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isLoading}
-                        className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-40 cursor-pointer"
-                      >
-                        <Paperclip className="w-3.5 h-3.5" />
-                      </button>
-                    </PromptInputAction>
-                  </div>
-
-                  {/* Right Side: Audio visualizer & Action button */}
-                  <div className="flex items-center gap-1.5">
-                    {isListening && (
-                      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/10 text-red-500 text-[10px] font-medium animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-                        <span>Listening</span>
-                      </div>
-                    )}
-
-                    {isLoading ? (
-                      <button
-                        type="button"
-                        onClick={handleStop}
-                        className="flex size-7.5 items-center justify-center rounded-xl bg-red-500 hover:bg-red-600 text-white transition-all shadow-sm active:scale-95 cursor-pointer"
-                        title="Stop"
-                      >
-                        <Square className="w-3.5 h-3.5 fill-current" />
-                      </button>
-                    ) : hasSpeechRecognition && !input.trim() && pendingImages.length === 0 && pendingFiles.length === 0 ? (
-                      <button
-                        type="button"
-                        onMouseDown={handleMouseDownMic}
-                        onMouseUp={handleMouseUpMic}
-                        onMouseLeave={handleMouseUpMic}
-                        className={`flex size-7.5 items-center justify-center rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer ${
-                          isListening
-                            ? 'bg-red-500 text-white shadow-red-500/30 animate-pulse'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                        }`}
-                        title="Push to Talk"
-                      >
-                        <Mic className="w-3.5 h-3.5" />
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0}
-                        className="flex size-7.5 items-center justify-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white transition-all shadow-sm disabled:opacity-40 disabled:pointer-events-none active:scale-95 cursor-pointer"
-                        title="Send"
-                      >
-                        <Send className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </PromptInputActions>
-              </PromptInput>
-
-              {/* Hidden attachment input */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept={ATTACH_INPUT_ACCEPT}
-                className="hidden"
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    addFilesToAttachments(e.target.files);
-                  }
-                  e.target.value = '';
-                }}
+      {/* 2. CHAT MESSAGES BODY */}
+      <div className="flex-1 p-4 nova-chat-scroll flex flex-col gap-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/25">
+        {/* Model Download Progress Card */}
+        {isInitializing && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-3.5 rounded-2xl border border-cyan-500/30 bg-cyan-50/50 dark:bg-cyan-950/20 shadow-sm"
+          >
+            <div className="flex items-center justify-between mb-2 text-xs">
+              <div className="flex items-center gap-2 font-semibold text-cyan-700 dark:text-cyan-300">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>{currentModel.name.split('(')[0].trim()}</span>
+              </div>
+              <span className="text-[10.5px] font-mono text-cyan-600 dark:text-cyan-400">
+                {downloadProgress}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div
+                className="h-full bg-cyan-500 transition-all duration-300 ease-out"
+                style={{ width: `${downloadProgress}%` }}
               />
             </div>
+            <p className="mt-1.5 text-[10.5px] text-slate-500 dark:text-slate-400 truncate">
+              {downloadStatusText || (isTr ? 'Ağırlıklar diske indiriliyor...' : 'Downloading model weights...')}
+            </p>
+          </motion.div>
+        )}
+
+        {/* Empty State */}
+        {messages.length === 0 && !isLoading && (
+          <div className="my-auto flex flex-col items-center justify-center text-center px-3 py-6">
+            <div className="relative mb-3 flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 via-sky-500/20 to-blue-600/20 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+              {isTr ? 'Nova AI Asistanı' : 'Nova AI Assistant'}
+            </h3>
+            <p className="mt-1 max-w-[260px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {isTr
+                ? 'Sayfaları özetleyin, sekmeleri yönetin veya web üzerinde yerel yapay zeka ile çalışın.'
+                : 'Summarize web pages, manage tabs, or automate actions privately on your device.'}
+            </p>
+
+            {/* Quick Starters */}
+            <div className="mt-5 w-full grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSendPrompt(isTr ? 'Bu sayfayı özetle' : 'Summarize this page')}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+              >
+                <Compass className="w-4 h-4 text-cyan-500 shrink-0" />
+                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 leading-tight">
+                  {isTr ? 'Sayfayı Özetle' : 'Summarize Page'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendPrompt(isTr ? 'Açık sekmeleri listele' : 'List open tabs')}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+              >
+                <Layers className="w-4 h-4 text-purple-500 shrink-0" />
+                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 leading-tight">
+                  {isTr ? 'Açık Sekmeler' : 'List Tabs'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendPrompt(isTr ? 'Web üzerinde en son haberleri ara' : 'Search latest news on web')}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+              >
+                <Search className="w-4 h-4 text-blue-500 shrink-0" />
+                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 leading-tight">
+                  {isTr ? 'Web’de Ara' : 'Search Web'}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleSendPrompt(isTr ? 'Neler yapabilirsin? Bana yeteneklerini anlat' : 'What can you do? Show capabilities')}
+                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+              >
+                <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-tight">
+                  {isTr ? 'Yetenekler' : 'Capabilities'}
+                </span>
+              </button>
+            </div>
           </div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        )}
+
+        {/* Message Items */}
+        {messages.map((msg, idx) => {
+          const isUser = msg.role === 'user';
+          const isReasoningOpen = Boolean(expandedReasoning[idx]);
+
+          return (
+            <div
+              key={idx}
+              className={`flex flex-col gap-1.5 w-full ${isUser ? 'items-end' : 'items-start'} group`}
+            >
+              {/* Sender Tag */}
+              <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 font-medium">
+                {isUser ? (
+                  <span>You</span>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
+                    <Sparkles className="w-3 h-3" />
+                    <span>Nova Assistant</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Reasoning Accordion (DeepSeek/Claude style) */}
+              {!isUser && msg.reasoning && (
+                <div className="w-full max-w-[92%] rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedReasoning((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                    className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Brain className="w-3.5 h-3.5 text-purple-500" />
+                      <span className="font-medium text-[11.5px]">Reasoning Process</span>
+                      {msg.reasoning.durationMs && (
+                        <span className="text-[9.5px] font-mono text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                          {(msg.reasoning.durationMs / 1000).toFixed(1)}s
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isReasoningOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {isReasoningOpen && (
+                    <div className="p-3 border-t border-slate-200/60 dark:border-white/5 text-[11.5px] leading-relaxed font-mono text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-52 nova-chat-scroll">
+                      {msg.reasoning.text}
+                    </div>
+                  )}
+                </div>
+              )}
+
+
+              {/* Message Bubble */}
+              <div
+                className={`max-w-[92%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed overflow-hidden shadow-2xs transition-all relative ${
+                  isUser
+                    ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 rounded-tr-xs font-normal border border-slate-800/80 dark:border-white/10'
+                    : 'bg-white/95 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-white/10 backdrop-blur-sm prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs prose-pre:text-slate-100'
+                }`}
+              >
+                {isUser ? (
+                  <>
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-2 justify-end">
+                        {msg.attachments.map((att, i) => (
+                          <img
+                            key={i}
+                            src={att.url}
+                            alt={att.name}
+                            className="size-16 object-cover rounded-xl border border-white/20 shadow-xs"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+                  </>
+                ) : (
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      a: ({ href, children }) => (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-500 underline hover:text-cyan-400 break-all"
+                        >
+                          {children}
+                        </a>
+                      ),
+                      p: ({ children }) => <p className="my-1 leading-relaxed break-words">{children}</p>,
+                      pre: ({ children }) => (
+                        <pre className="max-w-full overflow-x-auto rounded-xl p-3 my-2 bg-slate-950 text-slate-100 border border-slate-800 text-xs font-mono nova-chat-scroll">
+                          {children}
+                        </pre>
+                      ),
+                      code: ({ inline, children }: any) =>
+                        inline ? (
+                          <code className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-cyan-600 dark:text-cyan-400 font-mono text-[11.5px] break-all border border-slate-200/60 dark:border-white/5">
+                            {children}
+                          </code>
+                        ) : (
+                          <code className="block max-w-full overflow-x-auto whitespace-pre font-mono text-xs text-slate-100">
+                            {children}
+                          </code>
+                        ),
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                )}
+              </div>
+
+              {/* Action Buttons on Assistant Message */}
+              {!isUser && (
+                <div className="flex items-center gap-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(msg.content, idx)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
+                    title={isTr ? 'Kopyala' : 'Copy'}
+                  >
+                    {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedIdx === idx ? (isTr ? 'Kopyalandı' : 'Copied') : (isTr ? 'Kopyala' : 'Copy')}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSpeak(msg.content)}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
+                    title={isTr ? 'Sesli Oku' : 'Read aloud'}
+                  >
+                    {isSpeaking ? <VolumeX className="w-3 h-3 text-orange-500" /> : <Volume2 className="w-3 h-3" />}
+                    <span>{isTr ? 'Seslendir' : 'Speak'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Live Streaming Message Bubble */}
+        {isLoading && (
+          <div className="flex flex-col gap-1.5 w-full items-start">
+            <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
+              <Sparkles className="w-3 h-3 animate-pulse" />
+              <span>Nova Assistant</span>
+              {streamStartTime && (
+                <span className="text-[10px] font-mono text-slate-400">
+                  · {((Date.now() - streamStartTime) / 1000).toFixed(1)}s
+                </span>
+              )}
+            </div>
+            <div className="max-w-[92%] rounded-2xl rounded-tl-xs px-4 py-3 bg-white/95 dark:bg-slate-900/80 border border-slate-200/90 dark:border-white/10 text-slate-800 dark:text-slate-100 text-[13px] leading-relaxed shadow-2xs">
+              {streamingText ? (
+                <>
+                  <span className="whitespace-pre-wrap break-words">{streamingText}</span>
+                  <span className="inline-block w-1.5 h-3.5 ml-1 bg-cyan-500 animate-pulse rounded-full align-middle" />
+                </>
+              ) : (
+                <div className="flex items-center gap-2 text-slate-400 font-medium text-xs">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
+                  <span>{isTr ? 'Düşünüyor...' : 'Thinking...'}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* 3. MODERN SPRING PHYSICS PROMPT INPUT */}
+      <footer className="p-3 pt-1.5 bg-gradient-to-t from-slate-100/95 via-slate-100/80 to-transparent dark:from-slate-950/95 dark:via-slate-950/80 dark:to-transparent backdrop-blur-md flex justify-center">
+        <PromptInput
+          fullWidth
+          className="w-full"
+          placeholder={
+            hasActiveWebPage
+              ? (isTr ? 'Bu sayfa veya web hakkında bir soru sorun...' : 'Ask about this page or instruct Nova...')
+              : (isTr ? 'Nova Asistan’a bir şey sorun...' : 'Ask Nova Assistant anything...')
+          }
+          models={AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
+          selectedModel={currentModel.name.split('(')[0].trim()}
+          onModelChange={(modelName) => {
+            const found = AVAILABLE_AI_MODELS.find(
+              (m) => m.name.split('(')[0].trim().toLowerCase() === modelName.toLowerCase()
+            );
+            if (found) {
+              handleSelectModel(found.id);
+            }
+          }}
+          isLoading={isLoading}
+          onStop={handleStop}
+          onSubmit={(prompt, meta) => {
+            handleSendPrompt(prompt, meta);
+          }}
+        />
+      </footer>
+    </motion.aside>
   );
 });

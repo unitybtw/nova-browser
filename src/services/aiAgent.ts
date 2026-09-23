@@ -4,6 +4,7 @@ import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
 import { generateId } from "../utils/idGenerator";
 import { logger } from "../utils/logger";
+import { getLocale } from "./i18n";
 
 // ---------------------------------------------------------------------------
 // Security: Prompt injection sanitizer
@@ -102,7 +103,7 @@ export interface AIActionContext {
   onNavigate: (url: string) => void;
   onExecuteScript: (script: string) => Promise<any>;
   onCreateTab: (url: string) => void;
-  onCloseTab: (tabId: string) => void;
+  onCloseTab: (tabId?: string) => void;
   onSwitchTab: (tabId: string) => void;
   onGetAllTabs: () => { id: string, title: string, url: string }[];
   onScrollPage: (direction: "up"|"down"|"top"|"bottom", amount?: number) => void;
@@ -216,17 +217,19 @@ export const AVAILABLE_AI_MODELS: AIModelOption[] = [
   }
 ];
 
-function isTurkishText(str: string): boolean {
+function isTurkishContext(str: string): boolean {
+  if (getLocale() === 'tr-TR') return true;
   if (/[ığüşöçİĞÜŞÖÇ]/.test(str)) return true;
-  return /\b(merhaba|selam|selamlar|nasılsın|naber|lütfen|teşekkür|tesekkur|sekme|sekmeyi|sayfa|sayfayı|özetle|ozetle|kapat|kaydır|kaydir|gecmis|gecmisi)\b/i.test(str);
+  return /\b(merhaba|selam|selamlar|nasılsın|nasilsin|naber|lütfen|lutfen|teşekkür|tesekkur|sekme|sekmeyi|sayfa|sayfayı|sayfayi|özetle|ozetle|özet|ozet|kapat|kaydır|kaydir|gecmis|gecmisi|ara|bul|aç|ac|yenile)\b/i.test(str);
 }
+const isTurkishText = isTurkishContext;
 
 // Natural Language Intent Extractor: Instantly executes common browser commands and conversational greetings with 100% reliability
 export function detectDirectIntent(userText: string): { name: string; arguments: any; directReply?: string; isSummary?: boolean } | null {
   if (!userText || typeof userText !== 'string') return null;
   const text = userText.trim();
   const lower = text.toLowerCase();
-  const isTr = isTurkishText(text);
+  const isTr = isTurkishContext(text);
 
   // Normalize Turkish characters and common typos
   const normalized = lower
@@ -440,7 +443,7 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
   }
 
   // 10. Page reading and summarization
-  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|sayfayi ozetle|özetle|ozetle|bu sayfayı özetle|read page|read this page|summarize page|summarize this page)$/i.test(normalized)) {
+  if (/^(sayfayı oku|sayfayi oku|bu sayfayı oku|sayfada ne var|sayfayı özetle|sayfayi ozetle|özetle|ozetle|özet çıkar|ozet cikar|sayfa özeti|sayfa ozeti|bu sayfayı özetle|bu sayfayi ozetle|özet|ozet|read page|read this page|summarize page|summarize this page|summarize)$/i.test(normalized)) {
     const isSummary = /özet|ozet|summar/i.test(normalized);
     return { name: 'read_page_content', arguments: {}, isSummary };
   }
@@ -628,6 +631,18 @@ class AIAgent {
 
   public getModel(): string {
     return this.modelId;
+  }
+
+  public getAllTabs(): { id: string; title: string; url: string }[] {
+    return this.actionContext?.onGetAllTabs() || [];
+  }
+
+  public switchTab(id: string): void {
+    this.actionContext?.onSwitchTab(id);
+  }
+
+  public closeTab(id?: string): void {
+    this.actionContext?.onCloseTab(id);
   }
 
   /**
@@ -1734,8 +1749,7 @@ CRITICAL RULES:
           const tabs = this.actionContext.onGetAllTabs();
           result = { success: true, tabs, hint: "New tab created and focused. You can use navigate_to_url to open a specific page." };
         } else if (action === "close") {
-          if (!tabId) throw new Error("tabId required to close tab");
-          this.actionContext.onCloseTab(tabId as string);
+          this.actionContext.onCloseTab(tabId ? (tabId as string) : undefined);
           await new Promise(r => setTimeout(r, 500));
           const tabs = this.actionContext.onGetAllTabs();
           result = { success: true, tabs };
@@ -2094,10 +2108,6 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
     onChunk?: (chunk: string) => void,
     attachments?: ChatAttachments
   ): Promise<ChatCompletionMessageParam[]> {
-    if (!this.engine) {
-      this.emitStatus('loading_model', 'Waking up parked model...');
-      await this.init();
-    }
     this.isInterrupted = false;
     const generation = ++this.operationGeneration;
 
@@ -2181,17 +2191,24 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         if (onChunk) onChunk(`Executing action: ${funcName}...\n\n`);
 
         let friendlyResponse = "Action completed.";
+        const toolStartTime = Date.now();
+        const callId = generateId('call');
+        let parsedToolResult: any = null;
+        let toolExecutionError: string | undefined = undefined;
+
         try {
           const toolResult = await this.handleToolCall({
-            id: generateId('call'),
+            id: callId,
             type: "function",
             function: { name: funcName, arguments: JSON.stringify(directIntent.arguments) }
           }, generation);
-          let parsedToolResult: any = toolResult;
           try {
             parsedToolResult = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
-          } catch {}
+          } catch {
+            parsedToolResult = toolResult;
+          }
           if (parsedToolResult?.error) {
+            toolExecutionError = parsedToolResult.error;
             friendlyResponse = parsedToolResult.error === 'Action cancelled.'
               ? 'İşlem durduruldu.'
               : `İşlem tamamlanamadı: ${parsedToolResult.error}`;
@@ -2280,9 +2297,21 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           }
         }
       } catch (e: any) {
-          friendlyResponse = `Islem basarisiz: ${e.message || String(e)}`;
+          toolExecutionError = e.message || String(e);
+          friendlyResponse = `Islem basarisiz: ${toolExecutionError}`;
           this.emitStatus('error', friendlyResponse);
         }
+
+        const toolDurationMs = Date.now() - toolStartTime;
+        const toolCallInfo = [{
+          id: callId,
+          name: funcName,
+          args: directIntent.arguments || {},
+          state: (toolExecutionError ? 'error' : 'success') as 'error' | 'success',
+          result: typeof parsedToolResult === 'string' ? parsedToolResult : JSON.stringify(parsedToolResult, null, 2),
+          error: toolExecutionError,
+          durationMs: toolDurationMs,
+        }];
 
         if (onChunk) {
           onChunk(friendlyResponse);
@@ -2294,13 +2323,21 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           aiMemory.addTaskSummary(taskSummary);
         }
 
-        // Return ONLY clean user messages + single clean assistant response
-        return [...messages, { role: 'assistant', content: friendlyResponse }];
+        // Return clean user messages + single assistant response with tool execution metadata
+        return [...messages, {
+          role: 'assistant',
+          content: friendlyResponse,
+          toolCalls: toolCallInfo,
+        } as any];
       }
 
       // ---------------------------------------------------------------
       // 2. Conversational reasoning & multi-step execution
       // ---------------------------------------------------------------
+      if (!this.engine) {
+        this.emitStatus('loading_model', 'Waking up parked model...');
+        await this.init();
+      }
       const systemInstruction = this.buildSystemPrompt();
       const memoryPrompt = aiMemory.getFormattedMemoryPrompt();
 

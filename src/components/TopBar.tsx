@@ -55,8 +55,10 @@ import {
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
+import { getLanguage } from '../services/i18n';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 import { AdBlockerPopover } from './AdBlockerPopover';
+import { NovaAISparkle } from './ui/NovaAISparkle';
 import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { logger } from '../utils/logger';
 import { PageTranslatePopover } from './PageTranslatePopover';
@@ -123,6 +125,7 @@ interface TopBarProps {
   isVpnEnabled?: boolean;
   onToggleVpn?: () => void;
   onToggleAIAssistant: () => void;
+  isAIAssistantOpen?: boolean;
   activeDownloadsCount?: number;
   downloads?: DownloadItem[];
   onClearDownloads?: () => void;
@@ -925,7 +928,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       return;
     }
 
-    const url = formatSearchUrl(targetValue, searchEngine);
+    const url = formatSearchUrl(targetValue, searchEngine, getLanguage());
     onNavigate(url);
     setShowSuggestions(false);
     setSelectedIndex(-1);
@@ -1192,7 +1195,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   onMouseEnter={() => setSelectedIndex(-1)}
                   onClick={() => {
                     setShowSuggestions(false);
-                    onNavigate(formatSearchUrl(searchValue, searchEngine));
+                    onNavigate(formatSearchUrl(searchValue, searchEngine, getLanguage()));
                     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
@@ -1233,7 +1236,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                         onClick={() => {
                           setSearchValue(suggestion);
                           setShowSuggestions(false);
-                          onNavigate(formatSearchUrl(suggestion, searchEngine));
+                          onNavigate(formatSearchUrl(suggestion, searchEngine, getLanguage()));
                           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
@@ -1344,6 +1347,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   isVpnEnabled = false,
   onToggleVpn,
   onToggleAIAssistant,
+  isAIAssistantOpen = false,
   showBookmarksBar = false,
   onToggleReaderMode,
   onOpenExtensions,
@@ -1997,20 +2001,27 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
         {/* Extensions / Action Controls / More Menu */}
         <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
-          {/* AI Copilot Pill */}
+          {/* AI Copilot Pill with Animated SVG */}
           <motion.button 
-            whileHover={{ scale: 1.04 }} 
-            whileTap={{ scale: 0.96 }}
+            whileHover={{ scale: 1.05 }} 
+            whileTap={{ scale: 0.95 }}
             onClick={onToggleAIAssistant}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-colors font-semibold text-xs shrink-0 ${
-              isIncognito 
-                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20' 
-                : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 shadow-xs'
+            className={`group relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 font-semibold text-xs shrink-0 select-none cursor-pointer overflow-hidden ${
+              isAIAssistantOpen
+                ? 'bg-gradient-to-r from-cyan-500/20 via-sky-500/15 to-blue-600/20 text-cyan-400 border border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)] ring-1 ring-cyan-400/20'
+                : isIncognito 
+                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40' 
+                : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
             }`}
-            title="Nova AI Copilot (Side Panel)"
+            title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
           >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>AI</span>
+            {/* Shimmer sweep overlay on hover */}
+            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
+
+            <NovaAISparkle size={15} active={isAIAssistantOpen} />
+            <span className="font-bold tracking-wide text-[11px] bg-gradient-to-r from-cyan-400 to-sky-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all">
+              AI
+            </span>
           </motion.button>
 
           <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />

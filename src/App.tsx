@@ -22,8 +22,7 @@ import type {
   Bookmark, 
   Extension, 
   Workspace, 
-  ShortcutConfig,
-  SavedPassword 
+  ShortcutConfig
 } from './types/browser';
 import { defaultSettings } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
@@ -1510,6 +1509,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 isVpnEnabled={vpnEnabled}
                 onToggleVpn={handleToggleVpn}
                 onToggleAIAssistant={handleToggleAIAssistant}
+                isAIAssistantOpen={isSidePanelOpen}
                 onTabDragStart={handleTabDragStart}
                 onTabDragEnd={handleTabDragEnd}
                 onTabDrag={handleTabDrag}
@@ -1879,6 +1879,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           <SidePanel 
             isOpen={isSidePanelOpen} 
             onClose={handleCloseSidePanel}
+            activeTab={activeTab}
             pendingActions={pendingAIActions}
             onPendingActionConsumed={consumeAIAction}
             isDemo={demoParams.isDemo && demoParams.feature === 'ai'}
