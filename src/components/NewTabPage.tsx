@@ -409,7 +409,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
     if (!target) return;
     setShowSuggestions(false);
-    onNavigate(formatSearchUrl(target, searchEngine));
+    onNavigate(formatSearchUrl(target, searchEngine, language));
   };
 
   const handleAddSpeedDial = () => {
@@ -977,7 +977,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setShowSuggestions(false);
-                      onNavigate(formatSearchUrl(s, searchEngine));
+                      onNavigate(formatSearchUrl(s, searchEngine, language));
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 text-start text-sm transition-colors cursor-pointer ${

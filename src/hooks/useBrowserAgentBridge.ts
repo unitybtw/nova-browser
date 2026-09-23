@@ -407,7 +407,10 @@ export function useBrowserAgentBridge({
         throw new Error("No active webview or iframe found");
       },
       onCreateTab: (url: string) => mcpHandlersRef.current.handleNewTab(url),
-      onCloseTab: (id: string) => mcpHandlersRef.current.handleCloseTab(id),
+      onCloseTab: (id?: string) => {
+        const targetId = id || browserDataRef.current.activeTabId;
+        if (targetId) mcpHandlersRef.current.handleCloseTab(targetId);
+      },
       onSwitchTab: (id: string) => mcpHandlersRef.current.handleSelectTab(id),
       onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: (direction, amount) => {

@@ -45,7 +45,7 @@ import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { generateId } from '../utils/idGenerator';
-import { getLocale } from '../services/i18n';
+import { getLocale, getLanguage } from '../services/i18n';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -718,7 +718,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       targetValue = suggestions[selectedIndex];
     }
 
-    const url = formatSearchUrl(targetValue, searchEngine || 'google');
+    const url = formatSearchUrl(targetValue, searchEngine || 'google', getLanguage());
     if (onNavigate) {
       onNavigate(url);
     } else if (onNewTab) {
@@ -1026,7 +1026,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   <button
                     key={idx}
                     onMouseDown={() => {
-                      const formatted = formatSearchUrl(s, searchEngine);
+                      const formatted = formatSearchUrl(s, searchEngine, getLanguage());
                       if (onNavigate) onNavigate(formatted);
                       else onNewTab(formatted);
                       setShowSuggestions(false);

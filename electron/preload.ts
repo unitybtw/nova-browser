@@ -188,4 +188,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('blocked-site', handler);
     return () => ipcRenderer.removeListener('blocked-site', handler);
   },
+  setAppLanguage: (lang: string) => ipcRenderer.invoke('set-app-language', lang),
 });

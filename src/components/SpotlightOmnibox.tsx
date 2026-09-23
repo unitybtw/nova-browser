@@ -5,7 +5,7 @@ import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
-import { getLocale } from '../services/i18n';
+import { getLocale, getLanguage } from '../services/i18n';
 
 interface SpotlightOmniboxProps {
   isOpen: boolean;
@@ -172,7 +172,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
-    const url = formatSearchUrl(target, searchEngine);
+    const url = formatSearchUrl(target, searchEngine, getLanguage());
     if (onNavigate) {
       onNavigate(url);
     } else {

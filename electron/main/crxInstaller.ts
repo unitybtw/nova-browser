@@ -264,7 +264,27 @@ const MAX_TOTAL_UNCOMPRESSED_BYTES = 150 * 1024 * 1024; // 150 MB max uncompress
 const MAX_SINGLE_FILE_UNCOMPRESSED_BYTES = 50 * 1024 * 1024; // 50 MB max single file
 const MAX_TOTAL_ENTRIES = 2000; // 2000 files max
 
-async function assertCrxEntriesSafe(buffer: Buffer, targetDir: string): Promise<void> {
+// JSZip's `async('nodebuffer')` inflates the complete entry before returning,
+// so checking its size afterward still permits a zip bomb to exhaust memory.
+// Read each entry incrementally and stop decompression as soon as its actual
+// output crosses the remaining per-file or archive budget.
+async function readZipEntryWithLimit(file: any, maxBytes: number, filename: string): Promise<Buffer> {
+  const chunks: Buffer[] = [];
+  let received = 0;
+  const stream = file.nodeStream('nodebuffer') as any;
+  for await (const rawChunk of stream) {
+    const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk);
+    received += chunk.length;
+    if (received > maxBytes) {
+      stream.destroy();
+      throw new Error(`Extension file '${filename}' exceeds its uncompressed size limit (${maxBytes} bytes).`);
+    }
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks, received);
+}
+
+async function loadSafeCrxZip(buffer: Buffer, targetDir: string) {
   const zip = await JSZip.loadAsync(getCrxInnerZip(buffer));
   const resolvedTarget = path.resolve(targetDir);
   const entryKeys = Object.keys(zip.files);
@@ -289,6 +309,7 @@ async function assertCrxEntriesSafe(buffer: Buffer, targetDir: string): Promise<
       throw new Error(`Extension entry escapes the extraction directory: ${entryName}`);
     }
   }
+  return zip;
 }
 
 // Defense in depth: after extraction, nothing on disk may resolve outside the
@@ -430,10 +451,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     try {
       // Security: validate every zip entry against the staging target BEFORE extracting (zip-slip)
-      await assertCrxEntriesSafe(buffer, stagingPath);
-
-      // Extract cleanly with JSZip with cumulative and per-file byte limits
-      const zipPayload = await JSZip.loadAsync(getCrxInnerZip(buffer));
+      // Parse the archive once, validate every path before writing anything,
+      // then extract with cumulative and per-file streaming byte limits.
+      const zipPayload = await loadSafeCrxZip(buffer, stagingPath);
       let totalUncompressedBytes = 0;
       for (const [filename, file] of Object.entries(zipPayload.files)) {
         const normalized = filename.replace(/\\/g, '/');
@@ -444,14 +464,10 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
         if (file.dir) {
           fs.mkdirSync(destFile, { recursive: true });
         } else {
-          const content = await file.async('nodebuffer');
-          if (content.length > MAX_SINGLE_FILE_UNCOMPRESSED_BYTES) {
-            throw new Error(`Extension file '${filename}' exceeds maximum single file limit (${content.length} > ${MAX_SINGLE_FILE_UNCOMPRESSED_BYTES} bytes).`);
-          }
+          const remainingArchiveBytes = MAX_TOTAL_UNCOMPRESSED_BYTES - totalUncompressedBytes;
+          const entryLimit = Math.min(MAX_SINGLE_FILE_UNCOMPRESSED_BYTES, remainingArchiveBytes);
+          const content = await readZipEntryWithLimit(file, entryLimit, filename);
           totalUncompressedBytes += content.length;
-          if (totalUncompressedBytes > MAX_TOTAL_UNCOMPRESSED_BYTES) {
-            throw new Error(`Extension total uncompressed size exceeds limit (${totalUncompressedBytes} > ${MAX_TOTAL_UNCOMPRESSED_BYTES} bytes), potential zip bomb.`);
-          }
           fs.mkdirSync(path.dirname(destFile), { recursive: true });
           fs.writeFileSync(destFile, content);
         }

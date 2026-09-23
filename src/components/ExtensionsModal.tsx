@@ -93,6 +93,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to load unpacked extension:', err);
+      void showAlert({ title: 'Extensions', message: err?.message || 'Failed to load extension.' });
     }
   };
 
@@ -255,7 +256,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                 </div>
                 <div>
                   <h2 className="text-base font-semibold">Extensions</h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Chrome Web Store extensions & tools</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">Chrome extensions; compatibility depends on the APIs they use.</p>
                 </div>
               </div>
               <button 

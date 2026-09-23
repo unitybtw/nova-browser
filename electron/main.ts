@@ -6,6 +6,7 @@ import dns from 'dns';
 import http from 'http';
 import https from 'https';
 import { promisify } from 'util';
+import { once } from 'events';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain } from '../src/utils/securityUtils.js';
@@ -150,10 +151,6 @@ export function getStandardUserAgent(): string {
   return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 }
 
-try {
-  app.userAgentFallback = getStandardUserAgent();
-} catch (_) {}
-
 // Portable Mode: If running as a portable executable on Windows, isolate user data
 // into a local directory on the portable device instead of host %APPDATA%
 if (process.env.PORTABLE_EXECUTABLE_DIR) {
@@ -261,6 +258,17 @@ let mainWindow: BrowserWindow | null = null;
 let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
 let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
 
+
+function getAcceptLanguagesForLocale(localeOrLang?: string): string {
+  const l = (localeOrLang || 'tr').toLowerCase();
+  if (l.startsWith('tr')) return 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7';
+  if (l.startsWith('de')) return 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7';
+  if (l.startsWith('ar')) return 'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7';
+  return 'en-US,en;q=0.9,tr-TR;q=0.8,tr;q=0.7';
+}
+
+let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
+
 // Safely send IPC to the main window; accessing .webContents on a destroyed window throws.
 function sendToMainWindow(channel: string, payload?: unknown) {
   try {
@@ -327,10 +335,22 @@ let mcpServer: BrowserMCPServer | null = null;
 
 let currentWhitelistFilters: any[] = [];
 
+// Essential CAPTCHA & verification domains that must never be blocked by adblocker
+const CAPTCHA_WHITELIST_RULES = [
+  'google.com/recaptcha',
+  'gstatic.com/recaptcha',
+  'recaptcha.net',
+  'challenges.cloudflare.com',
+  'hcaptcha.com',
+  'newassets.hcaptcha.com'
+];
+
 function updateAdblockWhitelist(whitelist: string[]) {
-  if (!blocker || !Array.isArray(whitelist)) return;
-  const cleanWhitelist = whitelist
-    .filter(host => typeof host === 'string' && /^[a-zA-Z0-9.-]+$/.test(host.trim()))
+  if (!blocker) return;
+  const userList = Array.isArray(whitelist) ? whitelist : [];
+  const combined = Array.from(new Set([...userList, ...CAPTCHA_WHITELIST_RULES]));
+  const cleanWhitelist = combined
+    .filter(host => typeof host === 'string' && /^[a-zA-Z0-9.\-_/]+$/.test(host.trim()))
     .map(host => host.trim().toLowerCase());
   const newFilters = cleanWhitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
   
@@ -460,11 +480,18 @@ function initAdBlocker() {
               adBlockFlushTimer = null;
               return;
             }
-            if (mainWindow && !mainWindow.isDestroyed()) {
-              const batch = Object.fromEntries(pendingAdBlocks);
-              mainWindow.webContents.send('ad-blocked-batch', batch);
+            if (!mainWindow || mainWindow.isDestroyed()) {
+              // macOS can keep the app alive after its last window closes.
+              // Drop counters that can no longer be delivered and stop the
+              // periodic timer instead of retaining dead webContents IDs.
               pendingAdBlocks.clear();
+              if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
+              adBlockFlushTimer = null;
+              return;
             }
+            const batch = Object.fromEntries(pendingAdBlocks);
+            mainWindow.webContents.send('ad-blocked-batch', batch);
+            pendingAdBlocks.clear();
           }, 2000);
         }
       }
@@ -472,11 +499,15 @@ function initAdBlocker() {
 
     try {
       const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
+      let wl: string[] = [];
       if (fs.existsSync(settingsPath)) {
-        const wl = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (Array.isArray(wl)) updateAdblockWhitelist(wl);
+        const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        if (Array.isArray(parsed)) wl = parsed;
       }
-    } catch(e) {}
+      updateAdblockWhitelist(wl);
+    } catch(e) {
+      updateAdblockWhitelist([]);
+    }
   }).catch((e) => console.error('Failed to initialize adblocker:', e));
 }
 
@@ -583,20 +614,18 @@ function createWindow() {
     try { blocker.disableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
   }
 
-  const cachedChromeVer = process.versions.chrome || '134.0.0.0';
-  const cachedChromeMajor = cachedChromeVer.split('.')[0] || '134';
-  const cachedPlatformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
-  const cachedStandardUserAgent = getStandardUserAgent();
-  const cachedSecChUa = `"Not/A)Brand";v="8", "Chromium";v="${cachedChromeMajor}", "Google Chrome";v="${cachedChromeMajor}"`;
-  const cachedSecChUaFullVersionList = `"Not/A)Brand";v="8.0.0.0", "Chromium";v="${cachedChromeVer}", "Google Chrome";v="${cachedChromeVer}"`;
+  currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
 
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
     try {
-      targetSession.setUserAgent(cachedStandardUserAgent);
+      // Keep Electron/Chromium's native UA and Client Hints in sync. Only the
+      // language preference is customized for the user's selected app locale.
+      targetSession.setUserAgent(targetSession.getUserAgent(), currentAcceptLanguages);
     } catch (_) {}
 
-    // Inject Do Not Track, Global Privacy Control & authentic Chrome Client Hints
+    // Apply user-selected language and privacy signals without fabricating a
+    // Chrome identity; Chromium generates its own consistent Client Hints.
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
       
@@ -607,20 +636,7 @@ function createWindow() {
       } catch (_) {}
 
       if (isHttp) {
-        // Always enforce clean, genuine Chrome User-Agent and Client Hints across all web requests
-        requestHeaders['User-Agent'] = cachedStandardUserAgent;
-        requestHeaders['sec-ch-ua'] = cachedSecChUa;
-        requestHeaders['sec-ch-ua-mobile'] = '?0';
-        requestHeaders['sec-ch-ua-platform'] = cachedPlatformName;
-
-        if (requestHeaders['sec-ch-ua-full-version-list']) {
-          requestHeaders['sec-ch-ua-full-version-list'] = cachedSecChUaFullVersionList;
-        }
-
-        // Purge automation / webview leakage headers
-        if (requestHeaders['X-Requested-With']) {
-          delete requestHeaders['X-Requested-With'];
-        }
+        requestHeaders['Accept-Language'] = currentAcceptLanguages;
       }
 
       if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
@@ -727,15 +743,16 @@ function createWindow() {
   // Performance: dev-only value — skip regex-sanitizing/printing every renderer
   // console line entirely in packaged builds.
   if (!app.isPackaged) {
-    mainWindow?.webContents.on('console-message', (event: any, ...rest: any[]) => {
-      const level = typeof event?.level === 'number' ? event.level : (typeof rest[0] === 'number' ? rest[0] : 0);
-      let message = typeof event?.message === 'string' ? event.message : (typeof rest[1] === 'string' ? rest[1] : (typeof event === 'string' ? event : ''));
-      const line = typeof event?.lineNumber === 'number' ? event.lineNumber : (typeof rest[2] === 'number' ? rest[2] : 0);
-      const sourceId = typeof event?.sourceId === 'string' ? event.sourceId : (typeof rest[3] === 'string' ? rest[3] : '');
+    mainWindow?.webContents.on('console-message', (details) => {
+      const level = details.level;
+      const message = details.message;
+      const line = details.lineNumber;
+      const sourceId = details.sourceId;
 
-      if (!message && typeof event === 'object' && event !== null && 'message' in event) {
-        message = String(event.message);
-      }
+      // Chromium uses ERR_ABORTED for expected navigation replacement and
+      // redirects (including search-provider verification redirects). Avoid
+      // logging it as an app failure or printing provider-generated tokens.
+      if (message.includes('ERR_ABORTED')) return;
 
       // Sanitize any sensitive tokens, passwords or credential payloads from terminal logs
       if (message && (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message))) {
@@ -1296,6 +1313,8 @@ function cleanStaleUpdateArtifacts(): void {
 
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
+  loadExtensionDiagnostics();
+  await loadPersistentExtensions();
   createWindow();
   setupApplicationMenu();
   initAdBlocker();
@@ -2280,6 +2299,7 @@ fi
     sendToMainWindow('update-download-progress', { percent: 0, transferred: 0, total: 0 });
 
     let tempFilePath = '';
+    let updateFileStream: fs.WriteStream | null = null;
     try {
       const response = await fetch(targetUrl, {
         headers: { 'User-Agent': getStandardUserAgent() },
@@ -2308,7 +2328,11 @@ fi
         }
       }
 
+      const MAX_UPDATE_DOWNLOAD_BYTES = 1024 * 1024 * 1024;
       const totalBytes = Number(response.headers.get('content-length')) || 0;
+      if (totalBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
+        throw new Error('Update package exceeds the 1 GB size limit');
+      }
       const parsedUrl = new URL(targetUrl);
       const defaultExt = process.platform === 'darwin' ? 'dmg' : process.platform === 'win32' ? 'exe' : 'AppImage';
       let filename = assetName || path.basename(parsedUrl.pathname) || `Nova-Browser-Setup-${targetVersion || 'update'}.${defaultExt}`;
@@ -2336,7 +2360,15 @@ fi
       }
       tempFilePath = `${targetFilePath}.download_${Date.now()}`;
 
-      const fileStream = fs.createWriteStream(tempFilePath);
+      const fileStream = updateFileStream = fs.createWriteStream(tempFilePath);
+      let fileStreamError: Error | null = null;
+      // A write stream can fail before the first `drain` wait (for example,
+      // when the updates directory is full). Keep an error listener attached
+      // for its full lifetime so an I/O failure cannot become an uncaught
+      // main-process exception.
+      fileStream.on('error', (error: Error) => {
+        fileStreamError = error;
+      });
       let transferredBytes = 0;
       let lastReportTime = Date.now();
       let lastBytes = 0;
@@ -2347,8 +2379,18 @@ fi
 
       // @ts-ignore
       for await (const chunk of response.body) {
+        if (fileStreamError) throw fileStreamError;
         transferredBytes += chunk.length;
-        fileStream.write(chunk);
+        if (transferredBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
+          throw new Error('Update package exceeds the 1 GB size limit');
+        }
+        // Respect the filesystem stream's backpressure. Without waiting for
+        // `drain`, a fast network response can buffer the entire installer in
+        // main-process memory and make the browser sluggish or exhaust RAM.
+        if (!fileStream.write(chunk)) {
+          await once(fileStream, 'drain');
+        }
+        if (fileStreamError) throw fileStreamError;
 
         const now = Date.now();
         const elapsed = (now - lastReportTime) / 1000;
@@ -2368,6 +2410,7 @@ fi
         }
       }
 
+      if (fileStreamError) throw fileStreamError;
       await new Promise<void>((resolve, reject) => {
         fileStream.end((err?: Error | null) => {
           if (err) reject(err);
@@ -2402,6 +2445,10 @@ fi
         releaseName: latestReleaseDownloadInfo?.releaseName
       };
     } catch (downloadErr: any) {
+      if (updateFileStream && !updateFileStream.closed) {
+        updateFileStream.destroy();
+        try { await once(updateFileStream, 'close'); } catch (_) {}
+      }
       if (tempFilePath && fs.existsSync(tempFilePath)) {
         try { fs.unlinkSync(tempFilePath); } catch (_) {}
       }
@@ -2787,55 +2834,6 @@ fi
     checkForUpdatesInternal().catch(err => console.error("[Updater] Periodic background check error:", err));
   }, 4 * 60 * 60 * 1000);
 
-  // Load persistent extensions from disk
-  const extensionsPath = path.join(app.getPath('userData'), 'extensions');
-  const disabledIds = getDisabledExtensionIds();
-  if (fs.existsSync(extensionsPath)) {
-    try {
-      const extensionDirs = fs.readdirSync(extensionsPath);
-      for (const dir of extensionDirs) {
-        const extPath = path.join(extensionsPath, dir);
-        if (fs.statSync(extPath).isDirectory()) {
-          // Cleanup old corrupted timestamp folders
-          if (dir.match(/^\d+$/) || dir.match(/^\d+_.*\.crx$/)) {
-            try { fs.rmSync(extPath, { recursive: true, force: true }); } catch(e) {}
-            continue;
-          }
-          
-          if (fs.existsSync(path.join(extPath, 'manifest.json'))) {
-            if (disabledIds.includes(dir)) {
-              try {
-                const manifest = JSON.parse(fs.readFileSync(path.join(extPath, 'manifest.json'), 'utf8'));
-                loadedExtensions.push({
-                  id: dir,
-                  name: manifest.name || dir,
-                  path: extPath,
-                  version: manifest.version || '1.0',
-                  description: manifest.description || '',
-                  enabled: false
-                });
-              } catch (_) {}
-            } else {
-              try {
-                if (!session.defaultSession.getExtension(dir)) {
-                  const extInfo = await session.defaultSession.loadExtension(extPath, { allowFileAccess: false });
-                  if (!loadedExtensions.some(e => e.id === extInfo.id)) {
-                    loadedExtensions.push(extInfo);
-                  }
-                  console.log(`Loaded extension: ${extInfo.name}`);
-                }
-              } catch (err) {
-                console.error(`Failed to load extension at ${extPath}:`, err);
-              }
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error loading extensions on startup:', err);
-    }
-  }
-
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -2956,6 +2954,26 @@ app.on('web-contents-created', (_event, contents) => {
   });
 
   if (contents.getType() === 'webview') {
+    if (!app.isPackaged) {
+      contents.on('console-message', (details) => {
+        const isError = details.level === 'error';
+        const message = details.message;
+        const source = details.sourceId;
+        const line = details.lineNumber;
+        if (!isError || !source.startsWith('chrome-extension://')) return;
+        const safeMessage = message
+          .replace(/(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[redacted]')
+          .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+          .slice(0, 500);
+        let safeSource = source;
+        try {
+          const parsed = new URL(source);
+          safeSource = `${parsed.origin}${parsed.pathname}`;
+        } catch (_) {}
+        console.warn(`[Extensions:content-script] ${safeSource}:${line} ${safeMessage}`);
+      });
+    }
+
     // Native Audio State Hook
     const audioListener = (_audioEvt: any, audible: boolean) => {
       if (mainWindow && !mainWindow.isDestroyed()) {
@@ -3156,6 +3174,27 @@ ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
 ipcMain.handle('set-do-not-track', (event, enabled: boolean) => {
   if (!isTrustedSender(event)) return;
   isDoNotTrackEnabled = Boolean(enabled);
+});
+
+// IPC Handler to dynamically update Accept-Language across all Electron sessions
+ipcMain.handle('set-app-language', async (event, lang: unknown) => {
+  if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized' };
+  if (typeof lang !== 'string' || !lang.trim()) return { success: false, error: 'Invalid language' };
+  const cleanLang = lang.trim().toLowerCase();
+  currentAcceptLanguages = getAcceptLanguagesForLocale(cleanLang);
+
+  try {
+    session.defaultSession.setUserAgent(session.defaultSession.getUserAgent(), currentAcceptLanguages);
+    session.fromPartition('incognito').setUserAgent(session.fromPartition('incognito').getUserAgent(), currentAcceptLanguages);
+    for (const partName of hardenedIncognitoPartitions) {
+      try {
+        const targetSession = session.fromPartition(partName, { cache: false });
+        targetSession.setUserAgent(targetSession.getUserAgent(), currentAcceptLanguages);
+      } catch (_) {}
+    }
+  } catch (_) {}
+
+  return { success: true, acceptLanguages: currentAcceptLanguages };
 });
 
 // Daily 4K Ultra HD Wallpaper Engine (Bing 4K UHD Archive + 4K Desktop Masterpieces)
@@ -4602,11 +4641,13 @@ let activeExtensionPopupWin: BrowserWindow | null = null;
 let activeExtensionPopupUrl: string | null = null;
 
 const disabledExtensionsFile = path.join(app.getPath('userData'), 'disabled_extensions.json');
+const unpackedExtensionsFile = path.join(app.getPath('userData'), 'unpacked_extensions.json');
 
 function getDisabledExtensionIds(): string[] {
   try {
     if (fs.existsSync(disabledExtensionsFile)) {
-      return JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id)) : [];
     }
   } catch (_) {}
   return [];
@@ -4614,8 +4655,107 @@ function getDisabledExtensionIds(): string[] {
 
 function setDisabledExtensionIds(ids: string[]): void {
   try {
-    fs.writeFileSync(disabledExtensionsFile, JSON.stringify(ids), 'utf8');
+    const safeIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && /^[a-p]{32}$/.test(id))));
+    fs.writeFileSync(disabledExtensionsFile, JSON.stringify(safeIds), { encoding: 'utf8', mode: 0o600 });
   } catch (_) {}
+}
+
+function getUnpackedExtensionPaths(): Record<string, string> {
+  try {
+    if (!fs.existsSync(unpackedExtensionsFile)) return {};
+    const parsed = JSON.parse(fs.readFileSync(unpackedExtensionsFile, 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return Object.fromEntries(Object.entries(parsed).filter(([id, folderPath]) =>
+      /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
+    )) as Record<string, string>;
+  } catch (_) {
+    return {};
+  }
+}
+
+function setUnpackedExtensionPaths(paths: Record<string, string>): void {
+  try {
+    const safeEntries = Object.entries(paths).filter(([id, folderPath]) =>
+      /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
+    );
+    fs.writeFileSync(unpackedExtensionsFile, JSON.stringify(Object.fromEntries(safeEntries)), { encoding: 'utf8', mode: 0o600 });
+  } catch (err) {
+    console.error('[Extensions] Could not persist unpacked extension list:', err);
+  }
+}
+
+function loadExtensionDiagnostics(): void {
+  if (app.isPackaged) return;
+  const workers = session.defaultSession.serviceWorkers;
+  workers.on('console-message', (_event, details) => {
+    if (details.level < 2) return;
+    try {
+      const worker = workers.getInfoFromVersionID(details.versionId);
+      if (!worker.scriptUrl.startsWith('chrome-extension://')) return;
+      const safeMessage = details.message
+        .replace(/(password|token|secret|api[_-]?key|authorization)(\s*[:=]\s*)[^\s,;]+/gi, '$1$2[redacted]')
+        .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [redacted]')
+        .slice(0, 500);
+      const source = new URL(worker.scriptUrl);
+      console.warn(`[Extensions:service-worker] ${source.origin}${source.pathname} ${safeMessage}`);
+    } catch (_) {}
+  });
+}
+
+async function loadPersistentExtensions(): Promise<void> {
+  const extensionsPath = path.join(app.getPath('userData'), 'extensions');
+  const disabledIds = getDisabledExtensionIds();
+  const unpackedPaths = getUnpackedExtensionPaths();
+  const seenIds = new Set<string>();
+
+  const rememberDisabled = (id: string, extensionPath: string, manifest: any) => {
+    loadedExtensions.push({
+      id,
+      name: typeof manifest.name === 'string' ? manifest.name : id,
+      path: extensionPath,
+      version: typeof manifest.version === 'string' ? manifest.version : '1.0',
+      description: typeof manifest.description === 'string' ? manifest.description : '',
+      enabled: false
+    });
+  };
+
+  const restoreExtension = async (id: string, extensionPath: string) => {
+    if (!/^[a-p]{32}$/.test(id) || seenIds.has(id)) return;
+    seenIds.add(id);
+    try {
+      const realPath = fs.realpathSync(extensionPath);
+      if (!fs.statSync(realPath).isDirectory()) return;
+      const manifestPath = path.join(realPath, 'manifest.json');
+      if (!fs.existsSync(manifestPath)) return;
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      if (disabledIds.includes(id)) {
+        rememberDisabled(id, realPath, manifest);
+        return;
+      }
+      const existing = session.defaultSession.getExtension(id);
+      const extInfo = existing || await session.defaultSession.loadExtension(realPath, { allowFileAccess: false });
+      loadedExtensions.push(extInfo);
+      console.log(`[Extensions] Restored ${extInfo.name || id}`);
+    } catch (err) {
+      console.error(`[Extensions] Failed to restore ${id}:`, err);
+    }
+  };
+
+  try {
+    if (fs.existsSync(extensionsPath)) {
+      for (const dir of fs.readdirSync(extensionsPath)) {
+        if (/^[a-p]{32}$/.test(dir)) {
+          await restoreExtension(dir, path.join(extensionsPath, dir));
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Extensions] Failed to scan installed extensions:', err);
+  }
+
+  for (const [id, folderPath] of Object.entries(unpackedPaths)) {
+    await restoreExtension(id, folderPath);
+  }
 }
 
 function getLocalizedManifestString(extPath: string, text: string, fallback: string = ''): string {
@@ -4728,9 +4868,16 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
       setDisabledExtensionIds(disabledIds.filter(id => id !== extInfo.id));
     }
 
-    if (!loadedExtensions.some(e => e.id === extInfo.id)) {
-      loadedExtensions.push(extInfo);
+    if (targetSession === session.defaultSession) {
+      const managedRoot = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+      if (!resolvedFolder.startsWith(managedRoot + path.sep)) {
+        const unpackedPaths = getUnpackedExtensionPaths();
+        unpackedPaths[extInfo.id] = fs.realpathSync(resolvedFolder);
+        setUnpackedExtensionPaths(unpackedPaths);
+      }
     }
+
+    loadedExtensions = [...loadedExtensions.filter(e => e.id !== extInfo.id), extInfo];
 
     for (const w of BrowserWindow.getAllWindows()) {
       if (!w.isDestroyed()) {
@@ -4756,33 +4903,41 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
   const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
   const extPath = path.resolve(path.join(extensionsBaseDir, extensionId));
   const foundExt = loadedExtensions.find(e => e.id === extensionId);
-  const targetExtPath = (foundExt?.path && fs.existsSync(foundExt.path)) ? foundExt.path : extPath;
+  const unpackedPath = getUnpackedExtensionPaths()[extensionId];
+  const targetExtPath = (foundExt?.path && fs.existsSync(foundExt.path))
+    ? foundExt.path
+    : (unpackedPath && fs.existsSync(unpackedPath) ? unpackedPath : extPath);
 
   try {
     if (enabled) {
-      const newDisabled = disabledIds.filter(id => id !== extensionId);
-      setDisabledExtensionIds(newDisabled);
-      
-      if (fs.existsSync(targetExtPath)) {
-        const isLoaded = loadedExtensions.some(e => e.id === extensionId);
-        if (!isLoaded) {
-          const extInfo = await session.defaultSession.loadExtension(targetExtPath);
-          loadedExtensions.push(extInfo);
+      if (!fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
+        return { error: 'Extension files are missing. Remove and install the extension again.' };
+      }
+      const existing = session.defaultSession.getExtension(extensionId);
+      const extInfo = existing || await session.defaultSession.loadExtension(targetExtPath, { allowFileAccess: false });
+      if (extInfo.id !== extensionId) {
+        if (!existing) {
+          try { session.defaultSession.removeExtension(extInfo.id); } catch (_) {}
         }
+        return { error: 'Extension identity changed. Remove and install the extension again.' };
       }
+      setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId));
+      loadedExtensions = [...loadedExtensions.filter(e => e.id !== extensionId), extInfo];
     } else {
-      if (!disabledIds.includes(extensionId)) {
-        disabledIds.push(extensionId);
-        setDisabledExtensionIds(disabledIds);
+      const extensionInfo = foundExt || session.defaultSession.getExtension(extensionId);
+      if (!extensionInfo && !fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
+        return { error: 'Extension files are missing. Remove and install the extension again.' };
       }
-      try {
+      if (session.defaultSession.getExtension(extensionId)) {
         await session.defaultSession.removeExtension(extensionId);
-      } catch (_) {}
-      loadedExtensions = loadedExtensions.filter(e => e.id !== extensionId);
+      }
+      if (!disabledIds.includes(extensionId)) setDisabledExtensionIds([...disabledIds, extensionId]);
+      if (extensionInfo && !loadedExtensions.some(e => e.id === extensionId)) loadedExtensions.push(extensionInfo);
     }
 
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win) win.webContents.send('extension-changed');
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send('extension-changed');
+    }
     return { success: true };
   } catch (err: any) {
     console.error('Failed to toggle extension:', err);
@@ -5301,6 +5456,12 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
     const disabledIds = getDisabledExtensionIds();
     if (disabledIds.includes(extensionId)) {
       setDisabledExtensionIds(disabledIds.filter((id) => id !== extensionId));
+    }
+
+    const unpackedPaths = getUnpackedExtensionPaths();
+    if (unpackedPaths[extensionId]) {
+      delete unpackedPaths[extensionId];
+      setUnpackedExtensionPaths(unpackedPaths);
     }
 
     // 5. Permanently remove extension directory from disk

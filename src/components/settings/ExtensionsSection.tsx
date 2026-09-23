@@ -31,12 +31,14 @@ export const ExtensionsSection: React.FC = () => {
   const handleToggleExtension = async (extId: string, currentEnabled: boolean) => {
     try {
       const nextState = !currentEnabled;
-      if (getElectronAPI()?.toggleExtension) {
-        await getElectronAPI()?.toggleExtension(extId, nextState);
-      }
+      const api = getElectronAPI();
+      if (!api?.toggleExtension) throw new Error('Extension controls are unavailable in this window.');
+      const result = await api.toggleExtension(extId, nextState);
+      if (result?.error) throw new Error(result.error);
       setExtensions(prev => prev.map(e => e.id === extId ? { ...e, enabled: nextState } : e));
     } catch (e) {
       console.error('Failed to toggle extension:', e);
+      void showAlert({ title: 'Extensions', message: e instanceof Error ? e.message : 'The extension could not be updated.' });
     }
   };
 
@@ -52,6 +54,7 @@ export const ExtensionsSection: React.FC = () => {
         const res = await getElectronAPI()?.removeExtension?.(ext.id);
         if (res?.error) {
           console.error('Failed to remove extension:', res.error);
+          void showAlert({ title: 'Extensions', message: res.error });
           return;
         }
         setExtensions(prev => prev.filter(e => e.id !== ext.id));
@@ -77,6 +80,7 @@ export const ExtensionsSection: React.FC = () => {
       }
     } catch (e: any) {
       console.error(e);
+      void showAlert({ title: 'Extensions', message: e?.message || 'Failed to load extension.' });
     }
   };
 
