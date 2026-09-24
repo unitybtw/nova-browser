@@ -131,7 +131,7 @@ export function useAppSync({
   // Realtime Supabase change listener across other active devices
   useEffect(() => {
     const unsubscribe = syncService.onRemoteChange(() => {
-      console.log('[NovaSync] Triggering background pull for remote changes');
+      logger.debug('NovaSync', 'Triggering background pull for remote changes');
       handlePerformSyncRef.current().catch(() => {});
     });
     return () => { unsubscribe(); };

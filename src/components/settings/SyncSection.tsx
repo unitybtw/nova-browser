@@ -4,6 +4,7 @@ import { UserSettings } from '../../types/browser';
 import { syncService, SyncStatus, SyncPreferences } from '../../services/syncService';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
 import { getLocale } from '../../services/i18n';
+import { copyTextToClipboard } from '../../utils/clipboard';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -11,38 +12,6 @@ function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T
 
 function safeParseObject<T extends object>(raw: string | null, fallback: T, key: string = 'unknown_object'): T {
   return safeParseObjectWithBackup<T>(key, raw, fallback);
-}
-
-// P0: crash-safe clipboard. navigator.clipboard throws in insecure contexts
-// (http/file) — fall back to legacy textarea+execCommand. Resolves true only
-// on actual success so callers set "copied" state conditionally.
-// NOTE: SettingsPage keeps its own identical copy for its remaining flows;
-// duplicated here so this section stays self-contained.
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (!text) return false;
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_) {
-    // fall through to legacy path
-  }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.top = '-9999px';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
-  } catch (_) {
-    return false;
-  }
 }
 
 export interface SyncSectionProps {

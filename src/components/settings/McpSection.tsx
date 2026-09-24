@@ -1,38 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, Play, Square, Copy, Check, Users, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
-
-// P0: crash-safe clipboard. navigator.clipboard throws in insecure contexts
-// (http/file) — fall back to legacy textarea+execCommand. Resolves true only
-// on actual success so callers set "copied" state conditionally.
-// NOTE: SettingsPage keeps its own identical copy for its sync flows;
-// duplicated here so this section stays self-contained.
-async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (!text) return false;
-  try {
-    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_) {
-    // fall through to legacy path
-  }
-  try {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.setAttribute('readonly', '');
-    ta.style.position = 'fixed';
-    ta.style.top = '-9999px';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    document.body.removeChild(ta);
-    return ok;
-  } catch (_) {
-    return false;
-  }
-}
+import { copyTextToClipboard } from '../../utils/clipboard';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "nova_mcp_••••").
 // Never treat a masked value as the real secret.

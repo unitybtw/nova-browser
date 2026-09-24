@@ -28,6 +28,7 @@ import {
 import { tts } from '../services/tts';
 import { getLocale } from '../services/i18n';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
+import { copyTextToClipboard } from '../utils/clipboard';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
 
@@ -419,8 +420,9 @@ export const SidePanel = React.memo(({
     setStreamStartTime(null);
   }, [streamingText]);
 
-  const handleCopy = useCallback((text: string, idx: number) => {
-    navigator.clipboard.writeText(text);
+  const handleCopy = useCallback(async (text: string, idx: number) => {
+    const ok = await copyTextToClipboard(text);
+    if (!ok) return;
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 2000);
   }, []);

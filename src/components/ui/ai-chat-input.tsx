@@ -1,5 +1,3 @@
-"use client";
-
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
@@ -814,12 +812,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               expanded ? "cursor-text" : "cursor-default"
             )}
           >
-            <style dangerouslySetInnerHTML={{ __html: `
-              .prompt-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; background: transparent; }
-              .prompt-scrollbar::-webkit-scrollbar-track { background: transparent; }
-              .prompt-scrollbar::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
-              .prompt-scrollbar:hover::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
-            `}} />
 
             <textarea
               ref={textareaRef}
