@@ -27,6 +27,7 @@ import {
 } from '../services/aiAgent';
 import { tts } from '../services/tts';
 import { getLocale } from '../services/i18n';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
 
@@ -94,12 +95,36 @@ export const SidePanel = React.memo(({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
   const requestIdRef = useRef<number>(0);
+  // Object URLs minted for attachment previews; revoked on reset/unmount.
+  const blobUrlsRef = useRef<string[]>([]);
+  const revokeBlobUrls = useCallback(() => {
+    for (const url of blobUrlsRef.current) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Already revoked or invalid — ignore.
+      }
+    }
+    blobUrlsRef.current = [];
+  }, []);
+
+  // Release attachment preview URLs when the panel unmounts.
+  useEffect(() => {
+    return () => revokeBlobUrls();
+  }, [revokeBlobUrls]);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  // True while the user sits at (or near) the bottom; auto-scroll only then.
+  const isAtBottomRef = useRef(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+
   const scrollToBottom = useCallback((smooth = true) => {
+    isAtBottomRef.current = true;
+    setShowScrollButton(false);
     messagesEndRef.current?.scrollIntoView({
       behavior: smooth ? 'smooth' : 'auto',
       block: 'end',
@@ -108,19 +133,43 @@ export const SidePanel = React.memo(({
 
   useEffect(() => {
     if (isOpen) {
+      isAtBottomRef.current = true;
+      setShowScrollButton(false);
       scrollToBottom(false);
     }
   }, [isOpen, scrollToBottom]);
 
   useEffect(() => {
-    scrollToBottom(true);
+    // Never yank the viewport while the user reads older messages.
+    if (isAtBottomRef.current) {
+      scrollToBottom(!streamingText);
+    }
   }, [messages, streamingText, scrollToBottom]);
+
+  const handleChatScroll = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const atBottom = distanceFromBottom < 120;
+    isAtBottomRef.current = atBottom;
+    setShowScrollButton(prev => (prev === !atBottom ? prev : !atBottom));
+  }, []);
 
   // Sync agent status
   useEffect(() => {
     const unsub = aiAgent.onStatus((status) => {
       setIsReady(aiAgent.isReady());
-      setIsInitializing(status.state === 'loading_model');
+      const isLoadingModel = status.state === 'loading_model';
+      setIsInitializing(isLoadingModel);
+      if (isLoadingModel && status.detail) {
+        const match = status.detail.match(/(\d+)%/);
+        if (match) {
+          setDownloadProgress(parseInt(match[1], 10));
+        }
+        setDownloadStatusText(status.detail);
+      } else if (status.state === 'idle') {
+        setDownloadProgress(100);
+      }
     });
     return () => unsub();
   }, []);
@@ -136,13 +185,16 @@ export const SidePanel = React.memo(({
 
   // Model download / init handler
   const handleInit = useCallback(async () => {
-    if (isReady || isInitializing) return;
+    if (aiAgent.isReady()) {
+      setIsReady(true);
+      return;
+    }
     setIsInitializing(true);
     setDownloadProgress(0);
     setDownloadStatusText(isTr ? 'AI Modeli hazırlanıyor...' : 'Preparing AI model...');
     try {
       await aiAgent.init((p, text) => {
-        setDownloadProgress(p);
+        setDownloadProgress(Math.round(p));
         setDownloadStatusText(text);
       });
       setIsReady(true);
@@ -161,7 +213,7 @@ export const SidePanel = React.memo(({
     } finally {
       setIsInitializing(false);
     }
-  }, [isReady, isInitializing, isTr]);
+  }, [isTr]);
 
   // Send message flow
   const handleSendPrompt = useCallback(
@@ -172,15 +224,50 @@ export const SidePanel = React.memo(({
       const prompt = (textToSend || '').trim();
       if (!prompt || isLoading) return;
 
-      const userAttachments =
-        meta?.attachments && meta.attachments.length > 0
-          ? meta.attachments.map((f) => ({ name: f.name, url: URL.createObjectURL(f) }))
-          : undefined;
+      // Convert attachments for local preview and agent input
+      let chatAttachments: { images: string[]; files: Array<{ name: string; text: string }> } | undefined;
+      const userAttachments: Array<{ name: string; url: string }> = [];
+
+      if (meta?.attachments && meta.attachments.length > 0) {
+        const images: string[] = [];
+        const files: Array<{ name: string; text: string }> = [];
+
+        for (const file of meta.attachments) {
+          const blobUrl = URL.createObjectURL(file);
+          blobUrlsRef.current.push(blobUrl);
+          userAttachments.push({ name: file.name, url: blobUrl });
+
+          if (file.type.startsWith('image/')) {
+            try {
+              const base64 = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+              images.push(base64);
+            } catch (e) {
+              console.error('[SidePanel] Failed to read image attachment:', e);
+            }
+          } else {
+            try {
+              const text = await file.text();
+              files.push({ name: file.name, text });
+            } catch (e) {
+              console.error('[SidePanel] Failed to read text attachment:', e);
+            }
+          }
+        }
+
+        if (images.length > 0 || files.length > 0) {
+          chatAttachments = { images, files };
+        }
+      }
 
       const userMessage: ChatMessage = {
         role: 'user',
         content: prompt,
-        attachments: userAttachments,
+        attachments: userAttachments.length > 0 ? userAttachments : undefined,
       };
       const nextMessages = [...messagesRef.current, userMessage];
       setMessages(nextMessages);
@@ -194,45 +281,46 @@ export const SidePanel = React.memo(({
       const requestId = ++requestIdRef.current;
 
       try {
-        // 1. Direct zero-latency browser actions
-        const directIntent = detectDirectIntent(prompt);
-        if (directIntent) {
-          const directAssistantMsg: ChatMessage = {
-            role: 'assistant',
-            content: directIntent.directReply || (isTr ? 'İşlem tamamlandı.' : 'Action completed.'),
-          };
-          setMessages([...nextMessages, directAssistantMsg]);
-          messagesRef.current = [...nextMessages, directAssistantMsg];
-          setIsLoading(false);
-          setStreamingText('');
-          return;
+        // Switch to Vision model if images are present and current model lacks vision
+        if (chatAttachments?.images && chatAttachments.images.length > 0) {
+          const visionModel = AVAILABLE_AI_MODELS.find((m) => m.vision);
+          if (visionModel && aiAgent.getModel() !== visionModel.id) {
+            setSelectedModelId(visionModel.id);
+            await aiAgent.setModel(visionModel.id);
+          }
         }
 
-        // 2. Ensure engine initialized
-        if (!aiAgent.isReady()) {
-          await handleInit();
+        // Direct browser actions (navigate, tabs, scroll, greetings) do not need the heavy LLM engine
+        const directIntent = (chatAttachments?.images?.length || chatAttachments?.files?.length)
+          ? null
+          : detectDirectIntent(prompt);
+
+        if (!directIntent || directIntent.isSummary) {
+          if (!aiAgent.isReady()) {
+            await handleInit();
+          }
+
+          if (requestId !== requestIdRef.current) return;
+
+          if (!aiAgent.isReady()) {
+            setMessages([
+              ...nextMessages,
+              {
+                role: 'assistant',
+                content: isTr
+                  ? 'AI motoru başlatılamadı. Lütfen modelin yüklenmesini bekleyin veya WebGPU desteğinizi kontrol edin.'
+                  : 'AI engine could not be started. Please wait for model download or check WebGPU support.',
+              },
+            ]);
+            setIsLoading(false);
+            return;
+          }
         }
 
-        if (requestId !== requestIdRef.current) return;
-
-        if (!aiAgent.isReady()) {
-          setMessages([
-            ...nextMessages,
-            {
-              role: 'assistant',
-              content: isTr
-                ? 'AI motoru hazır değil. Lütfen modelin yüklenmesini bekleyin veya üstteki **AI Başlat** butonuna tıklayın.'
-                : 'AI engine is not ready. Please wait for model download or click **Start AI** in the header.',
-            },
-          ]);
-          setIsLoading(false);
-          return;
-        }
-
-        // 3. WebLLM Streaming
+        // WebLLM / aiAgent chat execution
         let accumulated = '';
         let lastRender = 0;
-        const THROTTLE = 60; // 60ms throttle for silky 60fps streaming
+        const THROTTLE = 50;
 
         const agentResult = await aiAgent.chat(
           nextMessages.map((m) => ({
@@ -247,27 +335,34 @@ export const SidePanel = React.memo(({
               setStreamingText(accumulated);
               lastRender = now;
             }
-          }
+          },
+          chatAttachments
         );
 
         if (requestId !== requestIdRef.current) return;
 
+        // Extract last assistant message from agentResult if available
+        const lastAssistantMsg = Array.isArray(agentResult)
+          ? [...agentResult].reverse().find((m) => m.role === 'assistant')
+          : null;
+        const rawContent = (typeof lastAssistantMsg?.content === 'string' ? lastAssistantMsg.content : '') || accumulated;
+
         // Parse reasoning (<think> tags from DeepSeek/Qwen)
-        let cleanContent = accumulated;
+        let cleanContent = rawContent;
         let reasoningText: string | undefined;
 
-        const thinkStart = accumulated.indexOf('<think>');
+        const thinkStart = rawContent.indexOf('<think>');
         if (thinkStart !== -1) {
-          const thinkEnd = accumulated.indexOf('</think>');
+          const thinkEnd = rawContent.indexOf('</think>');
           if (thinkEnd !== -1) {
-            reasoningText = accumulated.substring(thinkStart + 7, thinkEnd).trim();
-            cleanContent = (accumulated.substring(0, thinkStart) + accumulated.substring(thinkEnd + 8)).trim();
+            reasoningText = rawContent.substring(thinkStart + 7, thinkEnd).trim();
+            cleanContent = (rawContent.substring(0, thinkStart) + rawContent.substring(thinkEnd + 8)).trim();
           }
         }
 
         const finalAssistantMsg: ChatMessage = {
           role: 'assistant',
-          content: cleanContent || accumulated || (isTr ? 'Yanıt üretilemedi.' : 'No response generated.'),
+          content: cleanContent || (isTr ? 'İşlem tamamlandı.' : 'Completed.'),
           reasoning: reasoningText
             ? {
                 text: reasoningText,
@@ -303,6 +398,7 @@ export const SidePanel = React.memo(({
 
   const handleStop = useCallback(() => {
     requestIdRef.current++;
+    aiAgent.interrupt();
     setIsLoading(false);
     if (streamingText.trim()) {
       const stoppedMsg: ChatMessage = {
@@ -335,10 +431,11 @@ export const SidePanel = React.memo(({
   }, [isSpeaking]);
 
   const handleResetChat = useCallback(() => {
+    revokeBlobUrls();
     setMessages([]);
     messagesRef.current = [];
     setStreamingText('');
-  }, []);
+  }, [revokeBlobUrls]);
 
   const handleSelectModel = useCallback(async (modelId: string) => {
     if (modelId === selectedModelId && isReady) return;
@@ -434,7 +531,11 @@ export const SidePanel = React.memo(({
       </div>
 
       {/* 2. CHAT MESSAGES BODY */}
-      <div className="flex-1 p-4 nova-chat-scroll flex flex-col gap-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/25">
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleChatScroll}
+        className="relative flex-1 p-4 nova-chat-scroll flex flex-col gap-4 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-slate-300 dark:[&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-slate-400 dark:hover:[&::-webkit-scrollbar-thumb]:bg-white/25"
+      >
         {/* Model Download Progress Card */}
         {isInitializing && (
           <motion.div
@@ -605,16 +706,22 @@ export const SidePanel = React.memo(({
                   <ReactMarkdown
                     remarkPlugins={[remarkGfm]}
                     components={{
-                      a: ({ href, children }) => (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-cyan-500 underline hover:text-cyan-400 break-all"
-                        >
-                          {children}
-                        </a>
-                      ),
+                      a: ({ href, children }) => {
+                        // AI output is untrusted: never render javascript:/data: URLs as links.
+                        if (!href || !isSafeNavigationUrl(href)) {
+                          return <span className="underline opacity-60 break-all">{children}</span>;
+                        }
+                        return (
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-cyan-500 underline hover:text-cyan-400 break-all"
+                          >
+                            {children}
+                          </a>
+                        );
+                      },
                       p: ({ children }) => <p className="my-1 leading-relaxed break-words">{children}</p>,
                       pre: ({ children }) => (
                         <pre className="max-w-full overflow-x-auto rounded-xl p-3 my-2 bg-slate-950 text-slate-100 border border-slate-800 text-xs font-mono nova-chat-scroll">
@@ -695,6 +802,17 @@ export const SidePanel = React.memo(({
         )}
 
         <div ref={messagesEndRef} />
+        {showScrollButton && (
+          <button
+            type="button"
+            onClick={() => scrollToBottom(true)}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/95 dark:bg-slate-800/95 border border-slate-200 dark:border-white/15 text-slate-600 dark:text-slate-200 shadow-lg backdrop-blur-md hover:border-cyan-400/60 hover:text-cyan-600 dark:hover:text-cyan-300 transition-all cursor-pointer"
+            title={isTr ? 'En alta git' : 'Scroll to bottom'}
+          >
+            <ChevronDown className="w-3.5 h-3.5" />
+            {isTr ? 'Yeni mesajlar' : 'New messages'}
+          </button>
+        )}
       </div>
 
       {/* 3. MODERN SPRING PHYSICS PROMPT INPUT */}
