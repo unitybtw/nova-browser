@@ -231,8 +231,16 @@ export const SidePanel = React.memo(({
       if (meta?.attachments && meta.attachments.length > 0) {
         const images: string[] = [];
         const files: Array<{ name: string; text: string }> = [];
+        // Memory guards: images decode to base64, text loads fully into RAM.
+        const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+        const MAX_TEXT_BYTES = 256 * 1024;
 
         for (const file of meta.attachments) {
+          if (file.type.startsWith('image/')) {
+            if (file.type === 'image/svg+xml' || file.size > MAX_IMAGE_BYTES) continue;
+          } else if (file.size > MAX_TEXT_BYTES) {
+            continue;
+          }
           const blobUrl = URL.createObjectURL(file);
           blobUrlsRef.current.push(blobUrl);
           userAttachments.push({ name: file.name, url: blobUrl });
@@ -828,9 +836,13 @@ export const SidePanel = React.memo(({
           models={AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
           selectedModel={currentModel.name.split('(')[0].trim()}
           onModelChange={(modelName) => {
-            const found = AVAILABLE_AI_MODELS.find(
-              (m) => m.name.split('(')[0].trim().toLowerCase() === modelName.toLowerCase()
-            );
+            // Prefer stable IDs so a future display-name change can't silently break matching.
+            const key = modelName.toLowerCase();
+            const found = AVAILABLE_AI_MODELS.find((m) => m.id.toLowerCase() === key)
+              ?? AVAILABLE_AI_MODELS.find((m) => m.name === modelName)
+              ?? AVAILABLE_AI_MODELS.find(
+                (m) => m.name.split('(')[0].trim().toLowerCase() === key
+              );
             if (found) {
               handleSelectModel(found.id);
             }

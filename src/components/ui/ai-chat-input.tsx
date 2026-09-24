@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon } from "lucide-react";
+import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check } from "lucide-react";
 
 // ----------------------------------------------------------------------
 // Transition Physics
@@ -376,6 +376,20 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const bottomFadeRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const thumbRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+    // Live mirror of attachments for unmount cleanup + revoke-once guard so a
+    // URL is never revoked while still displayed, nor revoked twice.
+    const attachmentsRef = useRef(attachments);
+    attachmentsRef.current = attachments;
+    const revokedUrlsRef = useRef<Set<string>>(new Set());
+    const safeRevokeUrl = (url: string) => {
+      if (!url || revokedUrlsRef.current.has(url)) return;
+      revokedUrlsRef.current.add(url);
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // Already revoked or invalid — ignore.
+      }
+    };
 
     // Sync value ref for audio callback closure
     useEffect(() => {
@@ -404,6 +418,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const expand = () => {
       setIsSmoothResize(false); 
       setExpanded(true);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     };
 
     // --- Voice Recording Logic ---
@@ -521,6 +538,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           };
 
           recognition.onerror = (e: any) => {
+            if (e.error === 'no-speech') return;
             console.warn("[ai-chat-input] Speech recognition error:", e.error);
             stopRecording();
           };
@@ -545,13 +563,15 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       }
     }, [value, isRecording]);
 
-    // Ensure cleanup of mic/streams on unmount
+    // Ensure cleanup of mic/streams on unmount. Attachments are NOT in deps:
+    // revoking here must only ever run for URLs that are already dead.
     useEffect(() => {
       return () => {
         stopRecording();
-        attachments.forEach((a) => URL.revokeObjectURL(a.url)); 
+        attachmentsRef.current.forEach((a) => safeRevokeUrl(a.url));
       };
-    }, [stopRecording, attachments]);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [stopRecording]);
 
 
     useEffect(() => {
@@ -628,10 +648,12 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       setIsSmoothResize(false);
       onSubmit?.(value, { model: selectedModel, effort: efforts[effortIndex], attachments: attachments.map((a) => a.file) });
       handleValueChange("");
-      attachments.forEach((a) => URL.revokeObjectURL(a.url));
+      attachments.forEach((a) => safeRevokeUrl(a.url));
       setAttachments([]);
-      setExpanded(false);
       setIsModelSelectOpen(false);
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     };
 
     const cycleEffort = (e: React.MouseEvent) => {
@@ -644,8 +666,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       fileInputRef.current?.click();
     };
 
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
     const handleFilesChosen = async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
+      const files = Array.from(e.target.files ?? []).filter(
+        (f) => f.type.startsWith("image/") && f.type !== "image/svg+xml" && f.size <= MAX_IMAGE_BYTES
+      );
       e.target.value = ""; 
 
       if (files.length === 0) return;
@@ -659,7 +684,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = () => addAttachment(file, url, img.naturalWidth, img.naturalHeight);
-        img.onerror = () => addAttachment(file, url, 800, 600);
+        // Undecodable files (e.g. renamed executables) are rejected, not accepted blindly.
+        img.onerror = () => safeRevokeUrl(url);
         img.src = url;
       }
     };
@@ -673,7 +699,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       setIsSmoothResize(true);
       setAttachments((prev) => {
         const target = prev.find((a) => a.id === id);
-        if (target) URL.revokeObjectURL(target.url);
+        if (target) safeRevokeUrl(target.url);
         return prev.filter((a) => a.id !== id);
       });
       thumbRefs.current.delete(id);
@@ -801,9 +827,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               onChange={(e) => handleValueChange(e.target.value)}
               onScroll={updateFades}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
+                if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  handleSubmit();
+                  if (!isLoading && !isRecording) {
+                    handleSubmit();
+                  }
                 }
                 if (e.key === "Escape" && value.trim() === "" && !hasAttachments) {
                   setIsSmoothResize(false);
@@ -914,12 +942,18 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                           onModelChange?.(model);
                           setIsModelSelectOpen(false);
                         }}
-                        className="group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium text-foreground/80 outline-none active:scale-[0.98] cursor-default"
+                        className={cn(
+                          "group relative flex h-8 w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-xs font-medium outline-none active:scale-[0.98] cursor-default transition-colors",
+                          model === selectedModel ? "text-cyan-600 dark:text-cyan-400 font-semibold" : "text-foreground/80 hover:text-foreground"
+                        )}
                       >
                         <span className="flex items-center gap-2">
                           <ModelIcon model={model} className="size-3.5 opacity-85 group-hover:opacity-100 transition-opacity" />
                           {model}
                         </span>
+                        {model === selectedModel && (
+                          <Check className="size-3 text-cyan-600 dark:text-cyan-400 shrink-0" />
+                        )}
                       </button>
                     ))}
                   </div>
