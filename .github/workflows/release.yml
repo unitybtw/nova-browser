@@ -136,6 +136,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      VT_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -174,7 +176,7 @@ jobs:
 
       - name: Scan Release Binaries with VirusTotal
         id: virustotal
-        if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
+        if: env.VT_API_KEY != ''
         continue-on-error: true
         uses: crazy-max/ghaction-virustotal@v4
         with:
