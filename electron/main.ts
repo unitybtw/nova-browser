@@ -44,6 +44,22 @@ process.on('unhandledRejection', (reason) => {
   appendCrashLog(errorLog);
 });
 
+// Suppress known upstream third-party deprecation warnings (punycode, @cliqz/adblocker-electron session.getPreloads/setPreloads, etc.)
+process.on('warning', (warning) => {
+  if (warning.name === 'DeprecationWarning') {
+    const msg = warning.message || '';
+    if (
+      msg.includes('punycode') ||
+      msg.includes('url.parse') ||
+      msg.includes('getPreloads') ||
+      msg.includes('setPreloads')
+    ) {
+      return;
+    }
+  }
+  console.warn(`[Node Warning] ${warning.name}: ${warning.message}`);
+});
+
 let cachedDOMPurify: any = null;
 function getMainDOMPurify(): any {
   if (cachedDOMPurify) return cachedDOMPurify;
@@ -78,7 +94,13 @@ import child_process from 'child_process';
 import crypto from 'crypto';
 import os from 'os';
 import { isIP } from 'net';
-import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
+import {
+  initAdBlocker as initAdBlockerEngine,
+  updateAdblockWhitelist,
+  applyAdBlockerToSession,
+  applyAdBlockerToAllSessions,
+  getBlocker
+} from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
 import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
@@ -330,37 +352,20 @@ function isTrustedAppOrigin(urlStr: string): boolean {
 
 let isPrivacyShieldEnabled = true;
 let isDoNotTrackEnabled = true;
-let blocker: ElectronBlocker | null = null;
 let mcpServer: BrowserMCPServer | null = null;
 
-let currentWhitelistFilters: any[] = [];
-
-// Essential CAPTCHA & verification domains that must never be blocked by adblocker
-const CAPTCHA_WHITELIST_RULES = [
-  'google.com/recaptcha',
-  'gstatic.com/recaptcha',
-  'recaptcha.net',
-  'challenges.cloudflare.com',
-  'hcaptcha.com',
-  'newassets.hcaptcha.com'
-];
-
-function updateAdblockWhitelist(whitelist: string[]) {
-  if (!blocker) return;
-  const userList = Array.isArray(whitelist) ? whitelist : [];
-  const combined = Array.from(new Set([...userList, ...CAPTCHA_WHITELIST_RULES]));
-  const cleanWhitelist = combined
-    .filter(host => typeof host === 'string' && /^[a-zA-Z0-9.\-_/]+$/.test(host.trim()))
-    .map(host => host.trim().toLowerCase());
-  const newFilters = cleanWhitelist.map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`)).filter(Boolean);
-  
-  blocker.update({
-    newNetworkFilters: newFilters as any[],
-    removedNetworkFilters: currentWhitelistFilters as any[]
-  });
-  
-  currentWhitelistFilters = newFilters;
+// Reusable getter for all active electron sessions (default + incognito partitions)
+function getAllActiveSessions(): Electron.Session[] {
+  const sessions = [session.defaultSession, session.fromPartition('incognito')];
+  for (const partName of hardenedIncognitoPartitions) {
+    try {
+      sessions.push(session.fromPartition(partName, { cache: false }));
+    } catch (_) {}
+  }
+  return sessions;
 }
+
+export { updateAdblockWhitelist };
 
 // Tracks which per-tab incognito partitions have already been hardened to avoid stacking listeners.
 const hardenedIncognitoPartitions = new Set<string>();
@@ -392,27 +397,6 @@ async function applyProxyToAllSessions(rules: string) {
   await Promise.all(promises);
 }
 
-function applyAdBlockerToAllSessions(enable: boolean) {
-  if (!blocker) return;
-  const sessions = [session.defaultSession, session.fromPartition('incognito')];
-  for (const partName of hardenedIncognitoPartitions) {
-    try {
-      sessions.push(session.fromPartition(partName, { cache: false }));
-    } catch (_) {}
-  }
-  for (const sess of sessions) {
-    try {
-      if (enable) {
-        blocker.enableBlockingInSession(sess);
-      } else {
-        blocker.disableBlockingInSession(sess);
-      }
-    } catch (e) {
-      console.warn(`[AdBlocker] Failed to ${enable ? 'enable' : 'disable'} blocking in session:`, e);
-    }
-  }
-}
-
 function hardenIncognitoPartition(partitionName: string): boolean {
   if (hardenedIncognitoPartitions.has(partitionName)) return true;
   try {
@@ -428,10 +412,8 @@ function hardenIncognitoPartition(partitionName: string): boolean {
       applyProxyToSession(partSess, activeChromiumProxyRules);
     }
     // Apply ad blocker if enabled
-    if (isPrivacyShieldEnabled && blocker) {
-      try { blocker.enableBlockingInSession(partSess); } catch (e) {
-        console.error(`[Security] Failed to enable ad blocking for partition ${partitionName}:`, e);
-      }
+    if (isPrivacyShieldEnabled && getBlocker()) {
+      applyAdBlockerToSession(partSess, true);
     }
     hardenedIncognitoPartitions.add(partitionName);
     console.log(`[Security] Hardened incognito partition: ${partitionName}`);
@@ -445,58 +427,20 @@ function hardenIncognitoPartition(partitionName: string): boolean {
 // Initialize AdBlocker in a dedicated function called after app.whenReady()
 // to prevent race conditions and invalid path resolution from top-level app.getPath('userData').
 function initAdBlocker() {
-  const ADBLOCKER_CACHE_PATH = path.join(app.getPath('userData'), 'adblocker-engine.cache');
-  const ADBLOCKER_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // refetch filter lists older than 3 days
-  ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
-    path: ADBLOCKER_CACHE_PATH,
-    read: async (p) => {
-      const stat = await fs.promises.stat(p);
-      if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
-        throw new Error('adblocker cache expired');
+  initAdBlockerEngine({
+    userDataPath: app.getPath('userData'),
+    isPrivacyShieldEnabled: () => isPrivacyShieldEnabled,
+    getAllSessions: getAllActiveSessions,
+    onAdBlockedFlush: (pendingAdBlocks: Map<number, number>) => {
+      if (!mainWindow || mainWindow.isDestroyed()) {
+        pendingAdBlocks.clear();
+        return;
       }
-      return fs.promises.readFile(p);
-    },
-    write: async (p, buffer) => {
-      try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }
-    },
-  }).then((engine) => {
-    blocker = engine;
-
-    if (isPrivacyShieldEnabled) {
-      applyAdBlockerToAllSessions(true);
+      const batch = Object.fromEntries(pendingAdBlocks);
+      mainWindow.webContents.send('ad-blocked-batch', batch);
+      pendingAdBlocks.clear();
     }
-
-    const pendingAdBlocks = new Map<number, number>();
-    let adBlockFlushTimer: ReturnType<typeof setInterval> | null = null;
-    
-    blocker.on('request-blocked', (request: any) => {
-      if (request.tabId) {
-        pendingAdBlocks.set(request.tabId, (pendingAdBlocks.get(request.tabId) || 0) + 1);
-        
-        if (!adBlockFlushTimer) {
-          adBlockFlushTimer = setInterval(() => {
-            if (pendingAdBlocks.size === 0) {
-              if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
-              adBlockFlushTimer = null;
-              return;
-            }
-            if (!mainWindow || mainWindow.isDestroyed()) {
-              // macOS can keep the app alive after its last window closes.
-              // Drop counters that can no longer be delivered and stop the
-              // periodic timer instead of retaining dead webContents IDs.
-              pendingAdBlocks.clear();
-              if (adBlockFlushTimer) clearInterval(adBlockFlushTimer);
-              adBlockFlushTimer = null;
-              return;
-            }
-            const batch = Object.fromEntries(pendingAdBlocks);
-            mainWindow.webContents.send('ad-blocked-batch', batch);
-            pendingAdBlocks.clear();
-          }, 2000);
-        }
-      }
-    });
-
+  }).then(() => {
     try {
       const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
       let wl: string[] = [];
@@ -508,7 +452,7 @@ function initAdBlocker() {
     } catch(e) {
       updateAdblockWhitelist([]);
     }
-  }).catch((e) => console.error('Failed to initialize adblocker:', e));
+  }).catch((e: unknown) => console.error('Failed to initialize adblocker:', e));
 }
 
 function createWindow() {
@@ -606,6 +550,7 @@ function createWindow() {
   // preload is assigned during attachment after the destination is validated.
 
   // Apply AdBlocker to sessions (default and incognito)
+  const blocker = getBlocker();
   if (isPrivacyShieldEnabled && blocker) {
     try { blocker.enableBlockingInSession(session.defaultSession); } catch(e) {}
     try { blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
@@ -3167,7 +3112,7 @@ app.on('window-all-closed', () => {
 ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
   if (!isTrustedSender(event)) return false;
   isPrivacyShieldEnabled = Boolean(enabled);
-  applyAdBlockerToAllSessions(isPrivacyShieldEnabled);
+  applyAdBlockerToAllSessions(isPrivacyShieldEnabled, getAllActiveSessions());
   return isPrivacyShieldEnabled;
 });
 
@@ -5039,7 +4984,7 @@ ipcMain.handle('list-extensions', async (event) => {
 });
 
 // Open Extension Popup Window
-ipcMain.handle('open-extension-popup', async (event, url, bounds, activeTabInfo) => {
+ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?: number; y?: number; width?: number; height?: number } | null, activeTabInfo?: Record<string, unknown> | null) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   // VULN-14: Validate URL protocol for extension popups
   const blockedProtocols = ['javascript:', 'data:', 'vbscript:'];
