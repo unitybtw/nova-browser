@@ -4,6 +4,7 @@ console.log('\n--- AI Agent Tool Calling & Schema Security Suite ---');
 
 const ALLOWED_TOOLS = new Set([
   'navigate_to_url',
+  'web_research',
   'click_element',
   'fill_input',
   'scroll_page',
@@ -41,6 +42,12 @@ function validateToolCall(call: ToolCall): { valid: boolean; error?: string } {
     const dangerous = ['javascript:', 'data:', 'file:', 'vbscript:'];
     if (dangerous.some(d => args.url.toLowerCase().trim().startsWith(d))) {
       return { valid: false, error: 'Dangerous protocol blocked in AI navigation' };
+    }
+  }
+
+  if (call.name === 'web_research') {
+    if (typeof args.query !== 'string' || !args.query.trim()) {
+      return { valid: false, error: 'Missing or invalid query argument' };
     }
   }
 
@@ -136,4 +143,21 @@ const intentGoogleSearch = detectDirectIntent("google'da react ara");
 assert.equal(intentGoogleSearch?.name, 'navigate_to_url');
 assert.equal(intentGoogleSearch?.arguments?.url?.includes('search?q=react'), true);
 
-console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, Turkish intent parsing, and navigation controls verified.');
+// 8. Autonomous Web Research Intent Queries
+const intentWebNewsTr = detectDirectIntent('Web üzerinde en son haberleri ara');
+assert.equal(intentWebNewsTr?.name, 'web_research');
+assert.equal(typeof intentWebNewsTr?.arguments?.query === 'string' && intentWebNewsTr.arguments.query.length > 0, true);
+
+const intentWebNewsEn = detectDirectIntent('Search latest news on web');
+assert.equal(intentWebNewsEn?.name, 'web_research');
+assert.equal(typeof intentWebNewsEn?.arguments?.query === 'string' && intentWebNewsEn.arguments.query.length > 0, true);
+
+const intentResearchTopic = detectDirectIntent('react 19 yeniliklerini araştır');
+assert.equal(intentResearchTopic?.name, 'web_research');
+assert.equal(intentResearchTopic?.arguments?.query?.includes('react 19'), true);
+
+const intentWebSearchTr = detectDirectIntent('webde yapay zeka ara');
+assert.equal(intentWebSearchTr?.name, 'web_research');
+assert.equal(intentWebSearchTr?.arguments?.query?.includes('yapay zeka'), true);
+
+console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, Turkish intent parsing, navigation controls, and autonomous web research verified.');

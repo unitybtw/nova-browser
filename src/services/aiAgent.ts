@@ -467,7 +467,45 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     }
   }
 
-  // 14. Google Search Compound & General Search (e.g. "google'da hava durumu ara", "google aç ve hava durumu ara", "istanbul hava durumu nedir")
+  // 14. Autonomous Multi-Step Web Research Intent
+  // e.g. "Web üzerinde en son haberleri ara", "Search latest news on web", "react 19 yeniliklerini araştır", "webde yapay zeka haberleri ara"
+  const isExplicitEngineSearch = /^(?:google(?:['']?(?:da|de)|\s+da|\s+de)|youtube(?:['']?(?:da|de)|\s+da|\s+de)|github(?:['']?(?:da|de)|\s+da|\s+de)|wikipedia(?:['']?(?:da|de)|\s+da|\s+de)|duckduckgo(?:['']?(?:da|de)|\s+da|\s+de))/i.test(normalized);
+
+  if (!isExplicitEngineSearch) {
+    const webResearchMatch =
+      normalized.match(/^(?:web(?:['']?de|\s+üzerinde|\s+uzerinde|\s+de)?|internette?|online)\s+(?:en\s+son\s+haberleri\s+ara|haberleri\s+ara|araştır|arastir|ara|tara|bilgi\s+topla)\s*(.*)$/i) ||
+      normalized.match(/^(?:search\s+(?:the\s+)?(?:latest\s+)?news\s+on\s+web|search\s+the\s+web\s+for|search\s+web\s+for|research\s+on\s+web)\s*(.*)$/i) ||
+      normalized.match(/^(?:en\s+son\s+haberleri\s+ara|en\s+son\s+haberler|search\s+latest\s+news)$/i) ||
+      normalized.match(/^(.+?)\s+(?:hakkında\s+araştırma\s+yap|hakkinda\s+arastirma\s+yap|konusunu\s+araştır|konusunu\s+arastir|araştırıp\s+öğren|arastirip\s+ogren|araştır|arastir|hakkında\s+bilgi\s+topla|hakkinda\s+bilgi\s+topla)$/i) ||
+      normalized.match(/^(?:araştır|arastir|araştırma\s+yap|arastirma\s+yap|research|investigate|browse\s+and\s+read)\s*[:\s]\s*(.+)$/i) ||
+      normalized.match(/^(?:web\s+araştırması|web\s+arastirmasi|web\s+research)\s*[:\s]?\s*(.+)$/i) ||
+      normalized.match(/^(?:webde|web'de|internette)\s+(.+?)\s*(?:ara|araştır|arastir|bul)$/i);
+
+    if (webResearchMatch) {
+      let rawQuery = (webResearchMatch[1] || '').trim();
+      if (!rawQuery || rawQuery === 'en son haberleri ara' || rawQuery.includes('en son haberler')) {
+        rawQuery = isTr ? 'en son haberler ve gelişmeler' : 'latest news and headlines';
+      }
+      let cleanedQuery = rawQuery
+        .replace(/^(aç|ac|ve|git|bana|lütfen|lutfen)\s+/gi, '')
+        .replace(/\s+(ara|bul|araştır|arastir|bak|öğren|ogren)$/gi, '')
+        .replace(/^['']?(?:da|de|ta|te|ı|i|u|ü)\s*/i, '')
+        .trim();
+
+      if (!cleanedQuery) {
+        cleanedQuery = isTr ? 'en son haberler' : 'latest news';
+      }
+
+      if (cleanedQuery !== 'google' && cleanedQuery !== 'aç' && !cleanedQuery.startsWith('yeni sekme') && !cleanedQuery.startsWith('sayfa')) {
+        return {
+          name: 'web_research',
+          arguments: { query: cleanedQuery }
+        };
+      }
+    }
+  }
+
+  // 15. Google Search Compound & General Search (e.g. "google'da hava durumu ara", "google aç ve hava durumu ara", "istanbul hava durumu nedir")
   const googleCompoundMatch = 
     normalized.match(/^google(?:['']?(?:da|de)|\s+da|\s+de)?\s+(?:aç|ac|a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:ara|bul|bak|aç|ac)?$/i) ||
     normalized.match(/^(?:google'da\s+ara|google\s+ara|ara|search for|search|bana ara)\s*[:\s]\s*(.+)$/i) ||
@@ -517,11 +555,15 @@ export function parseReActAction(text: string): { name: string; arguments: any }
   if (funcSyntax) {
     const fn = funcSyntax[1];
     const rawParam = funcSyntax[2].trim();
-    const KNOWN_TOOLS = ["navigate_to_url", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form", "reload_page", "go_back", "go_forward"];
+    const KNOWN_TOOLS = ["navigate_to_url", "web_research", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form", "reload_page", "go_back", "go_forward"];
     if (KNOWN_TOOLS.includes(fn)) {
       if (fn === 'navigate_to_url') {
         const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
         return { name: fn, arguments: { url: cleaned || 'https://google.com' } };
+      }
+      if (fn === 'web_research') {
+        const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
+        return { name: fn, arguments: { query: cleaned } };
       }
       if (fn === 'click_element') {
         const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
@@ -569,7 +611,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
 
   // 5. Look for direct JSON matching known tool names
   const KNOWN_TOOLS = [
-    "navigate_to_url", "read_page_content", "get_page_url", "click_element",
+    "navigate_to_url", "web_research", "read_page_content", "get_page_url", "click_element",
     "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
     "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form",
     "reload_page", "go_back", "go_forward"
@@ -1144,6 +1186,20 @@ class AIAgent {
           required: ["query"]
         }
       }
+    },
+    {
+      type: "function",
+      function: {
+        name: "web_research",
+        description: "Autonomously searches the web, navigates into top result pages, scans and extracts live information, and returns a synthesized research report with source citations.",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "The search query or topic to research on the web." }
+          },
+          required: ["query"]
+        }
+      }
     }
   ];
 
@@ -1336,6 +1392,314 @@ CRITICAL RULES:
     } finally {
       this.isInitializing = false;
     }
+  }
+
+  /**
+   * Dispatches visual cursor animations to AICursorOverlay across the application.
+   */
+  private triggerVirtualCursor(x: number, y: number, action: 'move' | 'click' | 'type', text?: string): void {
+    if (typeof window !== 'undefined') {
+      try {
+        const winW = window.innerWidth || 1200;
+        const winH = window.innerHeight || 800;
+        window.dispatchEvent(new CustomEvent('ai-cursor', {
+          detail: {
+            x: Math.max(20, Math.min(winW - 20, Math.round(x))),
+            y: Math.max(20, Math.min(winH - 20, Math.round(y))),
+            action,
+            text
+          }
+        }));
+      } catch (e) {
+        // Overlay is best-effort visual feedback
+      }
+    }
+  }
+
+  /**
+   * Autonomous multi-step web research:
+   * 1. Animates the virtual AI cursor typing and searching.
+   * 2. Navigates to search engine and extracts top organic results.
+   * 3. Autonomously visits and scrolls source pages with visual cursor cues.
+   * 4. Synthesizes findings using LLM or structured extractor.
+   * 5. Persists learnings into AI memory and returns response with citations.
+   */
+  public async performWebResearch(
+    searchTopic: string,
+    messages: ChatCompletionMessageParam[],
+    onChunk?: (chunk: string) => void,
+    generation?: number
+  ): Promise<ChatCompletionMessageParam[]> {
+    const isTr = isTurkishText(searchTopic) || messages.some(m => typeof m.content === 'string' && isTurkishText(m.content));
+    const callId = generateId('call');
+    const startTime = Date.now();
+
+    // Check cancellation
+    const isCancelled = () => generation !== undefined && !this.isOperationActive(generation);
+    if (isCancelled()) {
+      const cancelReply = isTr ? 'İşlem iptal edildi.' : 'Action cancelled.';
+      if (onChunk) onChunk(cancelReply);
+      return [...messages, { role: 'assistant', content: cancelReply }];
+    }
+
+    this.emitStatus('acting', isTr ? `Web araştırması yapılıyor: "${searchTopic}"` : `Researching web: "${searchTopic}"`);
+
+    // Stream step 1: Starting research & cursor typing
+    const step1Msg = isTr
+      ? `🌐 **Otonom Web Araştırması Başlatıldı:** "${searchTopic}"\n\n`
+      : `🌐 **Autonomous Web Research Started:** "${searchTopic}"\n\n`;
+    if (onChunk) onChunk(step1Msg);
+
+    // Animate AI Cursor typing in the omnibox/search area
+    const omniboxX = typeof window !== 'undefined' ? window.innerWidth * 0.45 : 400;
+    this.triggerVirtualCursor(omniboxX, 42, 'type', searchTopic);
+    await new Promise(r => setTimeout(r, 400));
+
+    if (isCancelled()) return messages;
+
+    // Step 2: Navigate to Google search
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}`;
+    if (onChunk) {
+      onChunk(isTr ? `🔍 Arama motoruna bağlanılıyor ve sonuçlar taranıyor...\n` : `🔍 Navigating to search engine and scanning results...\n`);
+    }
+
+    if (this.actionContext?.onNavigate) {
+      this.actionContext.onNavigate(searchUrl);
+    }
+    await this.waitForPageLoadSettled(generation);
+    await new Promise(r => setTimeout(r, 600));
+
+    if (isCancelled()) return messages;
+
+    // Move virtual cursor to search results area
+    const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    this.triggerVirtualCursor(winWidth * 0.35, 260, 'move');
+    await new Promise(r => setTimeout(r, 250));
+    this.triggerVirtualCursor(winWidth * 0.35, 260, 'click');
+
+    // Step 3: Extract top organic result links from the search page
+    let searchResults: Array<{ title: string; url: string; snippet: string }> = [];
+    try {
+      const extracted = await this.actionContext?.onExecuteScript(`
+        (() => {
+          try {
+            const list = [];
+            const headings = Array.from(document.querySelectorAll('h3'));
+            for (const h3 of headings) {
+              const anchor = h3.closest('a') || h3.parentElement?.querySelector('a');
+              if (anchor && anchor.href && /^https?:\\/\\//i.test(anchor.href)) {
+                const u = anchor.href;
+                if (!u.includes('google.') && !u.includes('webcache') && !u.includes('support.google') && !u.includes('accounts.google')) {
+                  const title = (h3.innerText || anchor.innerText || '').trim();
+                  if (title && !list.some(item => item.url === u)) {
+                    const container = anchor.closest('div[data-hveid]') || anchor.closest('div.g') || anchor.parentElement?.parentElement;
+                    let snippet = '';
+                    if (container) {
+                      snippet = container.innerText.replace(title, '').replace(/\\s+/g, ' ').trim().slice(0, 260);
+                    }
+                    list.push({ title, url: u, snippet });
+                    if (list.length >= 3) break;
+                  }
+                }
+              }
+            }
+            if (list.length === 0) {
+              const allLinks = Array.from(document.querySelectorAll('a[href^="http"]'));
+              for (const a of allLinks) {
+                const href = a.href;
+                if (!href.includes('google.') && !href.includes('search') && a.innerText.trim().length > 15) {
+                  list.push({
+                    title: a.innerText.trim().slice(0, 80),
+                    url: href,
+                    snippet: ''
+                  });
+                  if (list.length >= 3) break;
+                }
+              }
+            }
+            return list;
+          } catch(e) {
+            return [];
+          }
+        })()
+      `);
+      if (Array.isArray(extracted)) {
+        searchResults = extracted.filter(r => r && r.url && r.title);
+      }
+    } catch (e) {
+      logger.warn('AIAgent:webResearch', 'Failed to parse search results', e);
+    }
+
+    // Step 4: Visit top sources, scroll with virtual cursor and read page content
+    const visitedSources: Array<{ title: string; url: string; content: string; snippet: string }> = [];
+    const maxSourcesToVisit = Math.min(searchResults.length, 2);
+
+    if (maxSourcesToVisit > 0) {
+      for (let i = 0; i < maxSourcesToVisit; i++) {
+        if (isCancelled()) break;
+        const target = searchResults[i];
+        
+        // Virtual cursor moves to and clicks source link
+        this.triggerVirtualCursor(winWidth * 0.35, 270 + (i * 90), 'click');
+        if (onChunk) {
+          onChunk(isTr
+            ? `\n📖 [${i + 1}/${maxSourcesToVisit}] Sayfa ziyaret ediliyor: **[${target.title}](${target.url})**...\n`
+            : `\n📖 [${i + 1}/${maxSourcesToVisit}] Visiting source: **[${target.title}](${target.url})**...\n`
+          );
+        }
+
+        // Navigate to the target source page
+        if (this.actionContext?.onNavigate) {
+          this.actionContext.onNavigate(target.url);
+        }
+        await this.waitForPageLoadSettled(generation);
+        await new Promise(r => setTimeout(r, 500));
+
+        if (isCancelled()) break;
+
+        // Animate virtual cursor scrolling through the page
+        this.triggerVirtualCursor(winWidth * 0.5, 450, 'move');
+        if (this.actionContext?.onScrollPage) {
+          this.actionContext.onScrollPage('down', 500);
+        }
+        await new Promise(r => setTimeout(r, 400));
+
+        // Read page content (sanitized and stripped of clutter)
+        let pageText = '';
+        try {
+          const raw = await this.actionContext?.onExecuteScript(`
+            (() => {
+              try {
+                const clone = document.body.cloneNode(true);
+                const removeSelectors = ['script', 'style', 'nav', 'header', 'footer', 'aside', 'noscript', 'iframe', '.ad', '.ads', '#cookie-banner', '.cookie-notice'];
+                for (const sel of removeSelectors) {
+                  clone.querySelectorAll(sel).forEach(el => el.remove());
+                }
+                const mainEl = clone.querySelector('article, main, [role="main"]') || clone;
+                return (mainEl.innerText || clone.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 3000);
+              } catch(e) {
+                return (document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 2500);
+              }
+            })()
+          `);
+          pageText = sanitizeAgentInput(typeof raw === 'string' ? raw : JSON.stringify(raw));
+        } catch (e) {
+          pageText = target.snippet || '';
+        }
+
+        visitedSources.push({
+          title: target.title,
+          url: target.url,
+          snippet: target.snippet,
+          content: pageText.slice(0, 2500)
+        });
+      }
+    }
+
+    if (isCancelled()) return messages;
+
+    // Step 5: Synthesize and learn
+    if (onChunk) {
+      onChunk(isTr ? `\n🧠 Bilgiler analiz ediliyor ve sentezleniyor...\n\n` : `\n🧠 Synthesizing findings and formatting report...\n\n`);
+    }
+    this.emitStatus('thinking');
+
+    let finalReport = '';
+    const hasVisitedContent = visitedSources.some(s => s.content && s.content.length > 50);
+
+    // If local LLM engine is initialized and ready, ask it to synthesize
+    if (this.engine && hasVisitedContent) {
+      try {
+        const sourcesContext = visitedSources.map((s, idx) =>
+          `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\nExcerpt:\n${s.content}`
+        ).join('\n\n---\n\n');
+
+        const synthesisPrompt = isTr
+          ? `Kullanıcı şu konuyu araştırdı: "${searchTopic}".\nOtonom olarak webde arandı, aşağıdaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLütfen bu kaynaklardaki bilgileri temel alarak net, kapsamlı, Türkçe ve profesyonel bir özet rapor sun. En son gelişmeleri ve önemli noktaları maddeler halinde vurgula. Raporun sonuna "### 📚 İncelenen Kaynaklar" başlığı altında her kaynağı [Başlık](URL) şeklinde ekle.`
+          : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight key developments and takeaways with bullet points. Conclude with a "### 📚 Consulted Sources" section listing each source as a markdown link [Title](URL).`;
+
+        const completion = await this.engine.chat.completions.create({
+          messages: [{ role: 'user', content: synthesisPrompt }],
+          temperature: 0.25,
+          max_tokens: 650,
+          stream: false
+        });
+
+        const llmContent = completion.choices[0]?.message?.content;
+        if (llmContent) {
+          finalReport = llmContent;
+        }
+      } catch (err) {
+        logger.warn('AIAgent:webResearch', 'LLM synthesis error, falling back to structured synthesis', err);
+      }
+    }
+
+    // Fallback structured synthesis if LLM unavailable or didn't respond
+    if (!finalReport) {
+      const summaryHeader = isTr
+        ? `## 🌐 Web Araştırma Raporu: ${searchTopic}\n\n`
+        : `## 🌐 Web Research Report: ${searchTopic}\n\n`;
+
+      let summaryBody = '';
+      if (visitedSources.length > 0) {
+        summaryBody += isTr
+          ? `Yapılan otonom web taramasında ilgili kaynaklar ziyaret edilmiş ve aşağıdaki temel bilgiler derlenmiştir:\n\n`
+          : `The autonomous web scan visited relevant sources and compiled the following key findings:\n\n`;
+
+        visitedSources.forEach((source, idx) => {
+          const cleanSnippet = source.snippet || source.content.slice(0, 240);
+          summaryBody += `### ${idx + 1}. [${source.title}](${source.url})\n`;
+          if (cleanSnippet) {
+            summaryBody += `> ${cleanSnippet}...\n\n`;
+          }
+          if (source.content.length > 100) {
+            const sentences = source.content.split('. ').filter(s => s.trim().length > 30);
+            if (sentences.length > 1) {
+              summaryBody += `📌 **${isTr ? 'Öne Çıkan' : 'Highlight'}:** ${sentences.slice(0, 2).join('. ')}.\n\n`;
+            }
+          }
+        });
+
+        summaryBody += isTr ? `### 📚 İncelenen Kaynaklar\n` : `### 📚 Consulted Sources\n`;
+        visitedSources.forEach(s => {
+          summaryBody += `- [${s.title}](${s.url})\n`;
+        });
+      } else {
+        summaryBody = isTr
+          ? `Arama gerçekleştirildi ancak doğrudan taranabilecek açık web sayfası içeriği bulunamadı. Lütfen arama teriminizi daha detaylı belirtiniz.`
+          : `Web search was conducted but no scrapable public page contents were found. Please refine your search query.`;
+      }
+
+      finalReport = summaryHeader + summaryBody;
+    }
+
+    // Deliver complete report to stream
+    if (onChunk) {
+      onChunk(finalReport);
+    }
+
+    // Learn & persist findings into AI memory
+    const briefMemory = `Web research on "${searchTopic}": ${visitedSources.map(s => s.title).join(', ')}`;
+    aiMemory.addMemory(briefMemory, 'fact', true);
+    aiMemory.addTaskSummary(isTr ? `Web araştırması: ${searchTopic}` : `Web research: ${searchTopic}`);
+
+    this.emitStatus('idle');
+
+    const durationMs = Date.now() - startTime;
+    const toolCallInfo = [{
+      id: callId,
+      name: 'web_research',
+      args: { query: searchTopic },
+      state: 'success' as const,
+      result: `Researched ${visitedSources.length} sources successfully.`,
+      durationMs
+    }];
+
+    return [...messages, {
+      role: 'assistant',
+      content: finalReport,
+      toolCalls: toolCallInfo
+    } as any];
   }
 
   /**
@@ -1843,6 +2207,21 @@ CRITICAL RULES:
         result = { success: true, results, hint: "Here are the top matches from history and bookmarks. If you find the link you need, you can navigate_to_url." };
       }
 
+      else if (functionName === "web_research") {
+        const query = (args.query || args.topic || "") as string;
+        const researchOutcome = await this.performWebResearch(
+          query,
+          [],
+          undefined,
+          generation
+        );
+        const lastMsg = researchOutcome[researchOutcome.length - 1];
+        result = {
+          success: true,
+          report: typeof lastMsg?.content === 'string' ? lastMsg.content : "Research completed."
+        };
+      }
+
       else if (functionName === "auto_fill_form") {
         // Fetch inputs from the page (including any tagged data-ai-id so the
         // model can reference elements the same way fill_input expects)
@@ -2264,6 +2643,16 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           const directReply = directIntent.directReply || "Hello! How can I help you today?";
           if (onChunk) onChunk(directReply);
           return [...messages, { role: 'assistant', content: directReply }];
+        }
+
+        // Autonomous multi-step Web Research Intent
+        if (funcName === 'web_research') {
+          return this.performWebResearch(
+            directIntent.arguments?.query || userQuery,
+            messages,
+            onChunk,
+            generation
+          );
         }
 
         if (onChunk) onChunk(`Executing action: ${funcName}...\n\n`);
