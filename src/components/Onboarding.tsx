@@ -173,7 +173,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         className="text-5xl font-bold text-white mb-4 tracking-tight select-none"
       >
         Welcome to<br />
-        <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-400">Nova Browser</span>
+        <span className="text-cyan-400">Nova Browser</span>
       </motion.h1>
       <motion.p
         initial={{ y: 20, opacity: 0 }}
@@ -188,8 +188,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
         onClick={goNext}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
-        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-lg shadow-cyan-500/25 no-drag cursor-pointer"
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-md shadow-cyan-500/20 no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         Let&apos;s Get Started

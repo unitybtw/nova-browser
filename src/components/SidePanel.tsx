@@ -31,6 +31,7 @@ import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { copyTextToClipboard } from '../utils/clipboard';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
+import { NovaAISparkle } from './ui/NovaAISparkle';
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -576,63 +577,46 @@ export const SidePanel = React.memo(({
 
         {/* Empty State */}
         {messages.length === 0 && !isLoading && (
-          <div className="my-auto flex flex-col items-center justify-center text-center px-3 py-6">
-            <div className="relative mb-3 flex h-13 w-13 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 via-sky-500/20 to-blue-600/20 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 shadow-sm">
-              <Sparkles className="h-6 w-6" />
+          <div className="my-auto flex flex-col items-center justify-center text-center px-4 py-8">
+            <div className="mb-3.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-cyan-500 shadow-2xs">
+              <NovaAISparkle size={20} active={false} />
             </div>
-            <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">
-              {isTr ? 'Nova AI Asistanı' : 'Nova AI Assistant'}
+            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+              {isTr ? 'Nova Asistan' : 'Nova Assistant'}
             </h3>
-            <p className="mt-1 max-w-[260px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+            <p className="mt-1 max-w-[250px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               {isTr
                 ? 'Sayfaları özetleyin, sekmeleri yönetin veya web üzerinde yerel yapay zeka ile çalışın.'
-                : 'Summarize web pages, manage tabs, or automate actions privately on your device.'}
+                : 'Summarize web pages, manage tabs, or run local AI workflows on your machine.'}
             </p>
 
             {/* Quick Starters */}
-            <div className="mt-5 w-full grid grid-cols-2 gap-2">
+            <div className="mt-5 w-full flex flex-col gap-1.5">
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Bu sayfayı özetle' : 'Summarize this page')}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
-                <Compass className="w-4 h-4 text-cyan-500 shrink-0" />
-                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-cyan-600 dark:group-hover:text-cyan-400 leading-tight">
-                  {isTr ? 'Sayfayı Özetle' : 'Summarize Page'}
-                </span>
+                <Compass className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <span className="truncate">{isTr ? 'Bu sayfayı özetle' : 'Summarize this page'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Açık sekmeleri listele' : 'List open tabs')}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
-                <Layers className="w-4 h-4 text-purple-500 shrink-0" />
-                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-purple-600 dark:group-hover:text-purple-400 leading-tight">
-                  {isTr ? 'Açık Sekmeler' : 'List Tabs'}
-                </span>
+                <Layers className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <span className="truncate">{isTr ? 'Açık sekmeleri listele' : 'List open tabs'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => handleSendPrompt(isTr ? 'Web üzerinde en son haberleri ara' : 'Search latest news on web')}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
+                className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
-                <Search className="w-4 h-4 text-blue-500 shrink-0" />
-                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 leading-tight">
-                  {isTr ? 'Web’de Ara' : 'Search Web'}
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSendPrompt(isTr ? 'Neler yapabilirsin? Bana yeteneklerini anlat' : 'What can you do? Show capabilities')}
-                className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-cyan-50 dark:hover:bg-slate-800 text-left border border-slate-200/80 dark:border-white/10 hover:border-cyan-400/60 transition-all group cursor-pointer shadow-2xs"
-              >
-                <Zap className="w-4 h-4 text-amber-500 shrink-0" />
-                <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-200 group-hover:text-amber-600 dark:group-hover:text-amber-400 leading-tight">
-                  {isTr ? 'Yetenekler' : 'Capabilities'}
-                </span>
+                <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <span className="truncate">{isTr ? 'En son haberleri ara' : 'Search latest news'}</span>
               </button>
             </div>
           </div>

@@ -836,13 +836,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         onClick={() => onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() })}
         className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100 cursor-pointer relative overflow-hidden group"
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/40 via-slate-950 to-purple-950/40 opacity-80" />
+        <div className="absolute inset-0 bg-slate-950/95" />
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
           <div className="w-24 h-24 rounded-3xl bg-slate-900/90 border border-slate-800 shadow-2xl flex items-center justify-center mb-6 backdrop-blur-xl group-hover:scale-105 transition-transform duration-300">
             {tab.favicon ? (
               <img src={tab.favicon} alt="" className="w-12 h-12 rounded-xl object-contain" />
             ) : (
-              <Moon className="w-10 h-10 text-indigo-400" />
+              <Moon className="w-10 h-10 text-cyan-400" />
             )}
           </div>
           <h2 className="text-2xl font-semibold text-white mb-2 line-clamp-1">{tab.title || tab.url}</h2>
@@ -854,7 +854,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               e.stopPropagation();
               onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
             }}
-            className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-sm transition-colors shadow-lg shadow-indigo-600/30 flex items-center gap-2 group-hover:scale-105"
+            className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold text-sm transition-all shadow-md shadow-cyan-950/50 flex items-center gap-2 group-hover:scale-[1.02] cursor-pointer"
           >
             <Zap className="w-4 h-4" />
             Reload Tab
@@ -1059,7 +1059,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               {/* GitHub Repo Header */}
               <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#30363d] pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                  <div className="w-10 h-10 rounded-full bg-[#21262d] border border-[#30363d] flex items-center justify-center text-white font-bold text-lg shadow-sm">
                     N
                   </div>
                   <div>

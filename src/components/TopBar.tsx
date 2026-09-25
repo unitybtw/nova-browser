@@ -2015,11 +2015,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             }`}
             title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
           >
-            {/* Shimmer sweep overlay on hover */}
-            <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/10 to-transparent pointer-events-none" />
-
             <NovaAISparkle size={15} active={isAIAssistantOpen} />
-            <span className="font-bold tracking-wide text-[11px] bg-gradient-to-r from-cyan-400 to-sky-300 bg-clip-text text-transparent group-hover:brightness-110 transition-all">
+            <span className="font-bold tracking-wide text-[11px] text-cyan-600 dark:text-cyan-400 group-hover:brightness-110 transition-colors">
               AI
             </span>
           </motion.button>
@@ -2109,7 +2106,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               }`}
               title="Downloads"
             >
-              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'animate-bounce' : ''}`} />
+              <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-cyan-500' : ''}`} />
               {(activeDownloadsCount || 0) > 0 && (
                 <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs animate-pulse">
                   {activeDownloadsCount}

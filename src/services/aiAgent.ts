@@ -1684,7 +1684,7 @@ CRITICAL RULES:
             
             typeBox.style.opacity = '0';
             typeBox.style.transform = 'translateY(10px)';
-            typeBox.style.transition = 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)';
+            typeBox.style.transition = 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)';
             document.body.appendChild(typeBox);
             
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));

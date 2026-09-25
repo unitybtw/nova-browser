@@ -760,10 +760,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
               display: block;
             }
             .reader-content blockquote {
-              border-left: 3px solid #06b6d4 !important;
+              border-left: 2px solid currentColor;
               padding-left: 1rem;
               font-style: italic;
-              opacity: 0.9;
+              opacity: 0.75;
             }
           `}</style>
 

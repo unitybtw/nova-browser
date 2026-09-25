@@ -260,7 +260,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                     <div className="text-xs space-y-1">
                       <h4 className="font-bold text-slate-900 dark:text-cyan-300">Welcome to Nova Browser</h4>
                       <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-                        Nova combines next-generation privacy, local WebGPU AI models, Model Context Protocol (MCP), and split-screen workflows into a blazing fast modern browser.
+                        Nova combines privacy-first browsing, local WebGPU AI models, Model Context Protocol (MCP), and split-screen workspaces into a lightweight desktop browser.
                       </p>
                     </div>
                   </div>

@@ -507,7 +507,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
     switch (newTabBackground) {
       case 'gradient':
-        return 'bg-gradient-to-br from-indigo-900 via-slate-900 to-purple-950 text-white';
+        return 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 text-white';
       case 'mesh':
       case 'aurora_waves':
       case 'cyber_grid':
