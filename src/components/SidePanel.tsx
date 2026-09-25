@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
   X,
@@ -490,32 +490,65 @@ export const SidePanel = React.memo(({
     }
   }, [selectedModelId, isReady]);
 
-  if (!isOpen) return null;
+  // Escape key handler to close side panel
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const currentModel = AVAILABLE_AI_MODELS.find((m) => m.id === selectedModelId) || AVAILABLE_AI_MODELS[0];
   const hasActiveWebPage = activeTab && activeTab.url && !activeTab.url.startsWith('nova://') && activeTab.url !== 'about:blank';
 
   return (
-    <motion.aside
-      initial={{ width: 0, opacity: 0 }}
-      animate={{ width: 420, opacity: 1 }}
-      exit={{ width: 0, opacity: 0 }}
-      transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-      style={{ width: 420, minWidth: 420, maxWidth: 420 }}
-      className="flex-shrink-0 w-[420px] min-w-[420px] max-w-[420px] relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-xl overflow-hidden select-none"
-    >
-      {/* 1. TOP CONTROLS (Seamless, unified without separate background tone or brand clutter) */}
-      <div className="flex flex-col px-3.5 pt-3 pb-1 shrink-0">
-        <div className="flex items-center justify-between min-h-[30px]">
-          {/* Left: Model download progress if loading */}
-          <div className="flex items-center gap-2">
-            {isInitializing && (
-              <div className="flex items-center gap-1.5 text-xs text-cyan-600 dark:text-cyan-400 font-medium">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                <span className="text-[11px] font-mono">{downloadProgress > 0 ? `${downloadProgress}%` : ''}</span>
-              </div>
-            )}
-          </div>
+    <AnimatePresence>
+      {isOpen && (
+        <motion.aside
+          key="nova-ai-sidepanel"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 420, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{
+            width: { type: 'spring', damping: 32, stiffness: 360, mass: 0.8 },
+            opacity: { duration: 0.2, ease: 'easeInOut' }
+          }}
+          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.45)] overflow-hidden select-none"
+        >
+          <motion.div
+            initial={{ x: 28, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 28, opacity: 0 }}
+            transition={{
+              x: { type: 'spring', damping: 30, stiffness: 350, mass: 0.8 },
+              opacity: { duration: 0.18, ease: 'easeOut' }
+            }}
+            className="w-[420px] min-w-[420px] max-w-[420px] h-full flex flex-col"
+          >
+            {/* 1. TOP CONTROLS (Seamless, unified without separate background tone or brand clutter) */}
+            <div className="flex flex-col px-3.5 pt-3 pb-1 shrink-0">
+              <div className="flex items-center justify-between min-h-[30px]">
+                {/* Left: Brand title & model indicator */}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-100">
+                    <NovaAISparkle size={15} active={isLoading || isInitializing} />
+                    <span className="tracking-tight font-medium">Nova AI</span>
+                  </div>
+                  {isInitializing ? (
+                    <div className="flex items-center gap-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-mono">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span>{downloadProgress > 0 ? `${downloadProgress}%` : ''}</span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 text-slate-400 dark:text-slate-500">
+                      {currentModel.name.split('(')[0].trim()}
+                    </span>
+                  )}
+                </div>
 
           {/* Right Action Buttons */}
           <div className="flex items-center gap-1 ml-auto">
@@ -885,6 +918,9 @@ export const SidePanel = React.memo(({
           }}
         />
       </footer>
-    </motion.aside>
+          </motion.div>
+        </motion.aside>
+      )}
+    </AnimatePresence>
   );
 });
