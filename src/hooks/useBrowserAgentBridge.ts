@@ -467,6 +467,30 @@ export function useBrowserAgentBridge({
         const matches = searchHistoryAndBookmarks(q, searchPool);
         const unique = Array.from(new Map(matches.map(item => [item.url, item])).values());
         return unique.slice(0, 10).map(u => ({ title: u.title, url: u.url }));
+      },
+      onReloadPage: () => {
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        if (webview && webview.reload) {
+          webview.reload();
+        } else if (webview && webview.executeJavaScript) {
+          webview.executeJavaScript('window.location.reload()');
+        }
+      },
+      onGoBack: () => {
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        if (webview && webview.canGoBack && webview.canGoBack()) {
+          webview.goBack();
+        } else if (webview && webview.goBack) {
+          webview.goBack();
+        }
+      },
+      onGoForward: () => {
+        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        if (webview && webview.canGoForward && webview.canGoForward()) {
+          webview.goForward();
+        } else if (webview && webview.goForward) {
+          webview.goForward();
+        }
       }
     });
 

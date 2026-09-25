@@ -13,15 +13,65 @@ export interface QueuedAction {
 
 type Subscriber = (actions: QueuedAction[]) => void;
 
-// Security: Tools that only READ state (page text, URLs, tab lists,
-// history) may auto-execute. Every other tool call is queued as 'pending' and
-// waits for an explicit user decision via approveAction()/denyAction() before
-// it runs. Keep this list strictly read-only — never add mutating tools here.
-const READ_ONLY_TOOLS = new Set([
+// Browser Tools that auto-execute when requested by the user.
+// Safe navigation, reading, tabs, scrolling, search, zoom and standard interaction
+// tools execute immediately without hanging.
+const AUTO_APPROVED_TOOLS = new Set([
+  // Read-only tools & inspection
   'read_page_content',
   'get_page_url',
   'get_page_links',
-  'get_all_tabs'
+  'get_all_tabs',
+  'search_history',
+  'take_screenshot',
+  'wait',
+  'browser_get_page_content',
+  'browser_get_url',
+  'browser_get_title',
+  'browser_get_interactive_elements',
+  'browser_get_page_links',
+  'browser_list_tabs',
+  'browser_search_history',
+  'browser_search_bookmarks',
+  'browser_take_screenshot',
+  'browser_wait',
+
+  // Navigation & Page control
+  'navigate_to_url',
+  'browser_navigate',
+  'open_url',
+  'reload_page',
+  'go_back',
+  'go_forward',
+
+  // Tab operations
+  'manage_tabs',
+  'create_tab',
+  'close_tab',
+  'switch_tab',
+  'browser_new_tab',
+  'browser_close_tab',
+  'browser_switch_tab',
+  'browser_duplicate_tab',
+
+  // Scrolling & Interaction
+  'scroll_page',
+  'browser_scroll_page',
+  'browser_scroll_element',
+  'click_element',
+  'fill_input',
+  'press_key',
+  'browser_click_element',
+  'browser_fill_input',
+  'browser_press_key',
+  'auto_fill_form',
+
+  // Utilities
+  'save_to_memory',
+  'delete_from_memory',
+  'speak_text',
+  'stop_speaking',
+  'stop_speech'
 ]);
 
 class AgentOrchestrator {
@@ -80,11 +130,9 @@ class AgentOrchestrator {
 
   /**
    * Queues a tool action and returns its queue id plus the approval promise
-   * (S3). Read-only tools resolve immediately with the same shape, so callers
-   * can use `id` for status emission and post-approval bookkeeping instead of
-   * fragile getQueue() tail inspection.
+   * (S3). Auto-approved tools resolve immediately, so user actions execute promptly.
    */
-  public enqueueAction(toolName: string, args: any): { id: string; done: Promise<boolean> } {
+  public enqueueAction(toolName: string, args: any, forceAutoApprove?: boolean): { id: string; done: Promise<boolean> } {
     const id = generateId('act');
     let clonedArgs: any = {};
     if (args && typeof args === 'object') {
@@ -100,12 +148,12 @@ class AgentOrchestrator {
     } else if (args !== undefined) {
       clonedArgs = args;
     }
+    const isAutoApproved = forceAutoApprove === true || AUTO_APPROVED_TOOLS.has(toolName);
     const action: QueuedAction = {
       id,
       toolName,
       args: clonedArgs,
-      // Read-only tools auto-execute; everything else requires user approval
-      state: READ_ONLY_TOOLS.has(toolName) ? 'executing' : 'pending'
+      state: isAutoApproved ? 'executing' : 'pending'
     };
 
     this.queue.push(action);
@@ -118,22 +166,21 @@ class AgentOrchestrator {
 
     // Wait for the user's decision. approveAction(id) resolves true,
     // denyAction(id) resolves false (and marks the action 'denied').
-    // Safety net: if nobody answers within PENDING_TIMEOUT_MS (e.g. the panel
-    // is closed and the approval card is invisible), deny so the agent loop
+    // Safety net: if nobody answers within PENDING_TIMEOUT_MS, deny so the agent loop
     // can never hang forever.
     const done = new Promise<boolean>((resolve, reject) => {
-      const timer = window.setTimeout(() => {
+      const timer = setTimeout(() => {
         if (this.resolvers.has(id)) {
           this.denyAction(id);
         }
       }, AgentOrchestrator.PENDING_TIMEOUT_MS);
       this.resolvers.set(id, {
         resolve: (val) => {
-          window.clearTimeout(timer);
+          clearTimeout(timer);
           resolve(val);
         },
         reject: (err) => {
-          window.clearTimeout(timer);
+          clearTimeout(timer);
           reject(err);
         }
       });

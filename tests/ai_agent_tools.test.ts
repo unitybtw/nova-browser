@@ -11,7 +11,10 @@ const ALLOWED_TOOLS = new Set([
   'search_history',
   'create_tab',
   'close_tab',
-  'switch_workspace'
+  'switch_workspace',
+  'reload_page',
+  'go_back',
+  'go_forward'
 ]);
 
 interface ToolCall {
@@ -94,4 +97,43 @@ const intentTab = detectDirectIntent('yeni sekme aç');
 assert.equal(intentTab?.name, 'manage_tabs');
 assert.equal(intentTab?.arguments?.action, 'create');
 
-console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, and detectDirectIntent natural language parsing verified.');
+const intentCloseTab = detectDirectIntent('sekmeyi kapat');
+assert.equal(intentCloseTab?.name, 'manage_tabs');
+assert.equal(intentCloseTab?.arguments?.action, 'close');
+
+// 5. Turkish accusative & dative suffix direct site tests (fixing "yapıyorum diyor yapmıyor")
+const intentYtU = detectDirectIntent("youtube'u aç");
+assert.equal(intentYtU?.name, 'navigate_to_url');
+assert.equal(intentYtU?.arguments?.url, 'https://youtube.com');
+
+const intentYtAc = detectDirectIntent('youtube aç');
+assert.equal(intentYtAc?.name, 'navigate_to_url');
+assert.equal(intentYtAc?.arguments?.url, 'https://youtube.com');
+
+const intentGoogleI = detectDirectIntent("google'ı aç");
+assert.equal(intentGoogleI?.name, 'navigate_to_url');
+assert.equal(intentGoogleI?.arguments?.url, 'https://google.com');
+
+// 6. Navigation controls
+const intentReload = detectDirectIntent('sayfayı yenile');
+assert.equal(intentReload?.name, 'reload_page');
+
+const intentYenile = detectDirectIntent('yenile');
+assert.equal(intentYenile?.name, 'reload_page');
+
+const intentBack = detectDirectIntent('geri git');
+assert.equal(intentBack?.name, 'go_back');
+
+const intentForward = detectDirectIntent('ileri git');
+assert.equal(intentForward?.name, 'go_forward');
+
+// 7. Compound search queries
+const intentYtSearch = detectDirectIntent("youtube'da tarkan ara");
+assert.equal(intentYtSearch?.name, 'navigate_to_url');
+assert.equal(intentYtSearch?.arguments?.url?.includes('search_query=tarkan'), true);
+
+const intentGoogleSearch = detectDirectIntent("google'da react ara");
+assert.equal(intentGoogleSearch?.name, 'navigate_to_url');
+assert.equal(intentGoogleSearch?.arguments?.url?.includes('search?q=react'), true);
+
+console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, Turkish intent parsing, and navigation controls verified.');

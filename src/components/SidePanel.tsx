@@ -44,6 +44,15 @@ export interface ChatMessage {
     name: string;
     url: string;
   }>;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    args?: any;
+    state?: 'pending' | 'executing' | 'completed' | 'success' | 'failed' | 'error';
+    result?: any;
+    error?: string;
+    durationMs?: number;
+  }>;
 }
 
 interface SidePanelProps {
@@ -87,6 +96,7 @@ export const SidePanel = React.memo(({
   const [isInitializing, setIsInitializing] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [downloadStatusText, setDownloadStatusText] = useState('');
+  const [agentStatusText, setAgentStatusText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
@@ -172,9 +182,19 @@ export const SidePanel = React.memo(({
       } else if (status.state === 'idle') {
         setDownloadProgress(100);
       }
+
+      if (status.state === 'acting') {
+        setAgentStatusText(isTr ? `İşlem yürütülüyor: ${status.detail || ''}` : `Executing: ${status.detail || ''}`);
+      } else if (status.state === 'thinking') {
+        setAgentStatusText(isTr ? 'Düşünüyor...' : 'Thinking...');
+      } else if (status.state === 'loading_model') {
+        setAgentStatusText(isTr ? 'Model hazırlanıyor...' : 'Preparing model...');
+      } else if (status.state === 'idle') {
+        setAgentStatusText('');
+      }
     });
     return () => unsub();
-  }, []);
+  }, [isTr]);
 
   // Listen to pending actions from outside
   useEffect(() => {
@@ -379,6 +399,7 @@ export const SidePanel = React.memo(({
                 durationMs: Date.now() - startTime,
               }
             : undefined,
+          toolCalls: (lastAssistantMsg as any)?.toolCalls,
         };
 
         const finalMessages = [...nextMessages, finalAssistantMsg];
@@ -671,6 +692,30 @@ export const SidePanel = React.memo(({
                 </div>
               )}
 
+              {/* Tool Execution Pills */}
+              {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 w-full max-w-[92%] mb-0.5">
+                  {msg.toolCalls.map((tc) => (
+                    <div
+                      key={tc.id}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 shadow-2xs"
+                    >
+                      <Zap className="w-3 h-3 text-cyan-500" />
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">{tc.name}</span>
+                      {tc.durationMs && (
+                        <span className="text-[9.5px] text-slate-400">
+                          {(tc.durationMs / 1000).toFixed(1)}s
+                        </span>
+                      )}
+                      {tc.state === 'error' || tc.error ? (
+                        <span className="text-rose-500 font-bold" title={tc.error}>✕</span>
+                      ) : (
+                        <span className="text-emerald-500 font-bold">✓</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Message Bubble */}
               <div
@@ -788,7 +833,7 @@ export const SidePanel = React.memo(({
               ) : (
                 <div className="flex items-center gap-2 text-slate-400 font-medium text-xs">
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-500" />
-                  <span>{isTr ? 'Düşünüyor...' : 'Thinking...'}</span>
+                  <span>{agentStatusText || (isTr ? 'Düşünüyor veya işlem yapıyor...' : 'Thinking or executing action...')}</span>
                 </div>
               )}
             </div>
