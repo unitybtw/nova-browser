@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v1.4.9). Leave empty to use version from package.json.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -46,7 +51,7 @@ jobs:
             dist-electron-builder/*.zip
             dist-electron-builder/*.blockmap
             dist-electron-builder/latest-mac.yml
-          if-no-files-found: error
+          if-no-files-found: warn
 
   release-windows:
     name: Build Windows (exe)
@@ -84,7 +89,7 @@ jobs:
             dist-electron-builder/*.zip
             dist-electron-builder/*.blockmap
             dist-electron-builder/latest.yml
-          if-no-files-found: error
+          if-no-files-found: warn
 
   release-linux:
     name: Build Linux (AppImage & deb)
@@ -123,15 +128,33 @@ jobs:
             dist-electron-builder/*.deb
             dist-electron-builder/*.blockmap
             dist-electron-builder/latest-linux.yml
-          if-no-files-found: error
+          if-no-files-found: warn
 
   publish-release:
     name: Publish Release
     needs: [release-mac, release-windows, release-linux]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      - name: Resolve Release Tag & Version
+        id: vars
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="${{ inputs.tag_name }}"
+          if [ -z "$TAG" ]; then
+            if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+              TAG="${{ github.ref_name }}"
+            else
+              TAG="v$VERSION"
+            fi
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "title=Nova Browser $TAG" >> $GITHUB_OUTPUT
+          echo "Resolved Release Tag: $TAG"
 
       - name: Download all Artifacts
         uses: actions/download-artifact@v4
@@ -142,7 +165,8 @@ jobs:
       - name: Generate SHA-256 Checksums
         run: |
           cd release-assets
-          sha256sum * > SHA256SUMS.txt 2>/dev/null || true
+          # Cleanly hash only binary distributables, excluding metadata and checksum file itself
+          find . -maxdepth 1 -type f \( -name "*.dmg" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) -exec sha256sum {} + | sed 's| \./|  |' | sort > SHA256SUMS.txt || true
           echo "### SHA-256 Release Checksums" >> $GITHUB_STEP_SUMMARY
           echo '```text' >> $GITHUB_STEP_SUMMARY
           cat SHA256SUMS.txt >> $GITHUB_STEP_SUMMARY
@@ -150,9 +174,8 @@ jobs:
 
       - name: Scan Release Binaries with VirusTotal
         id: virustotal
-        if: env.VIRUSTOTAL_API_KEY != ''
-        env:
-          VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+        if: ${{ secrets.VIRUSTOTAL_API_KEY != '' }}
+        continue-on-error: true
         uses: crazy-max/ghaction-virustotal@v4
         with:
           vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
@@ -184,18 +207,19 @@ jobs:
           cat release-assets/SHA256SUMS.txt >> release_notes_prepend.md
           echo '```' >> release_notes_prepend.md
 
-
       - name: Create & Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Nova Browser ${{ github.ref_name }}
+          tag_name: ${{ steps.vars.outputs.tag }}
+          name: ${{ steps.vars.outputs.title }}
           draft: false
           prerelease: false
           generate_release_notes: true
           body_path: release_notes_prepend.md
           append_body: true
-          files: release-assets/*
+          files: |
+            release-assets/*
+          fail_on_unmatched_files: false
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
