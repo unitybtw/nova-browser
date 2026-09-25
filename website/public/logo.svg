@@ -1,72 +1,85 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
   <defs>
-    <linearGradient id="tileBg" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#0F172A" />
-      <stop offset="100%" stop-color="#020617" />
+    <!-- Background Gradient: Deep Anodized Titanium & Obsidian Void -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161821" />
+      <stop offset="40%" stop-color="#0b0c11" />
+      <stop offset="100%" stop-color="#030407" />
     </linearGradient>
-    <linearGradient id="tileStroke" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.15)" />
+
+    <!-- Subtle Specular Rim Lighting -->
+    <linearGradient id="rimStroke" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.24)" />
+      <stop offset="35%" stop-color="rgba(255, 255, 255, 0.08)" />
       <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)" />
     </linearGradient>
 
-    <!-- Cardinal Light/Shade -->
-    <linearGradient id="cardLight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="100%" stop-color="#E2E8F0" />
-    </linearGradient>
-    <linearGradient id="cardShade" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#94A3B8" />
-      <stop offset="100%" stop-color="#64748B" />
+    <!-- Ambient Center Flare / Luminescence -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.14" />
+      <stop offset="45%" stop-color="#0284c7" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#030407" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- The Star Fill: Apple Pure Silver-White Liquid Gradient -->
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#f8fafc" />
+      <stop offset="85%" stop-color="#e2e8f0" />
+      <stop offset="100%" stop-color="#cbd5e1" />
     </linearGradient>
 
-    <!-- Diag Light/Shade -->
-    <linearGradient id="diagLight" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#CBD5E1" />
-      <stop offset="100%" stop-color="#94A3B8" />
-    </linearGradient>
-    <linearGradient id="diagShade" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#64748B" />
-      <stop offset="100%" stop-color="#475569" />
+    <!-- Diamond Secondary Facet Fill -->
+    <linearGradient id="diamondGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.55)" />
+      <stop offset="100%" stop-color="rgba(148, 163, 184, 0.25)" />
     </linearGradient>
 
-    <!-- Cyan Accent -->
-    <linearGradient id="cyanCore" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38BDF8" />
-      <stop offset="100%" stop-color="#06B6D4" />
-    </linearGradient>
-
-    <filter id="starShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
+    <!-- Subtle Optical Drop Shadow -->
+    <filter id="starShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
     </filter>
+
+    <!-- Optical Center Core Glow -->
+    <radialGradient id="cyanCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="65%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </radialGradient>
   </defs>
-  <rect x="80" y="80" width="864" height="864" rx="196"
-        fill="url(#tileBg)"
-        stroke="url(#tileStroke)"
+
+  <!-- macOS App Squircle Base (Apple Golden Ratio Corner Radius) -->
+  <rect x="80" y="80" width="864" height="864" rx="200"
+        fill="url(#bgGrad)"
+        stroke="url(#rimStroke)"
         stroke-width="3" />
+
+  <!-- Ambient Light Reflection -->
+  <rect x="80" y="80" width="864" height="864" rx="200"
+        fill="url(#centerGlow)" />
+
+  <!-- The Nova Star Glyph -->
   <g filter="url(#starShadow)">
-    <polygon points="512.0,512.0 667.6,356.4 536.9,451.9" fill="url(#diagLight)" />
-    <polygon points="512.0,512.0 667.6,356.4 572.1,487.1" fill="url(#diagShade)" />
-    <polygon points="512.0,512.0 667.6,667.6 572.1,536.9" fill="url(#diagLight)" />
-    <polygon points="512.0,512.0 667.6,667.6 536.9,572.1" fill="url(#diagShade)" />
-    <polygon points="512.0,512.0 356.4,667.6 487.1,572.1" fill="url(#diagLight)" />
-    <polygon points="512.0,512.0 356.4,667.6 451.9,536.9" fill="url(#diagShade)" />
-    <polygon points="512.0,512.0 356.4,356.4 451.9,487.1" fill="url(#diagLight)" />
-    <polygon points="512.0,512.0 356.4,356.4 487.1,451.9" fill="url(#diagShade)" />
-    <polygon points="512.0,512.0 512.0,162.0 481.4,438.1" fill="url(#cardLight)" />
-    <polygon points="512.0,512.0 512.0,162.0 542.6,438.1" fill="url(#cardShade)" />
-    <polygon points="512.0,512.0 862.0,512.0 585.9,481.4" fill="url(#cardLight)" />
-    <polygon points="512.0,512.0 862.0,512.0 585.9,542.6" fill="url(#cardShade)" />
-    <polygon points="512.0,512.0 512.0,862.0 542.6,585.9" fill="url(#cardLight)" />
-    <polygon points="512.0,512.0 512.0,862.0 481.4,585.9" fill="url(#cardShade)" />
-    <polygon points="512.0,512.0 162.0,512.0 438.1,542.6" fill="url(#cardLight)" />
-    <polygon points="512.0,512.0 162.0,512.0 438.1,481.4" fill="url(#cardShade)" />
-    <!-- Center Ring Outer -->
-    <circle cx="512" cy="512" r="68" fill="#0F172A" stroke="url(#cardLight)" stroke-width="4" />
-    <!-- Center Ring Inner -->
-    <circle cx="512" cy="512" r="44" fill="#020617" />
-    <!-- Cyan Center Aperture Core -->
+    <!-- Primary 4-point parabolic star -->
+    <path d="M 512 140
+             C 512 360 360 512 140 512
+             C 360 512 512 664 512 884
+             C 512 664 664 512 884 512
+             C 664 512 512 360 512 140 Z"
+          fill="url(#starGrad)" />
+
+    <!-- Secondary 45-degree diamond facet -->
+    <polygon points="512,320 704,512 512,704 320,512"
+             fill="url(#diamondGrad)" />
+
+    <!-- Optical Center Aperture Outer Ring -->
+    <circle cx="512" cy="512" r="40" fill="#090a0f" />
+
+    <!-- Optical Center Aperture Lens -->
     <circle cx="512" cy="512" r="24" fill="url(#cyanCore)" />
+
     <!-- Inner White Spark Point -->
-    <circle cx="512" cy="512" r="8" fill="#FFFFFF" />
+    <circle cx="512" cy="512" r="8" fill="#ffffff" />
   </g>
 </svg>
