@@ -1,62 +1,72 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
   <defs>
-    <!-- Strong visible shadow for squircle so it is clearly visible on white GitHub background -->
-    <filter id="squircleShadow" x="-15%" y="-15%" width="130%" height="130%">
-      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#000000" flood-opacity="0.14" />
-      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.08" />
-    </filter>
+    <linearGradient id="tileBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0F172A" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <linearGradient id="tileStroke" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.15)" />
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)" />
+    </linearGradient>
 
-    <linearGradient id="squircleBg" x1="0%" y1="0%" x2="0%" y2="100%">
+    <!-- Cardinal Light/Shade -->
+    <linearGradient id="cardLight" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#FFFFFF" />
-      <stop offset="100%" stop-color="#F8FAFC" />
+      <stop offset="100%" stop-color="#E2E8F0" />
+    </linearGradient>
+    <linearGradient id="cardShade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#94A3B8" />
+      <stop offset="100%" stop-color="#64748B" />
     </linearGradient>
 
-    <!-- Left Stem: Peach Coral to Radiant Rose -->
-    <linearGradient id="leftGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#FF7253" />
-      <stop offset="100%" stop-color="#F43F7E" />
+    <!-- Diag Light/Shade -->
+    <linearGradient id="diagLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+    <linearGradient id="diagShade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#64748B" />
+      <stop offset="100%" stop-color="#475569" />
     </linearGradient>
 
-    <!-- Diagonal: Rose Pink to Electric Violet to Royal Indigo -->
-    <linearGradient id="diagGrad" x1="15%" y1="15%" x2="85%" y2="85%">
-      <stop offset="0%" stop-color="#F43F7E" />
-      <stop offset="50%" stop-color="#A855F7" />
-      <stop offset="100%" stop-color="#3B82F6" />
-    </linearGradient>
-
-    <!-- Right Stem: Royal Blue to Vibrant Cyan -->
-    <linearGradient id="rightGrad" x1="0%" y1="100%" x2="0%" y2="0%">
-      <stop offset="0%" stop-color="#3B82F6" />
+    <!-- Cyan Accent -->
+    <linearGradient id="cyanCore" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38BDF8" />
       <stop offset="100%" stop-color="#06B6D4" />
     </linearGradient>
 
-    <!-- Soft shadow under the diagonal for ribbon depth -->
-    <filter id="ribbonDepth" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="-4" dy="8" stdDeviation="12" flood-color="#7C3AED" flood-opacity="0.30" />
-      <feDropShadow dx="2" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.12" />
+    <filter id="starShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6" />
     </filter>
   </defs>
-
-  <!-- Visible White Squircle Card with clear outline and depth shadow -->
-  <rect x="112" y="112" width="800" height="800" rx="185"
-        fill="url(#squircleBg)"
-        filter="url(#squircleShadow)"
-        stroke="#CBD5E1"
-        stroke-width="6" />
-
-  <!-- 3 Geometric Lines: Left Pillar, Right Pillar, Diagonal Ribbon Fold -->
-  <g id="novaN">
-    <!-- Left Pillar (Vertical rounded capsule) -->
-    <rect x="260" y="270" width="130" height="484" rx="65" fill="url(#leftGrad)" />
-
-    <!-- Right Pillar (Vertical rounded capsule) -->
-    <rect x="634" y="270" width="130" height="484" rx="65" fill="url(#rightGrad)" />
-
-    <!-- Diagonal Ribbon Bridge (crossing with depth and rounded caps) -->
-    <path d="M 325 335 L 699 689"
-          stroke="url(#diagGrad)"
-          stroke-width="130"
-          stroke-linecap="round"
-          filter="url(#ribbonDepth)" />
+  <rect x="80" y="80" width="864" height="864" rx="196"
+        fill="url(#tileBg)"
+        stroke="url(#tileStroke)"
+        stroke-width="3" />
+  <g filter="url(#starShadow)">
+    <polygon points="512.0,512.0 667.6,356.4 536.9,451.9" fill="url(#diagLight)" />
+    <polygon points="512.0,512.0 667.6,356.4 572.1,487.1" fill="url(#diagShade)" />
+    <polygon points="512.0,512.0 667.6,667.6 572.1,536.9" fill="url(#diagLight)" />
+    <polygon points="512.0,512.0 667.6,667.6 536.9,572.1" fill="url(#diagShade)" />
+    <polygon points="512.0,512.0 356.4,667.6 487.1,572.1" fill="url(#diagLight)" />
+    <polygon points="512.0,512.0 356.4,667.6 451.9,536.9" fill="url(#diagShade)" />
+    <polygon points="512.0,512.0 356.4,356.4 451.9,487.1" fill="url(#diagLight)" />
+    <polygon points="512.0,512.0 356.4,356.4 487.1,451.9" fill="url(#diagShade)" />
+    <polygon points="512.0,512.0 512.0,162.0 481.4,438.1" fill="url(#cardLight)" />
+    <polygon points="512.0,512.0 512.0,162.0 542.6,438.1" fill="url(#cardShade)" />
+    <polygon points="512.0,512.0 862.0,512.0 585.9,481.4" fill="url(#cardLight)" />
+    <polygon points="512.0,512.0 862.0,512.0 585.9,542.6" fill="url(#cardShade)" />
+    <polygon points="512.0,512.0 512.0,862.0 542.6,585.9" fill="url(#cardLight)" />
+    <polygon points="512.0,512.0 512.0,862.0 481.4,585.9" fill="url(#cardShade)" />
+    <polygon points="512.0,512.0 162.0,512.0 438.1,542.6" fill="url(#cardLight)" />
+    <polygon points="512.0,512.0 162.0,512.0 438.1,481.4" fill="url(#cardShade)" />
+    <!-- Center Ring Outer -->
+    <circle cx="512" cy="512" r="68" fill="#0F172A" stroke="url(#cardLight)" stroke-width="4" />
+    <!-- Center Ring Inner -->
+    <circle cx="512" cy="512" r="44" fill="#020617" />
+    <!-- Cyan Center Aperture Core -->
+    <circle cx="512" cy="512" r="24" fill="url(#cyanCore)" />
+    <!-- Inner White Spark Point -->
+    <circle cx="512" cy="512" r="8" fill="#FFFFFF" />
   </g>
 </svg>
