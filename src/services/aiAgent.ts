@@ -1395,6 +1395,25 @@ CRITICAL RULES:
   }
 
   /**
+   * Retrieves the active webview's current bounding rect in the host window.
+   * Enables precise coordinate mapping for the AI virtual cursor.
+   */
+  private getWebviewOffset(): { left: number; top: number } {
+    if (typeof document !== 'undefined') {
+      try {
+        const webview = document.querySelector('webview:not([style*="display: none"])') || document.querySelector('webview');
+        if (webview) {
+          const rect = webview.getBoundingClientRect();
+          if (rect.width > 0 && rect.height > 0) {
+            return { left: Math.round(rect.left), top: Math.round(rect.top) };
+          }
+        }
+      } catch (e) {}
+    }
+    return { left: 0, top: 76 };
+  }
+
+  /**
    * Dispatches visual cursor animations to AICursorOverlay across the application.
    */
   private triggerVirtualCursor(x: number, y: number, action: 'move' | 'click' | 'type', text?: string): void {
@@ -1419,9 +1438,9 @@ CRITICAL RULES:
   /**
    * Autonomous multi-step web research:
    * 1. Animates the virtual AI cursor typing and searching.
-   * 2. Navigates to search engine and extracts top organic results.
-   * 3. Autonomously visits and scrolls source pages with visual cursor cues.
-   * 4. Synthesizes findings using LLM or structured extractor.
+   * 2. Navigates to search engine and extracts top organic results with real DOM coordinates.
+   * 3. Autonomously visits and scrolls source pages with visual cursor cues on actual elements.
+   * 4. Synthesizes findings using LLM or structured extractor without emojis.
    * 5. Persists learnings into AI memory and returns response with citations.
    */
   public async performWebResearch(
@@ -1446,13 +1465,24 @@ CRITICAL RULES:
 
     // Stream step 1: Starting research & cursor typing
     const step1Msg = isTr
-      ? `🌐 **Otonom Web Araştırması Başlatıldı:** "${searchTopic}"\n\n`
-      : `🌐 **Autonomous Web Research Started:** "${searchTopic}"\n\n`;
+      ? `[Otonom Web Araştırması Başlatıldı: "${searchTopic}"]\n\n`
+      : `[Autonomous Web Research Started: "${searchTopic}"]\n\n`;
     if (onChunk) onChunk(step1Msg);
 
-    // Animate AI Cursor typing in the omnibox/search area
-    const omniboxX = typeof window !== 'undefined' ? window.innerWidth * 0.45 : 400;
-    this.triggerVirtualCursor(omniboxX, 42, 'type', searchTopic);
+    // Animate AI Cursor typing in the omnibox area
+    let omniboxX = typeof window !== 'undefined' ? window.innerWidth * 0.45 : 400;
+    let omniboxY = 42;
+    if (typeof document !== 'undefined') {
+      const omniInput = document.querySelector('input[type="text"]') || document.querySelector('input');
+      if (omniInput) {
+        const ob = omniInput.getBoundingClientRect();
+        if (ob.width > 0) {
+          omniboxX = ob.left + ob.width / 2;
+          omniboxY = ob.top + ob.height / 2;
+        }
+      }
+    }
+    this.triggerVirtualCursor(omniboxX, omniboxY, 'type', searchTopic);
     await new Promise(r => setTimeout(r, 400));
 
     if (isCancelled()) return messages;
@@ -1460,7 +1490,7 @@ CRITICAL RULES:
     // Step 2: Navigate to Google search
     const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}`;
     if (onChunk) {
-      onChunk(isTr ? `🔍 Arama motoruna bağlanılıyor ve sonuçlar taranıyor...\n` : `🔍 Navigating to search engine and scanning results...\n`);
+      onChunk(isTr ? `Arama motoruna bağlanılıyor ve sonuçlar taranıyor...\n` : `Navigating to search engine and scanning results...\n`);
     }
 
     if (this.actionContext?.onNavigate) {
@@ -1471,14 +1501,8 @@ CRITICAL RULES:
 
     if (isCancelled()) return messages;
 
-    // Move virtual cursor to search results area
-    const winWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    this.triggerVirtualCursor(winWidth * 0.35, 260, 'move');
-    await new Promise(r => setTimeout(r, 250));
-    this.triggerVirtualCursor(winWidth * 0.35, 260, 'click');
-
-    // Step 3: Extract top organic result links from the search page
-    let searchResults: Array<{ title: string; url: string; snippet: string }> = [];
+    // Step 3: Extract top organic result links from the search page with actual DOM coordinates
+    let searchResults: Array<{ title: string; url: string; snippet: string; rect?: { left: number; top: number; width: number; height: number } }> = [];
     try {
       const extracted = await this.actionContext?.onExecuteScript(`
         (() => {
@@ -1491,13 +1515,24 @@ CRITICAL RULES:
                 const u = anchor.href;
                 if (!u.includes('google.') && !u.includes('webcache') && !u.includes('support.google') && !u.includes('accounts.google')) {
                   const title = (h3.innerText || anchor.innerText || '').trim();
-                  if (title && !list.some(item => item.url === u)) {
+                  const rect = anchor.getBoundingClientRect();
+                  if (title && rect.width > 0 && rect.height > 0 && !list.some(item => item.url === u)) {
                     const container = anchor.closest('div[data-hveid]') || anchor.closest('div.g') || anchor.parentElement?.parentElement;
                     let snippet = '';
                     if (container) {
                       snippet = container.innerText.replace(title, '').replace(/\\s+/g, ' ').trim().slice(0, 260);
                     }
-                    list.push({ title, url: u, snippet });
+                    list.push({
+                      title,
+                      url: u,
+                      snippet,
+                      rect: {
+                        left: Math.round(rect.left),
+                        top: Math.round(rect.top),
+                        width: Math.round(rect.width),
+                        height: Math.round(rect.height)
+                      }
+                    });
                     if (list.length >= 3) break;
                   }
                 }
@@ -1508,12 +1543,21 @@ CRITICAL RULES:
               for (const a of allLinks) {
                 const href = a.href;
                 if (!href.includes('google.') && !href.includes('search') && a.innerText.trim().length > 15) {
-                  list.push({
-                    title: a.innerText.trim().slice(0, 80),
-                    url: href,
-                    snippet: ''
-                  });
-                  if (list.length >= 3) break;
+                  const rect = a.getBoundingClientRect();
+                  if (rect.width > 0 && rect.height > 0) {
+                    list.push({
+                      title: a.innerText.trim().slice(0, 80),
+                      url: href,
+                      snippet: '',
+                      rect: {
+                        left: Math.round(rect.left),
+                        top: Math.round(rect.top),
+                        width: Math.round(rect.width),
+                        height: Math.round(rect.height)
+                      }
+                    });
+                    if (list.length >= 3) break;
+                  }
                 }
               }
             }
@@ -1533,22 +1577,61 @@ CRITICAL RULES:
     // Step 4: Visit top sources, scroll with virtual cursor and read page content
     const visitedSources: Array<{ title: string; url: string; content: string; snippet: string }> = [];
     const maxSourcesToVisit = Math.min(searchResults.length, 2);
+    const offset = this.getWebviewOffset();
 
     if (maxSourcesToVisit > 0) {
       for (let i = 0; i < maxSourcesToVisit; i++) {
         if (isCancelled()) break;
         const target = searchResults[i];
         
-        // Virtual cursor moves to and clicks source link
-        this.triggerVirtualCursor(winWidth * 0.35, 270 + (i * 90), 'click');
+        // Calculate the real position of the target link on the user's screen
+        const linkCenterX = target.rect
+          ? offset.left + target.rect.left + Math.min(80, target.rect.width / 2)
+          : offset.left + 280;
+        const linkCenterY = target.rect
+          ? offset.top + target.rect.top + (target.rect.height / 2)
+          : offset.top + 220 + (i * 80);
+
+        // Move cursor smoothly over the actual link
+        this.triggerVirtualCursor(linkCenterX, linkCenterY, 'move');
+        await new Promise(r => setTimeout(r, 220));
+
+        // Click on the actual link with ripple
+        this.triggerVirtualCursor(linkCenterX, linkCenterY, 'click');
+
         if (onChunk) {
           onChunk(isTr
-            ? `\n📖 [${i + 1}/${maxSourcesToVisit}] Sayfa ziyaret ediliyor: **[${target.title}](${target.url})**...\n`
-            : `\n📖 [${i + 1}/${maxSourcesToVisit}] Visiting source: **[${target.title}](${target.url})**...\n`
+            ? `\n[${i + 1}/${maxSourcesToVisit}] Sayfa ziyaret ediliyor: [${target.title}](${target.url})...\n`
+            : `\n[${i + 1}/${maxSourcesToVisit}] Visiting source: [${target.title}](${target.url})...\n`
           );
         }
 
-        // Navigate to the target source page
+        // Dispatch realistic mouse click inside guest webview DOM
+        try {
+          const safeTargetUrl = escapeForJSTemplate(JSON.stringify(target.url));
+          await this.actionContext?.onExecuteScript(`
+            (() => {
+              try {
+                const a = document.querySelector('a[href="' + ${safeTargetUrl} + '"]') ||
+                          Array.from(document.querySelectorAll('a')).find(el => el.href === ${safeTargetUrl});
+                if (a) {
+                  const rect = a.getBoundingClientRect();
+                  const mouseOpts = {
+                    bubbles: true, cancelable: true, view: window,
+                    clientX: rect.left + rect.width / 2,
+                    clientY: rect.top + rect.height / 2
+                  };
+                  a.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+                  a.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+                  a.dispatchEvent(new MouseEvent('click', mouseOpts));
+                  a.click();
+                }
+              } catch(_) {}
+            })()
+          `);
+        } catch (_) {}
+
+        // Navigate to the target source page (reliable browser navigation)
         if (this.actionContext?.onNavigate) {
           this.actionContext.onNavigate(target.url);
         }
@@ -1557,8 +1640,13 @@ CRITICAL RULES:
 
         if (isCancelled()) break;
 
-        // Animate virtual cursor scrolling through the page
-        this.triggerVirtualCursor(winWidth * 0.5, 450, 'move');
+        // Position virtual cursor in reading area and scroll smoothly
+        const readAreaX = offset.left + 350;
+        const readAreaY = offset.top + 220;
+        this.triggerVirtualCursor(readAreaX, readAreaY, 'move');
+        await new Promise(r => setTimeout(r, 180));
+        this.triggerVirtualCursor(readAreaX, readAreaY + 160, 'move');
+
         if (this.actionContext?.onScrollPage) {
           this.actionContext.onScrollPage('down', 500);
         }
@@ -1600,14 +1688,14 @@ CRITICAL RULES:
 
     // Step 5: Synthesize and learn
     if (onChunk) {
-      onChunk(isTr ? `\n🧠 Bilgiler analiz ediliyor ve sentezleniyor...\n\n` : `\n🧠 Synthesizing findings and formatting report...\n\n`);
+      onChunk(isTr ? `\nBilgiler analiz ediliyor ve sentezleniyor...\n\n` : `\nSynthesizing findings and formatting report...\n\n`);
     }
     this.emitStatus('thinking');
 
     let finalReport = '';
     const hasVisitedContent = visitedSources.some(s => s.content && s.content.length > 50);
 
-    // If local LLM engine is initialized and ready, ask it to synthesize
+    // If local LLM engine is initialized and ready, ask it to synthesize without emojis
     if (this.engine && hasVisitedContent) {
       try {
         const sourcesContext = visitedSources.map((s, idx) =>
@@ -1615,8 +1703,8 @@ CRITICAL RULES:
         ).join('\n\n---\n\n');
 
         const synthesisPrompt = isTr
-          ? `Kullanıcı şu konuyu araştırdı: "${searchTopic}".\nOtonom olarak webde arandı, aşağıdaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLütfen bu kaynaklardaki bilgileri temel alarak net, kapsamlı, Türkçe ve profesyonel bir özet rapor sun. En son gelişmeleri ve önemli noktaları maddeler halinde vurgula. Raporun sonuna "### 📚 İncelenen Kaynaklar" başlığı altında her kaynağı [Başlık](URL) şeklinde ekle.`
-          : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight key developments and takeaways with bullet points. Conclude with a "### 📚 Consulted Sources" section listing each source as a markdown link [Title](URL).`;
+          ? `Kullanıcı şu konuyu araştırdı: "${searchTopic}".\nOtonom olarak webde arandı, aşağıdaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLütfen bu kaynaklardaki bilgileri temel alarak net, kapsamlı, Türkçe ve profesyonel bir özet rapor sun. En son gelişmeleri ve önemli noktaları maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" başlığı altında her kaynağı [Başlık](URL) şeklinde ekle.`
+          : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight key developments and takeaways with bullet points. NEVER use any emojis. Conclude with a "### Consulted Sources" section listing each source as a markdown link [Title](URL).`;
 
         const completion = await this.engine.chat.completions.create({
           messages: [{ role: 'user', content: synthesisPrompt }],
@@ -1634,11 +1722,11 @@ CRITICAL RULES:
       }
     }
 
-    // Fallback structured synthesis if LLM unavailable or didn't respond
+    // Fallback structured synthesis if LLM unavailable or didn't respond (Strictly NO emojis)
     if (!finalReport) {
       const summaryHeader = isTr
-        ? `## 🌐 Web Araştırma Raporu: ${searchTopic}\n\n`
-        : `## 🌐 Web Research Report: ${searchTopic}\n\n`;
+        ? `## Web Araştırma Raporu: ${searchTopic}\n\n`
+        : `## Web Research Report: ${searchTopic}\n\n`;
 
       let summaryBody = '';
       if (visitedSources.length > 0) {
@@ -1655,12 +1743,12 @@ CRITICAL RULES:
           if (source.content.length > 100) {
             const sentences = source.content.split('. ').filter(s => s.trim().length > 30);
             if (sentences.length > 1) {
-              summaryBody += `📌 **${isTr ? 'Öne Çıkan' : 'Highlight'}:** ${sentences.slice(0, 2).join('. ')}.\n\n`;
+              summaryBody += `**${isTr ? 'Öne Çıkan' : 'Highlight'}:** ${sentences.slice(0, 2).join('. ')}.\n\n`;
             }
           }
         });
 
-        summaryBody += isTr ? `### 📚 İncelenen Kaynaklar\n` : `### 📚 Consulted Sources\n`;
+        summaryBody += isTr ? `### İncelenen Kaynaklar\n` : `### Consulted Sources\n`;
         visitedSources.forEach(s => {
           summaryBody += `- [${s.title}](${s.url})\n`;
         });

@@ -12,7 +12,7 @@ import {
   Loader2,
   ChevronDown,
   Brain,
-  Compass,
+  Plus,
   Layers,
   Search,
   Zap,
@@ -78,13 +78,13 @@ export const SidePanel = React.memo(({
       return [
         {
           role: 'user',
-          content: isTr ? 'Bu sayfayı özetle' : 'Summarize this page',
+          content: isTr ? 'Açık sekmeleri listele' : 'List open tabs',
         },
         {
           role: 'assistant',
           content: isTr
-            ? '### Sayfa Özeti\nNova Browser, yerel WebGPU hızlandırmalı yapay zeka ile verilerinizi cihazınızdan çıkarmadan çalışır.\n\n- **Gizlilik:** Sayfa içeriği ve sorgularınız dış sunuculara iletilmez.\n- **Sekme Yönetimi:** Sekmeleri gruplayabilir, arayabilir ve dondurabilirsiniz.'
-            : '### Page Summary\nNova Browser runs local WebGPU-accelerated AI entirely on your device without transmitting data.\n\n- **Privacy:** Page contents and prompts never leave your machine.\n- **Tab Management:** Group, search, and hibernate tabs automatically.',
+            ? '### Açık Sekmeler\n1. [Nova Browser - Ana Sayfa](nova://newtab)\n2. [Dokümantasyon](https://docs.nova-browser.org)'
+            : '### Open Tabs\n1. [Nova Browser - Home](nova://newtab)\n2. [Documentation](https://docs.nova-browser.org)',
         },
       ];
     }
@@ -228,8 +228,8 @@ export const SidePanel = React.memo(({
         {
           role: 'assistant',
           content: isTr
-            ? `⚠️ **AI Modeli Başlatılamadı:** ${errMsg}\n\nLütfen WebGPU desteğini ve internet bağlantınızı kontrol edip tekrar deneyin.`
-            : `⚠️ **Failed to start AI model:** ${errMsg}\n\nPlease check your WebGPU settings and connection, then try again.`,
+            ? `**AI Modeli Başlatılamadı:** ${errMsg}\n\nLütfen WebGPU desteğini ve internet bağlantınızı kontrol edip tekrar deneyin.`
+            : `**Failed to start AI model:** ${errMsg}\n\nPlease check your WebGPU settings and connection, then try again.`,
         },
       ]);
     } finally {
@@ -576,21 +576,12 @@ export const SidePanel = React.memo(({
 
         {/* Active Tab Context Bar */}
         {hasActiveWebPage && (
-          <div className="mt-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2 shadow-2xs backdrop-blur-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
-              <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-              <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300 truncate" title={activeTab.title || activeTab.url}>
-                {activeTab.title || activeTab.url}
-              </span>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleSendPrompt(isTr ? 'Bu sayfayı özetle' : 'Summarize this page')}
-              className="px-2.5 py-0.5 rounded-lg text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/20 transition-all cursor-pointer active:scale-95 shrink-0"
-            >
-              {isTr ? '✦ Özetle' : '✦ Summarize'}
-            </button>
+          <div className="mt-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/10 flex items-center gap-2 shadow-2xs backdrop-blur-sm">
+            <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+            <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300 truncate" title={activeTab.title || activeTab.url}>
+              {activeTab.title || activeTab.url}
+            </span>
           </div>
         )}
       </div>
@@ -640,19 +631,19 @@ export const SidePanel = React.memo(({
             </h3>
             <p className="mt-1 max-w-[250px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               {isTr
-                ? 'Sayfaları özetleyin, sekmeleri yönetin veya web üzerinde yerel yapay zeka ile çalışın.'
-                : 'Summarize web pages, manage tabs, or run local AI workflows on your machine.'}
+                ? 'Web üzerinde araştırma yapın, sekmeleri yönetin ve yerel yapay zeka ile çalışın.'
+                : 'Research the web, manage tabs, and run local AI workflows on your machine.'}
             </p>
 
             {/* Quick Starters */}
             <div className="mt-5 w-full flex flex-col gap-1.5">
               <button
                 type="button"
-                onClick={() => handleSendPrompt(isTr ? 'Bu sayfayı özetle' : 'Summarize this page')}
+                onClick={() => handleSendPrompt(isTr ? 'Yeni sekme aç' : 'Open new tab')}
                 className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-slate-100/70 dark:bg-slate-800/50 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-left border border-slate-200/60 dark:border-white/5 transition-all text-xs text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white group cursor-pointer"
               >
-                <Compass className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
-                <span className="truncate">{isTr ? 'Bu sayfayı özetle' : 'Summarize this page'}</span>
+                <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-cyan-500 shrink-0 transition-colors" />
+                <span className="truncate">{isTr ? 'Yeni sekme aç' : 'Open new tab'}</span>
               </button>
 
               <button
