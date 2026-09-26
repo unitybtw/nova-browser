@@ -1737,6 +1737,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </AnimatePresence>
           </div>
+
+          {/* Spacer for Windows controls when vertical tabs are active */}
+          {isWindows && useVerticalTabs && (
+            <div 
+              className="w-[140px] shrink-0 select-none drag-region" 
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            />
+          )}
         </div>
       </div>
 
@@ -1776,7 +1784,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             ))
           ) : (
             <span className="text-[11px] text-slate-400 dark:text-slate-500 italic px-2 py-0.5 select-none">
-              Bookmarks will appear here. Press ⌘D to bookmark the current page.
+              Bookmarks will appear here. Press {isMac ? '⌘D' : 'Ctrl+D'} to bookmark the current page.
             </span>
           )}
         </div>

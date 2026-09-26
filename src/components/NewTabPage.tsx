@@ -313,23 +313,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           }
           return;
         }
-        // Fallback for non-electron web preview only when google is the chosen engine
-        if (typeof window !== 'undefined' && !window.electronAPI && searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'en';
-          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-          const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
-            signal: abortController.signal
-          });
-          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && res.ok) {
-            const data = await res.json();
-            if (data && Array.isArray(data) && Array.isArray(data[1])) {
-              const list = data[1].slice(0, 6);
-              setClientCachedSuggestions(cacheKey, list);
-              setSuggestions(list);
-              setShowSuggestions(list.length > 0);
-            }
-          }
-        }
+
+        // Without electron IPC, do not leak user typing to external domains from renderer
+        setSuggestions([]);
+        setShowSuggestions(false);
       } catch (err) {
         // ignore aborted or network errors
       }

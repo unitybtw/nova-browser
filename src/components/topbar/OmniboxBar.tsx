@@ -234,23 +234,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           return;
         }
 
-        // Fallback for non-electron web preview only when google is the chosen engine
-        if (typeof window !== 'undefined' && !window.electronAPI && searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'en';
-          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-          const response = await fetch(
-            `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`,
-            { signal: abortController.signal }
-          );
-          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId && response.ok) {
-            const data = await response.json();
-            if (data && Array.isArray(data) && Array.isArray(data[1])) {
-              const list = data[1].slice(0, 6);
-              setClientCachedSuggestions(cacheKey, list);
-              setSuggestions(list);
-            }
-          }
-        }
+        // Without electron IPC, do not leak user typing to external domains from renderer
+        setSuggestions([]);
       } catch (err: any) {
         if (err?.name !== 'AbortError') {
           logger.debug('TopBar:suggestions', 'Non-fatal error while fetching search suggestions', err);

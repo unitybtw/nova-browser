@@ -4,6 +4,8 @@ export interface KeyEventLike {
   metaKey?: boolean;
   ctrlKey?: boolean;
   altKey?: boolean;
+  isComposing?: boolean;
+  nativeEvent?: { isComposing?: boolean };
 }
 
 export interface ShortcutBindingLike {
@@ -24,6 +26,17 @@ export function matchesShortcut(
   isMac = true
 ): boolean {
   if (!binding) return false;
+
+  // Guard against active IME composition (e.g. CJK, dead keys, accent sequences)
+  if (event.isComposing || event.nativeEvent?.isComposing) return false;
+
+  // On Windows/Linux, the AltGr key triggers both ctrlKey: true and altKey: true simultaneously.
+  // Example: AltGr + Q (produces '@' on Turkish layout) or AltGr + 4 (produces '₺').
+  // Never treat AltGr combinations as pure Ctrl shortcuts.
+  if (!isMac && event.ctrlKey && event.altKey) {
+    return false;
+  }
+
   const key = event.key.toLowerCase();
   const shift = !!event.shiftKey;
   const meta = isMac ? !!event.metaKey : !!event.ctrlKey;

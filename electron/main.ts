@@ -256,8 +256,10 @@ if (process.platform === 'linux') {
   // Prevent blurry fonts and rendering under Wayland (GNOME / KDE)
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
   if (typeof process.getuid === 'function' && process.getuid() === 0) {
+    console.warn('[Security] Running as root. Linux sandboxing disabled. User will be notified after window ready.');
     app.commandLine.appendSwitch('no-sandbox');
     app.commandLine.appendSwitch('disable-setuid-sandbox');
+    (global as any).__sandboxDisabledWarning = true;
   }
   // Safe sandbox fallback: If unprivileged user namespaces are disabled in kernel
   try {
@@ -644,7 +646,7 @@ function createWindow() {
             ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
             // Production: unsafe-inline removed from style-src (Tailwind uses class-based CSS, no inline styles needed).
             // unsafe-inline is intentionally kept in dev only for Vite HMR compatibility.
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob:; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
         ];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
@@ -1101,18 +1103,32 @@ if (!app.isDefaultProtocolClient('nova')) {
   } catch (_) {}
 }
 
+function isValidDeepLinkUrl(targetUrl: unknown): boolean {
+  if (typeof targetUrl !== 'string' || !targetUrl.trim() || targetUrl.length > 2048) return false;
+  try {
+    const u = new URL(targetUrl.trim());
+    if (u.username || u.password) return false;
+    if (u.protocol === 'http:' || u.protocol === 'https:') return true;
+    if (u.protocol === 'nova:') {
+      const allowedPages = new Set(['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new', 'extensions']);
+      const page = (u.hostname || u.pathname.replace(/^\/+/, '')).toLowerCase().split(/[/?#]/)[0];
+      return allowedPages.has(page);
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 // macOS deep-link handler for nova: and web URLs
 app.on('open-url', (event, url) => {
   event.preventDefault();
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
-    try {
-      const u = new URL(url);
-      if ((u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'nova:') && !u.username && !u.password) {
-        sendToMainWindow('new-tab', url);
-      }
-    } catch {}
+    if (isValidDeepLinkUrl(url)) {
+      sendToMainWindow('new-tab', url.trim());
+    }
   }
 });
 
@@ -1122,16 +1138,9 @@ app.on('second-instance', (_event, commandLine) => {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.focus();
 
-    const possibleUrl = commandLine.find(arg => {
-      try {
-        const u = new URL(arg);
-        return (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'nova:') && !u.username && !u.password;
-      } catch {
-        return false;
-      }
-    });
+    const possibleUrl = commandLine.find(arg => isValidDeepLinkUrl(arg));
     if (possibleUrl) {
-      sendToMainWindow('new-tab', possibleUrl);
+      sendToMainWindow('new-tab', possibleUrl.trim());
     }
   }
 });
@@ -1409,6 +1418,9 @@ app.whenReady().then(async () => {
                 if (status === 'denied' || status === 'restricted') {
                   return callback(false);
                 }
+                if (status === 'granted') {
+                  return callback(true);
+                }
               } catch (e) {
                 console.warn('[Permissions] macOS systemPreferences check failed:', e);
                 return callback(false);
@@ -1650,10 +1662,10 @@ app.whenReady().then(async () => {
       }
     }
     const appPerm = rememberedPermissions.get('app')?.get('media');
-    if (appPerm && appPerm.allow) {
-      return { granted: true, status: 'granted', platform: process.platform };
+    if (appPerm) {
+      return { granted: appPerm.allow, status: appPerm.allow ? 'granted' : 'denied', platform: process.platform };
     }
-    return { granted: true, status: 'granted', platform: process.platform };
+    return { granted: false, status: 'not-determined', platform: process.platform };
   });
 
   // IPC: open system settings cross-platform (macOS, Windows, Linux)
@@ -3325,7 +3337,7 @@ ipcMain.handle('fetch-wallpaper-photos', async (event) => {
     if (typeof u !== 'string' || !u.trim() || /["'\r\n\\]/.test(u)) return false;
     try {
       const p = new URL(u);
-      return p.protocol === 'https:' || p.protocol === 'http:';
+      return p.protocol === 'https:';
     } catch {
       return false;
     }
@@ -4180,9 +4192,17 @@ ipcMain.on('save-password', (event, data: { hostname: string; username: string; 
   if (!data || typeof data !== 'object') return;
   const { hostname, username, password } = data;
   if (typeof hostname !== 'string' || typeof username !== 'string' || typeof password !== 'string') return;
-  if (hostname.length > 255 || username.length > 256 || password.length > 1024) return;
-  const cleanHost = hostname.trim();
   const cleanUser = username.trim();
+  let cleanHost = hostname.trim().toLowerCase();
+  try {
+    if (cleanHost.includes('://')) {
+      cleanHost = new URL(cleanHost).hostname.toLowerCase();
+    } else {
+      cleanHost = new URL(`https://${cleanHost}`).hostname.toLowerCase();
+    }
+  } catch {
+    cleanHost = cleanHost.replace(/:\d+$/, '').replace(/\.+$/, '');
+  }
   if (!cleanHost || !cleanUser || !password) return;
   // Emit event to the main window to trigger password prompt
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -4736,7 +4756,9 @@ ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
 ipcMain.handle('detect-language', async (event, sampleText: string) => {
   if (!isTrustedSender(event)) return 'auto';
   if (!sampleText || typeof sampleText !== 'string') return 'auto';
-  return await detectLanguageWithGoogle(sampleText);
+  const cleanText = sampleText.trim().slice(0, 2048);
+  if (!cleanText) return 'auto';
+  return await detectLanguageWithGoogle(cleanText);
 });
 
 // Autocomplete Suggestions handler (providers + LRU cache + staggered fallback live in main/suggestions.ts)
@@ -4922,26 +4944,29 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
     return { error: 'Invalid extension folder path.' };
   }
 
-  // Guard against directory traversal
-  if (folderPath.includes('..')) {
+  const normalizedInput = path.normalize(folderPath.trim());
+  // Guard against directory traversal in raw and normalized input
+  if (normalizedInput.includes('..') || folderPath.includes('..') || folderPath.includes('%2e%2e') || folderPath.includes('%2E%2E')) {
     return { error: 'Invalid extension path: path traversal detected.' };
   }
 
-  const resolvedFolder = path.resolve(folderPath.trim());
-  if (!fs.existsSync(resolvedFolder)) {
-    return { error: 'Extension directory does not exist.' };
-  }
-
+  const resolvedFolder = path.resolve(normalizedInput);
+  let realFolder: string;
   try {
-    const stat = fs.statSync(resolvedFolder);
+    realFolder = fs.realpathSync(resolvedFolder);
+    const stat = fs.statSync(realFolder);
     if (!stat.isDirectory()) {
       return { error: 'Selected path is not a directory.' };
     }
   } catch {
-    return { error: 'Unable to access extension directory.' };
+    return { error: 'Extension directory does not exist or is inaccessible.' };
   }
 
-  const manifestPath = path.join(resolvedFolder, 'manifest.json');
+  const manifestPath = path.join(realFolder, 'manifest.json');
+  if (!manifestPath.startsWith(realFolder + path.sep) && manifestPath !== path.join(realFolder, 'manifest.json')) {
+    return { error: 'Invalid extension path: path traversal detected.' };
+  }
+
   if (!fs.existsSync(manifestPath)) {
     return { error: 'No manifest.json found in the selected folder.' };
   }
@@ -4980,7 +5005,7 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
 
   try {
     const targetSession = win.webContents?.session || session.defaultSession;
-    const extInfo = await targetSession.loadExtension(resolvedFolder);
+    const extInfo = await targetSession.loadExtension(realFolder);
 
     const disabledIds = getDisabledExtensionIds();
     if (disabledIds.includes(extInfo.id)) {
@@ -4989,9 +5014,9 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
 
     if (targetSession === session.defaultSession) {
       const managedRoot = path.resolve(path.join(app.getPath('userData'), 'extensions'));
-      if (!resolvedFolder.startsWith(managedRoot + path.sep)) {
+      if (!realFolder.startsWith(managedRoot + path.sep)) {
         const unpackedPaths = getUnpackedExtensionPaths();
-        unpackedPaths[extInfo.id] = fs.realpathSync(resolvedFolder);
+        unpackedPaths[extInfo.id] = realFolder;
         setUnpackedExtensionPaths(unpackedPaths);
       }
     }

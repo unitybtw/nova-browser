@@ -329,6 +329,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const isRecordingRef = useRef(false);
     const isExplicitlyStoppedRef = useRef(false);
     const initialTextRef = useRef('');
+    const restartAttemptsRef = useRef(0);
+    const lastRestartTimeRef = useRef(0);
 
     const [hoverStyle, setHoverStyle] = useState({ opacity: 0, transform: "translateY(0px) scale(0.95)", transition: "none" });
     const [containerHeight, setContainerHeight] = useState(116);
@@ -397,6 +399,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const stopRecording = useCallback(() => {
       isExplicitlyStoppedRef.current = true;
       isRecordingRef.current = false;
+      restartAttemptsRef.current = 0;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -408,7 +411,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         rafRef.current = null;
       }
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        try {
+          streamRef.current.getTracks().forEach((track) => {
+            try { track.stop(); } catch {}
+          });
+        } catch {}
         streamRef.current = null;
       }
       if (audioContextRef.current) {
@@ -621,6 +628,21 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           if (isExplicitlyStoppedRef.current || !isRecordingRef.current) {
             stopRecording();
           } else {
+            const now = Date.now();
+            if (now - lastRestartTimeRef.current < 2500) {
+              restartAttemptsRef.current += 1;
+            } else {
+              restartAttemptsRef.current = 1;
+            }
+            lastRestartTimeRef.current = now;
+
+            // Cap rapid restarts to prevent indefinite mic capture loop
+            if (restartAttemptsRef.current > 4) {
+              console.warn('[ai-chat-input] SpeechRecognition max rapid restarts reached, stopping recording.');
+              stopRecording();
+              return;
+            }
+
             // User paused speech; restart recognition seamlessly without dropping recording
             try {
               if (recognitionRef.current && isRecordingRef.current) {

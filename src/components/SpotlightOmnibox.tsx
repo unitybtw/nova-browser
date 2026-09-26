@@ -86,20 +86,9 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
           }
           return;
         }
-        // Fallback for non-electron web preview only when google is the chosen engine
-        if (typeof window !== 'undefined' && !window.electronAPI && searchEngine === 'google') {
-          const lang = clientLocale.split('-')[0] || 'en';
-          const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
-          const response = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, { signal: controller.signal });
-          if (response.ok) {
-            const data = await response.json();
-            if (data && Array.isArray(data) && Array.isArray(data[1]) && !controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
-              const list = data[1].slice(0, 5);
-              setClientCachedSuggestions(cacheKey, list);
-              setSuggestions(list);
-            }
-          }
-        }
+
+        // Without electron IPC, do not leak user typing to external domains from renderer
+        setSuggestions([]);
       } catch (err: any) {
         if (err.name === 'AbortError') return;
         // ignore errors

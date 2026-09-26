@@ -54,21 +54,15 @@ const AUTO_APPROVED_TOOLS = new Set([
   'browser_switch_tab',
   'browser_duplicate_tab',
 
-  // Scrolling & Interaction
+  // Scrolling (Passive)
   'scroll_page',
   'browser_scroll_page',
   'browser_scroll_element',
-  'click_element',
-  'fill_input',
-  'press_key',
-  'browser_click_element',
-  'browser_fill_input',
-  'browser_press_key',
-  'auto_fill_form',
+
+  // Sensitive actions (click, fill, press_key, auto_fill, memory mutations)
+  // are intentionally excluded from auto-approval to prevent autonomous exploitation.
 
   // Utilities
-  'save_to_memory',
-  'delete_from_memory',
   'speak_text',
   'stop_speaking',
   'stop_speech'

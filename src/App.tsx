@@ -1001,6 +1001,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (demoParams.isDemo && demoParams.feature === 'website') return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Guard against active IME composition
+      if (e.isComposing || (e as any).nativeEvent?.isComposing) return;
+
+      // On Windows/Linux, AltGr triggers both ctrlKey: true and altKey: true
+      // E.g. AltGr+Q (@) on Turkish Q layout. Never trigger Ctrl shortcuts on AltGr combinations.
+      if (!isMac && e.ctrlKey && e.altKey) return;
+
       // Don't trigger shortcuts when typing in inputs/textareas
       if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
         // Allow Cmd/Ctrl combinations to pass through if they are specific browser shortcuts,
@@ -1354,10 +1361,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onMouseEnter={handleHoverSidebarOpen}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
-              title="Expand Sidebar (⌘S)"
+              title={isMac ? "Expand Sidebar (⌘S)" : "Expand Sidebar (Ctrl+S)"}
             >
               <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">⌘S</span>
+              <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘S' : 'Ctrl+S'}</span>
             </button>
           </div>
 
