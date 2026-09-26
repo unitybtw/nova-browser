@@ -156,9 +156,14 @@ export function isPrivateIP(ip: string): boolean {
     return testEmbeddedIPv4(h[6], h[7]);
   }
 
-  // 6. NAT64 Well-Known Prefix (64:ff9b::/96)
-  if (h[0] === 0x0064 && h[1] === 0xff9b && h[2] === 0 && h[3] === 0 && h[4] === 0 && h[5] === 0) {
-    return testEmbeddedIPv4(h[6], h[7]);
+  // 6. NAT64 Well-Known Prefix (64:ff9b::/96, RFC 6052) & Local-Use Prefix (64:ff9b:1::/48, RFC 8215)
+  if (h[0] === 0x0064 && h[1] === 0xff9b) {
+    // 64:ff9b:1::/48 is reserved exclusively for local-use IPv4/IPv6 translation (RFC 8215)
+    if (h[2] === 0x0001) return true;
+    // 64:ff9b::/96 Well-Known Prefix with embedded IPv4 in last 32 bits
+    if (h[2] === 0 && h[3] === 0 && h[4] === 0 && h[5] === 0) {
+      return testEmbeddedIPv4(h[6], h[7]);
+    }
   }
 
   // 7. 6to4 (2002::/16) - embedded IPv4 in hextets 1 and 2

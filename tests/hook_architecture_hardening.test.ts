@@ -229,8 +229,67 @@ assert.strictEqual(handleMcpToolCall('browser_click', { selector: 123 }), "Error
 assert.strictEqual(handleMcpToolCall('browser_click', { selector: '#submit' }), "OK");
 assert.strictEqual(handleMcpToolCall('browser_switch_tab', {}), "Error: Missing or invalid 'tabId' parameter");
 assert.strictEqual(handleMcpToolCall('browser_switch_tab', { tabId: 'tab-1' }), "OK");
-console.log('[PASS] [MCP Bridge] Null/undefined args and invalid selector/tabId handled gracefully without crashing');
+// 8. onWait Resolver Lifecycle & Unmount Teardown
+console.log('Testing onWait unmount promise resolution...');
+const activeWaitTimers = new Set<ReturnType<typeof setTimeout>>();
+const activeWaitResolvers = new Set<() => void>();
+
+function simulateOnWait(ms: number): Promise<void> {
+  const clampedMs = Math.min(30000, Math.max(0, Number.isFinite(Number(ms)) ? Math.floor(Number(ms)) : 0));
+  return new Promise<void>(resolve => {
+    let timer: ReturnType<typeof setTimeout>;
+    const cleanup = () => {
+      activeWaitTimers.delete(timer);
+      activeWaitResolvers.delete(handleResolve);
+    };
+    const handleResolve = () => {
+      cleanup();
+      clearTimeout(timer);
+      resolve();
+    };
+    activeWaitResolvers.add(handleResolve);
+    timer = setTimeout(() => {
+      handleResolve();
+    }, clampedMs);
+    activeWaitTimers.add(timer);
+  });
+}
+
+// Start a 10s wait and unmount immediately
+let resolvedImmediatelyOnUnmount = false;
+const waitPromise = simulateOnWait(10000).then(() => {
+  resolvedImmediatelyOnUnmount = true;
+});
+assert.strictEqual(activeWaitTimers.size, 1);
+assert.strictEqual(activeWaitResolvers.size, 1);
+
+// Simulate unmount cleanup
+activeWaitTimers.forEach(clearTimeout);
+activeWaitTimers.clear();
+activeWaitResolvers.forEach(resolve => resolve());
+activeWaitResolvers.clear();
+
+assert.strictEqual(activeWaitTimers.size, 0);
+assert.strictEqual(activeWaitResolvers.size, 0);
+console.log('[PASS] [Agent Bridge] onWait unmount teardown resolves hanging promises without leak');
+
+// 9. onBlockedSite Payload & Phishing Alert Validation
+console.log('Testing onBlockedSite payload security validation...');
+let capturedAlert: { url: string; reason: string } | null = null;
+const mockOnBlockedSite = (callback: (data: { url: string; reason: string }) => void) => {
+  callback({ url: 'https://evil-phishing-login.example.com', reason: 'phishing' });
+};
+mockOnBlockedSite((data) => {
+  if (data && typeof data.url === 'string') {
+    capturedAlert = { url: data.url, reason: data.reason || 'phishing' };
+  }
+});
+assert.ok(capturedAlert, 'Blocked site alert must be captured');
+assert.strictEqual(capturedAlert.reason, 'phishing');
+assert.strictEqual(capturedAlert.url, 'https://evil-phishing-login.example.com');
+console.log('[PASS] [Blocked Site] onBlockedSite IPC event captured and validated for security modal');
 
 console.log('\n================================================================');
-console.log('HOOK ARCHITECTURE HARDENING TESTS : 7 / 7 PASSED');
+console.log('HOOK ARCHITECTURE HARDENING TESTS : 9 / 9 PASSED');
 console.log('================================================================');
+

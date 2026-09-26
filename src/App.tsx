@@ -29,6 +29,7 @@ export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLo
 import { FindInPage } from './components/FindInPage';
 import { DownloadToast } from './components/DownloadToast';
 import { UpdateToast } from './components/UpdateToast';
+import { BlockedSiteModal, BlockedSiteAlertData } from './components/BlockedSiteModal';
 import { AICursorOverlay } from './components/AICursorOverlay';
 import { SidebarTabs } from './components/SidebarTabs';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
@@ -424,6 +425,25 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Permission requests state (Chrome-style top bar prompts) + onPermissionRequest
   // IPC listener + respond/dismiss handlers (extracted to usePermissionRequests)
   const { permissionRequests, handleRespondPermission, handleDismissPermission } = usePermissionRequests();
+
+  // Security: Guard against malicious / phishing destinations blocked by main process
+  const [blockedSiteAlert, setBlockedSiteAlert] = useState<BlockedSiteAlertData | null>(null);
+  useEffect(() => {
+    const api = getElectronAPI();
+    if (!api?.onBlockedSite) return;
+    const unsubscribe = api.onBlockedSite((_event, data) => {
+      if (data && typeof data.url === 'string') {
+        setBlockedSiteAlert({
+          url: data.url,
+          reason: data.reason || 'phishing',
+          timestamp: Date.now()
+        });
+      }
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
 
   // Downloads state + onDownloadUpdate IPC listener with ~100ms progress batching
   // + clear handler (extracted to useDownloads)
@@ -2020,6 +2040,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
       <DownloadToast downloads={downloads} />
       <UpdateToast />
+      <BlockedSiteModal alert={blockedSiteAlert} onClose={() => setBlockedSiteAlert(null)} />
 
       <AICursorOverlay />
     </div>

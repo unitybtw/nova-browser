@@ -1839,8 +1839,30 @@ app.whenReady().then(async () => {
     return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
   }
 
+  function extractExpectedSha256(release: any, assetName: string): string | undefined {
+    if (!release) return undefined;
+    if (typeof release.body === 'string' && assetName) {
+      const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}`, 'i');
+      const m1 = release.body.match(p1);
+      if (m1) return m1[1].toLowerCase();
+
+      const p2 = new RegExp(`${escapedName}[^a-fA-F0-9]*([a-fA-F0-9]{64})`, 'i');
+      const m2 = release.body.match(p2);
+      if (m2) return m2[1].toLowerCase();
+
+      if (release.assets?.length === 1) {
+        const m3 = release.body.match(/\b([a-fA-F0-9]{64})\b/);
+        if (m3) return m3[1].toLowerCase();
+      }
+    }
+    return undefined;
+  }
+
   // Auto Updater Configuration
   autoUpdater.autoDownload = false;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
   autoUpdater.autoInstallOnAppQuit = true;
   let isUpdateDownloaded = false;
   let latestReleaseDownloadInfo: {
@@ -1850,6 +1872,7 @@ app.whenReady().then(async () => {
     releaseNotes?: string;
     releaseName?: string;
     publishedAt?: string;
+    expectedSha256?: string;
   } | null = null;
   let downloadedUpdateFilePath: string | null = null;
   let isDownloadingUpdate = false;
@@ -2223,19 +2246,21 @@ fi
         });
         if (res.ok) {
           const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
           if (latestRelease) {
             const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
               latestReleaseDownloadInfo = {
                 version: latestTag,
                 downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
                 assetName: platformAsset?.name || '',
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`,
-                publishedAt: latestRelease.published_at || new Date().toISOString()
+                publishedAt: latestRelease.published_at || new Date().toISOString(),
+                expectedSha256: expectedSha
               };
               sendToMainWindow('update-available', { 
                 version: latestTag, 
@@ -2269,19 +2294,21 @@ fi
         });
         if (res.ok) {
           const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
           if (latestRelease) {
             const latestTag = (latestRelease.tag_name || '').replace(/^v/, '');
             const currentVersion = app.getVersion();
             if (latestTag && isNewerVersion(latestTag, currentVersion)) {
               const platformAsset = getPlatformAsset(latestRelease.assets || []);
+              const expectedSha = extractExpectedSha256(latestRelease, platformAsset?.name || '');
               latestReleaseDownloadInfo = {
                 version: latestTag,
                 downloadUrl: platformAsset?.browser_download_url || latestRelease.html_url,
                 assetName: platformAsset?.name || '',
                 releaseNotes: latestRelease.body || '',
                 releaseName: latestRelease.name || `v${latestTag}`,
-                publishedAt: latestRelease.published_at || new Date().toISOString()
+                publishedAt: latestRelease.published_at || new Date().toISOString(),
+                expectedSha256: expectedSha
               };
               sendToMainWindow('update-available', { 
                 version: latestTag, 
@@ -2369,6 +2396,7 @@ fi
     let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
     let targetVersion = latestReleaseDownloadInfo?.version || '';
     let assetName = latestReleaseDownloadInfo?.assetName || '';
+    let targetExpectedSha = latestReleaseDownloadInfo?.expectedSha256;
 
     // If no URL stored yet, query GitHub releases API directly
     if (!targetUrl) {
@@ -2378,12 +2406,15 @@ fi
         });
         if (res.ok) {
           const releases = await res.json();
-          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && r.tag_name) : null;
+          const latestRelease = Array.isArray(releases) ? releases.find((r: any) => !r.draft && !r.prerelease && r.tag_name) : null;
           if (latestRelease) {
             targetVersion = (latestRelease.tag_name || '').replace(/^v/, '');
             const platformAsset = getPlatformAsset(latestRelease.assets || []);
             targetUrl = platformAsset?.browser_download_url || latestRelease.html_url;
             assetName = platformAsset?.name || '';
+            if (!targetExpectedSha) {
+              targetExpectedSha = extractExpectedSha256(latestRelease, assetName);
+            }
           }
         }
       } catch (fetchErr: any) {
@@ -2491,6 +2522,7 @@ fi
       tempFilePath = `${targetFilePath}.download_${Date.now()}`;
 
       const fileStream = updateFileStream = fs.createWriteStream(tempFilePath);
+      const sha256Hasher = crypto.createHash('sha256');
       let fileStreamError: Error | null = null;
       // A write stream can fail before the first `drain` wait (for example,
       // when the updates directory is full). Keep an error listener attached
@@ -2510,6 +2542,7 @@ fi
       // @ts-ignore
       for await (const chunk of response.body) {
         if (fileStreamError) throw fileStreamError;
+        sha256Hasher.update(chunk);
         transferredBytes += chunk.length;
         if (transferredBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
           throw new Error('Update package exceeds the 1 GB size limit');
@@ -2547,6 +2580,13 @@ fi
           else resolve();
         });
       });
+
+      const calculatedSha256 = sha256Hasher.digest('hex').toLowerCase();
+      console.log(`[Updater] Downloaded update package SHA-256 checksum: ${calculatedSha256}`);
+      if (targetExpectedSha && calculatedSha256 !== targetExpectedSha.toLowerCase()) {
+        try { fs.unlinkSync(tempFilePath); } catch (_) {}
+        throw new Error(`Update package integrity check failed: SHA-256 checksum mismatch (expected ${targetExpectedSha}, calculated ${calculatedSha256})`);
+      }
 
       if (fs.existsSync(targetFilePath)) {
         try { fs.unlinkSync(targetFilePath); } catch (_) {}

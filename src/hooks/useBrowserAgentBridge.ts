@@ -49,6 +49,7 @@ export function useBrowserAgentBridge({
   const mcpHandlersRef = useRef({ handleNavigate, handleNewTab, handleCloseTab, handleSelectTab });
   mcpHandlersRef.current = { handleNavigate, handleNewTab, handleCloseTab, handleSelectTab };
   const activeWaitTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const activeWaitResolversRef = useRef<Set<() => void>>(new Set());
 
   useEffect(() => {
     // 1. Define executeMcpAction as a local function (not exposed on window)
@@ -461,9 +462,18 @@ export function useBrowserAgentBridge({
         const clampedMs = Math.min(30000, Math.max(0, Number.isFinite(Number(ms)) ? Math.floor(Number(ms)) : 0));
         return new Promise<void>(resolve => {
           let timer: ReturnType<typeof setTimeout>;
-          timer = setTimeout(() => {
+          const cleanup = () => {
             activeWaitTimersRef.current.delete(timer);
+            activeWaitResolversRef.current.delete(handleResolve);
+          };
+          const handleResolve = () => {
+            cleanup();
+            clearTimeout(timer);
             resolve();
+          };
+          activeWaitResolversRef.current.add(handleResolve);
+          timer = setTimeout(() => {
+            handleResolve();
           }, clampedMs);
           activeWaitTimersRef.current.add(timer);
         });
@@ -564,6 +574,8 @@ export function useBrowserAgentBridge({
       unsubscribeMcpBridge?.();
       activeWaitTimersRef.current.forEach(clearTimeout);
       activeWaitTimersRef.current.clear();
+      activeWaitResolversRef.current.forEach(resolve => resolve());
+      activeWaitResolversRef.current.clear();
     };
   }, []);
 }

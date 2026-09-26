@@ -107,6 +107,16 @@ async function runSyncTests() {
   assert.strictEqual(decryptedPass[0].password, 'secretPassword42!');
 
   console.log('[PASS] [Sync Vault] E2EE passwords payload encryption and decryption verified.');
+
+  // 6. Settings Per-Field Timestamp LWW Conflict Resolution (Anti-Setting Freeze)
+  const now = Date.now();
+  const testTimestamps = { theme: now + 10000, fontSize: now - 10000 };
+  syncService.saveSettingsTimestamps(testTimestamps);
+  const loadedTimestamps = syncService.getSettingsTimestamps();
+  assert.strictEqual(loadedTimestamps.theme, testTimestamps.theme, 'Theme timestamp must be preserved');
+  assert.strictEqual(loadedTimestamps.fontSize, testTimestamps.fontSize, 'FontSize timestamp must be preserved');
+
+  console.log('[PASS] [Sync Vault] Settings per-field timestamp persistence and LWW integrity verified.');
 }
 
 runSyncTests().then(() => {

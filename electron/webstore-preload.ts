@@ -255,6 +255,17 @@ if ((window as any).__novaPreloadInjected) {
 
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
+    const host = window.location.hostname.toLowerCase();
+    const isStoreOrigin = (host === 'chromewebstore.google.com' || host === 'chrome.google.com') && window.location.protocol === 'https:';
+    if (!isStoreOrigin) {
+      const existingBanner = document.getElementById('nova-extension-banner');
+      if (existingBanner) {
+        existingBanner.remove();
+        document.body.style.marginTop = '0px';
+      }
+      return;
+    }
+
     if (window.location.pathname.includes('/detail/')) {
       const existingBanner = document.getElementById('nova-extension-banner');
       if (existingBanner) return;
@@ -322,7 +333,7 @@ if ((window as any).__novaPreloadInjected) {
           window.postMessage({ 
             type: 'NOVA_INSTALL_EXTENSION', 
             extensionId: match[0]
-          }, window.location.origin);
+          }, `https://${host}`);
         }
       });
     } else {

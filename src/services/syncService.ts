@@ -72,6 +72,7 @@ export interface SyncDataBundle {
   passwordsSalt?: string;
   passwordsIv?: string;
   settings?: Partial<UserSettings>;
+  settingsTimestamps?: Record<string, number>;
   workspaces?: Workspace[];
 }
 
@@ -1411,8 +1412,36 @@ class NovaSyncService {
         }
 
         if (prefs.syncSettings && remoteBundle.settings) {
-          // Remote settings take precedence so newly paired devices inherit cloud configuration
-          mergedSettings = { ...localData.settings, ...remoteBundle.settings };
+          // Per-field Last-Write-Wins (LWW) conflict resolution using timestamps.
+          // Solves "setting freeze" where remote overwrote local settings upon every sync,
+          // while ensuring newly paired devices inherit cloud configuration cleanly.
+          const localTimestamps = this.getSettingsTimestamps();
+          const remoteTimestamps = remoteBundle.settingsTimestamps || {};
+          const fallbackRemoteTs = remoteBundle.timestamp || 0;
+          const merged: UserSettings = { ...localData.settings };
+
+          const allKeys = new Set([
+            ...Object.keys(localData.settings || {}),
+            ...Object.keys(remoteBundle.settings || {})
+          ]) as Set<keyof UserSettings>;
+
+          allKeys.forEach((key) => {
+            const localTs = localTimestamps[key] || 0;
+            const remoteTs = remoteTimestamps[key] ?? fallbackRemoteTs;
+
+            if (key in remoteBundle.settings! && (remoteTs > localTs || !(key in (localData.settings || {})))) {
+              (merged as any)[key] = remoteBundle.settings![key];
+              localTimestamps[key] = remoteTs;
+            } else if (key in (localData.settings || {})) {
+              (merged as any)[key] = (localData.settings as any)[key];
+              if (!localTimestamps[key]) {
+                localTimestamps[key] = Date.now();
+              }
+            }
+          });
+
+          mergedSettings = merged;
+          this.saveSettingsTimestamps(localTimestamps);
         }
 
         if (prefs.syncWorkspaces && remoteBundle.workspaces) {
@@ -1443,6 +1472,7 @@ class NovaSyncService {
         passwordsSalt: encryptedPassPayload?.salt,
         passwordsIv: encryptedPassPayload?.iv,
         settings: prefs.syncSettings ? mergedSettings : undefined,
+        settingsTimestamps: prefs.syncSettings ? this.getSettingsTimestamps() : undefined,
         workspaces: prefs.syncWorkspaces ? mergedWorkspaces : undefined
       };
 
@@ -1570,6 +1600,20 @@ class NovaSyncService {
     }
     this.notify();
     return true;
+  }
+
+  public getSettingsTimestamps(): Record<string, number> {
+    try {
+      const raw = localStorage.getItem('nova_settings_timestamps');
+      if (raw) return JSON.parse(raw) || {};
+    } catch (_) {}
+    return {};
+  }
+
+  public saveSettingsTimestamps(timestamps: Record<string, number>): void {
+    try {
+      localStorage.setItem('nova_settings_timestamps', JSON.stringify(timestamps));
+    } catch (_) {}
   }
 
   private notify() {
