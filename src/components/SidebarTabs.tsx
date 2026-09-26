@@ -113,8 +113,8 @@ export interface SidebarTabsProps {
   onDuplicateTab?: (id: string) => void;
   onTogglePinTab?: (id: string) => void;
   onCloseOtherTabs?: (id: string) => void;
-  onCloseTabsToRight?: (index: number) => void;
-  onNewTabRight?: (index: number) => void;
+  onCloseTabsToRight?: (target: number | string) => void;
+  onNewTabRight?: (target: number | string) => void;
   onReopenClosedTab?: () => void;
   canReopenClosedTab?: boolean;
   onToggleBookmark?: (targetTab?: Tab) => void;
@@ -509,6 +509,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const hoverRectRef = useRef<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
+  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
 
   const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
     isOpen: false,
@@ -814,14 +815,17 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   }, []);
 
   const handleOpenContextMenu = useCallback((tab: Tab, e: React.MouseEvent) => {
+    const wsId = tab.workspaceId || activeWorkspaceId || 'default';
+    const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === wsId);
+    const wsIdx = wsTabs.findIndex(t => t.id === tab.id);
     setTabContextMenu({
       isOpen: true,
       x: e.clientX,
       y: e.clientY,
       tab,
-      tabIndex: tabs.findIndex(t => t.id === tab.id)
+      tabIndex: wsIdx !== -1 ? wsIdx : tabs.findIndex(t => t.id === tab.id)
     });
-  }, [tabs]);
+  }, [tabs, activeWorkspaceId]);
 
   const isCurrentNewTab = !activeTab?.url || activeTab.url === 'nova://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
 
@@ -1237,16 +1241,24 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     role="button"
                     tabIndex={0}
                     aria-expanded={folder.isExpanded}
-                    onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('bg-slate-200/60', 'dark:bg-white/10'); }}
-                    onDragLeave={(e) => e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10')}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setDragOverFolderId(folder.id);
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setDragOverFolderId(null);
+                      }
+                    }}
                     onDrop={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      e.currentTarget.classList.remove('bg-slate-200/60', 'dark:bg-white/10');
+                      setDragOverFolderId(null);
                       const tabId = e.dataTransfer.getData('text/plain');
                       if (tabId) onMoveTabToFolder?.(tabId, folder.id);
                     }}
-                    className="flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder"
+                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer text-slate-700 hover:bg-slate-200/60 dark:text-slate-300 dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-slate-200/80 dark:bg-white/15 ring-2 ring-cyan-500/50' : ''}`}
                   >
                     <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
@@ -1507,15 +1519,15 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         onCloseOtherTabs={(tabId) => {
           if (onCloseOtherTabs) onCloseOtherTabs(tabId);
         }}
-        onCloseTabsToRight={(idx) => {
-          if (onCloseTabsToRight) onCloseTabsToRight(idx);
+        onCloseTabsToRight={(target) => {
+          if (onCloseTabsToRight) onCloseTabsToRight(target);
         }}
         onReopenClosedTab={() => {
           if (onReopenClosedTab) onReopenClosedTab();
         }}
         canReopenClosedTab={canReopenClosedTab}
         isBookmarked={tabContextMenu.tab && bookmarks ? bookmarks.some((b: Bookmark) => b.url === tabContextMenu.tab?.url) : false}
-        totalTabs={tabs.length}
+        totalTabs={tabs.filter(t => (t.workspaceId || 'default') === (tabContextMenu.tab?.workspaceId || activeWorkspaceId || 'default')).length}
       />
     </>
   );

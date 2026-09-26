@@ -102,6 +102,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Settings: reset all stored site permissions (remembered camera/mic/notifications grants)
   resetRememberedPermissions: () => ipcRenderer.invoke('reset-remembered-permissions'),
   getRememberedPermissionsCount: () => ipcRenderer.invoke('get-remembered-permissions-count'),
+  getSitePermissions: (origin: string) => ipcRenderer.invoke('get-site-permissions', origin),
   clearAiModelsCache: () => ipcRenderer.invoke('clear-ai-models-cache'),
   purgeSystemMemory: () => ipcRenderer.invoke('purge-system-memory'),
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),

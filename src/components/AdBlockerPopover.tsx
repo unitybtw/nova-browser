@@ -8,6 +8,7 @@ interface AdBlockerPopoverProps {
   onToggleWhitelist: () => void;
   onClose: () => void;
   hostname: string;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
@@ -15,7 +16,8 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
   isWhitelisted,
   onToggleWhitelist,
   onClose,
-  hostname
+  hostname,
+  buttonRef
 }) => {
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +28,11 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
       }
     };
     const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+      if (
+        popoverRef.current && 
+        !popoverRef.current.contains(e.target as Node) &&
+        (!buttonRef?.current || !buttonRef.current.contains(e.target as Node))
+      ) {
         onClose();
       }
     };
@@ -37,7 +43,7 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [onClose]);
+  }, [onClose, buttonRef]);
 
   return (
     <motion.div

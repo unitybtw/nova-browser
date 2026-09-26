@@ -105,8 +105,8 @@ interface TopBarProps {
   onTogglePinTab: (id: string, e?: React.MouseEvent) => void;
   onToggleMuteTab: (id: string, e?: React.MouseEvent) => void;
   onCloseOtherTabs?: (id: string) => void;
-  onCloseTabsToRight?: (index: number) => void;
-  onNewTabRight?: (index: number) => void;
+  onCloseTabsToRight?: (target: number | string) => void;
+  onNewTabRight?: (target: number | string) => void;
   onReopenClosedTab?: () => void;
   canReopenClosedTab?: boolean;
   onSuspendTab?: (id: string) => void;
@@ -747,15 +747,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   });
 
   const handleOpenContextMenu = useCallback((targetTab: Tab, index: number, e: React.MouseEvent) => {
+    const wsId = targetTab.workspaceId || activeWorkspaceId || 'default';
+    const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === wsId);
+    const wsIdx = wsTabs.findIndex(t => t.id === targetTab.id);
     setTabContextMenu({
       isOpen: true,
       x: e.clientX,
       y: e.clientY,
       tab: targetTab,
-      tabIndex: index
+      tabIndex: wsIdx !== -1 ? wsIdx : index
     });
-  }, []);
+  }, [tabs, activeWorkspaceId]);
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
+  const adBlockerBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
   const ghostElRef = useRef<HTMLDivElement>(null);
   const ghostTextRef = useRef<HTMLSpanElement>(null);
@@ -1444,6 +1448,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           {/* Ad Blocker Shield */}
           <div className="relative">
             <button 
+              ref={adBlockerBtnRef}
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
               className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
               title="Privacy & Ad Shield"
@@ -1462,6 +1467,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 onToggleWhitelist={handleToggleWhitelist}
                 onClose={() => setIsAdBlockerOpen(false)}
                 hostname={currentHostname}
+                buttonRef={adBlockerBtnRef}
               />
             )}
           </div>
@@ -1836,15 +1842,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       onCloseOtherTabs={(tabId) => {
         if (onCloseOtherTabs) onCloseOtherTabs(tabId);
       }}
-      onCloseTabsToRight={(idx) => {
-        if (onCloseTabsToRight) onCloseTabsToRight(idx);
+      onCloseTabsToRight={(target) => {
+        if (onCloseTabsToRight) onCloseTabsToRight(target);
       }}
       onReopenClosedTab={() => {
         if (onReopenClosedTab) onReopenClosedTab();
       }}
       canReopenClosedTab={canReopenClosedTab}
       isBookmarked={tabContextMenu.tab ? bookmarks.some(b => b.url === tabContextMenu.tab?.url) : false}
-      totalTabs={tabs.length}
+      totalTabs={tabs.filter(t => (t.workspaceId || 'default') === (tabContextMenu.tab?.workspaceId || activeWorkspaceId || 'default')).length}
     />
 
     {/* Tab Hover Preview */}

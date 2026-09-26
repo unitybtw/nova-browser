@@ -28,8 +28,14 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
   onRespond,
   onDismiss
 }) => {
-  const [remember, setRemember] = useState(true);
   const currentRequest = requests[0];
+  const [rememberMap, setRememberMap] = useState<Record<string, boolean>>({});
+  const remember = currentRequest ? (rememberMap[currentRequest.requestId] ?? false) : false;
+  const setRemember = (val: boolean) => {
+    if (currentRequest) {
+      setRememberMap(prev => ({ ...prev, [currentRequest.requestId]: val }));
+    }
+  };
 
   if (!currentRequest) return null;
 

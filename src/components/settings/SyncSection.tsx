@@ -98,6 +98,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               <div className="flex items-center gap-3">
                 <button
                   onClick={async () => {
+                    if (syncLoading || syncStatus.isSyncing) return;
                     setSyncErr(null);
                     setSyncMsg(null);
                     setSyncLoading(true);
@@ -158,11 +159,11 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       setSyncLoading(false);
                     }
                   }}
-                  disabled={syncLoading}
+                  disabled={syncLoading || syncStatus.isSyncing}
                   className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${syncLoading ? 'animate-spin' : ''}`} />
-                  <span>{syncLoading ? 'Syncing...' : 'Sync Now'}</span>
+                  <RefreshCw className={`w-3.5 h-3.5 ${syncLoading || syncStatus.isSyncing ? 'animate-spin' : ''}`} />
+                  <span>{syncLoading || syncStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
                 </button>
 
                 <button

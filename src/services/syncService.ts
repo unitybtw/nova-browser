@@ -246,6 +246,8 @@ class NovaSyncService {
   // In-flight lazy Supabase auth-listener initialization. Kept so concurrent
   // triggers share one init; reset on failure so a later auth action retries.
   private supabaseInitPromise: Promise<void> | null = null;
+  // Ciphertext of the last envelope written by this client to ignore self-echoes from Realtime
+  private lastPushedCiphertext: string | null = null;
 
   constructor() {
     this.loadSession();
@@ -767,7 +769,12 @@ class NovaSyncService {
             table: 'nova_sync_vaults',
             filter: `user_id=eq.${this.currentUser.id}`
           },
-          () => {
+          (payload: any) => {
+            const incomingCiphertext = payload?.new?.envelope?.ciphertext;
+            if (incomingCiphertext && incomingCiphertext === this.lastPushedCiphertext) {
+              logger.info('SyncService', 'Ignoring self-echo from Realtime WebSocket');
+              return;
+            }
             logger.info('SyncService', 'Remote sync change received via Realtime WebSocket');
             this.scheduleRealtimeNotify();
           }
@@ -1507,6 +1514,7 @@ class NovaSyncService {
       };
 
       const envelope = await encryptSyncPayload(newBundle, this.masterKey);
+      this.lastPushedCiphertext = envelope.ciphertext;
       const supabase = await getSupabaseClient();
       const { error: upsertError } = await supabase.from('nova_sync_vaults').upsert({
         user_id: this.currentUser.id,

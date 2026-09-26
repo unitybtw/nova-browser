@@ -275,14 +275,33 @@ export function useTabOperations({
     setTabs(toKeep);
   }, [pushClosedTabs, tabsRef, setActiveTabId, setTabs]);
 
-  const handleCloseTabsToRight = useCallback((index: number) => {
+  const handleCloseTabsToRight = useCallback((target: number | string) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
     const prev = tabsRef.current;
-    const activeWs = activeWorkspaceIdRef.current || 'default';
-    const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
-    if (index < 0 || index >= wsTabs.length - 1) return;
-    const targetTab = wsTabs[index];
-    const tabsToClose = wsTabs.slice(index + 1).filter(t => !t.isPinned);
+    let targetTab: Tab | undefined;
+
+    if (typeof target === 'string') {
+      targetTab = prev.find(t => t.id === target);
+    } else if (typeof target === 'number' && target >= 0) {
+      const activeWs = activeWorkspaceIdRef.current || 'default';
+      const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
+      if (target < wsTabs.length) {
+        targetTab = wsTabs[target];
+      } else if (target < prev.length) {
+        targetTab = prev[target];
+      }
+    }
+
+    if (!targetTab) return;
+
+    const targetWs = targetTab.workspaceId || 'default';
+    const wsTabs = prev.filter(t => (t.workspaceId || 'default') === targetWs);
+    const targetIdx = wsTabs.findIndex(t => t.id === targetTab!.id);
+    if (targetIdx < 0 || targetIdx >= wsTabs.length - 1) return;
+
+    const tabsToClose = wsTabs.slice(targetIdx + 1).filter(t => !t.isPinned);
+    if (tabsToClose.length === 0) return;
+
     const closeIds = new Set(tabsToClose.map(t => t.id));
     closeIds.forEach(id => tabThumbnailCache.remove(id));
     pushClosedTabs(tabsToClose);
@@ -293,11 +312,18 @@ export function useTabOperations({
     setTabs(nextTabs);
   }, [pushClosedTabs, tabsRef, activeWorkspaceIdRef, activeTabIdRef, setActiveTabId, setTabs]);
 
-  const handleNewTabRight = useCallback((index: number) => {
+  const handleNewTabRight = useCallback((target: number | string) => {
     const prev = tabsRef.current;
     const activeWs = activeWorkspaceIdRef.current || 'default';
-    const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
-    const targetTab = (index >= 0 && index < wsTabs.length) ? wsTabs[index] : (index >= 0 && index < prev.length ? prev[index] : undefined);
+    let targetTab: Tab | undefined;
+
+    if (typeof target === 'string') {
+      targetTab = prev.find(t => t.id === target);
+    } else if (typeof target === 'number' && target >= 0) {
+      const wsTabs = prev.filter(t => (t.workspaceId || 'default') === activeWs);
+      targetTab = (target < wsTabs.length) ? wsTabs[target] : (target < prev.length ? prev[target] : undefined);
+    }
+
     const targetWs = targetTab?.workspaceId || activeWs;
 
     const newId = generateId('tab');

@@ -41,23 +41,38 @@ class AIMemoryService {
     try {
       const data = localStorage.getItem(STORAGE_KEY);
       if (data) {
-        this.memories = JSON.parse(data);
-        return;
+        try {
+          const parsed = JSON.parse(data);
+          if (Array.isArray(parsed)) {
+            this.memories = parsed.filter((m: any) => m && typeof m.fact === 'string' && typeof m.id === 'string');
+            return;
+          }
+        } catch (parseErr) {
+          console.warn('Corrupted AI memories in localStorage, backing up and resetting:', parseErr);
+          try {
+            localStorage.setItem(`${STORAGE_KEY}_backup_${Date.now()}`, data);
+          } catch (_) {}
+          this.memories = [];
+          return;
+        }
       }
       // One-time migration from v1: keep entries as user-sourced, but drop
       // instruction-category entries (possible persisted prompt injections).
       const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
       if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed)) {
-          this.memories = parsed
-            .filter((m: any) => m && typeof m.fact === 'string' && m.category !== 'instruction')
-            .map((m: any) => ({ ...m, source: 'user' as const }));
-        }
+        try {
+          const parsed = JSON.parse(legacy);
+          if (Array.isArray(parsed)) {
+            this.memories = parsed
+              .filter((m: any) => m && typeof m.fact === 'string' && m.category !== 'instruction')
+              .map((m: any) => ({ ...m, source: 'user' as const }));
+          }
+        } catch (_) {}
         localStorage.removeItem(LEGACY_STORAGE_KEY);
       }
     } catch (e) {
       console.error('Failed to load AI memories from localStorage', e);
+      this.memories = [];
     }
   }
 
@@ -66,20 +81,26 @@ class AIMemoryService {
     try {
       const data = localStorage.getItem(TASK_STORAGE_KEY);
       if (data) {
-        this.taskHistory = JSON.parse(data);
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed)) {
+          this.taskHistory = parsed.filter((t: any) => t && typeof t.summary === 'string');
+        } else {
+          this.taskHistory = [];
+        }
       }
     } catch (e) {
       console.error('Failed to load task history', e);
+      this.taskHistory = [];
     }
   }
 
   /**
-   * Security: memories saved by a TOOL with category 'instruction' are
-   * session-only — they must never reach localStorage, so they can never be
-   * injected into the system prompt of a future session.
+   * Security: Tool-saved memories with category 'instruction' or 'preference'
+   * must NEVER be persisted to disk. They are untrusted inputs originating from
+   * web pages or external tools and cannot be allowed to survive session restarts.
    */
   private isPersistable(m: MemoryItem): boolean {
-    return !(m.source === 'tool' && m.category === 'instruction');
+    return !(m.source === 'tool' && (m.category === 'instruction' || m.category === 'preference'));
   }
 
   private saveMemories() {
@@ -246,9 +267,10 @@ class AIMemoryService {
   public getFormattedMemoryPrompt(): string {
     let prompt = '';
     if (this.memories.length > 0) {
-      // Security & Context Budget: exclude untrusted tool observations and cap to 10 verified preferences (max 1200 chars)
+      // Security & Context Budget: strictly allow only verified user-created memories (source === 'user')
+      // and cap to 10 entries (max 1200 chars). Tool-sourced observations are never allowed to alter system behavior.
       const allowedMemories = this.memories
-        .filter(m => m.source !== 'tool' || m.category === 'preference')
+        .filter(m => m.source === 'user')
         .slice(-10);
 
       let totalChars = 0;

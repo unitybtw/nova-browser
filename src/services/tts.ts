@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 /**
  * Language detection helper based on script characters and common stop-words.
  */
@@ -173,19 +175,13 @@ class TTSService {
           this.notify();
           return;
         }
-
-        // Fallback to Web Speech if native failed and not cancelled
-        if (!res?.success && sessionId === this.currentSessionId) {
-          return this._webSpeak(text, targetLang, rate, sessionId);
-        }
       } catch (err) {
-        if (sessionId !== this.currentSessionId) return;
+        logger.warn('TTS', 'Native TTS failed, falling back to Web Speech', err);
+      }
+
+      // Fallback to Web Speech if native failed and not cancelled
+      if (sessionId === this.currentSessionId) {
         return this._webSpeak(text, targetLang, rate, sessionId);
-      } finally {
-        if (sessionId === this.currentSessionId) {
-          this._isSpeaking = false;
-          this.notify();
-        }
       }
       return;
     }

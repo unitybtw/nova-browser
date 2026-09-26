@@ -4,7 +4,7 @@ interface ToggleSwitchProps {
   /** Undefined is treated as off, matching the previous inline `cond ? on : off` behavior. */
   checked: boolean | undefined;
   onToggle: () => void;
-  ariaLabel?: string;
+  ariaLabel: string;
   /** Active (on-state) background color. Defaults to the most common variant. */
   activeColorClass?: string;
 }
@@ -21,7 +21,7 @@ export function ToggleSwitch({ checked, onToggle, ariaLabel, activeColorClass = 
       type="button"
       role="switch"
       aria-checked={isChecked}
-      aria-label={ariaLabel || 'Toggle setting'}
+      aria-label={ariaLabel}
       onClick={onToggle}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isChecked ? activeColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
     >

@@ -1353,6 +1353,52 @@ app.whenReady().then(async () => {
   // Origin -> Rate limit record (max 5 requests per 10s)
   const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
+  const PERMISSIONS_FILE = path.join(app.getPath('userData'), 'remembered_permissions.json');
+
+  function loadRememberedPermissionsFromDisk(): void {
+    try {
+      if (fs.existsSync(PERMISSIONS_FILE)) {
+        const raw = fs.readFileSync(PERMISSIONS_FILE, 'utf8');
+        const data = JSON.parse(raw);
+        if (data && typeof data === 'object') {
+          const cutoff = Date.now() - PERMISSION_TTL_MS;
+          for (const [origin, perms] of Object.entries(data)) {
+            if (typeof origin === 'string' && perms && typeof perms === 'object') {
+              const permMap = new Map<string, { allow: boolean; ts: number }>();
+              for (const [perm, entry] of Object.entries(perms as Record<string, any>)) {
+                if (entry && typeof entry.allow === 'boolean' && typeof entry.ts === 'number' && entry.ts >= cutoff) {
+                  permMap.set(perm, { allow: entry.allow, ts: entry.ts });
+                }
+              }
+              if (permMap.size > 0) {
+                rememberedPermissions.set(origin, permMap);
+              }
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Permissions] Failed to load permissions from disk:', err);
+    }
+  }
+
+  function saveRememberedPermissionsToDisk(): void {
+    try {
+      const obj: Record<string, Record<string, { allow: boolean; ts: number }>> = {};
+      for (const [origin, perms] of rememberedPermissions.entries()) {
+        obj[origin] = {};
+        for (const [perm, entry] of perms.entries()) {
+          obj[origin][perm] = entry;
+        }
+      }
+      fs.writeFileSync(PERMISSIONS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('[Permissions] Failed to save permissions to disk:', err);
+    }
+  }
+
+  loadRememberedPermissionsFromDisk();
+
   /** Purge all remembered permission entries older than PERMISSION_TTL_MS. */
   function purgeExpiredRememberedPermissions(): void {
     const cutoff = Date.now() - PERMISSION_TTL_MS;
@@ -1389,6 +1435,7 @@ app.whenReady().then(async () => {
           rememberedPermissions.set(pending.origin, new Map());
         }
         rememberedPermissions.get(pending.origin)!.set(pending.permission, { allow, ts: Date.now() });
+        saveRememberedPermissionsToDisk();
       }
       try {
         pending.callback(allow);
@@ -1614,6 +1661,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('reset-remembered-permissions', (event) => {
     if (!isTrustedSender(event)) return false;
     rememberedPermissions.clear();
+    saveRememberedPermissionsToDisk();
     return true;
   });
 
@@ -1622,6 +1670,20 @@ app.whenReady().then(async () => {
     if (!isTrustedSender(event)) return 0;
     purgeExpiredRememberedPermissions();
     return rememberedPermissions.size;
+  });
+
+  // IPC: get remembered permissions for a specific site origin (used by SiteInfoPopover)
+  ipcMain.handle('get-site-permissions', (event, origin: unknown) => {
+    if (!isTrustedSender(event)) return {};
+    if (typeof origin !== 'string') return {};
+    purgeExpiredRememberedPermissions();
+    const sitePerms = rememberedPermissions.get(origin);
+    if (!sitePerms) return {};
+    const result: Record<string, { allow: boolean; ts: number }> = {};
+    for (const [k, v] of sitePerms.entries()) {
+      result[k] = v;
+    }
+    return result;
   });
 
   // IPC: check microphone permission status cross-platform
@@ -2373,9 +2435,9 @@ fi
     sendToMainWindow('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
   });
 
-  autoUpdater.on('error', async (err) => {
+  autoUpdater.on('error', (err) => {
     console.error('AutoUpdater error:', err);
-    await checkForUpdatesInternal();
+    sendToMainWindow('update-error', { message: err?.message || 'Update check encountered an error' });
   });
 
   ipcMain.handle('check-for-updates', async (event) => {

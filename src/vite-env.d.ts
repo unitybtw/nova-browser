@@ -175,6 +175,7 @@ export interface ElectronAPI {
   initIncognitoPartition: (tabId: string) => Promise<boolean>;
   resetRememberedPermissions: () => Promise<boolean>;
   getRememberedPermissionsCount: () => Promise<number>;
+  getSitePermissions: (origin: string) => Promise<Record<string, { allow: boolean; ts: number }>>;
   clearAiModelsCache: () => Promise<boolean>;
   purgeSystemMemory: () => Promise<boolean>;
   secureStoreSet: (key: string, value: string) => Promise<boolean>;

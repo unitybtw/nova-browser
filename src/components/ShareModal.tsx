@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Share2, X, Copy, Check, QrCode } from 'lucide-react';
+import QRCode from 'qrcode';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { copyTextToClipboard } from '../utils/clipboard';
 
 interface ShareModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
   title
 }) => {
   const [copied, setCopied] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const containerRef = useRef<HTMLDivElement>(null);
   const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
@@ -27,15 +30,27 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
     };
   }, []);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(url);
-    setCopied(true);
-    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
-    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
-  };
+  useEffect(() => {
+    if (!url) return;
+    let isMounted = true;
+    QRCode.toDataURL(url, { margin: 1, width: 180, errorCorrectionLevel: 'M' })
+      .then(dataUrl => {
+        if (isMounted) setQrCodeDataUrl(dataUrl);
+      })
+      .catch(err => {
+        console.error('Failed to generate local QR code:', err);
+      });
+    return () => { isMounted = false; };
+  }, [url]);
 
-  // Generate Google Chart API QR Code image URL for sharing with mobile phone
-  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(url)}`;
+  const handleCopy = async () => {
+    const success = await copyTextToClipboard(url);
+    if (success) {
+      setCopied(true);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -71,7 +86,13 @@ export const ShareModal: React.FC<ShareModalProps> = React.memo(({
             <div className="p-6 flex flex-col items-center gap-4 text-center">
               {/* QR Code Container */}
               <div className="p-3 bg-white border border-slate-200/80 dark:border-white/20 rounded-2xl shadow-sm flex flex-col items-center gap-2">
-                <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40 rounded-lg object-contain" />
+                {qrCodeDataUrl ? (
+                  <img src={qrCodeDataUrl} alt="QR Code" className="w-40 h-40 rounded-lg object-contain" />
+                ) : (
+                  <div className="w-40 h-40 rounded-lg flex items-center justify-center bg-slate-50 dark:bg-slate-800">
+                    <QrCode className="w-10 h-10 text-slate-300 dark:text-slate-600 animate-pulse" />
+                  </div>
+                )}
                 <span className="text-[10px] text-slate-500 font-medium flex items-center gap-1">
                   <QrCode className="w-3 h-3 text-cyan-500" /> Scan with mobile phone
                 </span>

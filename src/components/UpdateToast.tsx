@@ -66,7 +66,8 @@ export const UpdateToast: React.FC = React.memo(() => {
         unsubs.push(api.onUpdateError((_: any, err: any) => {
           setIsDownloading(false);
           setIsInstalling(false);
-          setError(typeof err === 'string' ? err : 'Update error encountered');
+          setError(typeof err === 'string' ? err : (err?.message || 'Update error encountered'));
+          setIsVisible(true);
         }));
       }
     }
@@ -84,10 +85,12 @@ export const UpdateToast: React.FC = React.memo(() => {
       if (!res.success && res.error) {
         setError(res.error);
         setIsDownloading(false);
+        setIsVisible(true);
       }
     } catch (e: any) {
       setError(e?.message || 'Download failed');
       setIsDownloading(false);
+      setIsVisible(true);
     }
   };
 
@@ -100,6 +103,7 @@ export const UpdateToast: React.FC = React.memo(() => {
       } catch (e: any) {
         setError(e?.message || 'Install failed');
         setIsInstalling(false);
+        setIsVisible(true);
       }
     }
   };

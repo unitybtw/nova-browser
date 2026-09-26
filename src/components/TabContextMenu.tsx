@@ -28,7 +28,7 @@ export interface TabContextMenuState {
 interface TabContextMenuProps {
   menuState: TabContextMenuState;
   onClose: () => void;
-  onNewTabRight: (index: number) => void;
+  onNewTabRight: (target: number | string) => void;
   onReloadTab: (tabId: string) => void;
   onDuplicateTab: (tabId: string) => void;
   onTogglePinTab: (tabId: string) => void;
@@ -36,7 +36,7 @@ interface TabContextMenuProps {
   onBookmarkTab: (tab: Tab) => void;
   onCloseTab: (tabId: string) => void;
   onCloseOtherTabs: (tabId: string) => void;
-  onCloseTabsToRight: (index: number) => void;
+  onCloseTabsToRight: (target: number | string) => void;
   onReopenClosedTab: () => void;
   canReopenClosedTab?: boolean;
   isBookmarked?: boolean;
@@ -109,7 +109,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         >
         {/* New Tab to Right */}
         <button
-          onClick={() => { onNewTabRight(tabIndex); onClose(); }}
+          onClick={() => { onNewTabRight(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
@@ -221,7 +221,7 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         {/* Close Tabs to Right */}
         {!isRightmost && (
           <button
-            onClick={() => { onCloseTabsToRight(tabIndex); onClose(); }}
+            onClick={() => { onCloseTabsToRight(tab.id); onClose(); }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
           >
             <span className="flex items-center gap-2">

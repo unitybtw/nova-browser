@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Lock, 
@@ -71,8 +71,32 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
     domain = url || 'New Tab';
   }
 
-  const isSecure = protocol === 'https:';
-  const isInternal = url.startsWith('nova://') || url.startsWith('about:');
+  const isDangerous = sec.level === 'dangerous';
+  const isHttp = sec.level === 'http';
+  const isFile = sec.level === 'file';
+  const isInternal = sec.level === 'internal' || url.startsWith('nova://') || url.startsWith('about:');
+  const isSecure = sec.level === 'secure' || (!isDangerous && !isHttp && !isInternal && !isFile && protocol === 'https:');
+
+  const [sitePerms, setSitePerms] = useState<Record<string, { allow: boolean; ts: number }>>({});
+
+  useEffect(() => {
+    if (!isOpen || isInternal || !domain) return;
+    const origin = `${protocol}//${domain}`;
+    const api = (window as any).electronAPI;
+    if (api?.getSitePermissions) {
+      api.getSitePermissions(origin).then((perms: any) => {
+        if (perms && typeof perms === 'object') setSitePerms(perms);
+      }).catch(() => {});
+    }
+  }, [isOpen, isInternal, protocol, domain]);
+
+  const getPermStatus = (key: string) => {
+    const p = sitePerms[key];
+    if (!p) return { label: 'Ask', color: 'text-slate-400' };
+    return p.allow 
+      ? { label: 'Allowed', color: 'text-emerald-500 font-semibold' }
+      : { label: 'Blocked', color: 'text-rose-500 font-semibold' };
+  };
 
   return (
     <AnimatePresence>
@@ -88,15 +112,27 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
         {/* Header */}
         <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100 dark:border-white/10">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className={`p-2 rounded-xl shrink-0 ${isInternal ? 'bg-cyan-500/10 text-cyan-500' : isSecure ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
-              {isInternal ? <Sparkles className="w-4 h-4" /> : isSecure ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+            <div className={`p-2 rounded-xl shrink-0 ${
+              isDangerous ? 'bg-rose-500/10 text-rose-500' :
+              isInternal ? 'bg-cyan-500/10 text-cyan-500' :
+              isSecure ? 'bg-emerald-500/10 text-emerald-500' :
+              'bg-amber-500/10 text-amber-500'
+            }`}>
+              {isDangerous ? <ShieldAlert className="w-4 h-4" /> :
+               isInternal ? <Sparkles className="w-4 h-4" /> :
+               isSecure ? <Lock className="w-4 h-4" /> :
+               <Unlock className="w-4 h-4" />}
             </div>
             <div className="min-w-0">
               <div className="font-bold text-sm text-slate-800 dark:text-slate-100 truncate" title={domain}>
                 {domain}
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                {isInternal ? 'Internal Nova System Page' : isSecure ? 'Connection is secure (TLS 1.3)' : 'Connection is not secure'}
+                {isDangerous ? (sec.tooltip || 'Phishing or dangerous site blocked') :
+                 isInternal ? 'Internal Nova System Page' :
+                 isFile ? 'Local Filesystem Resource' :
+                 isSecure ? 'Connection is secure (Encrypted TLS)' :
+                 'Connection is not secure (Unencrypted HTTP)'}
               </div>
             </div>
           </div>
@@ -112,11 +148,15 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
         <div className="py-3 space-y-2 border-b border-slate-100 dark:border-white/10">
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+              <ShieldCheck className={`w-3.5 h-3.5 ${isDangerous ? 'text-rose-500' : isSecure ? 'text-emerald-500' : 'text-amber-500'}`} />
               Certificate
             </span>
-            <span className="font-semibold text-slate-700 dark:text-slate-200">
-              {isInternal ? 'Built-in (Verified)' : isSecure ? 'Valid & Encrypted' : 'Not Valid'}
+            <span className={`font-semibold ${isDangerous ? 'text-rose-500' : isSecure ? 'text-slate-700 dark:text-slate-200' : 'text-amber-500'}`}>
+              {isDangerous ? 'Blocked / Untrusted' :
+               isInternal ? 'Built-in (Verified)' :
+               isFile ? 'Local origin' :
+               isSecure ? 'Valid & Encrypted' :
+               'None (Unencrypted)'}
             </span>
           </div>
 
@@ -151,21 +191,33 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
             </div>
             
             <div className="grid grid-cols-2 gap-1.5">
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <Camera className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[11px] truncate">Camera: Ask</span>
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Camera className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="text-[11px] truncate">Camera:</span>
+                </div>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('media').color}`}>{getPermStatus('media').label}</span>
               </div>
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <Mic className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[11px] truncate">Microphone: Ask</span>
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Mic className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="text-[11px] truncate">Microphone:</span>
+                </div>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('media').color}`}>{getPermStatus('media').label}</span>
               </div>
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <Bell className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[11px] truncate">Notifications: Ask</span>
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Bell className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="text-[11px] truncate">Notifications:</span>
+                </div>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('notifications').color}`}>{getPermStatus('notifications').label}</span>
               </div>
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                <span className="text-[11px] truncate">Location: Ask</span>
+              <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="text-[11px] truncate">Location:</span>
+                </div>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('geolocation').color}`}>{getPermStatus('geolocation').label}</span>
               </div>
             </div>
           </div>
