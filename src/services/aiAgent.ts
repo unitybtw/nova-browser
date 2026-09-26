@@ -1489,8 +1489,11 @@ CRITICAL RULES:
 
     if (isCancelled()) return messages;
 
-    // Step 2: Navigate to Google search with language hint
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}&hl=${isTr ? 'tr' : 'en'}`;
+    // Step 2: Navigate to Google search with language hint and News mode for news queries
+    const isNews = /haber|news|headline|gündem|gundem|sondakika|son dakika|flas/i.test(searchTopic);
+    const searchUrl = isNews
+      ? `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}&tbm=nws&hl=${isTr ? 'tr' : 'en'}`
+      : `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}&hl=${isTr ? 'tr' : 'en'}`;
     if (onChunk) {
       onChunk(isTr ? `Arama motoruna baglaniliyor ve sonuclar taraniyor...\n` : `Navigating to search engine and scanning results...\n`);
     }
@@ -1647,7 +1650,9 @@ CRITICAL RULES:
       if (onChunk) {
         onChunk(isTr ? `Alternatif motor da basarisiz, Bing deneniyor...\n` : `Alternative engine failed too, trying Bing...\n`);
       }
-      const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searchTopic)}`;
+      const bingUrl = isNews
+        ? `https://www.bing.com/news/search?q=${encodeURIComponent(searchTopic)}`
+        : `https://www.bing.com/search?q=${encodeURIComponent(searchTopic)}`;
       if (this.actionContext?.onNavigate) {
         this.actionContext.onNavigate(bingUrl);
       }
@@ -1661,7 +1666,14 @@ CRITICAL RULES:
     if (isCancelled()) return messages;
 
     // Step 4: Visit top sources, scroll with virtual cursor and read page content
-    const visitedSources: Array<{ title: string; url: string; content: string; snippet: string }> = [];
+    const visitedSources: Array<{
+      title: string;
+      url: string;
+      headlines: string[];
+      paragraphs: string[];
+      snippet: string;
+      content: string;
+    }> = [];
     const maxSourcesToVisit = Math.min(searchResults.length, 3);
     const offset = this.getWebviewOffset();
 
@@ -1672,61 +1684,101 @@ CRITICAL RULES:
       );
     }
 
-    // ── Helper: fast & non-destructive page content extractor (no cloneNode) ──
-    const readPageContent = async (): Promise<string> => {
+    // ── Helper: fast & rich page content extractor (extracts real headlines & story paragraphs) ──
+    const readPageContent = async (): Promise<{ headlines: string[]; paragraphs: string[]; fullText: string }> => {
       try {
         const raw = await this.actionContext?.onExecuteScript(`
           (() => {
             try {
-              // 1. Meta description as high-quality editorial summary
-              const metaDesc = (
-                document.querySelector('meta[name="description"]')?.getAttribute('content') ||
-                document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
-                document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ||
-                ''
+              const clean = (t) => (t || '').replace(/\\s+/g, ' ').trim();
+              const isBoilerplate = (t) => /offers (breaking )?news coverage|definitive source for|browse thousands of titles|all rights reserved|official website of|home of the|welcome to|read full articles, watch videos|enable javascript|cookies on|terms of service|privacy policy/i.test(t);
+
+              // 1. Extract distinct headlines from cards, headings, article titles
+              const headlines = [];
+              const headlineSelectors = [
+                'article h1', 'article h2', 'article h3', 'article h4',
+                '[data-card] h2', '[data-card] h3', '.card-title', '.story-title',
+                '[data-testid*="headline"]', '.headline', 'h2.title', 'h3.title',
+                'main h1', 'main h2', 'main h3', 'h1', 'h2', 'h3'
+              ];
+
+              for (const sel of headlineSelectors) {
+                const els = document.querySelectorAll(sel);
+                for (const el of Array.from(els)) {
+                  if (el.offsetParent === null) continue;
+                  const text = clean(el.innerText || el.textContent);
+                  if (
+                    text.length >= 18 &&
+                    text.length <= 220 &&
+                    !isBoilerplate(text) &&
+                    !/^(cookie|accept|privacy|subscribe|terms|advertisement|sign in|all rights|manage consent|we use cookies|follow us|share this|read more|watch live|listen now|podcasts|weather|sports|business|politics|world|entertainment|tech|health|opinion|video|search|menu|breaking news|top stories|latest news|trending)/i.test(text) &&
+                    !headlines.some(h => h.toLowerCase() === text.toLowerCase())
+                  ) {
+                    headlines.push(text);
+                    if (headlines.length >= 8) break;
+                  }
+                }
+                if (headlines.length >= 6) break;
+              }
+
+              // 2. Extract article body paragraphs or story summaries
+              const paragraphs = [];
+              const paraSelectors = [
+                'article p', 'main p', '[role="main"] p',
+                '.article-body p', '.story-body p', '.post-content p',
+                'p.summary', 'p.description', '.card p',
+                'p'
+              ];
+
+              for (const sel of paraSelectors) {
+                const els = document.querySelectorAll(sel);
+                for (const el of Array.from(els)) {
+                  if (el.offsetParent === null) continue;
+                  const text = clean(el.innerText || el.textContent);
+                  if (
+                    text.length >= 40 &&
+                    text.length <= 600 &&
+                    !isBoilerplate(text) &&
+                    !/^(cookie|accept|privacy|subscribe|terms|advertisement|sign in|all rights|manage consent|we use cookies|follow us|share this|photo by|getty images|reuters|ap photo|cnn|bbc|cbs|nbc|abc)/i.test(text) &&
+                    !paragraphs.some(p => p.toLowerCase() === text.toLowerCase())
+                  ) {
+                    paragraphs.push(text);
+                    if (paragraphs.length >= 6) break;
+                  }
+                }
+                if (paragraphs.length >= 5) break;
+              }
+
+              const fullText = (
+                (headlines.length > 0 ? 'Headlines:\\n' + headlines.map(h => '- ' + h).join('\\n') + '\\n\\n' : '') +
+                (paragraphs.length > 0 ? 'Details:\\n' + paragraphs.join('\\n\\n') : '')
               ).trim();
 
-              // 2. Locate main content container directly without cloning
-              const container = document.querySelector('article') ||
-                                document.querySelector('main') ||
-                                document.querySelector('[role="main"]') ||
-                                document.querySelector('.article-body, .story-body, .post-content, #main-content, .content, .caas-body') ||
-                                document.body;
-              if (!container) return metaDesc;
-
-              // 3. Extract text from headlines and paragraphs
-              const elements = container.querySelectorAll('h1, h2, h3, p');
-              const paragraphs = [];
-              if (metaDesc && metaDesc.length > 25) {
-                paragraphs.push(metaDesc);
-              }
-
-              for (const el of Array.from(elements)) {
-                // Skip invisible or zero-height elements
-                if (el.offsetParent === null) continue;
-                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
-                if (text.length > 25 &&
-                    !/^(cookie|accept|privacy|subscribe|terms|advertisement|sign in|all rights reserved|manage consent|we use cookies|follow us|share this|read more)/i.test(text)) {
-                  paragraphs.push(text);
-                  if (paragraphs.join(' ').length > 3000) break;
-                }
-              }
-
-              if (paragraphs.length > 0) {
-                return paragraphs.join('\\n\\n');
-              }
-              return (container.innerText || '').slice(0, 2500);
+              return JSON.stringify({ headlines, paragraphs, fullText });
             } catch(e) {
-              return (document.body ? document.body.innerText : '').slice(0, 1500);
+              return JSON.stringify({ headlines: [], paragraphs: [], fullText: (document.body ? document.body.innerText : '').slice(0, 1500) });
             }
           })()
         `);
-        if (typeof raw === 'string') return raw;
-        if (raw) return JSON.stringify(raw);
+
+        if (typeof raw === 'string') {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && (Array.isArray(parsed.headlines) || Array.isArray(parsed.paragraphs))) {
+              return {
+                headlines: Array.isArray(parsed.headlines) ? parsed.headlines : [],
+                paragraphs: Array.isArray(parsed.paragraphs) ? parsed.paragraphs : [],
+                fullText: parsed.fullText || ''
+              };
+            }
+          } catch (_) {
+            return { headlines: [], paragraphs: [], fullText: raw };
+          }
+        }
       } catch (e) {
         logger.warn('AIAgent:webResearch', 'Page content read error', e);
       }
-      return '';
+      return { headlines: [], paragraphs: [], fullText: '' };
     };
 
     if (maxSourcesToVisit > 0) {
@@ -1778,9 +1830,9 @@ CRITICAL RULES:
           }
           await new Promise(r => setTimeout(r, 350));
 
-          // Read page content
-          const rawText = await readPageContent();
-          let pageText = sanitizeAgentInput(rawText);
+          // Read page content (headlines & story paragraphs)
+          const extracted = await readPageContent();
+          let pageText = sanitizeAgentInput(extracted.fullText);
 
           if (!pageText || pageText.length < 30) {
             pageText = target.snippet || '';
@@ -1789,6 +1841,8 @@ CRITICAL RULES:
           visitedSources.push({
             title: target.title,
             url: target.url,
+            headlines: extracted.headlines,
+            paragraphs: extracted.paragraphs,
             snippet: target.snippet,
             content: pageText.slice(0, 3500)
           });
@@ -1806,6 +1860,8 @@ CRITICAL RULES:
           visitedSources.push({
             title: target.title,
             url: target.url,
+            headlines: [],
+            paragraphs: [],
             snippet: target.snippet,
             content: target.snippet || ''
           });
@@ -1831,6 +1887,8 @@ CRITICAL RULES:
           visitedSources.push({
             title: sr.title,
             url: sr.url,
+            headlines: [],
+            paragraphs: [sr.snippet],
             snippet: sr.snippet,
             content: sr.snippet
           });
@@ -1847,18 +1905,27 @@ CRITICAL RULES:
     this.emitStatus('thinking');
 
     let finalReport = '';
-    const hasVisitedContent = visitedSources.some(s => s.content && s.content.length > 40);
+    const hasVisitedContent = visitedSources.some(s => (s.headlines && s.headlines.length > 0) || (s.content && s.content.length > 40));
 
     // If local LLM engine is initialized and ready, ask it to synthesize without emojis (with 10s timeout)
     if (this.engine && hasVisitedContent) {
       try {
-        const sourcesContext = visitedSources.map((s, idx) =>
-          `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\nContent:\n${s.content.slice(0, 1200)}`
-        ).join('\n\n---\n\n');
+        const sourcesContext = visitedSources.map((s, idx) => {
+          let text = `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\n`;
+          if (s.headlines && s.headlines.length > 0) {
+            text += `Top Headlines:\n${s.headlines.map(h => `- ${h}`).join('\n')}\n`;
+          }
+          if (s.paragraphs && s.paragraphs.length > 0) {
+            text += `Key Excerpts:\n${s.paragraphs.slice(0, 3).join('\n\n')}\n`;
+          } else if (s.content) {
+            text += `Content:\n${s.content.slice(0, 1000)}\n`;
+          }
+          return text;
+        }).join('\n\n---\n\n');
 
         const synthesisPrompt = isTr
-          ? `Kullanici su konuyu arastirdi: "${searchTopic}".\nOtonom olarak webde arandi, asagidaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLutfen bu kaynaklardaki bilgileri temel alarak net, kapsamli, Turkce ve profesyonel bir ozet rapor sun. En son gelismeleri ve onemli noktalari maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" basligi altinda her kaynagi [Baslik](URL) seklinde ekle.`
-          : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight key developments and takeaways with bullet points. NEVER use any emojis. Conclude with a "### Consulted Sources" section listing each source as a markdown link [Title](URL).`;
+          ? `Kullanici su konuyu arastirdi: "${searchTopic}".\nOtonom olarak webde arandi, asagidaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLutfen bu kaynaklardaki somut haber ve bilgileri temel alarak net, kapsamli, Turkce ve profesyonel bir ozet rapor sun. One cikan guncel haber mansetlerini ve gelismeleri maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" basligi altinda her kaynagi [Baslik](URL) seklinde ekle.`
+          : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight actual breaking headlines and key developments with bullet points. NEVER use any emojis. Conclude with a "### Consulted Sources" section listing each source as a markdown link [Title](URL).`;
 
         let llmTimer: any = null;
         const llmTimeout = new Promise((_, reject) => {
@@ -1894,54 +1961,76 @@ CRITICAL RULES:
       let summaryBody = '';
       if (visitedSources.length > 0) {
         summaryBody += isTr
-          ? `Otonom web taramasinda ${visitedSources.length} kaynak ziyaret edilmis ve en guncel bilgiler derlenmistir:\n\n`
-          : `Autonomous web scan visited ${visitedSources.length} sources and compiled the latest findings:\n\n`;
+          ? `Otonom web taramasinda ${visitedSources.length} kaynak ziyaret edilmis ve en guncel haberler derlenmistir:\n\n`
+          : `Autonomous web scan visited ${visitedSources.length} sources and compiled the latest news:\n\n`;
 
-        // Section A: Key Highlights across sources
-        summaryBody += isTr ? `### Ozet ve One Cikan Noktalar\n\n` : `### Summary and Key Takeaways\n\n`;
-        const allKeyPoints: string[] = [];
-        visitedSources.forEach((source) => {
-          const textToParse = source.content || source.snippet || '';
-          if (textToParse.length > 30) {
-            const rawSentences = textToParse
-              .split(/[.!?\n]+/)
-              .map(s => s.trim())
-              .filter(s => s.length > 30 && s.length < 250 && !/^(cookie|accept|sign in|log in|subscribe|privacy|terms|agree|reject|consent|manage|allow|dismiss|skip|search|menu)/i.test(s));
-            if (rawSentences.length > 0) {
-              allKeyPoints.push(rawSentences[0]);
-              if (rawSentences.length > 1 && allKeyPoints.length < 6) {
-                allKeyPoints.push(rawSentences[1]);
+        // Section A: Top Headlines across visited sources
+        const allHeadlines: Array<{ headline: string; sourceTitle: string }> = [];
+        visitedSources.forEach(s => {
+          const shortName = s.title.split(/[-|–:]/)[0].trim();
+          if (Array.isArray(s.headlines)) {
+            s.headlines.forEach(h => {
+              if (h.length > 15 && !allHeadlines.some(item => item.headline.toLowerCase() === h.toLowerCase())) {
+                allHeadlines.push({ headline: h, sourceTitle: shortName });
               }
+            });
+          }
+        });
+
+        if (allHeadlines.length > 0) {
+          summaryBody += isTr ? `### One Cikan Haberler ve Mansetler\n\n` : `### Top Breaking News & Headlines\n\n`;
+          allHeadlines.slice(0, 8).forEach(item => {
+            summaryBody += `- **${item.headline}** (${item.sourceTitle})\n`;
+          });
+          summaryBody += '\n';
+        }
+
+        // Section B: Key Details & Story Excerpts
+        const allKeyPoints: string[] = [];
+        visitedSources.forEach(s => {
+          if (Array.isArray(s.paragraphs)) {
+            s.paragraphs.forEach(p => {
+              if (p.length > 40 && !allKeyPoints.some(existing => existing.includes(p.slice(0, 30)))) {
+                allKeyPoints.push(p);
+              }
+            });
+          } else if (s.content && s.content.length > 40) {
+            const rawSentences = s.content
+              .split(/[.!?\n]+/)
+              .map(str => str.trim())
+              .filter(str => str.length > 35 && str.length < 250 && !/^(cookie|accept|sign in|log in|subscribe|privacy|terms|agree|reject|consent|manage|allow|dismiss|skip|search|menu)/i.test(str));
+            if (rawSentences.length > 0 && !allKeyPoints.some(existing => existing.includes(rawSentences[0].slice(0, 30)))) {
+              allKeyPoints.push(rawSentences[0]);
             }
           }
         });
 
         if (allKeyPoints.length > 0) {
-          allKeyPoints.slice(0, 5).forEach(kp => {
-            summaryBody += `- ${kp}.\n`;
+          summaryBody += isTr ? `### Gelismelerin Ozet Detaylari\n\n` : `### Story Summaries & Key Details\n\n`;
+          allKeyPoints.slice(0, 4).forEach(kp => {
+            summaryBody += `> ${kp}\n\n`;
           });
-          summaryBody += '\n';
         }
 
-        // Section B: Detailed Source Insights
+        // Section C: Per-Source Insights
         summaryBody += isTr ? `### Kaynak Detaylari\n\n` : `### Source Insights\n\n`;
         visitedSources.forEach((source, idx) => {
           summaryBody += `#### ${idx + 1}. [${source.title}](${source.url})\n`;
-          if (source.snippet) {
-            summaryBody += `> ${source.snippet}\n\n`;
+          if (source.headlines && source.headlines.length > 0) {
+            summaryBody += isTr ? `**One Cikan Mansetler:**\n` : `**Key Headlines:**\n`;
+            source.headlines.slice(0, 3).forEach(h => {
+              summaryBody += `- ${h}\n`;
+            });
+            summaryBody += '\n';
           }
-          if (source.content && source.content !== source.snippet) {
-            const lines = source.content
-              .split('\n\n')
-              .map(l => l.trim())
-              .filter(l => l.length > 40 && !l.includes(source.snippet));
-            if (lines.length > 0) {
-              summaryBody += `${lines.slice(0, 2).join('\n\n')}\n\n`;
-            }
+          if (source.paragraphs && source.paragraphs.length > 0) {
+            summaryBody += `${source.paragraphs[0]}\n\n`;
+          } else if (source.snippet) {
+            summaryBody += `> ${source.snippet}\n\n`;
           }
         });
 
-        // Section C: Consulted Sources
+        // Section D: Consulted Sources
         summaryBody += isTr ? `### Incelenen Kaynaklar\n` : `### Consulted Sources\n`;
         visitedSources.forEach(s => {
           summaryBody += `- [${s.title}](${s.url})\n`;
