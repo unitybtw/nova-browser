@@ -199,6 +199,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     }
   }, [activeTab?.url, isFocused]);
 
+  // Re-render when the app language changes so suggestions are refetched in
+  // the new language instead of being served from the previous locale's cache.
+  const clientLanguage = getLanguage();
+
   useEffect(() => {
     const trimmed = searchValue.trim();
     if (isAIMode || !trimmed || trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('nova://') || trimmed.startsWith('about:')) {
@@ -207,8 +211,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
+    const clientLocale = getLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
-    const cached = getClientCachedSuggestions(cacheKey);
+    const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 6));
     }
@@ -220,12 +225,11 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
     const fetchSuggestions = async () => {
       try {
-        const clientLocale = getLocale();
         if (typeof window !== 'undefined' && getElectronAPI()?.getSuggestions) {
           const results = await getElectronAPI()?.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
-              setClientCachedSuggestions(cacheKey, results);
+              setClientCachedSuggestions(cacheKey, results, clientLocale);
               setSuggestions(results.slice(0, 6));
             } else {
               setSuggestions([]);
@@ -249,7 +253,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       clearTimeout(timer);
       abortController.abort();
     };
-  }, [searchValue, isAIMode, searchEngine]);
+  }, [searchValue, isAIMode, searchEngine, clientLanguage]);
 
   const handleSearchSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();

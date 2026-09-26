@@ -4,6 +4,20 @@ import { getLanguage } from '../services/i18n';
 
 const INTRANET_DOMAIN_REGEX = /^[a-zA-Z0-9-]+\.(local|test|internal|lan|home|docker|localhost)(:\d+)?(\/.*)?$/i;
 
+/**
+ * Language -> country mapping. Search engines without a region parameter
+ * (and engines whose region param we cannot derive) otherwise fall back to the
+ * request IP, which produces results in the wrong language for users abroad.
+ */
+const COUNTRY_BY_LANG: Record<string, string> = {
+  tr: 'TR', de: 'DE', ar: 'SA', en: 'US', fr: 'FR', es: 'ES', it: 'IT',
+  nl: 'NL', ru: 'RU', ja: 'JP', ko: 'KR', zh: 'CN', pt: 'BR', pl: 'PL',
+};
+
+function countryForLang(lang: string): string {
+  return COUNTRY_BY_LANG[lang] || 'US';
+}
+
 export function isValidUrlOrDomain(input: string): boolean {
   const trimmed = input.trim();
   if (!trimmed) return false;
@@ -117,28 +131,41 @@ export function formatSearchUrl(
 
   // Otherwise treat as localized search engine query
   const q = encodeURIComponent(trimmed);
+  // Chrome sends both a language and a region. Without the region the engine
+  // uses the IP-derived country, so a Turkish user abroad still gets results
+  // from the wrong market.
+  const country = activeLang ? countryForLang(activeLang) : '';
+  const gl = country ? `&gl=${country.toLowerCase()}` : '';
+  const cr = country ? `&cr=${country}` : '';
   switch (engine) {
     case 'duckduckgo': {
       if (!activeLang) return `https://duckduckgo.com/?q=${q}`;
       const ddgLocaleMap: Record<string, string> = { tr: 'tr-tr', de: 'de-de', ar: 'xa-ar', en: 'us-en' };
-      const kl = ddgLocaleMap[activeLang] || `${activeLang}-${activeLang}`;
+      const kl = ddgLocaleMap[activeLang] || `${country.toLowerCase()}-${activeLang}`;
       return `https://duckduckgo.com/?q=${q}&kl=${kl}`;
     }
     case 'brave': {
       if (!activeLang) return `https://search.brave.com/search?q=${q}`;
-      const braveCountryMap: Record<string, string> = { tr: 'tr', de: 'de', en: 'us' };
-      const country = braveCountryMap[activeLang] || activeLang;
       return `https://search.brave.com/search?q=${q}&country=${country}`;
     }
     case 'bing':
-      return activeLang ? `https://www.bing.com/search?q=${q}&setlang=${activeLang}` : `https://www.bing.com/search?q=${q}`;
+      return activeLang
+        ? `https://www.bing.com/search?q=${q}&setlang=${activeLang}&cc=${country}`
+        : `https://www.bing.com/search?q=${q}`;
     case 'ecosia':
-      return activeLang ? `https://www.ecosia.org/search?q=${q}&lang=${activeLang}` : `https://www.ecosia.org/search?q=${q}`;
+      // Ecosia only honours a language param; there is no separate region flag.
+      return activeLang
+        ? `https://www.ecosia.org/search?q=${q}&lang=${activeLang}`
+        : `https://www.ecosia.org/search?q=${q}`;
     case 'yahoo':
-      return activeLang ? `https://search.yahoo.com/search?p=${q}&vl=lang_${activeLang}` : `https://search.yahoo.com/search?p=${q}`;
+      return activeLang
+        ? `https://search.yahoo.com/search?p=${q}&vl=lang_${activeLang}${cr}`
+        : `https://search.yahoo.com/search?p=${q}`;
     case 'google':
     default:
-      return activeLang ? `https://www.google.com/search?q=${q}&hl=${activeLang}` : `https://www.google.com/search?q=${q}`;
+      return activeLang
+        ? `https://www.google.com/search?q=${q}&hl=${activeLang}${gl}${cr}`
+        : `https://www.google.com/search?q=${q}`;
   }
 }
 

@@ -55,6 +55,9 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     }
   }, [isOpen]);
 
+  // Re-render on language change so suggestions refetch in the new locale.
+  const clientLanguage = getLanguage();
+
   useEffect(() => {
     const trimmed = inputValue.trim();
     if (isAIMode || !trimmed || trimmed.includes('://')) {
@@ -63,8 +66,9 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
+    const clientLocale = getLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
-    const cached = getClientCachedSuggestions(cacheKey);
+    const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 5));
     }
@@ -73,12 +77,11 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     const currentReqId = ++suggestionRequestIdRef.current;
     const fetchSuggestions = async () => {
       try {
-        const clientLocale = getLocale();
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!controller.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
-              setClientCachedSuggestions(cacheKey, results);
+              setClientCachedSuggestions(cacheKey, results, clientLocale);
               setSuggestions(results.slice(0, 5));
             } else {
               setSuggestions([]);
@@ -100,7 +103,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       clearTimeout(timer);
       controller.abort();
     };
-  }, [inputValue, isAIMode, searchEngine]);
+  }, [inputValue, isAIMode, searchEngine, clientLanguage]);
 
   // Compute matching items for list navigation
   type ActionItem = 
@@ -108,6 +111,9 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     | { type: 'suggestion'; text: string };
 
   const items: ActionItem[] = useMemo(() => {
+    if (isAIMode) {
+      return [];
+    }
     const list: ActionItem[] = [];
     const query = inputValue.trim().toLowerCase();
 
@@ -126,7 +132,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       tabs.forEach(t => list.push({ type: 'tab', tab: t }));
     }
     return list;
-  }, [inputValue, tabs, suggestions]);
+  }, [inputValue, isAIMode, tabs, suggestions]);
 
   // Keep selected index within range and scroll into view
   useEffect(() => {
@@ -363,8 +369,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   if (prevProps.isOpen !== nextProps.isOpen) return false;
   if (!prevProps.isOpen && !nextProps.isOpen) return true;
 
-  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
-  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (
+    prevProps.activeTabId !== nextProps.activeTabId ||
+    prevProps.searchEngine !== nextProps.searchEngine ||
+    prevProps.onSelectTab !== nextProps.onSelectTab ||
+    prevProps.onNewTab !== nextProps.onNewTab ||
+    prevProps.onCloseTab !== nextProps.onCloseTab ||
+    prevProps.onNavigate !== nextProps.onNavigate ||
+    prevProps.onClose !== nextProps.onClose
+  ) {
+    return false;
+  }
 
   const prevTabs = prevProps.tabs;
   const nextTabs = nextProps.tabs;

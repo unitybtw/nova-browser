@@ -647,6 +647,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   // Fetch suggestions (AbortController guards against out-of-order/stale responses,
   // same pattern as TopBar.tsx)
+  // Re-render on language change so suggestions refetch in the new locale.
+  const clientLanguage = getLanguage();
+
   useEffect(() => {
     const trimmed = searchValue.trim();
     if (!isOmniboxFocused || !trimmed || trimmed.includes('://')) {
@@ -655,8 +658,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
+    const clientLocale = getLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
-    const cached = getClientCachedSuggestions(cacheKey);
+    const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 5));
     }
@@ -667,12 +671,11 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
     const fetchSuggestions = async () => {
       try {
-        const clientLocale = getLocale();
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted) {
             if (Array.isArray(results)) {
-              setClientCachedSuggestions(cacheKey, results);
+              setClientCachedSuggestions(cacheKey, results, clientLocale);
               setSuggestions(results.slice(0, 5));
             } else {
               setSuggestions([]);
@@ -695,7 +698,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       clearTimeout(timer);
       abortController.abort();
     };
-  }, [searchValue, isOmniboxFocused, searchEngine]);
+  }, [searchValue, isOmniboxFocused, searchEngine, clientLanguage]);
 
   const handleOmniboxSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();

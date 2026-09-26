@@ -33,13 +33,44 @@ function cacheSuggestions(cacheKey: string, list: string[]): void {
   suggestionsCache.set(cacheKey, { list, cachedAt: Date.now() });
 }
 
+// Language -> country mapping for engines that key off a bare country code.
+// Without an entry we fall back to the locale's region, then to "US".
+const DEFAULT_COUNTRY_BY_LANG: Record<string, string> = {
+  tr: 'tr',
+  de: 'de',
+  ar: 'sa',
+  en: 'us',
+  fr: 'fr',
+  es: 'es',
+  it: 'it',
+  nl: 'nl',
+  ru: 'ru',
+  ja: 'jp',
+  ko: 'kr',
+  zh: 'cn',
+  pt: 'br',
+};
+
+/** Normalises a locale into a lowercase ISO-3166 country code. */
+function normalizeCountry(raw: string | undefined, lang: string): string {
+  const candidate = (raw || '').trim().toLowerCase();
+  if (/^[a-z]{2}$/.test(candidate)) return candidate;
+  return DEFAULT_COUNTRY_BY_LANG[lang] || 'us';
+}
+
+function braveCountryFor(lang: string, country: string): string {
+  return normalizeCountry(country, lang).toUpperCase();
+}
+
 function resolveLocaleDetails(clientLocale?: string) {
   const rawLocale = (typeof clientLocale === 'string' && clientLocale.trim())
     ? clientLocale.trim()
     : (app.getLocale() || 'tr-TR');
   const parts = rawLocale.replace('_', '-').split('-');
   const lang = (parts[0] || 'tr').toLowerCase();
-  const country = (parts[1] || (lang === 'tr' ? 'tr' : 'us')).toLowerCase();
+  // Previously every region-less locale collapsed to "us", which made a German
+  // user get gl=us. Fall back to the language's own country instead.
+  const country = normalizeCountry(parts[1], lang);
   const ddgRegion = `${country}-${lang}`;
   const acceptLanguage = `${lang}-${country.toUpperCase()},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
   return { lang, country, ddgRegion, acceptLanguage };
@@ -170,7 +201,11 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 650);
       try {
-        const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false`;
+        // Brave expects a bare ISO country code (e.g. "TR", "DE"); without it
+        // the API falls back to the request IP's region, which yields results
+        // in the wrong language for users abroad.
+        const braveCountry = braveCountryFor(lang, country);
+        const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false&country=${encodeURIComponent(braveCountry)}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
@@ -195,7 +230,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 650);
       try {
-        const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list`;
+        const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list&locale=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
@@ -220,7 +255,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 650);
       try {
-        const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json`;
+        const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {

@@ -284,8 +284,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
+    const clientLocale = getLocale(language);
     const cacheKey = `${trimmed}_${searchEngine}`;
-    const cached = getClientCachedSuggestions(cacheKey);
+    const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 6));
       setShowSuggestions(cached.length > 0);
@@ -298,12 +299,11 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
     const timer = setTimeout(async () => {
       try {
-        const clientLocale = getLocale(language);
         if (typeof window !== 'undefined' && (window as any).electronAPI?.getSuggestions) {
           const results = await (window as any).electronAPI.getSuggestions(trimmed, searchEngine, clientLocale);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
-              setClientCachedSuggestions(cacheKey, results);
+              setClientCachedSuggestions(cacheKey, results, clientLocale);
               setSuggestions(results.slice(0, 6));
               setShowSuggestions(results.length > 0);
             } else {
