@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, session, dialog, webContents, shell, nativeTheme, safeStorage, Menu, MenuItem, clipboard, systemPreferences } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fetch from 'cross-fetch';
@@ -1366,10 +1366,31 @@ app.whenReady().then(async () => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
       
-      // Internal app pages must never receive browser permissions. They do not
-      // need camera, location, clipboard, or other website capabilities, and
-      // auto-allowing here would turn a renderer compromise into a silent grant.
+      // Internal app pages: Allow microphone (audio) for Nova Browser AI chat voice typing.
+      // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
       if (isTrustedAppOrigin(url)) {
+        if (permission === 'media') {
+          const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
+          const requestsVideo = mediaTypes?.includes('video');
+          const requestsAudio = !mediaTypes || mediaTypes.includes('audio');
+          if (requestsAudio && !requestsVideo) {
+            if (process.platform === 'darwin') {
+              try {
+                const status = systemPreferences.getMediaAccessStatus('microphone');
+                if (status === 'not-determined') {
+                  systemPreferences.askForMediaAccess('microphone').then((granted) => {
+                    callback(granted);
+                  }).catch(() => callback(false));
+                  return;
+                }
+                return callback(status === 'granted');
+              } catch (e) {
+                console.warn('[Permissions] macOS systemPreferences check failed:', e);
+              }
+            }
+            return callback(true);
+          }
+        }
         return callback(false);
       }
 
@@ -1488,9 +1509,22 @@ app.whenReady().then(async () => {
       // Security: Deny openExternal checks immediately
       if (permission === 'openExternal') return false;
 
-      // Internal pages are not permission principals. Keep all app-origin
-      // permission checks denied unless a future capability explicitly needs it.
+      // Internal pages: Permit microphone (audio) checks for AI chat voice typing.
+      // All other app-origin permission checks remain denied.
       if (isTrustedAppOrigin(requestingOrigin)) {
+        if (permission === 'media') {
+          const mediaType = (details as any)?.mediaType as string | undefined;
+          if (mediaType === 'audio') {
+            if (process.platform === 'darwin') {
+              try {
+                return systemPreferences.getMediaAccessStatus('microphone') === 'granted';
+              } catch {
+                return true;
+              }
+            }
+            return true;
+          }
+        }
         return false;
       }
 
@@ -1522,6 +1556,55 @@ app.whenReady().then(async () => {
     if (!isTrustedSender(event)) return 0;
     purgeExpiredRememberedPermissions();
     return rememberedPermissions.size;
+  });
+
+  // IPC: check microphone permission status
+  ipcMain.handle('check-microphone-permission', async (event) => {
+    if (!isTrustedSender(event)) return { status: 'denied', canAsk: false };
+    if (process.platform === 'darwin') {
+      try {
+        const status = systemPreferences.getMediaAccessStatus('microphone');
+        return { status, canAsk: status === 'not-determined' };
+      } catch {
+        return { status: 'unknown', canAsk: false };
+      }
+    }
+    return { status: 'granted', canAsk: false };
+  });
+
+  // IPC: request microphone permission
+  ipcMain.handle('request-microphone-permission', async (event) => {
+    if (!isTrustedSender(event)) return { granted: false, status: 'denied' };
+    if (process.platform === 'darwin') {
+      try {
+        const status = systemPreferences.getMediaAccessStatus('microphone');
+        if (status === 'granted') {
+          return { granted: true, status: 'granted' };
+        }
+        if (status === 'not-determined') {
+          const granted = await systemPreferences.askForMediaAccess('microphone');
+          return { granted, status: granted ? 'granted' : 'denied' };
+        }
+        return { granted: false, status };
+      } catch (e) {
+        console.warn('[Microphone] macOS permission request error:', e);
+        return { granted: false, status: 'error' };
+      }
+    }
+    return { granted: true, status: 'granted' };
+  });
+
+  // IPC: open macOS system settings
+  ipcMain.handle('open-system-settings', async (event, pane?: string) => {
+    if (!isTrustedSender(event)) return false;
+    if (process.platform === 'darwin') {
+      const url = pane === 'microphone'
+        ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+        : 'x-apple.systempreferences:';
+      await shell.openExternal(url).catch(() => {});
+      return true;
+    }
+    return false;
   });
 
   applyStrictSecurityToSession(session.defaultSession);

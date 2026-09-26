@@ -1,7 +1,8 @@
 import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check } from "lucide-react";
+import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
+import { getLocale } from "@/services/i18n";
 
 // ----------------------------------------------------------------------
 // Transition Physics
@@ -310,7 +311,15 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     // Audio/Voice recording states
     const [isRecording, setIsRecording] = useState(false);
     const [audioData, setAudioData] = useState<number[]>(new Array(5).fill(0));
+    const [voiceError, setVoiceError] = useState<string | null>(null);
     const valueRef = useRef(controlledValue !== undefined ? controlledValue : localValue);
+
+    // Auto-dismiss voice error after 7 seconds
+    useEffect(() => {
+      if (!voiceError) return;
+      const timer = setTimeout(() => setVoiceError(null), 7000);
+      return () => clearTimeout(timer);
+    }, [voiceError]);
 
     // Refs for Web Audio & Speech Recognition cleanup
     const streamRef = useRef<MediaStream | null>(null);
@@ -408,23 +417,68 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     }, []);
 
     const startRecording = useCallback(async () => {
+      setVoiceError(null);
       setIsSmoothResize(false);
       setExpanded(true);
 
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const isTr = (getLocale ? getLocale() : 'tr-TR').startsWith('tr');
 
+      // 1. Electron macOS / System permission check
+      if (typeof window !== 'undefined' && window.electronAPI?.requestMicrophonePermission) {
+        try {
+          const permResult = await window.electronAPI.requestMicrophonePermission();
+          if (!permResult.granted) {
+            setVoiceError(
+              isTr
+                ? "Mikrofon izni kapalı. macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon bölümünden Nova Browser için izni etkinleştirin."
+                : "Microphone access denied. Please enable microphone for Nova Browser in macOS System Settings > Privacy & Security > Microphone."
+            );
+            return;
+          }
+        } catch (e) {
+          console.warn("[ai-chat-input] requestMicrophonePermission error:", e);
+        }
+      }
+
+      // 2. Request user media stream for audio visualizer & device check
       let stream: MediaStream | null = null;
       try {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
           stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.warn("[ai-chat-input] Microphone access error:", err);
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+          setVoiceError(
+            isTr
+              ? "Mikrofon erişim izni verilmedi. Lütfen sistem ayarlarından mikrofon iznini etkinleştirin."
+              : "Microphone access was denied. Please allow microphone permissions."
+          );
+        } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
+          setVoiceError(
+            isTr
+              ? "Kullanılabilir mikrofon cihazı bulunamadı."
+              : "No microphone device found on this system."
+          );
+        } else {
+          setVoiceError(
+            isTr
+              ? "Mikrofona erişilemedi: " + (err?.message || "Bilinmeyen hata")
+              : "Could not access microphone: " + (err?.message || "Unknown error")
+          );
+        }
+        return;
       }
 
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
       if (!stream && !SpeechRecognition) {
-        console.warn("[ai-chat-input] Voice recording is not available on this device.");
+        setVoiceError(
+          isTr
+            ? "Bu cihazda ses kaydı veya konuşma tanıma desteklenmiyor."
+            : "Voice recording and speech recognition are not available on this device."
+        );
         return;
       }
 
@@ -470,7 +524,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           const recognition = new SpeechRecognition();
           recognition.continuous = true;
           recognition.interimResults = true;
-          recognition.lang = navigator.language || 'tr-TR';
+          const currentLocale = getLocale ? getLocale() : 'tr-TR';
+          recognition.lang = currentLocale || navigator.language || 'tr-TR';
 
           let baseline = valueRef.current;
 
@@ -498,6 +553,25 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           recognition.onerror = (e: any) => {
             if (e.error === 'no-speech') return;
             console.warn("[ai-chat-input] Speech recognition error:", e.error);
+            if (e.error === 'not-allowed') {
+              setVoiceError(
+                isTr
+                  ? "Ses tanıma izni verilmedi. Mikrofon izinlerini kontrol edin."
+                  : "Speech recognition permission denied."
+              );
+            } else if (e.error === 'network') {
+              setVoiceError(
+                isTr
+                  ? "Ses tanıma ağına bağlanılamadı. İnternet bağlantınızı kontrol edin."
+                  : "Speech recognition network error."
+              );
+            } else if (e.error === 'audio-capture') {
+              setVoiceError(
+                isTr
+                  ? "Mikrofon sesi yakalayamadı."
+                  : "Microphone failed to capture audio."
+              );
+            }
             stopRecording();
           };
 
@@ -507,10 +581,21 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
           recognitionRef.current = recognition;
           recognition.start();
-        } catch (recErr) {
+        } catch (recErr: any) {
           console.warn("[ai-chat-input] Failed to start SpeechRecognition:", recErr);
+          setVoiceError(
+            isTr
+              ? "Konuşma tanıma başlatılamadı: " + (recErr?.message || "Hata")
+              : "Failed to start speech recognition: " + (recErr?.message || "Error")
+          );
           stopRecording();
         }
+      } else {
+        setVoiceError(
+          isTr
+            ? "Tarayıcı ortamında SpeechRecognition API desteklenmiyor."
+            : "SpeechRecognition API is not supported in this browser environment."
+        );
       }
     }, [handleValueChange, stopRecording]);
 
@@ -697,6 +782,35 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               : "max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
           }}
         >
+          {/* Voice Error Notification Banner */}
+          {voiceError && (
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5 mb-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-xs shadow-sm">
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <AlertCircle className="size-3.5 shrink-0" />
+                <span className="truncate">{voiceError}</span>
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {typeof window !== 'undefined' && window.electronAPI?.openSystemSettings && voiceError.includes("macOS") && (
+                  <button
+                    type="button"
+                    onClick={() => window.electronAPI?.openSystemSettings?.('microphone')}
+                    className="px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors text-amber-700 dark:text-amber-300"
+                  >
+                    Ayarları Aç
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setVoiceError(null)}
+                  className="p-0.5 hover:opacity-75 transition-opacity"
+                  aria-label="Kapat"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
           <input
             ref={fileInputRef}
             type="file"

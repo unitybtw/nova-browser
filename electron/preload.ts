@@ -189,4 +189,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('blocked-site', handler);
   },
   setAppLanguage: (lang: string) => ipcRenderer.invoke('set-app-language', lang),
+  // Microphone & Permissions
+  checkMicrophonePermission: () => ipcRenderer.invoke('check-microphone-permission'),
+  requestMicrophonePermission: () => ipcRenderer.invoke('request-microphone-permission'),
+  openSystemSettings: (pane?: string) => ipcRenderer.invoke('open-system-settings', pane),
 });
