@@ -3,6 +3,8 @@ import { useState, useCallback } from 'react';
 export interface UsePanelsOptions {
   /** Initial visibility of the AI side panel (the demo showcase opens it). */
   initialSidePanelOpen?: boolean;
+  /** Initial visibility of the Account/Sync modal (the demo showcase opens it). */
+  initialAccountModalOpen?: boolean;
 }
 
 /**
@@ -21,13 +23,13 @@ export interface UsePanelsOptions {
  * - isHoverRevealing / drag states / onboarding: transient UI, out of scope.
  */
 export function usePanels(options: UsePanelsOptions = {}) {
-  const { initialSidePanelOpen = false } = options;
+  const { initialSidePanelOpen = false, initialAccountModalOpen = false } = options;
 
   const [isShareOpen, setIsShareOpen] = useState(false);
   const [isScreenshotOpen, setIsScreenshotOpen] = useState(false);
   const [isWorkspaceManagerOpen, setIsWorkspaceManagerOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isAccountModalOpen, setIsAccountModalOpen] = useState(false);
+  const [isAccountModalOpen, setIsAccountModalOpen] = useState(() => initialAccountModalOpen);
   const [isSidePanelOpen, setIsSidePanelOpen] = useState(() => initialSidePanelOpen);
   const [isReaderModeOpen, setIsReaderModeOpen] = useState(false);
   const [isFindInPageOpen, setIsFindInPageOpen] = useState(false);

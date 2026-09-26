@@ -285,7 +285,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     isSidebarCollapsed,
     setIsSidebarCollapsed,
     closeAllModals: closePanelModals,
-  } = usePanels({ initialSidePanelOpen: demoParams.isDemo && demoParams.feature === 'ai' });
+  } = usePanels({ 
+    initialSidePanelOpen: demoParams.isDemo && demoParams.feature === 'ai',
+    initialAccountModalOpen: demoParams.isDemo && demoParams.feature === 'sync'
+  });
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
 
   useEffect(() => {
