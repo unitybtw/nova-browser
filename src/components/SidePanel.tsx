@@ -8,7 +8,6 @@ import {
   RotateCcw,
   Volume2,
   VolumeX,
-  Globe,
   Loader2,
   ChevronDown,
   Brain,
@@ -573,17 +572,6 @@ export const SidePanel = React.memo(({
             </button>
           </div>
         </div>
-
-        {/* Active Tab Context Bar */}
-        {hasActiveWebPage && (
-          <div className="mt-2 px-3 py-1.5 rounded-xl bg-slate-100/70 dark:bg-white/[0.04] border border-slate-200/60 dark:border-white/10 flex items-center gap-2 shadow-2xs backdrop-blur-sm">
-            <span className="flex h-1.5 w-1.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
-            <Globe className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span className="text-[11.5px] font-medium text-slate-700 dark:text-slate-300 truncate" title={activeTab.title || activeTab.url}>
-              {activeTab.title || activeTab.url}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* 2. CHAT MESSAGES BODY */}

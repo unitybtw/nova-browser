@@ -1672,35 +1672,52 @@ CRITICAL RULES:
       );
     }
 
-    // ── Helper: read page content from current webview ──
+    // ── Helper: fast & non-destructive page content extractor (no cloneNode) ──
     const readPageContent = async (): Promise<string> => {
       try {
         const raw = await this.actionContext?.onExecuteScript(`
           (() => {
             try {
-              const clone = document.body.cloneNode(true);
-              const removeSelectors = [
-                'script', 'style', 'noscript', 'iframe',
-                'nav', 'header:not(article header)', 'footer', 'aside',
-                '.ad', '.ads', '.adsbygoogle', '[id*="cookie"]', '[class*="cookie"]',
-                '[id*="consent"]', '[class*="consent"]', '.popup', '.modal',
-                '[role="banner"]', '[role="navigation"]', '[role="complementary"]'
-              ];
-              for (const sel of removeSelectors) {
-                try { clone.querySelectorAll(sel).forEach(el => el.remove()); } catch(_) {}
+              // 1. Meta description as high-quality editorial summary
+              const metaDesc = (
+                document.querySelector('meta[name="description"]')?.getAttribute('content') ||
+                document.querySelector('meta[property="og:description"]')?.getAttribute('content') ||
+                document.querySelector('meta[name="twitter:description"]')?.getAttribute('content') ||
+                ''
+              ).trim();
+
+              // 2. Locate main content container directly without cloning
+              const container = document.querySelector('article') ||
+                                document.querySelector('main') ||
+                                document.querySelector('[role="main"]') ||
+                                document.querySelector('.article-body, .story-body, .post-content, #main-content, .content, .caas-body') ||
+                                document.body;
+              if (!container) return metaDesc;
+
+              // 3. Extract text from headlines and paragraphs
+              const elements = container.querySelectorAll('h1, h2, h3, p');
+              const paragraphs = [];
+              if (metaDesc && metaDesc.length > 25) {
+                paragraphs.push(metaDesc);
               }
-              const mainEl = clone.querySelector('article') ||
-                             clone.querySelector('main') ||
-                             clone.querySelector('[role="main"]') ||
-                             clone.querySelector('.post-content, .article-body, .entry-content, .story-body, #content, .content') ||
-                             clone;
-              let text = (mainEl.innerText || mainEl.textContent || '').replace(/\\s+/g, ' ').trim();
-              if (text.length < 100) {
-                text = (clone.innerText || clone.textContent || '').replace(/\\s+/g, ' ').trim();
+
+              for (const el of Array.from(elements)) {
+                // Skip invisible or zero-height elements
+                if (el.offsetParent === null) continue;
+                const text = (el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+                if (text.length > 25 &&
+                    !/^(cookie|accept|privacy|subscribe|terms|advertisement|sign in|all rights reserved|manage consent|we use cookies|follow us|share this|read more)/i.test(text)) {
+                  paragraphs.push(text);
+                  if (paragraphs.join(' ').length > 3000) break;
+                }
               }
-              return text.slice(0, 4000);
+
+              if (paragraphs.length > 0) {
+                return paragraphs.join('\\n\\n');
+              }
+              return (container.innerText || '').slice(0, 2500);
             } catch(e) {
-              return (document.body.innerText || document.body.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 3000);
+              return (document.body ? document.body.innerText : '').slice(0, 1500);
             }
           })()
         `);
@@ -1727,7 +1744,7 @@ CRITICAL RULES:
 
         // Move cursor smoothly over the actual link
         this.triggerVirtualCursor(linkCenterX, linkCenterY, 'move');
-        await new Promise(r => setTimeout(r, 220));
+        await new Promise(r => setTimeout(r, 180));
 
         // Click on the actual link with ripple
         this.triggerVirtualCursor(linkCenterX, linkCenterY, 'click');
@@ -1739,60 +1756,64 @@ CRITICAL RULES:
           );
         }
 
-        // Navigate to the target source page (reliable browser navigation)
-        if (this.actionContext?.onNavigate) {
-          this.actionContext.onNavigate(target.url);
-        }
-        await this.waitForPageLoadSettled(generation);
-        // Generous settle time for content-heavy pages
-        await new Promise(r => setTimeout(r, 1500));
-
-        if (isCancelled()) break;
-
-        // Position virtual cursor in reading area and scroll smoothly
-        const readAreaX = offset.left + 350;
-        const readAreaY = offset.top + 220;
-        this.triggerVirtualCursor(readAreaX, readAreaY, 'move');
-        await new Promise(r => setTimeout(r, 200));
-        this.triggerVirtualCursor(readAreaX, readAreaY + 160, 'move');
-
-        if (this.actionContext?.onScrollPage) {
-          this.actionContext.onScrollPage('down', 600);
-        }
-        await new Promise(r => setTimeout(r, 500));
-
-        // Read page content with retry
-        let pageText = '';
-        for (let readAttempt = 0; readAttempt < 2 && !pageText; readAttempt++) {
-          if (readAttempt > 0) await new Promise(r => setTimeout(r, 800));
-          const rawText = await readPageContent();
-          pageText = sanitizeAgentInput(rawText);
-
-          // If page text is too short, scroll to top and try again
-          if (pageText.length < 80 && this.actionContext?.onScrollPage) {
-            this.actionContext.onScrollPage('top', 0);
-            await new Promise(r => setTimeout(r, 300));
-            const retryText = await readPageContent();
-            const retryClean = sanitizeAgentInput(retryText);
-            if (retryClean.length > pageText.length) pageText = retryClean;
+        // Wrap single source visit with strict 5.5s timeout so slow or hung pages never freeze the pipeline
+        const visitSingleSource = async () => {
+          if (this.actionContext?.onNavigate) {
+            this.actionContext.onNavigate(target.url);
           }
-        }
+          await this.waitForPageLoadSettled(generation);
+          await new Promise(r => setTimeout(r, 600));
 
-        // If still no content, at least use the snippet
-        if (!pageText || pageText.length < 30) {
-          pageText = target.snippet || '';
-        }
+          if (isCancelled()) return;
 
-        visitedSources.push({
-          title: target.title,
-          url: target.url,
-          snippet: target.snippet,
-          content: pageText.slice(0, 3500)
-        });
+          // Position virtual cursor in reading area and scroll smoothly
+          const readAreaX = offset.left + 350;
+          const readAreaY = offset.top + 220;
+          this.triggerVirtualCursor(readAreaX, readAreaY, 'move');
+          await new Promise(r => setTimeout(r, 150));
+          this.triggerVirtualCursor(readAreaX, readAreaY + 140, 'move');
+
+          if (this.actionContext?.onScrollPage) {
+            this.actionContext.onScrollPage('down', 500);
+          }
+          await new Promise(r => setTimeout(r, 350));
+
+          // Read page content
+          const rawText = await readPageContent();
+          let pageText = sanitizeAgentInput(rawText);
+
+          if (!pageText || pageText.length < 30) {
+            pageText = target.snippet || '';
+          }
+
+          visitedSources.push({
+            title: target.title,
+            url: target.url,
+            snippet: target.snippet,
+            content: pageText.slice(0, 3500)
+          });
+        };
+
+        try {
+          let timeoutHandle: any = null;
+          const timeoutPromise = new Promise((_, reject) => {
+            timeoutHandle = setTimeout(() => reject(new Error('Source visit timeout')), 5500);
+          });
+          await Promise.race([visitSingleSource(), timeoutPromise]);
+          clearTimeout(timeoutHandle);
+        } catch (sourceErr) {
+          logger.warn('AIAgent:webResearch', `Source ${i + 1} timed out or failed, using snippet fallback`, sourceErr);
+          visitedSources.push({
+            title: target.title,
+            url: target.url,
+            snippet: target.snippet,
+            content: target.snippet || ''
+          });
+        }
 
         // Brief pause between sources
         if (i < maxSourcesToVisit - 1) {
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 150));
         }
       }
     }
@@ -1819,43 +1840,52 @@ CRITICAL RULES:
 
     if (isCancelled()) return messages;
 
-    // Step 5: Synthesize and learn
+    // ── Step 5: Synthesize and learn ──
     if (onChunk) {
       onChunk(isTr ? `\nBilgiler analiz ediliyor ve sentezleniyor...\n\n` : `\nSynthesizing findings and formatting report...\n\n`);
     }
     this.emitStatus('thinking');
 
     let finalReport = '';
-    const hasVisitedContent = visitedSources.some(s => s.content && s.content.length > 50);
+    const hasVisitedContent = visitedSources.some(s => s.content && s.content.length > 40);
 
-    // If local LLM engine is initialized and ready, ask it to synthesize without emojis
+    // If local LLM engine is initialized and ready, ask it to synthesize without emojis (with 10s timeout)
     if (this.engine && hasVisitedContent) {
       try {
         const sourcesContext = visitedSources.map((s, idx) =>
-          `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\nExcerpt:\n${s.content}`
+          `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\nContent:\n${s.content.slice(0, 1200)}`
         ).join('\n\n---\n\n');
 
         const synthesisPrompt = isTr
-          ? `Kullanıcı şu konuyu araştırdı: "${searchTopic}".\nOtonom olarak webde arandı, aşağıdaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLütfen bu kaynaklardaki bilgileri temel alarak net, kapsamlı, Türkçe ve profesyonel bir özet rapor sun. En son gelişmeleri ve önemli noktaları maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" başlığı altında her kaynağı [Başlık](URL) şeklinde ekle.`
+          ? `Kullanici su konuyu arastirdi: "${searchTopic}".\nOtonom olarak webde arandi, asagidaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLutfen bu kaynaklardaki bilgileri temel alarak net, kapsamli, Turkce ve profesyonel bir ozet rapor sun. En son gelismeleri ve onemli noktalari maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" basligi altinda her kaynagi [Baslik](URL) seklinde ekle.`
           : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight key developments and takeaways with bullet points. NEVER use any emojis. Conclude with a "### Consulted Sources" section listing each source as a markdown link [Title](URL).`;
 
-        const completion = await this.engine.chat.completions.create({
-          messages: [{ role: 'user', content: synthesisPrompt }],
-          temperature: 0.25,
-          max_tokens: 800,
-          stream: false
+        let llmTimer: any = null;
+        const llmTimeout = new Promise((_, reject) => {
+          llmTimer = setTimeout(() => reject(new Error('LLM synthesis timeout')), 10000);
         });
 
-        const llmContent = completion.choices[0]?.message?.content;
-        if (llmContent) {
+        const completion = await Promise.race([
+          this.engine.chat.completions.create({
+            messages: [{ role: 'user', content: synthesisPrompt }],
+            temperature: 0.25,
+            max_tokens: 800,
+            stream: false
+          }),
+          llmTimeout
+        ]) as any;
+        clearTimeout(llmTimer);
+
+        const llmContent = completion?.choices?.[0]?.message?.content;
+        if (llmContent && llmContent.trim().length > 50) {
           finalReport = llmContent;
         }
       } catch (err) {
-        logger.warn('AIAgent:webResearch', 'LLM synthesis error, falling back to structured synthesis', err);
+        logger.warn('AIAgent:webResearch', 'LLM synthesis timed out or failed, falling back to structured synthesis', err);
       }
     }
 
-    // Fallback structured synthesis if LLM unavailable or didn't respond (Strictly NO emojis)
+    // Fallback structured synthesis if LLM unavailable or timed out (Strictly NO emojis)
     if (!finalReport) {
       const summaryHeader = isTr
         ? `## Web Arastirma Raporu: ${searchTopic}\n\n`
@@ -1864,31 +1894,55 @@ CRITICAL RULES:
       let summaryBody = '';
       if (visitedSources.length > 0) {
         summaryBody += isTr
-          ? `Yapilan otonom web taramasinda ilgili kaynaklar ziyaret edilmis ve asagidaki temel bilgiler derlenmistir:\n\n`
-          : `The autonomous web scan visited relevant sources and compiled the following key findings:\n\n`;
+          ? `Otonom web taramasinda ${visitedSources.length} kaynak ziyaret edilmis ve en guncel bilgiler derlenmistir:\n\n`
+          : `Autonomous web scan visited ${visitedSources.length} sources and compiled the latest findings:\n\n`;
 
-        visitedSources.forEach((source, idx) => {
-          summaryBody += `### ${idx + 1}. [${source.title}](${source.url})\n`;
-
-          if (source.content && source.content.length > 60) {
-            // Extract meaningful sentences, filtering out cookie/consent/UI noise
-            const sentences = source.content
-              .split(/[.!?]+/)
+        // Section A: Key Highlights across sources
+        summaryBody += isTr ? `### Ozet ve One Cikan Noktalar\n\n` : `### Summary and Key Takeaways\n\n`;
+        const allKeyPoints: string[] = [];
+        visitedSources.forEach((source) => {
+          const textToParse = source.content || source.snippet || '';
+          if (textToParse.length > 30) {
+            const rawSentences = textToParse
+              .split(/[.!?\n]+/)
               .map(s => s.trim())
-              .filter(s => s.length > 25 && !/^(cookie|accept|sign in|log in|subscribe|privacy|terms|agree|reject|consent|manage|allow|dismiss)/i.test(s));
-
-            if (sentences.length > 0) {
-              const keyPoints = sentences.slice(0, 4).map(s => `- ${s}.`).join('\n');
-              summaryBody += `\n${keyPoints}\n\n`;
-            } else {
-              summaryBody += `> ${source.content.slice(0, 300)}...\n\n`;
+              .filter(s => s.length > 30 && s.length < 250 && !/^(cookie|accept|sign in|log in|subscribe|privacy|terms|agree|reject|consent|manage|allow|dismiss|skip|search|menu)/i.test(s));
+            if (rawSentences.length > 0) {
+              allKeyPoints.push(rawSentences[0]);
+              if (rawSentences.length > 1 && allKeyPoints.length < 6) {
+                allKeyPoints.push(rawSentences[1]);
+              }
             }
-          } else if (source.snippet) {
-            summaryBody += `> ${source.snippet}\n\n`;
           }
         });
 
-        summaryBody += isTr ? `\n### Incelenen Kaynaklar\n` : `\n### Consulted Sources\n`;
+        if (allKeyPoints.length > 0) {
+          allKeyPoints.slice(0, 5).forEach(kp => {
+            summaryBody += `- ${kp}.\n`;
+          });
+          summaryBody += '\n';
+        }
+
+        // Section B: Detailed Source Insights
+        summaryBody += isTr ? `### Kaynak Detaylari\n\n` : `### Source Insights\n\n`;
+        visitedSources.forEach((source, idx) => {
+          summaryBody += `#### ${idx + 1}. [${source.title}](${source.url})\n`;
+          if (source.snippet) {
+            summaryBody += `> ${source.snippet}\n\n`;
+          }
+          if (source.content && source.content !== source.snippet) {
+            const lines = source.content
+              .split('\n\n')
+              .map(l => l.trim())
+              .filter(l => l.length > 40 && !l.includes(source.snippet));
+            if (lines.length > 0) {
+              summaryBody += `${lines.slice(0, 2).join('\n\n')}\n\n`;
+            }
+          }
+        });
+
+        // Section C: Consulted Sources
+        summaryBody += isTr ? `### Incelenen Kaynaklar\n` : `### Consulted Sources\n`;
         visitedSources.forEach(s => {
           summaryBody += `- [${s.title}](${s.url})\n`;
         });
@@ -1927,9 +1981,14 @@ CRITICAL RULES:
       durationMs
     }];
 
+    // Construct full response combining completion notice with final report
+    const completionBanner = isTr
+      ? `[Otonom Web Arastirmasi Tamamlandi: "${searchTopic}"]\nToplam ${visitedSources.length} kaynak incelendi.\n\n---\n\n`
+      : `[Autonomous Web Research Completed: "${searchTopic}"]\nTotal ${visitedSources.length} sources examined.\n\n---\n\n`;
+
     return [...messages, {
       role: 'assistant',
-      content: finalReport,
+      content: completionBanner + finalReport,
       toolCalls: toolCallInfo
     } as any];
   }

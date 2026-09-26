@@ -390,10 +390,21 @@ export function useBrowserAgentBridge({
       onExecuteScript: async (script: string) => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview && webview.executeJavaScript) {
+          const timeoutMs = 3500;
+          let timer: any = null;
+          const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('Script execution timed out')), timeoutMs);
+          });
           try {
-            return await webview.executeJavaScript(script);
+            const res = await Promise.race([
+              webview.executeJavaScript(script),
+              timeoutPromise
+            ]);
+            clearTimeout(timer);
+            return res;
           } catch (e) {
-            console.error("AI execution error:", e);
+            clearTimeout(timer);
+            console.warn("AI execution error or timeout:", e);
             throw e;
           }
         }
