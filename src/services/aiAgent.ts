@@ -1436,12 +1436,14 @@ CRITICAL RULES:
   }
 
   /**
-   * Autonomous multi-step web research:
+   * Autonomous multi-step web research with robust multi-strategy extraction:
    * 1. Animates the virtual AI cursor typing and searching.
-   * 2. Navigates to search engine and extracts top organic results with real DOM coordinates.
-   * 3. Autonomously visits and scrolls source pages with visual cursor cues on actual elements.
-   * 4. Synthesizes findings using LLM or structured extractor without emojis.
-   * 5. Persists learnings into AI memory and returns response with citations.
+   * 2. Navigates to search engine and extracts top organic results with retry + fallback.
+   * 3. Falls back to DuckDuckGo HTML if Google DOM parsing fails.
+   * 4. Autonomously visits and scrolls source pages with visual cursor cues.
+   * 5. Reads page content with multiple extraction strategies and retry.
+   * 6. Synthesizes findings using LLM or structured extractor without emojis.
+   * 7. Persists learnings into AI memory and returns response with citations.
    */
   public async performWebResearch(
     searchTopic: string,
@@ -1487,103 +1489,234 @@ CRITICAL RULES:
 
     if (isCancelled()) return messages;
 
-    // Step 2: Navigate to Google search
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}`;
+    // Step 2: Navigate to Google search with language hint
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTopic)}&hl=${isTr ? 'tr' : 'en'}`;
     if (onChunk) {
-      onChunk(isTr ? `Arama motoruna bağlanılıyor ve sonuçlar taranıyor...\n` : `Navigating to search engine and scanning results...\n`);
+      onChunk(isTr ? `Arama motoruna baglaniliyor ve sonuclar taraniyor...\n` : `Navigating to search engine and scanning results...\n`);
     }
 
     if (this.actionContext?.onNavigate) {
       this.actionContext.onNavigate(searchUrl);
     }
     await this.waitForPageLoadSettled(generation);
-    await new Promise(r => setTimeout(r, 600));
+    // Extra settle time — Google's JS needs time to render the SERP
+    await new Promise(r => setTimeout(r, 1200));
 
     if (isCancelled()) return messages;
 
-    // Step 3: Extract top organic result links from the search page with actual DOM coordinates
-    let searchResults: Array<{ title: string; url: string; snippet: string; rect?: { left: number; top: number; width: number; height: number } }> = [];
-    try {
-      const extracted = await this.actionContext?.onExecuteScript(`
-        (() => {
-          try {
-            const list = [];
-            const headings = Array.from(document.querySelectorAll('h3'));
-            for (const h3 of headings) {
-              const anchor = h3.closest('a') || h3.parentElement?.querySelector('a');
-              if (anchor && anchor.href && /^https?:\\/\\//i.test(anchor.href)) {
-                const u = anchor.href;
-                if (!u.includes('google.') && !u.includes('webcache') && !u.includes('support.google') && !u.includes('accounts.google')) {
-                  const title = (h3.innerText || anchor.innerText || '').trim();
-                  const rect = anchor.getBoundingClientRect();
-                  if (title && rect.width > 0 && rect.height > 0 && !list.some(item => item.url === u)) {
-                    const container = anchor.closest('div[data-hveid]') || anchor.closest('div.g') || anchor.parentElement?.parentElement;
-                    let snippet = '';
-                    if (container) {
-                      snippet = container.innerText.replace(title, '').replace(/\\s+/g, ' ').trim().slice(0, 260);
-                    }
-                    list.push({
-                      title,
-                      url: u,
-                      snippet,
-                      rect: {
-                        left: Math.round(rect.left),
-                        top: Math.round(rect.top),
-                        width: Math.round(rect.width),
-                        height: Math.round(rect.height)
-                      }
-                    });
-                    if (list.length >= 3) break;
+    // ── Helper: extract search results from current page DOM (Google, DDG, Bing, generic) ──
+    const extractSearchResults = async (): Promise<Array<{ title: string; url: string; snippet: string; rect?: { left: number; top: number; width: number; height: number } | null }>> => {
+      try {
+        const extracted = await this.actionContext?.onExecuteScript(`
+          (() => {
+            try {
+              const list = [];
+
+              // Strategy A: Google — h3 headings inside anchor tags
+              const headings = Array.from(document.querySelectorAll('h3'));
+              for (const h3 of headings) {
+                const anchor = h3.closest('a') || h3.parentElement?.closest('a') || h3.parentElement?.querySelector('a');
+                if (!anchor || !anchor.href) continue;
+                let u = anchor.href;
+                // Parse Google redirect URLs: /url?q=https://real.url&...
+                try {
+                  const parsed = new URL(u);
+                  if (parsed.pathname === '/url' && parsed.searchParams.has('q')) {
+                    u = parsed.searchParams.get('q');
                   }
+                } catch(_) {}
+                if (!u || !/^https?:\\/\\//i.test(u)) continue;
+                if (u.includes('google.') || u.includes('webcache') || u.includes('accounts.google') || u.includes('support.google')) continue;
+                const title = (h3.innerText || anchor.innerText || '').trim();
+                if (!title || list.some(item => item.url === u)) continue;
+                const rect = anchor.getBoundingClientRect();
+                if (rect.width <= 0 || rect.height <= 0) continue;
+                const container = anchor.closest('div[data-hveid]') || anchor.closest('div.g') || anchor.closest('[data-sokoban-container]') || anchor.parentElement?.parentElement;
+                let snippet = '';
+                if (container) {
+                  const spans = container.querySelectorAll('span, em, div[data-sncf]');
+                  const texts = Array.from(spans).map(s => s.innerText || '').filter(t => t.length > 20 && !t.includes(title));
+                  snippet = texts.join(' ').replace(/\\s+/g, ' ').trim().slice(0, 300);
+                  if (!snippet) snippet = container.innerText.replace(title, '').replace(/\\s+/g, ' ').trim().slice(0, 260);
                 }
+                list.push({ title, url: u, snippet, rect: { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } });
+                if (list.length >= 5) break;
               }
-            }
-            if (list.length === 0) {
-              const allLinks = Array.from(document.querySelectorAll('a[href^="http"]'));
-              for (const a of allLinks) {
-                const href = a.href;
-                if (!href.includes('google.') && !href.includes('search') && a.innerText.trim().length > 15) {
+
+              // Strategy B: DuckDuckGo HTML — .result__a links
+              if (list.length === 0) {
+                const ddgLinks = document.querySelectorAll('a.result__a, .result-link, .result__title a, .web-result a.result__url');
+                for (const a of Array.from(ddgLinks)) {
+                  let href = a.href;
+                  try { const p = new URL(href); if (p.hostname.includes('duckduckgo.com') && p.searchParams.has('uddg')) href = decodeURIComponent(p.searchParams.get('uddg')); } catch(_) {}
+                  if (!href || !/^https?:\\/\\//i.test(href) || href.includes('duckduckgo.com')) continue;
+                  const title = (a.innerText || '').trim();
+                  if (!title || title.length < 5 || list.some(item => item.url === href)) continue;
                   const rect = a.getBoundingClientRect();
-                  if (rect.width > 0 && rect.height > 0) {
-                    list.push({
-                      title: a.innerText.trim().slice(0, 80),
-                      url: href,
-                      snippet: '',
-                      rect: {
-                        left: Math.round(rect.left),
-                        top: Math.round(rect.top),
-                        width: Math.round(rect.width),
-                        height: Math.round(rect.height)
-                      }
-                    });
-                    if (list.length >= 3) break;
-                  }
+                  const snippetEl = a.closest('.result')?.querySelector('.result__snippet') || a.closest('.web-result')?.querySelector('.result__snippet');
+                  const snippet = snippetEl ? snippetEl.innerText.trim().slice(0, 300) : '';
+                  list.push({ title: title.slice(0, 120), url: href, snippet, rect: rect.width > 0 ? { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } : null });
+                  if (list.length >= 5) break;
                 }
               }
+
+              // Strategy C: Bing — li.b_algo h2 > a
+              if (list.length === 0) {
+                const bingItems = document.querySelectorAll('li.b_algo');
+                for (const item of Array.from(bingItems)) {
+                  const a = item.querySelector('h2 a');
+                  if (!a || !a.href) continue;
+                  const href = a.href;
+                  if (!/^https?:\\/\\//i.test(href) || href.includes('bing.com') || href.includes('microsoft.com/bing')) continue;
+                  const title = (a.innerText || '').trim();
+                  if (!title) continue;
+                  const snippetEl = item.querySelector('.b_caption p, .b_lineclamp2');
+                  const snippet = snippetEl ? snippetEl.innerText.trim().slice(0, 300) : '';
+                  const rect = a.getBoundingClientRect();
+                  list.push({ title, url: href, snippet, rect: rect.width > 0 ? { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } : null });
+                  if (list.length >= 5) break;
+                }
+              }
+
+              // Strategy D: Generic fallback — any external links with substantial text
+              if (list.length === 0) {
+                const allLinks = Array.from(document.querySelectorAll('a[href^="http"]'));
+                for (const a of allLinks) {
+                  const href = a.href;
+                  if (!href || href.includes('google.') || href.includes('duckduckgo.') || href.includes('bing.com')) continue;
+                  const text = (a.innerText || '').trim();
+                  if (text.length < 12) continue;
+                  const rect = a.getBoundingClientRect();
+                  if (rect.width <= 0 || rect.height <= 0) continue;
+                  if (list.some(item => item.url === href)) continue;
+                  list.push({ title: text.slice(0, 100), url: href, snippet: '', rect: { left: Math.round(rect.left), top: Math.round(rect.top), width: Math.round(rect.width), height: Math.round(rect.height) } });
+                  if (list.length >= 5) break;
+                }
+              }
+
+              return list;
+            } catch(e) {
+              return [{ error: String(e) }];
             }
-            return list;
-          } catch(e) {
-            return [];
-          }
-        })()
-      `);
-      if (Array.isArray(extracted)) {
-        searchResults = extracted.filter(r => r && r.url && r.title);
+          })()
+        `);
+        if (Array.isArray(extracted)) {
+          return extracted.filter(r => r && r.url && r.title);
+        }
+      } catch (e) {
+        logger.warn('AIAgent:webResearch', 'Script extraction error', e);
       }
-    } catch (e) {
-      logger.warn('AIAgent:webResearch', 'Failed to parse search results', e);
+      return [];
+    };
+
+    // ── Step 3: Extract search results with retry (Google JS rendering can be slow) ──
+    let searchResults: Array<{ title: string; url: string; snippet: string; rect?: { left: number; top: number; width: number; height: number } | null }> = [];
+
+    for (let attempt = 0; attempt < 3 && searchResults.length === 0; attempt++) {
+      if (isCancelled()) return messages;
+      if (attempt > 0) {
+        logger.info('AIAgent:webResearch', `Retry ${attempt}/3 — waiting for search DOM to render`);
+        await new Promise(r => setTimeout(r, 800 + attempt * 600));
+      }
+      searchResults = await extractSearchResults();
     }
+
+    // ── Step 3b: DuckDuckGo HTML fallback if Google failed ──
+    if (searchResults.length === 0 && !isCancelled()) {
+      logger.info('AIAgent:webResearch', 'Google extraction failed, falling back to DuckDuckGo HTML');
+      if (onChunk) {
+        onChunk(isTr ? `Google sonuclari alinamadi, alternatif arama motoru deneniyor...\n` : `Google results unavailable, trying alternative search engine...\n`);
+      }
+      const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchTopic)}`;
+      if (this.actionContext?.onNavigate) {
+        this.actionContext.onNavigate(ddgUrl);
+      }
+      await this.waitForPageLoadSettled(generation);
+      await new Promise(r => setTimeout(r, 1000));
+      if (!isCancelled()) {
+        for (let attempt = 0; attempt < 2 && searchResults.length === 0; attempt++) {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 600));
+          searchResults = await extractSearchResults();
+        }
+      }
+    }
+
+    // ── Step 3c: Bing fallback ──
+    if (searchResults.length === 0 && !isCancelled()) {
+      logger.info('AIAgent:webResearch', 'DuckDuckGo also failed, falling back to Bing');
+      if (onChunk) {
+        onChunk(isTr ? `Alternatif motor da basarisiz, Bing deneniyor...\n` : `Alternative engine failed too, trying Bing...\n`);
+      }
+      const bingUrl = `https://www.bing.com/search?q=${encodeURIComponent(searchTopic)}`;
+      if (this.actionContext?.onNavigate) {
+        this.actionContext.onNavigate(bingUrl);
+      }
+      await this.waitForPageLoadSettled(generation);
+      await new Promise(r => setTimeout(r, 1200));
+      if (!isCancelled()) {
+        searchResults = await extractSearchResults();
+      }
+    }
+
+    if (isCancelled()) return messages;
 
     // Step 4: Visit top sources, scroll with virtual cursor and read page content
     const visitedSources: Array<{ title: string; url: string; content: string; snippet: string }> = [];
-    const maxSourcesToVisit = Math.min(searchResults.length, 2);
+    const maxSourcesToVisit = Math.min(searchResults.length, 3);
     const offset = this.getWebviewOffset();
+
+    if (onChunk && searchResults.length > 0) {
+      onChunk(isTr
+        ? `\n${searchResults.length} sonuc bulundu, en iyi ${maxSourcesToVisit} kaynak ziyaret edilecek...\n`
+        : `\n${searchResults.length} results found, visiting top ${maxSourcesToVisit} sources...\n`
+      );
+    }
+
+    // ── Helper: read page content from current webview ──
+    const readPageContent = async (): Promise<string> => {
+      try {
+        const raw = await this.actionContext?.onExecuteScript(`
+          (() => {
+            try {
+              const clone = document.body.cloneNode(true);
+              const removeSelectors = [
+                'script', 'style', 'noscript', 'iframe',
+                'nav', 'header:not(article header)', 'footer', 'aside',
+                '.ad', '.ads', '.adsbygoogle', '[id*="cookie"]', '[class*="cookie"]',
+                '[id*="consent"]', '[class*="consent"]', '.popup', '.modal',
+                '[role="banner"]', '[role="navigation"]', '[role="complementary"]'
+              ];
+              for (const sel of removeSelectors) {
+                try { clone.querySelectorAll(sel).forEach(el => el.remove()); } catch(_) {}
+              }
+              const mainEl = clone.querySelector('article') ||
+                             clone.querySelector('main') ||
+                             clone.querySelector('[role="main"]') ||
+                             clone.querySelector('.post-content, .article-body, .entry-content, .story-body, #content, .content') ||
+                             clone;
+              let text = (mainEl.innerText || mainEl.textContent || '').replace(/\\s+/g, ' ').trim();
+              if (text.length < 100) {
+                text = (clone.innerText || clone.textContent || '').replace(/\\s+/g, ' ').trim();
+              }
+              return text.slice(0, 4000);
+            } catch(e) {
+              return (document.body.innerText || document.body.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 3000);
+            }
+          })()
+        `);
+        if (typeof raw === 'string') return raw;
+        if (raw) return JSON.stringify(raw);
+      } catch (e) {
+        logger.warn('AIAgent:webResearch', 'Page content read error', e);
+      }
+      return '';
+    };
 
     if (maxSourcesToVisit > 0) {
       for (let i = 0; i < maxSourcesToVisit; i++) {
         if (isCancelled()) break;
         const target = searchResults[i];
-        
+
         // Calculate the real position of the target link on the user's screen
         const linkCenterX = target.rect
           ? offset.left + target.rect.left + Math.min(80, target.rect.width / 2)
@@ -1606,37 +1739,13 @@ CRITICAL RULES:
           );
         }
 
-        // Dispatch realistic mouse click inside guest webview DOM
-        try {
-          const safeTargetUrl = escapeForJSTemplate(JSON.stringify(target.url));
-          await this.actionContext?.onExecuteScript(`
-            (() => {
-              try {
-                const a = document.querySelector('a[href="' + ${safeTargetUrl} + '"]') ||
-                          Array.from(document.querySelectorAll('a')).find(el => el.href === ${safeTargetUrl});
-                if (a) {
-                  const rect = a.getBoundingClientRect();
-                  const mouseOpts = {
-                    bubbles: true, cancelable: true, view: window,
-                    clientX: rect.left + rect.width / 2,
-                    clientY: rect.top + rect.height / 2
-                  };
-                  a.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-                  a.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-                  a.dispatchEvent(new MouseEvent('click', mouseOpts));
-                  a.click();
-                }
-              } catch(_) {}
-            })()
-          `);
-        } catch (_) {}
-
         // Navigate to the target source page (reliable browser navigation)
         if (this.actionContext?.onNavigate) {
           this.actionContext.onNavigate(target.url);
         }
         await this.waitForPageLoadSettled(generation);
-        await new Promise(r => setTimeout(r, 500));
+        // Generous settle time for content-heavy pages
+        await new Promise(r => setTimeout(r, 1500));
 
         if (isCancelled()) break;
 
@@ -1644,34 +1753,33 @@ CRITICAL RULES:
         const readAreaX = offset.left + 350;
         const readAreaY = offset.top + 220;
         this.triggerVirtualCursor(readAreaX, readAreaY, 'move');
-        await new Promise(r => setTimeout(r, 180));
+        await new Promise(r => setTimeout(r, 200));
         this.triggerVirtualCursor(readAreaX, readAreaY + 160, 'move');
 
         if (this.actionContext?.onScrollPage) {
-          this.actionContext.onScrollPage('down', 500);
+          this.actionContext.onScrollPage('down', 600);
         }
-        await new Promise(r => setTimeout(r, 400));
+        await new Promise(r => setTimeout(r, 500));
 
-        // Read page content (sanitized and stripped of clutter)
+        // Read page content with retry
         let pageText = '';
-        try {
-          const raw = await this.actionContext?.onExecuteScript(`
-            (() => {
-              try {
-                const clone = document.body.cloneNode(true);
-                const removeSelectors = ['script', 'style', 'nav', 'header', 'footer', 'aside', 'noscript', 'iframe', '.ad', '.ads', '#cookie-banner', '.cookie-notice'];
-                for (const sel of removeSelectors) {
-                  clone.querySelectorAll(sel).forEach(el => el.remove());
-                }
-                const mainEl = clone.querySelector('article, main, [role="main"]') || clone;
-                return (mainEl.innerText || clone.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 3000);
-              } catch(e) {
-                return (document.body.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 2500);
-              }
-            })()
-          `);
-          pageText = sanitizeAgentInput(typeof raw === 'string' ? raw : JSON.stringify(raw));
-        } catch (e) {
+        for (let readAttempt = 0; readAttempt < 2 && !pageText; readAttempt++) {
+          if (readAttempt > 0) await new Promise(r => setTimeout(r, 800));
+          const rawText = await readPageContent();
+          pageText = sanitizeAgentInput(rawText);
+
+          // If page text is too short, scroll to top and try again
+          if (pageText.length < 80 && this.actionContext?.onScrollPage) {
+            this.actionContext.onScrollPage('top', 0);
+            await new Promise(r => setTimeout(r, 300));
+            const retryText = await readPageContent();
+            const retryClean = sanitizeAgentInput(retryText);
+            if (retryClean.length > pageText.length) pageText = retryClean;
+          }
+        }
+
+        // If still no content, at least use the snippet
+        if (!pageText || pageText.length < 30) {
           pageText = target.snippet || '';
         }
 
@@ -1679,8 +1787,33 @@ CRITICAL RULES:
           title: target.title,
           url: target.url,
           snippet: target.snippet,
-          content: pageText.slice(0, 2500)
+          content: pageText.slice(0, 3500)
         });
+
+        // Brief pause between sources
+        if (i < maxSourcesToVisit - 1) {
+          await new Promise(r => setTimeout(r, 200));
+        }
+      }
+    }
+
+    // If no pages were visited but we have search results with snippets, use snippets as content
+    if (visitedSources.length === 0 && searchResults.length > 0) {
+      if (onChunk) {
+        onChunk(isTr
+          ? `\nSayfalar dogrudan taranamadi, arama motorundaki on bilgiler kullaniliyor...\n`
+          : `\nDirect page scraping failed, using search engine snippets...\n`
+        );
+      }
+      for (const sr of searchResults.slice(0, 3)) {
+        if (sr.snippet && sr.snippet.length > 20) {
+          visitedSources.push({
+            title: sr.title,
+            url: sr.url,
+            snippet: sr.snippet,
+            content: sr.snippet
+          });
+        }
       }
     }
 
@@ -1709,7 +1842,7 @@ CRITICAL RULES:
         const completion = await this.engine.chat.completions.create({
           messages: [{ role: 'user', content: synthesisPrompt }],
           temperature: 0.25,
-          max_tokens: 650,
+          max_tokens: 800,
           stream: false
         });
 
@@ -1725,37 +1858,44 @@ CRITICAL RULES:
     // Fallback structured synthesis if LLM unavailable or didn't respond (Strictly NO emojis)
     if (!finalReport) {
       const summaryHeader = isTr
-        ? `## Web Araştırma Raporu: ${searchTopic}\n\n`
+        ? `## Web Arastirma Raporu: ${searchTopic}\n\n`
         : `## Web Research Report: ${searchTopic}\n\n`;
 
       let summaryBody = '';
       if (visitedSources.length > 0) {
         summaryBody += isTr
-          ? `Yapılan otonom web taramasında ilgili kaynaklar ziyaret edilmiş ve aşağıdaki temel bilgiler derlenmiştir:\n\n`
+          ? `Yapilan otonom web taramasinda ilgili kaynaklar ziyaret edilmis ve asagidaki temel bilgiler derlenmistir:\n\n`
           : `The autonomous web scan visited relevant sources and compiled the following key findings:\n\n`;
 
         visitedSources.forEach((source, idx) => {
-          const cleanSnippet = source.snippet || source.content.slice(0, 240);
           summaryBody += `### ${idx + 1}. [${source.title}](${source.url})\n`;
-          if (cleanSnippet) {
-            summaryBody += `> ${cleanSnippet}...\n\n`;
-          }
-          if (source.content.length > 100) {
-            const sentences = source.content.split('. ').filter(s => s.trim().length > 30);
-            if (sentences.length > 1) {
-              summaryBody += `**${isTr ? 'Öne Çıkan' : 'Highlight'}:** ${sentences.slice(0, 2).join('. ')}.\n\n`;
+
+          if (source.content && source.content.length > 60) {
+            // Extract meaningful sentences, filtering out cookie/consent/UI noise
+            const sentences = source.content
+              .split(/[.!?]+/)
+              .map(s => s.trim())
+              .filter(s => s.length > 25 && !/^(cookie|accept|sign in|log in|subscribe|privacy|terms|agree|reject|consent|manage|allow|dismiss)/i.test(s));
+
+            if (sentences.length > 0) {
+              const keyPoints = sentences.slice(0, 4).map(s => `- ${s}.`).join('\n');
+              summaryBody += `\n${keyPoints}\n\n`;
+            } else {
+              summaryBody += `> ${source.content.slice(0, 300)}...\n\n`;
             }
+          } else if (source.snippet) {
+            summaryBody += `> ${source.snippet}\n\n`;
           }
         });
 
-        summaryBody += isTr ? `### İncelenen Kaynaklar\n` : `### Consulted Sources\n`;
+        summaryBody += isTr ? `\n### Incelenen Kaynaklar\n` : `\n### Consulted Sources\n`;
         visitedSources.forEach(s => {
           summaryBody += `- [${s.title}](${s.url})\n`;
         });
       } else {
         summaryBody = isTr
-          ? `Arama gerçekleştirildi ancak doğrudan taranabilecek açık web sayfası içeriği bulunamadı. Lütfen arama teriminizi daha detaylı belirtiniz.`
-          : `Web search was conducted but no scrapable public page contents were found. Please refine your search query.`;
+          ? `Birden fazla arama motoru denendi (Google, DuckDuckGo, Bing) ancak sonuc cekilemedi. Bu durum genellikle:\n- Arama motorlarinin bot korumasini etkinlestirmesinden\n- Ag baglantisi sorunlarindan\n- Arama teriminin cok genel olmasindan kaynaklanir.\n\nLutfen farkli bir arama terimi deneyin veya dogrudan bir URL girin.`
+          : `Multiple search engines were tried (Google, DuckDuckGo, Bing) but results could not be extracted. This typically happens due to:\n- Search engine bot protection (CAPTCHA/consent screens)\n- Network connectivity issues\n- Search terms being too generic\n\nPlease try a different search term or navigate directly to a URL.`;
       }
 
       finalReport = summaryHeader + summaryBody;
@@ -1767,9 +1907,11 @@ CRITICAL RULES:
     }
 
     // Learn & persist findings into AI memory
-    const briefMemory = `Web research on "${searchTopic}": ${visitedSources.map(s => s.title).join(', ')}`;
-    aiMemory.addMemory(briefMemory, 'fact', true);
-    aiMemory.addTaskSummary(isTr ? `Web araştırması: ${searchTopic}` : `Web research: ${searchTopic}`);
+    if (visitedSources.length > 0) {
+      const briefMemory = `Web research on "${searchTopic}": ${visitedSources.map(s => s.title).join(', ')}`;
+      aiMemory.addMemory(briefMemory, 'fact', true);
+    }
+    aiMemory.addTaskSummary(isTr ? `Web arastirmasi: ${searchTopic}` : `Web research: ${searchTopic}`);
 
     this.emitStatus('idle');
 
@@ -1779,7 +1921,9 @@ CRITICAL RULES:
       name: 'web_research',
       args: { query: searchTopic },
       state: 'success' as const,
-      result: `Researched ${visitedSources.length} sources successfully.`,
+      result: visitedSources.length > 0
+        ? `Researched ${visitedSources.length} sources successfully.`
+        : `Search completed but no sources could be scraped.`,
       durationMs
     }];
 
