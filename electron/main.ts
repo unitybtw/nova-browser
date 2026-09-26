@@ -1558,51 +1558,79 @@ app.whenReady().then(async () => {
     return rememberedPermissions.size;
   });
 
-  // IPC: check microphone permission status
+  // IPC: check microphone permission status cross-platform
   ipcMain.handle('check-microphone-permission', async (event) => {
-    if (!isTrustedSender(event)) return { status: 'denied', canAsk: false };
+    if (!isTrustedSender(event)) return { status: 'denied', canAsk: false, platform: process.platform };
     if (process.platform === 'darwin') {
       try {
         const status = systemPreferences.getMediaAccessStatus('microphone');
-        return { status, canAsk: status === 'not-determined' };
+        return { status, canAsk: status === 'not-determined', platform: 'darwin' };
       } catch {
-        return { status: 'unknown', canAsk: false };
+        return { status: 'unknown', canAsk: false, platform: 'darwin' };
       }
     }
-    return { status: 'granted', canAsk: false };
+    return { status: 'granted', canAsk: false, platform: process.platform };
   });
 
-  // IPC: request microphone permission
+  // IPC: request microphone permission cross-platform
   ipcMain.handle('request-microphone-permission', async (event) => {
-    if (!isTrustedSender(event)) return { granted: false, status: 'denied' };
+    if (!isTrustedSender(event)) return { granted: false, status: 'denied', platform: process.platform };
     if (process.platform === 'darwin') {
       try {
         const status = systemPreferences.getMediaAccessStatus('microphone');
         if (status === 'granted') {
-          return { granted: true, status: 'granted' };
+          return { granted: true, status: 'granted', platform: 'darwin' };
         }
         if (status === 'not-determined') {
           const granted = await systemPreferences.askForMediaAccess('microphone');
-          return { granted, status: granted ? 'granted' : 'denied' };
+          return { granted, status: granted ? 'granted' : 'denied', platform: 'darwin' };
         }
-        return { granted: false, status };
+        return { granted: false, status, platform: 'darwin' };
       } catch (e) {
         console.warn('[Microphone] macOS permission request error:', e);
-        return { granted: false, status: 'error' };
+        return { granted: false, status: 'error', platform: 'darwin' };
       }
     }
-    return { granted: true, status: 'granted' };
+    return { granted: true, status: 'granted', platform: process.platform };
   });
 
-  // IPC: open macOS system settings
+  // IPC: open system settings cross-platform (macOS, Windows, Linux)
   ipcMain.handle('open-system-settings', async (event, pane?: string) => {
     if (!isTrustedSender(event)) return false;
-    if (process.platform === 'darwin') {
-      const url = pane === 'microphone'
-        ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
-        : 'x-apple.systempreferences:';
-      await shell.openExternal(url).catch(() => {});
-      return true;
+    try {
+      if (process.platform === 'darwin') {
+        const url = pane === 'microphone'
+          ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+          : 'x-apple.systempreferences:';
+        await shell.openExternal(url).catch(() => {});
+        return true;
+      }
+      if (process.platform === 'win32') {
+        const winUri = pane === 'microphone'
+          ? 'ms-settings:privacy-microphone'
+          : 'ms-settings:';
+        await shell.openExternal(winUri).catch(() => {});
+        return true;
+      }
+      if (process.platform === 'linux') {
+        const { spawn } = await import('child_process');
+        if (pane === 'microphone') {
+          const pavu = spawn('pavucontrol', [], { detached: true, stdio: 'ignore' });
+          pavu.on('error', () => {
+            const gnome = spawn('gnome-control-center', ['sound'], { detached: true, stdio: 'ignore' });
+            gnome.on('error', () => {});
+            gnome.unref();
+          });
+          pavu.unref();
+          return true;
+        }
+        const settings = spawn('gnome-control-center', [], { detached: true, stdio: 'ignore' });
+        settings.on('error', () => {});
+        settings.unref();
+        return true;
+      }
+    } catch (e) {
+      console.warn('[SystemSettings] Failed to open system settings:', e);
     }
     return false;
   });

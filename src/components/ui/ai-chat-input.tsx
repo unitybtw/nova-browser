@@ -423,15 +423,24 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
       const isTr = (getLocale ? getLocale() : 'tr-TR').startsWith('tr');
 
-      // 1. Electron macOS / System permission check
+      let currentPlatform = 'unknown';
+      // 1. Electron macOS / Windows / Linux permission check
       if (typeof window !== 'undefined' && window.electronAPI?.requestMicrophonePermission) {
         try {
           const permResult = await window.electronAPI.requestMicrophonePermission();
+          if (permResult.platform) currentPlatform = permResult.platform;
           if (!permResult.granted) {
+            const settingsName =
+              currentPlatform === 'win32'
+                ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
+                : currentPlatform === 'linux'
+                ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
+                : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
+
             setVoiceError(
               isTr
-                ? "Mikrofon izni kapalı. macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon bölümünden Nova Browser için izni etkinleştirin."
-                : "Microphone access denied. Please enable microphone for Nova Browser in macOS System Settings > Privacy & Security > Microphone."
+                ? `Mikrofon izni kapalı. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
+                : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
             );
             return;
           }
@@ -448,17 +457,24 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         }
       } catch (err: any) {
         console.warn("[ai-chat-input] Microphone access error:", err);
+        const settingsName =
+          currentPlatform === 'win32'
+            ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
+            : currentPlatform === 'linux'
+            ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
+            : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
+
         if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
           setVoiceError(
             isTr
-              ? "Mikrofon erişim izni verilmedi. Lütfen sistem ayarlarından mikrofon iznini etkinleştirin."
-              : "Microphone access was denied. Please allow microphone permissions."
+              ? `Mikrofon erişim izni verilmedi. Lütfen ${settingsName} bölümünden mikrofonu etkinleştirin.`
+              : `Microphone access was denied. Please allow microphone permissions in ${settingsName}.`
           );
         } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
           setVoiceError(
             isTr
-              ? "Kullanılabilir mikrofon cihazı bulunamadı."
-              : "No microphone device found on this system."
+              ? "Kullanılabilir mikrofon cihazı bulunamadı. Lütfen bir mikrofon bağlı olduğundan emin olun."
+              : "No microphone device found on this system. Please check your microphone connection."
           );
         } else {
           setVoiceError(
@@ -790,13 +806,13 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                 <span className="truncate">{voiceError}</span>
               </div>
               <div className="flex items-center gap-1 shrink-0">
-                {typeof window !== 'undefined' && window.electronAPI?.openSystemSettings && voiceError.includes("macOS") && (
+                {typeof window !== 'undefined' && Boolean(window.electronAPI?.openSystemSettings) && (
                   <button
                     type="button"
                     onClick={() => window.electronAPI?.openSystemSettings?.('microphone')}
                     className="px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors text-amber-700 dark:text-amber-300"
                   >
-                    Ayarları Aç
+                    {(getLocale ? getLocale() : 'tr-TR').startsWith('tr') ? "Ayarları Aç" : "Open Settings"}
                   </button>
                 )}
                 <button

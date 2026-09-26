@@ -263,8 +263,8 @@ export interface ElectronAPI {
   // App Locale / Language sync
   setAppLanguage: (lang: string) => Promise<{ success: boolean; acceptLanguages: string }>;
   // Microphone & Permissions
-  checkMicrophonePermission: () => Promise<{ status: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'; canAsk: boolean }>;
-  requestMicrophonePermission: () => Promise<{ granted: boolean; status: string }>;
+  checkMicrophonePermission: () => Promise<{ status: 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'; canAsk: boolean; platform?: string }>;
+  requestMicrophonePermission: () => Promise<{ granted: boolean; status: string; platform?: string }>;
   openSystemSettings: (pane?: string) => Promise<boolean>;
 }
 
