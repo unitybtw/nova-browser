@@ -1,9 +1,21 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { DownloadItem } from '../types/browser';
 import { safeParseArrayWithBackup } from '../utils/safeStorage';
 export type { DownloadItem };
 
 const STORAGE_KEY = 'nova_downloads_history';
+
+function persistDownloadsToStorage(items: DownloadItem[]): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 150)));
+    }
+  } catch (err) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 50)));
+    } catch (_) {}
+  }
+}
 
 /**
  * Owns the downloads domain: the downloads list state, the onDownloadUpdate
@@ -16,11 +28,20 @@ export function useDownloads() {
     try {
       const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
       const parsed = safeParseArrayWithBackup<DownloadItem>(STORAGE_KEY, saved, []);
-      return parsed.map(d => (d.state === 'progressing' ? { ...d, state: 'interrupted' } : d));
+      // Rehydrated downloads cannot be resumed/cancelled because electron's in-memory
+      // activeDownloads map is empty upon browser restart. Ensure terminal/interrupted
+      // state and clear isPaused to avoid dead UI controls.
+      return parsed.map(d => ({
+        ...d,
+        state: d.state === 'progressing' ? 'interrupted' : d.state,
+        isPaused: false
+      }));
     } catch {
       return [];
     }
   });
+
+  const lastProgressPersistRef = useRef<number>(0);
 
   // Listen for download progress events from main process with cleanups
   useEffect(() => {
@@ -43,6 +64,7 @@ export function useDownloads() {
       setDownloads(prev => {
         const updated = [...prev];
         let hasChanges = false;
+        let hasTerminalChange = false;
 
         Object.values(captured).forEach(pendingData => {
           const existingIdx = updated.findIndex(d => d.id === pendingData.id);
@@ -53,7 +75,24 @@ export function useDownloads() {
             updated.unshift(pendingData);
             hasChanges = true;
           }
+          if (
+            pendingData.state === 'completed' ||
+            pendingData.state === 'cancelled' ||
+            pendingData.state === 'interrupted'
+          ) {
+            hasTerminalChange = true;
+          }
         });
+
+        if (hasTerminalChange) {
+          persistDownloadsToStorage(updated);
+        } else if (hasChanges) {
+          const now = Date.now();
+          if (now - lastProgressPersistRef.current > 3000) {
+            lastProgressPersistRef.current = now;
+            persistDownloadsToStorage(updated);
+          }
+        }
 
         return hasChanges ? updated : prev;
       });
@@ -62,7 +101,7 @@ export function useDownloads() {
     const removeDownloadListener = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
       pendingUpdates[data.id] = data;
 
-      // Immediate update for new downloads or completion/cancellation
+      // Immediate update for new downloads or completion/cancellation/interruption
       if (data.receivedBytes === 0 || data.state === 'completed' || data.state === 'cancelled' || data.state === 'interrupted') {
         flushUpdates();
       } else if (!throttleTimer) {
@@ -80,23 +119,6 @@ export function useDownloads() {
       if (typeof removeDownloadListener === 'function') removeDownloadListener();
     };
   }, []);
-
-  // Persist download history across reloads (debounced 400ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      try {
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(downloads.slice(0, 150)));
-        }
-      } catch (err) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(downloads.slice(0, 50)));
-        } catch (_) {}
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [downloads]);
 
   const handleClearDownloads = useCallback(() => {
     setDownloads([]);

@@ -191,6 +191,56 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       return [];
     };
 
+    const fetchEcosia = async (): Promise<string[]> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 650);
+      try {
+        const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': userAgent,
+            'Accept-Language': acceptLanguage
+          }
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          }
+        }
+      } catch (_) {} finally {
+        clearTimeout(timeout);
+      }
+      return [];
+    };
+
+    const fetchYahoo = async (): Promise<string[]> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 650);
+      try {
+        const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json`;
+        const res = await fetch(url, {
+          signal: controller.signal,
+          headers: {
+            'User-Agent': userAgent,
+            'Accept-Language': acceptLanguage
+          }
+        });
+        clearTimeout(timeout);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          }
+        }
+      } catch (_) {} finally {
+        clearTimeout(timeout);
+      }
+      return [];
+    };
+
     let providers = [fetchGoogle, fetchDuckDuckGo, fetchBing];
     if (cleanEngine === 'duckduckgo') {
       providers = [fetchDuckDuckGo, fetchGoogle, fetchBing];
@@ -198,13 +248,17 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       providers = [fetchBing, fetchGoogle, fetchDuckDuckGo];
     } else if (cleanEngine === 'brave') {
       providers = [fetchBrave, fetchGoogle, fetchDuckDuckGo];
+    } else if (cleanEngine === 'ecosia') {
+      providers = [fetchEcosia, fetchDuckDuckGo, fetchGoogle];
+    } else if (cleanEngine === 'yahoo') {
+      providers = [fetchYahoo, fetchGoogle, fetchBing];
     }
 
     // Performance + Privacy: Fast staggered fallback to keep latency ultra-low.
-    // Resolve as soon as results are usable: if any provider already returned
-    // non-empty results and nothing is in flight, cancel pending stagger timers
-    // instead of waiting them out (they only exist to probe fallbacks when we
-    // have NO answer yet). Keeps the guaranteed ≥300ms floor off the happy path.
+    // Provider 0 is started immediately; subsequent fallback providers are probed
+    // with 150ms stagger intervals only if previous providers have not yet returned.
+    // As soon as any provider yields valid non-empty suggestions, remaining pending
+    // stagger timers are cancelled to minimize redundant network requests.
     const FALLBACK_STAGGER_MS = 150;
     const resultsByPriority = new Map<number, string[]>();
     let anyNonEmpty = false;

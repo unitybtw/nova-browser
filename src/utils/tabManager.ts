@@ -75,9 +75,11 @@ export function computeLiveAndSuspendedTabs(
   }
 
   for (const t of excessCandidates) {
-    // Strict cap: even audio-playing tabs past maxLive are suspended so the
-    // protected (audio/pinned/loading) total can never exceed maxLive.
-    // Priority ordering above guarantees protected tabs displace LRU tabs first.
+    // Tabs actively playing audio must NEVER be suspended in the background to prevent audio drops.
+    if (t.isPlayingAudio) {
+      liveIds.add(t.id);
+      continue;
+    }
     tabsToSuspend.add(t.id);
   }
 

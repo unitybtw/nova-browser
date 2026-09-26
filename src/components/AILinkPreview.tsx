@@ -12,7 +12,7 @@ interface AILinkPreviewProps {
   isOpen: boolean;
 }
 
-interface PreviewData {
+export interface PreviewData {
   title: string;
   domain: string;
   summary: string;
@@ -22,10 +22,10 @@ interface PreviewData {
 
 // In-memory LRU cache for instant previews. Keep the bound small enough to
 // avoid retaining page summaries and OG image URLs for every URL visited.
-const PREVIEW_CACHE_MAX_ENTRIES = 100;
-const previewCache = new Map<string, PreviewData>();
+export const PREVIEW_CACHE_MAX_ENTRIES = 100;
+export const previewCache = new Map<string, PreviewData>();
 
-function getCachedPreview(url: string): PreviewData | undefined {
+export function getCachedPreview(url: string): PreviewData | undefined {
   const cached = previewCache.get(url);
   if (!cached) return undefined;
 
@@ -35,7 +35,7 @@ function getCachedPreview(url: string): PreviewData | undefined {
   return cached;
 }
 
-function setCachedPreview(url: string, preview: PreviewData): void {
+export function setCachedPreview(url: string, preview: PreviewData): void {
   previewCache.delete(url);
   previewCache.set(url, preview);
   while (previewCache.size > PREVIEW_CACHE_MAX_ENTRIES) {
@@ -43,6 +43,21 @@ function setCachedPreview(url: string, preview: PreviewData): void {
     if (oldestKey === undefined) break;
     previewCache.delete(oldestKey);
   }
+}
+
+export function extractPreviewFallbackSummary(cleanText: string, ogDesc?: string | null, metaDesc?: string | null): string {
+  const descriptionCandidate = (ogDesc || metaDesc || '').trim();
+  if (descriptionCandidate.length > 30) {
+    return descriptionCandidate;
+  }
+  if (cleanText.length > 40) {
+    const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [];
+    if (sentences.length > 0) {
+      return sentences.slice(0, 2).join(' ').trim();
+    }
+    return cleanText.substring(0, 180).trim() + '...';
+  }
+  return 'Preview available. Click to visit this page.';
 }
 
 export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x, y, isOpen }) => {
@@ -163,19 +178,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         }
 
         if (!finalSummary) {
-          const descriptionCandidate = (ogDesc || metaDesc || '').trim();
-          if (descriptionCandidate.length > 30) {
-            finalSummary = descriptionCandidate;
-          } else if (cleanText.length > 40) {
-            const sentences = cleanText.match(/[^.!?]+[.!?]+/g) || [];
-            if (sentences.length > 0) {
-              finalSummary = sentences.slice(0, 2).join(' ').trim();
-            } else {
-              finalSummary = cleanText.substring(0, 180).trim() + '...';
-            }
-          } else {
-            finalSummary = 'Preview available. Click to visit this page.';
-          }
+          finalSummary = extractPreviewFallbackSummary(cleanText, ogDesc, metaDesc);
         }
 
         if (isCancelled) return;

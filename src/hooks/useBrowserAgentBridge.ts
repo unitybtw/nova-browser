@@ -48,6 +48,7 @@ export function useBrowserAgentBridge({
   browserDataRef.current = { activeTabId, tabs, history, bookmarks };
   const mcpHandlersRef = useRef({ handleNavigate, handleNewTab, handleCloseTab, handleSelectTab });
   mcpHandlersRef.current = { handleNavigate, handleNewTab, handleCloseTab, handleSelectTab };
+  const activeWaitTimersRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
 
   useEffect(() => {
     // 1. Define executeMcpAction as a local function (not exposed on window)
@@ -424,14 +425,18 @@ export function useBrowserAgentBridge({
       },
       onSwitchTab: (id: string) => mcpHandlersRef.current.handleSelectTab(id),
       onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
-      onScrollPage: (direction, amount) => {
+      onScrollPage: async (direction, amount) => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(amount) || 500)));
         if (webview && webview.executeJavaScript) {
-          if (direction === 'up') webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
-          if (direction === 'down') webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
-          if (direction === 'top') webview.executeJavaScript(`window.scrollTo(0, 0)`);
-          if (direction === 'bottom') webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+          try {
+            if (direction === 'up') await webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
+            else if (direction === 'down') await webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
+            else if (direction === 'top') await webview.executeJavaScript(`window.scrollTo(0, 0)`);
+            else if (direction === 'bottom') await webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+          } catch (err) {
+            console.warn("Failed to scroll page:", err);
+          }
         } else {
           console.warn("Cannot scroll iframes cross-origin.");
         }
@@ -453,7 +458,15 @@ export function useBrowserAgentBridge({
         throw new Error("No active webview found");
       },
       onWait: (ms: number) => {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        const clampedMs = Math.min(30000, Math.max(0, Number.isFinite(Number(ms)) ? Math.floor(Number(ms)) : 0));
+        return new Promise<void>(resolve => {
+          let timer: ReturnType<typeof setTimeout>;
+          timer = setTimeout(() => {
+            activeWaitTimersRef.current.delete(timer);
+            resolve();
+          }, clampedMs);
+          activeWaitTimersRef.current.add(timer);
+        });
       },
       onGetPageLinks: async () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
@@ -549,6 +562,8 @@ export function useBrowserAgentBridge({
     }
     return () => {
       unsubscribeMcpBridge?.();
+      activeWaitTimersRef.current.forEach(clearTimeout);
+      activeWaitTimersRef.current.clear();
     };
   }, []);
 }

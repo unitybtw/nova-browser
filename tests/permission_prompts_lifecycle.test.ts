@@ -1,20 +1,15 @@
 import assert from 'node:assert/strict';
 import type { PermissionRequest } from '../src/types/browser';
+import { processIncomingPermissionRequest, MAX_CONCURRENT_PERMISSION_PROMPTS } from '../src/hooks/usePermissionRequests';
 
 console.log('\n--- Permission Prompts Lifecycle & Flood Protection Test Suite ---');
 
-// 1. Permission Queueing with Flood Protection (Max 5 concurrent prompts)
 function queuePermissionRequest(
   currentQueue: PermissionRequest[],
   incoming: PermissionRequest,
   onAutoReject?: (requestId: string) => void
 ): PermissionRequest[] {
-  const filtered = currentQueue.filter(r => r.requestId !== incoming.requestId);
-  if (filtered.length >= 5) {
-    onAutoReject?.(incoming.requestId);
-    return filtered;
-  }
-  return [...filtered, incoming];
+  return processIncomingPermissionRequest(currentQueue, incoming, onAutoReject).updatedQueue;
 }
 
 const mockRequest = (id: string, origin: string, permission: PermissionRequest['permission']): PermissionRequest => ({

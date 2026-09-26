@@ -27,36 +27,45 @@ function assertM3(condition: boolean, suite: string, name: string, details: stri
   }
 }
 
-// =========================================================================
-// SUITE 1: TAB LIST SORTING MEMOIZATION & STABILITY
-// =========================================================================
-console.log('--- 1. Testing Tab Sorting Memoization & Stability ---');
+import { computeLiveAndSuspendedTabs } from '../src/utils/tabManager';
+import type { Tab } from '../src/types/browser';
 
-function memoizedSortTabs(tabs: Array<{ id: string; title: string }>) {
-  return [...tabs].sort((a, b) => a.id.localeCompare(b.id));
-}
+// =========================================================================
+// SUITE 1: TAB LIST WEBVIEW POOL & PROTECTION MEMOIZATION
+// =========================================================================
+console.log('--- 1. Testing Tab Webview Pool & Priority Protection ---');
 
-const rawTabs = [
-  { id: 'tab-c', title: 'Charlie' },
-  { id: 'tab-a', title: 'Alpha' },
-  { id: 'tab-b', title: 'Bravo' }
+const rawTabs: Tab[] = [
+  { id: 'tab-1', url: 'https://example.com/1', title: 'Tab 1', isPinned: false, isPlayingAudio: false, isSuspended: false, lastAccessed: 100 },
+  { id: 'tab-2', url: 'https://example.com/2', title: 'Tab 2', isPinned: true, isPlayingAudio: false, isSuspended: false, lastAccessed: 50 },
+  { id: 'tab-3', url: 'https://example.com/3', title: 'Tab 3', isPinned: false, isPlayingAudio: true, isSuspended: false, lastAccessed: 20 },
+  { id: 'tab-4', url: 'https://example.com/4', title: 'Tab 4', isPinned: false, isPlayingAudio: false, isSuspended: false, lastAccessed: 80 },
+  { id: 'tab-5', url: 'https://example.com/5', title: 'Tab 5', isPinned: false, isPlayingAudio: false, isSuspended: false, lastAccessed: 70 },
+  { id: 'tab-6', url: 'https://example.com/6', title: 'Tab 6', isPinned: false, isPlayingAudio: false, isSuspended: false, lastAccessed: 60 },
+  { id: 'tab-7', url: 'https://example.com/7', title: 'Tab 7', isPinned: false, isPlayingAudio: false, isSuspended: false, lastAccessed: 10 }
 ];
 
-const sorted1 = memoizedSortTabs(rawTabs);
-const sorted2 = memoizedSortTabs(rawTabs);
+const poolResult = computeLiveAndSuspendedTabs(rawTabs, 'tab-1', null, 4);
 
 assertM3(
-  sorted1[0].id === 'tab-a' && sorted1[1].id === 'tab-b' && sorted1[2].id === 'tab-c',
-  'Tab Sort Memoization',
-  'Sorts tabs deterministically by id',
-  `Expected [tab-a, tab-b, tab-c], got [${sorted1.map(t => t.id).join(', ')}]`
+  poolResult.liveIds.has('tab-1') && poolResult.liveIds.has('tab-2') && poolResult.liveIds.has('tab-3'),
+  'Tab Protection Priority',
+  'Protects active, pinned, and audio-playing tabs from background suspension',
+  `Expected tab-1, tab-2, tab-3 to be live, got [${Array.from(poolResult.liveIds).join(', ')}]`
 );
 
 assertM3(
-  rawTabs[0].id === 'tab-c',
-  'Tab Sort Immutability',
+  !poolResult.tabsToSuspend.has('tab-2') && !poolResult.tabsToSuspend.has('tab-3'),
+  'Pinned & Audio Protection',
+  'Pinned and audio tabs are never scheduled for suspension even when pool capacity is exceeded',
+  `tabsToSuspend contained protected tabs: ${Array.from(poolResult.tabsToSuspend).join(', ')}`
+);
+
+assertM3(
+  rawTabs[0].id === 'tab-1' && rawTabs.length === 7,
+  'Tab Immutability',
   'Does not mutate original tabs array in place',
-  `Original tab 0 id was modified to: ${rawTabs[0].id}`
+  `Original tab array length modified`
 );
 
 // =========================================================================

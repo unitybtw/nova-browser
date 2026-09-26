@@ -1308,6 +1308,12 @@ class NovaSyncService {
       let mergedWorkspaces = [...localData.workspaces];
 
       if (remoteBundle) {
+        const vaultVersion = typeof remoteBundle.version === 'number' ? remoteBundle.version : 1;
+        logger.info('SyncService:syncData', `Processing remote encrypted vault v${vaultVersion}`);
+        if (vaultVersion > 2) {
+          logger.warn('SyncService:syncData', `Remote vault has higher schema version (${vaultVersion}) than client (2)`);
+        }
+
         if (prefs.syncBookmarks && remoteBundle.bookmarks) {
           const normalizeBmUrl = (u: string) => {
             try {
@@ -1405,8 +1411,8 @@ class NovaSyncService {
         }
 
         if (prefs.syncSettings && remoteBundle.settings) {
-          // Local settings take precedence over remote to prevent silent clobbering
-          mergedSettings = { ...remoteBundle.settings, ...localData.settings };
+          // Remote settings take precedence so newly paired devices inherit cloud configuration
+          mergedSettings = { ...localData.settings, ...remoteBundle.settings };
         }
 
         if (prefs.syncWorkspaces && remoteBundle.workspaces) {

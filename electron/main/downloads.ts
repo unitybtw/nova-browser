@@ -319,6 +319,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           receivedBytes: item.getReceivedBytes(),
           totalBytes,
           state: 'interrupted',
+          isPaused: item.isPaused(),
           savePath: item.getSavePath() || undefined
         });
       } else if (state === 'progressing') {

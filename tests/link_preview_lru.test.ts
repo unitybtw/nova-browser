@@ -1,38 +1,19 @@
 import assert from 'node:assert/strict';
+import {
+  previewCache,
+  getCachedPreview,
+  setCachedPreview,
+  PREVIEW_CACHE_MAX_ENTRIES,
+  extractPreviewFallbackSummary,
+  PreviewData
+} from '../src/components/AILinkPreview';
 
 console.log('\n--- AI Link Preview LRU Cache & Sentence Processing Suite ---');
 
-interface PreviewData {
-  title: string;
-  domain: string;
-  summary: string;
-  readingTimeMinutes: number;
-  ogImage?: string;
-  isAiGenerated: boolean;
-}
+// Clear cache before test runs to ensure isolation
+previewCache.clear();
 
-const PREVIEW_CACHE_MAX_ENTRIES = 5;
-const previewCache = new Map<string, PreviewData>();
-
-function getCachedPreview(url: string): PreviewData | undefined {
-  const cached = previewCache.get(url);
-  if (!cached) return undefined;
-  previewCache.delete(url);
-  previewCache.set(url, cached);
-  return cached;
-}
-
-function setCachedPreview(url: string, preview: PreviewData): void {
-  previewCache.delete(url);
-  previewCache.set(url, preview);
-  while (previewCache.size > PREVIEW_CACHE_MAX_ENTRIES) {
-    const oldestKey = previewCache.keys().next().value;
-    if (oldestKey === undefined) break;
-    previewCache.delete(oldestKey);
-  }
-}
-
-// 1. Insertion and Retrieval
+// 1. Insertion and Retrieval with real production cache
 for (let i = 1; i <= 5; i++) {
   setCachedPreview(`https://site${i}.com`, {
     title: `Site ${i}`,
@@ -46,43 +27,47 @@ for (let i = 1; i <= 5; i++) {
 assert.equal(previewCache.size, 5);
 assert.equal(Boolean(getCachedPreview('https://site1.com')), true);
 
-// 2. LRU Eviction: Inserting 6th item should evict site2 (since site1 was just accessed)
-setCachedPreview('https://site6.com', {
-  title: 'Site 6',
-  domain: 'site6.com',
-  summary: 'Summary 6',
+// 2. Capacity & LRU eviction verified with production PREVIEW_CACHE_MAX_ENTRIES
+assert.equal(PREVIEW_CACHE_MAX_ENTRIES, 100, 'Production link preview cache must cap at 100 entries');
+
+// Fill cache up to capacity (100)
+for (let i = 6; i <= 100; i++) {
+  setCachedPreview(`https://site${i}.com`, {
+    title: `Site ${i}`,
+    domain: `site${i}.com`,
+    summary: `Summary of site ${i}`,
+    readingTimeMinutes: 1,
+    isAiGenerated: false
+  });
+}
+
+assert.equal(previewCache.size, 100, 'Cache must reach exactly 100 items');
+
+// Access site1 to refresh its LRU recency
+getCachedPreview('https://site1.com');
+
+// Insert 101st entry: must evict the oldest unaccessed entry (site2, since site1 was accessed)
+setCachedPreview('https://site101.com', {
+  title: 'Site 101',
+  domain: 'site101.com',
+  summary: 'Summary 101',
   readingTimeMinutes: 1,
   isAiGenerated: false
 });
 
-assert.equal(previewCache.size, 5);
-assert.equal(previewCache.has('https://site2.com'), false, 'Oldest unaccessed entry (site2) should be evicted');
+assert.equal(previewCache.size, 100, 'Cache must not exceed PREVIEW_CACHE_MAX_ENTRIES');
+assert.equal(previewCache.has('https://site2.com'), false, 'Oldest unaccessed entry (site2) must be evicted');
 assert.equal(previewCache.has('https://site1.com'), true, 'Recently accessed entry (site1) must remain in cache');
-assert.equal(previewCache.has('https://site6.com'), true, 'Newly inserted entry must be present');
+assert.equal(previewCache.has('https://site101.com'), true, 'Newly inserted entry must be present');
 
-// 3. Sentence extraction test
-function extractCompleteSentences(text: string, maxChars = 280): string {
-  if (!text) return '';
-  let clean = text
-    .replace(/cookie policy|çerez politikası|all rights reserved|privacy policy/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const sentences = clean.match(/[^.!?]+[.!?]+/g) || [];
-  let result = '';
-  for (const s of sentences) {
-    const trimmed = s.trim();
-    if (!trimmed || trimmed.length < 15) continue;
-    if (/^(menu|home|search|share)/i.test(trimmed)) continue;
-    if ((result + ' ' + trimmed).length > maxChars && result.length > 50) break;
-    result = result ? `${result} ${trimmed}` : trimmed;
-  }
-  return result || clean.slice(0, maxChars);
-}
-
-const rawArticle = 'Cookie policy. Nova is an ultra-fast on-device AI browser built with WebGPU. It executes local models at 64 tokens per second. All rights reserved.';
-const extracted = extractCompleteSentences(rawArticle);
-assert.equal(extracted.includes('Cookie policy'), false);
-assert.equal(extracted.includes('All rights reserved'), false);
+// 3. Fallback Sentence extraction test using production extractPreviewFallbackSummary
+const rawArticle = 'Nova is an ultra-fast on-device AI browser built with WebGPU. It executes local models at 64 tokens per second. Discover blazing fast web performance.';
+const extracted = extractPreviewFallbackSummary(rawArticle, null, null);
 assert.equal(extracted.includes('Nova is an ultra-fast on-device AI browser built with WebGPU.'), true);
+assert.equal(extracted.includes('It executes local models at 64 tokens per second.'), true);
 
-console.log('[PASS] [Link Preview LRU] Bounded capacity eviction, re-ordering, and sentence sanitation verified.');
+// Meta description takes precedence if provided and > 30 chars
+const fromMeta = extractPreviewFallbackSummary(rawArticle, null, 'Curated description from OpenGraph meta tags exceeding 30 characters');
+assert.equal(fromMeta, 'Curated description from OpenGraph meta tags exceeding 30 characters');
+
+console.log('[PASS] [Link Preview LRU] Production LRU cache capacity (100), eviction, and summary extraction verified.');

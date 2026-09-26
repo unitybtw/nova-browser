@@ -244,7 +244,7 @@ export function useTabOperations({
       if (!target) return prev;
       const willPin = !target.isPinned;
       const targetWs = target.workspaceId || 'default';
-      const updated = prev.map(t => t.id === tabId ? { ...t, isPinned: willPin } : t);
+      const updated = prev.map(t => t.id === tabId ? { ...t, isPinned: willPin, isSuspended: willPin ? false : t.isSuspended } : t);
       // Re-sort only within the target workspace, preserving workspace boundaries
       const wsTabs = updated.filter(t => (t.workspaceId || 'default') === targetWs);
       const wsPinned = wsTabs.filter(t => t.isPinned);
