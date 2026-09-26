@@ -1,7 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Clock, Search, Trash2, Globe, Calendar, ArrowUpRight } from 'lucide-react';
 import { HistoryItem } from '../types/browser';
-import { useTranslation } from '../services/i18n';
+import { useTranslation, t as translateFn } from '../services/i18n';
+
+// Building an Intl.DateTimeFormat is expensive: doing it once per row per render
+// dominated the cost of long history lists. The instance only depends on the
+// locale, so it is cached module level and reused for every row.
+// The options must stay in sync with the default used by i18n.formatTime so the
+// rendered string stays byte-for-byte identical.
+const TIME_FORMAT_OPTIONS: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+const timeFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const getTimeFormatter = (locale: string): Intl.DateTimeFormat => {
+  let formatter = timeFormatterCache.get(locale);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, TIME_FORMAT_OPTIONS);
+    timeFormatterCache.set(locale, formatter);
+  }
+  return formatter;
+};
+
+const formatTimeForLocale = (timestamp: number, locale: string): string => {
+  // Intl.DateTimeFormat#format throws on a non-finite timestamp, while
+  // toLocaleTimeString renders "Invalid Date". Keep the previous output.
+  if (!Number.isFinite(timestamp)) {
+    return new Date(timestamp).toLocaleTimeString(locale, TIME_FORMAT_OPTIONS);
+  }
+  return getTimeFormatter(locale).format(new Date(timestamp));
+};
 
 interface HistoryPageProps {
   history: HistoryItem[];
@@ -12,19 +38,23 @@ interface HistoryPageProps {
 
 interface HistoryRowItemProps {
   item: HistoryItem;
+  t: typeof translateFn;
   formatTime: (ts: number) => string;
   onNavigate: (url: string) => void;
   onRemoveHistoryItem: (id: string) => void;
 }
 
+// Memoized rows must not subscribe to i18n themselves: N rows would mean N
+// useState + N language listeners. `t` is a module level function (stable
+// reference) and is passed down from the single useTranslation() in the parent.
 const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
   item,
+  t,
   formatTime,
   onNavigate,
   onRemoveHistoryItem
 }) => {
   const [faviconFailed, setFaviconFailed] = useState(false);
-  const { t } = useTranslation();
 
   return (
     <div 
@@ -83,7 +113,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   onClearHistory,
   onRemoveHistoryItem
 }) => {
-  const { t, formatTime: formatTimeI18n } = useTranslation();
+  const { t, locale } = useTranslation();
   const [searchTerm, setSearchTerm] = useState('');
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [clearTimeframe, setClearTimeframe] = useState('all');
@@ -132,9 +162,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
     return Object.entries(groups).filter(([_, items]) => items.length > 0);
   }, [filteredHistory, t]);
 
-  const formatTime = (timestamp: number) => {
-    return formatTimeI18n(timestamp);
-  };
+  // Stable across renders: only the locale can invalidate it, so HistoryRowItem
+  // memoization actually holds instead of failing on a fresh closure every time.
+  const formatTime = useCallback(
+    (timestamp: number) => formatTimeForLocale(timestamp, locale),
+    [locale]
+  );
 
   return (
     <div 
@@ -260,6 +293,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                           <HistoryRowItem
                             key={item.id}
                             item={item}
+                            t={t}
                             formatTime={formatTime}
                             onNavigate={onNavigate}
                             onRemoveHistoryItem={onRemoveHistoryItem}

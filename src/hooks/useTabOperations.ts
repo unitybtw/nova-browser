@@ -111,6 +111,7 @@ export function useTabOperations({
             isLoading: false,
             canGoBack: false,
             canGoForward: false,
+            isIncognito: false,
             favicon: undefined,
             splitWith: undefined,
             isPinned: false,
@@ -144,6 +145,7 @@ export function useTabOperations({
         isLoading: false,
         canGoBack: false,
         canGoForward: false,
+        isIncognito: false,
         favicon: undefined,
         splitWith: undefined,
         isPinned: false,
@@ -172,9 +174,11 @@ export function useTabOperations({
         const targetWs = targetTab?.workspaceId || activeWs;
         const remainingWsTabs = newTabs.filter(t => (t.workspaceId || 'default') === targetWs);
         if (remainingWsTabs.length > 0) {
+          const normalTab = remainingWsTabs.find(t => !t.isIncognito);
           const wsTargetIdx = workspaceTabs.findIndex(t => t.id === id);
           const nextWsIdx = Math.min(Math.max(0, wsTargetIdx), remainingWsTabs.length - 1);
-          setActiveTabId(remainingWsTabs[nextWsIdx].id);
+          const nextCandidate = (targetTab?.isIncognito && normalTab) ? normalTab : remainingWsTabs[nextWsIdx];
+          setActiveTabId(nextCandidate.id);
         } else {
           const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
           setActiveTabId(newTabs[nextActiveIdx].id);
@@ -382,7 +386,7 @@ export function useTabOperations({
     }
   }, [activeTabId]);
 
-  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean }) => {
+  const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; isIncognito?: boolean }) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
     
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
@@ -423,6 +427,15 @@ export function useTabOperations({
       return;
     }
     
+    // Determine incognito status:
+    // - If explicitly requested via opts.isIncognito, respect that.
+    // - If opened from an internal link/window.open inside a tab (sourceTabId provided), inherit the source tab's incognito status.
+    // - Otherwise (user clicked "+", pressed ⌘T, or triggered a new tab from UI), always create a normal tab (isIncognito: false).
+    //   Private tabs are explicitly opened via handleNewIncognitoTab (⌘⇧N or Private Tab button).
+    const isIncognitoTab = opts?.isIncognito !== undefined
+      ? opts.isIncognito
+      : (sourceTabId ? Boolean(currentTarget?.isIncognito) : false);
+
     const newTab: Tab = {
       id: generateId('tab'),
       url: finalUrl,
@@ -431,13 +444,45 @@ export function useTabOperations({
       canGoBack: false,
       canGoForward: false,
       workspaceId: activeWorkspaceId,
-      // intentional: matches Chrome (new tabs inherit incognito mode)
-      isIncognito: currentTarget?.isIncognito || false,
+      isIncognito: isIncognitoTab,
       lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
     setActiveTabId(newTab.id);
   }, [activeWorkspaceId, setIsExtensionsOpen, activeTabIdRef, tabsRef, setTabs, setActiveTabId]);
+
+  const handleExitIncognitoTab = useCallback(() => {
+    const currentTab = tabsRef.current.find(t => t.id === activeTabIdRef.current);
+    if (!currentTab || !currentTab.isIncognito) return;
+
+    const prevTabs = tabsRef.current;
+    const activeWs = activeWorkspaceIdRef.current || 'default';
+    const normalTabsInWs = prevTabs.filter(t => !t.isIncognito && (t.workspaceId || 'default') === activeWs);
+
+    if (normalTabsInWs.length > 0) {
+      handleCloseTab(currentTab.id);
+    } else {
+      if (getElectronAPI()?.clearIncognitoSession) {
+        getElectronAPI()?.clearIncognitoSession(currentTab.id)?.catch((e: any) => console.error(e));
+        const remainingIncognito = prevTabs.some(t => t.isIncognito && t.id !== currentTab.id);
+        if (!remainingIncognito) {
+          getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        }
+      }
+      setTabs(prev => prev.map(t => t.id === currentTab.id ? {
+        ...t,
+        isIncognito: false,
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        favicon: undefined,
+        splitWith: undefined,
+        lastAccessed: Date.now()
+      } : t));
+    }
+  }, [handleCloseTab, activeTabIdRef, tabsRef, activeWorkspaceIdRef, setTabs]);
 
   const handleNewIncognitoTab = useCallback((url?: string | any) => {
     let targetUrl = typeof url === 'string' ? url : 'nova://newtab';
@@ -614,6 +659,7 @@ export function useTabOperations({
     handleOpenDevTools,
     handleNewTab,
     handleNewIncognitoTab,
+    handleExitIncognitoTab,
     handleNavigate,
     handleUpdateTab,
     handleToggleMuteTab,

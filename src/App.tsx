@@ -292,6 +292,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   });
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
 
+  // Tab listesi uzlaştırması: aynı `tabs` değişiminde üç ayrı effect üç ayrı
+  // O(n) tarama yapıyordu. Üçü de aynı anda aynı girdilere bağlı olduğu için
+  // tek effect'te birleştirildi; gövde sırası birebir korunur:
+  //   1) workspace görünürlüğü  2) folder ataması onarımı  3) genel uzlaştırma
   useEffect(() => {
     const visibleWorkspaceTabs = tabs.filter(tab =>
       (tab.workspaceId || 'default') === activeWorkspaceId
@@ -312,11 +316,28 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
       setActiveTabId(visibleWorkspaceTabs[0].id);
     }
-  }, [tabs, activeTabId, activeWorkspaceId]);
 
-  useEffect(() => {
+    // Geçersiz folderId'leri temizle. repairTabFolderAssignments değişiklik
+    // olmadığında aynı referansı döndürdüğü için gereksiz re-render üretmez.
     setTabs(prevTabs => repairTabFolderAssignments(prevTabs, folders));
-  }, [folders]);
+
+    // En az bir sekme var olsun ve activeTabId geçerli olsun
+    if (tabs.length === 0) {
+      const fallbackId = generateId('tab');
+      setTabs([{
+        id: fallbackId,
+        url: 'nova://newtab',
+        title: 'New Tab',
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+        lastAccessed: Date.now()
+      }]);
+      setActiveTabId(fallbackId);
+    } else if (!tabs.some(t => t.id === activeTabId)) {
+      setActiveTabId(tabs[0].id);
+    }
+  }, [tabs, activeTabId, activeWorkspaceId, folders]);
 
   // AI Assistant State (isSidePanelOpen lives in usePanels above)
   const [pendingAIActions, setPendingAIActions] = useState<Array<{ id: number; text: string }>>([]);
@@ -513,25 +534,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     isHydrated,
   });
 
-  // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
-  useEffect(() => {
-    if (tabs.length === 0) {
-      const fallbackId = generateId('tab');
-      setTabs([{
-        id: fallbackId,
-        url: 'nova://newtab',
-        title: 'New Tab',
-        isLoading: false,
-        canGoBack: false,
-        canGoForward: false,
-        lastAccessed: Date.now()
-      }]);
-      setActiveTabId(fallbackId);
-    } else if (!tabs.some(t => t.id === activeTabId)) {
-      setActiveTabId(tabs[0].id);
-    }
-  }, [tabs, activeTabId]);
-
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
   useThemeLanguage({ settings });
 
@@ -605,6 +607,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     handleOpenDevTools,
     handleNewTab,
     handleNewIncognitoTab,
+    handleExitIncognitoTab,
     handleNavigate,
     handleUpdateTab,
     handleToggleMuteTab,
@@ -1252,6 +1255,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
+  // DownloadToast tekil prop alıyor: öğe `downloads` dizisinden referansıyla
+  // seçilir, böylece toast her 250ms flush'ta tüm listeyi taramaz/kopyalamaz.
+  const activeDownload = useMemo(() => {
+    if (downloads.length === 0) return null;
+    return downloads.find(d => d.state === 'progressing') || downloads[0];
+  }, [downloads]);
   const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
   const useVerticalTabs = isWebsiteDemo ? false : settings.useVerticalTabs;
   // Keep the settings object identity stable between unrelated App renders so
@@ -1325,6 +1334,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onSelectTab={handleSelectTab}
               onCloseTab={handleCloseTab}
               onNewTab={handleNewTab}
+              onNewIncognitoTab={handleNewIncognitoTab}
+              onExitIncognito={handleExitIncognitoTab}
               onToggleMuteTab={handleToggleMuteTab}
               onDuplicateTab={handleDuplicateTab}
               onTogglePinTab={handleTogglePinTab}
@@ -1420,6 +1431,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onSelectTab={handleSelectTab}
                   onCloseTab={handleCloseTab}
                   onNewTab={handleNewTab}
+                  onNewIncognitoTab={handleNewIncognitoTab}
+                  onExitIncognito={handleExitIncognitoTab}
                   onToggleMuteTab={handleToggleMuteTab}
                   onDuplicateTab={handleDuplicateTab}
                   onTogglePinTab={handleTogglePinTab}
@@ -1541,6 +1554,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onCloseTab={handleCloseTab}
                 onNewTab={handleNewTab}
                 onNewIncognitoTab={handleNewIncognitoTab}
+                onExitIncognito={handleExitIncognitoTab}
                 onNavigate={handleNavigate}
                 onGoBack={handleGoBack}
                 onGoForward={handleGoForward}
@@ -1835,6 +1849,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     isActive={tab.id === activeTabId || tab.id === splitTabId}
                     onCloseTab={handleCloseTab}
                     isIncognito={tab.isIncognito || false}
+                    onExitIncognito={handleExitIncognitoTab}
                     history={typeof tab?.url === 'string' && tab.url.includes('nova://history') ? history : EMPTY_ARRAY}
                     downloads={typeof tab?.url === 'string' && tab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
                     onClearHistory={handleClearHistory}
@@ -2052,7 +2067,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       </React.Suspense>
 
       <React.Suspense fallback={null}>
-        <DownloadToast downloads={downloads} />
+        <DownloadToast activeDownload={activeDownload} />
         <UpdateToast />
         {blockedSiteAlert && (
           <BlockedSiteModal alert={blockedSiteAlert} onClose={handleCloseBlockedSiteAlert} />

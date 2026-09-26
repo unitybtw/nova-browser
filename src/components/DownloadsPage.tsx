@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Search, FolderOpen } from 'lucide-react';
-import { useTranslation } from '../services/i18n';
+import { useTranslation, t as translateFn } from '../services/i18n';
 
 export interface DownloadItemPage {
   id: string;
@@ -18,6 +18,129 @@ interface DownloadsPageProps {
   onClearDownloads: () => void;
 }
 
+interface DownloadRowItemProps {
+  item: DownloadItemPage;
+  t: typeof translateFn;
+  formatBytes: (bytes: number) => string;
+}
+
+// Module level so the reference handed to every memoized row is stable; a
+// per-render arrow here would defeat React.memo for all 100 visible rows.
+const formatBytes = (bytes: number) => {
+  if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
+// Extracted so a list re-render (search keystroke, show more, parent state) can
+// skip re-rendering rows whose item did not change. `t` is the module level
+// translation function, so its reference never changes.
+const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
+  item,
+  t,
+  formatBytes
+}) => {
+  const percent = item.totalBytes > 0 
+    ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
+    : 0;
+
+  return (
+    <div
+      className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/80 transition-colors shadow-2xs space-y-3"
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3.5 min-w-0">
+          <div className="p-2.5 bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 rounded-xl shrink-0 border border-cyan-500/20">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{item.filename}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5" title={item.url}>{item.url}</p>
+          </div>
+        </div>
+
+        <div className="shrink-0 text-right">
+          {item.state === 'completed' && (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+              <CheckCircle2 className="w-3.5 h-3.5" /> {t('downloads.completed')}
+            </span>
+          )}
+          {item.state === 'cancelled' && (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-red-500 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20">
+              <AlertCircle className="w-3.5 h-3.5" /> {t('downloads.cancelled')}
+            </span>
+          )}
+          {item.state === 'progressing' && (
+            <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">
+              {item.isPaused ? t('downloads.pause') : `${percent}%`}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Progress Bar */}
+      {item.state === 'progressing' && (
+        <div className="w-full bg-slate-200 dark:bg-slate-700/80 h-1.5 rounded-full overflow-hidden">
+          <div 
+            className="bg-cyan-500 h-full transition-[width] duration-300 rounded-full"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
+        <span>
+          {formatBytes(item.receivedBytes)} {item.totalBytes > 0 && `/ ${formatBytes(item.totalBytes)}`}
+        </span>
+        {item.state === 'progressing' && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                if (item.isPaused) {
+                  (window as any).electronAPI?.resumeDownload?.(item.id);
+                } else {
+                  (window as any).electronAPI?.pauseDownload?.(item.id);
+                }
+              }}
+              className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-500 transition-colors"
+              title={item.isPaused ? t('downloads.resume') : t('downloads.pause')}
+            >
+              {item.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
+            </button>
+            <button
+              onClick={() => {
+                (window as any).electronAPI?.cancelDownload?.(item.id);
+              }}
+              className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
+              title={t('downloads.cancel')}
+            >
+              <XCircle className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {item.state === 'completed' && item.savePath && (
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
+              className="text-xs font-semibold text-slate-600 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center gap-1"
+            >
+              <FolderOpen className="w-3.5 h-3.5" /> {t('downloads.openFolder')}
+            </button>
+            <button
+              onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}
+              className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 transition-colors"
+            >
+              {t('downloads.openFile')}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   downloads,
   onClearDownloads
@@ -25,14 +148,6 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   const { t } = useTranslation();
   const [filterText, setFilterText] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
-
-  const formatBytes = (bytes: number) => {
-    if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
 
   const filteredDownloads = useMemo(() => {
     const q = filterText.trim().toLowerCase();
@@ -99,106 +214,9 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
               </div>
             ) : (
               <>
-                {filteredDownloads.slice(0, visibleCount).map((item, idx) => {
-                const percent = item.totalBytes > 0 
-                  ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
-                  : 0;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="p-4 rounded-2xl border border-slate-200/80 dark:border-white/5 bg-slate-50/60 dark:bg-slate-800/40 hover:bg-white dark:hover:bg-slate-800/80 transition-colors shadow-2xs space-y-3"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="p-2.5 bg-cyan-500/10 dark:bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 rounded-xl shrink-0 border border-cyan-500/20">
-                          <FileText className="w-5 h-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{item.filename}</p>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5" title={item.url}>{item.url}</p>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        {item.state === 'completed' && (
-                          <span className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                            <CheckCircle2 className="w-3.5 h-3.5" /> {t('downloads.completed')}
-                          </span>
-                        )}
-                        {item.state === 'cancelled' && (
-                          <span className="flex items-center gap-1.5 text-xs font-semibold text-red-500 dark:text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full border border-red-500/20">
-                            <AlertCircle className="w-3.5 h-3.5" /> {t('downloads.cancelled')}
-                          </span>
-                        )}
-                        {item.state === 'progressing' && (
-                          <span className="text-xs font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">
-                            {item.isPaused ? t('downloads.pause') : `${percent}%`}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    {item.state === 'progressing' && (
-                      <div className="w-full bg-slate-200 dark:bg-slate-700/80 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-cyan-500 h-full transition-[width] duration-300 rounded-full"
-                          style={{ width: `${percent}%` }}
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
-                      <span>
-                        {formatBytes(item.receivedBytes)} {item.totalBytes > 0 && `/ ${formatBytes(item.totalBytes)}`}
-                      </span>
-                      {item.state === 'progressing' && (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              if (item.isPaused) {
-                                (window as any).electronAPI?.resumeDownload?.(item.id);
-                              } else {
-                                (window as any).electronAPI?.pauseDownload?.(item.id);
-                              }
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-500 transition-colors"
-                            title={item.isPaused ? t('downloads.resume') : t('downloads.pause')}
-                          >
-                            {item.isPaused ? <Play className="w-3.5 h-3.5" /> : <Pause className="w-3.5 h-3.5" />}
-                          </button>
-                          <button
-                            onClick={() => {
-                              (window as any).electronAPI?.cancelDownload?.(item.id);
-                            }}
-                            className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-red-500 transition-colors"
-                            title={t('downloads.cancel')}
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )}
-                      {item.state === 'completed' && item.savePath && (
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
-                            className="text-xs font-semibold text-slate-600 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center gap-1"
-                          >
-                            <FolderOpen className="w-3.5 h-3.5" /> {t('downloads.openFolder')}
-                          </button>
-                          <button
-                            onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}
-                            className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 transition-colors"
-                          >
-                            {t('downloads.openFile')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+                {filteredDownloads.slice(0, visibleCount).map((item) => (
+                  <DownloadRowItem key={item.id} item={item} t={t} formatBytes={formatBytes} />
+                ))}
                 {filteredDownloads.length > visibleCount && (
                   <button
                     onClick={() => setVisibleCount((c) => c + 100)}

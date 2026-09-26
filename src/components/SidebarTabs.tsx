@@ -23,6 +23,7 @@ import {
   Search,
   Shield,
   ShieldCheck,
+  ShieldOff,
   Puzzle,
   Package,
   Orbit,
@@ -109,6 +110,8 @@ export interface SidebarTabsProps {
   onSelectTab: (id: string) => void;
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: (url?: string) => void;
+  onNewIncognitoTab?: () => void;
+  onExitIncognito?: () => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onDuplicateTab?: (id: string) => void;
   onTogglePinTab?: (id: string) => void;
@@ -371,7 +374,11 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               ) : tab.url === 'nova://downloads' ? (
                 <Download className="w-3.5 h-3.5 opacity-70" />
               ) : isNewTabUrl ? (
-                <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                tab.isIncognito ? (
+                  <VenetianMask className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                ) : (
+                  <Compass className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-500 dark:text-cyan-400' : 'opacity-70'}`} />
+                )
               ) : (
                 <Globe className="w-3.5 h-3.5 opacity-70" />
               )}
@@ -435,6 +442,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
     prev.tab.isPlayingAudio === next.tab.isPlayingAudio &&
     prev.tab.isSuspended === next.tab.isSuspended &&
     prev.tab.isPinned === next.tab.isPinned &&
+    prev.tab.isIncognito === next.tab.isIncognito &&
     prev.tab.splitWith === next.tab.splitWith &&
     prev.splitTab?.id === next.splitTab?.id &&
     prev.splitTab?.title === next.splitTab?.title &&
@@ -453,6 +461,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onSelectTab,
   onCloseTab,
   onNewTab,
+  onNewIncognitoTab,
+  onExitIncognito,
   onToggleMuteTab,
   onDuplicateTab,
   onTogglePinTab,
@@ -1020,7 +1030,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               >
                 {suggestions.map((s, idx) => (
                   <button
-                    key={idx}
+                    key={s}
                     onMouseDown={() => {
                       const formatted = formatSearchUrl(s, searchEngine, getLanguage());
                       if (onNavigate) onNavigate(formatted);
@@ -1199,14 +1209,42 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           className="px-3.5 pt-1 pb-1 flex items-center justify-between text-[11px] font-semibold tracking-wider text-slate-400/80 dark:text-slate-500 uppercase no-drag select-none"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <span>Tabs</span>
-          <button
-            onClick={() => onNewTab()}
-            className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-            title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span>Tabs</span>
+            {isIncognito && (
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold tracking-wider uppercase bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
+                Private
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {isIncognito && onExitIncognito && (
+              <button
+                onClick={onExitIncognito}
+                className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/50 border border-cyan-500/30 transition-colors cursor-pointer flex items-center gap-1"
+                title="Normal Sekmeye Geç / Switch to Normal Tab"
+              >
+                <Compass className="w-3 h-3" />
+                <span className="text-[10px] capitalize font-medium">Normal</span>
+              </button>
+            )}
+            {onNewIncognitoTab && (
+              <button
+                onClick={onNewIncognitoTab}
+                className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                title={isMac ? "New Private Tab (⇧⌘N)" : "New Private Tab (Ctrl+Shift+N)"}
+              >
+                <ShieldOff className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button
+              onClick={() => onNewTab()}
+              className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
+              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
+            >
+              <Plus className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}
@@ -1548,6 +1586,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
+  if (prevProps.onNewIncognitoTab !== nextProps.onNewIncognitoTab) return false;
 
   // Array-valued props compared by reference (state arrays from App)
   if (prevProps.folders !== nextProps.folders) return false;
@@ -1571,6 +1611,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       a.favicon !== b.favicon ||
       a.isLoading !== b.isLoading ||
       a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
       a.isPlayingAudio !== b.isPlayingAudio ||
       a.isMuted !== b.isMuted ||
       a.isSuspended !== b.isSuspended ||

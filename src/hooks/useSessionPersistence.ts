@@ -1,7 +1,59 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
+
+/**
+ * Tab fields that represent durable state and must therefore trigger a
+ * `session_tabs` disk write when they change.
+ *
+ * Deliberately EXCLUDED (runtime-only, re-derived on hydration/restore):
+ *   - `blockedAdsCount` — bumped every 300ms by the `ad-blocked-batch` IPC
+ *   - `isLoading`, `canGoBack`, `canGoForward` — webview navigation state
+ *   - `webContentsId` — runtime handle, re-assigned on attach
+ *   - `lastAccessed` — LRU hint, defaulted during hydration (App.tsx)
+ *   - `thumbnail` — ephemeral preview cache, re-generated on demand
+ */
+const PERSISTED_TAB_FIELDS = [
+  'id',
+  'url',
+  'title',
+  'favicon',
+  'isPinned',
+  'isMuted',
+  'isPlayingAudio',
+  'isSuspended',
+  'isIncognito',
+  'splitWith',
+  'zoomFactor',
+  'workspaceId',
+  'folderId',
+  'isTranslated',
+  'translatedLang',
+] as const satisfies readonly (keyof Tab)[];
+
+/**
+ * Builds a cheap structural fingerprint of the tab list.
+ * Two invocations producing the same string guarantee the persisted JSON is
+ * identical, so the write can be skipped entirely.
+ */
+function buildTabSignature(tabs: Tab[]): string {
+  let signature = '';
+  for (const tab of tabs) {
+    for (const field of PERSISTED_TAB_FIELDS) {
+      const value = tab[field];
+      // 1-char encoding for flags keeps the fingerprint small and collision-free
+      // for booleans, while strings/numbers fall back to their JSON form.
+      if (typeof value === 'boolean' || value === undefined) {
+        signature += value === true ? '1' : '0';
+      } else {
+        signature += `${JSON.stringify(value)},`;
+      }
+    }
+    signature += ';';
+  }
+  return signature;
+}
 
 export interface UseSessionPersistenceOptions {
   tabs: Tab[];
@@ -29,7 +81,7 @@ export interface UseSessionPersistenceOptions {
  *     (`nova_session_tabs`/`session_tabs`, `active_tab_session`, `folders_session`,
  *      `user_settings`, `bookmarks`, `workspaces_session`, `active_workspace_session`
  *      + flushBookmarks()/flushHistory())
- *  3. session_tabs debounce (500ms, incognito-filtered)
+ *  3. session_tabs debounce (500ms, incognito-filtered, structural-change gated)
  *  4. active_tab debounce (300ms, localStorage only)
  *
  * Declaration order matches the original App.tsx order
@@ -143,10 +195,23 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   ]);
 
   // Save session whenever tabs changes (Excluding Incognito Tabs)
+  //
+  // Perf guard: the ad-block counter replaces the `tabs` array reference every
+  // 300ms, which used to cause a continuous `JSON.stringify` + localStorage +
+  // storeSet (disk) write storm on ad-heavy pages. We fingerprint only the
+  // durable fields (PERSISTED_TAB_FIELDS) and skip the debounce entirely when
+  // nothing structural changed. The signature is recorded as soon as the write
+  // is *scheduled* so bursts inside the 500ms window also collapse into one
+  // write. Transient counters are still flushed by the beforeunload /
+  // visibilitychange handler above, which reads live refs.
+  const lastPersistedTabsSignature = useRef<string | null>(null);
   useEffect(() => {
     if (isDemo || !isHydrated) return;
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
+    const signature = buildTabSignature(sessionTabs);
+    if (lastPersistedTabsSignature.current === signature) return;
+    lastPersistedTabsSignature.current = signature;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(sessionTabs);

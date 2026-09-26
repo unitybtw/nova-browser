@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 
 interface DownloadToastProps {
-  downloads: DownloadItem[];
+  /** Aktif indirme öğesi; App.tsx tarafından seçilip tekil prop olarak geçirilir. */
+  activeDownload: DownloadItem | null;
 }
 
 function getFileIcon(filename: string) {
@@ -50,44 +51,44 @@ function formatBytes(bytes?: number): string {
   return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
-export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloads }) => {
-  const [activeToast, setActiveToast] = useState<DownloadItem | null>(null);
+export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeDownload }) => {
   const [speed, setSpeed] = useState<string>('');
+  // Toast gövdesi artık prop'tan doğrudan türetiliyor; lokal state yalnızca
+  // gerçekten "türetilemeyen" UI durumunu tutar: kullanıcı tarafından kapatılan
+  // indirme id'si (Dismiss butonu + 5sn otomatik gizleme).
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
   const lastProgressRef = useRef<{ bytes: number; time: number }>({ bytes: 0, time: Date.now() });
 
   useEffect(() => {
-    if (!downloads || downloads.length === 0) return;
-
-    // Pick active progressing download first, otherwise latest item
-    const progressingItem = downloads.find(d => d.state === 'progressing');
-    const latestItem = progressingItem || downloads[0];
-
-    if (!latestItem) return;
-
-    setActiveToast(latestItem);
+    if (!activeDownload) return;
 
     // Calculate speed if progressing
-    if (latestItem.state === 'progressing' && latestItem.receivedBytes !== undefined) {
+    if (activeDownload.state === 'progressing' && activeDownload.receivedBytes !== undefined) {
       const now = Date.now();
       const elapsedSec = (now - lastProgressRef.current.time) / 1000;
       if (elapsedSec >= 0.5) {
-        const bytesDiff = latestItem.receivedBytes - lastProgressRef.current.bytes;
+        const bytesDiff = activeDownload.receivedBytes - lastProgressRef.current.bytes;
         if (bytesDiff > 0 && elapsedSec > 0) {
           const bytesPerSec = bytesDiff / elapsedSec;
           setSpeed(`${formatBytes(bytesPerSec)}/s`);
         }
-        lastProgressRef.current = { bytes: latestItem.receivedBytes, time: now };
+        lastProgressRef.current = { bytes: activeDownload.receivedBytes, time: now };
       }
     }
 
     // Auto-hide completed/cancelled toasts after 5 seconds
-    if (latestItem.state === 'completed' || latestItem.state === 'cancelled' || latestItem.state === 'interrupted') {
+    if (activeDownload.state === 'completed' || activeDownload.state === 'cancelled' || activeDownload.state === 'interrupted') {
       const timer = setTimeout(() => {
-        setActiveToast(current => (current?.id === latestItem.id ? null : current));
+        setDismissedId(current => (current === activeDownload.id ? current : activeDownload.id));
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [downloads]);
+  }, [activeDownload]);
+
+  const activeToast = activeDownload && activeDownload.id !== dismissedId ? activeDownload : null;
+  const dismissToast = () => {
+    if (activeToast) setDismissedId(activeToast.id);
+  };
 
   const progress = activeToast?.totalBytes 
     ? Math.min(100, Math.round((activeToast.receivedBytes / activeToast.totalBytes) * 100)) 
@@ -127,7 +128,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloa
                 {activeToast.filename}
               </div>
               <button 
-                onClick={(e) => { e.stopPropagation(); setActiveToast(null); }}
+                onClick={(e) => { e.stopPropagation(); dismissToast(); }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0 p-0.5 rounded-md"
                 title="Dismiss"
               >
@@ -178,7 +179,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloa
                   <button
                     onClick={() => {
                       (window as any).electronAPI?.showDownloadInFolder?.(activeToast.savePath!);
-                      setActiveToast(null);
+                      dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
@@ -188,7 +189,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloa
                   <button
                     onClick={() => {
                       (window as any).electronAPI?.openDownload?.(activeToast.savePath!);
-                      setActiveToast(null);
+                      dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >

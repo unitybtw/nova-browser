@@ -16,7 +16,7 @@ import {
   Search,
   Zap,
 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Tab } from '../types/browser';
 import {
@@ -63,6 +63,207 @@ interface SidePanelProps {
   pendingActions?: Array<{ id: number; text: string }>;
   onPendingActionConsumed?: (id: number) => void;
 }
+
+/**
+ * Markdown config lives at module scope on purpose. `ReactMarkdown` can only
+ * memoize across renders while `components` and `remarkPlugins` keep referential
+ * identity; building either object inline inside the render body defeats that
+ * memo and re-parses the whole transcript on every streaming tick (~20x/s).
+ */
+const MARKDOWN_REMARK_PLUGINS = [remarkGfm];
+
+const MARKDOWN_COMPONENTS: Components = {
+  a: ({ href, children }) => {
+    // AI output is untrusted: never render javascript:/data: URLs as links.
+    if (!href || !isSafeNavigationUrl(href)) {
+      return <span className="underline opacity-60 break-all">{children}</span>;
+    }
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-cyan-500 underline hover:text-cyan-400 break-all"
+      >
+        {children}
+      </a>
+    );
+  },
+  p: ({ children }) => <p className="my-1 leading-relaxed break-words">{children}</p>,
+  pre: ({ children }) => (
+    <pre className="max-w-full overflow-x-auto rounded-xl p-3 my-2 bg-slate-950 text-slate-100 border border-slate-800 text-xs font-mono nova-chat-scroll">
+      {children}
+    </pre>
+  ),
+  code: ({ inline, children }: any) =>
+    inline ? (
+      <code className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-cyan-600 dark:text-cyan-400 font-mono text-[11.5px] break-all border border-slate-200/60 dark:border-white/5">
+        {children}
+      </code>
+    ) : (
+      <code className="block max-w-full overflow-x-auto whitespace-pre font-mono text-xs text-slate-100">
+        {children}
+      </code>
+    ),
+};
+
+interface ChatMessageItemProps {
+  msg: ChatMessage;
+  idx: number;
+  isUser: boolean;
+  isTr: boolean;
+  /** Expansion state for *this* message only, not the whole record. */
+  expandedReasoning: boolean;
+  onToggleReasoning: (idx: number) => void;
+  onCopy: (text: string, idx: number) => void;
+  onSpeak: (text: string) => void;
+  isSpeaking: boolean;
+  copiedIdx: number | null;
+}
+
+/**
+ * One transcript entry. Memoized so a streaming tick only re-renders the single
+ * live bubble instead of re-parsing the markdown of every past assistant
+ * message. Props are kept primitive/stable by the parent for that to hold.
+ */
+const ChatMessageItem = React.memo(function ChatMessageItem({
+  msg,
+  idx,
+  isUser,
+  isTr,
+  expandedReasoning: isReasoningOpen,
+  onToggleReasoning,
+  onCopy,
+  onSpeak,
+  isSpeaking,
+  copiedIdx,
+}: ChatMessageItemProps) {
+  return (
+    <div
+      className={`flex flex-col gap-1.5 w-full ${isUser ? 'items-end' : 'items-start'} group`}
+    >
+      {/* Sender Tag */}
+      <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 font-medium">
+        {isUser ? (
+          <span>You</span>
+        ) : (
+          <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
+            <Sparkles className="w-3 h-3" />
+            <span>Nova Assistant</span>
+          </div>
+        )}
+      </div>
+
+      {/* Reasoning Accordion (DeepSeek/Claude style) */}
+      {!isUser && msg.reasoning && (
+        <div className="w-full max-w-[92%] rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-2xs">
+          <button
+            type="button"
+            onClick={() => onToggleReasoning(idx)}
+            className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer select-none"
+          >
+            <div className="flex items-center gap-2">
+              <Brain className="w-3.5 h-3.5 text-purple-500" />
+              <span className="font-medium text-[11.5px]">Reasoning Process</span>
+              {msg.reasoning.durationMs && (
+                <span className="text-[9.5px] font-mono text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                  {(msg.reasoning.durationMs / 1000).toFixed(1)}s
+                </span>
+              )}
+            </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isReasoningOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {isReasoningOpen && (
+            <div className="p-3 border-t border-slate-200/60 dark:border-white/5 text-[11.5px] leading-relaxed font-mono text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-52 nova-chat-scroll">
+              {msg.reasoning.text}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tool Execution Pills */}
+      {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 w-full max-w-[92%] mb-0.5">
+          {msg.toolCalls.map((tc) => (
+            <div
+              key={tc.id}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 shadow-2xs"
+            >
+              <Zap className="w-3 h-3 text-cyan-500" />
+              <span className="font-semibold text-slate-700 dark:text-slate-200">{tc.name}</span>
+              {tc.durationMs && (
+                <span className="text-[9.5px] text-slate-400">
+                  {(tc.durationMs / 1000).toFixed(1)}s
+                </span>
+              )}
+              {tc.state === 'error' || tc.error ? (
+                <span className="text-rose-500 font-bold" title={tc.error}>✕</span>
+              ) : (
+                <span className="text-emerald-500 font-bold">✓</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Message Bubble */}
+      <div
+        className={`max-w-[92%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed overflow-hidden shadow-2xs transition-all relative ${
+          isUser
+            ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 rounded-tr-xs font-normal border border-slate-800/80 dark:border-white/10'
+            : 'bg-white/95 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-white/10 backdrop-blur-sm prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs prose-pre:text-slate-100'
+        }`}
+      >
+        {isUser ? (
+          <>
+            {msg.attachments && msg.attachments.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2 justify-end">
+                {msg.attachments.map((att, i) => (
+                  <img
+                    key={i}
+                    src={att.url}
+                    alt={att.name}
+                    className="size-16 object-cover rounded-xl border border-white/20 shadow-xs"
+                  />
+                ))}
+              </div>
+            )}
+            <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+          </>
+        ) : (
+          <ReactMarkdown remarkPlugins={MARKDOWN_REMARK_PLUGINS} components={MARKDOWN_COMPONENTS}>
+            {msg.content}
+          </ReactMarkdown>
+        )}
+      </div>
+
+      {/* Action Buttons on Assistant Message */}
+      {!isUser && (
+        <div className="flex items-center gap-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            type="button"
+            onClick={() => onCopy(msg.content, idx)}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
+            title={isTr ? 'Kopyala' : 'Copy'}
+          >
+            {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+            <span>{copiedIdx === idx ? (isTr ? 'Kopyalandı' : 'Copied') : (isTr ? 'Kopyala' : 'Copy')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onSpeak(msg.content)}
+            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
+            title={isTr ? 'Sesli Oku' : 'Read aloud'}
+          >
+            {isSpeaking ? <VolumeX className="w-3 h-3 text-orange-500" /> : <Volume2 className="w-3 h-3" />}
+            <span>{isTr ? 'Seslendir' : 'Speak'}</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export const SidePanel = React.memo(({
   isOpen,
@@ -443,6 +644,12 @@ export const SidePanel = React.memo(({
     setStreamStartTime(null);
   }, [streamingText]);
 
+  // Stable identity so toggling one reasoning block doesn't invalidate every
+  // memoized ChatMessageItem.
+  const handleToggleReasoning = useCallback((idx: number) => {
+    setExpandedReasoning((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  }, []);
+
   const handleCopy = useCallback(async (text: string, idx: number) => {
     const ok = await copyTextToClipboard(text);
     if (!ok) return;
@@ -658,173 +865,21 @@ export const SidePanel = React.memo(({
         )}
 
         {/* Message Items */}
-        {messages.map((msg, idx) => {
-          const isUser = msg.role === 'user';
-          const isReasoningOpen = Boolean(expandedReasoning[idx]);
-
-          return (
-            <div
-              key={idx}
-              className={`flex flex-col gap-1.5 w-full ${isUser ? 'items-end' : 'items-start'} group`}
-            >
-              {/* Sender Tag */}
-              <div className="flex items-center gap-1.5 px-1 text-[11px] text-slate-400 font-medium">
-                {isUser ? (
-                  <span>You</span>
-                ) : (
-                  <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
-                    <Sparkles className="w-3 h-3" />
-                    <span>Nova Assistant</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Reasoning Accordion (DeepSeek/Claude style) */}
-              {!isUser && msg.reasoning && (
-                <div className="w-full max-w-[92%] rounded-xl border border-slate-200/80 dark:border-white/10 bg-slate-50/70 dark:bg-slate-900/60 backdrop-blur-sm overflow-hidden shadow-2xs">
-                  <button
-                    type="button"
-                    onClick={() => setExpandedReasoning((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                    className="flex w-full items-center justify-between px-3 py-2 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-800/40 transition-colors cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Brain className="w-3.5 h-3.5 text-purple-500" />
-                      <span className="font-medium text-[11.5px]">Reasoning Process</span>
-                      {msg.reasoning.durationMs && (
-                        <span className="text-[9.5px] font-mono text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
-                          {(msg.reasoning.durationMs / 1000).toFixed(1)}s
-                        </span>
-                      )}
-                    </div>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isReasoningOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {isReasoningOpen && (
-                    <div className="p-3 border-t border-slate-200/60 dark:border-white/5 text-[11.5px] leading-relaxed font-mono text-slate-600 dark:text-slate-400 whitespace-pre-wrap max-h-52 nova-chat-scroll">
-                      {msg.reasoning.text}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Tool Execution Pills */}
-              {!isUser && msg.toolCalls && msg.toolCalls.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 w-full max-w-[92%] mb-0.5">
-                  {msg.toolCalls.map((tc) => (
-                    <div
-                      key={tc.id}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-medium bg-slate-100 dark:bg-white/[0.06] border border-slate-200/80 dark:border-white/10 text-slate-600 dark:text-slate-300 shadow-2xs"
-                    >
-                      <Zap className="w-3 h-3 text-cyan-500" />
-                      <span className="font-semibold text-slate-700 dark:text-slate-200">{tc.name}</span>
-                      {tc.durationMs && (
-                        <span className="text-[9.5px] text-slate-400">
-                          {(tc.durationMs / 1000).toFixed(1)}s
-                        </span>
-                      )}
-                      {tc.state === 'error' || tc.error ? (
-                        <span className="text-rose-500 font-bold" title={tc.error}>✕</span>
-                      ) : (
-                        <span className="text-emerald-500 font-bold">✓</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Message Bubble */}
-              <div
-                className={`max-w-[92%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed overflow-hidden shadow-2xs transition-all relative ${
-                  isUser
-                    ? 'bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 rounded-tr-xs font-normal border border-slate-800/80 dark:border-white/10'
-                    : 'bg-white/95 dark:bg-slate-900/80 text-slate-800 dark:text-slate-100 rounded-tl-xs border border-slate-200/90 dark:border-white/10 backdrop-blur-sm prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-p:my-1 prose-headings:my-2 prose-pre:my-2 prose-pre:bg-slate-950 prose-pre:border prose-pre:border-slate-800 prose-pre:rounded-xl prose-pre:p-3 prose-pre:text-xs prose-pre:text-slate-100'
-                }`}
-              >
-                {isUser ? (
-                  <>
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-2 justify-end">
-                        {msg.attachments.map((att, i) => (
-                          <img
-                            key={i}
-                            src={att.url}
-                            alt={att.name}
-                            className="size-16 object-cover rounded-xl border border-white/20 shadow-xs"
-                          />
-                        ))}
-                      </div>
-                    )}
-                    <span className="whitespace-pre-wrap break-words">{msg.content}</span>
-                  </>
-                ) : (
-                  <ReactMarkdown
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      a: ({ href, children }) => {
-                        // AI output is untrusted: never render javascript:/data: URLs as links.
-                        if (!href || !isSafeNavigationUrl(href)) {
-                          return <span className="underline opacity-60 break-all">{children}</span>;
-                        }
-                        return (
-                          <a
-                            href={href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-cyan-500 underline hover:text-cyan-400 break-all"
-                          >
-                            {children}
-                          </a>
-                        );
-                      },
-                      p: ({ children }) => <p className="my-1 leading-relaxed break-words">{children}</p>,
-                      pre: ({ children }) => (
-                        <pre className="max-w-full overflow-x-auto rounded-xl p-3 my-2 bg-slate-950 text-slate-100 border border-slate-800 text-xs font-mono nova-chat-scroll">
-                          {children}
-                        </pre>
-                      ),
-                      code: ({ inline, children }: any) =>
-                        inline ? (
-                          <code className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 text-cyan-600 dark:text-cyan-400 font-mono text-[11.5px] break-all border border-slate-200/60 dark:border-white/5">
-                            {children}
-                          </code>
-                        ) : (
-                          <code className="block max-w-full overflow-x-auto whitespace-pre font-mono text-xs text-slate-100">
-                            {children}
-                          </code>
-                        ),
-                    }}
-                  >
-                    {msg.content}
-                  </ReactMarkdown>
-                )}
-              </div>
-
-              {/* Action Buttons on Assistant Message */}
-              {!isUser && (
-                <div className="flex items-center gap-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    type="button"
-                    onClick={() => handleCopy(msg.content, idx)}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
-                    title={isTr ? 'Kopyala' : 'Copy'}
-                  >
-                    {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedIdx === idx ? (isTr ? 'Kopyalandı' : 'Copied') : (isTr ? 'Kopyala' : 'Copy')}</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSpeak(msg.content)}
-                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] flex items-center gap-1 cursor-pointer"
-                    title={isTr ? 'Sesli Oku' : 'Read aloud'}
-                  >
-                    {isSpeaking ? <VolumeX className="w-3 h-3 text-orange-500" /> : <Volume2 className="w-3 h-3" />}
-                    <span>{isTr ? 'Seslendir' : 'Speak'}</span>
-                  </button>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {messages.map((msg, idx) => (
+          <ChatMessageItem
+            key={idx}
+            idx={idx}
+            msg={msg}
+            isUser={msg.role === 'user'}
+            isTr={isTr}
+            expandedReasoning={Boolean(expandedReasoning[idx])}
+            onToggleReasoning={handleToggleReasoning}
+            onCopy={handleCopy}
+            onSpeak={handleSpeak}
+            isSpeaking={isSpeaking}
+            copiedIdx={copiedIdx}
+          />
+        ))}
 
         {/* Live Streaming Message Bubble */}
         {isLoading && (

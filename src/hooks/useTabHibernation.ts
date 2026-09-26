@@ -28,7 +28,9 @@ const MAX_LIVE_WEBVIEWS = 6;
  *   webview sayısını LRU-6 ile cap'ler (`computeLiveAndSuspendedTabs`);
  *   kapalıyken askıdaki sekmeleri 300ms'de en fazla 2'şerli uyandırır
  *   (Chromium renderer patlamasını önler). `staggeredWakeRef` cleanup'ları
- *   aynen korunur.
+ *   aynen korunur. LRU güncellemesi de Effect 1 gibi `changed ? updated : prev`
+ *   guard'ı kullanır: `isSuspended` alanı fiilen değişmiyorsa `tabs`
+ *   referansı korunur, böylece dep array'i ikinci bir geçiş tetiklemez.
  *
  * Timer davranışı birebir aynıdır: 30sn idle kontrol, LRU-6, staggered wake.
  * Manuel kontroller (handleSelectTab/handleSuspendTab/handlePurgeMemory)
@@ -135,7 +137,20 @@ export function useTabHibernation({
 
     const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, MAX_LIVE_WEBVIEWS);
     if (tabsToSuspend.size > 0) {
-      setTabs(prev => prev.map(t => tabsToSuspend.has(t.id) ? { ...t, isSuspended: true } : t));
+      setTabs(prev => {
+        // Identity guard (Effect 1 ile aynı desen): `tabs` bu effect'in dep
+        // array'inde olduğu için, alanı gerçekten değişmeyen bir güncelleme
+        // yeni dizi referansı üretip garantili bir ikinci geçişi tetikler.
+        let changed = false;
+        const updated = prev.map(t => {
+          if (tabsToSuspend.has(t.id) && !t.isSuspended) {
+            changed = true;
+            return { ...t, isSuspended: true };
+          }
+          return t;
+        });
+        return changed ? updated : prev;
+      });
     }
   }, [tabs, activeTabId, splitTabId, settings.tabHibernationEnabled]);
 }

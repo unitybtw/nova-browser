@@ -83,9 +83,9 @@ const PermissionReviewDialog: React.FC<PermissionReviewDialogProps> = ({
         </div>
 
         <div className="space-y-2">
-          {permissions.map((perm, index) => (
+          {permissions.map((perm) => (
             <div
-              key={index}
+              key={perm.name}
               className="flex items-start gap-3 p-3 rounded-xl bg-slate-50/50 dark:bg-white/[0.02] border border-slate-100/50 dark:border-white/5"
             >
               <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 flex items-center justify-center mt-0.5">

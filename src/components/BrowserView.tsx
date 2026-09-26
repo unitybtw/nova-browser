@@ -52,6 +52,7 @@ interface BrowserViewProps {
   onUpdateTab: (id: string, updates: Partial<Tab>) => void;
   onCloseTab: (id: string) => void;
   isIncognito: boolean;
+  onExitIncognito?: () => void;
   onNewTab?: (url?: string, sourceTabId?: string) => void;
   onNavigate?: (url: string, tabId?: string) => void;
   onActivate?: (id: string) => void;
@@ -80,6 +81,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   onUpdateTab,
   onCloseTab,
   isIncognito,
+  onExitIncognito,
   onNewTab,
   onNavigate,
   onActivate,
@@ -902,6 +904,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             backgroundCustomUrl={settings.backgroundCustomUrl}
             showTasksWidget={disableTasksWidget ? false : settings.showTasksWidget}
             isIncognito={isIncognito}
+            onExitIncognito={onExitIncognito}
             isDemo={isDemo}
             theme={settings.theme}
             energySaverMode={settings.energySaverMode}
@@ -1241,6 +1244,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 }, (prevProps, nextProps) => {
   if (prevProps.isActive !== nextProps.isActive) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
   if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.newTabBackground !== nextProps.newTabBackground) return false;

@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Calendar } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Calendar, Compass } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
@@ -9,6 +9,7 @@ import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils
 import { generateId } from '../utils/idGenerator';
 import { useTranslation, getLocale } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
+import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { logger } from '../utils/logger';
 
 interface Todo {
@@ -32,6 +33,7 @@ interface NewTabPageProps {
   browserColor?: UserSettings['browserColor'];
   customBrowserColor?: string;
   isDemo?: boolean;
+  onExitIncognito?: () => void;
 }
 
 interface ClockProps {
@@ -180,6 +182,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   browserColor = 'default',
   customBrowserColor = '',
   isDemo = false,
+  onExitIncognito,
 }) => {
   const { t, language } = useTranslation();
   // Only animate on the first app launch, all subsequent new tabs open instantly
@@ -226,6 +229,32 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
+  const [urlError, setUrlError] = useState('');
+  const editModalRef = useRef<HTMLDivElement>(null);
+
+  const handleCloseEditModal = useCallback(() => {
+    setIsEditModalOpen(false);
+    setEditingDial({ name: '', url: '', index: null });
+    setUrlError('');
+  }, []);
+
+  useModalFocusTrap(isEditModalOpen, handleCloseEditModal, editModalRef);
+
+  const previewUrl = useMemo(() => {
+    return normalizeNavigationUrl(editingDial.url || 'https://google.com');
+  }, [editingDial.url]);
+
+  const previewDomain = useMemo(() => {
+    return getCleanDomain(previewUrl) || '';
+  }, [previewUrl]);
+
+  const previewName = useMemo(() => {
+    if (editingDial.name.trim()) return editingDial.name.trim();
+    if (previewDomain) {
+      return previewDomain.charAt(0).toUpperCase() + previewDomain.slice(1);
+    }
+    return editingDial.index !== null ? 'Shortcut' : (language === 'tr' ? 'Kısayol Önizleme' : 'Shortcut Preview');
+  }, [editingDial.name, previewDomain, editingDial.index, language]);
 
   const [todos, setTodos] = useState<Todo[]>(() => {
     // Incognito: never read persistent storage
@@ -400,12 +429,21 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   };
 
   const handleAddSpeedDial = () => {
-    if (!editingDial.url) return;
+    if (!editingDial.url || !editingDial.url.trim()) {
+      setUrlError(language === 'tr' ? 'Lütfen bir web adresi girin.' : 'Please enter a web address.');
+      return;
+    }
     const url = normalizeNavigationUrl(editingDial.url);
-    if (!isSafeNavigationUrl(url)) return;
+    if (!isSafeNavigationUrl(url)) {
+      setUrlError(language === 'tr' ? 'Geçerli ve güvenli bir web adresi girin.' : 'Please enter a valid, safe URL.');
+      return;
+    }
     try {
       const domain = getCleanDomain(url);
-      if (!domain) return;
+      if (!domain) {
+        setUrlError(language === 'tr' ? 'Geçerli bir alan adı bulunamadı.' : 'Could not determine a valid domain.');
+        return;
+      }
       const rawName = (editingDial.name || '').trim();
       const name = rawName || (domain.charAt(0).toUpperCase() + domain.slice(1));
       if (editingDial.index !== null) {
@@ -415,12 +453,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       } else {
         setSpeedDials([...speedDials, { name, url, domain }]);
       }
-    } catch(e) {
+    } catch (e) {
+      setUrlError(language === 'tr' ? 'Adres işlenirken bir hata oluştu.' : 'Failed to process address.');
       return;
     }
 
-    setIsEditModalOpen(false);
-    setEditingDial({ name: '', url: '', index: null });
+    handleCloseEditModal();
   };
 
   const handleSpeedDialClick = (e: React.MouseEvent, rawUrl: string) => {
@@ -568,6 +606,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               </button>
             </form>
           </motion.div>
+
+          {onExitIncognito && (
+            <motion.div variants={shouldAnimate ? itemVariants : undefined}>
+              <button
+                type="button"
+                onClick={onExitIncognito}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-cyan-500/10 cursor-pointer"
+              >
+                <Compass className="w-4 h-4 text-cyan-400" />
+                <span>{language === 'tr' ? 'Normal Sekmeye Geç' : 'Switch to Normal Tab'}</span>
+              </button>
+            </motion.div>
+          )}
         </motion.div>
       </div>
     );
@@ -1034,6 +1085,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     onClick={(e) => {
                       e.stopPropagation();
                       setEditingDial({ name: dial.name, url: dial.url, index: idx });
+                      setUrlError('');
                       setIsEditModalOpen(true);
                     }}
                     className="p-1 text-slate-300 hover:text-white rounded cursor-pointer"
@@ -1063,6 +1115,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <button
                   onClick={() => {
                     setEditingDial({ name: '', url: '', index: null });
+                    setUrlError('');
                     setIsEditModalOpen(true);
                   }}
                   className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed cursor-pointer backdrop-blur-xl ${
@@ -1200,52 +1253,150 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="absolute inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm"
+          transition={{ duration: 0.15 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 backdrop-blur-md p-4 select-auto"
+          onClick={handleCloseEditModal}
         >
           <motion.div 
-            initial={{ scale: 0.95 }}
-            animate={{ scale: 1 }}
-            exit={{ scale: 0.95 }}
-            className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200 dark:border-slate-700"
+            initial={{ scale: 0.95, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 400 }}
+            ref={editModalRef}
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="shortcut-modal-title"
+            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
           >
-            <h3 className="text-lg font-bold mb-4">{editingDial.index !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}</h3>
-            <div className="space-y-3">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                  <Globe className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 id="shortcut-modal-title" className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-tight">
+                    {editingDial.index !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {editingDial.index !== null
+                      ? (language === 'tr' ? 'Kısayol bilgilerini güncelleyin' : 'Update shortcut details')
+                      : (language === 'tr' ? 'Hızlı erişim için yeni bir web sitesi ekleyin' : 'Add a new website for quick access')}
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={handleCloseEditModal}
+                aria-label={t('common.close')}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Live Visual Preview */}
+            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-white/10 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center p-2 shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
+                <SpeedDialIcon name={previewName} url={previewUrl} domain={previewDomain} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                  {previewName}
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono">
+                  {previewDomain || 'https://...'}
+                </div>
+              </div>
+              <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
+                {language === 'tr' ? 'Önizleme' : 'Preview'}
+              </span>
+            </div>
+
+            {/* Form Inputs */}
+            <div className="space-y-3.5">
               <div>
-                <label className="text-xs font-semibold opacity-70 block mb-1">{t('newtab.shortcutName')}</label>
+                <label htmlFor="shortcut-name-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                  {t('newtab.shortcutName')}
+                </label>
                 <input 
+                  id="shortcut-name-input"
                   type="text" 
                   value={editingDial.name}
-                  onChange={(e) => setEditingDial({ ...editingDial, name: e.target.value })}
+                  onChange={(e) => {
+                    setEditingDial({ ...editingDial, name: e.target.value });
+                    if (urlError) setUrlError('');
+                  }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
-                  placeholder="e.g. YouTube"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm outline-none"
+                  placeholder={language === 'tr' ? 'Örn. YouTube, GitHub...' : 'e.g. YouTube, GitHub...'}
+                  className="w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20 transition-all"
                 />
               </div>
               <div>
-                <label className="text-xs font-semibold opacity-70 block mb-1">{t('newtab.shortcutUrl')}</label>
+                <label htmlFor="shortcut-url-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
+                  {t('newtab.shortcutUrl')}
+                </label>
                 <input 
+                  id="shortcut-url-input"
                   type="text" 
                   value={editingDial.url}
-                  onChange={(e) => setEditingDial({ ...editingDial, url: e.target.value })}
+                  onChange={(e) => {
+                    setEditingDial({ ...editingDial, url: e.target.value });
+                    if (urlError) setUrlError('');
+                  }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
-                  placeholder="e.g. https://youtube.com"
-                  className="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm outline-none"
+                  placeholder={language === 'tr' ? 'Örn. https://youtube.com veya youtube.com' : 'e.g. https://youtube.com or youtube.com'}
+                  className={`w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
+                    urlError 
+                      ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20' 
+                      : 'border-slate-200/90 dark:border-slate-700/80 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20'
+                  }`}
                 />
+                {urlError && (
+                  <p className="text-xs text-rose-500 dark:text-rose-400 mt-1.5 flex items-center gap-1 font-medium">
+                    {urlError}
+                  </p>
+                )}
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button 
-                onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl text-sm font-medium transition-colors"
-              >
-                {t('common.cancel')}
-              </button>
-              <button 
-                onClick={handleAddSpeedDial}
-                className="px-4 py-2 bg-accent-hover hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-colors shadow-md shadow-indigo-600/20"
-              >
-                {t('common.save')}
-              </button>
+
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-white/10">
+              {editingDial.index !== null ? (
+                <button 
+                  type="button"
+                  onClick={() => {
+                    if (editingDial.index !== null) {
+                      handleDeleteSpeedDial(editingDial.index);
+                      handleCloseEditModal();
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl transition-colors cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{t('common.delete')}</span>
+                </button>
+              ) : (
+                <div />
+              )}
+              <div className="flex items-center gap-2">
+                <button 
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                >
+                  {t('common.cancel')}
+                </button>
+                <button 
+                  type="button"
+                  onClick={handleAddSpeedDial}
+                  className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-cyan-500/25 active:scale-[0.98] cursor-pointer"
+                >
+                  {t('common.save')}
+                </button>
+              </div>
             </div>
           </motion.div>
         </motion.div>

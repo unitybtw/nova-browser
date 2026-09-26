@@ -70,6 +70,9 @@ import { getElectronAPI } from '../utils/electronBridge';
 import { OmniboxBar } from './topbar/OmniboxBar';
 export { OmniboxBar };
 
+/** Stable identity handed to the downloads popover while it is closed. */
+const EMPTY_DOWNLOADS: DownloadItem[] = [];
+
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
   blue: '#3b82f6',
@@ -117,6 +120,7 @@ interface TopBarProps {
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: (url?: string) => void;
   onNewIncognitoTab?: () => void;
+  onExitIncognito?: () => void;
   onOpenShare?: () => void;
   onTakeScreenshot?: () => void;
   useVerticalTabs?: boolean;
@@ -651,7 +655,9 @@ const MemoizedTabItem = React.memo(({
     prevProps.tab.isSuspended === nextProps.tab.isSuspended &&
     prevProps.tabsLength === nextProps.tabsLength &&
     prevProps.tabStyle === nextProps.tabStyle &&
-    prevProps.tabAnimation === nextProps.tabAnimation
+    prevProps.tabAnimation === nextProps.tabAnimation &&
+    prevProps.isIncognito === nextProps.isIncognito &&
+    prevProps.tab.isIncognito === nextProps.tab.isIncognito
   );
 });
 
@@ -700,6 +706,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onSelectTab,
   onNewTab,
   onNewIncognitoTab,
+  onExitIncognito,
   onCloseTab,
   onNavigate,
   onGoBack,
@@ -1302,6 +1309,24 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               >
                 <ShieldOff className="w-4 h-4" />
               </motion.button>
+
+              {/* Exit Incognito / Switch to Normal Tab Button */}
+              {isIncognito && onExitIncognito && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{
+                    duration: 0.15,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  onClick={onExitIncognito}
+                  className="px-2 py-1 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 text-[11px] font-medium bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/50 hover:text-cyan-300 border border-cyan-500/30 shadow-xs"
+                  title="Normal Sekmeye Geç / Switch to Normal Tab"
+                >
+                  <Compass className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Normal Sekme</span>
+                </motion.button>
+              )}
             </motion.div>
           </Reorder.Group>
 
@@ -1494,7 +1519,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </button>
             <DownloadsPopover
-              downloads={downloads}
+              // Shared empty array so the downloads popover can be handed a stable
+  // reference while closed. The main process broadcasts progress every 250ms;
+  // passing the live array straight through would invalidate the TopBar memo
+  // ~4x/second and repaint the whole (framer-motion animated) tab strip.
+  downloads={isDownloadsOpen ? downloads : EMPTY_DOWNLOADS}
               isOpen={isDownloadsOpen}
               onClose={() => setIsDownloadsOpen(false)}
               onClearDownloads={onClearDownloads || (() => {})}
@@ -1884,13 +1913,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   // unless actually changed)
   if (prevProps.workspaces !== nextProps.workspaces) return false;
   if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+  // `downloads` now arrives as a stable reference while the popover is closed
+  // (see EMPTY_DOWNLOADS), so a plain reference check no longer repaints the
+  // strip on every progress broadcast. The badge only needs the count.
   if (prevProps.downloads !== nextProps.downloads) return false;
+  if ((prevProps.activeDownloadsCount || 0) !== (nextProps.activeDownloadsCount || 0)) return false;
   if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
+  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
 
   // Tabs: length + order-sensitive per-field comparison of every field the
   // strip or the active-tab-derived UI reads:
   //   strip items: id, url, title, favicon, isLoading, isMuted, isPinned,
-  //                isPlayingAudio, isSuspended, splitWith
+  //                isPlayingAudio, isSuspended, splitWith, isIncognito
   //   active tab:  canGoBack, canGoForward, zoomFactor, blockedAdsCount,
   //                webContentsId (+ url/title/favicon/id above)
   const prevTabs = prevProps.tabs;
@@ -1909,6 +1943,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       a.isLoading !== b.isLoading ||
       a.isMuted !== b.isMuted ||
       a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
       a.isPlayingAudio !== b.isPlayingAudio ||
       a.isSuspended !== b.isSuspended ||
       a.isTranslated !== b.isTranslated ||
