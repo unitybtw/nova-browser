@@ -57,12 +57,16 @@ app.whenReady().then(async () => {
 
     const destPublic = path.join(publicDir, scene.name);
     fs.writeFileSync(destPublic, pngBuffer);
-    console.log(`Saved to ${destPublic}, size: ${pngBuffer.length} bytes`);
+    const destScreenshots = path.join(publicDir, 'screenshots', scene.name);
+    fs.writeFileSync(destScreenshots, pngBuffer);
+    console.log(`Saved to ${destScreenshots}, size: ${pngBuffer.length} bytes`);
 
     if (fs.existsSync(websitePublicDir)) {
       const destWebsite = path.join(websitePublicDir, scene.name);
       fs.writeFileSync(destWebsite, pngBuffer);
-      console.log(`Copied to ${destWebsite}`);
+      const destWebsiteScreenshots = path.join(websitePublicDir, 'screenshots', scene.name);
+      fs.writeFileSync(destWebsiteScreenshots, pngBuffer);
+      console.log(`Copied to ${destWebsiteScreenshots}`);
     }
   }
 
