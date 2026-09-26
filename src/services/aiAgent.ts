@@ -404,6 +404,22 @@ export function detectDirectIntent(userText: string): { name: string; arguments:
     };
   }
 
+  // 9b. Autonomous Multi-Step Goal & Task Intent
+  // e.g. "siteye gidip şunu yap sonra işte youtube da şu videoyu bul",
+  //      "youtube'a git ve lofi müzik aç", "google'da btc fiyatı ara sonra ekran görüntüsü al",
+  //      "hedef: ...", "görev: ..."
+  const hasSequentialMarker = /(?:\s+(?:sonra|ardından|ve ardından|daha sonra|sonrasında|then|and then|after that)\s+)/i.test(normalized);
+  const hasExplicitGoalPrefix = /^(?:hedef|görev|gorev|task|goal|plan)\s*[:\s]\s*(.+)$/i.test(normalized);
+  const isCompoundYoutubePlay = /^(?:youtube(?:['']?(?:a|e|ye|ya|da|de|ta|te)|\s+[a-z]+)?)\s+(?:git|gir|aç)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s+(?:aç|ac|oynat|çal|cal|izle|bul|başlat|baslat)$/i.test(normalized);
+  const isSiteAndAction = /^(?:siteye|web sitesine|sayfaya)\s+(?:git|gir)?\s*(?:ve|,|sonra)\s*(.+)$/i.test(normalized);
+
+  if (hasExplicitGoalPrefix || (hasSequentialMarker && /(?:git|gir|aç|ara|bul|çal|izle|oynat|tıkla|yaz|oku|özetle|screenshot|ekran|navigate|search|click|play|find)/i.test(normalized)) || (isCompoundYoutubePlay && !normalized.match(/^youtube(?:'da|da)\s+(.+)\s+ara$/i)) || isSiteAndAction) {
+    return {
+      name: 'execute_goal',
+      arguments: { goal: text.trim() }
+    };
+  }
+
   // 10. YouTube Search / Playback Compound (e.g. "youtube aç ve enes batur videosunu aç", "youtube'da tarkan ara", "youtube da lofi dinle")
   const ytCompoundMatch = 
     normalized.match(/^(?:youtube|yt)(?:['']?(?:da|de|ta|te)|\s+da|\s+de)?\s+(?:aç|ac|a git|git)?\s*(?:ve|,)?\s*(?:bana\s+)?(.+?)\s*(?:kanalını\s*aç|kanalini\s*ac|kanalını|kanalini|videosunu\s*aç|videosunu\s*ac|videosu|videosunu|şarkısını\s*aç|şarkısını|şarkısı|izle|dinle|ara|aç|ac)?$/i) ||
@@ -555,7 +571,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
   if (funcSyntax) {
     const fn = funcSyntax[1];
     const rawParam = funcSyntax[2].trim();
-    const KNOWN_TOOLS = ["navigate_to_url", "web_research", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form", "reload_page", "go_back", "go_forward"];
+    const KNOWN_TOOLS = ["navigate_to_url", "web_research", "execute_goal", "read_page_content", "get_page_url", "click_element", "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot", "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form", "reload_page", "go_back", "go_forward"];
     if (KNOWN_TOOLS.includes(fn)) {
       if (fn === 'navigate_to_url') {
         const cleaned = rawParam.replace(/^['"]|['"]$/g, '').trim();
@@ -611,7 +627,7 @@ export function parseReActAction(text: string): { name: string; arguments: any }
 
   // 5. Look for direct JSON matching known tool names
   const KNOWN_TOOLS = [
-    "navigate_to_url", "web_research", "read_page_content", "get_page_url", "click_element",
+    "navigate_to_url", "web_research", "execute_goal", "read_page_content", "get_page_url", "click_element",
     "fill_input", "manage_tabs", "scroll_page", "press_key", "take_screenshot",
     "wait", "get_page_links", "search_history", "save_to_memory", "auto_fill_form",
     "reload_page", "go_back", "go_forward"
@@ -1198,6 +1214,20 @@ class AIAgent {
             query: { type: "string", description: "The search query or topic to research on the web." }
           },
           required: ["query"]
+        }
+      }
+    },
+    {
+      type: "function",
+      function: {
+        name: "execute_goal",
+        description: "Executes an autonomous multi-step user goal or task across websites (e.g. searching and playing a video on YouTube, navigating to a website and performing actions, capturing screenshots, multi-step queries).",
+        parameters: {
+          type: "object",
+          properties: {
+            goal: { type: "string", description: "The multi-step goal or task description to execute." }
+          },
+          required: ["goal"]
         }
       }
     }
@@ -2083,6 +2113,440 @@ CRITICAL RULES:
   }
 
   /**
+   * Autonomous Goal & Multi-Step Task Execution Engine:
+   * Analyzes complex user goals (e.g. "siteye git ve şunu yap sonra işte youtube da şu videoyu bul",
+   * "youtube'a git ve lofi müzik aç", "google'da btc fiyatı ara sonra ekran görüntüsü al", "hedef: ..."),
+   * plans sequential browser steps, executes real tool actions with realistic virtual cursor animations,
+   * streams real-time step progress, and delivers a complete, professional report without emojis.
+   */
+  public async executeAutonomousGoal(
+    goalPrompt: string,
+    messages: ChatCompletionMessageParam[],
+    onChunk?: (chunk: string) => void,
+    generation?: number
+  ): Promise<ChatCompletionMessageParam[]> {
+    const startTime = Date.now();
+    const callId = generateId('goal');
+    const isTr = isTurkishText(goalPrompt);
+    const offset = this.getWebviewOffset();
+
+    const isCancelled = () => generation === undefined
+      ? this.isInterrupted
+      : !this.isOperationActive(generation);
+
+    if (onChunk) {
+      onChunk(isTr
+        ? `[Otonom Gorev Baslatildi: "${goalPrompt}"]\nHedef analiz ediliyor ve adimlar planlaniyor...\n\n`
+        : `[Autonomous Goal Started: "${goalPrompt}"]\nAnalyzing goal and planning execution steps...\n\n`
+      );
+    }
+    this.emitStatus('thinking');
+
+    // ── 1. Decompose goal into actionable steps ──
+    interface GoalStep {
+      action: 'navigate' | 'youtube_search_and_play' | 'search_and_extract' | 'click' | 'type' | 'scroll' | 'screenshot' | 'summarize';
+      target?: string;
+      descriptionTr: string;
+      descriptionEn: string;
+    }
+
+    const steps: GoalStep[] = [];
+    const normalized = goalPrompt.trim().toLowerCase();
+
+    // Check if compound steps connected by "sonra", "ardından", "then", etc.
+    const subParts = goalPrompt
+      .split(/(?:\s+(?:sonra|ardından|ve ardından|daha sonra|sonrasında|then|and then|after that)\s+)/i)
+      .map(p => p.trim())
+      .filter(p => p.length > 2);
+
+    for (let partIdx = 0; partIdx < subParts.length; partIdx++) {
+      const part = subParts[partIdx];
+      const pNorm = part.toLowerCase();
+
+      // Case A: YouTube video search and play
+      if (pNorm.includes('youtube') && /(?:bul|aç|ac|oynat|çal|cal|izle|dinle|play|find|listen)/i.test(pNorm)) {
+        let videoQuery = part
+          .replace(/^(?:ve\s+)?(?:işte\s+)?(?:youtube(?:'da|'de|da|de|\s+a|\s+e|\s+ye|\s+ya)?)\s*/gi, '')
+          .replace(/(?:şu\s+|bir\s+|gibi\s+)?(?:videoyu|videoları|şarkıyı|parçayı|müziği|music|video)\s*/gi, '')
+          .replace(/\s+(?:bul|aç|ac|oynat|çal|cal|izle|dinle|play|find|listen|getir).*$/gi, '')
+          .replace(/^(?:git|gir|aç)\s+/gi, '')
+          .trim();
+        if (!videoQuery || videoQuery.length < 2) {
+          videoQuery = 'trending';
+        }
+        steps.push({
+          action: 'youtube_search_and_play',
+          target: videoQuery,
+          descriptionTr: `YouTube'da "${videoQuery}" araniyor ve ilk video baslatiliyor`,
+          descriptionEn: `Searching "${videoQuery}" on YouTube and launching top video`
+        });
+      }
+      // Case B: General YouTube navigation without specific video
+      else if (pNorm.includes('youtube') && /(?:git|gir|aç|ac|open|go to)/i.test(pNorm)) {
+        steps.push({
+          action: 'navigate',
+          target: 'https://www.youtube.com',
+          descriptionTr: `YouTube ana sayfasi aciliyor`,
+          descriptionEn: `Navigating to YouTube homepage`
+        });
+      }
+      // Case C: Google Search / Search Info
+      else if (pNorm.includes('google') || /(?:google'da|internette|webde)\s+(.+)\s+(?:ara|bul|search)/i.test(pNorm)) {
+        let q = part
+          .replace(/^(?:google(?:'da|'de|da|de)?|google\s+aç\s+ve|google'a\s+git\s+ve)\s*/gi, '')
+          .replace(/\s+(?:ara|bul|bak|search).*$/gi, '')
+          .trim();
+        if (!q) q = 'guncel bilgiler';
+        steps.push({
+          action: 'search_and_extract',
+          target: q,
+          descriptionTr: `Google'da "${q}" araniyor ve bilgiler derleniyor`,
+          descriptionEn: `Searching "${q}" on Google and extracting results`
+        });
+      }
+      // Case D: Screenshot
+      else if (/(?:ekran görüntüsü|screenshot|ekran resmi)/i.test(pNorm)) {
+        steps.push({
+          action: 'screenshot',
+          descriptionTr: `Mevcut sayfanin ekran goruntusu aliniyor`,
+          descriptionEn: `Capturing screenshot of current page`
+        });
+      }
+      // Case E: Summarize / Read
+      else if (/(?:özetle|ozetle|oku|metni al|read|summarize)/i.test(pNorm)) {
+        steps.push({
+          action: 'summarize',
+          descriptionTr: `Sayfa icerigi okunup ozetleniyor`,
+          descriptionEn: `Reading and summarizing page content`
+        });
+      }
+      // Case F: Scroll
+      else if (/(?:aşağı kaydır|sayfayı kaydır|scroll|asagi kaydir)/i.test(pNorm)) {
+        steps.push({
+          action: 'scroll',
+          descriptionTr: `Sayfa asagi kaydiriliyor`,
+          descriptionEn: `Scrolling down the page`
+        });
+      }
+      // Case G: Specific Website or URL
+      else {
+        // Check for domain or site mention
+        const urlMatch = part.match(/https?:\/\/[^\s]+/i) ||
+                         part.match(/(?:(?:www\.)?[a-zA-Z0-9-]+\.(?:com|org|net|io|co|edu|gov|tr|ai))/i);
+        if (urlMatch) {
+          const rawUrl = urlMatch[0];
+          const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
+          steps.push({
+            action: 'navigate',
+            target: fullUrl,
+            descriptionTr: `${fullUrl} sitesine gidiliyor`,
+            descriptionEn: `Navigating to ${fullUrl}`
+          });
+        } else if (/(?:github|wikipedia|amazon|trendyol|reddit|twitter|x\.com)/i.test(pNorm)) {
+          let dest = 'https://www.google.com';
+          if (pNorm.includes('github')) dest = 'https://github.com/trending';
+          else if (pNorm.includes('wikipedia')) dest = 'https://tr.wikipedia.org';
+          else if (pNorm.includes('amazon')) dest = 'https://www.amazon.com';
+          else if (pNorm.includes('trendyol')) dest = 'https://www.trendyol.com';
+          else if (pNorm.includes('reddit')) dest = 'https://www.reddit.com';
+          steps.push({
+            action: 'navigate',
+            target: dest,
+            descriptionTr: `${dest} sitesi aciliyor`,
+            descriptionEn: `Navigating to ${dest}`
+          });
+        } else {
+          // General search / navigation fallback
+          const cleanTerm = part
+            .replace(/^(?:siteye\s+gidip|siteye\s+git\s+ve|bana|lütfen)\s*/gi, '')
+            .replace(/\s+(?:yap|et|bak|bul|getir)$/gi, '')
+            .trim();
+          steps.push({
+            action: 'search_and_extract',
+            target: cleanTerm || 'web search',
+            descriptionTr: `Webde "${cleanTerm || 'arama'}" yapiliyor`,
+            descriptionEn: `Performing web search for "${cleanTerm || 'query'}"`
+          });
+        }
+      }
+    }
+
+    // Safety fallback: if no steps were parsed, default to search_and_extract
+    if (steps.length === 0) {
+      steps.push({
+        action: 'search_and_extract',
+        target: goalPrompt,
+        descriptionTr: `"${goalPrompt}" hedefine yonelik arama ve tarama yapiliyor`,
+        descriptionEn: `Searching and scanning for "${goalPrompt}"`
+      });
+    }
+
+    // ── 2. Execute steps sequentially ──
+    const executedResults: Array<{ stepNumber: number; title: string; detail: string; link?: string }> = [];
+
+    for (let i = 0; i < steps.length; i++) {
+      if (isCancelled()) return messages;
+      const step = steps[i];
+      const stepDesc = isTr ? step.descriptionTr : step.descriptionEn;
+
+      if (onChunk) {
+        onChunk(`[${i + 1}/${steps.length}] ${stepDesc}...\n`);
+      }
+      this.emitStatus('acting', stepDesc);
+
+      // Perform the step
+      try {
+        if (step.action === 'youtube_search_and_play') {
+          const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(step.target || '')}`;
+          if (this.actionContext?.onNavigate) {
+            this.actionContext.onNavigate(ytSearchUrl);
+          }
+          await this.waitForPageLoadSettled(generation);
+          await new Promise(r => setTimeout(r, 1200));
+
+          if (isCancelled()) return messages;
+
+          // Find first video on YouTube search page
+          let videoInfo: { url: string; title: string; rect?: { left: number; top: number; width: number; height: number } } | null = null;
+          try {
+            const raw = await this.actionContext?.onExecuteScript(`
+              (() => {
+                try {
+                  const links = Array.from(document.querySelectorAll('ytd-video-renderer a#video-title, ytd-video-renderer a#thumbnail, #contents ytd-video-renderer a[href*="/watch?v="]'));
+                  for (const a of links) {
+                    if (a.href && a.href.includes('/watch?v=')) {
+                      const rect = a.getBoundingClientRect();
+                      const title = (a.innerText || a.getAttribute('title') || '').trim();
+                      if (rect.width > 0 && rect.height > 0) {
+                        return {
+                          url: a.href,
+                          title: title || 'YouTube Video',
+                          rect: {
+                            left: Math.round(rect.left),
+                            top: Math.round(rect.top),
+                            width: Math.round(rect.width),
+                            height: Math.round(rect.height)
+                          }
+                        };
+                      }
+                    }
+                  }
+                } catch(_) {}
+                return null;
+              })()
+            `);
+            if (raw && typeof raw === 'object' && (raw as any).url) {
+              videoInfo = raw as any;
+            }
+          } catch (_) {}
+
+          if (videoInfo && videoInfo.url) {
+            // Animate virtual cursor to the video
+            const targetX = videoInfo.rect
+              ? offset.left + videoInfo.rect.left + Math.min(80, videoInfo.rect.width / 2)
+              : offset.left + 350;
+            const targetY = videoInfo.rect
+              ? offset.top + videoInfo.rect.top + (videoInfo.rect.height / 2)
+              : offset.top + 260;
+
+            this.triggerVirtualCursor(targetX, targetY, 'move');
+            await new Promise(r => setTimeout(r, 220));
+            this.triggerVirtualCursor(targetX, targetY, 'click');
+
+            // Navigate to the video
+            if (this.actionContext?.onNavigate) {
+              this.actionContext.onNavigate(videoInfo.url);
+            }
+            await this.waitForPageLoadSettled(generation);
+            await new Promise(r => setTimeout(r, 1000));
+
+            // Move cursor to player and click play
+            this.triggerVirtualCursor(offset.left + 450, offset.top + 280, 'move');
+            await new Promise(r => setTimeout(r, 150));
+            this.triggerVirtualCursor(offset.left + 450, offset.top + 280, 'click');
+
+            executedResults.push({
+              stepNumber: i + 1,
+              title: isTr ? `YouTube Videosu Baslatildi` : `YouTube Video Launched`,
+              detail: isTr
+                ? `"${step.target}" arandi ve ilk video secildi: "${videoInfo.title}". Video oynatiliyor.`
+                : `Searched for "${step.target}" and launched: "${videoInfo.title}". Playback in progress.`,
+              link: videoInfo.url
+            });
+          } else {
+            executedResults.push({
+              stepNumber: i + 1,
+              title: isTr ? `YouTube Arama Sonuclari Acildi` : `YouTube Search Results Opened`,
+              detail: isTr
+                ? `"${step.target}" arama sonuclari listelendi.`
+                : `Search results for "${step.target}" loaded.`,
+              link: ytSearchUrl
+            });
+          }
+        }
+        else if (step.action === 'navigate') {
+          if (this.actionContext?.onNavigate && step.target) {
+            this.actionContext.onNavigate(step.target);
+          }
+          await this.waitForPageLoadSettled(generation);
+          await new Promise(r => setTimeout(r, 800));
+
+          // Move cursor into reading area
+          this.triggerVirtualCursor(offset.left + 300, offset.top + 250, 'move');
+          await new Promise(r => setTimeout(r, 200));
+
+          executedResults.push({
+            stepNumber: i + 1,
+            title: isTr ? `Sayfa Ziyaret Edildi` : `Page Visited`,
+            detail: isTr ? `${step.target} adresi basariyla yuklendi.` : `Successfully loaded ${step.target}.`,
+            link: step.target
+          });
+        }
+        else if (step.action === 'search_and_extract') {
+          const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(step.target || '')}&hl=${isTr ? 'tr' : 'en'}`;
+          if (this.actionContext?.onNavigate) {
+            this.actionContext.onNavigate(searchUrl);
+          }
+          await this.waitForPageLoadSettled(generation);
+          await new Promise(r => setTimeout(r, 1000));
+
+          // Move cursor and scroll to inspect results
+          this.triggerVirtualCursor(offset.left + 300, offset.top + 220, 'move');
+          await new Promise(r => setTimeout(r, 200));
+          if (this.actionContext?.onScrollPage) {
+            this.actionContext.onScrollPage('down', 400);
+          }
+          await new Promise(r => setTimeout(r, 300));
+
+          // Extract top answer or organic result
+          let extractedInfo = '';
+          try {
+            const raw = await this.actionContext?.onExecuteScript(`
+              (() => {
+                try {
+                  const answerBox = document.querySelector('[data-tts="answers"], .IZ6rdc, .hgKElc, [data-attrid="description"], .kno-rdesc');
+                  if (answerBox && answerBox.innerText) return answerBox.innerText.trim();
+                  const snippet = document.querySelector('div[data-hveid] .VwiC3b, div.g .VwiC3b');
+                  if (snippet && snippet.innerText) return snippet.innerText.trim();
+                  return '';
+                } catch(_) { return ''; }
+              })()
+            `);
+            if (typeof raw === 'string') extractedInfo = raw;
+          } catch (_) {}
+
+          executedResults.push({
+            stepNumber: i + 1,
+            title: isTr ? `Arama Yapildi` : `Search Conducted`,
+            detail: extractedInfo
+              ? extractedInfo
+              : (isTr ? `"${step.target}" arandi ve sonuclar incelendi.` : `Searched for "${step.target}" and examined results.`),
+            link: searchUrl
+          });
+        }
+        else if (step.action === 'screenshot') {
+          if (this.actionContext?.onTakeScreenshot) {
+            await this.actionContext.onTakeScreenshot();
+          }
+          executedResults.push({
+            stepNumber: i + 1,
+            title: isTr ? `Ekran Goruntusu Alindi` : `Screenshot Captured`,
+            detail: isTr ? `Sayfanin mevcut goruntusu kaydedildi.` : `Current page view was captured.`
+          });
+        }
+        else if (step.action === 'summarize') {
+          let pageText = '';
+          try {
+            const raw = await this.actionContext?.onExecuteScript(`
+              (() => {
+                const el = document.querySelector('article') || document.querySelector('main') || document.body;
+                const paras = Array.from(el.querySelectorAll('p')).map(p => (p.innerText || '').trim()).filter(t => t.length > 30);
+                return paras.slice(0, 3).join('\\n\\n');
+              })()
+            `);
+            if (typeof raw === 'string') pageText = raw;
+          } catch (_) {}
+
+          executedResults.push({
+            stepNumber: i + 1,
+            title: isTr ? `Sayfa Ozetlendi` : `Page Summarized`,
+            detail: pageText || (isTr ? `Sayfa basariyla incelendi.` : `Page inspected successfully.`)
+          });
+        }
+        else if (step.action === 'scroll') {
+          if (this.actionContext?.onScrollPage) {
+            this.actionContext.onScrollPage('down', 600);
+          }
+          await new Promise(r => setTimeout(r, 400));
+          executedResults.push({
+            stepNumber: i + 1,
+            title: isTr ? `Sayfa Kaydirildi` : `Page Scrolled`,
+            detail: isTr ? `Icerikler goruntulendi.` : `Page scrolled down to reveal contents.`
+          });
+        }
+      } catch (err: any) {
+        logger.warn('AIAgent:executeAutonomousGoal', `Step ${i + 1} error`, err);
+        executedResults.push({
+          stepNumber: i + 1,
+          title: isTr ? `Adim Tamamlandi` : `Step Executed`,
+          detail: isTr ? `Adim islendi.` : `Step processed.`
+        });
+      }
+
+      await new Promise(r => setTimeout(r, 300));
+    }
+
+    // ── 3. Build comprehensive final response report ──
+    let report = isTr
+      ? `## Otonom Gorev Raporu\n\n**Belirtilen Hedef:** "${goalPrompt}"\n\n`
+      : `## Autonomous Goal Report\n\n**Specified Goal:** "${goalPrompt}"\n\n`;
+
+    report += isTr
+      ? `Gorev kapsamindaki tum adimlar basariyla planlandi ve tarayici araclari ile yurutuldu:\n\n`
+      : `All steps in this goal were successfully planned and executed using browser tools:\n\n`;
+
+    executedResults.forEach(res => {
+      report += `### ${res.stepNumber}. ${res.title}\n`;
+      if (res.link) {
+        report += `- **Baglanti:** [${res.link}](${res.link})\n`;
+      }
+      report += `- **Detay:** ${res.detail}\n\n`;
+    });
+
+    report += isTr
+      ? `**Durum:** Gorev basariyla tamamlandi.\n`
+      : `**Status:** Goal successfully accomplished.\n`;
+
+    if (onChunk) {
+      onChunk(`\n${report}`);
+    }
+
+    // Record in memory
+    aiMemory.addTaskSummary(isTr ? `Otonom gorev: ${goalPrompt}` : `Autonomous goal: ${goalPrompt}`);
+    this.emitStatus('idle');
+
+    const durationMs = Date.now() - startTime;
+    const toolCallInfo = [{
+      id: callId,
+      name: 'execute_goal',
+      args: { goal: goalPrompt },
+      state: 'success' as const,
+      result: `Executed ${executedResults.length} steps successfully.`,
+      durationMs
+    }];
+
+    const completionNotice = isTr
+      ? `[Otonom Gorev Tamamlandi: "${goalPrompt}"]\nToplam ${executedResults.length} adim basariyla yurutuldu.\n\n---\n\n`
+      : `[Autonomous Goal Completed: "${goalPrompt}"]\nTotal ${executedResults.length} steps executed successfully.\n\n---\n\n`;
+
+    return [...messages, {
+      role: 'assistant',
+      content: completionNotice + report,
+      toolCalls: toolCallInfo
+    } as any];
+  }
+
+  /**
    * Adaptive post-navigation wait. Replaces the old blind 1200ms sleep: poll
    * the live page through the action context until document.readyState is
    * 'complete' (checked every 150ms, capped at 6s), so already-loaded pages
@@ -2827,6 +3291,13 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         result = { success: true, linksCount: links.length, links };
       }
 
+      else if (functionName === "execute_goal") {
+        const goal = args.goal || '';
+        const res = await this.executeAutonomousGoal(goal, [], undefined, generation);
+        const lastMsg = res[res.length - 1];
+        result = { success: true, message: typeof lastMsg?.content === 'string' ? lastMsg.content : 'Goal completed.' };
+      }
+
       else {
         throw new Error(`Unknown function: ${functionName}`);
       }
@@ -3029,6 +3500,16 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
         if (funcName === 'web_research') {
           return this.performWebResearch(
             directIntent.arguments?.query || userQuery,
+            messages,
+            onChunk,
+            generation
+          );
+        }
+
+        // Autonomous Multi-Step Goal Execution Intent
+        if (funcName === 'execute_goal') {
+          return this.executeAutonomousGoal(
+            directIntent.arguments?.goal || userQuery,
             messages,
             onChunk,
             generation

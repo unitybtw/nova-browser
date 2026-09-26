@@ -160,4 +160,17 @@ const intentWebSearchTr = detectDirectIntent('webde yapay zeka ara');
 assert.equal(intentWebSearchTr?.name, 'web_research');
 assert.equal(intentWebSearchTr?.arguments?.query?.includes('yapay zeka'), true);
 
-console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, Turkish intent parsing, navigation controls, and autonomous web research verified.');
+// 9. Autonomous Goal & Multi-Step Task Intent Queries
+const intentGoalCompound = detectDirectIntent('siteye gidip şunu yap sonra işte youtube da şu videoyu bul');
+assert.equal(intentGoalCompound?.name, 'execute_goal');
+
+const intentGoalYtPlay = detectDirectIntent("youtube'a git ve lofi music çal");
+assert.equal(intentGoalYtPlay?.name, 'execute_goal');
+
+const intentGoalExplicit = detectDirectIntent("hedef: amazon'da macbook ara");
+assert.equal(intentGoalExplicit?.name, 'execute_goal');
+
+const intentGoalSequential = detectDirectIntent("google'da btc fiyatı ara sonra ekran görüntüsü al");
+assert.equal(intentGoalSequential?.name, 'execute_goal');
+
+console.log('[PASS] [AI Agent Tools] Tool allowlist, DOM constraints, Turkish intent parsing, navigation controls, autonomous web research, and autonomous goals verified.');
