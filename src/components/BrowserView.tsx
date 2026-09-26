@@ -2,9 +2,7 @@ import React, { useRef, useEffect, useState, useCallback, Suspense, lazy } from 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Moon, Zap, Key } from 'lucide-react';
 import { Tab, HistoryItem, UserSettings } from '../types/browser';
-import { PasswordPromptModal } from './PasswordPromptModal';
 import type { DownloadItemPage } from './DownloadsPage';
-import { AILinkPreview } from './AILinkPreview';
 import { tabThumbnailCache } from '../services/thumbnailCache';
 import { 
   getExtractTextNodesScript, 
@@ -13,6 +11,8 @@ import {
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
+const PasswordPromptModal = lazy(() => import('./PasswordPromptModal').then(m => ({ default: m.PasswordPromptModal })));
+const AILinkPreview = lazy(() => import('./AILinkPreview').then(m => ({ default: m.AILinkPreview })));
 const NewTabPage = lazy(() => import('./NewTabPage').then(m => ({ default: m.NewTabPage })));
 const SettingsPage = lazy(() => import('./SettingsPage').then(m => ({ default: m.SettingsPage })));
 const HistoryPage = lazy(() => import('./HistoryPage').then(m => ({ default: m.HistoryPage })));
@@ -1190,45 +1190,51 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         </div>
       )}
 
-      <PasswordPromptModal
-        isOpen={passwordPrompt.isOpen}
-        hostname={passwordPrompt.hostname}
-        username={passwordPrompt.username}
-        password={passwordPrompt.password}
-        isUpdate={passwordPrompt.isUpdate}
-        onClose={() => setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))}
-        onSave={async (customUsername?: string, customPassword?: string) => {
-          const finalUsername = customUsername || passwordPrompt.username;
-          const finalPassword = customPassword || passwordPrompt.password;
-          try {
-            const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-            let passwords = raw ? JSON.parse(raw) : [];
-            
-            // Remove existing password for this host & username if any
-            passwords = passwords.filter((p: any) => !(p.hostname === passwordPrompt.hostname && p.username === finalUsername));
-            
-            passwords.push({
-              hostname: passwordPrompt.hostname,
-              username: finalUsername,
-              password: finalPassword,
-              timestamp: Date.now()
-            });
-            
-            await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
-          } catch (e) {
-            console.error('Failed to save password', e);
-          }
-          setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))
-        }}
-      />
+      {passwordPrompt.isOpen && (
+        <Suspense fallback={null}>
+          <PasswordPromptModal
+            isOpen={passwordPrompt.isOpen}
+            hostname={passwordPrompt.hostname}
+            username={passwordPrompt.username}
+            password={passwordPrompt.password}
+            isUpdate={passwordPrompt.isUpdate}
+            onClose={() => setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))}
+            onSave={async (customUsername?: string, customPassword?: string) => {
+              const finalUsername = customUsername || passwordPrompt.username;
+              const finalPassword = customPassword || passwordPrompt.password;
+              try {
+                const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                let passwords = raw ? JSON.parse(raw) : [];
+                
+                // Remove existing password for this host & username if any
+                passwords = passwords.filter((p: any) => !(p.hostname === passwordPrompt.hostname && p.username === finalUsername));
+                
+                passwords.push({
+                  hostname: passwordPrompt.hostname,
+                  username: finalUsername,
+                  password: finalPassword,
+                  timestamp: Date.now()
+                });
+                
+                await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
+              } catch (e) {
+                console.error('Failed to save password', e);
+              }
+              setPasswordPrompt((prev: any) => ({ ...prev, isOpen: false }))
+            }}
+          />
+        </Suspense>
+      )}
       
       {isActive && (settings.aiLinkPreviewEnabled ?? true) && (
-        <AILinkPreview 
-          url={aiPreview.url}
-          x={aiPreview.x}
-          y={aiPreview.y}
-          isOpen={aiPreview.isOpen}
-        />
+        <Suspense fallback={null}>
+          <AILinkPreview 
+            url={aiPreview.url}
+            x={aiPreview.x}
+            y={aiPreview.y}
+            isOpen={aiPreview.isOpen}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -21,7 +21,7 @@ export interface SettingsPageProps {
   onImportData?: (file: File) => void;
   onClearHistory?: () => void;
   onPurgeMemory?: () => Promise<void> | void;
-  onPerformSync?: (mergedData: any) => Promise<void> | void;
+  onPerformSync?: (mergedData?: any) => Promise<void> | void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({

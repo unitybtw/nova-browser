@@ -109,19 +109,21 @@ export function useTabHibernation({
         staggeredWakeRef.current = null;
       }
       staggeredWakeRef.current = setInterval(() => {
+        let shouldClear = false;
         setTabs(prev => {
           const suspendedTabs = prev.filter(t => t.isSuspended);
           if (suspendedTabs.length === 0) {
-            if (staggeredWakeRef.current !== null) {
-              clearInterval(staggeredWakeRef.current);
-              staggeredWakeRef.current = null;
-            }
+            shouldClear = true;
             return prev;
           }
           // Wake next 2 suspended tabs in this tick
           const idsToWake = new Set(suspendedTabs.slice(0, 2).map(t => t.id));
           return prev.map(t => idsToWake.has(t.id) ? { ...t, isSuspended: false } : t);
         });
+        if (shouldClear && staggeredWakeRef.current !== null) {
+          clearInterval(staggeredWakeRef.current);
+          staggeredWakeRef.current = null;
+        }
       }, 300);
       return () => {
         if (staggeredWakeRef.current !== null) {

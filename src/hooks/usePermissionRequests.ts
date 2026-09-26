@@ -29,7 +29,10 @@ export function processIncomingPermissionRequest(
 export function usePermissionRequests() {
   const [permissionRequests, setPermissionRequests] = useState<PermissionRequest[]>([]);
   const requestsRef = useRef<PermissionRequest[]>(permissionRequests);
-  requestsRef.current = permissionRequests;
+
+  useEffect(() => {
+    requestsRef.current = permissionRequests;
+  }, [permissionRequests]);
 
   useEffect(() => {
     const api = getElectronAPI();
@@ -47,6 +50,7 @@ export function usePermissionRequests() {
           }
         );
         if (!dropped) {
+          requestsRef.current = updatedQueue;
           setPermissionRequests(updatedQueue);
         }
       });
@@ -65,7 +69,9 @@ export function usePermissionRequests() {
         console.error('Failed to respond to permission request:', e);
       }
     }
-    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
+    const next = requestsRef.current.filter(r => r.requestId !== requestId);
+    requestsRef.current = next;
+    setPermissionRequests(next);
   }, []);
 
   const handleDismissPermission = useCallback((requestId: string) => {
@@ -75,7 +81,9 @@ export function usePermissionRequests() {
         api.respondPermissionRequest(requestId, false, false);
       } catch (e) {}
     }
-    setPermissionRequests(prev => prev.filter(r => r.requestId !== requestId));
+    const next = requestsRef.current.filter(r => r.requestId !== requestId);
+    requestsRef.current = next;
+    setPermissionRequests(next);
   }, []);
 
   return { permissionRequests, handleRespondPermission, handleDismissPermission };

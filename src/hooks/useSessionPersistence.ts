@@ -17,6 +17,7 @@ export interface UseSessionPersistenceOptions {
   flushHistory: () => void;
   flushBookmarks: () => void;
   isDemo?: boolean;
+  isHydrated?: boolean;
 }
 
 /**
@@ -56,12 +57,13 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     flushHistory,
     flushBookmarks,
     isDemo,
+    isHydrated = true,
   } = options;
 
   // Sync settings with local storage and backend (debounced 500ms like tabs:
   // color picker drags must not write localStorage / IPC per pixel)
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || !isHydrated) return;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(settings);
@@ -78,7 +80,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [settings, isDemo]);
+  }, [settings, isDemo, isHydrated]);
 
   // Immediate flush on beforeunload to prevent session loss on abrupt browser close
   // (also flushes debounced settings/bookmarks/workspaces stores)
@@ -142,7 +144,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
 
   // Save session whenever tabs changes (Excluding Incognito Tabs)
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || !isHydrated) return;
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
     const timer = setTimeout(() => {
@@ -156,10 +158,10 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [tabs, isDemo]);
+  }, [tabs, isDemo, isHydrated]);
 
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || !isHydrated) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('active_tab_session', activeTabId);
@@ -168,5 +170,5 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [activeTabId, isDemo]);
+  }, [activeTabId, isDemo, isHydrated]);
 }

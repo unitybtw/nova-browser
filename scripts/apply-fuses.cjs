@@ -91,6 +91,9 @@ async function defaultExport(context) {
     } catch (_) {}
   }
 
+  const isDarwin = platform === 'darwin' || platform === 'mas';
+  const hasSigningSecret = Boolean(process.env.CSC_LINK || process.env.CSC_KEY_PASSWORD);
+
   try {
     await flipFuses(binaryPath, fuseConfig);
     console.log(`[apply-fuses] Flipped Electron fuses in ${binaryPath}:`);
@@ -98,6 +101,21 @@ async function defaultExport(context) {
       console.log(`[apply-fuses]   ${name} -> ${value ? 'ON' : 'OFF'}`);
     }
   } catch (err) {
+    if (isDarwin && fuseConfig.resetAdHocDarwinSignature && !hasSigningSecret) {
+      console.warn(`[apply-fuses] Warning: resetAdHocDarwinSignature failed (${err.message}). Retrying with resetAdHocDarwinSignature: false for unsigned build...`);
+      try {
+        const fallbackConfig = { ...fuseConfig, resetAdHocDarwinSignature: false };
+        await flipFuses(binaryPath, fallbackConfig);
+        console.warn(`[apply-fuses] Successfully flipped Electron fuses with resetAdHocDarwinSignature: false (unsigned local/CI build fallback).`);
+        for (const [name, , value] of plan) {
+          console.log(`[apply-fuses]   ${name} -> ${value ? 'ON' : 'OFF'}`);
+        }
+        return;
+      } catch (retryErr) {
+        console.error(`[apply-fuses] FATAL: Fallback fuse flipping failed for ${binaryPath}:`, retryErr.message);
+        throw new Error(`[apply-fuses] Security fuse application failed on retry: ${retryErr.message}`);
+      }
+    }
     console.error(`[apply-fuses] FATAL: Fuse flipping failed for ${binaryPath}:`, err.message);
     throw new Error(`[apply-fuses] Security fuse application failed: ${err.message}`);
   }

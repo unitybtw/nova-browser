@@ -117,6 +117,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Request that your browsing traffic is not tracked</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle Do Not Track request"
               checked={settings.doNotTrack}
               onToggle={() => onUpdateSettings({ doNotTrack: !settings.doNotTrack })}
             />
@@ -128,6 +129,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Clear cookies and site data when you close all windows</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle clear cookies on exit"
               checked={settings.clearOnExit}
               onToggle={() => onUpdateSettings({ clearOnExit: !settings.clearOnExit })}
             />

@@ -40,7 +40,14 @@ export function useSettings(options: UseSettingsOptions = {}) {
 
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('user_settings') : null;
     const parsed = safeParseObjectWithBackup<Partial<UserSettings>>('user_settings', saved, {});
-    const merged = { ...initialSettings, ...parsed };
+    const merged: UserSettings = {
+      ...initialSettings,
+      ...parsed,
+      shortcuts: {
+        ...initialSettings.shortcuts,
+        ...(parsed.shortcuts || {})
+      }
+    };
     // Migration: ensure macOS users have shift: true for downloads shortcut if they had the legacy default shift: false
     // Preserve custom user settings: do NOT overwrite if the user has explicitly customized their shortcuts
     const isCustomized = typeof localStorage !== 'undefined' && localStorage.getItem('shortcuts_customized') === 'true';

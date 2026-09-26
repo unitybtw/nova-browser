@@ -224,6 +224,7 @@ class NovaSyncService {
   private currentUser: NovaUser | null = null;
   private token: string | null = null;
   private isSyncing = false;
+  private syncQueue: Promise<any> = Promise.resolve();
   private lastSyncedAt: number | null = null;
   private lastError: string | null = null;
   private listeners = new Set<(status: SyncStatus) => void>();
@@ -1195,7 +1196,36 @@ class NovaSyncService {
 
   // --- DATA SYNC ENGINE ---
 
-  public async syncData(localData: {
+  public syncData(localData: {
+    bookmarks: Bookmark[];
+    folders: Folder[];
+    history: HistoryItem[];
+    passwords: SavedPassword[];
+    settings: UserSettings;
+    workspaces: Workspace[];
+  }): Promise<{
+    mergedData: {
+      bookmarks: Bookmark[];
+      folders: Folder[];
+      history: HistoryItem[];
+      passwords: SavedPassword[];
+      settings: UserSettings;
+      workspaces: Workspace[];
+    };
+    syncedItemsCount: {
+      bookmarks: number;
+      history: number;
+      passwords: number;
+      workspaces: number;
+    };
+  }> {
+    const run = () => this.executeSyncData(localData);
+    const queued = this.syncQueue.then(run, run);
+    this.syncQueue = queued.catch(() => {});
+    return queued;
+  }
+
+  private async executeSyncData(localData: {
     bookmarks: Bookmark[];
     folders: Folder[];
     history: HistoryItem[];

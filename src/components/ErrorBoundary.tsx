@@ -18,6 +18,23 @@ export class ErrorBoundary extends Component<Props, State> {
     errorInfo: null,
   };
 
+  private cleanupTimer: NodeJS.Timeout | null = null;
+
+  public componentDidMount() {
+    // If the application loaded successfully, clear the chunk reload retry flag
+    // after 5 seconds of stable execution, allowing future chunk reload retries
+    // across the session without permanent white screens.
+    this.cleanupTimer = setTimeout(() => {
+      try {
+        sessionStorage.removeItem('chunk_reload_triggered');
+      } catch (_) {}
+    }, 5000);
+  }
+
+  public componentWillUnmount() {
+    if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
+  }
+
   public static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
   }
@@ -39,6 +56,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
+    try {
+      sessionStorage.removeItem('chunk_reload_triggered');
+    } catch (_) {}
     window.location.reload();
   };
 

@@ -32,7 +32,6 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
 
   const handleClose = () => {
     onStopFind();
-    setSearchText('');
     onClose();
   };
 
@@ -41,10 +40,17 @@ export const FindInPage: React.FC<FindInPageProps> = React.memo(({
   useEffect(() => {
     if (isOpen) {
       if (focusTimerRef.current) clearTimeout(focusTimerRef.current);
-      focusTimerRef.current = setTimeout(() => inputRef.current?.focus(), 50);
+      focusTimerRef.current = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }, 50);
+      if (searchText.trim()) {
+        triggerSearch(searchText, true, matchCase, wholeWord);
+      }
     } else {
       onStopFind();
-      setSearchText('');
     }
     return () => {
       if (focusTimerRef.current) clearTimeout(focusTimerRef.current);

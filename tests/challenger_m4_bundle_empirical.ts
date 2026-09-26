@@ -29,8 +29,10 @@ assert(fs.existsSync(ASSETS_DIR), '[Assets Exists] dist/assets directory exists'
 
 const assetFiles = fs.readdirSync(ASSETS_DIR);
 
-// 1.1 Check index chunk size
-const indexChunk = assetFiles.find(f => f.startsWith('index-') && f.endsWith('.js'));
+// 1.1 Check index chunk size (resolve true entry script referenced by index.html)
+const indexHtmlContent = fs.existsSync(path.join(DIST_DIR, 'index.html')) ? fs.readFileSync(path.join(DIST_DIR, 'index.html'), 'utf8') : '';
+const scriptMatch = indexHtmlContent.match(/src=["']\.\/assets\/(index-[^"']+\.js)["']/);
+const indexChunk = scriptMatch ? scriptMatch[1] : assetFiles.filter(f => f.startsWith('index-') && f.endsWith('.js')).sort((a, b) => fs.statSync(path.join(ASSETS_DIR, b)).size - fs.statSync(path.join(ASSETS_DIR, a)).size)[0];
 assert(Boolean(indexChunk), '[Index Chunk] Initial startup entry index-*.js found', indexChunk);
 
 if (indexChunk) {

@@ -31,6 +31,16 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Verify Supabase Environment
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Release builds require VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY repository secrets. Aborting to avoid shipping a build with broken cloud sync."
+            exit 1
+          fi
+
       - name: Build App
         run: npm run build
         env:
@@ -77,6 +87,16 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Verify Supabase Environment
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Release builds require VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY repository secrets. Aborting to avoid shipping a build with broken cloud sync."
+            exit 1
+          fi
+
       - name: Build App
         run: npm run build
         env:
@@ -119,6 +139,16 @@ jobs:
 
       - name: Install Dependencies
         run: npm ci
+
+      - name: Verify Supabase Environment
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::error::Release builds require VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY repository secrets. Aborting to avoid shipping a build with broken cloud sync."
+            exit 1
+          fi
 
       - name: Build App
         run: npm run build
@@ -173,6 +203,11 @@ jobs:
             else
               TAG="v$VERSION"
             fi
+          fi
+          EXPECTED_TAG="v$VERSION"
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Release tag mismatch: tag '$TAG' does not match package.json version '$EXPECTED_TAG'."
+            exit 1
           fi
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "title=Nova Browser $TAG" >> $GITHUB_OUTPUT

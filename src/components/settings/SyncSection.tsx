@@ -17,7 +17,7 @@ function safeParseObject<T extends object>(raw: string | null, fallback: T, key:
 
 export interface SyncSectionProps {
   settings: Pick<UserSettings, 'language'>;
-  onPerformSync?: (mergedData: any) => Promise<void> | void;
+  onPerformSync?: (mergedData?: any) => Promise<void> | void;
 }
 
 export const SyncSection: React.FC<SyncSectionProps> = ({
@@ -102,48 +102,51 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                     setSyncMsg(null);
                     setSyncLoading(true);
                     try {
-                      const rawB = localStorage.getItem('bookmarks');
-                      const rawF = localStorage.getItem('folders_session');
-                      const rawH = localStorage.getItem('browsing_history');
-                      const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
-                      const rawW = localStorage.getItem('workspaces_session');
-                      const rawS = localStorage.getItem('user_settings');
+                      if (onPerformSync) {
+                        // Delegate directly to onPerformSync() to capture live in-memory React state
+                        // rather than reading stale un-debounced localStorage entries.
+                        await onPerformSync();
+                      } else {
+                        const rawB = localStorage.getItem('bookmarks');
+                        const rawF = localStorage.getItem('folders_session');
+                        const rawH = localStorage.getItem('browsing_history');
+                        const rawP = await (window as any).electronAPI?.secureStoreGet?.('passwords');
+                        const rawW = localStorage.getItem('workspaces_session');
+                        const rawS = localStorage.getItem('user_settings');
 
-                      const syncRes = await syncService.syncData({
-                        bookmarks: safeParseArray(rawB),
-                        folders: safeParseArray(rawF),
-                        history: safeParseArray(rawH),
-                        passwords: safeParseArray(rawP),
-                        settings: safeParseObject(rawS, {} as any),
-                        workspaces: safeParseArray(rawW)
-                      });
+                        const syncRes = await syncService.syncData({
+                          bookmarks: safeParseArray(rawB),
+                          folders: safeParseArray(rawF),
+                          history: safeParseArray(rawH),
+                          passwords: safeParseArray(rawP),
+                          settings: safeParseObject(rawS, {} as any),
+                          workspaces: safeParseArray(rawW)
+                        });
 
-                      if (syncRes && syncRes.mergedData) {
-                        const md = syncRes.mergedData;
-                        if (md.bookmarks) {
-                          localStorage.setItem('bookmarks', JSON.stringify(md.bookmarks));
-                          (window as any).electronAPI?.storeSet?.('bookmarks', JSON.stringify(md.bookmarks));
-                        }
-                        if (md.folders) {
-                          localStorage.setItem('folders_session', JSON.stringify(md.folders));
-                          (window as any).electronAPI?.storeSet?.('folders_session', JSON.stringify(md.folders));
-                        }
-                        if (md.history) {
-                          localStorage.setItem('browsing_history', JSON.stringify(md.history));
-                        }
-                        if (md.workspaces) {
-                          localStorage.setItem('workspaces_session', JSON.stringify(md.workspaces));
-                          (window as any).electronAPI?.storeSet?.('workspaces_session', JSON.stringify(md.workspaces));
-                        }
-                        if (md.settings) {
-                          localStorage.setItem('user_settings', JSON.stringify(md.settings));
-                          (window as any).electronAPI?.storeSet?.('user_settings', JSON.stringify(md.settings));
-                        }
-                        if (md.passwords && (window as any).electronAPI?.secureStoreSet) {
-                          await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(md.passwords));
-                        }
-                        if (onPerformSync) {
-                          await onPerformSync(md);
+                        if (syncRes && syncRes.mergedData) {
+                          const md = syncRes.mergedData;
+                          if (md.bookmarks) {
+                            localStorage.setItem('bookmarks', JSON.stringify(md.bookmarks));
+                            (window as any).electronAPI?.storeSet?.('bookmarks', JSON.stringify(md.bookmarks));
+                          }
+                          if (md.folders) {
+                            localStorage.setItem('folders_session', JSON.stringify(md.folders));
+                            (window as any).electronAPI?.storeSet?.('folders_session', JSON.stringify(md.folders));
+                          }
+                          if (md.history) {
+                            localStorage.setItem('browsing_history', JSON.stringify(md.history));
+                          }
+                          if (md.workspaces) {
+                            localStorage.setItem('workspaces_session', JSON.stringify(md.workspaces));
+                            (window as any).electronAPI?.storeSet?.('workspaces_session', JSON.stringify(md.workspaces));
+                          }
+                          if (md.settings) {
+                            localStorage.setItem('user_settings', JSON.stringify(md.settings));
+                            (window as any).electronAPI?.storeSet?.('user_settings', JSON.stringify(md.settings));
+                          }
+                          if (md.passwords && (window as any).electronAPI?.secureStoreSet) {
+                            await (window as any).electronAPI.secureStoreSet('passwords', JSON.stringify(md.passwords));
+                          }
                         }
                       }
 

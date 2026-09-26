@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { VpnLocation } from '../types/browser';
 import { DEFAULT_VPN_LOCATION, DEFAULT_VPN_LOCATIONS } from '../utils/appConstants';
 import { isValidProxyUrl } from '../utils/proxyValidation';
@@ -19,6 +19,7 @@ export function useVpn(options: UseVpnOptions = {}) {
     return DEFAULT_VPN_LOCATIONS;
   });
   const [vpnLocation, setVpnLocation] = useState<VpnLocation>(() => vpnLocations[0] || DEFAULT_VPN_LOCATION);
+  const isHydratedRef = useRef(Boolean(isDemo));
 
   // Security: Asynchronously load custom VPN locations and credentials from OS safeStorage
   useEffect(() => {
@@ -108,6 +109,7 @@ export function useVpn(options: UseVpnOptions = {}) {
         setVpnLocation(activeLocationLoaded);
       }
       setVpnEnabled(enabledLoaded);
+      isHydratedRef.current = true;
     };
 
     loadSecureVpnData();
@@ -117,43 +119,29 @@ export function useVpn(options: UseVpnOptions = {}) {
     };
   }, [isDemo]);
 
+  // Persist custom VPN locations when updated (only after hydration is complete)
+  useEffect(() => {
+    if (isDemo || !isHydratedRef.current) return;
+    const customOnly = vpnLocations.filter(l => l.type === 'custom');
+    const api = getElectronAPI();
+    if (api?.secureStoreSet) {
+      api.secureStoreSet('nova_vpn_locations', JSON.stringify(customOnly)).catch(err => {
+        logger.warn('App:VPN', 'Failed to persist VPN locations to secureStore', err);
+      });
+    }
+    localStorage.removeItem('nova_vpn_locations');
+  }, [vpnLocations, isDemo]);
+
   const handleAddVpnLocation = useCallback((newLoc: VpnLocation) => {
-    setVpnLocations(prev => {
-      const updated = [...prev, newLoc];
-      if (!isDemo) {
-        const customOnly = updated.filter(l => l.type === 'custom');
-        const api = getElectronAPI();
-        if (api?.secureStoreSet) {
-          api.secureStoreSet('nova_vpn_locations', JSON.stringify(customOnly)).catch(err => {
-            logger.warn('App:VPN', 'Failed to persist VPN locations to secureStore', err);
-          });
-        }
-        // Do not store plaintext credentials in localStorage
-        localStorage.removeItem('nova_vpn_locations');
-      }
-      return updated;
-    });
-  }, [isDemo]);
+    setVpnLocations(prev => [...prev, newLoc]);
+  }, []);
 
   const handleRemoveVpnLocation = useCallback((id: string) => {
-    setVpnLocations(prev => {
-      const updated = prev.filter(l => l.id !== id);
-      if (!isDemo) {
-        const customOnly = updated.filter(l => l.type === 'custom');
-        const api = getElectronAPI();
-        if (api?.secureStoreSet) {
-          api.secureStoreSet('nova_vpn_locations', JSON.stringify(customOnly)).catch(err => {
-            logger.warn('App:VPN', 'Failed to persist VPN locations after removal', err);
-          });
-        }
-        localStorage.removeItem('nova_vpn_locations');
-      }
-      return updated;
-    });
-  }, [isDemo]);
+    setVpnLocations(prev => prev.filter(l => l.id !== id));
+  }, []);
 
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo || !isHydratedRef.current) return;
     const customLocations = vpnLocations.filter(loc => loc.type === 'custom');
     const api = getElectronAPI();
     if (api?.secureStoreSet) {

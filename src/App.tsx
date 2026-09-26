@@ -482,6 +482,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     onImportBookmarks: (imported) => setBookmarks(prev => [...prev, ...imported]),
   });
 
+  // Disk-backed storage hydration fallback: restore session tabs, folders,
+  // workspaces, bookmarks and settings from Electron disk store if localStorage
+  // was cleared/corrupted.
+  const { isHydrated } = useDiskHydrationFallback({
+    isDemo: demoParams.isDemo,
+    setSettings,
+    setWorkspaces,
+    setFolders,
+    setBookmarks,
+    setTabs,
+  });
+
   // Session persistence writes (debounced settings/tabs/active-tab + beforeunload
   // flush-all) extracted to useSessionPersistence — order/timing/keys preserved 1:1.
   useSessionPersistence({
@@ -498,6 +510,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     flushHistory,
     flushBookmarks,
     isDemo: demoParams.isDemo,
+    isHydrated,
   });
 
   // Tab list reconciliation: ensure at least one tab exists and activeTabId is valid
@@ -521,19 +534,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
   useThemeLanguage({ settings });
-  
-
-  // Disk-backed storage hydration fallback: restore session tabs, folders,
-  // workspaces, bookmarks and settings from Electron disk store if localStorage
-  // was cleared/corrupted.
-  useDiskHydrationFallback({
-    isDemo: demoParams.isDemo,
-    setSettings,
-    setWorkspaces,
-    setFolders,
-    setBookmarks,
-    setTabs,
-  });
 
   // Cloud sync handler + background auto-sync + realtime listener
   const { handlePerformSync } = useAppSync({
@@ -1636,16 +1636,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         {/* Find in page widget */}
         <React.Suspense fallback={null}>
-          {isFindInPageOpen && (
-            <FindInPage
-              isOpen={isFindInPageOpen}
-              onClose={handleCloseFindInPage}
-              matchIndex={findMatches.index}
-              matchCount={findMatches.count}
-              onFind={handleFind}
-              onStopFind={handleStopFind}
-            />
-          )}
+          <FindInPage
+            isOpen={isFindInPageOpen}
+            onClose={handleCloseFindInPage}
+            matchIndex={findMatches.index}
+            matchCount={findMatches.count}
+            onFind={handleFind}
+            onStopFind={handleStopFind}
+          />
         </React.Suspense>
 
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}

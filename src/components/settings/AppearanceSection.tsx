@@ -429,6 +429,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show favorite sites below address bar</div>
                     </div>
                     <ToggleSwitch
+                      ariaLabel="Toggle bookmarks bar"
                       checked={settings.showBookmarksBar}
                       onToggle={() => onUpdateSettings({ showBookmarksBar: !settings.showBookmarksBar })}
                     />
@@ -445,6 +446,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Display tabs on the left sidebar instead of the top</div>
                     </div>
                     <ToggleSwitch
+                      ariaLabel="Toggle vertical tabs"
                       checked={settings.useVerticalTabs}
                       onToggle={() => onUpdateSettings({ useVerticalTabs: !settings.useVerticalTabs })}
                     />
@@ -456,6 +458,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                       <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Show tasks and to-do list on the New Tab Page</div>
                     </div>
                     <ToggleSwitch
+                      ariaLabel="Toggle tasks widget"
                       checked={settings.showTasksWidget !== false}
                       onToggle={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
                     />

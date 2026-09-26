@@ -34,6 +34,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Automatically reads and summarizes links when you hover over them. (Uses local WebLLM)</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle AI link preview"
               checked={settings.aiLinkPreviewEnabled}
               onToggle={() => onUpdateSettings({ aiLinkPreviewEnabled: !settings.aiLinkPreviewEnabled })}
               activeColorClass="bg-indigo-500"
@@ -47,6 +48,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Offer to save and autofill passwords on websites. Credentials are encrypted on this device.</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle password manager"
               checked={settings.passwordManagerEnabled}
               onToggle={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
               activeColorClass="bg-indigo-500"
@@ -65,6 +67,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Unloads inactive background tabs from RAM to keep the browser lightning fast</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle automatic tab hibernation"
               checked={(settings.tabHibernationEnabled ?? true)}
               onToggle={() => onUpdateSettings({ tabHibernationEnabled: !(settings.tabHibernationEnabled ?? true) })}
             />
@@ -96,6 +99,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Throttles heavy background canvas shaders and limits particle effects to extend laptop battery life</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle energy saver mode"
               checked={settings.energySaverMode}
               onToggle={() => onUpdateSettings({ energySaverMode: !(settings.energySaverMode ?? false) })}
               activeColorClass="bg-emerald-500"
@@ -109,6 +113,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pre-resolves domain names and opens anticipatory sockets on link hover for instant page loads</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle DNS prefetching and link pre-warming"
               checked={(settings.preloadDnsEnabled ?? true)}
               onToggle={() => onUpdateSettings({ preloadDnsEnabled: !(settings.preloadDnsEnabled ?? true) })}
             />
@@ -121,6 +126,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Interpolates page scrolling with GPU composited physics for high refresh rate monitors</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle smooth scrolling"
               checked={(settings.smoothScrollingEnabled ?? true)}
               onToggle={() => onUpdateSettings({ smoothScrollingEnabled: !(settings.smoothScrollingEnabled ?? true) })}
             />
@@ -177,6 +183,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Use GPU to render web pages faster (requires restart)</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle hardware acceleration"
               checked={settings.hardwareAcceleration}
               onToggle={() => onUpdateSettings({ hardwareAcceleration: !settings.hardwareAcceleration })}
             />
@@ -188,6 +195,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Enable "Inspect Element" in right-click menu and advanced tools</div>
             </div>
             <ToggleSwitch
+              ariaLabel="Toggle developer mode"
               checked={settings.developerMode}
               onToggle={() => onUpdateSettings({ developerMode: !settings.developerMode })}
             />

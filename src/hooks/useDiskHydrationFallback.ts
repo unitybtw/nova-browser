@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
@@ -27,13 +27,21 @@ export function useDiskHydrationFallback({
   setFolders,
   setBookmarks,
   setTabs,
-}: UseDiskHydrationFallbackOptions): void {
+}: UseDiskHydrationFallbackOptions): { isHydrated: boolean } {
+  const [isHydrated, setIsHydrated] = useState(Boolean(isDemo));
+
   useEffect(() => {
-    if (isDemo) return;
+    if (isDemo) {
+      setIsHydrated(true);
+      return;
+    }
     const restoreFromDisk = async () => {
       try {
         const electronStore = getElectronAPI();
-        if (!electronStore?.storeGet) return;
+        if (!electronStore?.storeGet) {
+          setIsHydrated(true);
+          return;
+        }
 
         // Restore settings if missing from localStorage
         if (!localStorage.getItem('user_settings')) {
@@ -121,9 +129,13 @@ export function useDiskHydrationFallback({
         }
       } catch (err) {
         logger.warn('App:Storage', 'Fallback restore from disk encountered an error', err);
+      } finally {
+        setIsHydrated(true);
       }
     };
 
     restoreFromDisk();
   }, [isDemo, setSettings, setWorkspaces, setFolders, setBookmarks, setTabs]);
+
+  return { isHydrated };
 }
