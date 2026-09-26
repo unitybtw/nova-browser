@@ -101,10 +101,10 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
   }
 
   const isInternal = tab.url?.startsWith('nova://') || tab.url === 'about:blank';
-  const isSettings = tab.url === 'nova://settings' || tab.url?.includes('settings');
-  const isHistory = tab.url === 'nova://history' || tab.url?.includes('history');
-  const isDownloads = tab.url === 'nova://downloads' || tab.url?.includes('downloads');
-  const isNewTab = tab.url === 'nova://newtab' || tab.url === 'about:blank' || tab.url === 'https://newtab';
+  const isSettings = tab.url === 'nova://settings';
+  const isHistory = tab.url === 'nova://history';
+  const isDownloads = tab.url === 'nova://downloads';
+  const isNewTab = tab.url === 'nova://newtab' || tab.url === 'about:blank';
 
   return createPortal(
     <AnimatePresence>

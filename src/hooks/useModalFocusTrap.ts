@@ -6,6 +6,8 @@ export function useModalFocusTrap(
   containerRef: React.RefObject<HTMLElement | null>
 ) {
   const previousActiveElementRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -42,7 +44,7 @@ export function useModalFocusTrap(
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -85,9 +87,12 @@ export function useModalFocusTrap(
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       // Restore previous focus when modal closes
-      if (previousActiveElementRef.current && document.body.contains(previousActiveElementRef.current)) {
-        previousActiveElementRef.current.focus();
+      const prevEl = previousActiveElementRef.current;
+      if (prevEl && typeof prevEl.focus === 'function' && document.body.contains(prevEl)) {
+        requestAnimationFrame(() => {
+          prevEl.focus();
+        });
       }
     };
-  }, [isOpen, onClose, containerRef]);
+  }, [isOpen, containerRef]);
 }

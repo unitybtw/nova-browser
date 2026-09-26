@@ -80,14 +80,23 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   const [sitePerms, setSitePerms] = useState<Record<string, { allow: boolean; ts: number }>>({});
 
   useEffect(() => {
+    setSitePerms({});
     if (!isOpen || isInternal || !domain) return;
+    let isCancelled = false;
     const origin = `${protocol}//${domain}`;
     const api = (window as any).electronAPI;
     if (api?.getSitePermissions) {
       api.getSitePermissions(origin).then((perms: any) => {
-        if (perms && typeof perms === 'object') setSitePerms(perms);
-      }).catch(() => {});
+        if (!isCancelled && perms && typeof perms === 'object') {
+          setSitePerms(perms);
+        }
+      }).catch(() => {
+        if (!isCancelled) setSitePerms({});
+      });
     }
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, isInternal, protocol, domain]);
 
   const getPermStatus = (key: string) => {

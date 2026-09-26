@@ -69,12 +69,42 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        const items = Array.from(
+          menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') || []
+        );
+        if (items.length === 0) return;
+        const currentIdx = items.indexOf(document.activeElement as HTMLButtonElement);
+        if (e.key === 'ArrowDown') {
+          const next = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
+          items[next]?.focus();
+        } else {
+          const prev = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
+          items[prev]?.focus();
+        }
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
+        items?.[0]?.focus();
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
+        if (items && items.length > 0) items[items.length - 1]?.focus();
+      }
     };
 
     if (menuState.isOpen) {
       window.addEventListener('mousedown', handleOutsideClick);
       window.addEventListener('keydown', handleKeyDown);
+      requestAnimationFrame(() => {
+        const first = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
+        first?.focus();
+      });
     }
     return () => {
       window.removeEventListener('mousedown', handleOutsideClick);
@@ -92,23 +122,30 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
   // Adjust menu position to avoid overflowing viewport edges
   const menuWidth = 230;
   const menuHeight = 360;
-  const adjustedX = Math.min(menuState.x, window.innerWidth - menuWidth - 10);
-  const adjustedY = Math.min(menuState.y, window.innerHeight - menuHeight - 10);
+  const adjustedX = Math.max(10, Math.min(menuState.x, window.innerWidth - menuWidth - 10));
+  const adjustedY = Math.max(10, Math.min(menuState.y, window.innerHeight - menuHeight - 10));
 
   return (
     <AnimatePresence>
       {menuState.isOpen && tab && (
         <motion.div
           ref={menuRef}
+          role="menu"
+          aria-label="Tab options"
+          aria-orientation="vertical"
+          tabIndex={-1}
           initial={{ opacity: 0, scale: 0.95, y: -4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.12, ease: 'easeOut' }}
           style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
-          className="fixed z-[99999] w-58 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium"
+          className="fixed z-[99999] w-58 max-h-[calc(100vh-20px)] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium outline-none"
         >
         {/* New Tab to Right */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label="New tab to the right"
           onClick={() => { onNewTabRight(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -120,6 +157,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Reload */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label="Reload tab"
           onClick={() => { onReloadTab(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -132,6 +172,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Duplicate Tab */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label="Duplicate tab"
           onClick={() => { onDuplicateTab(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -143,6 +186,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Pin / Unpin */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label={tab.isPinned ? 'Unpin tab' : 'Pin tab'}
           onClick={() => { onTogglePinTab(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -154,6 +200,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Mute / Unmute */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label={tab.isMuted ? 'Unmute site' : 'Mute site'}
           onClick={() => { onToggleMuteTab(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -165,6 +214,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Bookmark Tab */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label={isBookmarked ? 'Edit bookmark' : 'Bookmark tab'}
           onClick={() => { onBookmarkTab(tab); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
@@ -177,6 +229,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Copy URL */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label="Copy page link"
           onClick={() => {
             if (tab.url && tab.url !== 'nova://newtab') {
               navigator.clipboard?.writeText(tab.url);
@@ -195,6 +250,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
 
         {/* Close Tab */}
         <button
+          role="menuitem"
+          tabIndex={-1}
+          aria-label="Close tab"
           onClick={() => { onCloseTab(tab.id); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
         >
@@ -208,6 +266,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         {/* Close Other Tabs */}
         {hasOtherTabs && (
           <button
+            role="menuitem"
+            tabIndex={-1}
+            aria-label="Close other tabs"
             onClick={() => { onCloseOtherTabs(tab.id); onClose(); }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
           >
@@ -221,6 +282,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         {/* Close Tabs to Right */}
         {!isRightmost && (
           <button
+            role="menuitem"
+            tabIndex={-1}
+            aria-label="Close tabs to the right"
             onClick={() => { onCloseTabsToRight(tab.id); onClose(); }}
             className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-red-500/10 hover:text-red-500 transition-colors text-left cursor-pointer"
           >
@@ -236,6 +300,9 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           <>
             <div className="my-1 border-t border-slate-200/60 dark:border-white/10" />
             <button
+              role="menuitem"
+              tabIndex={-1}
+              aria-label="Reopen closed tab"
               onClick={() => { onReopenClosedTab(); onClose(); }}
               className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer text-cyan-600 dark:text-cyan-400"
             >

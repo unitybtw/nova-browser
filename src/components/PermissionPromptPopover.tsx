@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, 
@@ -16,6 +16,7 @@ import {
   Globe 
 } from 'lucide-react';
 import { PermissionRequest } from '../types/browser';
+import { useTranslation } from '../services/i18n';
 
 interface PermissionPromptPopoverProps {
   requests: PermissionRequest[];
@@ -29,13 +30,32 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
   onDismiss
 }) => {
   const currentRequest = requests[0];
-  const [rememberMap, setRememberMap] = useState<Record<string, boolean>>({});
-  const remember = currentRequest ? (rememberMap[currentRequest.requestId] ?? false) : false;
-  const setRemember = (val: boolean) => {
-    if (currentRequest) {
-      setRememberMap(prev => ({ ...prev, [currentRequest.requestId]: val }));
-    }
-  };
+  const [remember, setRemember] = useState(false);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const allowButtonRef = useRef<HTMLButtonElement>(null);
+  const { language } = useTranslation();
+  const isTr = language === 'tr';
+
+  useEffect(() => {
+    setRemember(false);
+  }, [currentRequest?.requestId]);
+
+  useEffect(() => {
+    if (!currentRequest) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onDismiss(currentRequest.requestId);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    requestAnimationFrame(() => {
+      allowButtonRef.current?.focus();
+    });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentRequest?.requestId, onDismiss]);
 
   if (!currentRequest) return null;
 
@@ -44,18 +64,18 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
     const parsed = new URL(currentRequest.url || currentRequest.origin);
     domain = parsed.hostname;
   } catch {
-    domain = currentRequest.origin || currentRequest.url || 'Web Sitesi';
+    domain = currentRequest.origin || currentRequest.url || (isTr ? 'Web Sitesi' : 'Website');
   }
 
   const getPermissionDetails = (perm: string, mediaTypes?: string[]) => {
     switch (perm) {
-      case 'media':
+      case 'media': {
         const hasVideo = !mediaTypes || mediaTypes.includes('video');
         const hasAudio = !mediaTypes || mediaTypes.includes('audio');
         if (hasVideo && hasAudio) {
           return {
-            title: 'Camera & Microphone',
-            desc: 'Use your camera and microphone',
+            title: isTr ? 'Kamera ve Mikrofon' : 'Camera & Microphone',
+            desc: isTr ? 'Kameranızı ve mikrofonunuzu kullanmak istiyor' : 'Use your camera and microphone',
             icon: (
               <div className="flex items-center gap-1 text-blue-500">
                 <Camera className="w-4 h-4" />
@@ -66,73 +86,74 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
           };
         } else if (hasVideo) {
           return {
-            title: 'Camera',
-            desc: 'Use your camera',
+            title: isTr ? 'Kamera' : 'Camera',
+            desc: isTr ? 'Kameranızı kullanmak istiyor' : 'Use your camera',
             icon: <Camera className="w-4 h-4 text-blue-500" />,
             bg: 'bg-blue-500/10 dark:bg-blue-500/20'
           };
         } else {
           return {
-            title: 'Microphone',
-            desc: 'Use your microphone',
+            title: isTr ? 'Mikrofon' : 'Microphone',
+            desc: isTr ? 'Mikrofonunuzu kullanmak istiyor' : 'Use your microphone',
             icon: <Mic className="w-4 h-4 text-purple-500" />,
             bg: 'bg-purple-500/10 dark:bg-purple-500/20'
           };
         }
+      }
       case 'geolocation':
         return {
-          title: 'Location',
-          desc: 'Access your physical location',
+          title: isTr ? 'Konum' : 'Location',
+          desc: isTr ? 'Fiziksel konumunuza erişmek istiyor' : 'Access your physical location',
           icon: <MapPin className="w-4 h-4 text-emerald-500" />,
           bg: 'bg-emerald-500/10 dark:bg-emerald-500/20'
         };
       case 'notifications':
         return {
-          title: 'Notifications',
-          desc: 'Send you push notifications',
+          title: isTr ? 'Bildirimler' : 'Notifications',
+          desc: isTr ? 'Size anlık bildirim göndermek istiyor' : 'Send you push notifications',
           icon: <Bell className="w-4 h-4 text-amber-500" />,
           bg: 'bg-amber-500/10 dark:bg-amber-500/20'
         };
       case 'clipboard-read':
         return {
-          title: 'Clipboard',
-          desc: 'Read text and images from clipboard',
+          title: isTr ? 'Pano' : 'Clipboard',
+          desc: isTr ? 'Panodaki metin ve görselleri okumak istiyor' : 'Read text and images from clipboard',
           icon: <Clipboard className="w-4 h-4 text-cyan-500" />,
           bg: 'bg-cyan-500/10 dark:bg-cyan-500/20'
         };
       case 'pointerLock':
         return {
-          title: 'Pointer Lock',
-          desc: 'Lock and track mouse pointer movement',
+          title: isTr ? 'İmleç Kilidi' : 'Pointer Lock',
+          desc: isTr ? 'Fare imlecinizi kilitlemek ve hareketlerini takip etmek istiyor' : 'Lock and track mouse pointer movement',
           icon: <MousePointer className="w-4 h-4 text-indigo-500" />,
           bg: 'bg-indigo-500/10 dark:bg-indigo-500/20'
         };
       case 'fullscreen':
         return {
-          title: 'Full Screen',
-          desc: 'Enter full screen display mode',
+          title: isTr ? 'Tam Ekran' : 'Full Screen',
+          desc: isTr ? 'Tam ekran moduna geçmek istiyor' : 'Enter full screen display mode',
           icon: <Maximize className="w-4 h-4 text-slate-500" />,
           bg: 'bg-slate-500/10 dark:bg-slate-500/20'
         };
       case 'display-capture':
         return {
-          title: 'Screen Sharing',
-          desc: 'Capture or share your screen/window',
+          title: isTr ? 'Ekran Paylaşımı' : 'Screen Sharing',
+          desc: isTr ? 'Ekranınızı veya pencerenizi paylaşmak istiyor' : 'Capture or share your screen/window',
           icon: <Tv className="w-4 h-4 text-rose-500" />,
           bg: 'bg-rose-500/10 dark:bg-rose-500/20'
         };
       case 'midi':
       case 'midiSysex':
         return {
-          title: 'MIDI Devices',
-          desc: 'Access MIDI instruments and controllers',
+          title: isTr ? 'MIDI Cihazları' : 'MIDI Devices',
+          desc: isTr ? 'MIDI enstrümanlarına ve denetleyicilerine erişmek istiyor' : 'Access MIDI instruments and controllers',
           icon: <Music className="w-4 h-4 text-pink-500" />,
           bg: 'bg-pink-500/10 dark:bg-pink-500/20'
         };
       default:
         return {
           title: currentRequest.permissionName || perm,
-          desc: `Access ${currentRequest.permissionName || perm} permission`,
+          desc: isTr ? `${currentRequest.permissionName || perm} iznine erişmek istiyor` : `Access ${currentRequest.permissionName || perm} permission`,
           icon: <ShieldAlert className="w-4 h-4 text-amber-500" />,
           bg: 'bg-amber-500/10 dark:bg-amber-500/20'
         };
@@ -144,7 +165,11 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
   return (
     <AnimatePresence>
       <motion.div
+        ref={popoverRef}
         key={currentRequest.requestId}
+        role="dialog"
+        aria-modal="true"
+        aria-label={details.title}
         initial={{ opacity: 0, y: -8, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: -8, scale: 0.95 }}
@@ -165,7 +190,7 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
                 {domain}
               </span>
               <span className="text-[11px] text-slate-500 dark:text-slate-400 block -mt-0.5">
-                wants to:
+                {isTr ? 'şunu istiyor:' : 'wants to:'}
               </span>
             </div>
           </div>
@@ -173,7 +198,8 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
           <button
             onClick={() => onDismiss(currentRequest.requestId)}
             className="p-1 -mr-1 -mt-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="Close"
+            aria-label={isTr ? 'Kapat' : 'Close'}
+            title={isTr ? 'Kapat' : 'Close'}
           >
             <X className="w-4 h-4" />
           </button>
@@ -203,11 +229,11 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
               onChange={(e) => setRemember(e.target.checked)}
               className="w-3.5 h-3.5 rounded text-blue-600 focus:ring-blue-500/20 border-slate-300 dark:border-slate-600 dark:bg-slate-800 cursor-pointer"
             />
-            <span>Remember this choice for this site</span>
+            <span>{isTr ? 'Bu site için bu tercihi hatırla' : 'Remember this choice for this site'}</span>
           </label>
           {requests.length > 1 && (
             <span className="ml-auto text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full font-medium">
-              +{requests.length - 1} more
+              +{requests.length - 1} {isTr ? 'daha' : 'more'}
             </span>
           )}
         </div>
@@ -218,14 +244,15 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
             onClick={() => onRespond(currentRequest.requestId, false, remember)}
             className="px-3.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all active:scale-95 cursor-pointer"
           >
-            Block
+            {isTr ? 'Engelle' : 'Block'}
           </button>
           <button
+            ref={allowButtonRef}
             onClick={() => onRespond(currentRequest.requestId, true, remember)}
             className="px-4 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-xl shadow-xs shadow-blue-500/20 transition-all hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center gap-1.5"
           >
             <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-            Allow
+            {isTr ? 'İzin Ver' : 'Allow'}
           </button>
         </div>
       </motion.div>

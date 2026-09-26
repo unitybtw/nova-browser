@@ -276,16 +276,31 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       // strip directory components, separators, illegal characters, and Windows device names.
       const safeName = sanitizeDownloadFilename(filename);
       let targetPath = path.join(defaultDir, safeName);
-      // Auto-increment filename if already exists to avoid silent overwrite
+      // Auto-increment filename if already exists to avoid silent overwrite and TOCTOU races
       try {
-        if (fs.existsSync(targetPath)) {
-          const ext = path.extname(safeName);
-          const base = path.basename(safeName, ext);
-          let counter = 1;
-          while (fs.existsSync(path.join(defaultDir, `${base} (${counter})${ext}`))) {
-            counter++;
+        const ext = path.extname(safeName);
+        const base = path.basename(safeName, ext);
+        let candidatePath = targetPath;
+        let counter = 1;
+        while (true) {
+          try {
+            // Atomic creation test via O_CREAT | O_EXCL
+            const fd = fs.openSync(candidatePath, 'wx');
+            fs.closeSync(fd);
+            targetPath = candidatePath;
+            break;
+          } catch (err: any) {
+            if (err && err.code === 'EEXIST') {
+              candidatePath = path.join(defaultDir, `${base} (${counter})${ext}`);
+              counter++;
+              if (counter > 1000) {
+                targetPath = path.join(defaultDir, `${base}_${crypto.randomUUID().slice(0, 8)}${ext}`);
+                break;
+              }
+            } else {
+              break;
+            }
           }
-          targetPath = path.join(defaultDir, `${base} (${counter})${ext}`);
         }
       } catch {}
       // Security: final containment check — the resolved save path must stay
@@ -310,6 +325,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       savePath: item.getSavePath() || undefined
     });
 
+    let lastProgressBroadcastTime = 0;
     item.on('updated', (event, state) => {
       if (state === 'interrupted') {
         sendToMainWindow('download-update', {
@@ -323,16 +339,21 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           savePath: item.getSavePath() || undefined
         });
       } else if (state === 'progressing') {
-        sendToMainWindow('download-update', {
-          id: downloadId,
-          filename: path.basename(item.getSavePath() || filename),
-          url: item.getURL(),
-          receivedBytes: item.getReceivedBytes(),
-          totalBytes,
-          state: 'progressing',
-          isPaused: item.isPaused(),
-          savePath: item.getSavePath() || undefined
-        });
+        const now = Date.now();
+        // Throttle frequent byte updates to at most once every 250ms, unless pause status changed
+        if (item.isPaused() || now - lastProgressBroadcastTime >= 250) {
+          lastProgressBroadcastTime = now;
+          sendToMainWindow('download-update', {
+            id: downloadId,
+            filename: path.basename(item.getSavePath() || filename),
+            url: item.getURL(),
+            receivedBytes: item.getReceivedBytes(),
+            totalBytes,
+            state: 'progressing',
+            isPaused: item.isPaused(),
+            savePath: item.getSavePath() || undefined
+          });
+        }
       }
     });
 

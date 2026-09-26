@@ -67,18 +67,77 @@ function normalizeHomoglyphs(str: string): string {
   return str.split('').map(c => HOMOGLYPH_MAP[c] || c).join('');
 }
 
+function decodePunycodeLabel(input: string): string {
+  const BASE = 36;
+  const TMIN = 1;
+  const TMAX = 26;
+  const SKEW = 38;
+  const DAMP = 700;
+  const INITIAL_BIAS = 72;
+  const INITIAL_N = 128;
+
+  function adapt(delta: number, numPoints: number, firstTime: boolean): number {
+    let d = firstTime ? Math.floor(delta / DAMP) : Math.floor(delta / 2);
+    d += Math.floor(d / numPoints);
+    let k = 0;
+    while (d > Math.floor(((BASE - TMIN) * TMAX) / 2)) {
+      d = Math.floor(d / (BASE - TMIN));
+      k += BASE;
+    }
+    return k + Math.floor(((BASE - TMIN + 1) * d) / (d + SKEW));
+  }
+
+  const output: number[] = [];
+  const basicIndex = input.lastIndexOf('-');
+  const b = basicIndex > 0 ? basicIndex : 0;
+  for (let j = 0; j < b; ++j) {
+    output.push(input.charCodeAt(j));
+  }
+
+  let n = INITIAL_N;
+  let i = 0;
+  let bias = INITIAL_BIAS;
+  let inIdx = basicIndex > 0 ? basicIndex + 1 : 0;
+
+  while (inIdx < input.length) {
+    const oldi = i;
+    let w = 1;
+    for (let k = BASE; ; k += BASE) {
+      if (inIdx >= input.length) break;
+      const c = input.charCodeAt(inIdx++);
+      const digit = c - 48 < 10 ? c - 22 : c - 65 < 26 ? c - 65 : c - 97 < 26 ? c - 97 : BASE;
+      i += digit * w;
+      const t = k <= bias ? TMIN : k >= bias + TMAX ? TMAX : k - bias;
+      if (digit < t) break;
+      w *= BASE - t;
+    }
+    bias = adapt(i - oldi, output.length + 1, oldi === 0);
+    n += Math.floor(i / (output.length + 1));
+    i %= output.length + 1;
+    output.splice(i, 0, n);
+    i++;
+  }
+
+  return String.fromCodePoint(...output);
+}
+
+export function punycodeToUnicodeDomain(hostname: string): string {
+  return hostname.split('.').map(part => {
+    if (part.toLowerCase().startsWith('xn--')) {
+      try {
+        return decodePunycodeLabel(part.slice(4).toLowerCase());
+      } catch {
+        return part;
+      }
+    }
+    return part;
+  }).join('.');
+}
+
 export function isHomographSpoof(hostname: string): boolean {
   if (!hostname.includes('xn--')) return false;
 
-  let unicodeDomain = hostname;
-  try {
-    if (typeof process !== 'undefined' && process.versions && process.versions.node) {
-      const urlModule = require('url');
-      if (typeof urlModule.domainToUnicode === 'function') {
-        unicodeDomain = urlModule.domainToUnicode(hostname);
-      }
-    }
-  } catch (_) {}
+  const unicodeDomain = punycodeToUnicodeDomain(hostname);
 
   if (unicodeDomain !== hostname) {
     const normalized = normalizeHomoglyphs(unicodeDomain);

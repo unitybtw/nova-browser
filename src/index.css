@@ -83,24 +83,6 @@
   --nova-slate-100: #f1f5f9;
   --nova-slate-50: #f8fafc;
 
-/* Accessibility: High-contrast focus rings for keyboard navigation */
-:focus-visible {
-  outline: 2px solid var(--color-accent, #06b6d4) !important;
-  outline-offset: 2px !important;
-}
-
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible,
-[tabindex]:focus-visible,
-[role="button"]:focus-visible,
-[role="switch"]:focus-visible {
-  outline: 2px solid var(--color-accent, #06b6d4) !important;
-  outline-offset: 2px !important;
-}
-
   --background: #ffffff;
   --foreground: #09090b;
   --card: #ffffff;
@@ -169,6 +151,31 @@ select:focus-visible,
   --nova-inactive-tab-hover-bg: rgba(255, 255, 255, 0.06);
   --nova-border-subtle: rgba(255, 255, 255, 0.08);
   --nova-card-bg: var(--nova-slate-800);
+}
+
+/* Accessibility: High-contrast focus rings for keyboard navigation (WCAG 2.1 AA) */
+:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
+/* Composite input subfields where the outer container provides the accessible focus-within ring */
+[data-subfield]:focus,
+[data-subfield]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 @layer utilities {

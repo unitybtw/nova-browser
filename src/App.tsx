@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, MotionConfig } from 'framer-motion';
 import { PanelRight, PanelLeft, Columns2, ArrowLeftRight, X, Globe } from 'lucide-react';
 import { TopBar } from './components/TopBar';
 import { BrowserView } from './components/BrowserView';
@@ -1284,22 +1284,29 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   if (showOnboarding) {
     return (
-      <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
-        <Onboarding
-          onComplete={handleOnboardingComplete}
-        />
-      </React.Suspense>
+      <MotionConfig reducedMotion="user">
+        <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
+          <Onboarding
+            onComplete={handleOnboardingComplete}
+          />
+        </React.Suspense>
+      </MotionConfig>
     );
   }
 
+  const handleCloseHelp = useCallback(() => setIsHelpOpen(false), []);
+  const handleCloseAccountModal = useCallback(() => setIsAccountModalOpen(false), []);
+  const handleCloseBlockedSiteAlert = useCallback(() => setBlockedSiteAlert(null), []);
+
   return (
-    <div 
-      style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
-      className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
-        activeTab?.isIncognito
-          ? 'bg-slate-950 dark:bg-[#0a0812]'
-          : 'bg-slate-100 dark:bg-slate-950'
-      } transition-colors duration-300`}>
+    <MotionConfig reducedMotion="user">
+      <div 
+        style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
+        className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
+          activeTab?.isIncognito
+            ? 'bg-slate-950 dark:bg-[#0a0812]'
+            : 'bg-slate-100 dark:bg-slate-950'
+        } transition-colors duration-300`}>
       
       {/* Pinned Vertical Sidebar with smooth slide animation */}
       <AnimatePresence initial={false}>
@@ -2027,7 +2034,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {isHelpOpen && (
           <HelpModal
             isOpen={isHelpOpen}
-            onClose={() => setIsHelpOpen(false)}
+            onClose={handleCloseHelp}
             initialTab={helpInitialTab}
           />
         )}
@@ -2038,7 +2045,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {isAccountModalOpen && (
           <AccountModal
             isOpen={isAccountModalOpen}
-            onClose={() => setIsAccountModalOpen(false)}
+            onClose={handleCloseAccountModal}
             onPerformSync={handlePerformSync}
           />
         )}
@@ -2048,11 +2055,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <DownloadToast downloads={downloads} />
         <UpdateToast />
         {blockedSiteAlert && (
-          <BlockedSiteModal alert={blockedSiteAlert} onClose={() => setBlockedSiteAlert(null)} />
+          <BlockedSiteModal alert={blockedSiteAlert} onClose={handleCloseBlockedSiteAlert} />
         )}
         <AICursorOverlay />
       </React.Suspense>
     </div>
+    </MotionConfig>
   );
 }
 
