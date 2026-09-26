@@ -149,18 +149,19 @@ interface TopBarProps {
 }
 
 const MemoizedTabItem = React.memo(({ 
-  tab, activeTabId, index, isActive, isSplitChild, splitTab, ghostTab, tabStyle, tabAnimation, isIncognito,
+  tab, activeTabId, index, isActive, isSplitChild, splitTab, tabStyle, tabAnimation, isIncognito,
   wasJustUnsplit,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
-  tabsLength, setGhostTab, onOpenContextMenu, onTabHover, onTabLeave
+  tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave
 }: any) => {
   if (isSplitChild) return null;
 
   const isPinned = !!tab.isPinned;
-  const targetMinWidth = isPinned ? 38 : splitTab ? 260 : 120;
-  const targetMaxWidth = isPinned ? 38 : splitTab ? 420 : 240;
-  const targetPadding = isPinned ? 8 : splitTab ? 6 : 12;
+  const unpinnedCount = Math.max(1, tabsLength - (isPinned ? 1 : 0));
+  const baseWidth = Math.min(220, Math.max(90, Math.floor(1000 / unpinnedCount)));
+  const targetWidth = isPinned ? 38 : splitTab ? Math.min(360, baseWidth * 2) : baseWidth;
+  const targetPadding = isPinned ? 6 : splitTab ? 6 : 10;
   const animPreset = tabAnimation || 'chrome';
 
   const animationConfig = useMemo(() => {
@@ -171,18 +172,16 @@ const MemoizedTabItem = React.memo(({
             opacity: 0,
             y: 4,
             scale: 0.96,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4
           },
           animate: {
-            opacity: ghostTab?.id === tab.id ? 0.4 : 1,
+            opacity: 1,
             y: 0,
             scale: 1,
-            maxWidth: targetMaxWidth,
-            minWidth: targetMinWidth,
+            width: targetWidth,
             paddingLeft: targetPadding,
             paddingRight: targetPadding,
             marginRight: 0
@@ -194,8 +193,7 @@ const MemoizedTabItem = React.memo(({
             opacity: 0,
             y: 4,
             scale: 0.96,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4,
@@ -203,8 +201,7 @@ const MemoizedTabItem = React.memo(({
               opacity: { duration: 0.08, ease: 'easeOut' },
               y: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
               scale: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
-              maxWidth: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
-              minWidth: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
+              width: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
               paddingLeft: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
               paddingRight: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const },
               marginRight: { duration: 0.20, ease: [0.16, 1, 0.3, 1] as const }
@@ -222,18 +219,16 @@ const MemoizedTabItem = React.memo(({
             opacity: 0,
             y: 2,
             scale: 0.98,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4
           },
           animate: {
-            opacity: ghostTab?.id === tab.id ? 0.4 : 1,
+            opacity: 1,
             y: 0,
             scale: 1,
-            maxWidth: targetMaxWidth,
-            minWidth: targetMinWidth,
+            width: targetWidth,
             paddingLeft: targetPadding,
             paddingRight: targetPadding,
             marginRight: 0
@@ -244,16 +239,14 @@ const MemoizedTabItem = React.memo(({
           } : {
             opacity: 0,
             scale: 0.98,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4,
             transition: {
               opacity: { duration: 0.06, ease: 'easeOut' },
               scale: { duration: 0.12, ease: [0.2, 0, 0, 1] as const },
-              maxWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
-              minWidth: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
+              width: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               paddingLeft: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               paddingRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const },
               marginRight: { duration: 0.14, ease: [0.2, 0, 0, 1] as const }
@@ -267,8 +260,8 @@ const MemoizedTabItem = React.memo(({
         };
       case 'none':
         return {
-          initial: { opacity: 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0, marginRight: 0 },
-          animate: { opacity: ghostTab?.id === tab.id ? 0.4 : 1, maxWidth: targetMaxWidth, minWidth: targetMinWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0, marginRight: 0 },
+          initial: { opacity: 1, width: targetWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0, marginRight: 0 },
+          animate: { opacity: 1, width: targetWidth, paddingLeft: targetPadding, paddingRight: targetPadding, scale: 1, y: 0, marginRight: 0 },
           exit: { opacity: 0, transition: { duration: 0 } },
           transition: { duration: 0 }
         };
@@ -277,8 +270,7 @@ const MemoizedTabItem = React.memo(({
         return {
           initial: {
             opacity: 0,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4,
@@ -286,9 +278,8 @@ const MemoizedTabItem = React.memo(({
             y: 0
           },
           animate: {
-            opacity: ghostTab?.id === tab.id ? 0.4 : 1,
-            maxWidth: targetMaxWidth,
-            minWidth: targetMinWidth,
+            opacity: 1,
+            width: targetWidth,
             paddingLeft: targetPadding,
             paddingRight: targetPadding,
             marginRight: 0,
@@ -300,15 +291,13 @@ const MemoizedTabItem = React.memo(({
             transition: { duration: 0 }
           } : {
             opacity: 0,
-            maxWidth: 0,
-            minWidth: 0,
+            width: 0,
             paddingLeft: 0,
             paddingRight: 0,
             marginRight: -4,
             transition: {
               opacity: { duration: 0.08, ease: 'easeOut' },
-              maxWidth: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
-              minWidth: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
+              width: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
               paddingLeft: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
               paddingRight: { duration: 0.18, ease: [0.2, 0, 0, 1] as const },
               marginRight: { duration: 0.18, ease: [0.2, 0, 0, 1] as const }
@@ -321,7 +310,7 @@ const MemoizedTabItem = React.memo(({
           }
         };
     }
-  }, [animPreset, targetMaxWidth, targetMinWidth, targetPadding, ghostTab?.id, tab.id, !!splitTab]);
+  }, [animPreset, targetWidth, targetPadding, tab.id, !!splitTab]);
 
   return (
     <Reorder.Item
@@ -336,7 +325,7 @@ const MemoizedTabItem = React.memo(({
       animate={animationConfig.animate}
       exit={animationConfig.exit}
       transition={animationConfig.transition}
-      whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing' }}
+      whileDrag={{ scale: 1.02, zIndex: 50, cursor: 'grabbing', opacity: 0.7 }}
       onDragStart={() => {
         onTabLeave?.();
         if (!splitTab) {
@@ -348,16 +337,16 @@ const MemoizedTabItem = React.memo(({
         onTabDrag?.(info.point.y, info.point.x);
         // Only show ghost indicator if dragged completely clear of the TopBar header (> 110px)
         if (info.point.y > 110) {
-          setGhostTab({ id: tab.id, x: info.point.x, y: info.point.y });
+          onUpdateGhost?.(tab.title || 'Drop to Split Screen', info.point.x, info.point.y);
         } else {
-          setGhostTab(null);
+          onUpdateGhost?.(null);
         }
       }}
       onDragEnd={(e, info) => {
         if (!splitTab) {
           onTabDragEnd?.();
         }
-        setGhostTab(null);
+        onUpdateGhost?.(null);
         if (info.point.y > 110 && !splitTab) {
           const side = info.point.x < window.innerWidth / 2 ? 'left' : 'right';
           onDropToSplitScreen?.(tab.id, side);
@@ -385,22 +374,24 @@ const MemoizedTabItem = React.memo(({
       }}
       data-tab-id={tab.id}
       title={isPinned ? `${tab.title || 'Pinned Tab'} (Pinned)` : tab.title}
-      style={
-        isActive && !isIncognito 
+      style={{
+        flex: '0 0 auto',
+        width: targetWidth,
+        ...(isActive && !isIncognito 
           ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } 
-          : undefined
-      }
+          : {})
+      }}
       className={`group flex items-center justify-between ${
         isPinned ? 'justify-center' : ''
-      } flex-1 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative overflow-hidden ${
+      } flex-none shrink-0 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative overflow-hidden ${
         tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
         tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
         'h-[34px] rounded-t-xl border-t border-x'
       } ${
         isActive
           ? isIncognito
-            ? 'bg-slate-800 text-slate-100 border-slate-700 font-semibold shadow-xs border-t-2 border-t-blue-500 relative z-10'
-            : 'bg-white text-slate-900 border-slate-300/80 font-semibold shadow-xs border-t-2 border-t-blue-500 relative z-10 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700'
+            ? 'bg-slate-800 text-slate-100 border-slate-700 font-medium shadow-xs border-t-2 border-t-blue-500 relative z-10'
+            : 'bg-white text-slate-900 border-slate-300/80 font-medium shadow-xs border-t-2 border-t-blue-500 relative z-10 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700'
           : isIncognito
             ? 'bg-slate-800/40 text-slate-400 hover:bg-slate-800/80 hover:text-slate-200 border-transparent font-medium'
             : 'bg-slate-200/40 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 border-transparent font-medium dark:bg-slate-800/40 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
@@ -411,7 +402,7 @@ const MemoizedTabItem = React.memo(({
           {tab.isLoading ? (
             <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
           ) : tab.favicon ? (
-            <img src={tab.favicon} alt="" className="w-4 h-4 rounded-xs shrink-0" />
+            <img src={tab.favicon} width={16} height={16} alt="" className="w-4 h-4 rounded-xs shrink-0" />
           ) : (
             <Globe className="w-4 h-4 text-slate-400 shrink-0" />
           )}
@@ -459,7 +450,7 @@ const MemoizedTabItem = React.memo(({
             {tab.isLoading ? (
               <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : tab.favicon ? (
-              <img src={tab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
+              <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
@@ -528,7 +519,7 @@ const MemoizedTabItem = React.memo(({
             {splitTab.isLoading ? (
               <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : splitTab.favicon ? (
-              <img src={splitTab.favicon} className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
+              <img src={splitTab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0 object-contain" />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
@@ -554,7 +545,7 @@ const MemoizedTabItem = React.memo(({
             {tab.isLoading ? (
               <div className="w-3.5 h-3.5 border-2 border-blue-500/50 border-t-transparent rounded-full animate-spin shrink-0" />
             ) : tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
+              <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-sm shrink-0" />
             ) : tab.url === 'nova://settings' ? (
               <Settings className="w-3.5 h-3.5 text-slate-400 shrink-0" />
             ) : tab.url === 'nova://history' ? (
@@ -606,16 +597,13 @@ const MemoizedTabItem = React.memo(({
             )}
 
             {!tab.isPinned && (
-              <motion.button
-                whileHover={{ scale: 1.15 }}
-                whileTap={{ scale: 0.85 }}
-                transition={{ type: 'spring', stiffness: 400, damping: 22 }}
+              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onTabLeave?.();
                   onCloseTab(tab.id, e);
                 }}
-                className={`p-0.5 rounded-full transition-colors shrink-0 cursor-pointer ${
+                className={`w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0 cursor-pointer hover:scale-110 active:scale-95 ${
                   isActive
                     ? 'hover:bg-slate-200 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
                     : 'opacity-0 group-hover:opacity-100 hover:bg-slate-300 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
@@ -623,7 +611,7 @@ const MemoizedTabItem = React.memo(({
                 title="Close Tab"
               >
                 <X className="w-3.5 h-3.5" />
-              </motion.button>
+              </button>
             )}
           </div>
         </>
@@ -640,6 +628,7 @@ const MemoizedTabItem = React.memo(({
   );
 }, (prevProps: any, nextProps: any) => {
   return (
+    prevProps.index === nextProps.index &&
     prevProps.wasJustUnsplit === nextProps.wasJustUnsplit &&
     prevProps.isActive === nextProps.isActive &&
     prevProps.activeTabId === nextProps.activeTabId &&
@@ -650,7 +639,6 @@ const MemoizedTabItem = React.memo(({
     prevProps.splitTab?.isLoading === nextProps.splitTab?.isLoading &&
     prevProps.splitTab?.isMuted === nextProps.splitTab?.isMuted &&
     prevProps.splitTab?.isPlayingAudio === nextProps.splitTab?.isPlayingAudio &&
-    prevProps.ghostTab?.id === nextProps.ghostTab?.id &&
     prevProps.tab.id === nextProps.tab.id &&
     prevProps.tab.url === nextProps.tab.url &&
     prevProps.tab.title === nextProps.tab.title &&
@@ -769,7 +757,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   }, []);
   const downloadsBtnRef = useRef<HTMLButtonElement>(null);
   const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
-  const [ghostTab, setGhostTab] = useState<{ id: string; x: number; y: number } | null>(null);
+  const ghostElRef = useRef<HTMLDivElement>(null);
+  const ghostTextRef = useRef<HTMLSpanElement>(null);
+
+  const handleUpdateGhost = useCallback((title: string | null, x?: number, y?: number) => {
+    if (!ghostElRef.current) return;
+    if (title && x !== undefined && y !== undefined) {
+      ghostElRef.current.style.display = 'block';
+      ghostElRef.current.style.transform = `translate3d(${x - 100}px, ${y - 20}px, 0)`;
+      if (ghostTextRef.current) {
+        ghostTextRef.current.textContent = title;
+      }
+    } else {
+      ghostElRef.current.style.display = 'none';
+    }
+  }, []);
   const [hoveredTabPreview, setHoveredTabPreview] = useState<{
     tab: Tab;
     rect: { top: number; left: number; width: number; height: number; right: number; bottom: number };
@@ -940,7 +942,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           currentContainer.scrollTo({ left: Math.max(0, tabRight - containerWidth + 12), behavior: 'smooth' });
         }
       }
-    }, 60);
+    }, 220);
 
     return () => clearTimeout(timer);
   }, [activeTabId, tabs.length]);
@@ -1209,7 +1211,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             onWheel={handleWheel}
             className="flex-1 flex items-end gap-1 overflow-x-auto overflow-y-hidden no-scrollbar drag-region h-[38px] relative"
           >
-            <AnimatePresence initial={hasMounted}>
+            <AnimatePresence mode="popLayout" initial={hasMounted}>
             {visibleTabs.map((tab: Tab) => {
               const splitTab = tab.splitWith ? tabs.find(t => t.id === tab.splitWith) : null;
               const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
@@ -1222,7 +1224,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   index={tabs.findIndex(t => t.id === tab.id)}
                   isActive={isActive}
                   splitTab={splitTab}
-                  ghostTab={ghostTab}
                   tabStyle={tabStyle}
                   tabAnimation={tabAnimation}
                   isIncognito={isIncognito}
@@ -1237,7 +1238,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                   onTogglePip={onTogglePip}
                   onCloseTab={onCloseTab}
                   tabsLength={tabs.length}
-                  setGhostTab={setGhostTab}
+                  onUpdateGhost={handleUpdateGhost}
                   onTabHover={handleTabHover}
                   onTabLeave={handleTabLeave}
                   onOpenContextMenu={handleOpenContextMenu}
@@ -1783,10 +1784,11 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     </header>
 
     {/* Drag to Split Screen Ghost Tab */}
-    {ghostTab && createPortal(
+    {createPortal(
       <div 
-        className="fixed pointer-events-none z-[999999] opacity-90 transition-none"
-        style={{ left: ghostTab.x - 100, top: ghostTab.y - 20 }}
+        ref={ghostElRef}
+        className="fixed top-0 left-0 pointer-events-none z-[999999] opacity-90 transition-none"
+        style={{ display: 'none', willChange: 'transform' }}
       >
         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${
           isIncognito 
@@ -1794,8 +1796,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             : 'bg-white/90 border-blue-500/50 text-slate-800 dark:bg-slate-800/90 dark:border-blue-500/50 dark:text-slate-200'
         }`}>
           <Globe className="w-4 h-4 opacity-70" />
-          <span className="text-[13px] font-medium max-w-[160px] truncate">
-            {tabs.find(t => t.id === ghostTab.id)?.title || 'Drop to Split Screen'}
+          <span ref={ghostTextRef} className="text-[13px] font-medium max-w-[160px] truncate">
+            Drop to Split Screen
           </span>
         </div>
       </div>,
@@ -1842,7 +1844,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       tab={hoveredTabPreview?.tab || null}
       rect={hoveredTabPreview?.rect || null}
       position="bottom"
-      visible={Boolean(hoveredTabPreview && !ghostTab && !tabContextMenu.isOpen)}
+      visible={Boolean(hoveredTabPreview && !tabContextMenu.isOpen)}
     />
     </>
   );

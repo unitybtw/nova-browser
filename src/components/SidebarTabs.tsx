@@ -291,7 +291,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             title={tab.title}
           >
             {tab.favicon ? (
-              <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+              <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
@@ -338,7 +338,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             title={splitTab.title}
           >
             {splitTab.favicon ? (
-              <img src={splitTab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
+              <img src={splitTab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" />
             ) : (
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
@@ -348,7 +348,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 e.stopPropagation(); 
                 onMouseLeave?.();
                 onCloseTab(splitTab.id); 
-              }}
+              }} 
               className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
               title="Close Right Tab"
             >
@@ -363,7 +363,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               {tab.isLoading ? (
                 <div className="w-3.5 h-3.5 border-2 border-slate-400/40 border-t-slate-800 dark:border-slate-300/40 dark:border-t-white rounded-full animate-spin" />
               ) : tab.favicon ? (
-                <img src={tab.favicon} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
+                <img src={tab.favicon} width={14} height={14} alt="" className="w-3.5 h-3.5 rounded-xs object-contain" />
               ) : tab.url === 'nova://settings' ? (
                 <Settings className="w-3.5 h-3.5 opacity-70" />
               ) : tab.url === 'nova://history' ? (

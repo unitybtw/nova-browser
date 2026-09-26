@@ -2,7 +2,7 @@ import * as React from "react";
 import { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
-import { getLocale } from "@/services/i18n";
+import { getLocale } from "../../services/i18n";
 
 // ----------------------------------------------------------------------
 // Transition Physics
