@@ -102,6 +102,9 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ downloa
       {activeToast && (
         <motion.div
           key={activeToast.id}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
           initial={{ opacity: 0, y: 50, x: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
           exit={{ opacity: 0, y: 50, scale: 0.9 }}

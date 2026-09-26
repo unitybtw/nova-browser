@@ -329,6 +329,7 @@ const htmlContent = `
 const tempHtmlPath = path.join('/tmp', 'dmg-template.html');
 const out2xPath = path.join(rootDir, 'build', 'dmg-background@2x.png');
 const out1xPath = path.join(rootDir, 'build', 'dmg-background.png');
+fs.mkdirSync(path.join(rootDir, 'build'), { recursive: true });
 
 fs.writeFileSync(tempHtmlPath, htmlContent);
 

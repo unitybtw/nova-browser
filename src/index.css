@@ -83,6 +83,24 @@
   --nova-slate-100: #f1f5f9;
   --nova-slate-50: #f8fafc;
 
+/* Accessibility: High-contrast focus rings for keyboard navigation */
+:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible,
+[role="switch"]:focus-visible {
+  outline: 2px solid var(--color-accent, #06b6d4) !important;
+  outline-offset: 2px !important;
+}
+
   --background: #ffffff;
   --foreground: #09090b;
   --card: #ffffff;

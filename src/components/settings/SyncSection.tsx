@@ -241,14 +241,18 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   const Icon = item.icon;
 
                   return (
-                    <div
+                    <button
                       key={item.key}
+                      type="button"
+                      role="switch"
+                      aria-checked={isChecked}
+                      aria-label={item.label}
                       onClick={() => {
                         if (syncStatus.user) {
                           syncService.updatePreferences({ [item.key]: !isChecked });
                         }
                       }}
-                      className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-full flex items-center justify-between py-3.5 first:pt-0 last:pb-0 cursor-pointer hover:opacity-80 transition-opacity text-left"
                     >
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
@@ -263,7 +267,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       <div className={`w-9 h-5 rounded-full p-0.5 transition-colors ${isChecked ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
                         <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isChecked ? 'translate-x-4' : 'translate-x-0'}`} />
                       </div>
-                    </div>
+                    </button>
                   );
                 })}
               </div>

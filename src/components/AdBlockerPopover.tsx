@@ -80,6 +80,10 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate">{hostname || 'Current Domain'}</span>
           </div>
           <button
+            type="button"
+            role="switch"
+            aria-checked={!isWhitelisted}
+            aria-label={!isWhitelisted ? 'Disable ad blocking on this domain' : 'Enable ad blocking on this domain'}
             onClick={onToggleWhitelist}
             disabled={!hostname}
             className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none ${!hostname ? 'bg-slate-200 dark:bg-slate-700 opacity-50 cursor-not-allowed' : (!isWhitelisted ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-700')}`}

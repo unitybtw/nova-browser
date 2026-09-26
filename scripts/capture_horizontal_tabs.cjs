@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const assetsDir = path.resolve(__dirname, '../public');
+fs.mkdirSync(assetsDir, { recursive: true });
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({

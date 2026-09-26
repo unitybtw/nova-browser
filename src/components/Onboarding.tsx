@@ -344,6 +344,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
       </div>
       <div className="flex items-center gap-3 no-drag" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         <button
+          type="button"
+          role="switch"
+          aria-checked={privacyShield}
+          aria-label="Toggle Privacy Shield"
           onClick={() => setPrivacyShield(!privacyShield)}
           className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors duration-300 cursor-pointer ${privacyShield ? 'bg-emerald-500' : 'bg-slate-700'}`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}

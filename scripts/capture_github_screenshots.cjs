@@ -56,15 +56,19 @@ app.whenReady().then(async () => {
     const pngBuffer = image.toPNG();
 
     const destPublic = path.join(publicDir, scene.name);
+    fs.mkdirSync(path.dirname(destPublic), { recursive: true });
     fs.writeFileSync(destPublic, pngBuffer);
     const destScreenshots = path.join(publicDir, 'screenshots', scene.name);
+    fs.mkdirSync(path.dirname(destScreenshots), { recursive: true });
     fs.writeFileSync(destScreenshots, pngBuffer);
     console.log(`Saved to ${destScreenshots}, size: ${pngBuffer.length} bytes`);
 
     if (fs.existsSync(websitePublicDir)) {
       const destWebsite = path.join(websitePublicDir, scene.name);
+      fs.mkdirSync(path.dirname(destWebsite), { recursive: true });
       fs.writeFileSync(destWebsite, pngBuffer);
       const destWebsiteScreenshots = path.join(websitePublicDir, 'screenshots', scene.name);
+      fs.mkdirSync(path.dirname(destWebsiteScreenshots), { recursive: true });
       fs.writeFileSync(destWebsiteScreenshots, pngBuffer);
       console.log(`Copied to ${destWebsiteScreenshots}`);
     }

@@ -3,6 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 const outDir = process.env.OUTPUT_DIR || path.join(__dirname, '..', 'dist-screenshots');
+fs.mkdirSync(outDir, { recursive: true });
 
 app.whenReady().then(async () => {
   const win = new BrowserWindow({

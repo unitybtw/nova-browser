@@ -12,7 +12,7 @@ on:
         default: ''
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   release-mac:
@@ -20,10 +20,10 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
           cache: 'npm'
@@ -33,6 +33,9 @@ jobs:
 
       - name: Build App
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Run Tests
         run: npm test
@@ -40,10 +43,15 @@ jobs:
       - name: Package macOS DMG
         run: npx electron-builder --mac --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.MAC_CSC_LINK != '' }}
 
       - name: Upload macOS Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: mac-artifacts
           path: |
@@ -58,10 +66,10 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
           cache: 'npm'
@@ -71,6 +79,9 @@ jobs:
 
       - name: Build App
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Run Tests
         run: npm test
@@ -78,10 +89,12 @@ jobs:
       - name: Package Windows NSIS Installer
         run: npx electron-builder --win --publish never
         env:
-          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ secrets.WIN_CSC_LINK != '' }}
 
       - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: windows-artifacts
           path: |
@@ -96,10 +109,10 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
         with:
           node-version: 22
           cache: 'npm'
@@ -109,6 +122,9 @@ jobs:
 
       - name: Build App
         run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - name: Run Tests
         run: npm test
@@ -120,7 +136,7 @@ jobs:
         run: npx electron-builder --linux AppImage deb --publish never
 
       - name: Upload Linux Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
           name: linux-artifacts
           path: |
@@ -140,16 +156,20 @@ jobs:
       VT_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Resolve Release Tag & Version
         id: vars
+        env:
+          TAG_INPUT: ${{ inputs.tag_name }}
+          REF_NAME: ${{ github.ref_name }}
+          GITHUB_REF: ${{ github.ref }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          TAG="${{ inputs.tag_name }}"
+          TAG="$TAG_INPUT"
           if [ -z "$TAG" ]; then
-            if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-              TAG="${{ github.ref_name }}"
+            if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+              TAG="$REF_NAME"
             else
               TAG="v$VERSION"
             fi
@@ -159,7 +179,7 @@ jobs:
           echo "Resolved Release Tag: $TAG"
 
       - name: Download all Artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           path: release-assets
           merge-multiple: true
@@ -178,7 +198,7 @@ jobs:
         id: virustotal
         if: env.VT_API_KEY != ''
         continue-on-error: true
-        uses: crazy-max/ghaction-virustotal@v4
+        uses: crazy-max/ghaction-virustotal@1c1e08920194685ff88484e5b98df0537fd80fd7 # v4.0.0
         with:
           vt_api_key: ${{ secrets.VIRUSTOTAL_API_KEY }}
           files: |
@@ -210,7 +230,7 @@ jobs:
           echo '```' >> release_notes_prepend.md
 
       - name: Create & Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c062e49c394c8e79f6eb7b8b2e591702fbe13540 # v2.0.8
         with:
           tag_name: ${{ steps.vars.outputs.tag }}
           name: ${{ steps.vars.outputs.title }}

@@ -26,11 +26,7 @@ import type {
 } from './types/browser';
 import { defaultSettings } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
-import { FindInPage } from './components/FindInPage';
-import { DownloadToast } from './components/DownloadToast';
-import { UpdateToast } from './components/UpdateToast';
-import { BlockedSiteModal, BlockedSiteAlertData } from './components/BlockedSiteModal';
-import { AICursorOverlay } from './components/AICursorOverlay';
+import type { BlockedSiteAlertData } from './components/BlockedSiteModal';
 import { SidebarTabs } from './components/SidebarTabs';
 import { isSafeNavigationUrl } from './utils/safeNavigation';
 import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from './utils/verticalTabs';
@@ -96,6 +92,11 @@ const AccountModal = lazyWithRetry(() => import('./components/AccountModal').the
 const Onboarding = lazyWithRetry(() => import('./components/Onboarding').then(m => ({ default: m.Onboarding })));
 const SpotlightOmnibox = lazyWithRetry(() => import('./components/SpotlightOmnibox').then(m => ({ default: m.SpotlightOmnibox })));
 const VpnPopover = lazyWithRetry(() => import('./components/VpnPopover').then(m => ({ default: m.VpnPopover })));
+const BlockedSiteModal = lazyWithRetry(() => import('./components/BlockedSiteModal').then(m => ({ default: m.BlockedSiteModal })));
+const AICursorOverlay = lazyWithRetry(() => import('./components/AICursorOverlay').then(m => ({ default: m.AICursorOverlay })));
+const FindInPage = lazyWithRetry(() => import('./components/FindInPage').then(m => ({ default: m.FindInPage })));
+const DownloadToast = lazyWithRetry(() => import('./components/DownloadToast').then(m => ({ default: m.DownloadToast })));
+const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(m => ({ default: m.UpdateToast })));
 
 // VpnPopover requires an anchorRef prop, but no element ever attaches to it
 // (the VPN toggle lives inside TopBar's more-menu, which is unmounted while
@@ -1634,14 +1635,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         )}
 
         {/* Find in page widget */}
-        <FindInPage
-          isOpen={isFindInPageOpen}
-          onClose={handleCloseFindInPage}
-          matchIndex={findMatches.index}
-          matchCount={findMatches.count}
-          onFind={handleFind}
-          onStopFind={handleStopFind}
-        />
+        <React.Suspense fallback={null}>
+          {isFindInPageOpen && (
+            <FindInPage
+              isOpen={isFindInPageOpen}
+              onClose={handleCloseFindInPage}
+              matchIndex={findMatches.index}
+              matchCount={findMatches.count}
+              onFind={handleFind}
+              onStopFind={handleStopFind}
+            />
+          )}
+        </React.Suspense>
 
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
         <div 
@@ -2041,11 +2046,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         )}
       </React.Suspense>
 
-      <DownloadToast downloads={downloads} />
-      <UpdateToast />
-      <BlockedSiteModal alert={blockedSiteAlert} onClose={() => setBlockedSiteAlert(null)} />
-
-      <AICursorOverlay />
+      <React.Suspense fallback={null}>
+        <DownloadToast downloads={downloads} />
+        <UpdateToast />
+        {blockedSiteAlert && (
+          <BlockedSiteModal alert={blockedSiteAlert} onClose={() => setBlockedSiteAlert(null)} />
+        )}
+        <AICursorOverlay />
+      </React.Suspense>
     </div>
   );
 }

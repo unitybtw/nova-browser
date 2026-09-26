@@ -66,6 +66,9 @@ export default defineConfig({
       'Cross-Origin-Embedder-Policy': 'credentialless'
     }
   },
+  worker: {
+    format: 'es'
+  },
   build: {
     minify: 'terser',
     terserOptions: {
@@ -80,7 +83,8 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-ui': ['framer-motion', 'lucide-react'],
-          'vendor-markdown': ['react-markdown', 'remark-gfm', 'dompurify'],
+          'vendor-markdown': ['react-markdown', 'remark-gfm'],
+          'vendor-dompurify': ['dompurify'],
           'vendor-supabase': ['@supabase/supabase-js'],
           'vendor-readability': ['@mozilla/readability'],
           'web-llm': ['@mlc-ai/web-llm']

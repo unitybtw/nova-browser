@@ -21,6 +21,13 @@ export function useModalFocusTrap(
     // Focus initial element inside container
     const container = containerRef.current;
     if (container) {
+      if (!container.hasAttribute('role')) {
+        container.setAttribute('role', 'dialog');
+      }
+      if (!container.hasAttribute('aria-modal')) {
+        container.setAttribute('aria-modal', 'true');
+      }
+
       const focusables = Array.from(container.querySelectorAll<HTMLElement>(focusableQuery));
       if (focusables.length > 0) {
         // Focus first element, prefer input if available

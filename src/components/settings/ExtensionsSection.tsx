@@ -184,6 +184,10 @@ export const ExtensionsSection: React.FC = () => {
                   <div className="flex items-center gap-2 shrink-0 flex-wrap">
                     {/* Toggle Extension Enable/Disable */}
                     <button
+                      type="button"
+                      role="switch"
+                      aria-checked={ext.enabled !== false}
+                      aria-label={ext.enabled !== false ? `Disable ${ext.name}` : `Enable ${ext.name}`}
                       onClick={() => handleToggleExtension(ext.id, ext.enabled !== false)}
                       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ext.enabled !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                       title={ext.enabled !== false ? 'Disable Extension' : 'Enable Extension'}

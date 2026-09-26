@@ -15,14 +15,17 @@ interface ToggleSwitchProps {
  * in SettingsPage so there is zero visual difference.
  */
 export function ToggleSwitch({ checked, onToggle, ariaLabel, activeColorClass = 'bg-blue-500' }: ToggleSwitchProps) {
+  const isChecked = Boolean(checked);
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={isChecked}
+      aria-label={ariaLabel || 'Toggle setting'}
       onClick={onToggle}
-      aria-label={ariaLabel}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${checked ? activeColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${isChecked ? activeColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
     >
-      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${checked ? 'translate-x-6' : 'translate-x-1'}`} />
+      <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-200 ${isChecked ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
   );
 }
