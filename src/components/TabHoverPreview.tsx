@@ -34,6 +34,9 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
   );
 
   useEffect(() => {
+    let isCancelled = false;
+    const currentTabId = tab?.id;
+
     if (!tab) {
       setCachedThumbnail(undefined);
       return;
@@ -44,10 +47,11 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
 
     // If thumbnail is missing and webContentsId is available, attempt capture
     if (!current && tab.webContentsId && typeof (window as any).electronAPI?.captureTabThumbnail === 'function') {
-      (window as any).electronAPI.captureTabThumbnail(tab.webContentsId)
+      const targetWcId = tab.webContentsId;
+      (window as any).electronAPI.captureTabThumbnail(targetWcId)
         .then((thumb: string | null) => {
-          if (thumb) {
-            tabThumbnailCache.set(tab.id, thumb);
+          if (!isCancelled && thumb && currentTabId) {
+            tabThumbnailCache.set(currentTabId, thumb);
             setCachedThumbnail(thumb);
           }
         })
@@ -55,13 +59,14 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
     }
 
     const unsubscribe = tabThumbnailCache.subscribe(() => {
-      if (tab?.id) {
-        const updated = tabThumbnailCache.get(tab.id) || tab.thumbnail;
+      if (!isCancelled && currentTabId) {
+        const updated = tabThumbnailCache.get(currentTabId) || tab?.thumbnail;
         setCachedThumbnail(updated);
       }
     });
 
     return () => {
+      isCancelled = true;
       unsubscribe();
     };
   }, [tab?.id, tab?.thumbnail, tab?.webContentsId]);

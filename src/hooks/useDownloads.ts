@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DownloadItem } from '../types/browser';
+import { safeParseArrayWithBackup } from '../utils/safeStorage';
 export type { DownloadItem };
+
+const STORAGE_KEY = 'nova_downloads_history';
 
 /**
  * Owns the downloads domain: the downloads list state, the onDownloadUpdate
@@ -9,7 +12,15 @@ export type { DownloadItem };
  * conditions, and toast-facing state semantics are unchanged.
  */
 export function useDownloads() {
-  const [downloads, setDownloads] = useState<DownloadItem[]>([]);
+  const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
+    try {
+      const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+      const parsed = safeParseArrayWithBackup<DownloadItem>(STORAGE_KEY, saved, []);
+      return parsed.map(d => (d.state === 'progressing' ? { ...d, state: 'interrupted' } : d));
+    } catch {
+      return [];
+    }
+  });
 
   // Listen for download progress events from main process with cleanups
   useEffect(() => {
@@ -70,7 +81,31 @@ export function useDownloads() {
     };
   }, []);
 
-  const handleClearDownloads = useCallback(() => setDownloads([]), []);
+  // Persist download history across reloads (debounced 400ms)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(downloads.slice(0, 150)));
+        }
+      } catch (err) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(downloads.slice(0, 50)));
+        } catch (_) {}
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [downloads]);
+
+  const handleClearDownloads = useCallback(() => {
+    setDownloads([]);
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (_) {}
+  }, []);
 
   return { downloads, handleClearDownloads };
 }

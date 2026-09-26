@@ -14,7 +14,8 @@
     "forward": "تقدم",
     "reload": "إعادة تحميل",
     "copy": "نسخ",
-    "copied": "تم النسخ"
+    "copied": "تم النسخ",
+    "showMore": "عرض المزيد (متبقي {remaining})"
   },
   "nav": {
     "newTab": "علامة تبويب جديدة",
@@ -130,7 +131,11 @@
     "lastHour": "آخر ساعة",
     "last24Hours": "آخر 24 ساعة",
     "last7DaysOption": "آخر 7 أيام",
-    "allTime": "كل الأوقات"
+    "last4Weeks": "آخر 4 أسابيع",
+    "allTime": "كل الأوقات",
+    "openUrl": "فتح الرابط",
+    "removeFromHistory": "إزالة من السجل",
+    "timeframe": "النطاق الزمني"
   },
   "downloads": {
     "title": "التنزيلات",
@@ -139,6 +144,8 @@
     "noDownloads": "لا توجد تنزيلات بعد",
     "noDownloadsDesc": "الملفات التي تقوم بتنزيلها ستظهر هنا.",
     "openFolder": "فتح المجلد",
+    "openFile": "فتح الملف",
+    "totalItems": "{count} عنصر إجمالي",
     "cancel": "إلغاء",
     "pause": "إيقاف مؤقت",
     "resume": "استئناف",
@@ -147,5 +154,35 @@
     "cancelled": "ملغى",
     "interrupted": "متوقف",
     "progressing": "جار التنزيل..."
+  },
+  "find": {
+    "placeholder": "البحث في الصفحة...",
+    "matchCase": "مطابقة حالة الأحرف",
+    "wholeWord": "كلمة كاملة",
+    "previous": "السابق (Shift+Enter)",
+    "next": "التالي (Enter)",
+    "close": "إغلاق (Escape)"
+  },
+  "changelog": {
+    "releaseNotes": "ملاحظات الإصدار",
+    "title": "ما الجديد في Nova Browser",
+    "subtitle": "استكشف الميزات الحديثة والتحسينات الأمنية وإصلاحات الأداء في إصدارك المثبت.",
+    "syncNotes": "مزامنة الملاحظات",
+    "syncing": "جارٍ المزامنة...",
+    "startBrowsing": "بدء التصفح",
+    "githubReleases": "إصدارات GitHub",
+    "versionsTimeline": "الجدول الزمني للإصدارات",
+    "searchPlaceholder": "البحث في التغييرات...",
+    "noChanges": "لم يتم العثور على تغييرات تطابق الفلتر المحدد.",
+    "liveSync": "المزامنة المباشرة مع GitHub",
+    "releasesCount": "{count} إصدار",
+    "current": "الحالي",
+    "keyHighlights": "أبرز النقاط",
+    "allChanges": "جميع التغييرات",
+    "categoryFeature": "ميزة",
+    "categoryFix": "إصلاح",
+    "categorySecurity": "أمان",
+    "categoryPerformance": "أداء",
+    "categoryImprovement": "تحسين"
   }
 }

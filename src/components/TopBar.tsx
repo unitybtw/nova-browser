@@ -91,7 +91,7 @@ interface TopBarProps {
   tabAnimation?: 'chrome' | 'smooth' | 'snappy' | 'none';
   isIncognito?: boolean;
   searchEngine: UserSettings['searchEngine'];
-  onToggleBookmark: () => void;
+  onToggleBookmark: (targetTab?: Tab) => void;
   onOpenHistory: () => void;
   onOpenDownloads: () => void;
   onOpenSettings: () => void;
@@ -1830,7 +1830,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       onToggleMuteTab={(tabId) => onToggleMuteTab(tabId)}
       onBookmarkTab={(targetTab) => {
         if (onSelectTab) onSelectTab(targetTab.id);
-        if (onToggleBookmark) onToggleBookmark();
+        if (onToggleBookmark) onToggleBookmark(targetTab);
       }}
       onCloseTab={(tabId) => onCloseTab(tabId)}
       onCloseOtherTabs={(tabId) => {

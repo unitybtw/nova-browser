@@ -117,7 +117,7 @@ export interface SidebarTabsProps {
   onNewTabRight?: (index: number) => void;
   onReopenClosedTab?: () => void;
   canReopenClosedTab?: boolean;
-  onToggleBookmark?: () => void;
+  onToggleBookmark?: (targetTab?: Tab) => void;
   workspaces: Workspace[];
   activeWorkspaceId: string;
   onSelectWorkspace: (id: string) => void;
@@ -711,7 +711,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     } else if (onNewTab) {
       onNewTab(url);
     }
-    setSearchValue('');
+    if (targetValue !== searchValue) {
+      setSearchValue(targetValue);
+    }
     setShowSuggestions(false);
     setIsOmniboxFocused(false);
     omniboxInputRef.current?.blur();
@@ -1499,7 +1501,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           onToggleMuteTab(tabId, { stopPropagation: () => {} } as any);
         }}
         onBookmarkTab={(targetTab) => {
-          if (onToggleBookmark) onToggleBookmark();
+          if (onToggleBookmark) onToggleBookmark(targetTab);
         }}
         onCloseTab={(tabId) => onCloseTab(tabId)}
         onCloseOtherTabs={(tabId) => {

@@ -424,10 +424,12 @@ class NovaSyncService {
     }
   }
 
-  /** Read auth token from OS keychain / secureStore with non-destructive fallback. */
+  /** Read auth token from OS keychain / secureStore with session + legacy fallbacks. */
   private async readStoredToken(): Promise<string | null> {
     const secure = await this.readSecureStore(STORAGE_KEYS.TOKEN);
     if (secure) return secure;
+    const session = this.readSessionValue(STORAGE_KEYS.TOKEN);
+    if (session) return session;
     if (typeof localStorage !== 'undefined') {
       const legacy = localStorage.getItem(STORAGE_KEYS.TOKEN);
       if (legacy) {
@@ -438,9 +440,7 @@ class NovaSyncService {
           }
         } else {
           // Web fallback: lift the legacy plaintext token into
-          // session-scoped storage and scrub it from localStorage (same
-          // policy as readStoredUser/readUserRegistry). Auth tokens must
-          // never linger as plaintext in localStorage.
+          // session-scoped storage and scrub it from localStorage.
           this.writeSessionValue(STORAGE_KEYS.TOKEN, legacy);
           localStorage.removeItem(STORAGE_KEYS.TOKEN);
           logger.warn('SyncService:readStoredToken', 'Migrated legacy plaintext auth token from localStorage to session-only storage.');
@@ -451,11 +451,12 @@ class NovaSyncService {
     return null;
   }
 
-  /** Persist auth token to OS keychain / secureStore, wiping plaintext localStorage. */
+  /** Persist auth token to OS keychain / secureStore; session-only on web, wiping plaintext localStorage. */
   private async writeStoredToken(token: string): Promise<void> {
     this.token = token;
     if (!token) {
       await this.deleteSecureStore(STORAGE_KEYS.TOKEN);
+      this.removeSessionValue(STORAGE_KEYS.TOKEN);
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
       }
@@ -463,12 +464,16 @@ class NovaSyncService {
     }
     if (hasElectronSecureStore()) {
       await this.writeSecureStore(STORAGE_KEYS.TOKEN, token);
+      this.removeSessionValue(STORAGE_KEYS.TOKEN);
       if (typeof localStorage !== 'undefined') {
         localStorage.removeItem(STORAGE_KEYS.TOKEN);
       }
-    } else if (typeof localStorage !== 'undefined') {
-      // Security: never store auth token as plaintext in localStorage
-      localStorage.removeItem(STORAGE_KEYS.TOKEN);
+    } else {
+      // Security: Web builds keep token in session storage across page reloads
+      this.writeSessionValue(STORAGE_KEYS.TOKEN, token);
+      if (typeof localStorage !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEYS.TOKEN);
+      }
     }
   }
 
@@ -1400,7 +1405,8 @@ class NovaSyncService {
         }
 
         if (prefs.syncSettings && remoteBundle.settings) {
-          mergedSettings = { ...localData.settings, ...remoteBundle.settings };
+          // Local settings take precedence over remote to prevent silent clobbering
+          mergedSettings = { ...remoteBundle.settings, ...localData.settings };
         }
 
         if (prefs.syncWorkspaces && remoteBundle.workspaces) {
@@ -1421,7 +1427,7 @@ class NovaSyncService {
 
       // Build the encrypted vault payload. It is never stored in Web Storage.
       const newBundle: SyncDataBundle = {
-        version: 1,
+        version: 2,
         timestamp: syncTimestamp,
         userId: this.currentUser.id,
         bookmarks: prefs.syncBookmarks ? mergedBookmarks : undefined,

@@ -28,6 +28,7 @@ import { tts } from '../services/tts';
 import { getLocale } from '../services/i18n';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { copyTextToClipboard } from '../utils/clipboard';
+import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
 import { NovaAISparkle } from './ui/NovaAISparkle';
@@ -102,6 +103,7 @@ export const SidePanel = React.memo(({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [expandedReasoning, setExpandedReasoning] = useState<Record<number, boolean>>({});
+  const { setSafeTimeout } = useSafeTimeout();
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
@@ -445,8 +447,8 @@ export const SidePanel = React.memo(({
     const ok = await copyTextToClipboard(text);
     if (!ok) return;
     setCopiedIdx(idx);
-    setTimeout(() => setCopiedIdx(null), 2000);
-  }, []);
+    setSafeTimeout(() => setCopiedIdx(null), 2000);
+  }, [setSafeTimeout]);
 
   // Subscribe to TTS speaking state
   useEffect(() => {

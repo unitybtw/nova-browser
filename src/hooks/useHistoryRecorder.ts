@@ -9,16 +9,28 @@ export interface UseHistoryRecorderOptions {
   isDemo?: boolean;
 }
 
-function normalizeUrl(url: string): string {
+function cleanUrlForHistory(url: string): { cleanUrl: string; canonicalKey: string } {
   try {
     const parsed = new URL(url);
+    // Strip common marketing and tracking query parameters to prevent history pollution
+    const trackingParams = [
+      'utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content',
+      'fbclid', 'gclid', 'msclkid', 'mc_eid', 'igshid', '_ga', '_gl'
+    ];
+    for (const p of trackingParams) {
+      parsed.searchParams.delete(p);
+    }
     let pathname = parsed.pathname;
     if (pathname.length > 1 && pathname.endsWith('/')) {
       parsed.pathname = pathname.slice(0, -1);
     }
-    return parsed.href;
+    const cleanUrl = parsed.href;
+    // Canonical key ignores in-page hash and casing for deduplication so anchor jumps do not spam history
+    parsed.hash = '';
+    return { cleanUrl, canonicalKey: parsed.href.toLowerCase() };
   } catch {
-    return url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
+    const clean = url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
+    return { cleanUrl: clean, canonicalKey: clean.split('#')[0].toLowerCase() };
   }
 }
 
@@ -89,34 +101,33 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
         !targetUrl.startsWith('about:') &&
         !targetUrl.startsWith('chrome://')
       ) {
-        const normTarget = normalizeUrl(targetUrl);
+        const { cleanUrl, canonicalKey } = cleanUrlForHistory(targetUrl);
         setHistory(hPrev => {
           const now = Date.now();
-          const recentThreshold = 10000; // 10 seconds window for interleaved tabs
-          const recentIdx = hPrev.slice(0, 10).findIndex(item => {
+          const recentThreshold = 15000; // 15 seconds window for in-page hash jumps and interleaved tabs
+          const recentIdx = hPrev.slice(0, 15).findIndex(item => {
             const itemTime = typeof item.timestamp === 'number' ? item.timestamp : 0;
-            return normalizeUrl(item.url) === normTarget && (now - itemTime) < recentThreshold;
+            return cleanUrlForHistory(item.url).canonicalKey === canonicalKey && (now - itemTime) < recentThreshold;
           });
 
           if (recentIdx !== -1) {
             const existing = hPrev[recentIdx];
-            if (updated.title && existing.title !== updated.title) {
-              const updatedItem = {
-                ...existing,
-                title: updated.title,
-                favicon: updated.favicon || existing.favicon
-              };
-              const next = [...hPrev];
-              next[recentIdx] = updatedItem;
-              return next;
-            }
-            return hPrev;
+            const updatedItem = {
+              ...existing,
+              url: cleanUrl,
+              title: updated.title || existing.title,
+              favicon: updated.favicon || existing.favicon,
+              timestamp: now
+            };
+            const next = [...hPrev];
+            next[recentIdx] = updatedItem;
+            return next;
           }
 
           return [{
             id: generateId('hist'),
-            url: targetUrl,
-            title: updated.title || targetUrl,
+            url: cleanUrl,
+            title: updated.title || cleanUrl,
             favicon: updated.favicon,
             timestamp: now
           }, ...hPrev.slice(0, 299)]; // keep last 300 (matches sync cap)

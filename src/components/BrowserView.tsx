@@ -662,6 +662,17 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
   }, [tab?.isMuted]);
 
+  // Dynamically update font-size / zoom factor when user toggles fontSize setting
+  useEffect(() => {
+    const webview = webviewRef.current;
+    if (webview && tab?.zoomFactor === undefined && typeof (webview as any).setZoomFactor === 'function') {
+      try {
+        const zoomMap: Record<string, number> = { small: 0.85, medium: 1.0, large: 1.25 };
+        (webview as any).setZoomFactor(zoomMap[settings?.fontSize || 'medium'] || 1.0);
+      } catch (_) {}
+    }
+  }, [settings?.fontSize, tab?.zoomFactor]);
+
   // Capture thumbnail when switching away from this tab (stored in memory cache).
   const activeSinceRef = useRef(0);
   const lastThumbnailCaptureAtRef = useRef(0);
@@ -1249,6 +1260,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   if (prevProps.tab?.isTranslated !== nextProps.tab?.isTranslated) return false;
 
   // Settings comparison
+  if (prevProps.settings?.passwordManagerEnabled !== nextProps.settings?.passwordManagerEnabled) return false;
+  if (prevProps.settings?.fontSize !== nextProps.settings?.fontSize) return false;
+  if (prevProps.settings?.doNotTrack !== nextProps.settings?.doNotTrack) return false;
   if (prevProps.settings?.searchEngine !== nextProps.settings?.searchEngine) return false;
   if (prevProps.settings?.newTabBackground !== nextProps.settings?.newTabBackground) return false;
   if (prevProps.settings?.backgroundCustomUrl !== nextProps.settings?.backgroundCustomUrl) return false;

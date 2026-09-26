@@ -5,6 +5,7 @@ import { syncService, SyncStatus, SyncPreferences } from '../../services/syncSer
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
+import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -28,6 +29,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncErr, setSyncErr] = useState<string | null>(null);
   const [copiedSyncCode, setCopiedSyncCode] = useState(false);
+  const { setSafeTimeout } = useSafeTimeout();
 
   useEffect(() => {
     const unsub = syncService.subscribe(status => {
@@ -146,7 +148,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       }
 
                       setSyncMsg('Sync completed successfully!');
-                      setTimeout(() => setSyncMsg(null), 3000);
+                      setSafeTimeout(() => setSyncMsg(null), 3000);
                     } catch (e: any) {
                       setSyncErr(e.message || 'Sync failed');
                     } finally {
@@ -205,7 +207,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       if (copied) {
                         setCopiedSyncCode(true);
                         setSyncMsg(`Sync Code Copied to Clipboard: ${code}`);
-                        setTimeout(() => setCopiedSyncCode(false), 3000);
+                        setSafeTimeout(() => setCopiedSyncCode(false), 3000);
                       } else {
                         setSyncMsg(`Sync Code: ${code} (copy manually)`);
                       }
@@ -351,7 +353,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                       if (copied) {
                         setCopiedSyncCode(true);
                         setSyncMsg(`Sync Code: ${code} (Copied to clipboard!)`);
-                        setTimeout(() => setCopiedSyncCode(false), 4000);
+                        setSafeTimeout(() => setCopiedSyncCode(false), 4000);
                       } else {
                         setSyncMsg(`Sync Code: ${code} (copy manually)`);
                       }

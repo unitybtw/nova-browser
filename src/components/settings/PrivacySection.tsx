@@ -5,6 +5,7 @@ import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { aiAgent } from '../../services/aiAgent';
 import { ToggleSwitch } from './ToggleSwitch';
+import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 export interface PrivacySectionProps {
   settings: UserSettings;
@@ -22,6 +23,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
   const [resetPermsSuccess, setResetPermsSuccess] = useState(false);
   const [aiCacheStatus, setAiCacheStatus] = useState<string>('');
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
+  const { setSafeTimeout } = useSafeTimeout();
 
   useEffect(() => {
     if (getElectronAPI()?.getRememberedPermissionsCount) {
@@ -38,7 +40,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
       await getElectronAPI()!.resetRememberedPermissions();
       setRememberedPermCount(0);
       setResetPermsSuccess(true);
-      setTimeout(() => setResetPermsSuccess(false), 3000);
+      setSafeTimeout(() => setResetPermsSuccess(false), 3000);
     } catch (_) {}
     setResettingPerms(false);
   };
@@ -69,7 +71,7 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
         await getElectronAPI()!.clearAiModelsCache();
       }
       setAiCacheStatus('AI model cache cleared successfully!');
-      setTimeout(() => setAiCacheStatus(''), 4000);
+      setSafeTimeout(() => setAiCacheStatus(''), 4000);
     } catch (e: any) {
       setAiCacheStatus('Failed to clear cache: ' + (e?.message || String(e)));
     } finally {

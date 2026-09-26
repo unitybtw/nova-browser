@@ -723,8 +723,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
 
 
-  const handleToggleBookmarkActive = useCallback(() => {
-    if (activeTab) handleToggleBookmark(activeTab);
+  const handleToggleBookmarkActive = useCallback((targetTab?: Tab) => {
+    const tabToBookmark = targetTab || tabsRef.current.find(t => t.id === activeTabIdRef.current) || activeTab;
+    if (tabToBookmark) handleToggleBookmark(tabToBookmark);
   }, [activeTab, handleToggleBookmark]);
 
   const handleOpenHistory = useCallback(() => {

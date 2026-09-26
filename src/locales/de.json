@@ -14,7 +14,8 @@
     "forward": "Vorwärts",
     "reload": "Neu laden",
     "copy": "Kopieren",
-    "copied": "Kopiert"
+    "copied": "Kopiert",
+    "showMore": "Mehr anzeigen ({remaining} verbleibend)"
   },
   "nav": {
     "newTab": "Neuer Tab",
@@ -130,7 +131,11 @@
     "lastHour": "Letzte Stunde",
     "last24Hours": "Letzte 24 Stunden",
     "last7DaysOption": "Letzte 7 Tage",
-    "allTime": "Gesamte Zeit"
+    "last4Weeks": "Letzte 4 Wochen",
+    "allTime": "Gesamte Zeit",
+    "openUrl": "URL öffnen",
+    "removeFromHistory": "Aus dem Verlauf entfernen",
+    "timeframe": "Zeitbereich"
   },
   "downloads": {
     "title": "Downloads",
@@ -139,6 +144,8 @@
     "noDownloads": "Noch keine Downloads",
     "noDownloadsDesc": "Heruntergeladene Dateien werden hier angezeigt.",
     "openFolder": "Ordner öffnen",
+    "openFile": "Datei öffnen",
+    "totalItems": "{count} Elemente insgesamt",
     "cancel": "Abbrechen",
     "pause": "Pausieren",
     "resume": "Fortsetzen",
@@ -147,5 +154,35 @@
     "cancelled": "Abgebrochen",
     "interrupted": "Unterbrochen",
     "progressing": "Wird heruntergeladen..."
+  },
+  "find": {
+    "placeholder": "Auf Seite suchen...",
+    "matchCase": "Groß-/Kleinschreibung",
+    "wholeWord": "Ganzes Wort",
+    "previous": "Vorheriges (Umschalt+Eingabe)",
+    "next": "Nächstes (Eingabe)",
+    "close": "Schließen (Escape)"
+  },
+  "changelog": {
+    "releaseNotes": "Versionshinweise",
+    "title": "Was ist neu in Nova Browser",
+    "subtitle": "Entdecken Sie neue Funktionen, Sicherheitsverbesserungen und Leistungsoptimierungen in Ihrer installierten Version.",
+    "syncNotes": "Hinweise synchronisieren",
+    "syncing": "Wird synchronisiert...",
+    "startBrowsing": "Surfen starten",
+    "githubReleases": "GitHub-Releases",
+    "versionsTimeline": "Versions-Zeitleiste",
+    "searchPlaceholder": "In Änderungen suchen...",
+    "noChanges": "Keine Änderungen für den ausgewählten Filter gefunden.",
+    "liveSync": "GitHub Live-Synchronisierung",
+    "releasesCount": "{count} Veröffentlichungen",
+    "current": "Aktuell",
+    "keyHighlights": "Wichtigste Highlights",
+    "allChanges": "Alle Änderungen",
+    "categoryFeature": "Funktion",
+    "categoryFix": "Korrektur",
+    "categorySecurity": "Sicherheit",
+    "categoryPerformance": "Leistung",
+    "categoryImprovement": "Verbesserung"
   }
 }

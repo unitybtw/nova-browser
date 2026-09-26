@@ -35,7 +35,7 @@ export interface OmniboxBarProps {
   useVerticalTabs?: boolean;
   onNavigate: (url: string) => void;
   onToggleReaderMode?: () => void;
-  onToggleBookmark?: () => void;
+  onToggleBookmark?: (targetTab?: Tab) => void;
   onResetZoom?: () => void;
   isBookmarked: boolean;
   permissionRequests?: PermissionRequest[];
@@ -519,7 +519,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
             <button 
               type="button" 
-              onClick={onToggleBookmark}
+              onClick={() => onToggleBookmark?.(activeTab)}
               className={`p-1 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
               title="Bookmark Page"
             >

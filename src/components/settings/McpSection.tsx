@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Cpu, Play, Square, Copy, Check, Users, Key, RefreshCw, Lock, Unlock, ShieldAlert } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { copyTextToClipboard } from '../../utils/clipboard';
+import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 // mcpToken from getMcpTokenStatus is only a display prefix (e.g. "nova_mcp_••••").
 // Never treat a masked value as the real secret.
@@ -52,6 +53,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
   const [disabledTools, setDisabledTools] = useState<string[]>([]);
   const [mcpCopied, setMcpCopied] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const { setSafeTimeout } = useSafeTimeout();
 
   const fetchMcpStatus = useCallback(async () => {
     if ((window as any).electronAPI?.getMcpStatus) {
@@ -101,7 +103,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
       await (window as any).electronAPI?.startMcpServer?.();
       onUpdateSettings({ mcpServerEnabled: true });
     }
-    setTimeout(fetchMcpStatus, 300);
+    setSafeTimeout(fetchMcpStatus, 300);
   };
 
   const handleRotateToken = async () => {
@@ -118,7 +120,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
         const ok = await (window as any).electronAPI.copyMcpToken();
         if (ok) {
           setTokenCopied(true);
-          setTimeout(() => setTokenCopied(false), 2000);
+          setSafeTimeout(() => setTokenCopied(false), 2000);
           return;
         }
       }
@@ -128,7 +130,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
       const ok = await copyTextToClipboard(mcpToken);
       if (ok) {
         setTokenCopied(true);
-        setTimeout(() => setTokenCopied(false), 2000);
+        setSafeTimeout(() => setTokenCopied(false), 2000);
       }
     }
   };
@@ -159,7 +161,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
         const ok = await (window as any).electronAPI.copyMcpConfig();
         if (ok) {
           setMcpCopied(true);
-          setTimeout(() => setMcpCopied(false), 2000);
+          setSafeTimeout(() => setMcpCopied(false), 2000);
           return;
         }
       }
@@ -167,7 +169,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
     const ok = await copyTextToClipboard(mcpConfigSnippet);
     if (ok) {
       setMcpCopied(true);
-      setTimeout(() => setMcpCopied(false), 2000);
+      setSafeTimeout(() => setMcpCopied(false), 2000);
     }
   };
 

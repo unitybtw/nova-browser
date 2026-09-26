@@ -318,7 +318,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           url: item.getURL(),
           receivedBytes: item.getReceivedBytes(),
           totalBytes,
-          state: 'cancelled',
+          state: 'interrupted',
           savePath: item.getSavePath() || undefined
         });
       } else if (state === 'progressing') {
@@ -343,7 +343,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
         url: item.getURL(),
         receivedBytes: item.getReceivedBytes(),
         totalBytes: item.getTotalBytes(),
-        state: state === 'completed' ? 'completed' : 'cancelled',
+        state: state === 'completed' ? 'completed' : (state === 'interrupted' ? 'interrupted' : 'cancelled'),
         savePath: item.getSavePath() || undefined,
         isPaused: false
       });

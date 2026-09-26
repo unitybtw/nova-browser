@@ -117,15 +117,33 @@ export function useAppSync({
   const handlePerformSyncRef = useRef(handlePerformSync);
   handlePerformSyncRef.current = handlePerformSync;
 
-  // Background auto-sync on initial app load if already authenticated
+  // Background auto-sync on initial app load or as soon as login/session resolves
   useEffect(() => {
-    const status = syncService.getStatus();
-    if (status.isLoggedIn) {
-      const timer = setTimeout(() => {
-        handlePerformSyncRef.current().catch(() => {});
-      }, 2500);
-      return () => clearTimeout(timer);
-    }
+    let timer: NodeJS.Timeout | null = null;
+    let didInitialSyncForSession = false;
+
+    const unsubscribe = syncService.subscribe((status) => {
+      if (status.isLoggedIn) {
+        if (!didInitialSyncForSession) {
+          didInitialSyncForSession = true;
+          if (timer) clearTimeout(timer);
+          timer = setTimeout(() => {
+            handlePerformSyncRef.current().catch(() => {});
+          }, 2500);
+        }
+      } else {
+        didInitialSyncForSession = false;
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   // Realtime Supabase change listener across other active devices

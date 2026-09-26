@@ -189,6 +189,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
                     <option value="hour">{t('history.lastHour')}</option>
                     <option value="day">{t('history.last24Hours')}</option>
                     <option value="week">{t('history.last7DaysOption')}</option>
+                    <option value="month">{t('history.last4Weeks')}</option>
                     <option value="all">{t('history.allTime')}</option>
                   </select>
                 </div>

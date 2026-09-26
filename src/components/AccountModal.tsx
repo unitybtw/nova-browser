@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import { getLocale } from '../services/i18n';
 
 interface AccountModalProps {
@@ -42,6 +43,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
   const [isManualSyncing, setIsManualSyncing] = useState(false);
+  const { setSafeTimeout } = useSafeTimeout();
 
   const containerRef = useRef<HTMLDivElement>(null);
   useModalFocusTrap(isOpen, onClose, containerRef);
@@ -95,7 +97,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
       setGeneratedCode(code);
       setSuccessMessage('Sync Code created! Enter this code on your other devices.');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setSafeTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to generate sync code');
     } finally {
@@ -112,7 +114,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       await syncService.joinSyncChain(inputSyncCode);
       setSuccessMessage('Device paired! Syncing all bookmarks, passwords, and data...');
       if (onPerformSync) await onPerformSync();
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setSafeTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Invalid or expired sync code');
     } finally {
@@ -123,7 +125,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(true);
-    setTimeout(() => setCopiedCode(false), 2500);
+    setSafeTimeout(() => setCopiedCode(false), 2500);
   };
 
   const handleLeaveChain = () => {
@@ -131,7 +133,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     setGeneratedCode(null);
     setInputSyncCode('');
     setSuccessMessage('Left sync chain');
-    setTimeout(() => setSuccessMessage(null), 2000);
+    setSafeTimeout(() => setSuccessMessage(null), 2000);
   };
 
   const handleTogglePreference = (key: keyof SyncPreferences) => {
@@ -146,7 +148,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     try {
       if (onPerformSync) await onPerformSync();
       setSuccessMessage('Sync completed successfully!');
-      setTimeout(() => setSuccessMessage(null), 3000);
+      setSafeTimeout(() => setSuccessMessage(null), 3000);
     } catch (err: any) {
       setErrorMessage(err.message || 'Sync failed');
     } finally {

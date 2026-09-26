@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Download, Upload, Check, Zap, Loader2 } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { ToggleSwitch } from './ToggleSwitch';
+import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 
 export interface AdvancedSectionProps {
   settings: UserSettings;
@@ -20,6 +21,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
 }) => {
   const [isPurgingMemory, setIsPurgingMemory] = useState(false);
   const [purgedFeedback, setPurgedFeedback] = useState(false);
+  const { setSafeTimeout } = useSafeTimeout();
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -136,10 +138,10 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
                 try {
                   if (onPurgeMemory) await onPurgeMemory();
                 } catch (_) {}
-                setTimeout(() => {
+                setSafeTimeout(() => {
                   setIsPurgingMemory(false);
                   setPurgedFeedback(true);
-                  setTimeout(() => setPurgedFeedback(false), 3000);
+                  setSafeTimeout(() => setPurgedFeedback(false), 3000);
                 }, 500);
               }}
               disabled={isPurgingMemory}
