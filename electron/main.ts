@@ -248,9 +248,17 @@ if (process.platform === 'darwin') {
   ].join(','));
 }
 
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.novabrowser.app');
+}
+
 if (process.platform === 'linux') {
   // Prevent blurry fonts and rendering under Wayland (GNOME / KDE)
   app.commandLine.appendSwitch('ozone-platform-hint', 'auto');
+  if (typeof process.getuid === 'function' && process.getuid() === 0) {
+    app.commandLine.appendSwitch('no-sandbox');
+    app.commandLine.appendSwitch('disable-setuid-sandbox');
+  }
   // Safe sandbox fallback: If unprivileged user namespaces are disabled in kernel
   try {
     if (fs.existsSync('/proc/sys/kernel/unprivileged_userns_clone')) {
@@ -1087,6 +1095,27 @@ function setupApplicationMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+if (!app.isDefaultProtocolClient('nova')) {
+  try {
+    app.setAsDefaultProtocolClient('nova');
+  } catch (_) {}
+}
+
+// macOS deep-link handler for nova: and web URLs
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+    try {
+      const u = new URL(url);
+      if ((u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'nova:') && !u.username && !u.password) {
+        sendToMainWindow('new-tab', url);
+      }
+    } catch {}
+  }
+});
+
 // Security: When a second instance is launched, focus the existing window and safely route any valid URL
 app.on('second-instance', (_event, commandLine) => {
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1096,7 +1125,7 @@ app.on('second-instance', (_event, commandLine) => {
     const possibleUrl = commandLine.find(arg => {
       try {
         const u = new URL(arg);
-        return (u.protocol === 'http:' || u.protocol === 'https:') && !u.username && !u.password;
+        return (u.protocol === 'http:' || u.protocol === 'https:' || u.protocol === 'nova:') && !u.username && !u.password;
       } catch {
         return false;
       }
@@ -1366,7 +1395,7 @@ app.whenReady().then(async () => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
       
-      // Internal app pages: Allow microphone (audio) for Nova Browser AI chat voice typing.
+      // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
       // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
       if (isTrustedAppOrigin(url)) {
         if (permission === 'media') {
@@ -1377,21 +1406,27 @@ app.whenReady().then(async () => {
             if (process.platform === 'darwin') {
               try {
                 const status = systemPreferences.getMediaAccessStatus('microphone');
-                if (status === 'not-determined') {
-                  systemPreferences.askForMediaAccess('microphone').then((granted) => {
-                    callback(granted);
-                  }).catch(() => callback(false));
-                  return;
+                if (status === 'denied' || status === 'restricted') {
+                  return callback(false);
                 }
-                return callback(status === 'granted');
               } catch (e) {
                 console.warn('[Permissions] macOS systemPreferences check failed:', e);
+                return callback(false);
               }
             }
-            return callback(true);
+            // Check if app-level microphone permission was already remembered and allowed
+            const appPerm = rememberedPermissions.get('app')?.get('media') ||
+                            rememberedPermissions.get(url)?.get('media');
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return callback(appPerm.allow);
+            }
+            // Fall through to standard user prompt queue so the user is asked explicitly
+          } else {
+            return callback(false);
           }
+        } else {
+          return callback(false);
         }
-        return callback(false);
       }
 
       // Security: Block openExternal unconditionally for all web content.
@@ -1406,6 +1441,9 @@ app.whenReady().then(async () => {
         origin = new URL(url).origin;
       } catch {
         origin = url;
+      }
+      if (isTrustedAppOrigin(url)) {
+        origin = 'app';
       }
 
       // Security: Rate-limiting to prevent permission request flooding attacks (max 5 per 10s per origin)
@@ -1463,7 +1501,15 @@ app.whenReady().then(async () => {
         'window-management': 'Window Management'
       };
       
-      const permissionName = permissionNames[permission] || permission;
+      let permissionName = permissionNames[permission] || permission;
+      if (permission === 'media') {
+        const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
+        if (mediaTypes && mediaTypes.includes('audio') && !mediaTypes.includes('video')) {
+          permissionName = 'Microphone';
+        } else if (mediaTypes && mediaTypes.includes('video') && !mediaTypes.includes('audio')) {
+          permissionName = 'Camera';
+        }
+      }
 
       if (!mainWindow || mainWindow.isDestroyed()) {
         return callback(false);
@@ -1509,20 +1555,28 @@ app.whenReady().then(async () => {
       // Security: Deny openExternal checks immediately
       if (permission === 'openExternal') return false;
 
-      // Internal pages: Permit microphone (audio) checks for AI chat voice typing.
-      // All other app-origin permission checks remain denied.
+      // Fail-closed permission checking:
+      // Internal pages: Permit microphone (audio) checks only if remembered/granted.
+      // All other app-origin permission checks remain strictly denied.
       if (isTrustedAppOrigin(requestingOrigin)) {
         if (permission === 'media') {
           const mediaType = (details as any)?.mediaType as string | undefined;
           if (mediaType === 'audio') {
             if (process.platform === 'darwin') {
               try {
-                return systemPreferences.getMediaAccessStatus('microphone') === 'granted';
+                if (systemPreferences.getMediaAccessStatus('microphone') !== 'granted') {
+                  return false;
+                }
               } catch {
-                return true;
+                return false; // Fail closed!
               }
             }
-            return true;
+            const appPerm = rememberedPermissions.get('app')?.get('media') ||
+                            (requestingOrigin ? rememberedPermissions.get(requestingOrigin)?.get('media') : undefined);
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return appPerm.allow;
+            }
+            return false; // Fail closed if not granted
           }
         }
         return false;
@@ -1566,10 +1620,14 @@ app.whenReady().then(async () => {
         const status = systemPreferences.getMediaAccessStatus('microphone');
         return { status, canAsk: status === 'not-determined', platform: 'darwin' };
       } catch {
-        return { status: 'unknown', canAsk: false, platform: 'darwin' };
+        return { status: 'denied', canAsk: false, platform: 'darwin' };
       }
     }
-    return { status: 'granted', canAsk: false, platform: process.platform };
+    const appPerm = rememberedPermissions.get('app')?.get('media');
+    if (appPerm && appPerm.allow) {
+      return { status: 'granted', canAsk: false, platform: process.platform };
+    }
+    return { status: 'not-determined', canAsk: true, platform: process.platform };
   });
 
   // IPC: request microphone permission cross-platform
@@ -1588,8 +1646,12 @@ app.whenReady().then(async () => {
         return { granted: false, status, platform: 'darwin' };
       } catch (e) {
         console.warn('[Microphone] macOS permission request error:', e);
-        return { granted: false, status: 'error', platform: 'darwin' };
+        return { granted: false, status: 'denied', platform: 'darwin' };
       }
+    }
+    const appPerm = rememberedPermissions.get('app')?.get('media');
+    if (appPerm && appPerm.allow) {
+      return { granted: true, status: 'granted', platform: process.platform };
     }
     return { granted: true, status: 'granted', platform: process.platform };
   });
@@ -1700,15 +1762,15 @@ app.whenReady().then(async () => {
       const isDmg = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.dmg') && !a.name.toLowerCase().endsWith('.blockmap');
       const isZip = (a: any) => typeof a.name === 'string' && a.name.toLowerCase().endsWith('.zip');
       if (arch === 'arm64') {
-        return assets.find((a: any) => isDmg(a) && a.name.toLowerCase().includes('arm64')) ||
-               assets.find(isDmg) ||
-               assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('mac'))) ||
-               assets.find(isZip);
+        return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('universal') || a.name.toLowerCase().includes('aarch64'))) ||
+               assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('arm64') || a.name.toLowerCase().includes('universal') || a.name.toLowerCase().includes('aarch64'))) ||
+               assets.find((a: any) => isDmg(a) && !a.name.toLowerCase().includes('x64') && !a.name.toLowerCase().includes('intel')) ||
+               assets.find(isDmg);
       }
-      return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel'))) ||
-             assets.find(isDmg) ||
-             assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('mac'))) ||
-             assets.find(isZip);
+      return assets.find((a: any) => isDmg(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel') || a.name.toLowerCase().includes('universal'))) ||
+             assets.find((a: any) => isZip(a) && (a.name.toLowerCase().includes('x64') || a.name.toLowerCase().includes('x86_64') || a.name.toLowerCase().includes('intel') || a.name.toLowerCase().includes('universal'))) ||
+             assets.find((a: any) => isDmg(a) && !a.name.toLowerCase().includes('arm64') && !a.name.toLowerCase().includes('aarch64')) ||
+             assets.find((a: any) => isZip(a) && !a.name.toLowerCase().includes('arm64') && !a.name.toLowerCase().includes('aarch64'));
     }
 
     if (platform === 'win32') {
@@ -3843,7 +3905,8 @@ app.on('web-contents-created', (_event, wc) => {
           click: async () => {
             const currentUrl = wc.getURL();
             if (currentUrl && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
-              const defaultFilename = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_') + '.html';
+              const safeTitle = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_').slice(0, 100);
+              const defaultFilename = safeTitle + '.html';
               const saveRes = await dialog.showSaveDialog(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined as any, {
                 defaultPath: path.join(app.getPath('downloads'), defaultFilename),
                 filters: [{ name: 'HTML Complete Page', extensions: ['html', 'htm'] }]

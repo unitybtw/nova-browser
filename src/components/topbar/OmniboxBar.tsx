@@ -71,12 +71,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const relevantPermissionRequests = useMemo(() => {
-    if (!permissionRequests || !activeTab?.url) return [];
+    if (!permissionRequests || permissionRequests.length === 0) return [];
     let currentOrigin = '';
     try {
-      currentOrigin = new URL(activeTab.url).origin;
+      currentOrigin = activeTab?.url ? new URL(activeTab.url).origin : '';
     } catch {
-      currentOrigin = activeTab.url;
+      currentOrigin = activeTab?.url || '';
     }
     return permissionRequests.filter(req => {
       let reqOrigin = '';
@@ -85,7 +85,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       } catch {
         reqOrigin = req.origin || req.url;
       }
-      return reqOrigin === currentOrigin || (req.webContentsId && req.webContentsId === activeTab.webContentsId);
+      const isAppOrigin = req.origin === 'app' ||
+                          reqOrigin === 'app' ||
+                          reqOrigin === 'http://localhost:5173' ||
+                          req.url?.startsWith('file:') ||
+                          req.url?.startsWith('nova:');
+      return isAppOrigin || reqOrigin === currentOrigin || (req.webContentsId && req.webContentsId === activeTab?.webContentsId);
     });
   }, [permissionRequests, activeTab?.url, activeTab?.webContentsId]);
 
@@ -230,7 +235,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         }
 
         // Fallback for non-electron web preview only when google is the chosen engine
-        if (searchEngine === 'google') {
+        if (typeof window !== 'undefined' && !window.electronAPI && searchEngine === 'google') {
           const lang = clientLocale.split('-')[0] || 'en';
           const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
           const response = await fetch(

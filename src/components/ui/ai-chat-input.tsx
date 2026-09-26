@@ -326,6 +326,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const audioContextRef = useRef<AudioContext | null>(null);
     const rafRef = useRef<number | null>(null);
     const recognitionRef = useRef<any>(null);
+    const isRecordingRef = useRef(false);
+    const isExplicitlyStoppedRef = useRef(false);
+    const initialTextRef = useRef('');
 
     const [hoverStyle, setHoverStyle] = useState({ opacity: 0, transform: "translateY(0px) scale(0.95)", transition: "none" });
     const [containerHeight, setContainerHeight] = useState(116);
@@ -392,6 +395,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
     // --- Voice Recording Logic ---
     const stopRecording = useCallback(() => {
+      isExplicitlyStoppedRef.current = true;
+      isRecordingRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
@@ -423,29 +428,63 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
       const isTr = (getLocale ? getLocale() : 'tr-TR').startsWith('tr');
 
-      let currentPlatform = 'unknown';
-      // 1. Electron macOS / Windows / Linux permission check
-      if (typeof window !== 'undefined' && window.electronAPI?.requestMicrophonePermission) {
-        try {
-          const permResult = await window.electronAPI.requestMicrophonePermission();
-          if (permResult.platform) currentPlatform = permResult.platform;
-          if (!permResult.granted) {
-            const settingsName =
-              currentPlatform === 'win32'
-                ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
-                : currentPlatform === 'linux'
-                ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
-                : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
+      // Check SpeechRecognition API early before acquiring media stream
+      const SpeechRecognition =
+        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-            setVoiceError(
-              isTr
-                ? `Mikrofon izni kapalı. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
-                : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
-            );
-            return;
+      if (!SpeechRecognition) {
+        setVoiceError(
+          isTr
+            ? "Tarayıcı ortamında konuşma tanıma (SpeechRecognition API) desteklenmiyor."
+            : "SpeechRecognition API is not supported in this browser environment."
+        );
+        return;
+      }
+
+      let currentPlatform = 'unknown';
+      // 1. Electron OS-level permission checks (macOS / Windows / Linux)
+      if (typeof window !== 'undefined' && window.electronAPI) {
+        try {
+          if (window.electronAPI.checkMicrophonePermission) {
+            const check = await window.electronAPI.checkMicrophonePermission();
+            if (check.platform) currentPlatform = check.platform;
+            if (check.status === 'denied' || check.status === 'restricted') {
+              const settingsName =
+                currentPlatform === 'win32'
+                  ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
+                  : currentPlatform === 'linux'
+                  ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
+                  : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
+
+              setVoiceError(
+                isTr
+                  ? `Mikrofon izni kapalı. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
+                  : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
+              );
+              return;
+            }
+          }
+          if (window.electronAPI.requestMicrophonePermission) {
+            const permResult = await window.electronAPI.requestMicrophonePermission();
+            if (permResult.platform) currentPlatform = permResult.platform;
+            if (!permResult.granted) {
+              const settingsName =
+                currentPlatform === 'win32'
+                  ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
+                  : currentPlatform === 'linux'
+                  ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
+                  : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
+
+              setVoiceError(
+                isTr
+                  ? `Mikrofon izni verilmedi. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
+                  : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
+              );
+              return;
+            }
           }
         } catch (e) {
-          console.warn("[ai-chat-input] requestMicrophonePermission error:", e);
+          console.warn("[ai-chat-input] Microphone permission check error:", e);
         }
       }
 
@@ -486,18 +525,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         return;
       }
 
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (!stream && !SpeechRecognition) {
-        setVoiceError(
-          isTr
-            ? "Bu cihazda ses kaydı veya konuşma tanıma desteklenmiyor."
-            : "Voice recording and speech recognition are not available on this device."
-        );
-        return;
-      }
-
+      isExplicitlyStoppedRef.current = false;
+      isRecordingRef.current = true;
+      initialTextRef.current = valueRef.current;
       setIsRecording(true);
 
       if (stream) {
@@ -535,83 +565,86 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         }
       }
 
-      if (SpeechRecognition) {
-        try {
-          const recognition = new SpeechRecognition();
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          const currentLocale = getLocale ? getLocale() : 'tr-TR';
-          recognition.lang = currentLocale || navigator.language || 'tr-TR';
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        const currentLocale = getLocale ? getLocale() : 'tr-TR';
+        recognition.lang = currentLocale || navigator.language || 'tr-TR';
 
-          let baseline = valueRef.current;
+        recognition.onresult = (event: any) => {
+          let sessionFinal = "";
+          let sessionInterim = "";
 
-          recognition.onresult = (event: any) => {
-            let interimTranscript = "";
-            let finalTranscript = "";
-
-            for (let i = event.resultIndex; i < event.results.length; ++i) {
-              if (event.results[i].isFinal) {
-                finalTranscript += event.results[i][0].transcript;
+          for (let i = 0; i < event.results.length; ++i) {
+            const item = event.results[i];
+            if (item && item[0]?.transcript) {
+              if (item.isFinal) {
+                sessionFinal += item[0].transcript;
               } else {
-                interimTranscript += event.results[i][0].transcript;
+                sessionInterim += item[0].transcript;
               }
             }
+          }
 
-            if (finalTranscript) {
-              baseline += (baseline ? " " : "") + finalTranscript;
-            }
+          const prefix = initialTextRef.current ? initialTextRef.current + " " : "";
+          const combined = (prefix + sessionFinal + (sessionInterim ? " " + sessionInterim : "")).trim();
+          handleValueChange(combined);
+        };
 
-            handleValueChange(
-              (baseline + (interimTranscript ? " " + interimTranscript : "")).trim()
+        recognition.onerror = (e: any) => {
+          if (e.error === 'no-speech') return;
+          console.warn("[ai-chat-input] Speech recognition error:", e.error);
+          if (e.error === 'not-allowed') {
+            setVoiceError(
+              isTr
+                ? "Ses tanıma izni verilmedi. Mikrofon izinlerini kontrol edin."
+                : "Speech recognition permission denied."
             );
-          };
-
-          recognition.onerror = (e: any) => {
-            if (e.error === 'no-speech') return;
-            console.warn("[ai-chat-input] Speech recognition error:", e.error);
-            if (e.error === 'not-allowed') {
-              setVoiceError(
-                isTr
-                  ? "Ses tanıma izni verilmedi. Mikrofon izinlerini kontrol edin."
-                  : "Speech recognition permission denied."
-              );
-            } else if (e.error === 'network') {
-              setVoiceError(
-                isTr
-                  ? "Ses tanıma ağına bağlanılamadı. İnternet bağlantınızı kontrol edin."
-                  : "Speech recognition network error."
-              );
-            } else if (e.error === 'audio-capture') {
-              setVoiceError(
-                isTr
-                  ? "Mikrofon sesi yakalayamadı."
-                  : "Microphone failed to capture audio."
-              );
-            }
-            stopRecording();
-          };
-
-          recognition.onend = () => {
-            stopRecording();
-          };
-
-          recognitionRef.current = recognition;
-          recognition.start();
-        } catch (recErr: any) {
-          console.warn("[ai-chat-input] Failed to start SpeechRecognition:", recErr);
-          setVoiceError(
-            isTr
-              ? "Konuşma tanıma başlatılamadı: " + (recErr?.message || "Hata")
-              : "Failed to start speech recognition: " + (recErr?.message || "Error")
-          );
+          } else if (e.error === 'network') {
+            setVoiceError(
+              isTr
+                ? "Ses tanıma ağına bağlanılamadı. İnternet bağlantınızı kontrol edin."
+                : "Speech recognition network error."
+            );
+          } else if (e.error === 'audio-capture') {
+            setVoiceError(
+              isTr
+                ? "Mikrofon sesi yakalayamadı."
+                : "Microphone failed to capture audio."
+            );
+          }
           stopRecording();
-        }
-      } else {
+        };
+
+        recognition.onend = () => {
+          if (isExplicitlyStoppedRef.current || !isRecordingRef.current) {
+            stopRecording();
+          } else {
+            // User paused speech; restart recognition seamlessly without dropping recording
+            try {
+              if (recognitionRef.current && isRecordingRef.current) {
+                initialTextRef.current = valueRef.current;
+                recognitionRef.current.start();
+              } else {
+                stopRecording();
+              }
+            } catch {
+              stopRecording();
+            }
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+      } catch (recErr: any) {
+        console.warn("[ai-chat-input] Failed to start SpeechRecognition:", recErr);
         setVoiceError(
           isTr
-            ? "Tarayıcı ortamında SpeechRecognition API desteklenmiyor."
-            : "SpeechRecognition API is not supported in this browser environment."
+            ? "Konuşma tanıma başlatılamadı: " + (recErr?.message || "Hata")
+            : "Failed to start speech recognition: " + (recErr?.message || "Error")
         );
+        stopRecording();
       }
     }, [handleValueChange, stopRecording]);
 

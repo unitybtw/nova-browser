@@ -1444,6 +1444,24 @@ CRITICAL RULES:
   }
 
   /**
+   * Cancellable sleep that aborts immediately if the current generation or user stopped.
+   */
+  private async interruptibleSleep(ms: number, generation?: number): Promise<boolean> {
+    const isCancelled = () => generation === undefined
+      ? this.isInterrupted
+      : !this.isOperationActive(generation);
+
+    const step = 40;
+    let elapsed = 0;
+    while (elapsed < ms) {
+      if (isCancelled()) return false;
+      await new Promise(r => setTimeout(r, Math.min(step, ms - elapsed)));
+      elapsed += step;
+    }
+    return !isCancelled();
+  }
+
+  /**
    * Dispatches visual cursor animations to AICursorOverlay across the application.
    */
   private triggerVirtualCursor(x: number, y: number, action: 'move' | 'click' | 'type', text?: string): void {
@@ -2296,13 +2314,14 @@ CRITICAL RULES:
 
       // Perform the step
       try {
+        const liveOffset = this.getWebviewOffset();
         if (step.action === 'youtube_search_and_play') {
           const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(step.target || '')}`;
           if (this.actionContext?.onNavigate) {
             this.actionContext.onNavigate(ytSearchUrl);
           }
           await this.waitForPageLoadSettled(generation);
-          await new Promise(r => setTimeout(r, 1200));
+          await this.interruptibleSleep(1200, generation);
 
           if (isCancelled()) return messages;
 
@@ -2341,16 +2360,17 @@ CRITICAL RULES:
           } catch (_) {}
 
           if (videoInfo && videoInfo.url) {
+            const currentOffset = this.getWebviewOffset();
             // Animate virtual cursor to the video
             const targetX = videoInfo.rect
-              ? offset.left + videoInfo.rect.left + Math.min(80, videoInfo.rect.width / 2)
-              : offset.left + 350;
+              ? currentOffset.left + videoInfo.rect.left + Math.min(80, videoInfo.rect.width / 2)
+              : currentOffset.left + 350;
             const targetY = videoInfo.rect
-              ? offset.top + videoInfo.rect.top + (videoInfo.rect.height / 2)
-              : offset.top + 260;
+              ? currentOffset.top + videoInfo.rect.top + (videoInfo.rect.height / 2)
+              : currentOffset.top + 260;
 
             this.triggerVirtualCursor(targetX, targetY, 'move');
-            await new Promise(r => setTimeout(r, 220));
+            await this.interruptibleSleep(220, generation);
             this.triggerVirtualCursor(targetX, targetY, 'click');
 
             // Navigate to the video
@@ -2358,12 +2378,13 @@ CRITICAL RULES:
               this.actionContext.onNavigate(videoInfo.url);
             }
             await this.waitForPageLoadSettled(generation);
-            await new Promise(r => setTimeout(r, 1000));
+            await this.interruptibleSleep(1000, generation);
 
             // Move cursor to player and click play
-            this.triggerVirtualCursor(offset.left + 450, offset.top + 280, 'move');
-            await new Promise(r => setTimeout(r, 150));
-            this.triggerVirtualCursor(offset.left + 450, offset.top + 280, 'click');
+            const playerOffset = this.getWebviewOffset();
+            this.triggerVirtualCursor(playerOffset.left + 450, playerOffset.top + 280, 'move');
+            await this.interruptibleSleep(150, generation);
+            this.triggerVirtualCursor(playerOffset.left + 450, playerOffset.top + 280, 'click');
 
             executedResults.push({
               stepNumber: i + 1,
@@ -2389,11 +2410,12 @@ CRITICAL RULES:
             this.actionContext.onNavigate(step.target);
           }
           await this.waitForPageLoadSettled(generation);
-          await new Promise(r => setTimeout(r, 800));
+          await this.interruptibleSleep(800, generation);
 
           // Move cursor into reading area
-          this.triggerVirtualCursor(offset.left + 300, offset.top + 250, 'move');
-          await new Promise(r => setTimeout(r, 200));
+          const navOffset = this.getWebviewOffset();
+          this.triggerVirtualCursor(navOffset.left + 300, navOffset.top + 250, 'move');
+          await this.interruptibleSleep(200, generation);
 
           executedResults.push({
             stepNumber: i + 1,
@@ -2408,15 +2430,16 @@ CRITICAL RULES:
             this.actionContext.onNavigate(searchUrl);
           }
           await this.waitForPageLoadSettled(generation);
-          await new Promise(r => setTimeout(r, 1000));
+          await this.interruptibleSleep(1000, generation);
 
           // Move cursor and scroll to inspect results
-          this.triggerVirtualCursor(offset.left + 300, offset.top + 220, 'move');
-          await new Promise(r => setTimeout(r, 200));
+          const searchOffset = this.getWebviewOffset();
+          this.triggerVirtualCursor(searchOffset.left + 300, searchOffset.top + 220, 'move');
+          await this.interruptibleSleep(200, generation);
           if (this.actionContext?.onScrollPage) {
             this.actionContext.onScrollPage('down', 400);
           }
-          await new Promise(r => setTimeout(r, 300));
+          await this.interruptibleSleep(300, generation);
 
           // Extract top answer or organic result
           let extractedInfo = '';
@@ -2477,7 +2500,7 @@ CRITICAL RULES:
           if (this.actionContext?.onScrollPage) {
             this.actionContext.onScrollPage('down', 600);
           }
-          await new Promise(r => setTimeout(r, 400));
+          await this.interruptibleSleep(400, generation);
           executedResults.push({
             stepNumber: i + 1,
             title: isTr ? `Sayfa Kaydirildi` : `Page Scrolled`,
@@ -2493,7 +2516,7 @@ CRITICAL RULES:
         });
       }
 
-      await new Promise(r => setTimeout(r, 300));
+      await this.interruptibleSleep(300, generation);
     }
 
     // ── 3. Build comprehensive final response report ──

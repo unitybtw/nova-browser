@@ -314,7 +314,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           return;
         }
         // Fallback for non-electron web preview only when google is the chosen engine
-        if (searchEngine === 'google') {
+        if (typeof window !== 'undefined' && !window.electronAPI && searchEngine === 'google') {
           const lang = clientLocale.split('-')[0] || 'en';
           const country = clientLocale.split('-')[1] || (lang === 'tr' ? 'TR' : 'US');
           const res = await fetch(`https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(trimmed)}&hl=${lang}&gl=${country}`, {
