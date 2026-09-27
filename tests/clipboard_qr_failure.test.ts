@@ -198,8 +198,16 @@ async function renderSuite() {
       await act(async () => {
         root.render(React.createElement(ShareModal, { isOpen: true, onClose: () => {}, url, title: 'A Page' }));
       });
-      // Let the encoder's promise settle through the effect.
-      await act(async () => { await new Promise(r => setTimeout(r, 30)); });
+      // Let the encoder's promise settle through the effect (poll up to 500ms for slow CI environments)
+      for (let i = 0; i < 20; i++) {
+        await act(async () => { await new Promise(r => setTimeout(r, 25)); });
+        if (
+          container.innerHTML.includes('data:image/png;base64,') ||
+          container.innerHTML.includes('QR code could not be generated')
+        ) {
+          break;
+        }
+      }
       const html = container.innerHTML;
       await act(async () => { root.unmount(); });
       container.remove();

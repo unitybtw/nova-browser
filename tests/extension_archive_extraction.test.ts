@@ -187,12 +187,14 @@ async function main() {
         rejected++;
       }
       // Even if it did not throw, nothing may land outside the target dir.
-      const escaped = path.resolve(tmpRoot, 'etc');
       assert.ok(
-        !fs.existsSync(path.resolve(target, '..', '..', '..', 'etc', 'passwd')),
+        !fs.existsSync(path.join(tmpRoot, 'etc')),
         `payload escaped the target: ${entry}`
       );
-      void escaped;
+      assert.ok(
+        !fs.existsSync(path.join(tmpRoot, 'passwd')),
+        `payload escaped the target: ${entry}`
+      );
     }
     assert.equal(rejected, payloads.length, `all ${payloads.length} traversal payloads must be rejected`);
     console.log(`[PASS] [CRX-ZipSlip] all ${payloads.length} traversal payloads rejected, nothing escaped`);
