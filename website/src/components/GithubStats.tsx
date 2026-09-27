@@ -41,10 +41,10 @@ interface Milestone {
 
 const VERIFIED_MILESTONES: Milestone[] = [
   {
-    version: 'v1.4.8',
+    version: 'v1.4.9',
     date: 'Current Release',
     tag: 'Latest',
-    description: 'Cloud Sync per-field LWW merge, SafeStorage credentials, SHA-256 binary validation.'
+    description: 'Private Tab Navigation, E2EE Vault Conflict Resolution & Local Whisper AI'
   },
   {
     version: 'v1.4.0',

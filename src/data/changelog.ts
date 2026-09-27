@@ -42,10 +42,67 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.4.9',
+    date: 'September 2026',
+    title: 'Private Tab Navigation, E2EE Vault Conflict Resolution & Local Whisper AI',
+    badge: 'Latest Release',
+    lede: 'Seamless switching between private and normal tabs, deterministic E2EE synchronization with race condition resilience, on-device Whisper voice transcription, and strict boundary defense across every subsystem.',
+    hero: {
+      src: './screenshots/newtab.png',
+      alt: 'Nova Browser v1.4.9 release interface.',
+      caption: 'Nova v1.4.9: Sovereign desktop browsing with offline AI speech recognition and bulletproof privacy controls.',
+    },
+    highlights: [
+      'Private tabs lifecycle hardened: effortless switching to normal tabs with automatic session cleanup and UI badge indicators.',
+      'E2EE Sync Vault upgraded with LWW timestamp verification, conflict resolution retries, and tombstone propagation.',
+      'On-device Whisper voice transcription powered by local WebAssembly transformers for zero-latency private speech recognition.',
+      'Agent navigation guard and CRX archive safety preventing SSRF, zip-slip, and extension decompression bombs.',
+      'Full modal and popover dialog accessibility (A11y) with bulletproof focus trapping and keyboard navigation.',
+    ],
+    sections: [
+      {
+        eyebrow: 'Privacy & Tabs',
+        title: 'Seamless sovereignty in every tab',
+        body: 'Exiting private mode is now frictionless. Tab operations guarantee clean partitions, prioritized normal tab focusing, and dedicated one-click escape routes on both horizontal and vertical tab strips.',
+        points: [
+          'Immediate partition teardown on private tab close via Electron session isolation.',
+          'Dedicated switch-to-normal action on New Tab page and toolbar controls.',
+          'React.memo state parity across all tab strip components.',
+        ],
+      },
+      {
+        eyebrow: 'Cloud Sync',
+        title: 'Deterministic E2EE vault sync',
+        body: 'Sync conflicts now resolve deterministically using field-level LWW clocks and automatic race retries, preventing silent overwrites and data loss.',
+        points: [
+          'Field-level write timestamping guarantees latest edit wins across devices.',
+          'Tombstone tracking purges deleted items cleanly without re-surfacing.',
+          'Zero-knowledge AES-256-GCM envelope v2 verification.',
+        ],
+      },
+      {
+        eyebrow: 'Intelligence',
+        title: 'Private voice recognition, strictly on-device',
+        body: 'Speak to Nova without sending audio packets across the internet. An integrated WebAssembly Whisper model transcribes spoken commands entirely on your CPU/GPU.',
+        points: [
+          'Fully offline, browser-local ONNX/WASM speech-to-text pipeline.',
+          'Instant voice prompts in AI Assistant side panel and Omnibox.',
+          'Startup chunk optimizations keeping browser launch snappy and memory-light.',
+        ],
+      },
+    ],
+    changes: [
+      { category: 'fix', text: 'Fixed private tab traps preventing transitions back to normal workspaces.' },
+      { category: 'security', text: 'Hardened Agent Navigation Guard against private subnet SSRF and DNS rebinding.' },
+      { category: 'feature', text: 'Added local Whisper voice recognition engine with zero telemetry.' },
+      { category: 'performance', text: 'Reduced startup bundle size and memory footprint with dynamic vendor chunking.' },
+      { category: 'improvement', text: 'Enhanced dialog accessibility with focus restoration and trap management.' },
+    ],
+  },
+  {
     version: '1.4.8',
     date: 'September 2026',
     title: 'Security Hardening, Browser Identity & 120Hz Fluid Motion',
-    badge: 'Latest Release',
     lede: 'Nova stopped pretending to be Chrome. Requests now carry Chromium’s own identity, every download and autofill boundary is fenced off, and the whole interface moves at 120Hz.',
     hero: {
       src: './screenshots/newtab.png',

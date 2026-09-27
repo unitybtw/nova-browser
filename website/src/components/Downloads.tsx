@@ -74,7 +74,7 @@ export const Downloads: React.FC = () => {
                 <Apple className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
-                v1.4.8 // APPLE SILICON & INTEL
+                v1.4.9 // APPLE SILICON & INTEL
               </span>
             </div>
 
@@ -144,7 +144,7 @@ export const Downloads: React.FC = () => {
                 <Monitor className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
-                v1.4.8 // X64
+                v1.4.9 // X64
               </span>
             </div>
 
@@ -214,7 +214,7 @@ export const Downloads: React.FC = () => {
                 <Terminal className="w-6 h-6" />
               </div>
               <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
-                v1.4.8 // LINUX
+                v1.4.9 // LINUX
               </span>
             </div>
 
