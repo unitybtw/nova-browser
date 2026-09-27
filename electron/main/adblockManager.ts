@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import fetch from 'cross-fetch';
 import { ElectronBlocker, parseFilter } from '@cliqz/adblocker-electron';
+import { adsAndTrackingLists } from '@cliqz/adblocker';
 
 let blocker: ElectronBlocker | null = null;
 let currentWhitelistFilters: any[] = [];
@@ -150,7 +151,14 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
   const ADBLOCKER_CACHE_MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000; // refetch filter lists older than 3 days
 
   try {
-    const engine = await ElectronBlocker.fromPrebuiltAdsAndTracking(fetch, {
+    const engine = await ElectronBlocker.fromLists(fetch, adsAndTrackingLists, {
+      // Electron 43+ deprecates session.setPreloads/getPreloads which the cosmetic
+      // filter injection requires. Using these deprecated APIs corrupts the renderer's
+      // preload startup sequence, resulting in a blank window (empty DOM).
+      // Disabling cosmetic filters eliminates the deprecated API calls entirely.
+      // Network-level ad and tracker blocking (easylist + easyprivacy) is fully preserved.
+      loadCosmeticFilters: false,
+    }, {
       path: ADBLOCKER_CACHE_PATH,
       read: async (p) => {
         const stat = await fs.promises.stat(p);
