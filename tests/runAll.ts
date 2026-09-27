@@ -78,3 +78,4 @@ import './format_bytes.test';
 // installs window/document globals while it does.
 import './clipboard_qr_failure.test';
 import './download_open_policy.test';
+import './renderer_recovery.test';

@@ -20,8 +20,16 @@ const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
 // macOS activate, so an app-level listener added there would accumulate.
 // NOTE: render-process-gone fires on `app`, not on webContents.
 app.on('render-process-gone', (_event, contents, details) => {
+  // render-process-gone fires on `app`, and it fires for an ORDINARY window
+  // teardown too, not just a crash. The update path destroys every window and
+  // then quits, so a `clean-exit` arrives moments before the process is meant to
+  // die; reloading there resurrected a window while the updater script was
+  // replacing the bundle underneath it, which is how a finished update could
+  // come back on the error screen. Only a genuine crash is recoverable, and
+  // never while the app is on its way out.
   if (contents !== mainWindow?.webContents) return;
-  console.error(`[App] Main renderer gone (${details.reason}). Reloading.`);
+  if (!shouldReloadAfterRendererGone(details?.reason)) return;
+  console.error(`[App] Main renderer gone (${details.reason}); reloading.`);
   try {
     if (!contents.isDestroyed()) contents.reload();
   } catch (err) {
@@ -126,6 +134,7 @@ import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
 import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
 import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
+import { shouldReloadAfterRendererGone, markQuitting } from './main/rendererRecovery.js';
 
 /**
  * Validates URLs for context-menu media saving and address copying.
@@ -573,7 +582,26 @@ function createWindow() {
   // attached - its IPC is then rejected by isTrustedSender because the
   // webContents id differs, but the window still loads a remote URL with no
   // scheme check. Deny at the source rather than trusting each call site.
-  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Deny the POPUP, but do not silently swallow the action: a blanket deny
+  // broke the "open Chrome Web Store" buttons and the extension options page,
+  // which are the only ways to reach those screens. http(s) is routed into a
+  // normal tab - the same thing the guest handler already does - and anything
+  // else (file:, javascript:, custom schemes) is refused outright.
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    let parsed: URL;
+    try {
+      parsed = new URL(details.url);
+    } catch {
+      return { action: 'deny' };
+    }
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      if (!parsed.hostname) return { action: 'deny' };
+      sendToMainWindow('new-tab', details.url);
+      return { action: 'deny' };
+    }
+    console.warn(`[Security] Blocked window.open for scheme: ${parsed.protocol}`);
+    return { action: 'deny' };
+  });
 
   // Closing the last window does not quit on macOS, and React's tab-cleanup
   // effects never run, so anything the renderer owned must be reclaimed here.
@@ -2113,6 +2141,8 @@ app.whenReady().then(async () => {
     }
 
     console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
+    updateInstallInProgress = true;
+    markQuitting();
 
     if (mcpServer && mcpServer.isRunning()) {
       try { mcpServer.stop(); } catch (_) {}
@@ -2969,6 +2999,8 @@ fi
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     console.log('[Updater] Restart and install requested.');
     try {
+      updateInstallInProgress = true;
+      markQuitting();
       if (downloadedUpdateFilePath && fs.existsSync(downloadedUpdateFilePath)) {
         return await performSelfUpdateAndRelaunch(downloadedUpdateFilePath);
       }
@@ -3643,40 +3675,56 @@ app.on('web-contents-created', (_event, contents) => {
   }
 });
 
-app.on('will-quit', () => {
+
+let clearOnExitInFlight = false;
+/**
+ * True from the moment an update install starts until the process is on its way
+ * out. The update's shell script blocks on this PID exiting, so anything that
+ * defers the quit would strand the browser on the old version.
+ */
+let updateInstallInProgress = false;
+
+function isUpdateInstallInProgress(): boolean {
+  return updateInstallInProgress;
+}
+
+/** Reads clearOnExit from the persisted settings, or false if unreadable. */
+function readClearOnExitSetting(): boolean {
   try {
     const userDataDir = app.getPath('userData');
-    const userSettingsPath = path.join(userDataDir, 'store_user_settings.json');
-    const legacySettingsPath = path.join(userDataDir, 'store_settings.json');
-    const settingsFile = fs.existsSync(userSettingsPath) ? userSettingsPath : (fs.existsSync(legacySettingsPath) ? legacySettingsPath : null);
-    if (settingsFile) {
-      const rawContent = fs.readFileSync(settingsFile, 'utf-8');
-      const parsed = JSON.parse(rawContent);
-      const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
-      if (settings && settings.clearOnExit) {
-        // 'will-quit' fires at the very end of app.quit() and Electron does not
-        // await async work started from it: the process exits, the pending IPC to
-        // the storage service is dropped, and the setting silently does nothing.
-        // The clears are therefore handed to before-quit, which can hold the quit
-        // open until they settle.
-        pendingClearOnExit = true;
-      }
-    }
-  } catch (e) {}
-});
-
-let pendingClearOnExit = false;
-let clearOnExitDone = false;
+    const primary = path.join(userDataDir, 'store_user_settings.json');
+    const legacy = path.join(userDataDir, 'store_settings.json');
+    const settingsFile = fs.existsSync(primary) ? primary : (fs.existsSync(legacy) ? legacy : null);
+    if (!settingsFile) return false;
+    const parsed = JSON.parse(fs.readFileSync(settingsFile, 'utf-8'));
+    const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+    return Boolean(settings && settings.clearOnExit);
+  } catch (_) {
+    return false;
+  }
+}
 
 app.on('before-quit', (event) => {
-  if (pendingClearOnExit && !clearOnExitDone && app.isReady()) {
+  // This has to happen HERE, in before-quit. It used to be done in will-quit,
+  // which fires at the very end of app.quit() - by then the guard below had
+  // already run, so the clear never happened at all, and the flag it left set
+  // made the NEXT quit defer for no reason. Electron does not await async work
+  // started from will-quit, so the setting was a silent no-op.
+  //
+  // It also must not run during an update: install-update calls app.quit() and
+  // the updater script is blocked on this process exiting, so deferring the quit
+  // on a hanging clearStorageData would leave the browser waiting forever.
+  if (app.isReady() && !clearOnExitInFlight && readClearOnExitSetting() && !isUpdateInstallInProgress()) {
     event.preventDefault();
-    clearOnExitDone = true;
-    const finish = () => { app.quit(); };
+    clearOnExitInFlight = true;
+    const finish = () => {
+      clearOnExitInFlight = false;
+      app.quit();
+    };
     Promise.allSettled([
       session.defaultSession.clearStorageData(),
       session.defaultSession.clearCache(),
-    ]).then((results) => {
+    ]).then(results => {
       for (const r of results) {
         if (r.status === 'rejected') console.warn('[Quit] clear-on-exit step failed:', r.reason);
       }
@@ -3684,18 +3732,14 @@ app.on('before-quit', (event) => {
     });
     return;
   }
+  markQuitting();
   try {
     if (mcpServer && mcpServer.isRunning()) {
       mcpServer.stop();
     }
   } catch (e) {
-    console.error('Error stopping MCP server on quit:', e);
+    console.warn('[Quit] MCP server stop failed:', e);
   }
-  try {
-    const incogSession = session.fromPartition('incognito');
-    incogSession.clearStorageData().catch(() => {});
-    incogSession.clearCache().catch(() => {});
-  } catch (_) {}
 });
 
 app.on('window-all-closed', () => {

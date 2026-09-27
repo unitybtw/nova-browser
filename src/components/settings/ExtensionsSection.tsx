@@ -216,7 +216,12 @@ export const ExtensionsSection: React.FC = () => {
                       <button
                         onClick={() => {
                           const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
-                          window.open(`chrome-extension://${ext.id}/${cleanOptions}`, '_blank');
+                          // Routed through the main process, which checks that the
+                          // extension is installed and confines the path. window.open
+                          // would create an unmanaged BrowserWindow instead.
+                          (window as any).electronAPI?.openExtensionPopup?.(
+                            `chrome-extension://${ext.id}/${cleanOptions}`
+                          );
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
                         title="Open Options"
