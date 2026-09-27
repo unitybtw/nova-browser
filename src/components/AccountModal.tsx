@@ -1,17 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  X, 
-  Key, 
-  Cloud, 
-  RefreshCw, 
-  Check, 
-  AlertCircle, 
-  LogOut, 
-  ShieldCheck, 
-  Bookmark, 
-  Clock, 
-  Settings, 
+import {
+  X,
+  Key,
+  Cloud,
+  RefreshCw,
+  Check,
+  AlertCircle,
+  LogOut,
+  ShieldCheck,
+  Bookmark,
+  Clock,
+  Settings,
   FolderTree,
   Sparkles,
   Link2,
@@ -19,7 +19,8 @@ import {
   Laptop,
   ArrowRight
 } from 'lucide-react';
-import { syncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { syncService, NovaSyncService, SyncStatus, SyncPreferences } from '../services/syncService';
+import { copyTextToClipboard } from '../utils/clipboard';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import { getLocale } from '../services/i18n';
@@ -122,18 +123,31 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     }
   };
 
-  const handleCopyCode = (code: string) => {
-    navigator.clipboard.writeText(code);
-    setCopiedCode(true);
-    setSafeTimeout(() => setCopiedCode(false), 2500);
+  const handleCopyCode = async (code: string) => {
+    setErrorMessage(null);
+    if (!code) {
+      setErrorMessage('No sync code available to copy yet.');
+      return;
+    }
+    // A sync code is a secret, so never report success on an unconfirmed write:
+    // navigator.clipboard rejects outright in an insecure context (http/file) and
+    // the old fire-and-forget call still flipped the button to "Copied".
+    const copied = await copyTextToClipboard(code);
+    if (copied) {
+      setCopiedCode(true);
+      setSafeTimeout(() => setCopiedCode(false), 2500);
+    } else {
+      setErrorMessage(`Copy failed. Copy this code manually: ${code}`);
+    }
   };
 
   const handleLeaveChain = () => {
-    syncService.logout();
+    // Device pairing is not implemented (syncService throws), so there is no
+    // chain to leave. This used to call logout(), which silently destroyed the
+    // user's real cloud session and every key derived from it.
     setGeneratedCode(null);
     setInputSyncCode('');
-    setSuccessMessage('Left sync chain');
-    setSafeTimeout(() => setSuccessMessage(null), 2000);
+    setErrorMessage(null);
   };
 
   const handleTogglePreference = (key: keyof SyncPreferences) => {
@@ -168,7 +182,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md select-none"
           onClick={onClose}
         >
@@ -202,8 +216,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   </p>
                 </div>
               </div>
-              <button 
-                onClick={onClose} 
+              <button
+                onClick={onClose}
                 className="p-1.5 rounded-xl hover:bg-slate-200/80 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
                 title="Close"
               >
@@ -230,7 +244,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               {syncStatus.isLoggedIn ? (
                 /* ACTIVE SYNC CHAIN VIEW */
                 <div className="space-y-5">
-                  {/* Sync Code Card */}
+                  {/* Sync Code Card - hidden until the pairing join flow exists */}
+                  {NovaSyncService.PAIRING_AVAILABLE && (
                   <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-blue-500/5 border border-cyan-500/20 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
@@ -259,6 +274,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       </button>
                     </div>
                   </div>
+                  )}
 
                   {/* Sync Controls */}
                   <div className="p-4 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 flex items-center justify-between">
@@ -334,7 +350,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     </div>
                   </div>
                 </div>
-              ) : (
+              ) : NovaSyncService.PAIRING_AVAILABLE ? (
                 /* PAIRING SETUP (NO EMAIL / NO PASSWORD NEEDED) */
                 <div className="space-y-5">
                   {/* Option 1: Enter Code from another device */}
@@ -419,6 +435,23 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       <strong className="font-semibold text-cyan-600 dark:text-cyan-400">Zero-Knowledge Security:</strong> No email or password needed. All passwords and bookmarks are encrypted client-side using 256-bit AES-GCM.
                     </p>
                   </div>
+                </div>
+              ) : (
+                /* Pairing is not built yet: say so instead of offering a code
+                   that can never be redeemed. */
+                <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-2.5 text-center">
+                  <div className="flex justify-center">
+                    <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                      <Laptop className="w-4 h-4" />
+                    </div>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                    Sign in to sync this browser
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                    Your bookmarks, history, tabs and workspaces sync through your Nova Cloud
+                    account. Pairing a second device with a sync code is not available yet.
+                  </p>
                 </div>
               )}
             </div>

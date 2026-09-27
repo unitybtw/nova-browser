@@ -18,8 +18,6 @@ export interface WallpaperPhoto {
   date?: string;
 }
 
-export type UnsplashPhoto = WallpaperPhoto;
-
 export const STORAGE_KEYS = {
   ACTIVE_WALLPAPER_ID: 'nova_wallpaper_active_id',
   ACTIVE_WALLPAPER_DATE: 'nova_wallpaper_active_date',
@@ -691,14 +689,6 @@ export function resolveUnsplashPhoto(): WallpaperPhoto {
   return getInitialActiveWallpaper(cachedDailyWallpapers);
 }
 
-export function getUnsplashPhotoUrl(): string {
-  return resolveUnsplashPhoto().imageUrl;
-}
-
-export function getUnsplashThumbnailUrl(): string {
-  return resolveUnsplashPhoto().thumbnailUrl;
-}
-
 /**
  * Sets the active wallpaper across all tabs, windows, and settings.
  */
@@ -814,21 +804,31 @@ export function useLiveUnsplashPhoto(enabled = true) {
     let isMounted = true;
     setIsLoading(true);
 
-    fetchDaily4KWallpapers().then(photos => {
-      if (!isMounted) return;
-      if (photos && photos.length > 0) {
-        setPhotoPool(photos);
-        // Important: Preserve the currently selected photo so there is no jump
-        const activeId = currentPhotoRef.current.id;
-        const stillPresent = photos.find(p => p.id === activeId);
-        if (!stillPresent) {
-          // If previous active photo is missing from updated pool, recalculate
-          const refreshed = getInitialActiveWallpaper(photos);
-          setCurrentPhoto(refreshed);
+    fetchDaily4KWallpapers()
+      .then(photos => {
+        if (!isMounted) return;
+        if (photos && photos.length > 0) {
+          setPhotoPool(photos);
+          // Important: Preserve the currently selected photo so there is no jump
+          const activeId = currentPhotoRef.current.id;
+          const stillPresent = photos.find(p => p.id === activeId);
+          if (!stillPresent) {
+            // If previous active photo is missing from updated pool, recalculate
+            const refreshed = getInitialActiveWallpaper(photos);
+            setCurrentPhoto(refreshed);
+          }
         }
-      }
-      setIsLoading(false);
-    });
+      })
+      .catch(err => {
+        // Every branch inside the fetcher is individually guarded today, so this
+        // is defence in depth — but without it a rejection would escape as an
+        // unhandled rejection AND, since the reset used to live in the .then
+        // above, leave the wallpaper spinner running forever.
+        console.warn('Daily 4K wallpaper fetch failed:', err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoading(false);
+      });
 
     return () => {
       isMounted = false;

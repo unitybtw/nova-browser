@@ -66,6 +66,11 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
   const [displayedSummary, setDisplayedSummary] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Whether `data` came from the LRU cache. Cached previews skip the typewriter;
+  // freshly fetched ones type out. This has to be tracked explicitly: the cache
+  // is written as soon as a fetch succeeds, so the typewriter effect could never
+  // tell the two apart by asking getCachedPreview().
+  const [isFromCache, setIsFromCache] = useState(false);
 
   // Typewriter effect for clean reading
   useEffect(() => {
@@ -75,15 +80,15 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
     }
 
     // If loaded from cache, show immediately without waiting for typewriter
-    if (getCachedPreview(url)) {
+    if (isFromCache) {
       setDisplayedSummary(data.summary);
       return;
     }
-    
+
     let currentIdx = 0;
     const targetText = data.summary;
     const step = Math.max(1, Math.ceil(targetText.length / 40)); // Dynamic speed based on length
-    
+
     const interval = setInterval(() => {
       currentIdx += step;
       if (currentIdx <= targetText.length) {
@@ -93,32 +98,34 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         clearInterval(interval);
       }
     }, 15);
-    
+
     return () => clearInterval(interval);
-  }, [data?.summary, isOpen, url]);
+  }, [data?.summary, isOpen, isFromCache]);
 
   useEffect(() => {
     if (!isOpen || !url) return;
-    
+
     // Check cache first
     const cached = getCachedPreview(url);
     if (cached) {
       setData(cached);
       setDisplayedSummary(cached.summary);
+      setIsFromCache(true);
       setIsLoading(false);
       setError(null);
       return;
     }
 
     let isCancelled = false;
-    
+
     const fetchAndSummarize = async () => {
       setIsLoading(true);
       setError(null);
       setData(null);
       setDisplayedSummary('');
+      setIsFromCache(false);
       setLoadingText('Fetching page content...');
-      
+
       try {
         let domain = '';
         try {
@@ -128,10 +135,10 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         }
         const api = (window as any).electronAPI;
         if (!api?.fetchPageHtml) throw new Error("API not available");
-        
+
         const result = await api.fetchPageHtml(url);
         if (isCancelled) return;
-        
+
         if (!result.success || !result.html) {
           throw new Error(result.error || "Failed to load content");
         }
@@ -141,7 +148,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         const sanitizedHtml = DOMPurify.sanitize(result.html, { WHOLE_DOCUMENT: true });
         const parser = new DOMParser();
         const doc = parser.parseFromString(sanitizedHtml, 'text/html');
-        
+
         const ogTitle = doc.querySelector('meta[property="og:title"]')?.getAttribute('content');
         const ogDesc = doc.querySelector('meta[property="og:description"]')?.getAttribute('content');
         const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
@@ -156,7 +163,7 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
         } catch (e) {
           cleanText = doc.body.textContent || '';
         }
-        
+
         cleanText = cleanText.replace(/\s+/g, ' ').trim();
         const wordCount = cleanText.split(/\s+/).filter(Boolean).length;
         const readingTimeMinutes = Math.max(1, Math.round(wordCount / 200));
@@ -190,8 +197,11 @@ export const AILinkPreview: React.FC<AILinkPreviewProps> = React.memo(({ url, x,
           readingTimeMinutes,
           isAiGenerated
         };
-        setCachedPreview(url, previewResult);
+        // setData BEFORE the cache write: the typewriter effect keys off
+        // isFromCache, and the commit that renders the summary happens after
+        // this task, so the fresh (non-cached) summary is what animates in.
         setData(previewResult);
+        setCachedPreview(url, previewResult);
       } catch (err: any) {
         if (!isCancelled) {
           console.error('Failed to preview link:', err);

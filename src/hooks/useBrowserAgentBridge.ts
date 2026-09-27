@@ -1,9 +1,37 @@
-import { useEffect, useRef } from 'react';
-import type { Dispatch, SetStateAction, RefObject } from 'react';
+import { useEffect, useRef, type Dispatch, type SetStateAction, type RefObject } from 'react';
 import type { Bookmark, HistoryItem, Tab, UserSettings } from '../types/browser';
 import { aiAgent } from '../services/aiAgent';
 import { orchestrator } from '../services/agentOrchestrator';
-import { isSafeNavigationUrl } from '../utils/safeNavigation';
+// The agent boundary uses the strict destination policy, not the general
+// navigation one: agent-supplied URLs are untrusted, and the general predicate
+// deliberately permits loopback/private hosts for real user navigation.
+import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
+
+/**
+ * Full agent-boundary check: the synchronous renderer policy plus a
+ * main-process DNS resolution.
+ *
+ * `isSafeAgentNavigationUrl` cannot tell whether a public hostname resolves to
+ * a private address, so without the second step an attacker-controlled domain
+ * (or a rebind between the check and the connect) could aim the agent at
+ * 127.0.0.1 or 169.254.169.254 and then read the response back through
+ * browser_read_page. When the bridge runs outside Electron there is no main
+ * process to ask, so the synchronous check stands alone and the gap is the
+ * same one the pure-web build already has.
+ */
+async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!isSafeAgentNavigationUrl(url)) return { ok: false, reason: 'destination is not a public address' };
+  const api = (window as any).electronAPI;
+  if (!api?.checkAgentNavigationHost) return { ok: true };
+  try {
+    const verdict = await api.checkAgentNavigationHost(url);
+    if (!verdict?.allowed) return { ok: false, reason: verdict?.reason || 'destination failed the host check' };
+    return { ok: true };
+  } catch (err: any) {
+    // Fail closed: an unreachable main process must not become a bypass.
+    return { ok: false, reason: `host check failed (${err?.message || 'unknown error'})` };
+  }
+}
 import { searchHistoryAndBookmarks, SearchableItem } from '../utils/searchHistoryBookmarks';
 
 export interface UseBrowserAgentBridgeOptions {
@@ -67,7 +95,18 @@ export function useBrowserAgentBridge({
       switch (toolName) {
         case 'browser_navigate':
           if (!safeArgs.url || typeof safeArgs.url !== 'string') return "Error: Missing or invalid 'url' parameter";
-          if (!isSafeNavigationUrl(safeArgs.url)) return "Error: Navigation to this destination is blocked for security.";
+          // Agent boundary: the URL here comes from an MCP client or LLM, and
+          // page content the agent reads can author it. So the stricter
+          // destination policy applies on top of the general one — loopback,
+          // link-local (169.254.169.254 metadata), RFC1918 and their IPv6
+          // equivalents are refused, so a prompt injection cannot point the
+          // agent at an internal service and then read it back out through
+          // browser_read_page. See safeNavigation.ts for what this does and
+          // does not cover.
+          const gate = await agentNavigationAllowed(safeArgs.url);
+          if (!gate.ok) {
+            return `Error: Navigation to this destination is blocked for security (${gate.reason}).`;
+          }
           mcpHandlersRef.current.handleNavigate(safeArgs.url);
           return `Navigated to ${safeArgs.url}`;
 
@@ -90,9 +129,9 @@ export function useBrowserAgentBridge({
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) { 
+                  if (el) {
                     const rect = el.getBoundingClientRect();
-                    el.click(); 
+                    el.click();
                     return { success: true, x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
                   }
                   return { success: false, error: "Element not found with selector: " + ${JSON.stringify(safeArgs.selector)} };
@@ -120,7 +159,7 @@ export function useBrowserAgentBridge({
               (() => {
                 try {
                   const el = document.querySelector(${JSON.stringify(safeArgs.selector)});
-                  if (el) { 
+                  if (el) {
                     const rect = el.getBoundingClientRect();
                     el.value = ${JSON.stringify(textToType)};
                     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -142,7 +181,7 @@ export function useBrowserAgentBridge({
               window.dispatchEvent(new CustomEvent('ai-cursor', {
                 detail: { x: bounds.left + result.x, y: bounds.top + result.y, action: 'type', text: textToType }
               }));
-              return "Successfully typed text."; 
+              return "Successfully typed text.";
             }
             return result.error || "Error";
           }
@@ -195,8 +234,11 @@ export function useBrowserAgentBridge({
 
         case 'browser_new_tab': {
           const newUrl = safeArgs.url || 'nova://newtab';
-          if (!isSafeNavigationUrl(newUrl)) {
-            return `Error: Navigation blocked for unsafe URL scheme: ${newUrl}`;
+          // Same agent boundary as browser_navigate: a new tab at an internal
+          // address is just as reachable by browser_read_page.
+          const gate = await agentNavigationAllowed(newUrl);
+          if (!gate.ok) {
+            return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
           }
           mcpHandlersRef.current.handleNewTab(newUrl);
           return `Opened new tab: ${newUrl}`;
@@ -386,7 +428,14 @@ export function useBrowserAgentBridge({
 
     // 2. Original aiAgent context setup
     aiAgent.setActionContext({
-      onNavigate: (url: string) => {
+      onNavigate: async (url: string) => {
+        // Same untrusted-input boundary as the MCP tools above: these URLs come
+        // from LLM output, which page content can influence.
+        const gate = await agentNavigationAllowed(url);
+        if (!gate.ok) {
+          console.warn(`AI agent navigation refused (${gate.reason}):`, url);
+          return;
+        }
         mcpHandlersRef.current.handleNavigate(url);
       },
       onExecuteScript: async (script: string) => {
@@ -419,7 +468,14 @@ export function useBrowserAgentBridge({
 
         throw new Error("No active webview or iframe found");
       },
-      onCreateTab: (url: string) => mcpHandlersRef.current.handleNewTab(url),
+      onCreateTab: async (url: string) => {
+        const gate = await agentNavigationAllowed(url);
+        if (!gate.ok) {
+          console.warn(`AI agent tab creation refused (${gate.reason}):`, url);
+          return;
+        }
+        mcpHandlersRef.current.handleNewTab(url);
+      },
       onCloseTab: (id?: string) => {
         const targetId = id || browserDataRef.current.activeTabId;
         if (targetId) mcpHandlersRef.current.handleCloseTab(targetId);
@@ -481,10 +537,17 @@ export function useBrowserAgentBridge({
       onGetPageLinks: async () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
         if (webview) {
+          // Cap the collected anchors (and clamp each field) so the IPC payload
+          // itself stays bounded. Link-dense pages (Wikipedia, a sitemap, a large
+          // category listing) hold tens of thousands of anchors, and a single
+          // href can be a megabyte-sized data: URI — without a cap the
+          // structured clone back to the app shell is what freezes the renderer.
+          // The agent re-clamps to its own (smaller) budget; these limits are
+          // only the transport guard.
           return await webview.executeJavaScript(`
-            Array.from(document.querySelectorAll('a')).map(a => ({
-              text: a.innerText.trim(),
-              href: a.href
+            Array.from(document.querySelectorAll('a')).slice(0, 200).map(a => ({
+              text: (a.innerText || '').trim().substring(0, 200),
+              href: (a.href || '').substring(0, 500)
             })).filter(l => l.text && l.href)
           `);
         }

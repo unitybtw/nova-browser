@@ -4,6 +4,7 @@ import { X, Plus, Trash2, Edit2, Check, LayoutGrid, Briefcase, User, Code, Spark
 import { Workspace } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface WorkspaceManagerProps {
   isOpen: boolean;
@@ -52,6 +53,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   const [editIcon, setEditIcon] = useState('LayoutGrid');
   const containerRef = useRef<HTMLDivElement>(null);
 
+  useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
 
   // Prevent background scrolling
@@ -102,6 +104,9 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md" onClick={onClose}>
           <motion.div 
             ref={containerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Workspaces"
             tabIndex={-1}
             onClick={(e) => e.stopPropagation()}
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -215,7 +220,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                         {activeWorkspaceId === workspace.id && <div className="text-[9px] text-cyan-600 dark:text-cyan-400 font-bold uppercase tracking-wider">Active</div>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
                       <button 
                         onClick={() => {
                           setEditingId(workspace.id);

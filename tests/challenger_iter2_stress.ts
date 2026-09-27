@@ -1,8 +1,7 @@
-import fs from 'fs';
-import path from 'path';
 import React from 'react';
 import ReactDOMServer from 'react-dom/server';
 import { BrowserView } from '../src/components/BrowserView';
+import { safeBase64 } from '../src/utils/securityUtils';
 
 async function runChallengerStressTest() {
   console.log('===========================================================');
@@ -17,39 +16,22 @@ async function runChallengerStressTest() {
   // -------------------------------------------------------------
   console.log('--- SECTION 1: ReaderMode safeBase64 Lone Surrogate Stress Testing ---');
 
-  // Read safeBase64 implementation verbatim from src/components/ReaderMode.tsx
-  const readerModeSrc = fs.readFileSync(
-    path.resolve(process.cwd(), 'src/components/ReaderMode.tsx'),
-    'utf-8'
-  ).replace(/\r\n/g, '\n');
+  // This used to regex-scrape the body of `safeBase64` out of
+  // src/components/ReaderMode.tsx purely to prove the regex matched, then throw
+  // the captured body away and hand a RE-TYPED copy to `new Function`. The copy
+  // had already drifted from the shipped helper: production
+  // src/utils/securityUtils.ts:350-363 emits URL-safe base64
+  // (`+`->`-`, `/`->`_`, `=` stripped) with a `[^a-zA-Z0-9_-]` fallback, while
+  // the copy used plain `btoa(...)` and a `[^a-zA-Z0-9]` fallback. So the suite
+  // reported [PASS] for a contract production did not have. It now drives the
+  // real exported helper, and the assertions below are ones the copy fails.
+  const URL_SAFE_BASE64 = /^[A-Za-z0-9_-]*$/;
 
-  // Extract safeBase64 function implementation using Regex
-  const safeBase64Match = readerModeSrc.match(/const safeBase64 = \(([\s\S]*?)\n\};/);
-  if (!safeBase64Match) {
-    throw new Error('Could not find safeBase64 function definition in ReaderMode.tsx');
-  }
-
-  // Create function dynamically from the extracted code
-  const safeBase64Func = new Function(
-    'str',
-    `
-    if (!str) return '';
-    const wellFormed = typeof str.toWellFormed === 'function'
-      ? str.toWellFormed()
-      : str.replace(/[\\uD800-\\uDBFF](?![\\uDC00-\\uDFFF])|(?<![\\uD800-\\uDBFF])[\\uDC00-\\uDFFF]/g, '\\uFFFD');
-
-    try {
-      return btoa(unescape(encodeURIComponent(wellFormed)));
-    } catch (e) {
-      try {
-        const sanitized = wellFormed.replace(/%/g, '_');
-        return btoa(sanitized);
-      } catch (e2) {
-        return wellFormed.replace(/[^a-zA-Z0-9]/g, '_');
-      }
-    }
-    `
-  ) as (str: string) => string;
+  const decodeUrlSafeBase64 = (encoded: string): string => {
+    const b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64.padEnd(Math.ceil(b64.length / 4) * 4, '=');
+    return decodeURIComponent(escape(atob(padded)));
+  };
 
   const surrogateTestCases = [
     { name: 'Lone Lead Surrogate U+D800', input: 'https://example.com/\uD800/path' },
@@ -67,14 +49,47 @@ async function runChallengerStressTest() {
 
   for (const tc of surrogateTestCases) {
     try {
-      const result = safeBase64Func(tc.input);
+      const result = safeBase64(tc.input);
       if (typeof result !== 'string') {
         throw new Error(`Returned non-string: ${typeof result}`);
+      }
+      // The shipped helper must emit the URL-safe alphabet only. The old
+      // re-typed copy emitted `+`, `/` and `=` and would fail this line.
+      if (!URL_SAFE_BASE64.test(result)) {
+        throw new Error(`Output is not URL-safe base64: ${JSON.stringify(result)}`);
+      }
+      // Encoding must be a pure function of the input.
+      if (safeBase64(tc.input) !== result) {
+        throw new Error(`Non-deterministic output for ${JSON.stringify(tc.input)}`);
       }
       console.log(`[PASS] [ReaderMode] ${tc.name} -> base64 length: ${result.length}, output: "${result.substring(0, 35)}..."`);
       passedTests++;
     } catch (err: any) {
       console.error(`[FAIL] [ReaderMode] ${tc.name} threw uncaught exception: ${err.name} - ${err.message}`);
+      failedTests++;
+    }
+  }
+
+  // The vectors above are all deliberately malformed (lone surrogates), so they
+  // prove the encoder never throws and never leaks standard-base64 characters.
+  // These prove the opposite direction as well: a well-formed string must still
+  // round-trip losslessly, so "URL-safe" is not paid for with data loss.
+  const roundTripVectors = [
+    'https://example.com/😊/🎉/тест?q=a+b/c=',
+    'https://ru.wikipedia.org/wiki/Заглавная_страница',
+    'https://example.com/foo%20bar%26baz',
+  ];
+  for (const input of roundTripVectors) {
+    try {
+      const encoded = safeBase64(input);
+      const decoded = decodeUrlSafeBase64(encoded);
+      if (decoded !== input) {
+        throw new Error(`Round trip changed the input: ${JSON.stringify(decoded)} !== ${JSON.stringify(input)}`);
+      }
+      console.log(`[PASS] [ReaderMode] URL-safe round trip preserved "${input.substring(0, 40)}"`);
+      passedTests++;
+    } catch (err: any) {
+      console.error(`[FAIL] [ReaderMode] URL-safe round trip failed for ${JSON.stringify(input)}: ${err.message}`);
       failedTests++;
     }
   }

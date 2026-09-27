@@ -15,11 +15,14 @@
     "reload": "Reload",
     "copy": "Copy",
     "copied": "Copied",
-    "showMore": "Show more ({remaining} remaining)"
+    "showMore": "Show more ({remaining} remaining)",
+    "showMore_one": "Show more ({remaining} remaining)",
+    "showMore_other": "Show more ({remaining} remaining)"
   },
   "nav": {
     "newTab": "New Tab",
     "searchPlaceholder": "Search with {engine} or enter address",
+    "aiPlaceholder": "AI: What would you like me to do? (e.g. summarize this page)",
     "addShortcut": "Add",
     "bookmarks": "Bookmarks",
     "history": "History",
@@ -69,13 +72,28 @@
     "clearCache": "Clear AI Cache",
     "clearCacheDesc": "Delete downloaded local AI models to free up disk space.",
     "model": "Model",
-    "status": "Status"
+    "status": "Status",
+    "voiceMicDenied": "Microphone access was denied. Enable it for Nova Browser in {settings}.",
+    "voiceNoDevice": "No microphone device found. Check that a microphone is connected.",
+    "voiceInaccessible": "Could not access the microphone: {reason}",
+    "voiceUnsupported": "Voice input needs a secure app window and is unavailable here.",
+    "voiceModelDownloading": "Preparing on-device voice model… {percent}%",
+    "voiceTranscribing": "Transcribing on device…",
+    "voiceNoSpeech": "No speech detected. Try again a little closer to the microphone.",
+    "voiceTooShort": "That recording was too short to transcribe.",
+    "voiceFailed": "On-device transcription failed: {reason}",
+    "voiceNetwork": "The voice model could not be downloaded. Check your connection and try again.",
+    "voiceSettingsWin": "Windows Settings > Privacy & Security > Microphone",
+    "voiceSettingsMac": "macOS System Settings > Privacy & Security > Microphone",
+    "voiceSettingsLinux": "System Sound and Input Settings",
+    "voiceSettingsGeneric": "your system privacy settings"
   },
   "security": {
     "safe": "Secure Connection",
     "dangerous": "Deceptive Site Warning",
     "blocked": "Navigation Blocked",
-    "blockedDesc": "This URL has been blocked for your safety."
+    "blockedDesc": "This URL has been blocked for your safety.",
+    "siteInfo": "Site information and permissions"
   },
   "vpn": {
     "active": "Proxy / VPN Active",
@@ -105,6 +123,8 @@
     "searchEngine": "Engine: {engine}",
     "tasks": "Tasks",
     "tasksLeft": "{count} left",
+    "tasksLeft_one": "{count} left",
+    "tasksLeft_other": "{count} left",
     "clearCompletedTasks": "Clear",
     "noTasks": "No tasks for today. All done!",
     "addTaskPlaceholder": "Add a new task...",
@@ -114,11 +134,18 @@
     "editShortcutTitle": "Edit Shortcut",
     "shortcutName": "Name",
     "shortcutUrl": "URL",
-    "shuffleWallpaper": "Shuffle / Next Daily Photo"
+    "shuffleWallpaper": "Shuffle / Next Daily Photo",
+    "editSpeedDial": "Edit shortcut {name}",
+    "removeSpeedDial": "Remove shortcut {name}",
+    "search": "Search",
+    "clearSearch": "Clear search",
+    "addTask": "Add task"
   },
   "history": {
     "title": "History",
     "pagesRecorded": "{count} pages recorded",
+    "pagesRecorded_one": "{count} page recorded",
+    "pagesRecorded_other": "{count} pages recorded",
     "clearBrowsingData": "Clear browsing data",
     "searchPlaceholder": "Search history...",
     "noHistory": "No history found",
@@ -153,6 +180,8 @@
     "interrupted": "Interrupted",
     "progressing": "Downloading...",
     "totalItems": "{count} total items",
+    "totalItems_one": "{count} total item",
+    "totalItems_other": "{count} total items",
     "openFile": "Open file"
   },
   "find": {
@@ -176,9 +205,16 @@
     "noChanges": "No changes found matching the selected filter.",
     "liveSync": "GitHub Live Sync",
     "releasesCount": "{count} releases",
+    "releasesCount_one": "{count} release",
+    "releasesCount_other": "{count} releases",
     "current": "Current",
     "keyHighlights": "Key Highlights",
     "allChanges": "All Changes",
+    "everythingElse": "Every change, line by line",
+    "clearFilters": "Clear filters",
+    "resultsCount": "{count} of {total} changes match",
+    "resultsCount_one": "{count} of {total} change matches",
+    "resultsCount_other": "{count} of {total} changes match",
     "categoryFeature": "Feature",
     "categoryFix": "Fix",
     "categorySecurity": "Security",

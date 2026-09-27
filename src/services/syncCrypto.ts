@@ -68,15 +68,34 @@ export async function decryptSyncPayload<T>(envelope: EncryptedSyncEnvelope, pas
   }
   // Allow legacy passphrases during decryption to prevent locking out older users
   const key = await deriveKey(passphrase, base64ToBytes(envelope.salt), true);
-  const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: base64ToBytes(envelope.iv) },
-    key,
-    base64ToBytes(envelope.ciphertext)
-  );
+
+  // AES-GCM verifies its own auth tag, so a wrong passphrase OR a tampered
+  // ciphertext is rejected *here*, before any plaintext exists. This call has
+  // to sit inside the try: left outside, the rejection escaped as an opaque
+  // DOMException("OperationError") and the descriptive message below was
+  // reachable only when the key was correct and the plaintext happened not to
+  // be JSON — i.e. practically never.
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(envelope.iv) },
+      key,
+      base64ToBytes(envelope.ciphertext)
+    );
+  } catch {
+    // The auth tag did not verify. AES-GCM cannot distinguish a wrong key from
+    // a corrupted vault, so name both rather than guessing.
+    throw new Error('Invalid encrypted sync payload: wrong passphrase or corrupted vault');
+  }
+
+  // The key was correct — those bytes genuinely decrypted. Anything that fails
+  // from here on is a malformed payload, NOT a wrong passphrase, and is
+  // reported as such so the user is not sent off to re-type a passphrase that
+  // was always right.
   try {
     return JSON.parse(textDecoder.decode(plaintext)) as T;
   } catch {
-    throw new Error('Invalid encrypted sync payload: wrong passphrase or corrupted vault');
+    throw new Error('Invalid encrypted sync payload: vault decrypted but its contents are not valid JSON (corrupted vault)');
   }
 }
 

@@ -3,10 +3,8 @@
  * Nova Browser Milestone 1
  */
 
-import path from 'path';
 import fs from 'fs';
-import os from 'os';
-import { fileURLToPath, pathToFileURL } from 'url';
+import path from 'path';
 
 console.log('================================================================');
 console.log('STARTING EMPIRICAL ADVERSARIAL VERIFICATION SUITE - MILESTONE 1');
@@ -32,652 +30,383 @@ function assert(condition: boolean, suite: string, name: string, details: string
 }
 
 // =========================================================================
-// 1. ORIGIN VALIDATION CHALLENGE (isTrustedAppOrigin)
+// 1. ORIGIN VALIDATION CHALLENGE (isTrustedAppOrigin) — REMOVED
 // =========================================================================
-console.log('--- 1. Testing Origin Validation (isTrustedAppOrigin) ---');
-
-function isTrustedAppOrigin(urlStr: string, mockDistIndexHtml?: string): boolean {
-  if (!urlStr || typeof urlStr !== 'string') return false;
-  try {
-    const parsed = new URL(urlStr);
-    if (parsed.protocol === 'nova:' || parsed.protocol === 'devtools:') return true;
-    if (parsed.origin === 'http://localhost:5173') return true;
-    if (parsed.protocol === 'file:') {
-      const allowedPath = mockDistIndexHtml || path.resolve(path.join(__dirname, '../dist/index.html'));
-      try {
-        const navPath = fileURLToPath(urlStr);
-        return path.resolve(navPath) === allowedPath;
-      } catch {
-        return false;
-      }
-    }
-    return false;
-  } catch {
-    return false;
-  }
-}
-
-const allowedFile = path.resolve(path.join(__dirname, '../dist/index.html'));
-const allowedFileUrl = pathToFileURL(allowedFile).href;
-
-const originAttackVectors = [
-  // Bypass attempts on localhost:5173
-  { url: 'http://localhost:5173.evil.com', expected: false, desc: 'Subdomain bypass (localhost:5173.evil.com)' },
-  { url: 'http://localhost:5173.attacker.io/login', expected: false, desc: 'Subdomain path bypass' },
-  { url: 'http://localhost:5173@attacker.com', expected: false, desc: 'Userinfo hostname bypass (localhost:5173@attacker.com)' },
-  { url: 'http://localhost:51730', expected: false, desc: 'Port confusion (51730)' },
-  { url: 'http://localhost:5173:80', expected: false, desc: 'Double port confusion' },
-  { url: 'http://localhost:5174', expected: false, desc: 'Port mismatch (5174)' },
-  { url: 'http://evil.com?http://localhost:5173', expected: false, desc: 'Query parameter spoof' },
-  { url: 'http://evil.com#http://localhost:5173', expected: false, desc: 'Hash fragment spoof' },
-  { url: 'http://localhost.evil.com:5173', expected: false, desc: 'Nested subdomain attack' },
-  { url: 'https://localhost:5173', expected: false, desc: 'HTTPS scheme mismatch' },
-  { url: 'ws://localhost:5173', expected: false, desc: 'WebSocket scheme mismatch' },
-  { url: 'http://127.0.0.1:5173', expected: false, desc: 'IP representation instead of localhost origin' },
-  { url: 'http://0.0.0.0:5173', expected: false, desc: '0.0.0.0 IP representation' },
-  { url: 'http://[::1]:5173', expected: false, desc: 'IPv6 loopback representation' },
-
-  // Legitimate dev server origins
-  { url: 'http://localhost:5173', expected: true, desc: 'Exact localhost origin' },
-  { url: 'http://localhost:5173/', expected: true, desc: 'Localhost origin with root slash' },
-  { url: 'http://localhost:5173/settings?tab=general#sec', expected: true, desc: 'Localhost origin with path, query, and hash' },
-  { url: 'http://user:pass@localhost:5173/', expected: true, desc: 'Localhost with basic auth userinfo' },
-
-  // Internal schemes
-  { url: 'nova://settings', expected: true, desc: 'nova: internal protocol' },
-  { url: 'nova://history', expected: true, desc: 'nova: history protocol' },
-  { url: 'nova://newtab', expected: true, desc: 'nova: newtab protocol' },
-  { url: 'devtools://devtools/bundled/inspector.html', expected: true, desc: 'devtools: protocol' },
-
-  // Dangerous protocols & Blob origin isolation
-  { url: 'javascript:alert(1)', expected: false, desc: 'javascript: protocol' },
-  { url: 'data:text/html,<h1>test</h1>', expected: false, desc: 'data: protocol' },
-  { url: 'blob:https://evil.com/uuid-1234', expected: false, desc: 'blob: protocol with evil origin' },
-  { url: 'blob:http://localhost:5173.evil.com/uuid-1234', expected: false, desc: 'blob: protocol with spoofed subdomain origin' },
-  { url: 'blob:http://localhost:5173/uuid-1234', expected: true, desc: 'blob: protocol with trusted localhost origin (WebWorker/ObjectBlob)' },
-  { url: 'vbscript:msgbox(1)', expected: false, desc: 'vbscript: protocol' },
-
-  // Local file scheme
-  { url: allowedFileUrl, expected: true, desc: 'Exact dist/index.html file URL' },
-  { url: `${allowedFileUrl}/../../etc/passwd`, expected: false, desc: 'File URL path traversal' },
-  { url: 'file:///etc/passwd', expected: false, desc: 'Unauthorized system file URL' },
-  { url: 'file:///C:/Windows/System32/cmd.exe', expected: false, desc: 'Windows system file URL' },
-
-  // Non-string / malformed inputs
-  { url: '', expected: false, desc: 'Empty string' },
-  { url: '    ', expected: false, desc: 'Whitespace string' },
-  { url: 'not-a-valid-url-at-all', expected: false, desc: 'Malformed non-URL string' },
-  { url: null as any, expected: false, desc: 'null value' },
-  { url: undefined as any, expected: false, desc: 'undefined value' },
-  { url: 12345 as any, expected: false, desc: 'number value' },
-  { url: {} as any, expected: false, desc: 'object value' },
-  { url: [] as any, expected: false, desc: 'array value' },
-];
-
-for (const vec of originAttackVectors) {
-  const result = isTrustedAppOrigin(vec.url, allowedFile);
-  assert(
-    result === vec.expected,
-    'Origin Validation',
-    vec.desc,
-    `Input: ${JSON.stringify(vec.url)} | Expected: ${vec.expected} | Got: ${result}`
-  );
-}
+// This section declared its own `isTrustedAppOrigin` and ran 37 attack vectors
+// against it. It was worse than inert: it had DRIFTED from the shipped
+// predicate (electron/main.ts:347) in ways that inverted the verdict.
+//
+//   shipped (electron/main.ts:347-370)          copy that was asserted against
+//   ------------------------------------------   --------------------------------
+//   devtools: -> FALSE, always                   devtools: -> TRUE
+//   nova: only for 6 allowlisted hostnames,      nova: -> TRUE for any host
+//   with no pathname/search/userinfo, and
+//   for `settings` only an empty or
+//   #extensions/#mcp hash
+//   localhost:5173 trusted only when
+//   !app.isPackaged
+//
+// So `devtools://devtools/bundled/inspector.html` and `nova://settings?x=1`
+// were asserted TRUE here while production rejects them, and the four
+// `http://localhost:5173` "legitimate" vectors only hold in a dev build. The
+// vectors are not deleted wholesale: the attack shapes in them are worth
+// keeping, so they are moved to a source-level regression guard in section 8
+// below that reads the shipped predicate instead of a copy of it.
+//
+// NEEDED EXPORT: `isTrustedAppOrigin(urlStr: string): boolean` from
+// electron/main.ts:347. electron/main.ts is the Electron entry point and
+// cannot be imported by a Node test, so the right end state is an extracted
+// module (e.g. electron/main/trustedOrigin.ts) that main.ts imports, which a
+// test can then import directly.
 
 // =========================================================================
-// 2. PATH TRAVERSAL CHALLENGE (remove-extension & install-extension)
+// 2. PATH TRAVERSAL CHALLENGE (extension id & install folder) — REMOVED
 // =========================================================================
-console.log('\n--- 2. Testing Path Traversal & Identifier Validation ---');
-
-function validateExtensionId(extensionId: string): boolean {
-  if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
-    return false;
-  }
-  return true;
-}
-
-function resolveAndValidateExtensionDir(userDataDir: string, extensionId: string): { valid: boolean; targetPath?: string } {
-  if (!validateExtensionId(extensionId)) return { valid: false };
-  const extensionsBaseDir = path.resolve(path.join(userDataDir, 'extensions'));
-  const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
-  if (extDir.startsWith(extensionsBaseDir + path.sep)) {
-    return { valid: true, targetPath: extDir };
-  }
-  return { valid: false };
-}
-
-function validateInstallExtensionFolder(userDataDir: string, folderPath: string): boolean {
-  if (!folderPath || typeof folderPath !== 'string') return false;
-  if (folderPath.includes('..')) return false;
-  const extensionsDir = path.resolve(path.join(userDataDir, 'extensions'));
-  const resolvedFolder = path.resolve(folderPath);
-  if (!resolvedFolder.startsWith(extensionsDir + path.sep) && resolvedFolder !== extensionsDir) {
-    return false;
-  }
-  return true;
-}
-
-const mockUserData = path.join(os.tmpdir(), 'nova_test_userdata_' + Date.now());
-
-const extensionIdVectors = [
-  // Traversal & injection attempts
-  { id: '../../evil', valid: false, desc: 'Directory traversal (../../evil)' },
-  { id: '..\\..\\evil', valid: false, desc: 'Windows traversal (..\\..\\evil)' },
-  { id: '..', valid: false, desc: 'Parent dir dot-dot (..)' },
-  { id: '.', valid: false, desc: 'Current dir dot (.)' },
-  { id: '/etc/passwd', valid: false, desc: 'Root absolute path (/etc/passwd)' },
-  { id: 'C:\\Windows\\System32', valid: false, desc: 'Windows absolute path' },
-  { id: 'ext\0nullbyte', valid: false, desc: 'Null byte injection (ext\\0nullbyte)' },
-  { id: 'ext;rm -rf /', valid: false, desc: 'Shell command injection' },
-  { id: 'ext$(whoami)', valid: false, desc: 'Subshell command substitution' },
-  { id: 'ext`id`', valid: false, desc: 'Backtick command substitution' },
-  { id: 'ext*wildcard', valid: false, desc: 'Wildcard char (*)' },
-  { id: 'ext?query', valid: false, desc: 'Question mark char (?)' },
-  { id: 'ext#fragment', valid: false, desc: 'Hash char (#)' },
-  { id: 'ext space', valid: false, desc: 'Space char' },
-  { id: 'ext\nnewline', valid: false, desc: 'Newline char' },
-  { id: 'ext\ttab', valid: false, desc: 'Tab char' },
-  { id: '.hidden_ext', valid: false, desc: 'Leading dot' },
-  { id: 'ext.dir', valid: false, desc: 'Dot in ID' },
-  { id: '\u202e_malicious', valid: false, desc: 'Right-to-left override unicode' },
-  { id: 'ехt_cyrillic', valid: false, desc: 'Cyrillic homoglyph characters' },
-  { id: '', valid: false, desc: 'Empty string' },
-  { id: null as any, valid: false, desc: 'null value' },
-  { id: undefined as any, valid: false, desc: 'undefined value' },
-  { id: 12345 as any, valid: false, desc: 'numeric ID' },
-  { id: {} as any, valid: false, desc: 'object ID' },
-  { id: [] as any, valid: false, desc: 'array ID' },
-
-  // Valid extension IDs
-  { id: 'abcdefghijklmnopabcdefghijklmnop', valid: true, desc: '32-char webstore ID format' },
-  { id: 'my-custom-extension_123', valid: true, desc: 'Alphanumeric with hyphen and underscore' },
-  { id: 'ublock_origin-v2', valid: true, desc: 'Standard extension slug' },
-  { id: 'A', valid: true, desc: 'Single uppercase letter' },
-  { id: '123456', valid: true, desc: 'Numeric string ID' }
-];
-
-for (const vec of extensionIdVectors) {
-  const isValidId = validateExtensionId(vec.id);
-  assert(
-    isValidId === vec.valid,
-    'Extension ID Regex',
-    vec.desc,
-    `ID: ${JSON.stringify(vec.id)} | Expected: ${vec.valid} | Got: ${isValidId}`
-  );
-
-  const dirRes = resolveAndValidateExtensionDir(mockUserData, vec.id);
-  assert(
-    dirRes.valid === vec.valid,
-    'Extension Dir Confinement',
-    `${vec.desc} (confinement check)`,
-    `ID: ${JSON.stringify(vec.id)} | Expected: ${vec.valid} | Got: ${dirRes.valid}`
-  );
-}
-
-const installFolderVectors = [
-  { folder: path.join(mockUserData, 'extensions', 'my-extension'), expected: true, desc: 'Valid path within extensions directory' },
-  { folder: path.join(mockUserData, 'extensions'), expected: true, desc: 'Root extensions directory' },
-  { folder: path.join(mockUserData, 'extensions', '..', 'evil'), expected: false, desc: 'Dot-dot traversal in path' },
-  { folder: '/etc/passwd', expected: false, desc: 'System file path' },
-  { folder: path.join(mockUserData, 'other_dir'), expected: false, desc: 'Sibling folder outside extensions' },
-  { folder: '', expected: false, desc: 'Empty folder path' },
-  { folder: null as any, expected: false, desc: 'null folder path' },
-  { folder: undefined as any, expected: false, desc: 'undefined folder path' }
-];
-
-for (const vec of installFolderVectors) {
-  const res = validateInstallExtensionFolder(mockUserData, vec.folder);
-  assert(
-    res === vec.expected,
-    'Install Extension Path Confinement',
-    vec.desc,
-    `Folder: ${JSON.stringify(vec.folder)} | Expected: ${vec.expected} | Got: ${res}`
-  );
-}
-
+// Same failure mode: `validateExtensionId`, `resolveAndValidateExtensionDir`
+// and `validateInstallExtensionFolder` were all declared here and asserted
+// against themselves. They are also re-copied in
+// tests/challenger_m1_security_empirical.ts:480 and
+// tests/security_regression_audit.test.ts:380, so the same predicate has three
+// private implementations plus the inline one it was copied from — four places
+// that can disagree.
+//
+// Note the copy did not match even the code it cited: production applies the
+// id regex before resolving, and separately rejects a folder whose raw string
+// contains `..`, which a `path.resolve`+prefix check alone does not.
+//
+// NEEDED EXPORT: `validateExtensionId(id: string): boolean` and
+// `resolveAndValidateExtensionDir(userDataDir: string, id: string)` from
+// electron/main.ts, again via an extracted electron/main/ module — NOT a
+// new module under tests/.
+//
 // =========================================================================
 // 3. IPC PARAMETER FUZZING & CRASH RESISTANCE
 // =========================================================================
 console.log('\n--- 3. Testing IPC Parameter Fuzzing & Crash Resistance ---');
 
-// 3.1. set-vpn parameter validation logic
-function testSetVpnLogic(config: any): { success: boolean; error?: string; proxyRules?: string } {
-  if (!config || typeof config !== 'object') {
-    return { success: false, error: 'Invalid VPN config object' };
-  }
-  const isEnabled = Boolean(config.enabled);
-  const rawProxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : '';
-  const proxyRules = (isEnabled && rawProxyUrl) ? rawProxyUrl : 'direct://';
+// 3.1 set-vpn parameter validation — REMOVED (test-local `testSetVpnLogic`).
+// The protocol allowlist it asserted is re-derived from the `set-vpn` IPC
+// handler in electron/main.ts; the real, already-extracted predicate is
+// `isValidSecureProxy` in electron/main/proxySecurity.ts:13, which IS
+// importable and is now covered for real in section 9 below.
+//
+// 3.2 store-set parameter validation — REMOVED (test-local
+// `testStoreSetLogic`). NEEDED EXPORT: the store key/value guard from the
+// `store-set` IPC handler in electron/main.ts, via an extracted module.
+//
+// 3.3 set-theme parameter validation — REMOVED (test-local
+// `testSetThemeLogic`). NEEDED EXPORT: the `set-theme` handler's validation
+// from electron/main.ts, via an extracted module.
 
-  if (isEnabled && rawProxyUrl) {
-    const allowedProxyProtocols = ['http://', 'https://', 'socks4://', 'socks5://'];
-    if (!allowedProxyProtocols.some(proto => proxyRules.startsWith(proto))) {
-      return { success: false, error: 'Invalid proxy URL format. Must start with http://, https://, socks4://, or socks5://' };
-    }
-  }
+// 3.4 open-download / show-download-in-folder path validation
+//
+// This used to be a test-local `testDownloadPathLogic` asserting its own
+// `startsWith(downloadsDir + sep)`. Downloads hardening has since been
+// extracted into a real module, so the download surface is now driven through
+// the shipped code rather than a copy of it.
+import { isSafeDownloadUrl, sanitizeDownloadFilename } from '../electron/main/downloads';
 
-  return { success: true, proxyRules };
-}
-
-const vpnFuzzVectors = [
-  { input: null, valid: false, desc: 'set-vpn: null config' },
-  { input: undefined, valid: false, desc: 'set-vpn: undefined config' },
-  { input: 'string', valid: false, desc: 'set-vpn: string primitive' },
-  { input: 12345, valid: false, desc: 'set-vpn: number primitive' },
-  { input: true, valid: false, desc: 'set-vpn: boolean primitive' },
-  { input: [], valid: true, expectedRules: 'direct://', desc: 'set-vpn: empty array (handled as empty object)' },
-  { input: {}, valid: true, expectedRules: 'direct://', desc: 'set-vpn: empty object' },
-  { input: { enabled: false, proxyUrl: 'http://malicious.com' }, valid: true, expectedRules: 'direct://', desc: 'set-vpn: disabled ignores proxyUrl' },
-  { input: { enabled: true, proxyUrl: 'http://proxy.com:8080' }, valid: true, expectedRules: 'http://proxy.com:8080', desc: 'set-vpn: valid http proxy' },
-  { input: { enabled: true, proxyUrl: 'https://secure-proxy.com:443' }, valid: true, expectedRules: 'https://secure-proxy.com:443', desc: 'set-vpn: valid https proxy' },
-  { input: { enabled: true, proxyUrl: 'socks4://127.0.0.1:1080' }, valid: true, expectedRules: 'socks4://127.0.0.1:1080', desc: 'set-vpn: valid socks4 proxy' },
-  { input: { enabled: true, proxyUrl: 'socks5://127.0.0.1:1080' }, valid: true, expectedRules: 'socks5://127.0.0.1:1080', desc: 'set-vpn: valid socks5 proxy' },
-  { input: { enabled: true, proxyUrl: 'javascript:alert(1)' }, valid: false, desc: 'set-vpn: javascript: proxy protocol injection' },
-  { input: { enabled: true, proxyUrl: 'file:///etc/passwd' }, valid: false, desc: 'set-vpn: file:/// proxy protocol' },
-  { input: { enabled: true, proxyUrl: 'ftp://proxy.com' }, valid: false, desc: 'set-vpn: ftp:// proxy protocol' },
-  { input: { enabled: true, proxyUrl: 'data:text/plain,foo' }, valid: false, desc: 'set-vpn: data: proxy protocol' },
-  { input: { enabled: true, proxyUrl: '   ' }, valid: true, expectedRules: 'direct://', desc: 'set-vpn: whitespace proxyUrl fallback' },
-  { input: { enabled: true, proxyUrl: 12345 as any }, valid: true, expectedRules: 'direct://', desc: 'set-vpn: non-string proxyUrl fallback' },
-  { input: { enabled: true, proxyUrl: null as any }, valid: true, expectedRules: 'direct://', desc: 'set-vpn: null proxyUrl fallback' },
+const DOWNLOAD_URL_VECTORS = [
+  { url: 'https://example.com/file.pdf', expected: true, desc: 'https download URL' },
+  { url: 'http://example.com/file.pdf', expected: true, desc: 'http download URL' },
+  { url: 'blob:https://example.com/uuid-1234', expected: true, desc: 'blob: wrapping a legitimate https origin' },
+  { url: 'data:image/png;base64,iVBORw0KGgo=', expected: true, desc: 'data: image payload' },
+  { url: 'javascript:alert(1)', expected: false, desc: 'javascript: scheme' },
+  { url: 'file:///etc/passwd', expected: false, desc: 'file: scheme' },
+  { url: 'vbscript:msgbox(1)', expected: false, desc: 'vbscript: scheme' },
+  { url: 'blob:file:///etc/passwd', expected: false, desc: 'blob: wrapping a file origin' },
+  { url: 'blob:https://user:pass@example.com/uuid', expected: false, desc: 'blob: inner URL with credentials' },
+  { url: 'data:text/html,<script>alert(1)</script>', expected: false, desc: 'data: HTML payload' },
+  { url: 'data:application/javascript,alert(1)', expected: false, desc: 'data: javascript payload' },
+  { url: 'data:application/octet-stream;base64,AAAA', expected: false, desc: 'data: executable payload' },
+  { url: 'data:image/svg+xml;base64,AAAA', expected: false, desc: 'data: SVG payload' },
+  { url: 'https://user:pass@example.com/file.pdf', expected: false, desc: 'https URL with embedded credentials' },
+  { url: '', expected: false, desc: 'empty URL' },
+  { url: null as any, expected: false, desc: 'null URL' },
+  { url: 'not a url', expected: false, desc: 'malformed URL' },
 ];
 
-for (const vec of vpnFuzzVectors) {
-  const res = testSetVpnLogic(vec.input);
+for (const vec of DOWNLOAD_URL_VECTORS) {
+  const res = isSafeDownloadUrl(vec.url);
   assert(
-    res.success === vec.valid && (!vec.expectedRules || res.proxyRules === vec.expectedRules),
-    'set-vpn Fuzzing',
+    res === vec.expected,
+    'open-download URL Confinement',
     vec.desc,
-    `Input: ${JSON.stringify(vec.input)} | Expected valid: ${vec.valid} | Got: ${res.success}, rules: ${res.proxyRules}`
+    `URL: ${JSON.stringify(vec.url)} | Expected: ${vec.expected} | Got: ${res}`
   );
 }
 
-// 3.2. store-set parameter validation logic
-function testStoreSetLogic(key: any, value: any): { success: boolean; error?: string } {
-  if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
-    return { success: false, error: 'Invalid key format' };
-  }
-  if (typeof value !== 'string') {
-    return { success: false, error: 'Invalid value format: must be string' };
-  }
-  const MAX_STORE_VALUE_SIZE = 10 * 1024 * 1024; // 10MB
-  if (Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
-    return { success: false, error: 'Value exceeds maximum allowed size of 10MB' };
-  }
-  return { success: true };
-}
-
-const storeSetFuzzVectors = [
-  { key: 'settings', value: '{"theme":"dark"}', valid: true, desc: 'store-set: valid key and JSON string' },
-  { key: 'adblocker_whitelist', value: '["example.com"]', valid: true, desc: 'store-set: valid whitelist key' },
-  { key: '../../etc/passwd', value: 'evil', valid: false, desc: 'store-set: directory traversal key' },
-  { key: 'store/secret', value: 'evil', valid: false, desc: 'store-set: slash in key' },
-  { key: 'key with spaces', value: 'val', valid: false, desc: 'store-set: spaces in key' },
-  { key: 'key\0null', value: 'val', valid: false, desc: 'store-set: null byte in key' },
-  { key: '', value: 'val', valid: false, desc: 'store-set: empty key' },
-  { key: null, value: 'val', valid: false, desc: 'store-set: null key' },
-  { key: undefined, value: 'val', valid: false, desc: 'store-set: undefined key' },
-  { key: 12345, value: 'val', valid: false, desc: 'store-set: number key' },
-  { key: 'valid_key', value: null, valid: false, desc: 'store-set: null value' },
-  { key: 'valid_key', value: undefined, valid: false, desc: 'store-set: undefined value' },
-  { key: 'valid_key', value: { obj: 1 }, valid: false, desc: 'store-set: object value' },
-  { key: 'valid_key', value: 12345, valid: false, desc: 'store-set: number value' },
-  { key: 'valid_key', value: 'A'.repeat(1024 * 1024), valid: true, desc: 'store-set: 1MB payload (under 10MB limit)' },
-  { key: 'valid_key', value: 'A'.repeat(11 * 1024 * 1024), valid: false, desc: 'store-set: 11MB payload (exceeds 10MB limit)' },
+const DOWNLOAD_FILENAME_VECTORS = [
+  { raw: '../../etc/passwd', desc: 'path traversal is reduced to a basename' },
+  { raw: 'C:\\Windows\\System32\\cmd.exe', desc: 'backslash separator is normalised' },
+  { raw: 'report.pdf', desc: 'an ordinary filename is preserved' },
 ];
 
-for (const vec of storeSetFuzzVectors) {
-  const res = testStoreSetLogic(vec.key, vec.value);
+for (const vec of DOWNLOAD_FILENAME_VECTORS) {
+  const res = sanitizeDownloadFilename(vec.raw);
   assert(
-    res.success === vec.valid,
-    'store-set Fuzzing',
+    !res.includes('/') && !res.includes('\\') && !res.includes('..') && res.length > 0,
+    'open-download Filename Sanitization',
     vec.desc,
-    `Key: ${JSON.stringify(vec.key)}, Val type: ${typeof vec.value} | Expected: ${vec.valid} | Got: ${res.success} (${res.error || 'ok'})`
+    `Raw: ${JSON.stringify(vec.raw)} | Got: ${JSON.stringify(res)}`
   );
 }
 
-// 3.3. set-theme parameter validation logic
-function testSetThemeLogic(theme: any): boolean {
-  if (theme === 'light' || theme === 'dark' || theme === 'system') {
-    return true;
-  }
-  return false;
-}
+assert(
+  sanitizeDownloadFilename('  ').length > 0,
+  'open-download Filename Sanitization',
+  'a filename that sanitises down to nothing must still yield a usable name',
+  `Got: ${JSON.stringify(sanitizeDownloadFilename('  '))}`
+);
+assert(
+  /^download_/.test(sanitizeDownloadFilename('CON.tar.gz')),
+  'open-download Filename Sanitization',
+  'Windows reserved device names (incl. compound extensions) must be prefixed, not passed through',
+  `Got: ${JSON.stringify(sanitizeDownloadFilename('CON.tar.gz'))}`
+);
 
-const themeVectors = [
-  { theme: 'light', valid: true, desc: 'set-theme: light' },
-  { theme: 'dark', valid: true, desc: 'set-theme: dark' },
-  { theme: 'system', valid: true, desc: 'set-theme: system' },
-  { theme: 'LIGHT', valid: false, desc: 'set-theme: uppercase invalid' },
-  { theme: 'black', valid: false, desc: 'set-theme: invalid theme name' },
-  { theme: '', valid: false, desc: 'set-theme: empty string' },
-  { theme: null, valid: false, desc: 'set-theme: null' },
-  { theme: undefined, valid: false, desc: 'set-theme: undefined' },
-  { theme: 123, valid: false, desc: 'set-theme: number' },
-  { theme: {}, valid: false, desc: 'set-theme: object' }
+// 3.5 capture-tab-thumbnail & capture-full-page webContentsId validation —
+// REMOVED (test-local `testWebContentsIdValidation`). The nearest real,
+// importable guard is `markNextDownloadAsSaveAs` in electron/main/downloads.ts:161,
+// which requires a finite number id; the capture-* handler's own guard is
+// inline in electron/main.ts and needs an export to be reachable.
+
+// 3.6 Native TTS default-voice selection by language
+//
+// This used to be a test-local `sanitizeTtsVoice` that asserted itself. Two
+// separate false assurances lived in it:
+//
+//   1. It hardcoded a single `'Yelda'` fallback. The shipped logic picks a
+//      default voice by language prefix (electron/main.ts:6342-6352, and the
+//      same table exported as `getMacDefaultVoice` in src/services/tts.ts:92):
+//      de->Anna, fr->Thomas, es->Monica, it->Alice, ja->Kyoko, ru->Milena,
+//      tr->Yelda, everything else->Samantha. The test never reached that
+//      branch, so it could not have detected a wrong or missing mapping.
+//   2. The flag-injection guard it also copied (`/[a-zA-Z0-9\s]+/`, <=40 chars,
+//      no leading `-`) is still inline in electron/main.ts and is not exported,
+//      so it cannot be asserted against at all today.
+//
+// The language mapping is now driven through the real exported helper, and the
+// language branch is genuinely exercised.
+import { getMacDefaultVoice } from '../src/services/tts';
+
+const TTS_DEFAULT_VOICE_VECTORS = [
+  { lang: 'tr', expected: 'Yelda', desc: 'tr-TR -> Yelda' },
+  { lang: 'tr-TR', expected: 'Yelda', desc: 'region-qualified tr-TR -> Yelda' },
+  { lang: 'de', expected: 'Anna', desc: 'de-DE -> Anna' },
+  { lang: 'de-AT', expected: 'Anna', desc: 'region-qualified de-AT -> Anna' },
+  { lang: 'fr', expected: 'Thomas', desc: 'fr-FR -> Thomas' },
+  { lang: 'es', expected: 'Mónica', desc: 'es-ES -> Mónica' },
+  { lang: 'it', expected: 'Alice', desc: 'it-IT -> Alice' },
+  { lang: 'ja', expected: 'Kyoko', desc: 'ja-JP -> Kyoko' },
+  { lang: 'ru', expected: 'Milena', desc: 'ru-RU -> Milena' },
+  { lang: 'en', expected: 'Samantha', desc: 'en -> Samantha' },
+  { lang: 'EN-us', expected: 'Samantha', desc: 'uppercase en-US -> Samantha' },
+  { lang: 'pt-BR', expected: 'Samantha', desc: 'an unmapped language falls back to Samantha' },
+  { lang: 'xx', expected: 'Samantha', desc: 'an unknown prefix falls back to Samantha' },
+  { lang: '', expected: 'Samantha', desc: 'an empty language falls back to Samantha' },
 ];
 
-for (const vec of themeVectors) {
-  const res = testSetThemeLogic(vec.theme);
-  assert(
-    res === vec.valid,
-    'set-theme Fuzzing',
-    vec.desc,
-    `Theme: ${JSON.stringify(vec.theme)} | Expected: ${vec.valid} | Got: ${res}`
-  );
-}
-
-// 3.4. open-download and show-download-in-folder path validation logic
-function testDownloadPathLogic(downloadsPath: string, pathStr: any): boolean {
-  if (!pathStr || typeof pathStr !== 'string') return false;
+for (const vec of TTS_DEFAULT_VOICE_VECTORS) {
+  let res: string | null = null;
+  let threw: string | null = null;
   try {
-    const resolvedPath = path.resolve(pathStr);
-    // Simulation of realpath check within downloads
-    const resolvedDownloads = path.resolve(downloadsPath);
-    if (resolvedPath && resolvedPath.startsWith(resolvedDownloads + path.sep)) {
-      return true;
-    }
-  } catch {}
-  return false;
-}
-
-const mockDownloadsDir = path.join(os.tmpdir(), 'nova_downloads_mock');
-const downloadPathVectors = [
-  { path: path.join(mockDownloadsDir, 'file.pdf'), valid: true, desc: 'open-download: file inside downloads folder' },
-  { path: path.join(mockDownloadsDir, 'subfolder', 'archive.zip'), valid: true, desc: 'open-download: subfolder file inside downloads' },
-  { path: '/etc/passwd', valid: false, desc: 'open-download: /etc/passwd' },
-  { path: path.join(mockDownloadsDir, '..', 'etc', 'passwd'), valid: false, desc: 'open-download: path traversal outside downloads' },
-  { path: '', valid: false, desc: 'open-download: empty string' },
-  { path: null, valid: false, desc: 'open-download: null' },
-  { path: undefined, valid: false, desc: 'open-download: undefined' },
-  { path: 12345, valid: false, desc: 'open-download: number' },
-];
-
-for (const vec of downloadPathVectors) {
-  const res = testDownloadPathLogic(mockDownloadsDir, vec.path);
-  assert(
-    res === vec.valid,
-    'open-download Path Confinement',
-    vec.desc,
-    `Path: ${JSON.stringify(vec.path)} | Expected: ${vec.valid} | Got: ${res}`
-  );
-}
-
-// 3.5. capture-tab-thumbnail & capture-full-page webContentsId validation
-function testWebContentsIdValidation(wcId: any): boolean {
-  if (typeof wcId !== 'number' || !Number.isInteger(wcId)) return false;
-  return true;
-}
-
-const wcIdVectors = [
-  { id: 1, valid: true, desc: 'webContentsId: positive integer' },
-  { id: 42, valid: true, desc: 'webContentsId: standard ID' },
-  { id: 0, valid: true, desc: 'webContentsId: zero integer' },
-  { id: 3.14, valid: false, desc: 'webContentsId: float' },
-  { id: NaN, valid: false, desc: 'webContentsId: NaN' },
-  { id: Infinity, valid: false, desc: 'webContentsId: Infinity' },
-  { id: -Infinity, valid: false, desc: 'webContentsId: -Infinity' },
-  { id: '1', valid: false, desc: 'webContentsId: string representation' },
-  { id: null, valid: false, desc: 'webContentsId: null' },
-  { id: undefined, valid: false, desc: 'webContentsId: undefined' },
-  { id: {}, valid: false, desc: 'webContentsId: object' },
-];
-
-for (const vec of wcIdVectors) {
-  const res = testWebContentsIdValidation(vec.id);
-  assert(
-    res === vec.valid,
-    'capture-tab-thumbnail ID Guard',
-    vec.desc,
-    `wcId: ${JSON.stringify(vec.id)} | Expected: ${vec.valid} | Got: ${res}`
-  );
-}
-
-// 3.6. Native TTS voice sanitization against command injection
-function sanitizeTtsVoice(voiceName?: any): string {
-  let cleanVoice = 'Yelda';
-  if (voiceName && typeof voiceName === 'string') {
-    const rawName = voiceName.split('(')[0].trim();
-    if (/^[a-zA-Z0-9\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {
-      cleanVoice = rawName;
-    }
+    res = getMacDefaultVoice(vec.lang);
+  } catch (err: any) {
+    threw = `${err.name}: ${err.message}`;
   }
-  return cleanVoice;
+  assert(
+    threw === null && res === vec.expected,
+    'TTS Default Voice Selection',
+    vec.desc,
+    `lang: ${JSON.stringify(vec.lang)} | Expected: ${vec.expected} | Got: ${threw ?? res}`
+  );
 }
 
-const ttsVoiceVectors = [
-  { voice: 'Samantha', expected: 'Samantha', desc: 'Valid standard voice name' },
-  { voice: 'Alex (Enhanced)', expected: 'Alex', desc: 'Voice name with parenthesized suffix' },
-  { voice: '-o /tmp/evil', expected: 'Yelda', desc: 'CLI flag injection attempt (-o)' },
-  { voice: '--output-file=/tmp/evil', expected: 'Yelda', desc: 'CLI double-dash flag injection' },
-  { voice: 'Voice; rm -rf /', expected: 'Yelda', desc: 'Semicolon command chaining' },
-  { voice: 'Voice && cat /etc/passwd', expected: 'Yelda', desc: 'AND command chaining' },
-  { voice: 'Voice`whoami`', expected: 'Yelda', desc: 'Backtick command execution' },
-  { voice: 'Voice$(id)', expected: 'Yelda', desc: 'Subshell command execution' },
-  { voice: 'A'.repeat(50), expected: 'Yelda', desc: 'Excessive voice name length (>40 chars)' },
-  { voice: null, expected: 'Yelda', desc: 'null voice fallback' },
-  { voice: undefined, expected: 'Yelda', desc: 'undefined voice fallback' },
+// =========================================================================
+// 4. CHROME WEB STORE HOSTNAME VALIDATION & ISOLATION — REMOVED
+// =========================================================================
+// The 15 host vectors were run against a test-local `isChromeWebStoreHost`
+// that asserted itself. The real check is inline in electron/main.ts:3373 (and
+// a second, slightly different form in electron/webstore-preload.ts), so there
+// is nothing importable to drive. The vectors are worth keeping and are moved
+// to the source-level guard in section 8.
+//
+// NEEDED EXPORT: `isChromeWebStoreHost(hostname: string): boolean` from an
+// extracted electron/main/ module that both electron/main.ts and
+// electron/webstore-preload.ts import — one shared predicate, so the main
+// process and the webstore preload cannot disagree about what the Web Store is.
+
+// =========================================================================
+// 5. IPC SENDER ORIGIN & FRAME HARDENING — REMOVED
+// =========================================================================
+// `simulateIsTrustedSender` was a test-local copy of `isTrustedSender`
+// (electron/main.ts:330) asserting itself, over mocks of a BrowserWindow. The
+// shipped function closes over the module-level `mainWindow`, so a test can
+// never drive it without refactoring the dependency away from the closure.
+//
+// NEEDED EXPORT: an extracted module exposing
+// `isTrustedSenderEvent(senderId, senderFrame, trustedWebContentsId, trustedMainFrame, isWindowDestroyed): boolean`
+// (or the same predicate with the window passed in), leaving
+// electron/main.ts:330 to call it with the real `mainWindow`.
+//
+// =========================================================================
+// 6. WEBVIEW SANDBOX & PRELOAD RESTRICTION — REMOVED
+// =========================================================================
+// `simulateWillAttachWebview` re-declared the `will-attach-webview` handler's
+// preference forcing and then asserted its own assignments back at itself. It
+// mutates a plain object and reads it back, so it could not fail.
+//
+// NEEDED EXPORT: the hardened preference builder from an extracted
+// electron/main/ module, e.g.
+// `hardenWebviewPreferences(webPreferences, appDir): WebPreferences`, used by
+// the real `will-attach-webview` listener in electron/main.ts.
+
+// =========================================================================
+// 7. TERMINAL LOG SANITIZATION — REMOVED
+// =========================================================================
+// `sanitizeConsoleLogMessage` was a test-local copy of the redaction branch at
+// electron/main.ts:763 asserting itself. src/utils/logger.ts is the natural
+// home but exports no redaction predicate today.
+//
+// NEEDED EXPORT: `redactSensitiveLog(message: string): { redacted: boolean; output: string }`
+// from src/utils/logger.ts, with electron/main.ts:763 calling it.
+
+// =========================================================================
+// 8. SOURCE-LEVEL GUARDS FOR THE PREDICATES THAT CANNOT BE IMPORTED
+// =========================================================================
+// electron/main.ts is the Electron entry point: importing it from a Node test
+// would boot an app. Until the extraction described in sections 1, 2, 4, 5, 6
+// and 7 above happens, the only way to assert anything true about those
+// predicates is to read the shipped source.
+//
+// This is deliberately NOT the anti-pattern this suite was failing on. Every
+// assertion below is falsifiable against production: delete or weaken the guard
+// in electron/main.ts and the assertion fails. That is the opposite of asserting
+// a private copy against itself, which no edit to production can ever break.
+//
+// Each entry names the exact hardening the older test *claimed* to cover, so
+// the guarantee is not lost — it is just attached to the real code now.
+console.log('\n--- 8. Testing Shipped Main-Process Guards Are Still Present ---');
+
+const mainSource = fs.readFileSync(
+  path.resolve(process.cwd(), 'electron/main.ts'),
+  'utf-8'
+).replace(/\r\n/g, '\n');
+
+const MAIN_SOURCE_GUARDS: Array<{ needle: string; desc: string }> = [
+  // Section 1: isTrustedAppOrigin (electron/main.ts:347). The old copy trusted
+  // devtools: unconditionally; production must keep refusing it.
+  {
+    needle: "if (parsed.protocol === 'devtools:') return false;",
+    desc: 'isTrustedAppOrigin refuses devtools: origins (the old test copy trusted them)',
+  },
+  {
+    needle: "const allowedHost = ['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new'].includes(parsed.hostname);",
+    desc: 'isTrustedAppOrigin restricts nova: to a six-host allowlist (the old copy trusted any nova: URL)',
+  },
+  {
+    needle: "if (!app.isPackaged && parsed.origin === 'http://localhost:5173') return true;",
+    desc: 'isTrustedAppOrigin trusts the Vite dev server only in unpackaged builds',
+  },
+  // Section 4: Web Store host (electron/main.ts:3373).
+  {
+    needle: "parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')",
+    desc: 'the Web Store popup handler requires https and an exact host match, not a suffix',
+  },
+  // Section 5: isTrustedSender (electron/main.ts:330).
+  {
+    needle: 'if (!event.senderFrame || !mainWindow.webContents.mainFrame || event.senderFrame !== mainWindow.webContents.mainFrame) {',
+    desc: 'isTrustedSender treats a missing senderFrame as untrusted',
+  },
+  // Section 2: extension id / install folder confinement.
+  {
+    needle: "const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;",
+    desc: 'chrome-extension: hostnames are constrained to the id character set and carry no credentials',
+  },
+  // Section 3.2: store-set key guard.
+  {
+    needle: "if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');",
+    desc: 'store-set rejects keys outside the id character set',
+  },
+  // Section 7: console redaction (electron/main.ts:763).
+  {
+    needle: "message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message)",
+    desc: 'renderer console output is redacted for the password dump marker and credential keywords',
+  },
+  // Section 3.6: the language table the old test could never reach.
+  { needle: "if (prefix === 'tr') cleanVoice = 'Yelda';", desc: 'TTS default voice maps tr to Yelda' },
+  { needle: "else if (prefix === 'de') cleanVoice = 'Anna';", desc: 'TTS default voice maps de to Anna' },
+  { needle: "else if (prefix === 'fr') cleanVoice = 'Thomas';", desc: 'TTS default voice maps fr to Thomas' },
+  { needle: "else if (prefix === 'es') cleanVoice = 'Mónica';", desc: 'TTS default voice maps es to Mónica' },
+  { needle: "else if (prefix === 'it') cleanVoice = 'Alice';", desc: 'TTS default voice maps it to Alice' },
+  { needle: "else if (prefix === 'ja') cleanVoice = 'Kyoko';", desc: 'TTS default voice maps ja to Kyoko' },
+  { needle: "else if (prefix === 'ru') cleanVoice = 'Milena';", desc: 'TTS default voice maps ru to Milena' },
+  { needle: "else cleanVoice = 'Samantha';", desc: 'TTS falls back to Samantha for unmapped languages' },
+  // Section 3.6: the flag-injection guard that is not exported.
+  {
+    needle: "if (/^[a-zA-Z0-9\\s]+$/.test(rawName) && rawName.length <= 40 && !rawName.startsWith('-')) {",
+    desc: 'TTS voice names are restricted to alphanumerics, length-capped and may not start with a CLI flag dash',
+  },
+  // Section 3.1 / 5: MCP SSRF port block.
+  {
+    needle: "if (port === '3020' || port === activeMcpPort) {",
+    desc: 'requests to the default and the live MCP port are blocked',
+  },
 ];
 
-for (const vec of ttsVoiceVectors) {
-  const res = sanitizeTtsVoice(vec.voice);
+for (const guard of MAIN_SOURCE_GUARDS) {
+  assert(
+    mainSource.includes(guard.needle),
+    'Shipped Guard Present',
+    guard.desc,
+    `electron/main.ts no longer contains: ${guard.needle.slice(0, 90)}`
+  );
+}
+
+// =========================================================================
+// 9. VPN PROXY VALIDATION (real, extracted module)
+// =========================================================================
+// Replaces the removed test-local `testSetVpnLogic`. The set-vpn handler's
+// protocol allowlist now lives in electron/main/proxySecurity.ts, which is
+// importable, so it is driven for real instead of restated.
+console.log('\n--- 9. Testing VPN Proxy Scheme Validation ---');
+
+import { isValidSecureProxy, normalizeProxyForChromium } from '../electron/main/proxySecurity';
+
+const PROXY_VECTORS = [
+  { proxy: 'https://secure-proxy.org:8443', expected: true, desc: 'https proxy' },
+  { proxy: 'socks5://127.0.0.1:1080', expected: true, desc: 'socks5 proxy' },
+  { proxy: 'socks5h://127.0.0.1:1080', expected: true, desc: 'socks5h proxy' },
+  { proxy: 'http://insecure-cleartext:8080', expected: false, desc: 'cleartext http proxy' },
+  { proxy: 'socks4://proxy:1080', expected: false, desc: 'socks4 proxy' },
+  { proxy: 'pac-script://data:text/javascript;alert(1)', expected: false, desc: 'PAC script proxy' },
+  { proxy: 'https://admin:pass@proxy.com:8443', expected: false, desc: 'proxy with embedded credentials' },
+  { proxy: 'javascript:alert(1)', expected: false, desc: 'javascript: proxy' },
+  { proxy: 'file:///etc/passwd', expected: false, desc: 'file: proxy' },
+  { proxy: 'ftp://proxy.com', expected: false, desc: 'ftp: proxy' },
+  { proxy: 'data:text/plain,foo', expected: false, desc: 'data: proxy' },
+  { proxy: '', expected: false, desc: 'empty proxy' },
+  { proxy: null, expected: false, desc: 'null proxy' },
+  { proxy: '   ', expected: false, desc: 'whitespace-only proxy' },
+];
+
+for (const vec of PROXY_VECTORS) {
+  const res = isValidSecureProxy(vec.proxy as any);
   assert(
     res === vec.expected,
-    'TTS Voice Flag Sanitization',
+    'set-vpn Proxy Scheme Validation',
     vec.desc,
-    `Voice: ${JSON.stringify(vec.voice)} | Expected: ${vec.expected} | Got: ${res}`
+    `proxy: ${JSON.stringify(vec.proxy)} | Expected: ${vec.expected} | Got: ${res}`
   );
 }
 
-// =========================================================================
-// 4. CHROME WEB STORE HOSTNAME VALIDATION & ISOLATION
-// =========================================================================
-console.log('\n--- 4. Testing Chrome Web Store Hostname Checks ---');
-
-function isChromeWebStoreHost(hostname: string): boolean {
-  if (!hostname || typeof hostname !== 'string') return false;
-  const currentHost = hostname.toLowerCase();
-  return currentHost === 'chromewebstore.google.com' || currentHost === 'chrome.google.com';
-}
-
-const webStoreHostVectors = [
-  { host: 'chromewebstore.google.com', expected: true, desc: 'chromewebstore.google.com' },
-  { host: 'chrome.google.com', expected: true, desc: 'chrome.google.com' },
-  { host: 'CHROMEWEBSTORE.GOOGLE.COM', expected: true, desc: 'Case insensitive upper case' },
-  { host: 'Chrome.Google.Com', expected: true, desc: 'Case insensitive mixed case' },
-  { host: 'chromewebstore.google.com.evil.com', expected: false, desc: 'Subdomain spoof (chromewebstore.google.com.evil.com)' },
-  { host: 'evil.chromewebstore.google.com', expected: false, desc: 'Subdomain prefix spoof' },
-  { host: 'attacker-chromewebstore.google.com', expected: false, desc: 'Hyphenated domain spoof' },
-  { host: 'chrome.google.com.attacker.com', expected: false, desc: 'chrome.google.com suffix spoof' },
-  { host: 'attacker-chrome.google.com', expected: false, desc: 'attacker-chrome.google.com' },
-  { host: 'google.com', expected: false, desc: 'Root google.com' },
-  { host: 'evil.com', expected: false, desc: 'evil.com' },
-  { host: 'localhost', expected: false, desc: 'localhost' },
-  { host: '', expected: false, desc: 'empty hostname' },
-  { host: null as any, expected: false, desc: 'null hostname' }
-];
-
-for (const vec of webStoreHostVectors) {
-  const res = isChromeWebStoreHost(vec.host);
-  assert(
-    res === vec.expected,
-    'Web Store Host Check',
-    vec.desc,
-    `Host: ${JSON.stringify(vec.host)} | Expected: ${vec.expected} | Got: ${res}`
-  );
-}
-
-// =========================================================================
-// 5. IPC SENDER ORIGIN & FRAME HARDENING (isTrustedSender)
-// =========================================================================
-console.log('\n--- 5. Testing IPC Sender Origin & Frame Hardening ---');
-
-function simulateIsTrustedSender(
-  mainWindowObj: { isDestroyed: () => boolean; webContents: { id: number; mainFrame: any } } | null,
-  event: { sender: { id: number }; senderFrame?: any }
-): boolean {
-  if (!mainWindowObj || mainWindowObj.isDestroyed()) return false;
-  if (event.sender.id !== mainWindowObj.webContents.id) return false;
-  if (!event.senderFrame || !mainWindowObj.webContents.mainFrame || event.senderFrame !== mainWindowObj.webContents.mainFrame) {
-    return false;
-  }
-  return true;
-}
-
-const mockMainFrame = { name: 'mainFrame_root' };
-const mockSubFrame = { name: 'subFrame_iframe' };
-const mockMainWindow = {
-  isDestroyed: () => false,
-  webContents: {
-    id: 100,
-    mainFrame: mockMainFrame
-  }
-};
-const mockDestroyedMainWindow = {
-  isDestroyed: () => true,
-  webContents: {
-    id: 100,
-    mainFrame: mockMainFrame
-  }
-};
-
-const trustedSenderVectors = [
-  {
-    desc: 'Trusted main window & main frame',
-    win: mockMainWindow,
-    event: { sender: { id: 100 }, senderFrame: mockMainFrame },
-    expected: true
-  },
-  {
-    desc: 'IPC without senderFrame',
-    win: mockMainWindow,
-    event: { sender: { id: 100 } },
-    expected: false
-  },
-  {
-    desc: 'Sender from untrusted webview guest webContents (id 105 != 100)',
-    win: mockMainWindow,
-    event: { sender: { id: 105 }, senderFrame: mockMainFrame },
-    expected: false
-  },
-  {
-    desc: 'Sender from untrusted subframe/iframe inside main window',
-    win: mockMainWindow,
-    event: { sender: { id: 100 }, senderFrame: mockSubFrame },
-    expected: false
-  },
-  {
-    desc: 'Main window is destroyed',
-    win: mockDestroyedMainWindow,
-    event: { sender: { id: 100 }, senderFrame: mockMainFrame },
-    expected: false
-  },
-  {
-    desc: 'Main window is null',
-    win: null,
-    event: { sender: { id: 100 }, senderFrame: mockMainFrame },
-    expected: false
-  }
-];
-
-for (const vec of trustedSenderVectors) {
-  const res = simulateIsTrustedSender(vec.win, vec.event);
-  assert(
-    res === vec.expected,
-    'isTrustedSender Hardening',
-    vec.desc,
-    `Expected: ${vec.expected} | Got: ${res}`
-  );
-}
-
-// =========================================================================
-// 6. WEBVIEW SANDBOX & PRELOAD RESTRICTION (will-attach-webview)
-// =========================================================================
-console.log('\n--- 6. Testing Webview Sandbox & Preload Lockdown ---');
-
-function simulateWillAttachWebview(webPreferences: any, appDir: string) {
-  // Force entirely secure environment for webviews
-  webPreferences.nodeIntegration = false;
-  webPreferences.nodeIntegrationInWorker = false;
-  webPreferences.nodeIntegrationInSubFrames = false;
-  webPreferences.contextIsolation = true;
-  webPreferences.webSecurity = true;
-  webPreferences.allowRunningInsecureContent = false;
-  webPreferences.experimentalFeatures = false;
-  webPreferences.sandbox = true;
-  webPreferences.backgroundThrottling = true;
-
-  // Preload restriction: only allow authorized webstore preload script
-  const authorizedPreloads = [
-    path.resolve(path.join(appDir, 'webstore-preload.cjs')),
-    path.resolve(path.join(appDir, 'webstore-preload.js'))
-  ];
-  if (webPreferences.preload) {
-    const resolvedPreload = path.resolve(webPreferences.preload);
-    if (!authorizedPreloads.includes(resolvedPreload)) {
-      delete webPreferences.preload;
-    }
-  }
-}
-
-const mockAppDir = path.join(os.tmpdir(), 'nova_electron_app');
-const authorizedPreloadPath = path.join(mockAppDir, 'webstore-preload.cjs');
-const maliciousPreloadPath = '/tmp/malicious_preload.js';
-
-const webviewTestPrefs1 = {
-  nodeIntegration: true,
-  contextIsolation: false,
-  sandbox: false,
-  webSecurity: false,
-  allowRunningInsecureContent: true,
-  preload: maliciousPreloadPath
-};
-
-simulateWillAttachWebview(webviewTestPrefs1, mockAppDir);
-
-assert(webviewTestPrefs1.nodeIntegration === false, 'Webview Lockdown', 'nodeIntegration forced to false', 'nodeIntegration === false');
-assert(webviewTestPrefs1.contextIsolation === true, 'Webview Lockdown', 'contextIsolation forced to true', 'contextIsolation === true');
-assert(webviewTestPrefs1.sandbox === true, 'Webview Lockdown', 'sandbox forced to true', 'sandbox === true');
-assert(webviewTestPrefs1.webSecurity === true, 'Webview Lockdown', 'webSecurity forced to true', 'webSecurity === true');
-assert(webviewTestPrefs1.backgroundThrottling === true, 'Webview Lockdown', 'backgroundThrottling forced to true', 'backgroundThrottling === true');
-assert(webviewTestPrefs1.preload === undefined, 'Webview Lockdown', 'Unauthorized preload stripped', 'preload is undefined');
-
-const webviewTestPrefs2 = {
-  preload: authorizedPreloadPath
-};
-simulateWillAttachWebview(webviewTestPrefs2, mockAppDir);
-assert(webviewTestPrefs2.preload === authorizedPreloadPath, 'Webview Lockdown', 'Authorized webstore preload preserved', 'preload is preserved');
-
-// =========================================================================
-// 7. TERMINAL LOG SANITIZATION (console-message redaction)
-// =========================================================================
-console.log('\n--- 7. Testing Terminal Console Message Sanitization ---');
-
-function sanitizeConsoleLogMessage(message: string): { redacted: boolean; output: string } {
-  if (message.includes('NOVA_SAVE_PW') || /password|token|secret|apiKey/i.test(message)) {
-    return { redacted: true, output: '[REDACTED_SENSITIVE_LOG]' };
-  }
-  return { redacted: false, output: message };
-}
-
-const logVectors = [
-  { msg: 'NOVA_SAVE_PW::user1::pass123', shouldRedact: true, desc: 'NOVA_SAVE_PW password dump' },
-  { msg: 'User password is Secret123!', shouldRedact: true, desc: 'Log containing password keyword' },
-  { msg: 'Bearer token=eyJhbGciOi...', shouldRedact: true, desc: 'Log containing token keyword' },
-  { msg: 'API key: apiKey=sk_live_123', shouldRedact: true, desc: 'Log containing apiKey keyword' },
-  { msg: 'Master secret configuration', shouldRedact: true, desc: 'Log containing secret keyword' },
-  { msg: 'Page loaded successfully in 120ms', shouldRedact: false, desc: 'Standard non-sensitive log' },
-  { msg: 'Navigated to https://example.com', shouldRedact: false, desc: 'Standard navigation log' }
-];
-
-for (const vec of logVectors) {
-  const res = sanitizeConsoleLogMessage(vec.msg);
-  assert(
-    res.redacted === vec.shouldRedact,
-    'Log Sanitizer',
-    vec.desc,
-    `Msg: ${vec.msg} | Redacted: ${res.redacted} | Output: ${res.output}`
-  );
-}
+assert(
+  normalizeProxyForChromium('socks5h://127.0.0.1:1080') === 'socks5://127.0.0.1:1080',
+  'set-vpn Chromium Proxy Normalisation',
+  'socks5h is mapped to socks5 so Chromium cannot fall back to direct://',
+  `Got: ${normalizeProxyForChromium('socks5h://127.0.0.1:1080')}`
+);
 
 // =========================================================================
 // SUMMARY & VERDICT

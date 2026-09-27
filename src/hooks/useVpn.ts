@@ -2,11 +2,93 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { VpnLocation } from '../types/browser';
 import { DEFAULT_VPN_LOCATION, DEFAULT_VPN_LOCATIONS } from '../utils/appConstants';
 import { isValidProxyUrl } from '../utils/proxyValidation';
-import { getElectronAPI } from '../utils/electronBridge';
+import { getElectronAPI, type ElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
 
 export interface UseVpnOptions {
   isDemo?: boolean;
+}
+
+const LEGACY_VPN_LOCATIONS_KEY = 'nova_vpn_locations';
+const LEGACY_VPN_STATE_KEY = 'nova_vpn';
+
+/** A location the app can actually connect through. */
+function isUsableLocation(loc: unknown): loc is VpnLocation {
+  const url = (loc as { url?: unknown })?.url;
+  return Boolean(loc) && typeof url === 'string' && (url === '' || isValidProxyUrl(url));
+}
+
+/**
+ * Move a legacy plaintext VPN list into the OS secure store.
+ *
+ * Returns the accepted locations, or null when the payload is not a usable list.
+ * The legacy key is scrubbed ONLY once the secure write actually landed:
+ * `secureStoreSet` resolves false on every failure path instead of rejecting, the
+ * migration runs once per app version, and the plaintext copy is the user's only
+ * remaining data — so an unconditional `removeItem` turned a failed secure write
+ * into permanent, unrecoverable loss of the user's proxies.
+ */
+export async function migrateLegacyVpnLocations(
+  raw: string,
+  api: Pick<NonNullable<ElectronAPI>, 'secureStoreSet'> | undefined
+): Promise<VpnLocation[] | null> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn('App:VPN', 'Legacy VPN locations are not readable JSON — keeping the legacy copy', err);
+    return null;
+  }
+  if (!Array.isArray(parsed) || parsed.length === 0) return null;
+
+  const locations = parsed.filter(isUsableLocation);
+  if (locations.length !== parsed.length) {
+    logger.warn('App:VPN', `Skipped ${parsed.length - locations.length} legacy VPN location(s) with an unsupported proxy URL — they are not migrated and are removed from the list.`);
+  }
+
+  if (api?.secureStoreSet) {
+    const migrated = await api.secureStoreSet(LEGACY_VPN_LOCATIONS_KEY, JSON.stringify(locations));
+    if (!migrated) {
+      logger.error('App:VPN', 'VPN location migration to secureStore failed — legacy copy kept so it can be retried');
+      return locations;
+    }
+  }
+  localStorage.removeItem(LEGACY_VPN_LOCATIONS_KEY);
+  return locations;
+}
+
+/**
+ * Move the legacy plaintext VPN toggle/active-location into the OS secure store,
+ * under the same rule as the location list: the plaintext key survives a failed
+ * secure write.
+ */
+export async function migrateLegacyVpnState(
+  raw: string,
+  api: Pick<NonNullable<ElectronAPI>, 'secureStoreSet'> | undefined
+): Promise<{ enabled: boolean; location: VpnLocation | null } | null> {
+  let parsed: any;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (err) {
+    logger.warn('App:VPN', 'Legacy nova_vpn is not readable JSON — keeping the legacy copy', err);
+    return null;
+  }
+  if (!parsed || typeof parsed !== 'object') return null;
+
+  const migrated: { enabled: boolean; location: VpnLocation | null } = {
+    enabled: Boolean(parsed.enabled),
+    location: isUsableLocation(parsed.location) ? parsed.location : null
+  };
+
+  if (api?.secureStoreSet) {
+    const ok = await api.secureStoreSet(LEGACY_VPN_STATE_KEY, raw);
+    if (!ok) {
+      logger.error('App:VPN', 'VPN state migration to secureStore failed — legacy copy kept so it can be retried');
+      return migrated;
+    }
+  }
+  localStorage.removeItem(LEGACY_VPN_STATE_KEY);
+  return migrated;
 }
 
 export function useVpn(options: UseVpnOptions = {}) {
@@ -39,14 +121,14 @@ export function useVpn(options: UseVpnOptions = {}) {
           if (rawLocs) {
             const parsed = JSON.parse(rawLocs);
             if (Array.isArray(parsed)) {
-              locationsLoaded = parsed.filter(l => l && typeof l.url === 'string' && (l.url === '' || isValidProxyUrl(l.url)));
+              locationsLoaded = parsed.filter(isUsableLocation);
             }
           }
           const rawVpn = await api.secureStoreGet('nova_vpn');
           if (rawVpn) {
             const parsed = JSON.parse(rawVpn);
             enabledLoaded = Boolean(parsed.enabled);
-            if (parsed.location && (parsed.location.url === '' || isValidProxyUrl(parsed.location.url))) {
+            if (isUsableLocation(parsed.location)) {
               activeLocationLoaded = parsed.location;
             }
           }
@@ -58,17 +140,9 @@ export function useVpn(options: UseVpnOptions = {}) {
       // 2. Fallback / Migration: If not in secureStore, check legacy localStorage
       if (!locationsLoaded) {
         try {
-          const legacyLocs = localStorage.getItem('nova_vpn_locations');
+          const legacyLocs = localStorage.getItem(LEGACY_VPN_LOCATIONS_KEY);
           if (legacyLocs) {
-            const parsed = JSON.parse(legacyLocs);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              locationsLoaded = parsed.filter(l => l && typeof l.url === 'string' && (l.url === '' || isValidProxyUrl(l.url)));
-              // Migrate to secureStore and purge from insecure localStorage
-              if (api?.secureStoreSet) {
-                await api.secureStoreSet('nova_vpn_locations', JSON.stringify(locationsLoaded));
-              }
-            }
-            localStorage.removeItem('nova_vpn_locations');
+            locationsLoaded = await migrateLegacyVpnLocations(legacyLocs, api);
           }
         } catch (err) {
           logger.warn('App:VPN', 'Failed to migrate legacy VPN locations', err);
@@ -77,17 +151,13 @@ export function useVpn(options: UseVpnOptions = {}) {
 
       if (!activeLocationLoaded) {
         try {
-          const legacyVpn = localStorage.getItem('nova_vpn');
+          const legacyVpn = localStorage.getItem(LEGACY_VPN_STATE_KEY);
           if (legacyVpn) {
-            const parsed = JSON.parse(legacyVpn);
-            enabledLoaded = Boolean(parsed.enabled);
-            if (parsed.location && (parsed.location.url === '' || isValidProxyUrl(parsed.location.url))) {
-              activeLocationLoaded = parsed.location;
+            const migrated = await migrateLegacyVpnState(legacyVpn, api);
+            if (migrated) {
+              enabledLoaded = migrated.enabled;
+              activeLocationLoaded = migrated.location;
             }
-            if (api?.secureStoreSet) {
-              await api.secureStoreSet('nova_vpn', legacyVpn);
-            }
-            localStorage.removeItem('nova_vpn');
           }
         } catch (err) {
           logger.warn('App:VPN', 'Failed to migrate legacy nova_vpn', err);

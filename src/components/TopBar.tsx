@@ -2,9 +2,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { DownloadsPopover } from './DownloadsPopover';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
-import { SiteInfoPopover } from './SiteInfoPopover';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
-import { 
+import {
   ArrowLeft,
   ArrowRight,
   RotateCw,
@@ -55,23 +54,37 @@ import {
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, DownloadItem } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
-import { getLanguage } from '../services/i18n';
-import { getUrlSecurityInfo } from '../utils/securityUtils';
+import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
 import { NovaAISparkle } from './ui/NovaAISparkle';
-import { PermissionPromptPopover } from './PermissionPromptPopover';
 import { logger } from '../utils/logger';
-import { PageTranslatePopover } from './PageTranslatePopover';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabHoverPreview } from './TabHoverPreview';
-import { getLocale } from '../services/i18n';
 import { getElectronAPI } from '../utils/electronBridge';
 import { OmniboxBar } from './topbar/OmniboxBar';
 export { OmniboxBar };
 
 /** Stable identity handed to the downloads popover while it is closed. */
 const EMPTY_DOWNLOADS: DownloadItem[] = [];
+
+/**
+ * True when a `click`/`keydown` reaching a container handler came from a
+ * nested interactive control rather than from the container's own surface.
+ *
+ * A split half is a `role="button"` container that wraps a real <button> (the
+ * ✕). That ✕ only stopped propagation on `click`, never on `keydown`, so
+ * Enter on it ran the half's own handler and selected the tab it was closing.
+ * This rejects any event that originated inside a nested form control, on
+ * both paths. It is deliberately not a blanket
+ * `e.currentTarget !== e.target` test: a click on the title span or favicon is
+ * a descendant event too, and it must keep selecting the tab.
+ */
+const isFromNestedControl = (e: React.SyntheticEvent<HTMLElement>): boolean => {
+  const target = e.target as HTMLElement | null;
+  if (!target || target === e.currentTarget) return false;
+  return !!target.closest('button, a, input, select, textarea');
+};
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -120,7 +133,6 @@ interface TopBarProps {
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: (url?: string) => void;
   onNewIncognitoTab?: () => void;
-  onExitIncognito?: () => void;
   onOpenShare?: () => void;
   onTakeScreenshot?: () => void;
   useVerticalTabs?: boolean;
@@ -152,15 +164,19 @@ interface TopBarProps {
   onDismissPermission?: (requestId: string) => void;
 }
 
-const MemoizedTabItem = React.memo(({ 
-  tab, activeTabId, index, isActive, isSplitChild, splitTab, tabStyle, tabAnimation, isIncognito,
+const MemoizedTabItem = React.memo(({
+  tab, activeTabId, index, isActive, splitTab, tabStyle, tabAnimation, isIncognito,
   wasJustUnsplit,
   onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
   onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
   tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave
 }: any) => {
-  if (isSplitChild) return null;
-
+  // No early return before the first hook. A `isSplitChild` bail-out used to sit
+  // here; it is gone because nothing ever passed the prop and `visibleTabs`
+  // already drops a split partner, so the branch could only ever have been a
+  // conditional hook — the moment it was taken, the hook count dropped 1 -> 0
+  // and React tore down the whole tab strip with "Rendered fewer hooks than
+  // expected". Split halves are de-duplicated in the parent, not hidden here.
   const isPinned = !!tab.isPinned;
   const unpinnedCount = Math.max(1, tabsLength - (isPinned ? 1 : 0));
   const baseWidth = Math.min(220, Math.max(90, Math.floor(1000 / unpinnedCount)));
@@ -356,7 +372,8 @@ const MemoizedTabItem = React.memo(({
           onDropToSplitScreen?.(tab.id, side);
         }
       }}
-      onClick={() => {
+      onClick={(e) => {
+        if (isFromNestedControl(e)) return;
         onTabLeave?.();
         onSelectTab(tab.id);
       }}
@@ -381,15 +398,15 @@ const MemoizedTabItem = React.memo(({
       style={{
         flex: '0 0 auto',
         width: targetWidth,
-        ...(isActive && !isIncognito 
-          ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } 
+        ...(isActive && !isIncognito
+          ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' }
           : {})
       }}
       className={`group flex items-center justify-between ${
         isPinned ? 'justify-center' : ''
       } flex-none shrink-0 text-[13px] cursor-grab active:cursor-grabbing transition-colors no-drag relative overflow-hidden ${
-        tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' : 
-        tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' : 
+        tabStyle === 'floating' ? 'h-[32px] mb-1 rounded-lg border mx-0.5' :
+        tabStyle === 'square' ? 'h-[34px] rounded-none border-t border-x' :
         'h-[34px] rounded-t-xl border-t border-x'
       } ${
         isActive
@@ -423,7 +440,7 @@ const MemoizedTabItem = React.memo(({
       ) : splitTab ? (
         <div className="flex w-full items-center h-full gap-0.5">
           {/* Primary Tab Half */}
-          <div 
+          <div
             role="button"
             tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-left relative ${
@@ -431,12 +448,14 @@ const MemoizedTabItem = React.memo(({
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
-            onClick={(e) => { 
-              e.stopPropagation(); 
+            onClick={(e) => {
+              if (isFromNestedControl(e)) return;
+              e.stopPropagation();
               onTabLeave?.();
-              onSelectTab(tab.id); 
+              onSelectTab(tab.id);
             }}
             onKeyDown={(e) => {
+              if (isFromNestedControl(e)) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 onSelectTab(tab.id);
@@ -459,7 +478,7 @@ const MemoizedTabItem = React.memo(({
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
             <span className="truncate text-[12px] flex-1">{tab.title || tab.url || 'New Tab'}</span>
-            
+
             <button
               aria-label="Close Left Tab"
               onClick={(e) => {
@@ -467,6 +486,7 @@ const MemoizedTabItem = React.memo(({
                 onTabLeave?.();
                 onCloseTab(tab.id);
               }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
               className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
               title="Close Left Tab"
             >
@@ -492,7 +512,7 @@ const MemoizedTabItem = React.memo(({
           </div>
 
           {/* Secondary Tab Half */}
-          <div 
+          <div
             role="button"
             tabIndex={0}
             className={`flex flex-1 items-center gap-1.5 px-2 min-w-0 h-[28px] rounded-md transition-colors cursor-pointer group/split-right relative ${
@@ -500,12 +520,14 @@ const MemoizedTabItem = React.memo(({
                 ? 'bg-blue-500/15 text-blue-600 dark:text-cyan-300 font-semibold shadow-xs'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 text-slate-600 dark:text-slate-400 font-normal'
             }`}
-            onClick={(e) => { 
-              e.stopPropagation(); 
+            onClick={(e) => {
+              if (isFromNestedControl(e)) return;
+              e.stopPropagation();
               onTabLeave?.();
-              onSelectTab(splitTab.id); 
+              onSelectTab(splitTab.id);
             }}
             onKeyDown={(e) => {
+              if (isFromNestedControl(e)) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 onSelectTab(splitTab.id);
@@ -528,14 +550,15 @@ const MemoizedTabItem = React.memo(({
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
             <span className="truncate text-[12px] flex-1">{splitTab.title || splitTab.url || 'New Tab'}</span>
-            
-            <button 
+
+            <button
               aria-label="Close Right Tab"
-              onClick={(e) => { 
-                e.stopPropagation(); 
+              onClick={(e) => {
+                e.stopPropagation();
                 onTabLeave?.();
-                onCloseTab(splitTab.id); 
-              }} 
+                onCloseTab(splitTab.id);
+              }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
               className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
               title="Close Right Tab"
             >
@@ -607,10 +630,10 @@ const MemoizedTabItem = React.memo(({
                   onTabLeave?.();
                   onCloseTab(tab.id, e);
                 }}
-                className={`w-5 h-5 flex items-center justify-center rounded-full transition-all duration-150 shrink-0 cursor-pointer hover:scale-110 active:scale-95 ${
+                className={`w-6 h-6 flex items-center justify-center rounded-full transition-all duration-150 shrink-0 cursor-pointer hover:scale-110 active:scale-95 ${
                   isActive
                     ? 'hover:bg-slate-200 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
-                    : 'opacity-0 group-hover:opacity-100 hover:bg-slate-300 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
+                    : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-slate-300 text-slate-500 hover:text-red-500 dark:hover:bg-slate-700 dark:text-slate-400'
                 }`}
                 title="Close Tab"
               >
@@ -623,9 +646,9 @@ const MemoizedTabItem = React.memo(({
 
       {/* Active Tab Bottom Cover (to blend with the toolbar below) */}
       {isActive && (
-        <div 
+        <div
           style={!isIncognito ? { backgroundColor: 'var(--nova-active-tab-bg)' } : undefined}
-          className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`} 
+          className={`absolute -bottom-px left-0 right-0 h-px z-20 ${isIncognito ? 'bg-slate-800' : 'bg-white dark:bg-slate-800'}`}
         />
       )}
     </Reorder.Item>
@@ -706,7 +729,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onSelectTab,
   onNewTab,
   onNewIncognitoTab,
-  onExitIncognito,
   onCloseTab,
   onNavigate,
   onGoBack,
@@ -996,7 +1018,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     };
     fetchWhitelist();
   }, []);
-  
+
   // Fetch MCP status on mount and listen for client changes
   useEffect(() => {
     const fetchMcp = async () => {
@@ -1019,7 +1041,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         setMcpRunning(isRunning);
       });
     }
-    return () => { 
+    return () => {
       if (typeof cleanup === 'function') cleanup();
       if (typeof cleanupStatus === 'function') cleanupStatus();
     };
@@ -1038,16 +1060,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         logger.warn('TopBar:fetchExtensions', 'Failed to fetch extensions list', err);
       }
     };
-    
+
     fetchExtensions();
-    
+
     let cleanup: (() => void) | undefined;
     if (getElectronAPI()?.onExtensionChanged) {
       cleanup = getElectronAPI()?.onExtensionChanged(() => {
         fetchExtensions();
       });
     }
-    
+
     return () => {
       if (cleanup) cleanup();
     };
@@ -1072,14 +1094,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     logger.debug('TopBar:hostname', 'Failed to parse hostname from activeTab URL', err);
   }
   const isWhitelisted = Array.isArray(adblockWhitelist) && Boolean(currentHostname) && adblockWhitelist.includes(currentHostname);
-  
+
   const handleToggleWhitelist = async () => {
     if (!currentHostname) return;
     const currentList = Array.isArray(adblockWhitelist) ? adblockWhitelist : [];
-    const newWhitelist = isWhitelisted 
+    const newWhitelist = isWhitelisted
       ? currentList.filter(h => h !== currentHostname)
       : [...currentList, currentHostname];
-    
+
     setAdblockWhitelist(newWhitelist);
     if (getElectronAPI()?.storeSet) {
       await getElectronAPI()?.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
@@ -1089,16 +1111,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
   return (
     <>
-    <header 
+    <header
       style={!isIncognito ? { backgroundColor: 'var(--nova-header-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
       className={`w-full flex flex-col select-none drag-region border-b relative z-50 ${isIncognito ? 'bg-slate-900 border-slate-800 text-slate-100 dark' : 'bg-slate-100 border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-900 dark:text-slate-100'}`}
     >
-      {/* 
+      {/*
         ROW 1: Tabs & Window Controls spacer
       */}
       <AnimatePresence initial={false}>
       {!useVerticalTabs && (
-        <motion.div 
+        <motion.div
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 44, opacity: 1, transitionEnd: { overflow: 'visible' } }}
           exit={{ height: 0, opacity: 0, overflow: 'hidden' }}
@@ -1107,9 +1129,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         >
           {/* macOS Traffic Lights Spacer: 78px so native traffic lights never collide with Workspace or Tabs */}
           {isMac && (
-            <div 
-              className="w-[78px] h-full shrink-0 select-none drag-region" 
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            <div
+              className="w-[78px] h-full shrink-0 select-none drag-region"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             />
           )}
 
@@ -1127,7 +1149,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               {isWorkspaceDropdownOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsWorkspaceDropdownOpen(false)} />
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -10, scale: 0.95 }}
@@ -1257,7 +1279,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               );
             })}
             </AnimatePresence>
-            
+
             {/* Action Buttons Container (New Tab & Private Tab) */}
             <motion.div
               layout="position"
@@ -1282,8 +1304,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }}
                 onClick={() => onNewTab()}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                  isIncognito 
-                    ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200' 
+                  isIncognito
+                    ? 'text-slate-400 hover:bg-slate-700/80 hover:text-slate-200'
                     : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
                 title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
@@ -1301,32 +1323,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }}
                 onClick={onNewIncognitoTab}
                 className={`p-1.5 rounded-lg transition-colors shrink-0 cursor-pointer ${
-                  isIncognito 
-                    ? 'text-slate-300 hover:bg-slate-700/80 hover:text-white' 
+                  isIncognito
+                    ? 'text-slate-300 hover:bg-slate-700/80 hover:text-white'
                     : 'text-slate-500 hover:bg-slate-200/80 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-200'
                 }`}
                 title={isMac ? "New Private / Incognito Tab (⇧⌘N)" : "New Private / Incognito Tab (Ctrl+Shift+N)"}
               >
                 <ShieldOff className="w-4 h-4" />
               </motion.button>
-
-              {/* Exit Incognito / Switch to Normal Tab Button */}
-              {isIncognito && onExitIncognito && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  transition={{
-                    duration: 0.15,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  onClick={onExitIncognito}
-                  className="px-2 py-1 rounded-lg transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 text-[11px] font-medium bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/50 hover:text-cyan-300 border border-cyan-500/30 shadow-xs"
-                  title="Normal Sekmeye Geç / Switch to Normal Tab"
-                >
-                  <Compass className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Normal Sekme</span>
-                </motion.button>
-              )}
             </motion.div>
           </Reorder.Group>
 
@@ -1353,19 +1357,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
         {/* Spacer for Windows controls */}
         {isWindows && (
-          <div 
-            className="w-[140px] shrink-0 select-none drag-region" 
-            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+          <div
+            className="w-[140px] shrink-0 select-none drag-region"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           />
         )}
       </motion.div>
       )}
       </AnimatePresence>
 
-      {/* 
+      {/*
         ROW 2: Toolbar (Nav, Omnibox, Extensions)
       */}
-      <div 
+      <div
         style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
         className={`flex items-center px-3 py-1.5 gap-3 no-drag ${isIncognito ? 'bg-slate-800 border-b border-slate-700' : 'bg-white dark:bg-slate-800 dark:border-b dark:border-slate-700'}`}
       >
@@ -1405,15 +1409,15 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         {/* Extensions / Action Controls / More Menu */}
         <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
           {/* AI Copilot Pill with Animated SVG */}
-          <motion.button 
-            whileHover={{ scale: 1.05 }} 
+          <motion.button
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={onToggleAIAssistant}
             className={`group relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 font-semibold text-xs shrink-0 select-none cursor-pointer overflow-hidden ${
               isAIAssistantOpen
                 ? 'bg-gradient-to-r from-cyan-500/20 via-sky-500/15 to-blue-600/20 text-cyan-400 border border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)] ring-1 ring-cyan-400/20'
-                : isIncognito 
-                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40' 
+                : isIncognito
+                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40'
                 : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
             }`}
             title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
@@ -1472,7 +1476,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
           {/* Ad Blocker Shield */}
           <div className="relative">
-            <button 
+            <button
               ref={adBlockerBtnRef}
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
               className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
@@ -1486,7 +1490,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </button>
             {isAdBlockerOpen && (
-              <AdBlockerPopover 
+              <AdBlockerPopover
                 blockedCount={activeTab?.blockedAdsCount || 0}
                 isWhitelisted={isWhitelisted}
                 onToggleWhitelist={handleToggleWhitelist}
@@ -1505,8 +1509,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               className={`p-1.5 rounded-lg transition-colors relative cursor-pointer ${
                 (activeDownloadsCount || 0) > 0
                   ? 'text-cyan-500 bg-cyan-500/10 hover:bg-cyan-500/20 shadow-xs'
-                  : isIncognito 
-                    ? 'hover:bg-slate-700 text-slate-300' 
+                  : isIncognito
+                    ? 'hover:bg-slate-700 text-slate-300'
                     : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
               }`}
               title="Downloads"
@@ -1562,8 +1566,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 }
               }}
               className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${
-                isIncognito 
-                  ? 'hover:bg-slate-700 text-slate-300' 
+                isIncognito
+                  ? 'hover:bg-slate-700 text-slate-300'
                   : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white'
               }`}
               title={`${ext.name}${ext.popupUrl ? ' (Click to open popup)' : ''}`}
@@ -1579,7 +1583,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           ))}
 
           {/* Extensions Manager Button */}
-          <button 
+          <button
             onClick={onOpenExtensions}
             className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
             title="Extensions (Beta)"
@@ -1592,8 +1596,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             <button
               onClick={onOpenAccount}
               className={`p-1.5 rounded-lg transition-colors relative flex items-center justify-center ${
-                isIncognito 
-                  ? 'hover:bg-slate-700 text-slate-300' 
+                isIncognito
+                  ? 'hover:bg-slate-700 text-slate-300'
                   : syncStatus.isLoggedIn
                     ? 'hover:bg-cyan-500/10 text-cyan-600 dark:text-cyan-400'
                     : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'
@@ -1612,14 +1616,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               )}
             </button>
           )}
-          
+
           {/* More Menu */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
               className={`p-1.5 rounded-lg transition-colors ${
-                isMoreMenuOpen 
-                  ? 'bg-slate-200 dark:bg-slate-700 text-cyan-500' 
+                isMoreMenuOpen
+                  ? 'bg-slate-200 dark:bg-slate-700 text-cyan-500'
                   : 'hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white'
               }`}
               title="More Options"
@@ -1631,7 +1635,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               {isMoreMenuOpen && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsMoreMenuOpen(false)} />
-                  <motion.div 
+                  <motion.div
                     initial={{ opacity: 0, y: -4, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }}
@@ -1675,8 +1679,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
                     {/* View & Layout Section */}
                     <div className="py-1">
-                      <button 
-                        onClick={() => { onToggleSplitView(); setIsMoreMenuOpen(false); }} 
+                      <button
+                        onClick={() => { onToggleSplitView(); setIsMoreMenuOpen(false); }}
                         className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
                       >
                         <div className="flex items-center gap-2.5">
@@ -1687,8 +1691,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                       </button>
 
                       {onToggleVpn && (
-                        <button 
-                          onClick={() => { onToggleVpn(); setIsMoreMenuOpen(false); }} 
+                        <button
+                          onClick={() => { onToggleVpn(); setIsMoreMenuOpen(false); }}
                           className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
                         >
                           <div className="flex items-center gap-2.5">
@@ -1703,8 +1707,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         </button>
                       )}
 
-                      <button 
-                        onClick={() => { onNavigate('nova://settings#mcp'); setIsMoreMenuOpen(false); }} 
+                      <button
+                        onClick={() => { onNavigate('nova://settings#mcp'); setIsMoreMenuOpen(false); }}
                         className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 text-xs font-medium rounded-xl transition-colors"
                       >
                         <div className="flex items-center gap-2.5">
@@ -1775,19 +1779,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
           {/* Spacer for Windows controls when vertical tabs are active */}
           {isWindows && useVerticalTabs && (
-            <div 
-              className="w-[140px] shrink-0 select-none drag-region" 
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            <div
+              className="w-[140px] shrink-0 select-none drag-region"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             />
           )}
         </div>
       </div>
 
-      {/* 
+      {/*
         ROW 3: Bookmarks Bar
       */}
       {showBookmarksBar && (
-        <div 
+        <div
           style={!isIncognito ? { backgroundColor: 'var(--nova-toolbar-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
           className={`flex items-center px-3 py-1 gap-2 border-t overflow-x-auto no-scrollbar no-drag ${
             isIncognito ? 'bg-slate-800/80 border-slate-700/60' : 'bg-slate-50 dark:bg-slate-900/80 border-slate-200/60 dark:border-slate-800'
@@ -1799,16 +1803,16 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 key={bookmark.id}
                 onClick={() => onNavigate(bookmark.url)}
                 className={`flex items-center gap-1.5 px-2 py-1 rounded-md transition-colors text-[12px] max-w-[150px] group ${
-                  isIncognito 
-                    ? 'hover:bg-slate-700 text-slate-300' 
+                  isIncognito
+                    ? 'hover:bg-slate-700 text-slate-300'
                     : 'hover:bg-slate-200/70 text-slate-600 dark:text-slate-300 dark:hover:bg-slate-800'
                 }`}
                 title={bookmark.url}
               >
                 {bookmark.favicon ? (
-                  <img 
-                    src={bookmark.favicon} 
-                    className="w-3.5 h-3.5 rounded-sm" 
+                  <img
+                    src={bookmark.favicon}
+                    className="w-3.5 h-3.5 rounded-sm"
                     onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none'; }}
                   />
                 ) : (
@@ -1828,14 +1832,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
     {/* Drag to Split Screen Ghost Tab */}
     {createPortal(
-      <div 
+      <div
         ref={ghostElRef}
         className="fixed top-0 left-0 pointer-events-none z-[999999] opacity-90 transition-none"
         style={{ display: 'none', willChange: 'transform' }}
       >
         <div className={`flex items-center gap-2 px-3 py-2 rounded-xl shadow-2xl border backdrop-blur-md ${
-          isIncognito 
-            ? 'bg-slate-800/90 border-slate-600 text-slate-200' 
+          isIncognito
+            ? 'bg-slate-800/90 border-slate-600 text-slate-200'
             : 'bg-white/90 border-blue-500/50 text-slate-800 dark:bg-slate-800/90 dark:border-blue-500/50 dark:text-slate-200'
         }`}>
           <Globe className="w-4 h-4 opacity-70" />
@@ -1908,6 +1912,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;
   if (prevProps.splitTabId !== nextProps.splitTabId) return false;
+  // Drives the AI pill's active state and sparkle; toggling the assistant only
+  // flips this prop, so without the check the pill never repainted.
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
 
   // Array-valued props compared by reference (state arrays from App; stable
   // unless actually changed)
@@ -1919,7 +1926,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.downloads !== nextProps.downloads) return false;
   if ((prevProps.activeDownloadsCount || 0) !== (nextProps.activeDownloadsCount || 0)) return false;
   if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
-  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
 
   // Tabs: length + order-sensitive per-field comparison of every field the
   // strip or the active-tab-derived UI reads:

@@ -1,7 +1,8 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Folder as FolderIcon } from 'lucide-react';
+import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Folder as FolderIcon } from 'lucide-react';
 import { DownloadItem } from '../types/browser';
+import { formatBytes } from '../utils/formatBytes';
 
 interface DownloadsPopoverProps {
   downloads: DownloadItem[];
@@ -111,7 +112,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                           <div className="mt-1">
                             <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 mb-1">
                               <span>{isPaused ? 'Paused' : `${progress}%`}</span>
-                              {item.totalBytes ? <span>{(item.totalBytes / 1024 / 1024).toFixed(1)} MB</span> : <span>Downloading...</span>}
+                              {item.totalBytes ? <span>{formatBytes(item.totalBytes)}</span> : <span>Downloading...</span>}
                             </div>
                             <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-700/60 rounded-full overflow-hidden">
                               <div className={`h-full rounded-full transition-all duration-300 ${isPaused ? 'bg-amber-500' : 'bg-cyan-500'}`} style={{ width: `${progress}%` }} />
@@ -126,7 +127,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                         )}
                       </div>
                     
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
                         {isCompleted && item.savePath && (
                           <button
                             onClick={(e) => {

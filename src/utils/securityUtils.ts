@@ -1,6 +1,6 @@
 /**
  * Nova Browser Security Utilities
- * Provides URL security classification, phishing detection, and HTTPS enforcement helpers.
+ * Provides URL security classification and phishing detection helpers.
  */
 import { DANGEROUS_PROTOCOLS } from './safeNavigation';
 
@@ -14,8 +14,6 @@ export interface SecurityInfo {
   icon: string;         // emoji icon
   tooltip: string;
 }
-
-export type SecurityStatus = SecurityInfo;
 
 // Internal nova:// pages are always safe
 const INTERNAL_PROTOCOLS = ['nova:', 'about:', 'chrome-extension:'];
@@ -325,47 +323,6 @@ export function getUrlSecurityInfo(url: string): SecurityInfo {
     };
   }
 }
-
-/**
- * Attempt HTTPS upgrade: if url is HTTP, try HTTPS equivalent.
- * Returns the HTTPS url if it should be tried, or null if already HTTPS/internal.
- */
-export function getHttpsUpgradeUrl(url: string): string | null {
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol === 'http:') {
-      const host = parsed.hostname.toLowerCase();
-      // Exclude localhost and private intranet addresses from HTTPS upgrade to align with main process
-      if (
-        host === 'localhost' ||
-        host.endsWith('.localhost') ||
-        host.endsWith('.local') ||
-        host.endsWith('.internal') ||
-        host.endsWith('.lan') ||
-        host.startsWith('127.') ||
-        host === '0.0.0.0' ||
-        host === '::1' ||
-        host === '[::1]'
-      ) {
-        return null;
-      }
-      const ipv4Match = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
-      if (ipv4Match) {
-        const o1 = Number(ipv4Match[1]);
-        const o2 = Number(ipv4Match[2]);
-        if (o1 === 10 || o1 === 0 || o1 === 127) return null;
-        if (o1 === 172 && o2 >= 16 && o2 <= 31) return null;
-        if (o1 === 192 && o2 === 168) return null;
-        if (o1 === 169 && o2 === 254) return null;
-      }
-      parsed.protocol = 'https:';
-      return parsed.toString();
-    }
-  } catch {}
-  return null;
-}
-
-export const getConnectionSecurity = getUrlSecurityInfo;
 
 /**
  * Format a URL for display in the address bar (strip trailing slash, protocol for common sites)

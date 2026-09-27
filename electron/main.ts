@@ -16,9 +16,25 @@ export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 console.log('Main process starting...');
 
 const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
+// Registered once at module scope on purpose: createWindow runs again on every
+// macOS activate, so an app-level listener added there would accumulate.
+// NOTE: render-process-gone fires on `app`, not on webContents.
+app.on('render-process-gone', (_event, contents, details) => {
+  if (contents !== mainWindow?.webContents) return;
+  console.error(`[App] Main renderer gone (${details.reason}). Reloading.`);
+  try {
+    if (!contents.isDestroyed()) contents.reload();
+  } catch (err) {
+    console.error('[App] Reload after renderer crash failed:', err);
+  }
+});
+
 function appendCrashLog(entry: string): void {
   try {
-    const logPath = app.isReady() ? path.join(app.getPath('userData'), 'crash.log') : 'crash.log';
+    // Not a bare 'crash.log': that resolves against the process CWD, which is '/'
+    // for a packaged macOS app (write fails, entry lost) and the repo root in dev.
+    const crashDir = app.isReady() ? app.getPath('userData') : require('os').tmpdir();
+    const logPath = path.join(crashDir, 'crash.log');
     if (fs.existsSync(logPath)) {
       const stats = fs.statSync(logPath);
       if (stats.size > MAX_CRASH_LOG_BYTES) {
@@ -108,6 +124,8 @@ import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
 import { isPrivateIP } from './main/ipAddress.js';
+import { enforceModelCacheBudget, MAX_MODEL_CACHE_FILE_BYTES } from './main/modelCacheQuota.js';
+import { isAgentNavigationHostPublic } from './main/agentNavigationGuard.js';
 
 /**
  * Validates URLs for context-menu media saving and address copying.
@@ -289,6 +307,22 @@ if (!app.isPackaged) {
 let mainWindow: BrowserWindow | null = null;
 let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
 let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
+
+// Sync Windows native titlebar buttons with theme updates. Registered once at
+// module scope: nativeTheme outlives any window, and re-registering inside
+// createWindow() stacked one listener per window recreation (macOS re-enters
+// createWindow via app.on('activate')).
+nativeTheme.on('updated', () => {
+  if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.setTitleBarOverlay({
+        color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
+        symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
+        height: 44
+      });
+    } catch (_) {}
+  }
+});
 
 
 function getAcceptLanguagesForLocale(localeOrLang?: string): string {
@@ -496,19 +530,6 @@ function createWindow() {
     }
   });
 
-  // Sync Windows native titlebar buttons with theme updates
-  nativeTheme.on('updated', () => {
-    if (process.platform === 'win32' && mainWindow && !mainWindow.isDestroyed()) {
-      try {
-        mainWindow.setTitleBarOverlay({
-          color: nativeTheme.shouldUseDarkColors ? '#0f172a' : '#f8fafc',
-          symbolColor: nativeTheme.shouldUseDarkColors ? '#94a3b8' : '#64748b',
-          height: 44
-        });
-      } catch (_) {}
-    }
-  });
-
   // Performance: don't paint a blank window while content loads — show once the
   // renderer is ready to paint, with a safety timeout in case 'ready-to-show'
   // never fires (e.g. dev-server retry loop failing for a while).
@@ -536,6 +557,39 @@ function createWindow() {
   setTimeout(() => {
     if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) mainWindow.show();
   }, 3000);
+
+  // Guest tabs have their own render-process-gone handler with a Reload button
+  // (BrowserView.tsx). The app's OWN renderer had none, so when it died the
+  // window stayed alive and blank: no message, no Reload, and React's
+  // ErrorBoundary could not help because a crashed renderer never runs. The
+  // user could only force-quit.
+  mainWindow.webContents.on('unresponsive', () => {
+    console.error('[App] Main renderer unresponsive.');
+  });
+
+  // Every webview, the view-source window and the extension popup get a
+  // setWindowOpenHandler; the privileged main window did not. A popup there
+  // inherits the parent's webPreferences, so it is created with this preload
+  // attached - its IPC is then rejected by isTrustedSender because the
+  // webContents id differs, but the window still loads a remote URL with no
+  // scheme check. Deny at the source rather than trusting each call site.
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+
+  // Closing the last window does not quit on macOS, and React's tab-cleanup
+  // effects never run, so anything the renderer owned must be reclaimed here.
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+    // Incognito tabs are never persisted, so their partition names can never be
+    // reused. Without this sweep every close/reopen cycle orphans a live
+    // Electron.Session (own cache dir + permission/webRequest handlers), and
+    // each later privacy/VPN/language/purge call walks all of them.
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      hardenedIncognitoPartitions.delete(partName);
+      try {
+        session.fromPartition(partName, { cache: false }).clearStorageData();
+      } catch (_) {}
+    }
+  });
 
   // Security: Prevent Drag and Drop navigation on the main UI window
   mainWindow.webContents.on('will-navigate', (event, url) => {
@@ -583,7 +637,7 @@ function createWindow() {
     // Chrome identity; Chromium generates its own consistent Client Hints.
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
-      
+
       let isHttp = false;
       try {
         const parsedUrl = new URL(details.url);
@@ -640,13 +694,42 @@ function createWindow() {
       // VULN-16: Add Content Security Policy for the app's own pages
       if (isAppFile || isDevLocalhost) {
         const isDev = isDevLocalhost || !app.isPackaged;
-        
+
+        // VULN-16 / CSP parity: this PROD header and the <meta> policy that
+        // vite.config.ts bakes into dist/index.html (HARDENED_PROD_CSP) are
+        // INTENTIONALLY BYTE-IDENTICAL. A page's enforced CSP is the
+        // intersection of every policy delivered to it, so a value present in
+        // only one copy contributes nothing — and it has never been verified
+        // which copy actually binds for a file:// load. Identical copies make
+        // the question moot. Editing one without the other silently changes the
+        // intersection.
+        //
+        // PROD directives that are easy to "tidy" back into an asymmetric state:
+        //  - style-src keeps 'unsafe-inline' ON PURPOSE. src/ has 136
+        //    `style={{...}}` attributes — 46 of them `-webkit-app-region: drag |
+        //    no-drag` on the frameless title bar, so dropping it makes the title
+        //    bar undraggable and its buttons drag regions — plus a runtime
+        //    <style> element in ReaderMode. That is a functional break, not
+        //    cosmetics, so it belongs in BOTH prod copies.
+        //  - No frame-src: it falls back to default-src 'self', i.e. the
+        //    stricter header-bound behaviour we already ship. The
+        //    `https://*.supabase.co` frame-src that lived only in the prod meta
+        //    never took effect and must not come back — a framed Supabase origin
+        //    sits inside this privileged UI.
+        //  - font-src carries no bare `https:`; under intersection it was
+        //    already the narrower value below.
+        //  - script-src carries no `blob:`: the one Worker (services/aiAgent) is
+        //    covered by worker-src, and every createObjectURL use is an <img> or
+        //    a download (img-src).
+        //  - form-action is inherited from the prod meta so both copies express
+        //    it; every <form> in src/ is JS-submitted (onSubmit +
+        //    preventDefault, no action/method attribute), so nothing regresses.
+        //  - frame-ancestors is ignored by browsers in a <meta> policy; it is
+        //    kept here only so the two prod copies stay byte-identical.
         responseHeaders['Content-Security-Policy'] = [
           isDev
-            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-            // Production: unsafe-inline removed from style-src (Tailwind uses class-based CSS, no inline styles needed).
-            // unsafe-inline is intentionally kept in dev only for Vite HMR compatibility.
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.huggingface.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
         ];
         responseHeaders['X-Content-Type-Options'] = ['nosniff'];
       }
@@ -743,16 +826,41 @@ function createWindow() {
 
 // Track URLs that failed HTTPS upgrade to prevent infinite loops with eviction cap (max 1000 items)
 const MAX_UPGRADED_URLS = 1000;
-const upgradedUrls = new Set<string>();
+const UPGRADED_URL_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const upgradedUrls = new Map<string, number>(); // url -> last upgrade attempt timestamp
 
 function addUpgradedUrl(url: string): void {
+  // Delete-then-set so Map insertion order tracks recency, which makes the
+  // eviction below drop the least-recently-seen entry (same LRU trick as
+  // addKnownDownloadPath() in main/downloads.ts).
+  upgradedUrls.delete(url);
   if (upgradedUrls.size >= MAX_UPGRADED_URLS) {
-    const oldest = upgradedUrls.values().next().value;
+    const oldest = upgradedUrls.keys().next().value;
     if (oldest !== undefined) {
       upgradedUrls.delete(oldest);
     }
   }
-  upgradedUrls.add(url);
+  upgradedUrls.set(url, Date.now());
+}
+
+/**
+ * True when an HTTPS upgrade was already attempted for this exact URL recently.
+ *
+ * Entries expire after UPGRADED_URL_TTL_MS. Without expiry a single failed
+ * upgrade (a transient TLS error, or an active MITM deliberately causing one)
+ * pinned that exact URL to plaintext for the rest of the app's lifetime: every
+ * later visit was waved through over http:// with no upgrade attempt and no
+ * warning. Expiry is lazy — stale entries are dropped on read — so the map
+ * stays bounded by MAX_UPGRADED_URLS without needing a timer.
+ */
+function hasUpgradedUrl(url: string): boolean {
+  const lastAttempt = upgradedUrls.get(url);
+  if (lastAttempt === undefined) return false;
+  if (Date.now() - lastAttempt >= UPGRADED_URL_TTL_MS) {
+    upgradedUrls.delete(url);
+    return false;
+  }
+  return true;
 }
 
 function setupApplicationMenu() {
@@ -1237,7 +1345,8 @@ function cleanStaleUpdateArtifacts(): void {
               try {
                 if (fs.existsSync(lsregisterPath)) {
                   try {
-                    child_process.execFileSync(lsregisterPath, ['-u', orphanPath], { stdio: 'ignore' });
+                    // No timeout: a wedged lsregister blocks the main thread forever.
+                    child_process.execFileSync(lsregisterPath, ['-u', orphanPath], { stdio: 'ignore', timeout: 15000 });
                   } catch (_) {}
                 }
                 fs.rmSync(orphanPath, { recursive: true, force: true });
@@ -1250,7 +1359,10 @@ function cleanStaleUpdateArtifacts(): void {
 
         if (foundOrphans && fs.existsSync(lsregisterPath)) {
           try {
-            child_process.execFileSync(lsregisterPath, ['-gc'], { stdio: 'ignore' });
+            // -gc rebuilds the entire system LaunchServices database and is routinely
+  // multi-second. Synchronous, it freezes every window, and it runs on a 5s
+  // timer - exactly when the user starts interacting. Bounded and non-blocking.
+  child_process.execFile(lsregisterPath, ['-gc'], { encoding: 'utf8', timeout: 15000 }, () => {});
           } catch (_) {}
         }
       } catch (_) {}
@@ -1391,7 +1503,24 @@ app.whenReady().then(async () => {
           obj[origin][perm] = entry;
         }
       }
-      fs.writeFileSync(PERMISSIONS_FILE, JSON.stringify(obj, null, 2), 'utf8');
+      // Write to a sibling temp file, then rename. A crash or ENOSPC mid-write
+      // used to leave a truncated PERMISSIONS_FILE: the next JSON.parse throws,
+      // the load catch swallows it, and every remembered permission decision is
+      // silently forgotten (users get re-prompted for mic/camera/geolocation).
+      // rename is atomic on the same volume, so the file holds either the old
+      // contents or the new ones, never a half-written prefix. The mode is forced
+      // because writeFileSync's `mode` only applies when it CREATES the file — and
+      // this file enumerates which origins were granted camera/microphone/
+      // geolocation, so it must never be left world-readable.
+      const tmpFile = PERMISSIONS_FILE + '.tmp';
+      try {
+        fs.writeFileSync(tmpFile, JSON.stringify(obj, null, 2), { encoding: 'utf8', mode: 0o600 });
+        try { fs.chmodSync(tmpFile, 0o600); } catch (_) {}
+        fs.renameSync(tmpFile, PERMISSIONS_FILE);
+      } catch (writeErr) {
+        try { fs.unlinkSync(tmpFile); } catch (_) {}
+        throw writeErr;
+      }
     } catch (err) {
       console.warn('[Permissions] Failed to save permissions to disk:', err);
     }
@@ -1450,14 +1579,21 @@ app.whenReady().then(async () => {
   applyStrictSecurityToSession = (targetSession: Electron.Session) => {
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
-      
+
       // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
       // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
       if (isTrustedAppOrigin(url)) {
         if (permission === 'media') {
           const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
-          const requestsVideo = mediaTypes?.includes('video');
-          const requestsAudio = !mediaTypes || mediaTypes.includes('audio');
+          // `mediaTypes` is optional in Electron's request details. When it is
+          // absent the request cannot be classified, and defaulting it to
+          // audio-only ALLOWED it — including a camera capture that must stay
+          // denied. Fail closed, matching setPermissionCheckHandler below.
+          if (!Array.isArray(mediaTypes)) {
+            return callback(false);
+          }
+          const requestsVideo = mediaTypes.includes('video');
+          const requestsAudio = mediaTypes.includes('audio');
           if (requestsAudio && !requestsVideo) {
             if (process.platform === 'darwin') {
               try {
@@ -1544,7 +1680,7 @@ app.whenReady().then(async () => {
           if (originPerms.size === 0) rememberedPermissions.delete(origin);
         }
       }
-      
+
       // Map permission names for Chrome-style UI
       const permissionNames: Record<string, string> = {
         'media': 'Camera and Microphone',
@@ -1559,7 +1695,7 @@ app.whenReady().then(async () => {
         'display-capture': 'Screen Sharing',
         'window-management': 'Window Management'
       };
-      
+
       let permissionName = permissionNames[permission] || permission;
       if (permission === 'media') {
         const mediaTypes = (details as any)?.mediaTypes as string[] | undefined;
@@ -1901,22 +2037,50 @@ app.whenReady().then(async () => {
     return assets.find((a: any) => typeof a.name === 'string' && !a.name.endsWith('.blockmap') && !a.name.endsWith('.yml')) || assets[0];
   }
 
+  const SHA256_HEX_RE = /^[a-f0-9]{64}$/;
+
+  /**
+   * The expected SHA-256 for a release asset, in order of trust:
+   *
+   * 1. `asset.digest` — GitHub's own per-asset metadata ("sha256:<64 hex>"),
+   *    served by the Releases API. This is the source to use: it is structured,
+   *    per-asset, and cannot be accidentally altered by pasting free text.
+   * 2. The release body text, for releases published before digests existed.
+   *    This is a weak fallback and only an exact asset-name match is accepted:
+   *    a Nova release carries ~18 assets and a checksums block, so a loose
+   *    "64 hex characters" match can easily pick up a DIFFERENT asset's hash
+   *    and then fail a perfectly good download.
+   *
+   * Returns undefined only when no usable digest exists at all. Callers must
+   * treat that as "unverified" rather than "verified" - see the download path.
+   */
   function extractExpectedSha256(release: any, assetName: string): string | undefined {
     if (!release) return undefined;
+
+    // 1. GitHub's structured per-asset digest.
+    if (assetName && Array.isArray(release.assets)) {
+      const asset = release.assets.find(
+        (a: any) => a && typeof a.name === 'string' && a.name === assetName
+      );
+      const digest = asset?.digest;
+      if (typeof digest === 'string') {
+        const match = /^sha256:([a-fA-F0-9]{64})$/.exec(digest.trim());
+        if (match) return match[1].toLowerCase();
+        // A digest we cannot parse is a hard signal, not something to guess at.
+        console.warn(`[Updater] Ignoring unrecognised digest format for ${assetName}: ${digest.slice(0, 32)}`);
+      }
+    }
+
+    // 2. Release body fallback, exact asset-name match only.
     if (typeof release.body === 'string' && assetName) {
       const escapedName = assetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}`, 'i');
+      const p1 = new RegExp(`([a-fA-F0-9]{64})\\s+[*]?${escapedName}(?![^\\n]*[a-fA-F0-9])`, 'i');
       const m1 = release.body.match(p1);
-      if (m1) return m1[1].toLowerCase();
+      if (m1 && SHA256_HEX_RE.test(m1[1].toLowerCase())) return m1[1].toLowerCase();
 
-      const p2 = new RegExp(`${escapedName}[^a-fA-F0-9]*([a-fA-F0-9]{64})`, 'i');
+      const p2 = new RegExp(`${escapedName}[^a-fA-F0-9\\n]*([a-fA-F0-9]{64})`, 'i');
       const m2 = release.body.match(p2);
-      if (m2) return m2[1].toLowerCase();
-
-      if (release.assets?.length === 1) {
-        const m3 = release.body.match(/\b([a-fA-F0-9]{64})\b/);
-        if (m3) return m3[1].toLowerCase();
-      }
+      if (m2 && SHA256_HEX_RE.test(m2[1].toLowerCase())) return m2[1].toLowerCase();
     }
     return undefined;
   }
@@ -2156,11 +2320,29 @@ fi
         fs.mkdirSync(updateDir, { recursive: true });
         const batPath = path.join(updateDir, 'update.bat');
         const destinationExe = app.getPath('exe');
+        // The batch reads its arguments from the environment (FILE_PATH /
+        // TARGET_PID / DEST_EXE) instead of %~1..%~3. `cmd` re-parses the whole
+        // string after /c with its own quote rules: with a username containing a
+        // space the OS temp path gets quoted, and because the command line then
+        // holds more than two quote characters cmd falls back to "strip the first
+        // quote, drop the last quote" — truncating the batch path. The batch never
+        // runs, yet `cmd.exe` itself started, so the caller still calls app.quit()
+        // and the browser disappears with no relaunch and no error. The
+        // environment is not parsed by cmd's command-line rules, so paths with
+        // spaces, quotes or metacharacters survive intact.
+        // `setlocal` below must therefore stay plain: enabling delayed expansion
+        // makes cmd expand every `!` in the inherited environment as it parses,
+        // so an install path containing one (C:\Users\Bob!\...) is silently
+        // mangled in %FILE_PATH% / %DEST_EXE% — the installer is not found, not
+        // deleted and the app does not relaunch, i.e. the same "browser
+        // disappears" symptom the env-variable change fixed, for a different
+        // username. No `!`-delayed read exists in the script to justify it.
         const batContent = `@echo off
-setlocal enabledelayedexpansion
-set "FILE_PATH=%~1"
-set "TARGET_PID=%~2"
-set "DEST_EXE=%~3"
+rem Delayed expansion MUST stay disabled: with it enabled cmd consumes every
+rem "!" in the inherited environment while parsing, so an install path holding
+rem one (C:\\Users\\Bob!\\...) is silently mangled in %FILE_PATH% / %DEST_EXE%.
+rem Nothing in this script reads a "!"-delayed variable, so keep it off.
+setlocal
 set "UPDATE_DIR=%~dp0"
 
 :wait_loop
@@ -2189,9 +2371,14 @@ exit
 `;
         try {
           fs.writeFileSync(batPath, batContent);
-          const runner = child_process.spawn('cmd.exe', ['/c', batPath, resolvedFilePath, String(currentPid), destinationExe], {
+          // Only the batch path is passed on the command line. A single argv entry
+          // makes libuv quote it as one token, so cmd's "exactly two quotes" rule
+          // preserves the path verbatim even when it contains spaces; every
+          // payload that used to travel as an argument now travels in the env.
+          const runner = child_process.spawn('cmd.exe', ['/c', batPath], {
             detached: true,
-            stdio: 'ignore'
+            stdio: 'ignore',
+            env: { ...process.env, FILE_PATH: resolvedFilePath, TARGET_PID: String(currentPid), DEST_EXE: destinationExe }
           });
           runner.unref();
 
@@ -2298,7 +2485,41 @@ fi
     return { success: !openRes, error: openRes || undefined };
   }
 
-  async function checkForUpdatesInternal(): Promise<{ success: boolean; version?: string; isAvailable?: boolean; error?: string }> {
+  type UpdateCheckResult = { success: boolean; version?: string; isAvailable?: boolean; error?: string };
+  // In-flight update check, mirroring the isDownloadingUpdate lock lifecycle
+  // above: the slot is claimed synchronously before the first await and released
+  // on both fulfilment and rejection, so it can never get stuck.
+  let checkForUpdatesPromise: Promise<UpdateCheckResult> | null = null;
+
+  /**
+   * Deduplicates overlapping update checks onto a single run.
+   *
+   * The startup check, the manual `check-for-updates` IPC and the 4-hourly timer
+   * can all overlap, and the manual GitHub path is not internally deduped: each
+   * extra call issued its own api.github.com fetch and the last writer won on
+   * `latestReleaseDownloadInfo`. If a release were published mid-flight the UI
+   * could be told about 1.2.3 and then handed 1.2.4's URL — the button shows one
+   * version and installs another.
+   */
+  function checkForUpdatesInternal(): Promise<UpdateCheckResult> {
+    if (checkForUpdatesPromise) {
+      console.log('[Updater] Update check already in flight; reusing the running check');
+      return checkForUpdatesPromise;
+    }
+    const inFlight = runUpdateCheckInternal();
+    checkForUpdatesPromise = inFlight;
+    // Release on both paths so a thrown/rejected check cannot wedge the guard.
+    // The identity check keeps a late release from clearing a newer run's slot.
+    const release = () => { if (checkForUpdatesPromise === inFlight) checkForUpdatesPromise = null; };
+    inFlight.then(release, release);
+    return inFlight;
+  }
+
+  /**
+   * Performs one update check. Callers should go through
+   * checkForUpdatesInternal(), which dedupes overlapping calls onto one run.
+   */
+  async function runUpdateCheckInternal(): Promise<UpdateCheckResult> {
     try {
       const isManualUpdateOnly = !app.isPackaged || process.platform === 'linux' || process.platform === 'darwin' || !!process.env.PORTABLE_EXECUTABLE_DIR;
       if (isManualUpdateOnly) {
@@ -2324,8 +2545,8 @@ fi
                 publishedAt: latestRelease.published_at || new Date().toISOString(),
                 expectedSha256: expectedSha
               };
-              sendToMainWindow('update-available', { 
-                version: latestTag, 
+              sendToMainWindow('update-available', {
+                version: latestTag,
                 releaseDate: latestRelease.published_at,
                 downloadUrl: latestReleaseDownloadInfo.downloadUrl,
                 assetName: platformAsset?.name,
@@ -2372,8 +2593,8 @@ fi
                 publishedAt: latestRelease.published_at || new Date().toISOString(),
                 expectedSha256: expectedSha
               };
-              sendToMainWindow('update-available', { 
-                version: latestTag, 
+              sendToMainWindow('update-available', {
+                version: latestTag,
                 releaseDate: latestRelease.published_at,
                 downloadUrl: latestReleaseDownloadInfo.downloadUrl,
                 assetName: platformAsset?.name,
@@ -2405,8 +2626,8 @@ fi
       releaseNotes: (info as any)?.releaseNotes || '',
       releaseName: (info as any)?.releaseName || `v${info.version}`
     };
-    sendToMainWindow('update-available', { 
-      version: info.version, 
+    sendToMainWindow('update-available', {
+      version: info.version,
       releaseDate: info.releaseDate,
       isManual: false,
       releaseNotes: (info as any)?.releaseNotes || '',
@@ -2454,7 +2675,21 @@ fi
   ipcMain.handle('download-update', async (event, customUrl?: string) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
     if (isDownloadingUpdate) return { success: false, error: 'Download already in progress' };
+    // Claim the lock synchronously, before the first await. It used to be set
+    // ~65 lines later, so two invocations both passed the guard: each then ran
+    // the `.download_` cleanup (unlinking the other's in-flight temp file, which
+    // made its rename throw ENOENT), raced each other on the same target path,
+    // interleaved their progress events, and one run's error handler cleared
+    // the flag while the other was still downloading.
+    isDownloadingUpdate = true;
+    try {
+      return await runUpdateDownload(customUrl);
+    } finally {
+      isDownloadingUpdate = false;
+    }
+  });
 
+  async function runUpdateDownload(customUrl?: string) {
     let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
     let targetVersion = latestReleaseDownloadInfo?.version || '';
     let assetName = latestReleaseDownloadInfo?.assetName || '';
@@ -2464,7 +2699,8 @@ fi
     if (!targetUrl) {
       try {
         const res = await fetch('https://api.github.com/repos/unitybtw/nova-browser/releases', {
-          headers: { 'User-Agent': getStandardUserAgent() }
+          headers: { 'User-Agent': getStandardUserAgent() },
+          signal: AbortSignal.timeout(10_000)
         });
         if (res.ok) {
           const releases = await res.json();
@@ -2518,15 +2754,30 @@ fi
       return { success: false, error: 'Malformed update download URL' };
     }
 
-    isDownloadingUpdate = true;
+    // Release snapshot: `latestReleaseDownloadInfo` is re-read from a global that
+    // a mid-download check can overwrite, which used to report the newer
+    // release's notes next to the older package that was actually downloaded.
+    const downloadedReleaseNotes = latestReleaseDownloadInfo?.releaseNotes || '';
+    const downloadedReleaseName = latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`;
+
     sendToMainWindow('update-download-progress', { percent: 0, transferred: 0, total: 0 });
 
     let tempFilePath = '';
     let updateFileStream: fs.WriteStream | null = null;
+    // Bound the whole transfer, not just the connect. Without a signal a server
+    // that accepts the connection and then stalls holds the
+    // `for await (const chunk of response.body)` loop open indefinitely:
+    // `download-update` never returns, the `isDownloadingUpdate` lock is never
+    // released, and the update button stays permanently dead until restart.
+    // Sized for the payload this handler allows (up to 1 GB), so it is orders
+    // of magnitude larger than the 10s releases-API call above — that one is a
+    // small JSON document, this one may be a multi-hundred-MB installer.
+    const UPDATE_DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000;
     try {
       const response = await fetch(targetUrl, {
         headers: { 'User-Agent': getStandardUserAgent() },
-        redirect: 'follow'
+        redirect: 'follow',
+        signal: AbortSignal.timeout(UPDATE_DOWNLOAD_TIMEOUT_MS)
       });
 
       if (!response.ok) {
@@ -2581,7 +2832,10 @@ fi
       if (!path.resolve(targetFilePath).startsWith(path.resolve(updatesDir) + path.sep)) {
         throw new Error('Invalid update filename: path escapes updates directory');
       }
-      tempFilePath = `${targetFilePath}.download_${Date.now()}`;
+      // pid+uuid, like store-set and model-cache-set: Date.now() collides
+      // between two calls in the same millisecond, and createWriteStream follows a
+      // pre-planted symlink and truncates its target.
+      tempFilePath = `${targetFilePath}.download_${process.pid}_${crypto.randomUUID()}`;
 
       const fileStream = updateFileStream = fs.createWriteStream(tempFilePath);
       const sha256Hasher = crypto.createHash('sha256');
@@ -2644,10 +2898,27 @@ fi
       });
 
       const calculatedSha256 = sha256Hasher.digest('hex').toLowerCase();
-      console.log(`[Updater] Downloaded update package SHA-256 checksum: ${calculatedSha256}`);
-      if (targetExpectedSha && calculatedSha256 !== targetExpectedSha.toLowerCase()) {
-        try { fs.unlinkSync(tempFilePath); } catch (_) {}
-        throw new Error(`Update package integrity check failed: SHA-256 checksum mismatch (expected ${targetExpectedSha}, calculated ${calculatedSha256})`);
+      // Integrity is decided here and only here. A mismatch is fatal: the
+      // package is deleted and never promoted. A MISSING expectation is not
+      // fatal (older releases published no digest, and refusing them would
+      // strand users on an old build), but it must never be reported as
+      // verified - the flag travels with the download result and the
+      // update-downloaded event so the UI can say so out loud.
+      const integrityVerified = Boolean(targetExpectedSha);
+      if (!integrityVerified) {
+        console.warn(
+          `[Updater] No published SHA-256 for ${assetName || 'the update package'}; ` +
+          `the download was completed but could NOT be integrity-verified (sha256=${calculatedSha256}).`
+        );
+      } else {
+        console.log(`[Updater] Downloaded update package SHA-256: ${calculatedSha256} (verified against the published digest)`);
+        if (calculatedSha256 !== targetExpectedSha!.toLowerCase()) {
+          try { fs.unlinkSync(tempFilePath); } catch (_) {}
+          throw new Error(
+            `Update package integrity check failed: SHA-256 mismatch for ${assetName || 'the update package'} ` +
+            `(expected ${targetExpectedSha}, got ${calculatedSha256}). The download was discarded.`
+          );
+        }
       }
 
       if (fs.existsSync(targetFilePath)) {
@@ -2657,7 +2928,6 @@ fi
 
       downloadedUpdateFilePath = targetFilePath;
       isUpdateDownloaded = true;
-      isDownloadingUpdate = false;
       registerKnownDownloadPath(targetFilePath);
 
       sendToMainWindow('update-downloaded', {
@@ -2665,16 +2935,20 @@ fi
         releaseDate: new Date().toISOString(),
         filePath: targetFilePath,
         isManual: true,
-        releaseNotes: latestReleaseDownloadInfo?.releaseNotes || '',
-        releaseName: latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`
+        integrityVerified,
+        sha256: calculatedSha256,
+        releaseNotes: downloadedReleaseNotes,
+        releaseName: downloadedReleaseName
       });
 
-      return { 
-        success: true, 
-        filePath: targetFilePath, 
+      return {
+        success: true,
+        filePath: targetFilePath,
         version: targetVersion,
-        releaseNotes: latestReleaseDownloadInfo?.releaseNotes,
-        releaseName: latestReleaseDownloadInfo?.releaseName
+        integrityVerified,
+        sha256: calculatedSha256,
+        releaseNotes: downloadedReleaseNotes,
+        releaseName: downloadedReleaseName
       };
     } catch (downloadErr: any) {
       if (updateFileStream && !updateFileStream.closed) {
@@ -2689,7 +2963,7 @@ fi
       sendToMainWindow('update-error', downloadErr?.message || 'Download failed');
       return { success: false, error: downloadErr?.message || 'Download failed' };
     }
-  });
+  }
 
   ipcMain.handle('install-update', async (event) => {
     if (!isTrustedSender(event)) return { success: false, error: 'Unauthorized sender' };
@@ -2832,8 +3106,14 @@ fi
           console.warn(`[Security] Blocked open-external to private/loopback host: ${host}`);
           return false;
         }
-        // Security: DNS pin (mirrors validatePreviewUrl) — resolve hostname and
-        // fail closed if any resolved IP is private. Fail closed on DNS error.
+        // Resolve the hostname and refuse if any answer is private; fail closed on
+        // error. NOTE: this is a check-then-connect, NOT a pin. The answer below
+        // is not bound to the connection, because `shell.openExternal` hands the
+        // URL to the OS default browser, which resolves it again with its own
+        // resolver. A 0-second-TTL name can pass here and reach 127.0.0.1. Only
+        // `fetch-page-html` genuinely pins, by injecting the vetted address as
+        // the agent's `lookup`. Closing this needs the same treatment or a
+        // Chromium-side resolver; see agentNavigationGuard for the same caveat.
         try {
           const lookupHost = (host.startsWith('[') && host.endsWith(']')) ? host.slice(1, -1) : host;
           const dnsResult = await Promise.race([
@@ -3127,7 +3407,13 @@ app.on('web-contents-created', (_event, contents) => {
         const parsed = new URL(params.src);
         const allowedProtocols = ['http:', 'https:'];
         const isAllowedAboutBlank = parsed.protocol === 'about:' && (parsed.pathname === 'blank' || parsed.href === 'about:blank');
-        const isAllowedExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname);
+        // An extension-shaped id is not enough: a page can window.open any
+        // chrome-extension://<id> and this accepted it, so the isInstalled gate
+        // the other two entry points enforce was skipped. Shape AND existence.
+        const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
+          /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
+          (loadedExtensions.some(ext => ext.id === parsed.hostname) ||
+            Boolean(session.defaultSession.getExtension(parsed.hostname)));
 
         if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
             parsed.username || parsed.password) {
@@ -3282,15 +3568,16 @@ app.on('web-contents-created', (_event, contents) => {
       try {
         const urlObj = new URL(navigationUrl);
         if (urlObj.protocol === 'http:' && !isLocalOrIntranetHost(urlObj.hostname)) {
-          if (upgradedUrls.has(navigationUrl)) {
+          if (hasUpgradedUrl(navigationUrl)) {
             // Zaten denedik ve patladı (SSL hatası vs.), sonsuz döngüye girmemek için devam et
+            // (yalnızca UPGRADED_URL_TTL_MS boyunca; sonra tekrar denenir)
             return;
           }
-          
+
           e.preventDefault();
           addUpgradedUrl(navigationUrl);
           const httpsUrl = navigationUrl.replace(/^http:/, 'https:');
-          
+
           // Security (L-7): never auto-fall back to plain HTTP when the HTTPS
           // upgrade fails — a MITM can force that downgrade. Log and stay put.
           // navigationUrl is now in upgradedUrls, so an EXPLICIT user retry of
@@ -3344,7 +3631,7 @@ app.on('web-contents-created', (_event, contents) => {
       }
 
       if (parsed.protocol === 'http:' && !isLocalOrIntranetHost(parsed.hostname)) {
-        if (upgradedUrls.has(redirectUrl)) return;
+        if (hasUpgradedUrl(redirectUrl)) return;
         e.preventDefault();
         addUpgradedUrl(redirectUrl);
         const httpsUrl = redirectUrl.replace(/^http:/i, 'https:');
@@ -3367,16 +3654,36 @@ app.on('will-quit', () => {
       const parsed = JSON.parse(rawContent);
       const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
       if (settings && settings.clearOnExit) {
-        // Robustness: attach catch handlers so cleanup rejections can't float;
-        // quit is intentionally NOT blocked on these async clears.
-        session.defaultSession.clearStorageData().catch((e) => console.warn('[Quit] clearStorageData failed:', e));
-        session.defaultSession.clearCache().catch((e) => console.warn('[Quit] clearCache failed:', e));
+        // 'will-quit' fires at the very end of app.quit() and Electron does not
+        // await async work started from it: the process exits, the pending IPC to
+        // the storage service is dropped, and the setting silently does nothing.
+        // The clears are therefore handed to before-quit, which can hold the quit
+        // open until they settle.
+        pendingClearOnExit = true;
       }
     }
   } catch (e) {}
 });
 
-app.on('before-quit', () => {
+let pendingClearOnExit = false;
+let clearOnExitDone = false;
+
+app.on('before-quit', (event) => {
+  if (pendingClearOnExit && !clearOnExitDone && app.isReady()) {
+    event.preventDefault();
+    clearOnExitDone = true;
+    const finish = () => { app.quit(); };
+    Promise.allSettled([
+      session.defaultSession.clearStorageData(),
+      session.defaultSession.clearCache(),
+    ]).then((results) => {
+      for (const r of results) {
+        if (r.status === 'rejected') console.warn('[Quit] clear-on-exit step failed:', r.reason);
+      }
+      finish();
+    });
+    return;
+  }
   try {
     if (mcpServer && mcpServer.isRunning()) {
       mcpServer.stop();
@@ -3579,7 +3886,7 @@ ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => 
   try {
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed()) return null;
-    
+
     // Security: Only allow capturing webviews (tabs)
     if (wc.getType() !== 'webview') return null;
 
@@ -3660,7 +3967,7 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
         } catch (_) {}
       }
     }
-    
+
     return dataUrl;
   } catch (err) {
     console.error('Failed to capture full page:', err);
@@ -3698,7 +4005,10 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
   if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
     try {
       const resp = await fetch(currentUrl);
-      htmlSource = await resp.text();
+      // Bounded like every sibling fetch path: an adversarially large or
+      // never-ending body would otherwise be buffered into the main process and
+      // then serialised a second time into the viewer, twice over.
+      htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
     } catch {}
   }
 
@@ -3834,7 +4144,7 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: labels.saveLinkAs,
             click: () => {
-              markNextDownloadAsSaveAs();
+              markNextDownloadAsSaveAs(wc.id);
               wc.downloadURL(params.linkURL);
             }
           }));
@@ -3861,7 +4171,7 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: labels.saveImageAs,
             click: () => {
-              markNextDownloadAsSaveAs();
+              markNextDownloadAsSaveAs(wc.id);
               wc.downloadURL(params.srcURL);
             }
           }));
@@ -3942,7 +4252,7 @@ app.on('web-contents-created', (_event, wc) => {
             menu.append(new MenuItem({
               label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
               click: () => {
-                markNextDownloadAsSaveAs();
+                markNextDownloadAsSaveAs(wc.id);
                 wc.downloadURL(params.srcURL);
               }
             }));
@@ -4253,6 +4563,12 @@ ipcMain.handle('clear-ai-models-cache', async (event) => {
       storages: ['serviceworkers', 'cachestorage']
     });
     await defaultSess.clearCache();
+    // The Cache API and the HTTP cache above hold nothing on disk for us to
+    // reclaim: model shards are written by the main process straight to
+    // <userData>/models/<sha256>. Without this the "clear AI models cache"
+    // button freed zero bytes and the feature kept working off disk.
+    // `force` ignores a missing directory; the write path re-creates it.
+    await fs.promises.rm(modelCacheDir(), { recursive: true, force: true });
     return true;
   } catch (err) {
     console.error('Error clearing AI models cache:', err);
@@ -4336,7 +4652,19 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
       const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
       if (safeStorage.isEncryptionAvailable()) {
         const encrypted = safeStorage.encryptString(value);
-        await fs.promises.writeFile(keyPath, encrypted, { mode: 0o600 });
+        // writeFile opens O_TRUNC, so a crash between truncate and write leaves a
+        // short file. secure-store-get then fails decryptString, fails the
+        // fallback magic check, and fails closed to null - and the next sync
+        // re-seals that null as an empty set, so every saved password is gone.
+        // `store-set` already uses this exact pattern for the same reason.
+        const secureTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+        try {
+          await fs.promises.writeFile(secureTmp, encrypted, { mode: 0o600 });
+          await fs.promises.rename(secureTmp, keyPath);
+        } catch (err) {
+          try { await fs.promises.unlink(secureTmp); } catch (_) {}
+          throw err;
+        }
         try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
       } else {
         console.warn(`[Security] safeStorage encryption unavailable. Storing key "${key}" with local AES-256-GCM cipher.`);
@@ -4345,14 +4673,28 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
           let secret: Buffer;
           if (fs.existsSync(secretPath)) {
             secret = fs.readFileSync(secretPath);
+            // A truncated or empty secret still "works" as scrypt input, so the
+            // only symptom is a GCM auth failure much later. Fail here, loudly.
+            if (secret.length !== 32) {
+              throw new Error(
+                `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
+                'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
+              );
+            }
           } else {
             secret = crypto.randomBytes(32);
+            // Only a chmod failure is tolerable. Swallowing the write means the
+            // secret exists in memory but never on disk, so every value
+            // encrypted with it is unreadable on the next launch - silently,
+            // with no log and nothing for the user to act on.
             try {
               fs.writeFileSync(secretPath, secret, { mode: 0o600 });
               if (process.platform !== 'win32') {
-                fs.chmodSync(secretPath, 0o600);
+                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
               }
-            } catch (_) {}
+            } catch (err: any) {
+              if (err?.code !== 'ENOENT') throw err;
+            }
           }
           // K-3: Bind salt to machine identity so copying userData to another machine/account fails
           const machineSalt = getMachineSalt('nova-secure-salt');
@@ -4364,7 +4706,16 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         const enc = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
         const tag = cipher.getAuthTag();
         const payload = Buffer.concat([Buffer.from('NENC', 'utf8'), iv, tag, enc]);
-        await fs.promises.writeFile(keyPath, payload, { mode: 0o600 });
+        // Same reasoning as the safeStorage branch above: O_TRUNC in place turns a
+        // crash mid-write into unreadable ciphertext that then reads as null.
+        const nencTmp = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+        try {
+          await fs.promises.writeFile(nencTmp, payload, { mode: 0o600 });
+          await fs.promises.rename(nencTmp, keyPath);
+        } catch (err) {
+          try { await fs.promises.unlink(nencTmp); } catch (_) {}
+          throw err;
+        }
         if (process.platform !== 'win32') {
           try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
         }
@@ -4379,6 +4730,10 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
 
 ipcMain.handle('secure-store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
+  // Read under the same mutex the writer uses: otherwise a read can land inside
+  // the writer's truncate window, fail to decrypt the partial buffer, and
+  // report "no credential stored" for a secret that exists.
+  return withSecureStoreMutex(async () => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
@@ -4415,10 +4770,12 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
     console.error('Secure store get error:', err);
   }
   return null;
+  });
 });
 
 ipcMain.handle('secure-store-delete', async (event, key: string) => {
   if (!isTrustedSender(event)) return false;
+  return withSecureStoreMutex(async () => {
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
     const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
@@ -4430,6 +4787,121 @@ ipcMain.handle('secure-store-delete', async (event, key: string) => {
     console.error('Secure store delete error:', err);
     return false;
   }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// On-device model cache
+//
+// The packaged app is loaded with loadFile(), so the renderer runs on an opaque
+// `file://` origin where the Cache API is unavailable. transformers.js therefore
+// cannot cache its model shards and would re-download ~41 MB on every launch.
+// These handlers give it a disk-backed cache in userData instead.
+//
+// The URL is never used to build a path: the file name is a SHA-256 of the URL,
+// and only HTTPS requests to the model CDNs the app's CSP already allows are
+// accepted, so a hostile renderer cannot write anywhere it likes.
+// ---------------------------------------------------------------------------
+const MODEL_CACHE_HOST_RE = /(^|\.)(huggingface\.co|hf\.co)$/i;
+
+// Hoisted function (not a const) so `clear-ai-models-cache`, registered further
+// up the file, can resolve the shard directory without a TDZ reference.
+function modelCacheDir(): string {
+  return path.join(app.getPath('userData'), 'models');
+}
+
+function modelCachePathFor(url: string): string | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== 'https:') return null;
+  if (parsed.username || parsed.password) return null;
+  if (!MODEL_CACHE_HOST_RE.test(parsed.hostname.toLowerCase())) return null;
+  const hash = crypto.createHash('sha256').update(url).digest('hex');
+  return path.join(modelCacheDir(), hash);
+}
+
+ipcMain.handle('model-cache-get', async (event, url: unknown) => {
+  if (!isTrustedSender(event)) return null;
+  if (typeof url !== 'string') return null;
+  const filePath = modelCachePathFor(url);
+  if (!filePath) return null;
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_MODEL_CACHE_FILE_BYTES) return null;
+    const buffer = await fs.promises.readFile(filePath);
+    // Transfer as a plain ArrayBuffer so the structured clone copies the bytes
+    // instead of exposing a Node Buffer to the renderer.
+    return buffer.buffer.slice(
+      buffer.byteOffset,
+      buffer.byteOffset + buffer.byteLength
+    );
+  } catch (err: any) {
+    // A bare `return null` is indistinguishable from "not cached" in the
+    // renderer, and forwarded renderer output can be redacted — so the main
+    // process is the only reliable place to record an unexpected read failure.
+    // ENOENT is the ordinary miss and stays silent.
+    if (err?.code !== 'ENOENT') {
+      console.warn('[ModelCache] Failed to read model file:', err, filePath);
+    }
+    return null;
+  }
+});
+
+ipcMain.handle('model-cache-set', async (event, url: unknown, data: unknown) => {
+  if (!isTrustedSender(event)) return false;
+  if (typeof url !== 'string') return false;
+  const filePath = modelCachePathFor(url);
+  if (!filePath) return false;
+  // Same per-call uniqueness requirement as `store-set`: a pid-only temp name
+  // would let two concurrent shard writes truncate one shared file and splice
+  // their bytes, so the rename would not be atomic in practice.
+  const tmpPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+  try {
+    let buffer: Buffer;
+    if (data instanceof ArrayBuffer) {
+      if (data.byteLength === 0 || data.byteLength > MAX_MODEL_CACHE_FILE_BYTES) return false;
+      buffer = Buffer.from(new Uint8Array(data));
+    } else if (ArrayBuffer.isView(data)) {
+      const view = data as ArrayBufferView;
+      if (view.byteLength === 0 || view.byteLength > MAX_MODEL_CACHE_FILE_BYTES) return false;
+      buffer = Buffer.from(view.buffer, view.byteOffset, view.byteLength);
+    } else {
+      return false;
+    }
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    // A per-file cap is not a budget: each distinct URL gets its own file, so
+    // without a total ceiling the cache can fill the user's disk. Make room
+    // (oldest first) before promoting the new file.
+    const withinBudget = await enforceModelCacheBudget(
+      path.dirname(filePath), buffer.byteLength, filePath
+    );
+    if (!withinBudget) {
+      console.warn('[ModelCache] Write exceeds the total cache budget; refusing to cache this model.');
+      try { await fs.promises.unlink(tmpPath); } catch (_) {}
+      return false;
+    }
+    await fs.promises.writeFile(tmpPath, buffer, { mode: 0o600 });
+    await fs.promises.rename(tmpPath, filePath);
+    return true;
+  } catch (err) {
+    console.warn('[ModelCache] Failed to persist model file:', err);
+    try { await fs.promises.unlink(tmpPath); } catch (_) {}
+    return false;
+  }
+});
+
+// Second layer of the agent navigation policy. The renderer check
+// (isSafeAgentNavigationUrl) cannot resolve a DNS name, so a public hostname
+// that points at a private address still needs to be refused here, where the
+// name can actually be resolved. Trusted-sender only, and read-only.
+ipcMain.handle('agent-navigation-host-check', async (event, url: unknown) => {
+  if (!isTrustedSender(event)) return { allowed: false, reason: 'untrusted sender' };
+  if (typeof url !== 'string') return { allowed: false, reason: 'invalid url' };
+  return isAgentNavigationHostPublic(url);
 });
 
 // Generic JSON Storage API (for highlights, stats, whitelists, etc.)
@@ -4453,15 +4925,32 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
       return { error: 'Value exceeds maximum allowed size of 10MB' };
     }
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
-    await fs.promises.writeFile(keyPath, value, 'utf-8');
-    
+    // Atomic replace. `writeFile` truncates in place, and the renderer has two
+    // concurrent writers per key (the debounced persistence effect plus the
+    // beforeunload / visibilitychange flush, which fires on every app switch).
+    // An interleaved write left a spliced file, and every consumer swallows the
+    // resulting JSON.parse error and silently falls back to defaults — so a
+    // torn write looked exactly like "your tabs/bookmarks/settings are gone".
+    // The temp name must be unique per call, not just per process: keyed on the
+    // pid alone, both writers opened and truncated the SAME temp file, so the
+    // payload that survived the rename was a byte-level splice of the two values
+    // (invalid JSON) and the losing rename rejected with ENOENT.
+    const tmpPath = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
+    try {
+      await fs.promises.writeFile(tmpPath, value, 'utf-8');
+      await fs.promises.rename(tmpPath, keyPath);
+    } catch (writeErr) {
+      try { await fs.promises.unlink(tmpPath); } catch (_) {}
+      throw writeErr;
+    }
+
     if (key === 'adblocker_whitelist') {
       try {
         const wl = JSON.parse(value);
         if (Array.isArray(wl)) updateAdblockWhitelist(wl);
       } catch(e) {}
     }
-    
+
     return true;
   } catch (err) {
     console.error('Store set error:', err);
@@ -4489,7 +4978,7 @@ ipcMain.handle('set-vpn', async (event, config: { enabled: boolean; proxyUrl?: s
   }
   const isEnabled = Boolean(config.enabled);
   const rawProxyUrl = typeof config.proxyUrl === 'string' ? config.proxyUrl.trim() : '';
-  
+
   if (isEnabled && rawProxyUrl) {
     if (!isValidSecureProxy(rawProxyUrl)) {
       console.error('Secure proxy required: https:// or socks5://');
@@ -4637,10 +5126,10 @@ async function readResponseTextWithLimit(response: any, maxBytes: number): Promi
 ipcMain.handle('fetch-page-html', async (event, url: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
   if (!url || typeof url !== 'string') return { error: 'Invalid URL' };
-  
+
   let currentUrl = url;
   const MAX_REDIRECTS = 3;
-  
+
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     // Validate every hop. Redirects can cross from a public host to localhost,
     // a private IP, a mapped IPv4 address, or the local MCP port.
@@ -4798,7 +5287,7 @@ ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
 
   try {
     const results: string[] = [...texts];
-    
+
     // Group into HTML payload chunks of ~1600 chars or ~35 elements
     const chunks: { indices: number[]; payload: string }[] = [];
     let currentIndices: number[] = [];
@@ -4807,7 +5296,7 @@ ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
     for (let i = 0; i < texts.length; i++) {
       const txt = texts[i] || '';
       if (!txt.trim()) continue;
-      
+
       const itemHtml = `<p id="${i}">${escapeHtmlForTranslation(txt)}</p>`;
       if (currentIndices.length >= 35 || (currentPayload.length + itemHtml.length > 1600 && currentIndices.length > 0)) {
         chunks.push({ indices: currentIndices, payload: currentPayload });
@@ -5005,15 +5494,15 @@ function getLocalizedManifestString(extPath: string, text: string, fallback: str
   if (!text || typeof text !== 'string') return fallback;
   if (!text.startsWith('__MSG_') || !text.endsWith('__')) return text;
   const key = text.slice(6, -2);
-  
+
   const localesDir = path.join(extPath, '_locales');
   if (!fs.existsSync(localesDir)) return fallback || text;
-  
+
   const candidateLocales = ['en', 'en_US', 'en_GB', 'tr'];
   try {
     const allLocales = fs.readdirSync(localesDir);
     const searchOrder = [...candidateLocales.filter(l => allLocales.includes(l)), ...allLocales];
-    
+
     for (const loc of searchOrder) {
       const msgFile = path.join(localesDir, loc, 'messages.json');
       if (fs.existsSync(msgFile)) {
@@ -5032,7 +5521,7 @@ function getLocalizedManifestString(extPath: string, text: string, fallback: str
       }
     }
   } catch (_) {}
-  
+
   return fallback || text;
 }
 
@@ -5064,10 +5553,11 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
     return { error: 'Extension directory does not exist or is inaccessible.' };
   }
 
+  // No traversal guard here: `manifestPath` was assigned that exact path.join two
+  // lines up, so the previous check compared the value to itself and could never
+  // fire - a dead control that read like a defence. realFolder is already
+  // realpathSync'd and isDirectory-checked above, which is the real containment.
   const manifestPath = path.join(realFolder, 'manifest.json');
-  if (!manifestPath.startsWith(realFolder + path.sep) && manifestPath !== path.join(realFolder, 'manifest.json')) {
-    return { error: 'Invalid extension path: path traversal detected.' };
-  }
 
   if (!fs.existsSync(manifestPath)) {
     return { error: 'No manifest.json found in the selected folder.' };
@@ -5145,7 +5635,9 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
     return { error: 'Invalid extension ID format' };
   }
 
-  const disabledIds = getDisabledExtensionIds();
+  // NOTE: the disabled-extension list is intentionally NOT snapshotted here.
+  // Both branches below await a session call before persisting, so each one
+  // re-reads the list immediately before writing (see the comments inline).
   const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
   const extPath = path.resolve(path.join(extensionsBaseDir, extensionId));
   const foundExt = loadedExtensions.find(e => e.id === extensionId);
@@ -5167,7 +5659,11 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
         }
         return { error: 'Extension identity changed. Remove and install the extension again.' };
       }
-      setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId));
+      // Re-read immediately before writing instead of using a snapshot taken
+      // before the await above: two toggles within the same second both read
+      // the same list, and whichever write lands last would clobber the other,
+      // silently re-enabling (or re-disabling) an extension on next launch.
+      setDisabledExtensionIds(getDisabledExtensionIds().filter(id => id !== extensionId));
       loadedExtensions = [...loadedExtensions.filter(e => e.id !== extensionId), extInfo];
     } else {
       const extensionInfo = foundExt || session.defaultSession.getExtension(extensionId);
@@ -5177,7 +5673,10 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
       if (session.defaultSession.getExtension(extensionId)) {
         await session.defaultSession.removeExtension(extensionId);
       }
-      if (!disabledIds.includes(extensionId)) setDisabledExtensionIds([...disabledIds, extensionId]);
+      // Same reason as the enable branch: this branch awaits removeExtension(),
+      // so the list must be re-read after the await, not before it.
+      const currentDisabledIds = getDisabledExtensionIds();
+      if (!currentDisabledIds.includes(extensionId)) setDisabledExtensionIds([...currentDisabledIds, extensionId]);
       if (extensionInfo && !loadedExtensions.some(e => e.id === extensionId)) loadedExtensions.push(extensionInfo);
     }
 
@@ -5207,7 +5706,7 @@ ipcMain.handle('list-extensions', async (event) => {
       }
     }
   } catch (_) {}
-  
+
   return Promise.all(loadedExtensions.map(async (e) => {
     let iconData = undefined;
     let popupUrl = undefined;
@@ -5219,7 +5718,7 @@ ipcMain.handle('list-extensions', async (event) => {
       const manifestPath = path.join(e.path, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
         const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-        
+
         localizedName = getLocalizedManifestString(e.path, manifest.name, e.name);
         localizedDesc = getLocalizedManifestString(e.path, manifest.description, e.description);
 
@@ -5268,7 +5767,7 @@ ipcMain.handle('list-extensions', async (event) => {
     } catch (err) {
       console.error('Failed to load extension icon', err);
     }
-    
+
     return {
       name: localizedName || e.name || e.id,
       id: e.id,
@@ -5296,7 +5795,14 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   if (url.startsWith('file://')) {
     try {
       const filePath = path.resolve(fileURLToPath(url));
-      if (!filePath.startsWith(extensionsDir + path.sep)) {
+      // path.resolve collapses `..` but not symlinks, and the check is done on
+      // the string while Chromium re-resolves the real path. A link planted in
+      // <userData>/extensions would pass this and render an arbitrary local file
+      // in a chrome-less, always-on-top window. The sibling handlers here use
+      // realpathSync on both sides; this one was the odd case out.
+      const realExtensionsDir = fs.realpathSync(extensionsDir);
+      const realFilePath = fs.realpathSync(filePath);
+      if (!realFilePath.startsWith(realExtensionsDir + path.sep)) {
         return { error: 'Blocked: file:// URL must be within extensions directory.' };
       }
     } catch {
@@ -5342,11 +5848,11 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   if (bounds && typeof bounds.x === 'number' && typeof bounds.y === 'number') {
     const [winX, winY] = win.getPosition();
     const [winW, winH] = win.getSize();
-    
+
     // Calculate screen coordinate anchored directly under the button
     const btnCenterX = winX + Math.round(bounds.x) + Math.round((bounds.width || 28) / 2);
     const calculatedX = btnCenterX - Math.round(popupWidth / 2);
-    
+
     posX = Math.max(winX + 12, Math.min(calculatedX, winX + winW - popupWidth - 12));
     posY = winY + Math.round(bounds.y) + Math.round(bounds.height || 28) + 6;
   }
@@ -5493,7 +5999,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   popupWin.webContents.on('dom-ready', async () => {
     injectActiveTabBridge();
     showPopup();
-    
+
     // Auto-fit popup dimensions to content
     try {
       const dimensions = await popupWin.webContents.executeJavaScript(`
@@ -5505,7 +6011,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
         const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
         const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
-        
+
         if (!popupWin.isDestroyed()) {
           popupWin.setSize(fitWidth, fitHeight);
         }
@@ -5628,34 +6134,72 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
   }
 
   try {
+    // Perf/Freeze fix: the read + parse below is synchronous on the main process.
+    // Chrome's Bookmarks file legitimately reaches tens of thousands of entries
+    // (tens of MB), and the old unbounded path froze every window while the main
+    // thread was stuck reading, parsing, URL()-ing and structured-cloning. Refuse
+    // implausibly large files outright, and cap the node walk below.
+    const MAX_BOOKMARKS_FILE_BYTES = 32 * 1024 * 1024;
+    const MAX_IMPORTED_BOOKMARKS = 20000;
+    const fileSize = fs.statSync(bookmarksPath).size;
+    if (fileSize > MAX_BOOKMARKS_FILE_BYTES) {
+      return {
+        success: false,
+        error: `Bookmarks file is too large to import safely (${(fileSize / (1024 * 1024)).toFixed(1)} MB, limit 32 MB).`
+      };
+    }
+
     const data = JSON.parse(fs.readFileSync(bookmarksPath, 'utf8'));
     const importedBookmarks: any[] = [];
-    
+    let truncated = false;
+
     // Recursive function to extract URLs safely
     const extractNodes = (node: any, depth = 0) => {
       if (depth > 20 || !node) return;
+      // Hard cap: a huge-but-under-the-size-limit file must not produce an
+      // unbounded result (nor an unbounded walk) either.
+      if (importedBookmarks.length >= MAX_IMPORTED_BOOKMARKS) {
+        truncated = true;
+        return;
+      }
       if (node.type === 'url' && typeof node.url === 'string') {
         try {
           const parsed = new URL(node.url);
           // Security: Only allow http and https protocols in imported bookmarks
           if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-            const domain = parsed.hostname;
+            // Privacy: no favicon URL is synthesized here. Guessing
+            // https://<domain>/favicon.ico queued one request to a third-party
+            // host per bookmark, leaking the user's IP/UA to every site they ever
+            // bookmarked. The bookmark list renders a Globe icon when favicon is
+            // absent, so nothing breaks.
             importedBookmarks.push({
               id: `bm_imp_${crypto.randomUUID()}`,
               title: String(node.name || node.url).substring(0, 200),
-              url: node.url,
-              favicon: domain ? `https://${domain}/favicon.ico` : undefined
+              url: node.url
             });
           }
         } catch (_) {}
       } else if (node.type === 'folder' && Array.isArray(node.children)) {
-        node.children.forEach((child: any) => extractNodes(child, depth + 1));
+        for (const child of node.children) {
+          if (importedBookmarks.length >= MAX_IMPORTED_BOOKMARKS) {
+            truncated = true;
+            return;
+          }
+          extractNodes(child, depth + 1);
+        }
       }
     };
 
     if (data.roots?.bookmark_bar) extractNodes(data.roots.bookmark_bar);
     if (data.roots?.other) extractNodes(data.roots.other);
     if (data.roots?.synced) extractNodes(data.roots.synced);
+
+    if (truncated) {
+      return {
+        success: false,
+        error: `Import stopped at ${MAX_IMPORTED_BOOKMARKS} bookmarks (limit reached). The bookmark list was not imported — narrow it down or remove old bookmarks and try again.`
+      };
+    }
 
     return { success: true, bookmarks: importedBookmarks };
   } catch (err) {
@@ -5670,10 +6214,10 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
   if (!extensionId || typeof extensionId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(extensionId)) {
     return { error: 'Invalid extension ID format' };
   }
-  
+
   try {
     const foundExt = loadedExtensions.find((e) => e.id === extensionId);
-    
+
     // 1. Close any active popup windows for this extension
     if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
       try {
@@ -5712,7 +6256,7 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
 
     // 5. Permanently remove extension directory from disk
     const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
-    
+
     // Path 1: Direct ID folder
     const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
     if (extDir.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(extDir)) {
@@ -5789,20 +6333,20 @@ ipcMain.handle('review-extension-permissions', async (event, extensionId: string
   } catch {
     return { error: 'Extension permission path does not exist' };
   }
-  
+
   const permissions = await parseExtensionPermissions(resolvedExtractPath);
-  
+
   // Combine all permissions for display
   const allPermissions = [
     ...permissions.permissions,
     ...permissions.optionalPermissions,
     ...permissions.hostPermissions
   ];
-  
+
   const formattedPermissions = formatPermissionsForDisplay(allPermissions);
-  
+
   const parentWin = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-  
+
   const confirmOptions: Electron.MessageBoxOptions = {
     type: 'question',
     buttons: ['Cancel', 'Install'],
@@ -5814,15 +6358,15 @@ ipcMain.handle('review-extension-permissions', async (event, extensionId: string
     checkboxLabel: 'Remember this decision',
     checkboxChecked: false
   };
-  
+
   const { response, checkboxChecked } = parentWin
     ? await dialog.showMessageBox(parentWin, confirmOptions)
     : await dialog.showMessageBox(confirmOptions);
-  
+
   if (response !== 1) {
     return { allowed: false, cancelled: true };
   }
-  
+
   return { allowed: true, remember: checkboxChecked };
 });
 
@@ -5929,7 +6473,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
       if (cleanVoice) {
         args.push('-v', cleanVoice);
       }
-      
+
       if (rate && typeof rate === 'number' && Number.isFinite(rate)) {
         const clampedRate = Math.max(0.5, Math.min(2.5, rate));
         const wpm = Math.round(175 * clampedRate);
@@ -6008,6 +6552,14 @@ ipcMain.handle('native-tts-stop', async (event) => {
 const CONFIRM_DIALOG_LIMIT = 5;
 const CONFIRM_DIALOG_WINDOW_MS = 10_000;
 const confirmDialogAttempts = new Map<number, number[]>();
+// Senders that already carry a 'destroyed' cleanup listener. `destroyed` never
+// fires on a live window (macOS keeps the app running when the last window
+// closes), so gating registration on the rate-limit map — whose entry is dropped
+// as soon as the 10s window empties — re-registered a permanent closure on an
+// app-lifetime webContents every 10 seconds. Settings toggles, "clear data" and
+// "restart" all come through here. Tracking ids in their own set keeps the
+// listener count at one per sender for the sender's whole lifetime.
+const confirmDialogCleanupRegistered = new Set<number>();
 
 ipcMain.handle('show-confirm-dialog', async (event, options: { title?: string; message: string; detail?: string; confirmLabel?: string; cancelLabel?: string }) => {
   if (!isTrustedSender(event)) return false;
@@ -6018,8 +6570,14 @@ ipcMain.handle('show-confirm-dialog', async (event, options: { title?: string; m
   if (recentAttempts.length === 0) confirmDialogAttempts.delete(senderId);
   // Avoid unbounded growth from destroyed senders: drop state when the sender dies.
   try {
-    if (!confirmDialogAttempts.has(senderId)) {
-      event.sender.once('destroyed' as any, () => { confirmDialogAttempts.delete(senderId); });
+    if (!confirmDialogCleanupRegistered.has(senderId)) {
+      event.sender.once('destroyed' as any, () => {
+        confirmDialogAttempts.delete(senderId);
+        confirmDialogCleanupRegistered.delete(senderId);
+      });
+      // Marked only after once() succeeds, so a throw here still lets a later
+      // dialog retry the registration instead of stranding the sender unmarked.
+      confirmDialogCleanupRegistered.add(senderId);
     }
   } catch {}
   if (recentAttempts.length >= CONFIRM_DIALOG_LIMIT) {

@@ -29,6 +29,11 @@ export function reorderTabsWithinGroup(tabs: Tab[], draggedId: string, targetId:
 
   const reorderedGroup = [...groupIds];
   const [removed] = reorderedGroup.splice(draggedIndex, 1);
+  // Insert at the target's pre-removal index: the dragged tab ends up occupying
+  // the slot the target held, which is the standard array-move convention
+  // (react-dnd `move`, immutability-helpers `arrayMove`). Removing first shifts
+  // later slots down by one, and that is what makes a rightward drag land at the
+  // new position rather than one past it.
   reorderedGroup.splice(targetIndex, 0, removed);
 
   const groupPositions = tabs.reduce<number[]>((positions, tab, index) => {

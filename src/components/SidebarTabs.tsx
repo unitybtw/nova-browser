@@ -1,21 +1,21 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  X, 
-  Globe, 
-  VolumeX, 
-  Volume2, 
-  ChevronDown, 
-  ChevronRight, 
-  Folder as FolderIcon, 
-  FolderPlus, 
-  Check, 
-  Settings, 
-  Clock, 
-  Download, 
-  VenetianMask, 
+import {
+  Plus,
+  X,
+  Globe,
+  VolumeX,
+  Volume2,
+  ChevronDown,
+  ChevronRight,
+  Folder as FolderIcon,
+  FolderPlus,
+  Check,
+  Settings,
+  Clock,
+  Download,
+  VenetianMask,
   Moon,
   ArrowLeft,
   ArrowRight,
@@ -55,6 +55,26 @@ const WORKSPACE_COLORS: Record<string, string> = {
   purple: '#a855f7',
   rose: '#f43f5e',
   amber: '#f59e0b'
+};
+
+/**
+ * True when a `click`/`keydown` reaching a container handler came from a
+ * nested interactive control rather than from the container's own surface.
+ *
+ * A tab row / folder header is a `role="tab"` / `role="button"` container that
+ * wraps real <button> children (the ✕). Those children only stopped
+ * propagation on `click`, never on `keydown`, so Enter on a tab's ✕ ran the
+ * row's own handler and selected the tab, and Enter on a folder's ✕ ran the
+ * header's handler and collapsed the folder — the button's own action was
+ * never reached. This rejects any event that originated inside a nested form
+ * control, on both paths. It is deliberately not a blanket
+ * `e.currentTarget !== e.target` test: a click on the title span or favicon is
+ * a descendant event too, and it must keep selecting the tab.
+ */
+const isFromNestedControl = (e: React.SyntheticEvent<HTMLElement>): boolean => {
+  const target = e.target as HTMLElement | null;
+  if (!target || target === e.currentTarget) return false;
+  return !!target.closest('button, a, input, select, textarea');
 };
 
 export interface FavoriteApp {
@@ -111,7 +131,6 @@ export interface SidebarTabsProps {
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onNewTab: (url?: string) => void;
   onNewIncognitoTab?: () => void;
-  onExitIncognito?: () => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
   onDuplicateTab?: (id: string) => void;
   onTogglePinTab?: (id: string) => void;
@@ -252,8 +271,9 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       exit={splitTab ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0 }}
       transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
       key={tab.id}
-      onClick={() => onSelectTab(tab.id)}
+      onClick={(e) => { if (isFromNestedControl(e)) return; onSelectTab(tab.id); }}
       onKeyDown={(e) => {
+        if (isFromNestedControl(e)) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onSelectTab(tab.id);
@@ -284,13 +304,13 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       {splitTab ? (
         <div className="flex items-center w-full gap-0.5">
           {/* Primary Split Subtab */}
-          <div 
+          <div
             className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-left relative ${
-              activeTabId === tab.id 
-                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
+              activeTabId === tab.id
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
             }`}
-            onClick={(e) => { e.stopPropagation(); onSelectTab(tab.id); }}
+            onClick={(e) => { if (isFromNestedControl(e)) return; e.stopPropagation(); onSelectTab(tab.id); }}
             title={tab.title}
           >
             {tab.favicon ? (
@@ -305,6 +325,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
                 onMouseLeave?.();
                 onCloseTab(tab.id);
               }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
               className="opacity-0 group-hover/split-left:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
               title="Close Left Tab"
             >
@@ -319,6 +340,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               onMouseLeave?.();
               onCloseSplit?.(tab.id, splitTab.id);
             }}
+            onKeyDown={(e) => { e.stopPropagation(); }}
             className="p-0.5 rounded hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors shrink-0 group/unsplit cursor-pointer"
             title="Separate Tabs"
           >
@@ -327,16 +349,17 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           </button>
 
           {/* Secondary Split Subtab */}
-          <div 
+          <div
             className={`flex items-center gap-1.5 flex-1 min-w-0 px-2 py-1 rounded-lg transition-colors cursor-pointer group/split-right relative ${
-              activeTabId === splitTab.id 
-                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold' 
+              activeTabId === splitTab.id
+                ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 font-semibold'
                 : 'hover:bg-black/5 dark:hover:bg-white/5 opacity-80'
             }`}
-            onClick={(e) => { 
-              e.stopPropagation(); 
+            onClick={(e) => {
+              if (isFromNestedControl(e)) return;
+              e.stopPropagation();
               onMouseLeave?.();
-              onSelectTab(splitTab.id); 
+              onSelectTab(splitTab.id);
             }}
             title={splitTab.title}
           >
@@ -346,12 +369,13 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               <Globe className="w-3.5 h-3.5 opacity-70 shrink-0" />
             )}
             <span className="truncate text-[12px] flex-1">{splitTab.title || 'New Tab'}</span>
-            <button 
-              onClick={(e) => { 
-                e.stopPropagation(); 
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
                 onMouseLeave?.();
-                onCloseTab(splitTab.id); 
-              }} 
+                onCloseTab(splitTab.id);
+              }}
+              onKeyDown={(e) => { e.stopPropagation(); }}
               className="opacity-0 group-hover/split-right:opacity-100 p-0.5 rounded-sm hover:bg-red-500/20 text-slate-400 hover:text-red-500 shrink-0 transition-opacity cursor-pointer"
               title="Close Right Tab"
             >
@@ -395,11 +419,11 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
             isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
           }`}>
             {tab.isMuted ? (
-              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
                 <VolumeX className="w-3 h-3" />
               </button>
             ) : tab.isPlayingAudio ? (
-              <button onClick={(e) => onToggleMuteTab(tab.id, e)} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
+              <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-cyan-600 dark:text-cyan-400">
                 <Volume2 className="w-3 h-3 animate-pulse" />
               </button>
             ) : null}
@@ -409,13 +433,14 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
               </span>
             )}
             {!tab.isPinned && (
-              <button 
-                onClick={(e) => { 
-                  e.stopPropagation(); 
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
                   onMouseLeave?.();
-                  onCloseTab(tab.id, e); 
-                }} 
-                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors cursor-pointer"
+                  onCloseTab(tab.id, e);
+                }}
+                onKeyDown={(e) => { e.stopPropagation(); }}
+                className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/15 text-slate-400 hover:text-slate-800 dark:text-slate-400 hover:text-white transition-colors cursor-pointer"
                 title="Close Tab"
               >
                 <X className="w-3 h-3" />
@@ -462,7 +487,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onCloseTab,
   onNewTab,
   onNewIncognitoTab,
-  onExitIncognito,
   onToggleMuteTab,
   onDuplicateTab,
   onTogglePinTab,
@@ -818,7 +842,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         setIsLibraryDropdownOpen(false);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -846,21 +870,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
-      <div 
+      <div
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
         className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
       >
-        
+
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
-        <div 
+        <div
           className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0 select-none"
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           <div className="flex items-center gap-1">
             {isMac && (
-              <div 
-                className="w-[72px] h-full shrink-0 select-none drag-region" 
-                style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+              <div
+                className="w-[72px] h-full shrink-0 select-none drag-region"
+                style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
               />
             )}
             {onToggleCollapse && (
@@ -880,7 +904,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </div>
 
           {/* Navigation Controls in Arc style */}
-          <div 
+          <div
             className="flex items-center gap-0.5 no-drag"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
@@ -932,21 +956,25 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 2. INTEGRATED OMNIBOX / URL SEARCH PILL */}
-        <div 
+        <div
           className="px-3 pt-1 pb-2.5 no-drag relative"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           <form onSubmit={handleOmniboxSubmit}>
             <div className={`relative flex items-center h-8 px-2.5 rounded-xl transition-colors duration-200 border ${
-              isOmniboxFocused 
-                ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10' 
+              isOmniboxFocused
+                ? 'bg-white border-cyan-500/50 shadow-md ring-1 ring-cyan-500/20 dark:bg-white/12 dark:border-white/20 dark:shadow-lg dark:ring-white/10'
                 : 'bg-white/80 hover:bg-white border-slate-300/80 dark:bg-white/6 dark:hover:bg-white/8 dark:border-white/[0.08]'
             }`}>
               <Search className="w-3.5 h-3.5 text-slate-400 shrink-0 mr-2 opacity-70" />
-              
+
               <input
                 ref={omniboxInputRef}
                 type="text"
+                // Same stable hook as the horizontal TopBar omnibox, so the
+                // ⌘L / focus-url shortcut sites resolve to *this* input in the
+                // vertical-tabs layout too. See OmniboxBar.tsx.
+                data-omnibox-input="true"
                 value={searchValue}
                 onChange={(e) => {
                   setSearchValue(e.target.value);
@@ -1051,7 +1079,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 3. CUSTOMIZABLE TOP FAVORITES GRID (Arc 2-column or 4-column glass tiles) */}
-        <div 
+        <div
           className="px-3 pb-2.5 no-drag"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
@@ -1138,8 +1166,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </AnimatePresence>
 
         {/* 4. ACTIVE SPACE / PROFILE HEADER (Zero Emoji, Clean Lucide Orbit) */}
-        <div 
-          className="px-3 pb-2 no-drag relative" 
+        <div
+          className="px-3 pb-2 no-drag relative"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           ref={dropdownRef}
         >
@@ -1205,7 +1233,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 5. TABS SECTION HEADER */}
-        <div 
+        <div
           className="px-3.5 pt-1 pb-1 flex items-center justify-between text-[11px] font-semibold tracking-wider text-slate-400/80 dark:text-slate-500 uppercase no-drag select-none"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
@@ -1218,16 +1246,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {isIncognito && onExitIncognito && (
-              <button
-                onClick={onExitIncognito}
-                className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-cyan-950/40 text-cyan-400 hover:bg-cyan-900/50 border border-cyan-500/30 transition-colors cursor-pointer flex items-center gap-1"
-                title="Normal Sekmeye Geç / Switch to Normal Tab"
-              >
-                <Compass className="w-3 h-3" />
-                <span className="text-[10px] capitalize font-medium">Normal</span>
-              </button>
-            )}
             {onNewIncognitoTab && (
               <button
                 onClick={onNewIncognitoTab}
@@ -1248,7 +1266,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}
-        <div 
+        <div
           className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 no-scrollbar flex flex-col gap-0.5 no-drag"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
@@ -1272,8 +1290,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   className="flex flex-col gap-0.5"
                 >
                   <div
-                    onClick={() => onToggleFolder?.(folder.id)}
+                    onClick={(e) => { if (isFromNestedControl(e)) return; onToggleFolder?.(folder.id); }}
                     onKeyDown={(e) => {
+                      if (isFromNestedControl(e)) return;
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         onToggleFolder?.(folder.id);
@@ -1308,6 +1327,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
+                      onKeyDown={(e) => { e.stopPropagation(); }}
                       className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
                     >
                       <X className="w-3 h-3" />
@@ -1418,8 +1438,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 7. BOTTOM DOCK FOOTER */}
-        <div 
-          className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative" 
+        <div
+          className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           ref={libraryRef}
         >
@@ -1586,7 +1606,6 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
   if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
   if (prevProps.onNewIncognitoTab !== nextProps.onNewIncognitoTab) return false;
 
   // Array-valued props compared by reference (state arrays from App)

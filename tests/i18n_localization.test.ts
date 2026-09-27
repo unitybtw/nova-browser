@@ -48,20 +48,11 @@ assert.equal(t(getGreetingKey(9)), 'Good Morning');
 assert.equal(t(getGreetingKey(14)), 'Good Afternoon');
 assert.equal(t(getGreetingKey(20)), 'Good Evening');
 
-setLanguage('tr');
-assert.equal(t(getGreetingKey(9)), 'Günaydın');
-assert.equal(t(getGreetingKey(14)), 'İyi Günler');
-assert.equal(t(getGreetingKey(20)), 'İyi Akşamlar');
-
-setLanguage('de');
-assert.equal(t(getGreetingKey(9)), 'Guten Morgen');
-assert.equal(t(getGreetingKey(14)), 'Guten Tag');
-assert.equal(t(getGreetingKey(20)), 'Guten Abend');
-
-setLanguage('ar');
-assert.equal(t(getGreetingKey(9)), 'صباح الخير');
-assert.equal(t(getGreetingKey(14)), 'مساء الخير');
-assert.equal(t(getGreetingKey(20)), 'مساء الخير');
+// The tr/de/ar dictionaries are dynamic imports in the app, so they are NOT
+// synchronously available here and this suite does not seed them: i18n is
+// module-level shared state, and seeding from two suites makes them order
+// dependent. The loading policy and the translated strings are asserted in
+// tests/i18n_loading.test.ts, which owns those dictionaries.
 
 // 5. Reactive Listener on Language Change
 let listenerTriggered = false;

@@ -1,10 +1,9 @@
 import type { Express, Request } from 'express';
-import { BrowserWindow, safeStorage, dialog, powerMonitor } from 'electron';
+import { BrowserWindow, safeStorage, dialog, powerMonitor, app as electronApp } from 'electron';
 import { randomUUID, createHash, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
-import { app as electronApp } from 'electron';
 // Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
@@ -267,6 +266,10 @@ const TOOLS: McpTool[] = [
   }
 ];
 
+// The names this server actually implements. A name outside this set is not a
+// tool at all, whatever the user's per-tool toggles say.
+const REGISTERED_TOOL_NAMES = new Set<string>(TOOLS.map(tool => tool.name));
+
 // Tool permission levels
 export type ToolPermissionLevel = 'safe' | 'medium' | 'sensitive';
 
@@ -322,6 +325,22 @@ interface SseClient {
 export class BrowserMCPServer {
   private warnedQueryToken = false;
   private server: any;
+  // A start() that has been claimed but has not bound its port yet. The
+  // caller's isRunning() guard is evaluated BEFORE start() runs, so without a
+  // synchronous claim two concurrent calls (e.g. the user double-clicking the
+  // toggle) both reach app.listen() and the second assignment to this.server
+  // orphans the first listener — an authenticated port stays bound while the
+  // UI reports "stopped", and stop() only closes the one it still knows about.
+  private starting: boolean = false;
+  // Set by stop() when it lands while a start() is still in flight. The
+  // in-flight start has no port to close yet, so it unwinds on bind instead
+  // of leaving an orphan listener behind.
+  private stopRequested: boolean = false;
+  // Rejects the in-flight start(), if there is one. Defaults to a no-op so
+  // stop() is safe before start() has reached its listen call. Without this, a
+  // stop() landing after listen() but before the 'listening' callback would
+  // close the pending listener and leave start()'s promise pending forever.
+  private abortStart: (err: Error) => void = () => {};
   private mainWindow: BrowserWindow | null = null;
   private clients: Map<string, SseClient> = new Map();
   private token: string;
@@ -471,6 +490,15 @@ export class BrowserMCPServer {
   public getToken(): string { return this.token; }
 
   public rotateToken(): string {
+    // Security: rotating the token is documented as a hard revocation, so it
+    // must actually evict live sessions. /message re-validates the bearer on
+    // every request, so the old token can no longer issue commands — but
+    // without ending the already-open SSE streams the previous holder keeps
+    // receiving events, in-flight tool results still land on its stream, and
+    // getConnectedClientsInfo() still lists it. Close every live stream and
+    // drop the registry exactly like stop() does. Token-rotation semantics are
+    // unchanged: the new token is persisted and the old one stops matching.
+    this.revokeAllClients();
     this.token = this.saveNewToken();
     return this.token;
   }
@@ -525,8 +553,18 @@ export class BrowserMCPServer {
     return false;
   }
 
+  private isRegisteredTool(toolName: unknown): boolean {
+    return typeof toolName === 'string' && REGISTERED_TOOL_NAMES.has(toolName);
+  }
+
   private isToolAllowed(toolName: string): boolean {
-    return !this.disabledTools.has(toolName);
+    // Allowlist, not blocklist. "Not in the disabled set" let any name the
+    // registry never declared — a typo, a tool removed from TOOLS but still
+    // listed in TOOL_PERMISSIONS (browser_full_page_screenshot), or a
+    // non-string such as an absent body.params.name — pass the gate and be
+    // forwarded to the renderer. A name must now be a registered tool AND not
+    // be disabled.
+    return this.isRegisteredTool(toolName) && !this.disabledTools.has(toolName);
   }
 
   public setMainWindow(window: BrowserWindow | null) {
@@ -543,6 +581,16 @@ export class BrowserMCPServer {
 
   public getClientCount() {
     return this.clients.size;
+  }
+
+  // Terminate every live SSE stream and clear the client registry. The
+  // requests' own 'close' handlers fire when res.end() completes, which also
+  // notifies the renderer, so no explicit mcp-client-changed send is needed.
+  private revokeAllClients(): void {
+    for (const client of this.clients.values()) {
+      try { client.res.end(); } catch (_) {}
+    }
+    this.clients.clear();
   }
 
   private sendToClient(clientId: string, event: string, data: any) {
@@ -592,7 +640,14 @@ export class BrowserMCPServer {
     }
 
     if (!this.isToolAllowed(toolName)) {
-      throw new Error(`Permission denied: Tool '${toolName}' is disabled in MCP security settings.`);
+      // Distinguish "you turned this off" from "this does not exist", and never
+      // echo a non-string name straight back into the response.
+      const label = typeof toolName === 'string' ? toolName : 'unnamed';
+      throw new Error(
+        this.isRegisteredTool(toolName)
+          ? `Permission denied: Tool '${toolName}' is disabled in MCP security settings.`
+          : `Permission denied: Tool '${label}' is not a known MCP tool.`
+      );
     }
 
     // Special: nova_browser_info
@@ -662,9 +717,11 @@ export class BrowserMCPServer {
 
     // Health check endpoint — only return minimal info without auth
     app.get('/health', (req, res) => {
-      const appVersion = electronApp?.getVersion?.() || '1.4.8';
       if (this.isAuthenticated(req)) {
-        // Authenticated: return detailed info
+        // Authenticated: return detailed info, build string included. Read the
+        // version only on this branch so an unauthenticated probe never causes
+        // it to be computed at all.
+        const appVersion = electronApp?.getVersion?.() || '1.4.8';
         res.json({
           status: 'ok',
           server: 'nova-browser-mcp',
@@ -676,11 +733,17 @@ export class BrowserMCPServer {
           timestamp: Date.now()
         });
       } else {
-        // Unauthenticated: minimal response only
-        res.json({
-          status: 'ok',
-          version: appVersion
-        });
+        // Unauthenticated: liveness only. The exact build string is a
+        // fingerprinting primitive — it maps 1:1 onto a published
+        // known-vulnerability list, so it is gated behind the same bearer check
+        // as /sse, /message, /call and /tools rather than served to any local
+        // process that can open a socket. The endpoint and its rate-limiter
+        // exemption both stay: a liveness probe must never be locked out, and a
+        // probe that cannot read a version is still a working probe.
+        // (Grepped: nothing in this repo consumes /health — no UI, renderer,
+        // test or client code — so this reduces disclosure with no consumer to
+        // break.)
+        res.json({ status: 'ok' });
       }
     });
 
@@ -747,6 +810,21 @@ export class BrowserMCPServer {
       const body = req.body;
       const sessionId = req.query.sessionId as string;
 
+      // express.json() only parses a JSON content type, so a text/plain, empty
+      // or otherwise unmatched POST leaves req.body undefined. Dereferencing it
+      // below threw a TypeError that the catch further down turned into a 500
+      // carrying an internal message — a client error reported as a server
+      // fault. Answer 4xx with a generic message instead, before anything
+      // reads the body. (`body?.id` below is now redundant but harmless; it is
+      // left alone to keep the diff surgical.)
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({
+          jsonrpc: '2.0',
+          id: null,
+          error: { code: -32600, message: 'Invalid JSON-RPC request' }
+        });
+      }
+
       // Security: only route responses to KNOWN sessions. A missing or unknown
       // sessionId must never fall back to broadcasting tool results to ALL clients.
       if (!sessionId || !this.clients.has(sessionId)) {
@@ -763,7 +841,7 @@ export class BrowserMCPServer {
       const respondToClient = (payload: any) => {
         this.sendToClient(sessionId, 'message', payload);
       };
-      
+
       try {
         // Handle MCP protocol messages
         if (body.method === 'initialize') {
@@ -839,7 +917,15 @@ export class BrowserMCPServer {
         return res.status(401).json({ error: 'Unauthorized: Invalid or missing token' });
       }
 
-      const { tool, args = {} } = req.body;
+      // Same unguarded-dereference hazard as /message: this destructure threw a
+      // TypeError on a non-JSON body, and being inside an async handler the
+      // rejection reached Express 5's error handler as a 500.
+      const body = req.body;
+      if (!body || typeof body !== 'object' || Array.isArray(body)) {
+        return res.status(400).json({ error: 'Invalid request body' });
+      }
+
+      const { tool, args = {} } = body;
       if (!tool) return res.status(400).json({ error: 'Missing tool name' });
 
       try {
@@ -860,94 +946,177 @@ export class BrowserMCPServer {
   }
 
   public async start(): Promise<void> {
-    // Performance: load express + express-rate-limit lazily — they are only parsed/
-    // required when the MCP server actually starts, not on every app launch.
-    const [{ default: express }, { default: rateLimit }] = await Promise.all([
-      import('express'),
-      import('express-rate-limit')
-    ]);
+    // Idempotency: claim the "starting" state SYNCHRONOUSLY, before the first
+    // await below. The caller checks isRunning() before invoking start(), and
+    // the dynamic imports suspend in between, so without this claim two
+    // concurrent invocations (a double-clicked toggle — the UI button is never
+    // disabled) both reach app.listen() and the second assignment to
+    // this.server orphans the first listener on the requested port.
+    if (this.server || this.starting) {
+      throw new Error('MCP server is already running or starting');
+    }
+    this.starting = true;
+    this.stopRequested = false;
 
-    const app = express();
-    // Security: Tighten JSON body limit to 1MB (prevents memory exhaustion DoS)
-    app.use(express.json({ limit: '1mb' }));
+    try {
+      // Performance: load express + express-rate-limit lazily — they are only parsed/
+      // required when the MCP server actually starts, not on every app launch.
+      const [{ default: express }, { default: rateLimit }] = await Promise.all([
+        import('express'),
+        import('express-rate-limit')
+      ]);
 
-    // Rate limiter: exempt /health so liveness checks are never locked out
-    const apiLimiter = rateLimit({
-      windowMs: 60 * 1000,
-      max: 120,
-      message: 'Too many requests',
-      standardHeaders: true,
-      legacyHeaders: false,
-      skip: (req) => req.path === '/health'
-    });
-    app.use(apiLimiter);
-    this.setupRoutes(app);
+      const app = express();
+      // Security: Tighten JSON body limit to 1MB (prevents memory exhaustion DoS)
+      app.use(express.json({ limit: '1mb' }));
 
-    return new Promise((resolve, reject) => {
-      try {
-        // Use requestedPort (0 = random ephemeral port assigned by OS)
-        this.server = app.listen(this.requestedPort, '127.0.0.1', () => {
-          // Capture the actual port assigned by the OS
-          const address = this.server.address();
-          if (address && typeof address === 'object') {
-            this.actualPort = address.port;
-            // Persist the actual port for client reconnection
-            this.savePersistedPort(this.actualPort);
+      // Rate limiter: exempt /health so liveness checks are never locked out
+      const apiLimiter = rateLimit({
+        windowMs: 60 * 1000,
+        max: 120,
+        message: 'Too many requests',
+        standardHeaders: true,
+        legacyHeaders: false,
+        skip: (req) => req.path === '/health'
+      });
+      app.use(apiLimiter);
+      this.setupRoutes(app);
+
+      return await new Promise<void>((resolve, reject) => {
+        // The promise must settle at most once on every path below. Note that
+        // express 5's app.listen() also registers the callback it is given as a
+        // one-time 'error' listener, so the listen callback below fires for a
+        // FAILED bind as well as for 'listening' — the 'error' handler below is
+        // what decides whether to fall back to another port.
+        let settled = false;
+        const resolveOnce = () => { if (settled) return; settled = true; resolve(); };
+        const rejectOnce = (err: any) => { if (settled) return; settled = true; reject(err); };
+        // Let a stop() that arrives from here on settle this promise directly,
+        // rather than relying on the listen callback still being delivered.
+        this.abortStart = rejectOnce;
+
+        // A stop() that lands while this start() is in flight has no port to
+        // close yet, so unwind as soon as the listener binds instead of
+        // leaving it running behind a UI that already says "stopped".
+        const abortIfStopRequested = (): boolean => {
+          if (!this.stopRequested) return false;
+          console.log('[MCP Server] Start aborted: stop() was requested before the listener bound');
+          if (this.server) {
+            try { this.server.close(); } catch (_) {}
+            this.server = null;
           }
-          console.log(`[MCP Server] Running at http://localhost:${this.actualPort}`);
-          console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
-          console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
-          console.log('[MCP Server] Authentication token loaded securely');
-          resolve();
-        });
+          rejectOnce(new Error('MCP server start aborted: stop() requested before bind completed'));
+          return true;
+        };
 
-        this.server.on('error', (err: any) => {
-          if (err.code === 'EADDRINUSE' && this.requestedPort !== 0) {
-            console.warn(`[MCP Server] Port ${this.requestedPort} is in use, falling back to random available port...`);
-            try {
-              this.server = app.listen(0, '127.0.0.1', () => {
-                const address = this.server.address();
-                if (address && typeof address === 'object') {
-                  this.actualPort = address.port;
-                  this.savePersistedPort(this.actualPort);
+        try {
+          // Use requestedPort (0 = random ephemeral port assigned by OS)
+          this.server = app.listen(this.requestedPort, '127.0.0.1', () => {
+            // Capture the actual port assigned by the OS. No address means the
+            // bind failed and express routed us here through its 'error'
+            // listener — settle below, but leave the reporting to the handler.
+            const address = this.server.address();
+            if (address && typeof address === 'object') {
+              this.actualPort = address.port;
+              // Persist the actual port for client reconnection
+              this.savePersistedPort(this.actualPort);
+              if (abortIfStopRequested()) return;
+              console.log(`[MCP Server] Running at http://localhost:${this.actualPort}`);
+              console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
+              console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
+              console.log('[MCP Server] Authentication token loaded securely');
+            }
+            resolveOnce();
+          });
+
+          this.server.on('error', (err: any) => {
+            if (err.code === 'EADDRINUSE' && this.requestedPort !== 0) {
+              console.warn(`[MCP Server] Port ${this.requestedPort} is in use, falling back to random available port...`);
+              try {
+                this.server = app.listen(0, '127.0.0.1', () => {
+                  const address = this.server.address();
+                  if (address && typeof address === 'object') {
+                    this.actualPort = address.port;
+                    this.savePersistedPort(this.actualPort);
+                    if (abortIfStopRequested()) return;
+                    console.log(`[MCP Server] Running on fallback port http://localhost:${this.actualPort}`);
+                    console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
+                    console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
+                    console.log('[MCP Server] Authentication token loaded securely');
+                  }
+                  resolveOnce();
+                });
+              } catch (fallbackErr) {
+                console.error('[MCP Server] Fallback bind failed:', fallbackErr);
+                this.server = null;
+                rejectOnce(fallbackErr);
+                return;
+              }
+              // An unhandled 'error' on a net.Server is rethrown as an uncaught
+              // exception. The main process' uncaughtException handler swallows
+              // that, so this failure would never reach the caller and the app
+              // would silently half-start. The replacement server therefore needs
+              // its own handler, bound before the listen callback can fail, so
+              // every path out of this fallback settles the promise and cleans up
+              // the half-bound listener instead of hanging.
+              const fallbackServer = this.server;
+              fallbackServer.on('error', (fallbackErr: any) => {
+                if (fallbackServer.listening) {
+                  // Already bound and serving: this is a runtime accept/socket
+                  // error, not a failed start. Log it and keep serving rather
+                  // than killing a healthy listener.
+                  console.error('[MCP Server] Fallback listener error after start:', fallbackErr);
+                  return;
                 }
-                console.log(`[MCP Server] Running on fallback port http://localhost:${this.actualPort}`);
-                console.log(`[MCP Server] SSE endpoint: http://localhost:${this.actualPort}/sse`);
-                console.log(`[MCP Server] Health: http://localhost:${this.actualPort}/health`);
-                console.log('[MCP Server] Authentication token loaded securely');
-                resolve();
+                console.error('[MCP Server] Fallback bind failed:', fallbackErr);
+                try { fallbackServer.close(); } catch (_) {}
+                if (this.server === fallbackServer) this.server = null;
+                rejectOnce(fallbackErr);
               });
               return;
-            } catch (fallbackErr) {
-              console.error('[MCP Server] Fallback bind failed:', fallbackErr);
             }
-          }
-          console.error('[MCP Server] Failed to start:', err);
-          // Clear the handle so isRunning() returns false and the server can be restarted
-          this.server = null;
-          reject(err);
-        });
-      } catch (err) {
-        reject(err);
-      }
-    });
+            console.error('[MCP Server] Failed to start:', err);
+            // Clear the handle so isRunning() returns false and the server can be restarted
+            this.server = null;
+            rejectOnce(err);
+          });
+        } catch (err) {
+          rejectOnce(err);
+        }
+      });
+    } finally {
+      // Release the claim on every path (success, failure, abort) so a failed
+      // start can be retried and a running one is tracked by this.server.
+      this.starting = false;
+      this.abortStart = () => {};
+    }
   }
 
   public stop() {
+    // A start() that is still in flight has not bound its port yet: reject it
+    // so its promise always settles, and record the request so a listener that
+    // binds afterwards is torn down instead of being orphaned.
+    if (this.starting) {
+      this.stopRequested = true;
+      console.log('[MCP Server] Stop requested while starting');
+      this.abortStart(new Error('MCP server start aborted: stop() called during startup'));
+    }
     if (this.server) {
       // Close all SSE connections gracefully
-      for (const client of this.clients.values()) {
-        try { client.res.end(); } catch (_) {}
-      }
-      this.clients.clear();
-      this.server.close();
+      this.revokeAllClients();
+      // close() throws ERR_SERVER_NOT_RUNNING if the listener never finished
+      // binding, which is now reachable because isRunning() reports true while
+      // a start is in flight. Nothing is listening in that case, so ignore it.
+      try { this.server.close(); } catch (_) {}
       this.server = null;
       console.log('[MCP Server] Stopped');
     }
   }
 
   public isRunning() {
-    return !!this.server;
+    // Report true while a start() is in flight so a second concurrent start()
+    // is refused before it can bind a second listener.
+    return !!this.server || this.starting;
   }
 
   public getPort(): number {

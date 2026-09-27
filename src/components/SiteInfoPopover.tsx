@@ -24,7 +24,7 @@ interface SiteInfoPopoverProps {
   onClose: () => void;
   url: string;
   blockedAdsCount?: number;
-  buttonRef?: React.RefObject<HTMLDivElement | null>;
+  buttonRef?: React.RefObject<HTMLButtonElement | null>;
 }
 
 export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({

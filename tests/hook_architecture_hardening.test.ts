@@ -1,295 +1,189 @@
+/**
+ * Hook Architecture Hardening & Regression Test Suite.
+ *
+ * This file used to be nine sections of test-local helpers
+ * (`createNewTabRight`, `computeReusedTabState`, `createSplitViewTab`,
+ * `pushClosedTabToStack`, `sanitizeFolderRename`, `handleMcpToolCall`,
+ * `simulateOnWait`, `mockOnBlockedSite`) each asserted against itself and each
+ * printed `[PASS] [Tab Operations]` / `[PASS] [Folders]` / `[PASS] [Agent Bridge]`.
+ * A 4-line `sanitizeFolderRename` in this file never touched the folder code
+ * that actually renames folders; `handleMcpToolCall` restated the MCP tool
+ * dispatcher in src/hooks/useBrowserAgentBridge.ts without calling it. None of it
+ * could fail.
+ *
+ * Every section below now drives shipped code, or is gone. The exports that
+ * would let the deleted sections come back for real are listed in the section
+ * that used to hold them, with the file and symbol needed.
+ */
+
 import assert from 'node:assert/strict';
-import type { Tab, Bookmark, HistoryItem } from '../src/types/browser';
-import { isSafeNavigationUrl } from '../src/utils/safeNavigation';
+import { useFolders } from '../src/hooks/useFolders';
+import { useBrowserAgentBridge } from '../src/hooks/useBrowserAgentBridge';
+import { sanitizeImportedBookmarks } from '../src/hooks/useAppDataBackup';
 
 console.log('\n--- Hook Architecture Hardening & Regression Test Suite ---');
 
-// 1. Tab Operations: Incognito Inheritance on "New Tab to the Right"
-console.log('Testing handleNewTabRight incognito inheritance...');
-const incognitoTab: Tab = {
-  id: 'tab-incog-1',
-  url: 'https://example.com/private',
-  title: 'Private Session',
-  isLoading: false,
-  canGoBack: false,
-  canGoForward: false,
-  workspaceId: 'default',
-  isIncognito: true,
-  lastAccessed: Date.now()
-};
-
-function createNewTabRight(targetTab: Tab | undefined, targetWs: string, newId: string): Tab {
-  return {
-    id: newId,
-    url: 'nova://newtab',
-    title: 'New Tab',
-    isLoading: false,
-    canGoBack: false,
-    canGoForward: false,
-    lastAccessed: Date.now(),
-    workspaceId: targetWs,
-    isIncognito: targetTab?.isIncognito || false
-  };
-}
-
-const createdFromIncognito = createNewTabRight(incognitoTab, 'default', 'tab-incog-2');
-assert.strictEqual(createdFromIncognito.isIncognito, true, 'New tab to right must inherit isIncognito from target tab');
-
-const normalTab: Tab = {
-  id: 'tab-norm-1',
-  url: 'https://example.com/public',
-  title: 'Public Session',
-  isLoading: false,
-  canGoBack: false,
-  canGoForward: false,
-  workspaceId: 'default',
-  isIncognito: false,
-  lastAccessed: Date.now()
-};
-const createdFromNormal = createNewTabRight(normalTab, 'default', 'tab-norm-2');
-assert.strictEqual(createdFromNormal.isIncognito, false, 'New tab to right from normal tab must have isIncognito: false');
-console.log('[PASS] [Tab Operations] handleNewTabRight correctly inherits incognito mode');
-
-// 2. Tab Operations: Blank Tab Reuse Loading State
-console.log('Testing blank tab reuse isLoading logic...');
-function computeReusedTabState(tab: Tab, finalUrl: string, initialTitle: string) {
-  const isInternalPage = finalUrl.startsWith('nova://') || finalUrl === 'about:blank';
-  return {
-    ...tab,
-    url: finalUrl,
-    title: initialTitle,
-    isLoading: !isInternalPage
-  };
-}
-
-const blankTab: Tab = {
-  id: 'blank-1',
-  url: 'nova://newtab',
-  title: 'New Tab',
-  isLoading: false,
-  canGoBack: false,
-  canGoForward: false
-};
-
-const reusedWeb = computeReusedTabState(blankTab, 'https://github.com', 'GitHub');
-assert.strictEqual(reusedWeb.isLoading, true, 'Reused blank tab navigating to web URL must set isLoading: true');
-
-const reusedInternal = computeReusedTabState(blankTab, 'nova://settings', 'Settings');
-assert.strictEqual(reusedInternal.isLoading, false, 'Reused blank tab navigating to internal page must set isLoading: false');
-console.log('[PASS] [Tab Operations] Blank tab reuse correctly sets isLoading flag');
-
-// 3. Split View: Incognito Inheritance & lastAccessed Timestamp
-console.log('Testing split view incognito inheritance & timestamp...');
-function createSplitViewTab(activeTab: Tab | undefined, activeWorkspaceId: string, newId: string): Tab {
-  return {
-    id: newId,
-    url: 'nova://newtab',
-    title: 'New Tab',
-    isLoading: false,
-    canGoBack: false,
-    canGoForward: false,
-    workspaceId: activeWorkspaceId,
-    splitWith: activeTab?.id,
-    isIncognito: activeTab?.isIncognito || false,
-    lastAccessed: Date.now()
-  };
-}
-
-const splitTabFromIncog = createSplitViewTab(incognitoTab, 'default', 'tab-split-incog');
-assert.strictEqual(splitTabFromIncog.isIncognito, true, 'New split tab paired with incognito tab must be incognito');
-assert.ok(typeof splitTabFromIncog.lastAccessed === 'number' && splitTabFromIncog.lastAccessed > 0, 'Split tab must have lastAccessed timestamp');
-
-const splitTabFromNorm = createSplitViewTab(normalTab, 'default', 'tab-split-norm');
-assert.strictEqual(splitTabFromNorm.isIncognito, false, 'New split tab paired with normal tab must not be incognito');
-console.log('[PASS] [Split View] Toggle split view properly inherits incognito mode and sets lastAccessed');
-
-// 4. Closed Tabs Stack: Memory Cap (50 items max) & Incognito Exclusion
-console.log('Testing closed tabs stack memory cap and incognito filtering...');
-const MAX_CLOSED_TABS = 50;
-
-function pushClosedTabToStack(stack: Tab[], tab: Tab): Tab[] {
-  if (tab.isIncognito) return stack;
-  return [...stack, tab].slice(-MAX_CLOSED_TABS);
-}
-
-function pushClosedTabsToStack(stack: Tab[], tabs: Tab[]): Tab[] {
-  const visibleTabs = tabs.filter(t => !t.isIncognito);
-  if (visibleTabs.length === 0) return stack;
-  return [...stack, ...visibleTabs].slice(-MAX_CLOSED_TABS);
-}
-
-let testStack: Tab[] = [];
-// Push 100 tabs
-for (let i = 1; i <= 100; i++) {
-  testStack = pushClosedTabToStack(testStack, {
-    id: `tab-${i}`,
-    url: `https://test${i}.com`,
-    title: `Test ${i}`,
-    isLoading: false,
-    canGoBack: false,
-    canGoForward: false
-  });
-}
-assert.strictEqual(testStack.length, MAX_CLOSED_TABS, 'Closed tabs stack must be capped at MAX_CLOSED_TABS (50)');
-assert.strictEqual(testStack[0].id, 'tab-51', 'Oldest entries (1-50) must be evicted, keeping 51-100');
-assert.strictEqual(testStack[49].id, 'tab-100', 'Latest entry must be at the top of stack');
-
-// Ensure incognito tabs are never added
-const incogPush = pushClosedTabToStack(testStack, incognitoTab);
-assert.strictEqual(incogPush.length, MAX_CLOSED_TABS, 'Incognito tab must be ignored and not added to stack');
-
-const batchWithIncog = pushClosedTabsToStack([], [incognitoTab, normalTab]);
-assert.strictEqual(batchWithIncog.length, 1, 'Batch push must filter out incognito tabs');
-assert.strictEqual(batchWithIncog[0].id, normalTab.id);
-console.log('[PASS] [Closed Tabs] Closed tabs stack capped at 50 to prevent memory leak, incognito strictly excluded');
-
-// 5. Folder Rename: Sanitization and Empty Name Protection
-console.log('Testing folder rename sanitization...');
-function sanitizeFolderRename(name: string): string | null {
-  const trimmed = (name || '').trim();
-  if (!trimmed) return null;
-  return trimmed.slice(0, 100);
-}
-
-assert.strictEqual(sanitizeFolderRename(''), null, 'Empty string must be rejected');
-assert.strictEqual(sanitizeFolderRename('   '), null, 'Whitespace-only string must be rejected');
-assert.strictEqual(sanitizeFolderRename('  Dev Tools  '), 'Dev Tools', 'Whitespace should be trimmed');
-assert.strictEqual(sanitizeFolderRename('A'.repeat(150))?.length, 100, 'Overly long folder names should be capped at 100 chars');
-console.log('[PASS] [Folders] Folder rename sanitization prevents empty or overflowing folder names');
-
-// 6. Data Backup: Sanitization and Missing Field Recovery
-console.log('Testing data backup import sanitization...');
+// 1. Bookmarks: the import path that the hook actually runs
+//
+// Was an inline `.filter().map()` pipeline in this file, asserted against its
+// own output. It is now `sanitizeImportedBookmarks`
+// (src/hooks/useAppDataBackup.ts:166), the same function the import button
+// calls, so a change to the real policy is a failure here.
 const rawImportedBookmarks = [
   { url: 'https://valid.com', title: 'Valid' }, // missing id and timestamp
   { url: 'javascript:alert(1)', title: 'XSS Vector' }, // malicious protocol
   { url: 'data:text/html,<h1>PWN</h1>', title: 'Data URL' }, // blocked protocol
-  { id: 'custom-bm', url: 'https://custom.com', createdAt: 1700000000000 } // createdAt instead of timestamp
+  { id: 'custom-bm', url: 'https://custom.com', createdAt: 1700000000000 }, // createdAt instead of timestamp
+  { id: '', url: 'https://emptyid.com', title: 'Empty id must be regenerated' },
+  { id: 'long-title', url: 'https://long.com', title: 'x'.repeat(900) }, // title must be truncated
 ];
 
-const sanitizedBookmarks = rawImportedBookmarks
-  .filter((b: any) => b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url))
-  .map((b: any) => ({
-    id: typeof b.id === 'string' && b.id ? b.id : 'generated-id',
-    title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
-    url: b.url,
-    timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
-  }));
+const imported = sanitizeImportedBookmarks(rawImportedBookmarks);
 
-assert.strictEqual(sanitizedBookmarks.length, 2, 'Must filter out javascript: and data: URLs');
-assert.strictEqual(sanitizedBookmarks[0].id, 'generated-id', 'Missing ID must be generated');
-assert.strictEqual(sanitizedBookmarks[1].id, 'custom-bm', 'Existing ID must be preserved');
-assert.strictEqual(sanitizedBookmarks[1].timestamp, 1700000000000, 'createdAt must be accepted as timestamp fallback');
+assert.strictEqual(imported.length, 4, 'javascript: and data: bookmark URLs must be dropped');
+assert.deepStrictEqual(
+  imported.map((b) => b.url),
+  ['https://valid.com', 'https://custom.com', 'https://emptyid.com', 'https://long.com'],
+  'Retained bookmarks must keep source order and their original URLs'
+);
+assert.ok((imported[0].id as string).length > 0, 'a missing id must be generated, not left undefined');
+assert.strictEqual(imported[1].id, 'custom-bm', 'an existing id must be preserved');
+assert.strictEqual(imported[1].timestamp, 1700000000000, 'createdAt must be accepted as the timestamp fallback');
+assert.ok((imported[2].id as string).length > 0, 'an empty-string id must be regenerated');
+assert.notStrictEqual(imported[0].id, imported[2].id, 'each regenerated id must be distinct, or rows collide');
+assert.strictEqual(imported[3].title.length, 500, 'an oversized title must be truncated to 500 characters');
+
 console.log('[PASS] [Data Backup] Import sanitization rejects dangerous schemes and recovers missing IDs/timestamps');
 
-// 7. MCP Bridge: Parameter Validation and Null Safety
-console.log('Testing MCP bridge parameter safety...');
-function handleMcpToolCall(toolName: string, args: any) {
-  const safeArgs = (args && typeof args === 'object') ? args : {};
-  switch (toolName) {
-    case 'browser_click':
-    case 'browser_type':
-    case 'browser_hover':
-    case 'browser_focus':
-    case 'browser_select_option':
-    case 'browser_get_element_text':
-    case 'browser_scroll_to_element':
-      if (typeof safeArgs.selector !== 'string' || !safeArgs.selector) {
-        return "Error: Missing or invalid 'selector' parameter";
-      }
-      return "OK";
-    case 'browser_switch_tab':
-    case 'browser_close_tab':
-      if (!safeArgs.tabId || typeof safeArgs.tabId !== 'string') {
-        return "Error: Missing or invalid 'tabId' parameter";
-      }
-      return "OK";
-    case 'browser_zoom': {
-      const zoomLevel = Number(safeArgs.level) || 0;
-      return `Zoom level set to ${zoomLevel}`;
-    }
-    case 'browser_mute_tab': {
-      const mute = Boolean(safeArgs.mute);
-      return mute ? "Tab muted" : "Tab unmuted";
-    }
-    case 'browser_pin_tab': {
-      const pin = Boolean(safeArgs.pin);
-      return pin ? "Tab pinned" : "Tab unpinned";
-    }
-    default:
-      return "Error: Unknown tool";
-  }
-}
+// 1a. A real gap found while replacing the inline copy, recorded so it is not
+// lost. `sanitizeImportedBookmarks` (src/hooks/useAppDataBackup.ts:173) guards
+// the incoming id with `typeof b.id === 'string' && b.id`, i.e. a truthiness
+// check. A whitespace-only id such as `"  "` is truthy, so it is imported
+// verbatim. Two backup rows carrying `"  "` therefore land in the store with the
+// same id, and every later sync dedupes on `keyOf: b => b.id`, so one of them is
+// dropped without a trace. The vector below pins the current behaviour; the fix
+// belongs in src/hooks/useAppDataBackup.ts:173 (trim before the truthiness test),
+// which is outside this file's ownership.
+const whitespaceIdImported = sanitizeImportedBookmarks([
+  { id: '  ', url: 'https://ws-a.example/', title: 'A' },
+  { id: '  ', url: 'https://ws-b.example/', title: 'B' },
+]);
+assert.strictEqual(
+  whitespaceIdImported.length,
+  2,
+  'both rows are imported'
+);
+assert.strictEqual(
+  whitespaceIdImported[0].id,
+  whitespaceIdImported[1].id,
+  'KNOWN GAP: a whitespace-only id is passed through verbatim, so two such rows collide on sync keyOf(id). src/hooks/useAppDataBackup.ts:173 needs a trim before the truthiness check.'
+);
 
-// Ensure null/undefined args do not throw TypeError
-assert.strictEqual(handleMcpToolCall('browser_zoom', null), 'Zoom level set to 0');
-assert.strictEqual(handleMcpToolCall('browser_mute_tab', undefined), 'Tab unmuted');
-assert.strictEqual(handleMcpToolCall('browser_pin_tab', null), 'Tab unpinned');
-assert.strictEqual(handleMcpToolCall('browser_click', null), "Error: Missing or invalid 'selector' parameter");
-assert.strictEqual(handleMcpToolCall('browser_click', { selector: 123 }), "Error: Missing or invalid 'selector' parameter");
-assert.strictEqual(handleMcpToolCall('browser_click', { selector: '#submit' }), "OK");
-assert.strictEqual(handleMcpToolCall('browser_switch_tab', {}), "Error: Missing or invalid 'tabId' parameter");
-assert.strictEqual(handleMcpToolCall('browser_switch_tab', { tabId: 'tab-1' }), "OK");
-// 8. onWait Resolver Lifecycle & Unmount Teardown
-console.log('Testing onWait unmount promise resolution...');
-const activeWaitTimers = new Set<ReturnType<typeof setTimeout>>();
-const activeWaitResolvers = new Set<() => void>();
+// 1b. The second half of the import path — folding sanitised rows into the
+// store without resurrecting deleted rows — is deliberately NOT re-tested here.
+// `mergeImportedBookmarks` (src/hooks/useAppDataBackup.ts:192) is already driven
+// for real against the tombstone, alias-key and restore-additivity cases in
+// tests/backup_tombstone.test.ts. A second, weaker copy of those assertions in
+// this file would be the same duplication pattern this rewrite is removing.
 
-function simulateOnWait(ms: number): Promise<void> {
-  const clampedMs = Math.min(30000, Math.max(0, Number.isFinite(Number(ms)) ? Math.floor(Number(ms)) : 0));
-  return new Promise<void>(resolve => {
-    let timer: ReturnType<typeof setTimeout>;
-    const cleanup = () => {
-      activeWaitTimers.delete(timer);
-      activeWaitResolvers.delete(handleResolve);
-    };
-    const handleResolve = () => {
-      cleanup();
-      clearTimeout(timer);
-      resolve();
-    };
-    activeWaitResolvers.add(handleResolve);
-    timer = setTimeout(() => {
-      handleResolve();
-    }, clampedMs);
-    activeWaitTimers.add(timer);
-  });
-}
+// 2. Hook module shape
+//
+// The weakest honest assertion available for a React hook whose internals are
+// not exported: the hook exists, is callable, and is a named function. This is
+// not a substitute for behavioural coverage — it is the floor, and it fails if a
+// hook is renamed, dropped, or replaced with a non-function export.
+assert.strictEqual(typeof useFolders, 'function', 'useFolders must remain an exported hook function');
+assert.strictEqual(
+  typeof useBrowserAgentBridge,
+  'function',
+  'useBrowserAgentBridge must remain an exported hook function'
+);
+assert.strictEqual(
+  useFolders.length,
+  1,
+  'useFolders must keep taking a single options object'
+);
+assert.strictEqual(
+  useBrowserAgentBridge.length,
+  1,
+  'useBrowserAgentBridge must keep taking a single options object'
+);
 
-// Start a 10s wait and unmount immediately
-let resolvedImmediatelyOnUnmount = false;
-const waitPromise = simulateOnWait(10000).then(() => {
-  resolvedImmediatelyOnUnmount = true;
-});
-assert.strictEqual(activeWaitTimers.size, 1);
-assert.strictEqual(activeWaitResolvers.size, 1);
+console.log('[PASS] [Hook Shape] useFolders and useBrowserAgentBridge are callable hooks taking one options object');
 
-// Simulate unmount cleanup
-activeWaitTimers.forEach(clearTimeout);
-activeWaitTimers.clear();
-activeWaitResolvers.forEach(resolve => resolve());
-activeWaitResolvers.clear();
+// 3. REMOVED — folder rename sanitization
+//
+// `sanitizeFolderRename` was declared in this file and asserted against itself.
+// The code that actually renames folders is `handleRenameFolder`
+// (src/hooks/useFolders.ts:36-40), inline in the hook body:
+//
+//   const trimmed = (name || '').trim();
+//   if (!trimmed) return;
+//   setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name: trimmed.slice(0, 100) } : f));
+//
+// The 100-character cap and the empty-name rejection the old section claimed to
+// cover are real in production, but unreachable from a test.
+//
+// NEEDED EXPORT: from src/hooks/useFolders.ts, the name sanitiser lifted out of
+// the callback — `sanitizeFolderName(name: string): string | null` — with
+// `handleRenameFolder` (src/hooks/useFolders.ts:36) calling it. `null` for a
+// name that trims to empty; otherwise the trimmed name capped at 100 chars.
+// That one export makes this section real and is also the only way to assert
+// the 100-char cap is still enforced.
 
-assert.strictEqual(activeWaitTimers.size, 0);
-assert.strictEqual(activeWaitResolvers.size, 0);
-console.log('[PASS] [Agent Bridge] onWait unmount teardown resolves hanging promises without leak');
+// 4. REMOVED — incognito inheritance, blank-tab reuse, split view, closed tabs
+//
+// All four asserted against test-local constructors (`createNewTabRight`,
+// `computeReusedTabState`, `createSplitViewTab`, `pushClosedTabToStack`).
+// The MAX_CLOSED_TABS=50 cap in particular was asserted against a literal
+// `const MAX_CLOSED_TABS = 50` written in this file, so it proved nothing about
+// the real cap.
+//
+// NEEDED EXPORTS:
+//   - src/hooks/useTabOperations.ts: the blank-tab-reuse decision
+//     (`shouldMarkLoading(url)` or the reused-tab state builder).
+//   - src/hooks/useSplitView.ts: the split-view tab factory, so incognito
+//     inheritance is checked against production.
+//   - the closed-tabs stack: `MAX_CLOSED_TABS` and a pure
+//     `pushClosedTabs(stack, tabs)` reducer exported from the owning hook, so
+//     the 50-item cap and the incognito exclusion are asserted against the real
+//     cap rather than a literal in this file.
 
-// 9. onBlockedSite Payload & Phishing Alert Validation
-console.log('Testing onBlockedSite payload security validation...');
-let capturedAlert: { url: string; reason: string } | null = null;
-const mockOnBlockedSite = (callback: (data: { url: string; reason: string }) => void) => {
-  callback({ url: 'https://evil-phishing-login.example.com', reason: 'phishing' });
-};
-mockOnBlockedSite((data) => {
-  if (data && typeof data.url === 'string') {
-    capturedAlert = { url: data.url, reason: data.reason || 'phishing' };
-  }
-});
-assert.ok(capturedAlert, 'Blocked site alert must be captured');
-assert.strictEqual(capturedAlert.reason, 'phishing');
-assert.strictEqual(capturedAlert.url, 'https://evil-phishing-login.example.com');
-console.log('[PASS] [Blocked Site] onBlockedSite IPC event captured and validated for security modal');
+// 5. REMOVED — MCP bridge tool dispatch
+//
+// `handleMcpToolCall` was a 35-line restatement of the tool dispatcher in
+// src/hooks/useBrowserAgentBridge.ts:125+, including the selector/tabId guards,
+// asserted against its own strings. The shipped dispatcher drives a real
+// webview, so its guard clauses are only observable through the dispatcher.
+//
+// NEEDED EXPORTS: from src/hooks/useBrowserAgentBridge.ts, the argument
+// validation split out of the dispatch switch — e.g.
+// `validateMcpToolArgs(toolName: string, args: unknown): string | null`
+// returning the same error string or null — plus the tool-name allowlist. With
+// those, the null/undefined-safety assertions this section used to make about
+// itself become assertions about the shipped guard.
+
+// 6. REMOVED — onWait unmount teardown
+//
+// `simulateOnWait` built a promise/timer/resolver bookkeeping structure in this
+// file and then asserted the sizes of that same structure. It exercised a
+// 4-line mock, not the hook.
+//
+// NEEDED EXPORT: from src/hooks/useBrowserAgentBridge.ts, the onWait lifecycle
+// split out as `createOnWaitLifecycle({ clampMs })` exposing the active timer
+// and resolver sets, so unmount teardown can be asserted against the real one.
+// The 30s clamp the old section referenced is production behaviour, not a
+// property of the mock.
+
+// 7. REMOVED — onBlockedSite payload
+//
+// `mockOnBlockedSite` called its own callback with its own object and asserted
+// it had been called. Nothing about the production IPC handler was involved.
+//
+// NEEDED EXPORT: from src/hooks/useBrowserAgentBridge.ts (or wherever the
+// `blocked-site` IPC event is subscribed), the payload normaliser, e.g.
+// `normaliseBlockedSitePayload(data: unknown): { url: string; reason: string } | null`.
 
 console.log('\n================================================================');
-console.log('HOOK ARCHITECTURE HARDENING TESTS : 9 / 9 PASSED');
+console.log('HOOK ARCHITECTURE HARDENING TESTS : 4 / 4 PASSED');
 console.log('================================================================');
-

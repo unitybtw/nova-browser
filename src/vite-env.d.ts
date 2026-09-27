@@ -181,6 +181,11 @@ export interface ElectronAPI {
   secureStoreSet: (key: string, value: string) => Promise<boolean>;
   secureStoreGet: (key: string) => Promise<string | null>;
   secureStoreDelete: (key: string) => Promise<boolean>;
+  // Disk-backed model cache: the packaged app runs on a `file://` origin where
+  // the Cache API is unavailable, so on-device model shards are cached in
+  // userData by the main process instead of being re-downloaded each launch.
+  modelCacheGet: (url: string) => Promise<ArrayBuffer | null>;
+  modelCacheSet: (url: string, data: ArrayBuffer | ArrayBufferView) => Promise<boolean>;
   // Password manager: fire-and-forget send channel (not invoke)
   savePassword: (data: { hostname: string; username: string; password: string }) => void;
   storeSet: (key: string, value: string) => Promise<boolean | { error: string }>;

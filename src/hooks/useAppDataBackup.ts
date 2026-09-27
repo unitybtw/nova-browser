@@ -1,12 +1,18 @@
-import { useCallback } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { Bookmark, HistoryItem, UserSettings } from '../types/browser';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { generateId } from '../utils/idGenerator';
 import { showAlert } from '../utils/confirmDialog';
+import { mergeSyncedCollection, normalizeBookmarkUrl } from '../services/syncService';
 
 export interface UseAppDataBackupOptions {
-  bookmarks: Bookmark[];
+  /**
+   * The RAW store, tombstoned rows included. This is deliberately not the live
+   * view the UI renders: exporting only live rows would bake a backup that
+   * cannot represent a deletion, so restoring it would resurrect every item the
+   * user had deleted.
+   */
+  bookmarkRows: Bookmark[];
   history: HistoryItem[];
   settings: UserSettings;
   setBookmarks: Dispatch<SetStateAction<Bookmark[]>>;
@@ -15,7 +21,7 @@ export interface UseAppDataBackupOptions {
 }
 
 export function useAppDataBackup({
-  bookmarks,
+  bookmarkRows,
   history,
   settings,
   setBookmarks,
@@ -26,7 +32,7 @@ export function useAppDataBackup({
     const backup = {
       version: '1.0',
       timestamp: Date.now(),
-      bookmarks,
+      bookmarks: bookmarkRows,
       history,
       settings
     };
@@ -40,29 +46,42 @@ export function useAppDataBackup({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }, [bookmarks, history, settings]);
+  }, [bookmarkRows, history, settings]);
 
   const handleImportData = useCallback((file: File) => {
     const reader = new FileReader();
+    // Only onload was wired, so an unreadable file (permissions, moved/deleted
+    // meanwhile, a directory) or a cancelled read was completely silent: the
+    // user clicked Import and nothing at all happened. Route both through the
+    // same alert the success/failure paths already use.
+    const reportReadFailure = (reason: string, detail?: string) => {
+      console.error('Backup import read error:', detail || reason);
+      void showAlert({ title: 'Import Data', message: `Failed to import backup: ${reason}` });
+    };
+    reader.onerror = () => reportReadFailure('the selected file could not be read.', reader.error?.message);
+    reader.onabort = () => reportReadFailure('the import was cancelled.');
     reader.onload = (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
         let importedSomething = false;
 
         if (data.bookmarks && Array.isArray(data.bookmarks)) {
-          const sanitizedBookmarks: Bookmark[] = data.bookmarks
-            .filter((b: any) =>
-              b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
-            )
-            .map((b: any) => ({
-              id: typeof b.id === 'string' && b.id ? b.id : generateId('bm'),
-              title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
-              url: b.url,
-              timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
-              favicon: typeof b.favicon === 'string' && (b.favicon.startsWith('https://') || b.favicon.startsWith('data:image/')) ? b.favicon : undefined,
-            }));
+          const sanitizedBookmarks = sanitizeImportedBookmarks(data.bookmarks);
           if (sanitizedBookmarks.length > 0) {
-            setBookmarks(sanitizedBookmarks);
+            // Union merge, not replace. Replacing the store dropped every local
+            // tombstone, so a restore brought deleted bookmarks back AND this
+            // device then pushed them as live rows, undoing the delete on every
+            // other signed-in device. Reusing the sync merge keeps ONE policy for
+            // "which row wins" instead of a second, subtly different one here:
+            // a local tombstone outranks an older live row from the backup, and a
+            // tombstone inside the backup suppresses the matching local row.
+            //
+            // No cap here on purpose: capSyncedCollection exists to bound the
+            // UPLOAD payload, and the local store has no size limit of its own
+            // (its "keep newest 100" is only a fallback after a storage-quota
+            // failure). Applying an upload cap to the store would silently drop
+            // the user's oldest bookmarks on every import.
+            setBookmarks(current => mergeImportedBookmarks(current, sanitizedBookmarks));
             importedSomething = true;
           }
         }
@@ -115,7 +134,10 @@ export function useAppDataBackup({
         }
 
         if (importedSomething) {
-          void showAlert({ title: 'Import Data', message: 'Backup successfully imported!' });
+          void showAlert({
+            title: 'Import Data',
+            message: 'Backup merged in. Existing bookmarks were kept, and anything you deleted stays deleted.'
+          });
         } else {
           void showAlert({ title: 'Import Data', message: 'No valid data found in backup file.' });
         }
@@ -131,4 +153,49 @@ export function useAppDataBackup({
     handleExportData,
     handleImportData,
   };
+}
+
+/**
+ * Validate and normalise bookmark rows coming out of a backup file.
+ *
+ * Exported so the import path can be tested without a FileReader. It rebuilds
+ * each row field by field, which is exactly why `deletedAt` had to be carried
+ * over explicitly: a sanitiser that forgets one field silently drops it, and a
+ * dropped `deletedAt` turns a backup row back into a live one.
+ */
+export function sanitizeImportedBookmarks(raw: unknown): Bookmark[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((b: any) =>
+      b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
+    )
+    .map((b: any) => ({
+      id: typeof b.id === 'string' && b.id ? b.id : generateId('bm'),
+      title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
+      url: b.url,
+      timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
+      favicon: typeof b.favicon === 'string' && (b.favicon.startsWith('https://') || b.favicon.startsWith('data:image/')) ? b.favicon : undefined,
+      deletedAt: typeof b.deletedAt === 'number' && Number.isFinite(b.deletedAt) && b.deletedAt > 0
+        ? b.deletedAt
+        : undefined,
+    }));
+}
+
+/**
+ * Fold a backup's bookmarks into the local store.
+ *
+ * Delegates to the sync merge so the tombstone rules are defined once. Exported
+ * for the same reason as {@link sanitizeImportedBookmarks}: the policy that
+ * decides whether a restore may resurrect a deleted bookmark must be testable
+ * without driving a file input.
+ */
+export function mergeImportedBookmarks(current: Bookmark[], imported: Bookmark[]): Bookmark[] {
+  return mergeSyncedCollection(current, imported, {
+    keyOf: (b: Bookmark) => b.id,
+    // A bookmark is identified by its URL too: ids are minted per device, so a
+    // backup imported on a second machine would otherwise re-add rows the user
+    // deleted there.
+    aliasKeyOf: (b: Bookmark) => normalizeBookmarkUrl(b.url),
+    now: Date.now(),
+  });
 }

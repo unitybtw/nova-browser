@@ -16,6 +16,25 @@ import {
   Undo2 
 } from 'lucide-react';
 import { Tab } from '../types/browser';
+import { copyTextToClipboard } from '../utils/clipboard';
+
+/**
+ * Which menu item a navigation key moves to, or `null` for a key the menu does
+ * not handle. `activeIndex` is `-1` when focus is not on an item, which behaves
+ * as "from the start" for ArrowDown and "from the end" for ArrowUp.
+ */
+export function resolveMenuFocusIndex(
+  key: string,
+  itemCount: number,
+  activeIndex: number
+): number | null {
+  if (itemCount === 0) return null;
+  if (key === 'ArrowDown') return activeIndex < itemCount - 1 ? activeIndex + 1 : 0;
+  if (key === 'ArrowUp') return activeIndex > 0 ? activeIndex - 1 : itemCount - 1;
+  if (key === 'Home') return 0;
+  if (key === 'End') return itemCount - 1;
+  return null;
+}
 
 export interface TabContextMenuState {
   isOpen: boolean;
@@ -61,56 +80,63 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
   totalTabs
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
-
+  const onCloseRef = useRef(onClose);
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  // Keyed on `isOpen` alone. `onClose` is a fresh inline arrow on every
+  // `TopBar`/`SidebarTabs` render, so putting it in the dep list re-attached
+  // both listeners — and re-focused item 1 — on every parent render. A download
+  // in flight (a new `downloads` array every 100ms) or a background tab's title
+  // change was enough: right-click a tab, press ArrowDown three times, press
+  // Enter, and the highlighted action had already been reset to "New tab to the
+  // right". The handler reads `onCloseRef`, so the identity no longer matters.
+  useEffect(() => {
+    if (!menuState.isOpen) return;
+
     const handleOutsideClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
+        onCloseRef.current();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
-      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-        e.preventDefault();
-        const items = Array.from(
-          menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') || []
-        );
-        if (items.length === 0) return;
-        const currentIdx = items.indexOf(document.activeElement as HTMLButtonElement);
-        if (e.key === 'ArrowDown') {
-          const next = currentIdx < items.length - 1 ? currentIdx + 1 : 0;
-          items[next]?.focus();
-        } else {
-          const prev = currentIdx > 0 ? currentIdx - 1 : items.length - 1;
-          items[prev]?.focus();
-        }
-      } else if (e.key === 'Home') {
-        e.preventDefault();
-        const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
-        items?.[0]?.focus();
-      } else if (e.key === 'End') {
-        e.preventDefault();
-        const items = menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])');
-        if (items && items.length > 0) items[items.length - 1]?.focus();
-      }
+      const items = Array.from(
+        menuRef.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not([disabled])') || []
+      );
+      const target = resolveMenuFocusIndex(
+        e.key,
+        items.length,
+        items.indexOf(document.activeElement as HTMLButtonElement)
+      );
+      if (target === null) return;
+      e.preventDefault();
+      items[target]?.focus();
     };
 
-    if (menuState.isOpen) {
-      window.addEventListener('mousedown', handleOutsideClick);
-      window.addEventListener('keydown', handleKeyDown);
-      requestAnimationFrame(() => {
-        const first = menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]');
-        first?.focus();
-      });
-    }
+    window.addEventListener('mousedown', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('mousedown', handleOutsideClick);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [menuState.isOpen, onClose]);
+  }, [menuState.isOpen]);
+
+  // Initial focus is its own effect for the same reason: it must run exactly
+  // once per open, never on a parent re-render. The frame is cancelled in
+  // cleanup so a menu that closes again before the next paint cannot steal
+  // focus on its way out.
+  useEffect(() => {
+    if (!menuState.isOpen) return;
+    const frame = requestAnimationFrame(() => {
+      menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [menuState.isOpen]);
 
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 
@@ -234,7 +260,11 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           aria-label="Copy page link"
           onClick={() => {
             if (tab.url && tab.url !== 'nova://newtab') {
-              navigator.clipboard?.writeText(tab.url);
+              // `navigator.clipboard.writeText` rejects outright in a non-secure
+              // context, and an unhandled rejection is a global error that takes
+              // the tab strip with it. The helper falls back to execCommand and
+              // reports real success.
+              void copyTextToClipboard(tab.url);
             }
             onClose();
           }}

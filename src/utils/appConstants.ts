@@ -50,4 +50,3 @@ export const getDemoParams = (): DemoParams => {
 // Platform detection constants (module-level to prevent TDZ issues in hooks and initializers)
 export const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
 export const isWindows = typeof navigator !== 'undefined' && /Win/i.test(navigator.platform || navigator.userAgent);
-export const isLinux = typeof navigator !== 'undefined' && /Linux/i.test(navigator.platform || navigator.userAgent) && !/Android/i.test(navigator.userAgent);

@@ -18,8 +18,8 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab, Bookmark, UserSettings, PermissionRequest } from '../../types/browser';
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../../utils/searchEngine';
-import { getLanguage, getLocale } from '../../services/i18n';
-import { getUrlSecurityInfo } from '../../utils/securityUtils';
+import { getLanguage, getLocale, useTranslation } from '../../services/i18n';
+import { getUrlSecurityInfo, formatDisplayUrl } from '../../utils/securityUtils';
 import { SiteInfoPopover } from '../SiteInfoPopover';
 import { PermissionPromptPopover } from '../PermissionPromptPopover';
 import { PageTranslatePopover } from '../PageTranslatePopover';
@@ -65,10 +65,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [isSiteInfoOpen, setIsSiteInfoOpen] = useState(false);
-  const siteInfoBtnRef = useRef<HTMLDivElement>(null);
+  const siteInfoBtnRef = useRef<HTMLButtonElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const suggestionRequestIdRef = useRef<number>(0);
   const blurTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Reactive: the placeholder below is localised, so it has to repaint on
+  // language change rather than only whenever some other prop changes.
+  const { t } = useTranslation();
 
   const relevantPermissionRequests = useMemo(() => {
     if (!permissionRequests || permissionRequests.length === 0) return [];
@@ -214,9 +218,9 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     const clientLocale = getLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
     const cached = getClientCachedSuggestions(cacheKey, clientLocale);
-    if (cached) {
-      setSuggestions(cached.slice(0, 6));
-    }
+    // Always assign, including on a miss: skipping the write here would leave
+    // the previous query's suggestions visible and clickable under the new text.
+    setSuggestions(cached ? cached.slice(0, 6) : []);
 
     abortControllerRef.current?.abort();
     const abortController = new AbortController();
@@ -243,6 +247,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       } catch (err: any) {
         if (err?.name !== 'AbortError') {
           logger.debug('TopBar:suggestions', 'Non-fatal error while fetching search suggestions', err);
+          // A failed lookup must not strand the previous query's suggestions in
+          // the dropdown. Same staleness guard as the success path, so a
+          // superseded request cannot clobber a newer one.
+          if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
+            setSuggestions([]);
+          }
         }
       }
     };
@@ -271,7 +281,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       let prompt = targetValue;
       if (prompt.startsWith('@ai ')) prompt = prompt.substring(4);
       if (prompt.startsWith('ai:')) prompt = prompt.substring(3);
-      
+
       window.dispatchEvent(new CustomEvent('ai-quick-action', { detail: prompt.trim() }));
       setSearchValue('');
       setIsAIMode(false);
@@ -287,7 +297,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     onNavigate(url);
     setShowSuggestions(false);
     setSelectedIndex(-1);
-    
+
     // Blur the active element to drop focus
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
@@ -302,14 +312,22 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           className="nova-omnibox-form relative group w-full"
           style={{ position: 'relative' }}
         >
-          <div 
+          {/* This is a real control - it opens the site information and
+              permissions popover - but it was a div, so it was not focusable and
+              could not be opened with Enter or Space. A keyboard user had no way
+              to reach the current site's permissions at all, which is the one
+              control that matters most on this chip. */}
+          <button
+            type="button"
             ref={siteInfoBtnRef}
+            aria-label={t('security.siteInfo')}
+            aria-expanded={isSiteInfoOpen}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setIsSiteInfoOpen(prev => !prev);
             }}
-            className="absolute left-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer"
+            className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 z-10 cursor-pointer h-7 px-1 rounded-md"
           >
             {isIncognito ? (
               <div className="flex items-center gap-1.5 text-cyan-400 bg-cyan-500/15 border border-cyan-500/30 px-2 py-0.5 rounded-lg shadow-xs hover:bg-cyan-500/25 transition-colors" title="Private & Incognito Mode (Click for Site Info)">
@@ -335,7 +353,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 );
               })()
             )}
-          </div>
+          </button>
 
           <SiteInfoPopover
             isOpen={isSiteInfoOpen}
@@ -363,7 +381,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
           {/* Chrome-Style Omnibox Permission Chip */}
           {relevantPermissionRequests.length > 0 && (
-            <div 
+            <div
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -381,6 +399,12 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
           <input
             type="text"
             aria-label="Address and search bar"
+            // Stable hook for the ⌘L / focus-url shortcut sites in App.tsx and
+            // useAppIpc.ts. They must never match on placeholder text again:
+            // the placeholder is now localised (and changes with the language
+            // and the search engine), and the AI-mode string never contained
+            // the capitalised "Search" those selectors relied on.
+            data-omnibox-input="true"
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             onKeyDown={(e) => {
@@ -420,14 +444,14 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               if (blurTimerRef.current) clearTimeout(blurTimerRef.current);
               blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
-            placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Open YouTube and search for music)" : `Search ${getSearchEngineName(searchEngine)} or type a URL`}
+            placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
             className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${
               relevantPermissionRequests.length > 0
                 ? isIncognito ? 'pl-52' : 'pl-34'
                 : isIncognito ? 'pl-28' : 'pl-11'
             } ${
-              isIncognito 
-                ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500' 
+              isIncognito
+                ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500'
                 : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
             } ${isAIMode ? 'border-cyan-400/50 ring-4 ring-cyan-500/20 bg-cyan-950/30 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
@@ -446,7 +470,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               </span>
               {activeTab?.url && activeTab.url !== 'nova://newtab' && (
                 <span className="text-[10px] truncate text-slate-500 dark:text-slate-400 leading-[12px]">
-                  {formatSearchUrl(activeTab.url)}
+                  {formatDisplayUrl(activeTab.url)}
                 </span>
               )}
             </div>
@@ -465,8 +489,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             }}
           >
             {activeTab?.zoomFactor !== undefined && activeTab.zoomFactor !== 1.0 && (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={onResetZoom}
                 className={`px-1.5 py-0.5 mr-1 rounded-md text-[10px] font-bold cursor-pointer select-none transition-colors hover:scale-105 active:scale-95 ${isIncognito ? 'bg-slate-700 hover:bg-slate-600 text-cyan-400' : 'bg-slate-200 hover:bg-slate-300 text-slate-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-cyan-400'}`}
                 title="Zoom Level (Click to reset 100%)"
@@ -476,27 +500,27 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
             )}
 
             {onToggleReaderMode && (
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={onToggleReaderMode}
-                className={`p-1 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+                className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
                 title="Toggle Reader Mode"
               >
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen className="w-4 h-4" />
               </button>
             )}
 
             {/* Page Translation Button & Popover */}
             {activeTab?.url && (activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://')) && (
               <div className="relative flex items-center">
-                <button 
-                  type="button" 
+                <button
+                  type="button"
                   onClick={() => setIsTranslateOpen(!isTranslateOpen)}
-                  className={`p-1 rounded-lg transition-colors relative ${
+                  className={`p-1.5 rounded-lg transition-colors relative ${
                     activeTab.isTranslated
                       ? 'text-cyan-500 bg-cyan-500/15 hover:bg-cyan-500/25'
-                      : isIncognito 
-                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' 
+                      : isIncognito
+                        ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'
                         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'
                   }`}
                   title="Translate Page"
@@ -521,10 +545,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               </div>
             )}
 
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={() => onToggleBookmark?.(activeTab)}
-              className={`p-1 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
+              className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-700' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-200 dark:hover:text-slate-200 dark:hover:bg-slate-700'}`}
               title="Bookmark Page"
             >
               <Star className={`w-3.5 h-3.5 ${isBookmarked ? 'fill-cyan-500 text-cyan-500' : ''}`} />
@@ -535,7 +559,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         {/* Search Suggestions Dropdown */}
         <AnimatePresence>
           {showSuggestions && searchValue.trim().length > 0 && (
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, y: -8, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
@@ -543,7 +567,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white/95 backdrop-blur-xl border border-slate-200/80 divide-slate-100 dark:bg-slate-900/95 dark:border-white/10 dark:divide-white/5'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >
-              
+
               {/* Primary Direct Action (Index -1) */}
                 <button
                   type="button"
@@ -554,10 +578,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
-                    selectedIndex === -1 
-                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold' 
-                      : isIncognito 
-                        ? 'hover:bg-slate-700 text-slate-200' 
+                    selectedIndex === -1
+                      ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold'
+                      : isIncognito
+                        ? 'hover:bg-slate-700 text-slate-200'
                         : 'hover:bg-slate-100 text-slate-800 dark:text-slate-200 dark:hover:bg-slate-800'
                   }`}
                 >
@@ -595,8 +619,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                          selectedIndex === idx 
-                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium' 
+                          selectedIndex === idx
+                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
                             : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
                         }`}
                       >

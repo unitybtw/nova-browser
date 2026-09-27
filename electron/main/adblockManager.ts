@@ -21,21 +21,96 @@ export function getBlocker(): ElectronBlocker | null {
   return blocker;
 }
 
+// `store-set` accepts a 10 MB string for any non-restricted key, and for
+// `adblocker_whitelist` it hands the parsed array straight to this module, which
+// runs parseFilter() once per entry plus a WASM matcher rebuild — all
+// synchronously, on the main thread, inside the IPC handler. A compromised
+// renderer shell (the threat model isTrustedSender already implies) could
+// therefore turn one IPC message into a cheap main-thread DoS by shipping a
+// million short entries. Bound the list here, before any parseFilter() call.
+const MAX_USER_WHITELIST_ENTRIES = 500; // a real user whitelist is < 100
+const MAX_WHITELIST_HOST_LENGTH = 253; // RFC 1035 full-name limit
+
+/**
+ * A plausible DNS hostname: dot-separated labels of alphanumerics (underscore
+ * allowed inside a label, as in service records) that do not start or end with a
+ * separator, plus an optional trailing dot. No scheme, no port, no path, no
+ * wildcard, no '@'.
+ *
+ * This has to be strict because the accepted string is pasted into a filter
+ * template — `@@||${host}^$document,…` — so a looser pattern would let a
+ * renderer-supplied entry rewrite the filter's own syntax rather than merely
+ * name a host. It is deliberately applied to USER entries only:
+ * CAPTCHA_WHITELIST_RULES is trusted, pre-reviewed data and two of its entries
+ * carry a path (`google.com/recaptcha`) that no hostname pattern accepts.
+ */
+const WHITELIST_HOST_RE =
+  /^[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9_-]{0,61}[a-z0-9])?)*$/;
+
 export function updateAdblockWhitelist(whitelist: string[]): void {
   if (!blocker) return;
-  const userList = Array.isArray(whitelist) ? whitelist : [];
-  const combined = Array.from(new Set([...userList, ...CAPTCHA_WHITELIST_RULES]));
-  const cleanWhitelist = combined
-    .filter(host => typeof host === 'string' && /^[a-zA-Z0-9.\-_/]+$/.test(host.trim()))
-    .map(host => host.trim().toLowerCase());
-  const newFilters = cleanWhitelist
-    .map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`))
-    .filter(Boolean);
 
-  blocker.update({
-    newNetworkFilters: newFilters as any[],
-    removedNetworkFilters: currentWhitelistFilters as any[]
-  });
+  // --- 1. Bound and validate the user list. Nothing below this point can throw
+  //        on attacker-controlled input, and no parseFilter() call has happened
+  //        yet, so a rejected list costs nothing. ---
+  const rawList = Array.isArray(whitelist) ? whitelist : [];
+  if (rawList.length > MAX_USER_WHITELIST_ENTRIES) {
+    console.warn(
+      `[AdBlocker] Whitelist has ${rawList.length} entries; keeping the first ${MAX_USER_WHITELIST_ENTRIES}.`
+    );
+  }
+
+  const userHosts = new Set<string>();
+  let rejected = 0;
+  for (const entry of rawList.slice(0, MAX_USER_WHITELIST_ENTRIES)) {
+    if (typeof entry !== 'string') { rejected++; continue; }
+    // Trim, lowercase and drop a single trailing dot (the FQDN form, which
+    // people paste from a URL bar) before testing.
+    const host = entry.trim().toLowerCase().replace(/\.$/, '');
+    if (!host || host.length > MAX_WHITELIST_HOST_LENGTH || !WHITELIST_HOST_RE.test(host)) {
+      rejected++;
+      continue;
+    }
+    userHosts.add(host);
+  }
+  if (rejected > 0) {
+    console.warn(`[AdBlocker] Dropped ${rejected} invalid adblock whitelist entries.`);
+  }
+
+  // The built-in CAPTCHA rules are appended AFTER user filtering, never filtered
+  // through it. Concatenating trusted rules after a user-supplied list means a
+  // malformed or hostile whitelist cannot shrink the set that must never be
+  // blocked — filtering the combined list would let a renderer-supplied entry
+  // evict `hcaptcha.com` from the blocker's exceptions.
+  const combined = Array.from(new Set([...userHosts, ...CAPTCHA_WHITELIST_RULES]));
+
+  // --- 2. Compile the whole replacement set. If this throws, the blocker's
+  //        filter state is left exactly as it was (update() is never reached) and
+  //        currentWhitelistFilters still describes what is installed, so the next
+  //        call removes the same set it thinks it added. ---
+  let newFilters: any[];
+  try {
+    newFilters = combined
+      .map(host => parseFilter(`@@||${host}^$document,script,stylesheet,image,subdocument,xmlhttprequest`))
+      .filter(Boolean);
+  } catch (err) {
+    console.warn('[AdBlocker] Failed to compile whitelist filters; keeping the previous filter set:', err);
+    return;
+  }
+
+  // --- 3. Swap the installed set atomically, and only commit our bookkeeping
+  //        once the swap has succeeded — otherwise a throw in update() would
+  //        leave us recording filters the blocker no longer holds, and they
+  //        could never be removed again. ---
+  try {
+    blocker.update({
+      newNetworkFilters: newFilters as any[],
+      removedNetworkFilters: currentWhitelistFilters as any[]
+    });
+  } catch (err) {
+    console.warn('[AdBlocker] Failed to apply whitelist filters; keeping the previous filter set:', err);
+    return;
+  }
 
   currentWhitelistFilters = newFilters;
 }

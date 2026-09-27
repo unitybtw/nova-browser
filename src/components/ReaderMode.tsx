@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square, 
+import {
+  Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square,
   Trash2, Clock, BookOpen, Volume2, Globe, Sparkles, SkipBack, SkipForward,
   Check, ChevronDown
 } from 'lucide-react';
@@ -16,13 +16,108 @@ const safeBase64 = (str: string): string => {
   return safeBase64Util(str);
 };
 
-interface HighlightData {
+export interface HighlightData {
   id: string;
   text: string;
   color: string;
   note: string;
   path: string;
   offset: number;
+}
+
+export const READER_HIGHLIGHT_INJECT_DELAY_MS = 100;
+
+export function highlightsStorageKey(url: string): string {
+  return 'reader_highlights_' + safeBase64(url);
+}
+
+/**
+ * The slice of a store read this loader uses: a `then` that can hand the value
+ * to a handler, plus a `catch` for a failed read. In the app this is the IPC
+ * promise from `storeGet`; the test hands in a thenable that settles on the
+ * spot, so the generation contract is observable without waiting on a clock.
+ */
+export type HighlightStoreRead = {
+  then: (onFulfilled: (saved: string | null | undefined) => void) => {
+    catch: (onRejected: () => void) => void;
+  };
+};
+
+export interface HighlightLoadOptions {
+  /** The article currently on screen. */
+  url: string;
+  read: (storageKey: string) => HighlightStoreRead;
+  /** Called synchronously on entry, for every article, saved or not. */
+  onReset: () => void;
+  onApply: (highlights: HighlightData[]) => void;
+  /** Injects `<mark>` elements into the rendered article. */
+  onInject: (highlights: HighlightData[]) => void;
+  injectDelayMs?: number;
+  /** Injectable clock; defaults to the real one. */
+  setTimer?: (fn: () => void, ms: number) => unknown;
+  clearTimer?: (handle: unknown) => void;
+}
+
+/**
+ * Loads one article's saved highlights as a cancellable generation, and returns
+ * its cancel function.
+ *
+ * `ReaderMode` is not remounted on navigation — `App.tsx` only swaps the `url`
+ * prop — so every piece of reader state survives a page change. Two things
+ * followed from the old effect and are fixed here:
+ *
+ * - It reset nothing on entry. The storage read had no `else` branch, so an
+ *   article with no saved highlights left the *previous* article's rows in
+ *   state, and the next save wrote them under the new article's key.
+ * - Nothing cancelled a slow read. A read for article A could resolve after
+ *   article B had loaded, applying A's rows to B and injecting A's `<mark>`
+ *   elements into B's DOM.
+ *
+ * The generation guard and the pending-injection cleanup below match the shape
+ * the article-extraction effect in this file already uses.
+ */
+export function loadArticleHighlights(options: HighlightLoadOptions): () => void {
+  const injectDelayMs = options.injectDelayMs ?? READER_HIGHLIGHT_INJECT_DELAY_MS;
+  const schedule = options.setTimer ?? ((fn: () => void, ms: number) => setTimeout(fn, ms));
+  const unschedule = options.clearTimer ?? ((handle: unknown) => clearTimeout(handle as ReturnType<typeof setTimeout>));
+  let cancelled = false;
+  let injectHandle: unknown = null;
+  let injectPending = false;
+
+  options.onReset();
+
+  if (options.url) {
+    options.read(highlightsStorageKey(options.url))
+      .then((saved) => {
+        if (cancelled || !saved) return;
+        let parsed: HighlightData[];
+        try {
+          const raw = JSON.parse(saved);
+          if (!Array.isArray(raw)) return;
+          parsed = raw as HighlightData[];
+        } catch (e) {
+          console.error('Failed to parse highlights', e);
+          return;
+        }
+        if (cancelled) return;
+        options.onApply(parsed);
+        injectPending = true;
+        injectHandle = schedule(() => {
+          if (cancelled) return;
+          options.onInject(parsed);
+        }, injectDelayMs);
+      })
+      .catch(() => {});
+  }
+
+  return () => {
+    cancelled = true;
+    if (injectPending) {
+      injectPending = false;
+      unschedule(injectHandle);
+      injectHandle = null;
+    }
+  };
 }
 
 interface ReaderModeProps {
@@ -40,7 +135,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   const [readingTime, setReadingTime] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Theme & Appearance with persistence
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>(() => {
     if (typeof window !== 'undefined') {
@@ -52,7 +147,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     }
     return 'dark';
   });
-  
+
   const [font, setFont] = useState<'sans' | 'serif' | 'mono'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('nova_reader_font');
@@ -96,12 +191,12 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   const [sentences, setSentences] = useState<string[]>([]);
   const [detectedLang, setDetectedLang] = useState(() => getLocale());
   const [selectedLanguage, setSelectedLanguage] = useState<'auto' | 'tr-TR' | 'en-US' | 'de-DE' | 'fr-FR' | 'es-ES'>('auto');
-  
+
   // Voices (Native OS + Web Speech)
   const [nativeVoices, setNativeVoices] = useState<NativeVoiceInfo[]>([]);
   const [webVoices, setWebVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoiceName, setSelectedVoiceName] = useState<string>('');
-  
+
   const contentRef = useRef<HTMLDivElement>(null);
   const controlsRef = useRef<HTMLDivElement>(null);
   const isPlayingRef = useRef(false);
@@ -141,6 +236,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   }>({ visible: false, top: 0, left: 0, text: '' });
   const [noteText, setNoteText] = useState('');
   const [highlightColor, setHighlightColor] = useState('#fef08a');
+  // Shown inside the highlight popover when the selection cannot be wrapped.
+  const [highlightError, setHighlightError] = useState('');
   const [viewingNote, setViewingNote] = useState<{
     visible: boolean;
     id?: string;
@@ -213,64 +310,60 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
   // Load highlights from storage when content is ready
   useEffect(() => {
-    if (content && url) {
-      const storageKey = 'reader_highlights_' + safeBase64(url);
-      (window as any).electronAPI?.storeGet(storageKey).then((saved: string) => {
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            setHighlights(parsed);
-            
-            setTimeout(() => {
-              if (!contentRef.current) return;
-              const walkDOM = (node: Node, textToFind: string): Range | null => {
-                if (node.nodeType === 3) {
-                  const idx = node.nodeValue?.indexOf(textToFind);
-                  if (idx !== undefined && idx !== -1) {
-                    const range = document.createRange();
-                    range.setStart(node, idx);
-                    range.setEnd(node, idx + textToFind.length);
-                    return range;
-                  }
-                }
-                for (let i = 0; i < node.childNodes.length; i++) {
-                  const r = walkDOM(node.childNodes[i], textToFind);
-                  if (r) return r;
-                }
-                return null;
-              };
+    if (!content) return;
 
-              parsed.forEach((h: HighlightData) => {
-                if (contentRef.current) {
-                  const range = walkDOM(contentRef.current, h.text);
-                  if (range) {
-                    const span = document.createElement('mark');
-                    span.style.backgroundColor = h.color;
-                    span.style.cursor = 'pointer';
-                    span.dataset.id = h.id;
-                    span.onclick = (e) => {
-                      e.stopPropagation();
-                      setViewingNote({
-                        visible: true,
-                        id: h.id,
-                        note: h.note,
-                        top: e.clientY,
-                        left: e.clientX
-                      });
-                    };
-                    try {
-                      range.surroundContents(span);
-                    } catch (e) {}
-                  }
-                }
-              });
-            }, 100);
-          } catch (e) {
-            console.error('Failed to parse highlights', e);
+    return loadArticleHighlights({
+      url,
+      read: (storageKey) => (window as any).electronAPI?.storeGet(storageKey),
+      // Keep the identity when it is already empty, so the unconditional reset
+      // costs no extra render on first load.
+      onReset: () => setHighlights(prev => (prev.length === 0 ? prev : [])),
+      onApply: setHighlights,
+      onInject: (parsed) => {
+        if (!contentRef.current) return;
+        const walkDOM = (node: Node, textToFind: string): Range | null => {
+          if (node.nodeType === 3) {
+            const idx = node.nodeValue?.indexOf(textToFind);
+            if (idx !== undefined && idx !== -1) {
+              const range = document.createRange();
+              range.setStart(node, idx);
+              range.setEnd(node, idx + textToFind.length);
+              return range;
+            }
           }
-        }
-      });
-    }
+          for (let i = 0; i < node.childNodes.length; i++) {
+            const r = walkDOM(node.childNodes[i], textToFind);
+            if (r) return r;
+          }
+          return null;
+        };
+
+        parsed.forEach((h: HighlightData) => {
+          if (contentRef.current) {
+            const range = walkDOM(contentRef.current, h.text);
+            if (range) {
+              const span = document.createElement('mark');
+              span.style.backgroundColor = h.color;
+              span.style.cursor = 'pointer';
+              span.dataset.id = h.id;
+              span.onclick = (e) => {
+                e.stopPropagation();
+                setViewingNote({
+                  visible: true,
+                  id: h.id,
+                  note: h.note,
+                  top: e.clientY,
+                  left: e.clientX
+                });
+              };
+              try {
+                range.surroundContents(span);
+              } catch (e) {}
+            }
+          }
+        });
+      },
+    });
   }, [content, url]);
 
   // Handle selection for highlighting
@@ -284,7 +377,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
-      
+
       setPopoverState({
         visible: true,
         top: rect.top,
@@ -294,6 +387,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       });
       setNoteText('');
       setHighlightColor('#fef08a');
+      setHighlightError('');
       setViewingNote({ visible: false, note: '', top: 0, left: 0 });
     };
 
@@ -303,6 +397,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
   const saveHighlight = () => {
     if (!popoverState.range) return;
+    setHighlightError('');
 
     const id = popoverState.existingId || generateId('hl');
     const newHighlight: HighlightData = {
@@ -319,7 +414,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       updated = highlights.map(h => h.id === id ? newHighlight : h);
     } else {
       updated = [...highlights, newHighlight];
-      
+
       const span = document.createElement('mark');
       span.style.backgroundColor = highlightColor;
       span.style.cursor = 'pointer';
@@ -335,12 +430,29 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
         });
         setPopoverState(prev => ({ ...prev, visible: false }));
       };
-      
+
+      // surroundContents() throws InvalidStateError unless the range sits wholly
+      // inside one Text node — i.e. for every selection that crosses a <b>, <a>,
+      // <em> or a paragraph boundary, which is the common case in article prose.
+      // extractContents() tolerates partial selections: the selected fragment is
+      // lifted out, the mark is inserted in its place, and the fragment moved in.
       try {
-        popoverState.range.surroundContents(span);
+        const range = popoverState.range;
+        const fragment = range.extractContents();
+        range.insertNode(span);
+        span.appendChild(fragment);
       } catch (e) {
-        console.warn('Could not surround range with highlight:', e);
-        setPopoverState({ visible: false, top: 0, left: 0, text: '' });
+        console.warn('Could not highlight range:', e);
+        // Undo a half-finished insert so the prose is not left inside an
+        // untracked mark, then tell the user instead of failing silently.
+        if (span.parentNode) {
+          if (span.firstChild) {
+            span.parentNode.replaceChild(document.createTextNode(span.textContent || ''), span);
+          } else {
+            span.parentNode.removeChild(span);
+          }
+        }
+        setHighlightError('This selection could not be highlighted. Try a shorter, continuous passage.');
         return;
       }
     }
@@ -350,7 +462,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       const storageKey = 'reader_highlights_' + safeBase64(url);
       (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
     }
-    
+
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
     window.getSelection()?.removeAllRanges();
   };
@@ -380,6 +492,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
   const closePopover = () => {
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
+    setHighlightError('');
   };
 
   // Extract sentences when content changes using smart Intl / regex sentence splitting
@@ -406,6 +519,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     }
   }, [content, title]);
 
+  // Speech lifecycle is anchored to isActive, i.e. to "this reader's tab is the
+  // one in front". Leaving that tab (or unmounting) must stop narration,
+  // otherwise TTS keeps reading the previous article over the next tab.
+  // The cleanup covers the false -> true flip too, so a stale utterance can
+  // never survive the transition back.
+  // NOTE: deps must stay [isActive] — stopSpeech is re-created every render, so
+  // listing it would re-run this effect (and stop speech) on every render.
   useEffect(() => {
     if (!isActive) {
       stopSpeech();
@@ -468,7 +588,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       utterance.lang = effectiveLanguage;
       utterance.rate = rate;
       utterance.pitch = 1.0;
-      
+
       const voices = window.speechSynthesis.getVoices();
       let chosenVoice: SpeechSynthesisVoice | null = null;
       if (selectedVoiceName) {
@@ -566,7 +686,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     setIsPaused(false);
     setCurrentSentenceIndex(0);
   };
-  
+
   const changeSpeechRate = () => {
     const nextRate = speechRate === 1 ? 1.25 : speechRate === 1.25 ? 1.5 : speechRate === 1.5 ? 2 : 1;
     setSpeechRate(nextRate);
@@ -587,6 +707,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   useEffect(() => {
     if (!isActive) return;
 
+    // Generation guard: tab switch / navigation / unmount flips `cancelled`, so a
+    // slower earlier extraction can no longer resolve after a newer one and
+    // overwrite the article on screen with the previous page's content.
+    let cancelled = false;
+
     const extractContent = async () => {
       setIsLoading(true);
       setError('');
@@ -605,6 +730,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
         if (webview && typeof webview.executeJavaScript === 'function') {
           try {
             html = await webview.executeJavaScript(`document.documentElement.outerHTML`);
+            if (cancelled) return;
           } catch (e) {
             console.warn('ReaderMode webview.executeJavaScript failed, trying fallback', e);
           }
@@ -612,11 +738,13 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
         if (!html && (window as any).electronAPI?.fetchPageHtml) {
           try {
             const res = await (window as any).electronAPI.fetchPageHtml(url);
+            if (cancelled) return;
             html = typeof res === 'string' ? res : (res?.html ?? '');
           } catch (e) {
             console.warn('ReaderMode fetchPageHtml fallback failed', e);
           }
         }
+        if (cancelled) return;
         if (typeof html !== 'string') html = String(html ?? '');
         // Main-process fetch-page-html already caps sanitized output at 3MB;
         // cap the unbounded webview outerHTML path here as well.
@@ -625,11 +753,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           html = html.slice(0, MAX_READER_HTML_CHARS);
         }
         if (!html) throw new Error('Unable to extract article content from this page.');
-        
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const clonedDoc = doc.cloneNode(true) as Document;
-        
+
         try {
           const base = clonedDoc.createElement('base');
           base.href = url;
@@ -648,18 +776,19 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
         const reader = new Readability(clonedDoc);
         const article = reader.parse();
+        if (cancelled) return;
 
         if (article && article.content) {
           setTitle(article.title || '');
           setAuthor(article.byline || '');
-          
+
           const textContent = article.textContent || '';
           const words = textContent.trim().split(/\s+/).filter(Boolean).length;
           setWordCount(words);
           setReadingTime(Math.max(1, Math.ceil(words / 200)));
 
           // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode and security
-          const rawCleanHtml = DOMPurify.sanitize(article.content, { 
+          const rawCleanHtml = DOMPurify.sanitize(article.content, {
             USE_PROFILES: { html: true },
             ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
             ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
@@ -679,13 +808,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           setError('The text content on this page is not suitable for reader mode.');
         }
       } catch (err: any) {
+        if (cancelled) return;
         setError(err.message || 'Page content could not be read.');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     extractContent();
+    return () => { cancelled = true; };
   }, [isActive, tabId, url]);
 
   const bgColors = {
@@ -771,18 +902,18 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           <div className={`sticky top-0 px-4 py-3 flex items-center justify-between backdrop-blur-md bg-opacity-90 border-b z-40 ${theme === 'dark' ? 'border-white/10 bg-slate-950/90' : theme === 'sepia' ? 'border-amber-900/10 bg-[#f6f0e2]/90' : 'border-black/5 bg-white/90'}`}>
             <div className="flex items-center gap-2 no-drag">
               {isMac && <div className="w-[68px] shrink-0" />}
-              <button 
+              <button
                 onClick={onClose}
                 className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full transition-colors text-sm font-medium no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
               >
                 <ArrowLeft className="w-4 h-4" /> Close
               </button>
             </div>
-            
+
             <div className="relative flex items-center gap-1.5 no-drag" ref={controlsRef}>
               {/* Audio Read Aloud Quick Button */}
               <div className={`flex items-center gap-1 rounded-full px-2.5 py-1 mr-1 no-drag shadow-xs ${theme === 'dark' ? 'bg-white/10' : 'bg-black/5'}`}>
-                <button 
+                <button
                   onClick={toggleSpeech}
                   className={`p-1.5 rounded-full transition-colors no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                   title={isPlaying ? "Pause" : "Read Aloud with Natural Voice"}
@@ -790,7 +921,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   {isPlaying ? <Pause className="w-4 h-4 text-cyan-400" /> : <Play className="w-4 h-4 ml-0.5 text-cyan-400" />}
                 </button>
                 {(isPlaying || isPaused) && (
-                  <button 
+                  <button
                     onClick={stopSpeech}
                     className={`p-1.5 rounded-full transition-colors text-red-400 no-drag cursor-pointer ${theme === 'dark' ? 'hover:bg-white/20' : 'hover:bg-black/10'}`}
                     title="Stop"
@@ -807,15 +938,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   {speechRate}x
                 </button>
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => setShowControls(!showControls)}
                 className={`p-2 rounded-full transition-colors no-drag cursor-pointer ${showControls ? 'bg-cyan-500 text-slate-950' : theme === 'dark' ? 'hover:bg-white/10 text-slate-200' : 'hover:bg-black/5 text-slate-800'}`}
                 title="Appearance & Voice Settings"
               >
                 <Type className="w-4 h-4" />
               </button>
-              
+
               {showControls && (
                 <div className={`absolute top-full right-0 mt-2 p-5 rounded-2xl shadow-2xl border flex flex-col gap-5 min-w-[320px] z-[100] no-drag ${theme === 'dark' ? 'bg-slate-900 border-white/10 shadow-black/50 text-slate-100' : theme === 'sepia' ? 'bg-[#fdf8ee] border-amber-800/20 text-[#4a3928]' : 'bg-white border-slate-200 text-slate-800'}`}>
                   {/* Theme */}
@@ -863,7 +994,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 dark:text-slate-500 mb-2.5 tracking-wider uppercase">
                       <Volume2 className="w-3.5 h-3.5 text-cyan-400" /> Natural Voice & Audio Settings
                     </div>
-                    
+
                     <div className="space-y-2.5">
                       {/* Language Selection */}
                       <div className="flex items-center justify-between gap-2">
@@ -904,7 +1035,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                           <option value="">
                             {isMac ? (effectiveLanguage.startsWith('tr') ? 'Yelda (Apple Natural)' : 'Samantha (Apple Natural)') : 'Best Natural Voice'}
                           </option>
-                          
+
                           {activeNativeVoices.length > 0 && (
                             <optgroup label="macOS System Voices">
                               {activeNativeVoices.map((v) => (
@@ -940,7 +1071,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <p className="text-sm font-medium">Extracting article content...</p>
               </div>
             )}
-            
+
             {error && (
               <div className="text-center py-20 text-red-400">
                 <ShieldAlert className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -951,7 +1082,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
             {content && !isLoading && !error && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={sizes[fontSize]}>
                 <h1 className="text-3xl md:text-5xl font-bold mb-4 leading-tight tracking-tight">{title}</h1>
-                
+
                 {/* Article Metadata Bar */}
                 <div className="flex flex-wrap items-center gap-4 text-xs opacity-70 mb-8 border-b pb-4 border-current/10">
                   {author && <span className="font-semibold uppercase tracking-wider">{author}</span>}
@@ -969,10 +1100,10 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </span>
                 </div>
 
-                <div 
+                <div
                   ref={contentRef}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
-                  dangerouslySetInnerHTML={{ 
+                  dangerouslySetInnerHTML={{
                     __html: DOMPurify.sanitize(content, {
                       USE_PROFILES: { html: true },
                       ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
@@ -980,8 +1111,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
                       FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
                       ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-                    }) 
-                  }} 
+                    })
+                  }}
                 />
               </motion.div>
             )}
@@ -1032,7 +1163,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
                 {/* Progress bar */}
                 <div className="w-full bg-slate-200 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="bg-cyan-500 h-full transition-all duration-300 rounded-full"
                     style={{ width: `${((currentSentenceIndex + 1) / Math.max(1, sentences.length)) * 100}%` }}
                   />
@@ -1087,9 +1218,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                 className="fixed z-[100] shadow-2xl rounded-2xl p-3.5 border w-72 text-sm"
-                style={{ 
-                  top: Math.max(10, popoverState.top - 10), 
-                  left: popoverState.left, 
+                style={{
+                  top: Math.max(10, popoverState.top - 10),
+                  left: popoverState.left,
                   transform: 'translate(-50%, -100%)',
                   backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
                   borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
@@ -1101,7 +1232,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Color</span>
                   <div className="flex gap-2">
                     {highlightColors.map(c => (
-                      <button 
+                      <button
                         key={c.name}
                         onClick={() => setHighlightColor(c.hex)}
                         className={`w-6 h-6 rounded-full border-2 transition-all ${highlightColor === c.hex ? 'border-cyan-500 scale-110 shadow-xs' : 'border-transparent'}`}
@@ -1111,7 +1242,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     ))}
                   </div>
                 </div>
-                <textarea 
+                <textarea
                   value={noteText}
                   onChange={e => setNoteText(e.target.value)}
                   placeholder="Add note (optional)..."
@@ -1122,9 +1253,21 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     color: theme === 'dark' ? '#f8fafc' : '#0f172a'
                   }}
                 />
+                {highlightError && (
+                  <p
+                    role="alert"
+                    className="mb-2.5 rounded-lg px-2.5 py-2 text-[11px] font-medium leading-snug"
+                    style={{
+                      backgroundColor: theme === 'dark' ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.08)',
+                      color: theme === 'dark' ? '#fca5a5' : '#b91c1c'
+                    }}
+                  >
+                    {highlightError}
+                  </p>
+                )}
                 <div className="flex justify-end gap-2">
-                  <button 
-                    onClick={closePopover} 
+                  <button
+                    onClick={closePopover}
                     className="px-3 py-1.5 rounded-lg transition-colors text-xs font-medium"
                     style={{
                       color: theme === 'dark' ? '#cbd5e1' : '#64748b'
@@ -1132,8 +1275,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   >
                     Cancel
                   </button>
-                  <button 
-                    onClick={saveHighlight} 
+                  <button
+                    onClick={saveHighlight}
                     className="px-3.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors text-xs font-bold shadow-xs"
                   >
                     Highlight
@@ -1151,9 +1294,9 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="fixed z-[100] shadow-2xl rounded-2xl p-4 border max-w-sm w-80"
-                style={{ 
-                  top: viewingNote.top + 10, 
-                  left: viewingNote.left, 
+                style={{
+                  top: viewingNote.top + 10,
+                  left: viewingNote.left,
                   transform: 'translateX(-50%)',
                   backgroundColor: theme === 'dark' ? '#0f172a' : '#ffffff',
                   borderColor: theme === 'dark' ? '#334155' : '#e2e8f0',
@@ -1163,15 +1306,15 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                 <div className="flex justify-between items-center mb-2.5">
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">Highlight Note</span>
                   <div className="flex items-center gap-1">
-                    <button 
+                    <button
                       onClick={() => deleteHighlight(viewingNote.id)}
                       className="p-1 rounded-md text-red-400 hover:bg-red-500/10 transition-colors"
                       title="Delete Highlight"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
-                    <button 
-                      onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })} 
+                    <button
+                      onClick={() => setViewingNote({ visible: false, note: '', top: 0, left: 0 })}
                       className="p-1 rounded-md text-slate-400 hover:text-slate-200 transition-colors text-sm"
                     >
                       &times;

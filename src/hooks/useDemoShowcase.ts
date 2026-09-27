@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { Tab, BrowserDemoOptions } from '../types/browser';
 
 export interface UseDemoShowcaseOptions {

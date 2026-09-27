@@ -3,9 +3,41 @@ import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
 
-// Kaynak: electron/main.ts:2584 (open-external tehlikeli uzantı kontrolü) ile aynı regex.
-// Import yerine kopya kullanıldı çünkü main.ts composition root (döngüsel bağımlılık riski).
+// Mirrors the open-external check in main.ts. Duplicated rather than imported
+// because main.ts is the composition root and importing it back would be
+// circular. Keep the two lists in step.
 const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
+
+/**
+ * Document types the OS opens by EXECUTING script rather than displaying it.
+ *
+ * A page can serve `Content-Disposition: attachment; filename="invoice.html"`
+ * with no compromise of the app at all, and a single click then hands that file
+ * to the default browser, which runs its script from a file:// origin. Nothing
+ * in the dangerous-extension list above covers this, because none of these are
+ * executables. They are not blocked either - opening a downloaded HTML file is
+ * legitimate - but the user is asked first.
+ */
+const SCRIPT_CAPABLE_EXT_REGEX = /\.(html?|xhtml|mhtml|xml|svg|svgz|hta|js|mjs|jar|url|lnk|reg|chm|wsf|ps1|vbs|xbl|xsl|xslt)(\?|#|$)/i;
+
+/**
+ * A filename the user may reasonably double-click to open. Used only to decide
+ * whether confirmation is required, never to grant access - a file outside the
+ * allowlist is still refused.
+ */
+export function requiresOpenConfirmation(filePath: string): boolean {
+  return DANGEROUS_EXT_REGEX.test(filePath) || SCRIPT_CAPABLE_EXT_REGEX.test(filePath);
+}
+
+/** Strips credentials, query and fragment before a URL reaches a log sink. */
+export function redactUrlForLog(raw: string): string {
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return '<unparseable-url>';
+  }
+}
 
 type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
@@ -32,7 +64,14 @@ function addKnownDownloadPath(targetPath: string): void {
 // doesn't stack duplicate listeners (which would duplicate download handling).
 const downloadsRegistered = new WeakSet<Electron.Session>();
 
-let nextDownloadAsSaveAs = false;
+// WebContents ids that asked for a Save-As dialog on their next download.
+// `will-download` fires asynchronously, so a single module-level boolean could
+// be consumed by an unrelated download that happened to arrive first (another
+// tab, a subresource) and hand that one the dialog instead. Keyed per
+// webContents, and consumed with delete() so each request fires exactly once.
+// Bounded in case a sender asks but never downloads.
+const MAX_PENDING_SAVE_AS = 100;
+const nextDownloadAsSaveAsIds = new Set<number>();
 
 let sendToMainWindow: SendToMainWindow = () => {};
 let isTrustedSender: TrustedSenderCheck = () => false;
@@ -93,34 +132,56 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
     return false;
   });
 
+  /**
+   * Resolves a renderer-supplied path to a real file inside the Downloads
+   * directory (or one this app recorded as its own download), or null.
+   *
+   * realpathSync runs BEFORE the prefix test, so both `~/Downloads/../x` and a
+   * symlink inside ~/Downloads pointing elsewhere are rejected. Previously this
+   * block was duplicated verbatim across two handlers, so a fix to one did not
+   * reach the other.
+   */
+  const resolveContainedDownloadPath = (pathStr: string): string | null => {
+    const downloadsPath = app.getPath('downloads');
+    const realPath = fs.realpathSync(path.resolve(pathStr));
+    const realDownloads = fs.realpathSync(downloadsPath);
+    const win = process.platform === 'win32';
+    const normPath = win ? realPath.toLowerCase() : realPath;
+    const normDownloads = win ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
+    const isUnderDownloads = normPath.startsWith(normDownloads);
+    const isKnown = win
+      ? Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath)
+      : knownDownloadPaths.has(realPath);
+    if (!isUnderDownloads && !isKnown) return null;
+    return fs.existsSync(realPath) ? realPath : null;
+  };
+
   ipcMain.handle('open-download', async (event, pathStr: string) => {
     if (!isTrustedSender(event)) return false;
     if (!pathStr || typeof pathStr !== 'string') return false;
-    const downloadsPath = app.getPath('downloads');
+    let confirmedPath: string | null = null;
     try {
-      const resolvedPath = path.resolve(pathStr);
-      const realPath = fs.realpathSync(resolvedPath);
-      const realDownloads = fs.realpathSync(downloadsPath);
-      const normPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
-      const normDownloads = process.platform === 'win32' ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
-      const isUnderDownloads = normPath.startsWith(normDownloads);
-      const isKnown = knownDownloadPaths.has(realPath) || (process.platform === 'win32' && Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath));
-      if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
-        if (DANGEROUS_EXT_REGEX.test(realPath)) {
-          const { response } = await dialog.showMessageBox({
-            type: 'warning',
-            buttons: ['Cancel', 'Open'],
-            defaultId: 0,
-            cancelId: 0,
-            title: 'Potentially dangerous file',
-            message: `This file (${path.basename(realPath)}) could harm your computer. Do you want to open it?`,
-            detail: realPath,
-          });
-          if (response !== 1) return false;
-        }
-        await shell.openPath(realPath);
-        return true;
+      confirmedPath = resolveContainedDownloadPath(pathStr);
+      if (!confirmedPath) return false;
+      if (requiresOpenConfirmation(confirmedPath)) {
+        const { response } = await dialog.showMessageBox({
+          type: 'warning',
+          buttons: ['Cancel', 'Open'],
+          defaultId: 0,
+          cancelId: 0,
+          title: 'Potentially dangerous file',
+          message: `This file (${path.basename(confirmedPath)}) could harm your computer. Do you want to open it?`,
+          detail: confirmedPath,
+        });
+        if (response !== 1) return false;
       }
+      // The dialog can stay open for an unbounded time, so a symlink planted
+      // while it is up would be followed by the next resolve. Re-validate
+      // immediately before handing the path to the OS.
+      const revalidated = resolveContainedDownloadPath(confirmedPath);
+      if (!revalidated) return false;
+      await shell.openPath(revalidated);
+      return true;
     } catch (err) {
       console.error('Error opening download:', err);
     }
@@ -130,16 +191,9 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
   ipcMain.handle('show-download-in-folder', (event, pathStr: string) => {
     if (!isTrustedSender(event)) return false;
     if (!pathStr || typeof pathStr !== 'string') return false;
-    const downloadsPath = app.getPath('downloads');
     try {
-      const resolvedPath = path.resolve(pathStr);
-      const realPath = fs.realpathSync(resolvedPath);
-      const realDownloads = fs.realpathSync(downloadsPath);
-      const normPath = process.platform === 'win32' ? realPath.toLowerCase() : realPath;
-      const normDownloads = process.platform === 'win32' ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
-      const isUnderDownloads = normPath.startsWith(normDownloads);
-      const isKnown = knownDownloadPaths.has(realPath) || (process.platform === 'win32' && Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath));
-      if ((isUnderDownloads || isKnown) && fs.existsSync(realPath)) {
+      const realPath = resolveContainedDownloadPath(pathStr);
+      if (realPath) {
         shell.showItemInFolder(realPath);
         return true;
       }
@@ -150,9 +204,16 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
   });
 }
 
-/** Flags that the next download should pop the Save-As dialog (context-menu "Save ... As"). */
-export function markNextDownloadAsSaveAs(): void {
-  nextDownloadAsSaveAs = true;
+/** Flags that the next download from this webContents should pop the Save-As dialog (context-menu "Save ... As"). */
+export function markNextDownloadAsSaveAs(webContentsId: number): void {
+  if (typeof webContentsId !== 'number' || !Number.isFinite(webContentsId)) return;
+  // Re-insert to refresh recency, so the eviction below drops the stalest request.
+  nextDownloadAsSaveAsIds.delete(webContentsId);
+  if (nextDownloadAsSaveAsIds.size >= MAX_PENDING_SAVE_AS) {
+    const oldest = nextDownloadAsSaveAsIds.values().next().value;
+    if (oldest !== undefined) nextDownloadAsSaveAsIds.delete(oldest);
+  }
+  nextDownloadAsSaveAsIds.add(webContentsId);
 }
 
 /**
@@ -239,7 +300,13 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     const isSafeInitial = isSafeDownloadUrl(itemUrl);
     const isSafeChain = Array.isArray(urlChain) && urlChain.every(u => isSafeDownloadUrl(u));
     if (!isSafeInitial || !isSafeChain) {
-      console.warn(`[Security] Blocked download with disallowed protocol or unsafe chain:`, urlChain);
+      // Redacted: the checker treats userinfo as sensitive enough to reject, and
+      // query strings carry bearer tokens and presigned-URL signatures, so
+      // logging the chain verbatim would put credentials in the system log.
+      console.warn(
+        '[Security] Blocked download with disallowed protocol or unsafe chain:',
+        urlChain.map(redactUrlForLog)
+      );
       item.cancel();
       activeDownloads.delete(downloadId);
       return;
@@ -264,8 +331,11 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       }
     };
 
-    if (nextDownloadAsSaveAs) {
-      nextDownloadAsSaveAs = false;
+    // Consume-and-delete, and only for the webContents that actually asked:
+    // a download from any other tab must never pop this dialog.
+    const requesterId = webContents?.id;
+    const wantsSaveAsDialog = typeof requesterId === 'number' && nextDownloadAsSaveAsIds.delete(requesterId);
+    if (wantsSaveAsDialog) {
       // Do not set save path so Electron shows the Save Dialog automatically
       item.once('done', (_event, state) => {
         if (state === 'completed') recordCompletedPath();

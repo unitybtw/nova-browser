@@ -1,7 +1,54 @@
 import { ipcRenderer, webFrame } from 'electron';
 
+// Security: single source of truth for "is this the Chrome Web Store?". Every
+// host and origin check in this file goes through these helpers instead of
+// repeating a literal comparison.
+//
+// IMPORTANT — the MAIN PROCESS is the authority, not this predicate. It decides
+// whether this preload is attached at all (electron/main.ts, 'will-attach-webview')
+// and whether an install is honoured (electron/main/crxInstaller.ts, which
+// additionally requires chrome.google.com URLs to start with '/webstore/'). That
+// check is deliberately stricter than the host-only checks here, so a webview
+// pointed at e.g. https://chrome.google.com/intl/en/ still gets this preload but
+// main will reject the resulting invoke. Do not "harmonise" the two checks into
+// something weaker, and do not treat a true result here as an authorisation.
+const WEBSTORE_HOSTS: readonly string[] = ['chromewebstore.google.com', 'chrome.google.com'];
+const isWebStoreHost = (hostname: string): boolean =>
+  WEBSTORE_HOSTS.includes(String(hostname || '').toLowerCase());
+const isWebStoreOrigin = (origin: string): boolean =>
+  WEBSTORE_HOSTS.some((host) => origin === `https://${host}`);
+
+// Chrome Web Store extension IDs are exactly 32 characters drawn from a–p. Held
+// as a pattern *source* so the identical anchored pattern can be interpolated
+// into the main-world script below: the page-side check on incoming
+// NOVA_INSTALL_EXTENSION messages and the injected `chrome.webstore.install`
+// shim must not be able to drift apart, or a crafted URL such as
+// '/x?y=aaaa…dddd' resolves to a different real extension than the page meant.
+const EXTENSION_ID_SOURCE = '^[a-p]{32}$';
+const EXTENSION_ID_RE = new RegExp(EXTENSION_ID_SOURCE);
+
+// Read an extension ID from either a bare ID or a web store URL. Only a whole
+// path segment counts, so a 32-character run hidden in a query value
+// ('/x?y=aaaa…dddd') is rejected instead of being installed.
+const extractExtensionId = (value: unknown): string | null => {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  if (EXTENSION_ID_RE.test(raw)) return raw;
+  const lastSegment = raw.match(/\/([^/?#]+)\/?(?:[?#].*)?$/);
+  if (lastSegment && EXTENSION_ID_RE.test(lastSegment[1])) return lastSegment[1];
+  return null;
+};
+
+// Escape a value for interpolation into a string that is later EXECUTED as
+// code. JSON.stringify on its own is not enough: it escapes " and \ but
+// neither a backtick nor ${. Every value interpolated into the injection below
+// currently lands in a plain double-quoted literal, where JSON.stringify
+// suffices — but this file already runs code in the main world, so the sink
+// stays safe even if a site is later moved inside a template literal.
+const jsString = (value: string): string =>
+  JSON.stringify(value).replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+
 const currentHost = window.location.hostname.toLowerCase();
-const isChromeWebStore = currentHost === 'chromewebstore.google.com' || currentHost === 'chrome.google.com';
+const isChromeWebStore = isWebStoreHost(currentHost);
 
 if ((window as any).__novaPreloadInjected) {
   // Already injected
@@ -39,7 +86,7 @@ if ((window as any).__novaPreloadInjected) {
 
     const toast = document.createElement('div');
     toast.id = 'nova-extension-toast';
-    
+
     let bgColor = '#3b82f6';
     if (type === 'success') bgColor = '#10b981';
     if (type === 'error') bgColor = '#ef4444';
@@ -85,24 +132,24 @@ if ((window as any).__novaPreloadInjected) {
         setTimeout(() => toast.remove(), 300);
       }, 4000);
     }
-    
+
     return toast;
   };
 
   window.addEventListener('message', (event) => {
     const host = window.location.hostname.toLowerCase();
-    if (host !== 'chromewebstore.google.com' && host !== 'chrome.google.com') return;
+    if (!isWebStoreHost(host)) return;
     if (event.source !== window ||
-        (event.origin !== 'https://chromewebstore.google.com' && event.origin !== 'https://chrome.google.com') ||
+        !isWebStoreOrigin(event.origin) ||
         !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;
-    
+
     const extensionId = event.data.extensionId;
-    if (typeof extensionId !== 'string' || !/^[a-p]{32}$/.test(extensionId)) {
+    if (typeof extensionId !== 'string' || !EXTENSION_ID_RE.test(extensionId)) {
       showNovaToast('Invalid extension identifier.', 'error');
       return;
     }
     const loadingToast = showNovaToast("Installing to Nova Browser...", 'info');
-      
+
     ipcRenderer.invoke('install-from-webstore', extensionId)
       .then(result => {
         loadingToast.remove();
@@ -164,24 +211,24 @@ if ((window as any).__novaPreloadInjected) {
 
         const dynamicBrands = [
           { brand: greaseBrand, version: greaseVersion },
-          { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
-          { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
+          { brand: 'Chromium', version: ${jsString(majorVer)} },
+          { brand: 'Google Chrome', version: ${jsString(majorVer)} }
         ];
 
         Object.defineProperty(Navigator.prototype, 'userAgentData', {
           get: () => ({
             brands: dynamicBrands,
             mobile: false,
-            platform: ${JSON.stringify(platformName)},
+            platform: ${jsString(platformName)},
             getHighEntropyValues: async (hints) => ({
-              architecture: ${JSON.stringify(architecture)},
+              architecture: ${jsString(architecture)},
               bitness: '64',
               brands: dynamicBrands,
               mobile: false,
               model: '',
-              platform: ${JSON.stringify(platformName)},
-              platformVersion: ${JSON.stringify(platformVersion)},
-              uaFullVersion: ${JSON.stringify(chromeVer)}
+              platform: ${jsString(platformName)},
+              platformVersion: ${jsString(platformVersion)},
+              uaFullVersion: ${jsString(chromeVer)}
             }),
             toJSON: function() {
               return { brands: this.brands, mobile: this.mobile, platform: this.platform };
@@ -192,22 +239,37 @@ if ((window as any).__novaPreloadInjected) {
       } catch (_) {}
 
     window.chrome = window.chrome || {};
+
+    // Same anchored pattern source as the isolated-world preload uses to vet
+    // incoming NOVA_INSTALL_EXTENSION messages, so the two validators can never
+    // diverge. The shim used an unanchored /[a-p]{32}/ search, which let a
+    // crafted URL such as '/x?y=aaaa…dddd' match a 32-character run anywhere in
+    // the string and install a different real extension than the page intended.
+    // Note: this whole block is a template literal, so regex backslashes have to
+    // be doubled (\\/) to survive into the generated code.
+    const EXTENSION_ID_RE = new RegExp(${jsString(EXTENSION_ID_SOURCE)});
+    const extractExtensionId = (value) => {
+      const raw = String(value == null ? '' : value).trim();
+      if (EXTENSION_ID_RE.test(raw)) return raw;
+      const lastSegment = raw.match(/\\/([^/?#]+)\\/?(?:[?#].*)?$/);
+      if (lastSegment && EXTENSION_ID_RE.test(lastSegment[1])) return lastSegment[1];
+      return null;
+    };
+
     window.chrome.webstore = {
       install: (url, successCallback, failureCallback) => {
         const targetUrl = url || window.location.href;
-        const match = targetUrl.match(/[a-p]{32}/);
-        
-        if (!match) {
+        const extensionId = extractExtensionId(targetUrl);
+
+        if (!extensionId) {
           if (failureCallback) failureCallback('Could not determine extension ID');
           return;
         }
-        
-        const extensionId = match[0];
-        
+
         const listener = (event: MessageEvent) => {
           if (event.source !== window || event.origin !== window.location.origin || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
           window.removeEventListener('message', listener);
-          
+
           if (event.data.success) {
             if (successCallback) successCallback();
           } else {
@@ -215,11 +277,11 @@ if ((window as any).__novaPreloadInjected) {
           }
         };
         window.addEventListener('message', listener);
-        
+
         window.postMessage({ type: 'NOVA_INSTALL_EXTENSION', extensionId }, window.location.origin);
       }
     };
-    
+
     window.chrome.webstorePrivate = {
       beginInstallWithManifest3: (details, callback) => {
         if (typeof callback === 'function') {
@@ -230,16 +292,16 @@ if ((window as any).__novaPreloadInjected) {
           });
         }
       },
-      completeInstall: (id, callback) => { 
-        if (typeof callback === 'function') callback(); 
+      completeInstall: (id, callback) => {
+        if (typeof callback === 'function') callback();
         else return Promise.resolve();
       },
-      getBrowserLogin: (callback) => { 
-        if (typeof callback === 'function') callback({ login: '', loggedIn: false }); 
+      getBrowserLogin: (callback) => {
+        if (typeof callback === 'function') callback({ login: '', loggedIn: false });
         else return Promise.resolve({ login: '', loggedIn: false });
       },
-      getExtensionStatus: (id, callback) => { 
-        if (typeof callback === 'function') callback('installable'); 
+      getExtensionStatus: (id, callback) => {
+        if (typeof callback === 'function') callback('installable');
         else return Promise.resolve('installable');
       },
       isInIncognitoMode: (callback) => {
@@ -256,7 +318,7 @@ if ((window as any).__novaPreloadInjected) {
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
     const host = window.location.hostname.toLowerCase();
-    const isStoreOrigin = (host === 'chromewebstore.google.com' || host === 'chrome.google.com') && window.location.protocol === 'https:';
+    const isStoreOrigin = isWebStoreHost(host) && window.location.protocol === 'https:';
     if (!isStoreOrigin) {
       const existingBanner = document.getElementById('nova-extension-banner');
       if (existingBanner) {
@@ -276,14 +338,14 @@ if ((window as any).__novaPreloadInjected) {
 
       const leftContainer = document.createElement('div');
       leftContainer.style.cssText = 'display: flex; align-items: center; gap: 12px;';
-      
+
       const iconWrap = document.createElement('div');
       iconWrap.appendChild(buildSvgElement(24, [
         { tag: 'path', attrs: { d: 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z' } },
         { tag: 'polyline', attrs: { points: '3.27 6.96 12 12.01 20.73 6.96' } },
         { tag: 'line', attrs: { x1: '12', y1: '22.08', x2: '12', y2: '12' } }
       ]));
-      
+
       const textWrap = document.createElement('div');
       const title = document.createElement('div');
       title.style.cssText = 'font-weight: 600; font-size: 15px;';
@@ -291,7 +353,7 @@ if ((window as any).__novaPreloadInjected) {
       const subtitle = document.createElement('div');
       subtitle.style.cssText = 'font-size: 13px; opacity: 0.9;';
       subtitle.textContent = "Install this extension with 1-click directly into Nova Browser.";
-      
+
       textWrap.appendChild(title);
       textWrap.appendChild(subtitle);
       leftContainer.appendChild(iconWrap.firstChild!);
@@ -309,8 +371,8 @@ if ((window as any).__novaPreloadInjected) {
       document.body.style.marginTop = '60px';
 
       btn.addEventListener('click', () => {
-        const match = window.location.href.match(/[a-p]{32}/);
-        if (match) {
+        const extensionId = extractExtensionId(window.location.href);
+        if (extensionId) {
           btn.setAttribute('disabled', 'true');
           btn.style.opacity = '0.7';
           btn.textContent = "Installing...";
@@ -330,9 +392,9 @@ if ((window as any).__novaPreloadInjected) {
           };
           window.addEventListener('message', cleanupListener);
 
-          window.postMessage({ 
-            type: 'NOVA_INSTALL_EXTENSION', 
-            extensionId: match[0]
+          window.postMessage({
+            type: 'NOVA_INSTALL_EXTENSION',
+            extensionId
           }, `https://${host}`);
         }
       });

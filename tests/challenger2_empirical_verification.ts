@@ -3,24 +3,12 @@
  * Nova Browser Milestone 1
  */
 
-// Implementation of safeBase64 from ReaderMode.tsx
-const safeBase64 = (str: string): string => {
-  if (!str) return '';
-  const wellFormed = typeof (str as any).toWellFormed === 'function'
-    ? (str as any).toWellFormed()
-    : str.replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
-
-  try {
-    return btoa(unescape(encodeURIComponent(wellFormed)));
-  } catch (e) {
-    try {
-      const sanitized = wellFormed.replace(/%/g, '_');
-      return btoa(sanitized);
-    } catch (e2) {
-      return wellFormed.replace(/[^a-zA-Z0-9]/g, '_');
-    }
-  }
-};
+// This used to carry a hand-copied `safeBase64` "implementation of ... from
+// ReaderMode.tsx" that was then asserted against itself. The copy had drifted:
+// the shipped helper (src/utils/securityUtils.ts:350-363) emits URL-safe base64
+// and a `[^a-zA-Z0-9_-]` fallback. The real helper is imported instead, so a
+// regression in the shipped encoder is a regression in this suite.
+import { safeBase64 } from '../src/utils/securityUtils';
 
 async function runAdversarialTests() {
   console.log('====================================================');
@@ -45,16 +33,27 @@ async function runAdversarialTests() {
     { name: 'Lone Surrogate String', url: 'https://example.com/\uD800/test' },
   ];
 
+  // The shipped contract is URL-safe base64, not merely "does not throw". The
+  // re-typed copy this suite used to assert against emitted `+`, `/` and `=`,
+  // so it would fail every vector below that produces a non-trivial encoding.
+  const URL_SAFE_BASE64 = /^[A-Za-z0-9_-]*$/;
+
   for (const tc of unicodeTestCases) {
     try {
       const result = safeBase64(tc.url);
+      if (typeof result !== 'string') {
+        throw new Error(`Returned non-string: ${typeof result}`);
+      }
+      if (!URL_SAFE_BASE64.test(result)) {
+        throw new Error(`Output is not URL-safe base64: ${JSON.stringify(result)}`);
+      }
       testResults.push({
         category: 'ReaderMode safeBase64',
         name: tc.name,
         status: 'PASS',
         detail: `Output len: ${result.length}, Output preview: ${result.substring(0, 30)}...`
       });
-      console.log(`[PASS] ${tc.name}: safeBase64 produced valid string length ${result.length}`);
+      console.log(`[PASS] ${tc.name}: safeBase64 produced URL-safe string length ${result.length}`);
     } catch (err: any) {
       testResults.push({
         category: 'ReaderMode safeBase64',

@@ -10,6 +10,7 @@ import { generateId } from '../utils/idGenerator';
 import { useTranslation, getLocale } from '../services/i18n';
 import { SpeedDialIcon, getCleanDomain, normalizeNavigationUrl } from './SpeedDialIcon';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
+import { useSharedLocalStorageState } from '../hooks/useSharedLocalStorage';
 import { logger } from '../utils/logger';
 
 interface Todo {
@@ -49,11 +50,11 @@ const getGreetingKey = (hour: number): string => {
   return 'newtab.goodEvening';
 };
 
-export const Clock: React.FC<ClockProps> = React.memo(({ 
-  variants, 
-  isActive = true, 
+export const Clock: React.FC<ClockProps> = React.memo(({
+  variants,
+  isActive = true,
   hasWallpaper = false,
-  isDarkTheme = true 
+  isDarkTheme = true
 }) => {
   const { t, language } = useTranslation();
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -96,12 +97,12 @@ export const Clock: React.FC<ClockProps> = React.memo(({
   const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
 
   return (
-    <motion.div 
-      variants={variants} 
+    <motion.div
+      variants={variants}
       className="flex flex-col items-center justify-center text-center mb-2 select-none relative"
     >
       {/* Date Badge Pill */}
-      <div 
+      <div
         className={`flex items-center gap-2 mb-2.5 px-4 py-1.5 rounded-full text-xs font-medium tracking-wide transition-all duration-300 ${
           useDarkCanvasStyle
             ? 'bg-black/35 hover:bg-black/50 text-white/95 border border-white/20 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10'
@@ -113,7 +114,7 @@ export const Clock: React.FC<ClockProps> = React.memo(({
       </div>
 
       {/* Main Time Display with Crisp Layered Shadows */}
-      <h1 
+      <h1
         className={`text-7xl md:text-8xl font-light tracking-tight font-sans tabular-nums transition-colors duration-300 ${
           useDarkCanvasStyle
             ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] drop-shadow-[0_10px_28px_rgba(0,0,0,0.65)]'
@@ -125,7 +126,7 @@ export const Clock: React.FC<ClockProps> = React.memo(({
       </h1>
 
       {/* Greeting Subtitle */}
-      <p 
+      <p
         className={`text-xl md:text-2xl font-medium tracking-wide mt-2 transition-colors duration-300 ${
           useDarkCanvasStyle
             ? 'text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.55)]'
@@ -139,35 +140,156 @@ export const Clock: React.FC<ClockProps> = React.memo(({
   );
 });
 
-const DEFAULT_SPEED_DIALS = [
-  { name: 'Google', url: 'https://www.google.com', domain: 'google.com' },
-  { name: 'GitHub', url: 'https://github.com', domain: 'github.com' },
-  { name: 'YouTube', url: 'https://www.youtube.com', domain: 'youtube.com' },
-  { name: 'Reddit', url: 'https://www.reddit.com', domain: 'reddit.com' },
-  { name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' }
+const DEFAULT_SPEED_DIALS: SpeedDial[] = [
+  { id: 'dial_google', name: 'Google', url: 'https://www.google.com', domain: 'google.com' },
+  { id: 'dial_github', name: 'GitHub', url: 'https://github.com', domain: 'github.com' },
+  { id: 'dial_youtube', name: 'YouTube', url: 'https://www.youtube.com', domain: 'youtube.com' },
+  { id: 'dial_reddit', name: 'Reddit', url: 'https://www.reddit.com', domain: 'reddit.com' },
+  { id: 'dial_wikipedia', name: 'Wikipedia', url: 'https://www.wikipedia.org', domain: 'wikipedia.org' }
 ];
+
+export interface SpeedDial {
+  /** Stable across reorder and across every tab; see {@link updateSpeedDial}. */
+  id: string;
+  name: string;
+  url: string;
+  domain: string;
+}
+
+/**
+ * Reads a persisted speed-dial list.
+ *
+ * Three things make this more than a `JSON.parse`:
+ *
+ * - Rows written before dials had ids are given a fresh one here, so an edit
+ *   opened against a legacy list still resolves a row by identity.
+ * - A row can be a hole. The old positional editor did
+ *   `updated[editingDial.index] = …`; after two deletes in another tab that
+ *   assigns past the end of a one-element array, producing a sparse array that
+ *   `JSON.stringify` writes out as `null`. `null` is not `undefined`, so the
+ *   `.filter(d => d && typeof d.url === 'string')` guard that used to be here
+ *   is what drops them — before the next Add spread the array, the iterator
+ *   yielded a real `undefined`, and `title={dial.name}` threw into the
+ *   full-screen ErrorBoundary.
+ * - Unknown stored keys are dropped rather than spread into state.
+ */
+export function parseSpeedDials(raw: string): SpeedDial[] | null {
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return null;
+  const dials: SpeedDial[] = [];
+  for (const entry of parsed) {
+    if (!entry || typeof entry !== 'object' || typeof entry.url !== 'string') continue;
+    const url = normalizeNavigationUrl(entry.url);
+    if (!isSafeNavigationUrl(url)) continue;
+    dials.push({
+      id: typeof entry.id === 'string' && entry.id ? entry.id : generateId('dial'),
+      name: typeof entry.name === 'string' ? entry.name : '',
+      url,
+      domain: typeof entry.domain === 'string' && entry.domain ? entry.domain : getCleanDomain(url)
+    });
+  }
+  return dials;
+}
+
+/**
+ * Last line of defence for the grid.
+ *
+ * `parseSpeedDials` sanitises the persistent list, but an incognito/demo tab
+ * seeds a private store straight from `DEFAULT_SPEED_DIALS`, and any future
+ * writer could skip the parser. One unusable row must not take the whole new tab
+ * down with it, so the grid renders only rows that carry the three fields it
+ * dereferences.
+ */
+export function isRenderableSpeedDial(dial: unknown): dial is SpeedDial {
+  if (!dial || typeof dial !== 'object') return false;
+  const candidate = dial as Partial<SpeedDial>;
+  return (
+    typeof candidate.id === 'string' && candidate.id.length > 0 &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.url === 'string' && candidate.url.length > 0
+  );
+}
+
+/**
+ * Applies the open editor to the row it is actually holding.
+ *
+ * The editor is per-`NewTabPage` instance and is NOT reset on a tab switch —
+ * `App.tsx` keeps every `BrowserView` mounted and hides the inactive ones — while
+ * the list is shared by every new tab in the window through
+ * `useSharedLocalStorageState`. So the row can be deleted out from under the
+ * open modal. Resolving by id at save time is what makes that safe: writing the
+ * position the modal was opened with over a shortened array appends a phantom
+ * third shortcut and loses the edit, and writing past the end builds the sparse
+ * array described in {@link parseSpeedDials}.
+ *
+ * Returns `null` when the row is gone, so the caller can say so instead of
+ * silently persisting nothing.
+ */
+export function updateSpeedDial(
+  dials: SpeedDial[],
+  targetId: string,
+  next: Omit<SpeedDial, 'id'>
+): SpeedDial[] | null {
+  const index = dials.findIndex(dial => dial.id === targetId);
+  if (index === -1) return null;
+  const updated = [...dials];
+  updated[index] = { ...next, id: targetId };
+  return updated;
+}
+
+export function removeSpeedDial(dials: SpeedDial[], targetId: string): SpeedDial[] {
+  return dials.filter(dial => dial.id !== targetId);
+}
+
+export function addSpeedDial(dials: SpeedDial[], dial: Omit<SpeedDial, 'id'>): SpeedDial[] {
+  return [...dials, { ...dial, id: generateId('dial') }];
+}
+
+/**
+ * Minimal credit line for the daily wallpaper pill.
+ *
+ * Unsplash titles are decorated for search ("4K Desktop Wallpaper (anime) …
+ * 4K UHD") and the pill has room for a category, not for the query. The daily
+ * wallpaper suite previously kept its own verbatim copies of these two
+ * functions, which is how the production copy and the asserted copy could drift
+ * without anything noticing.
+ */
+export function formatWallpaperCreditTitle(title: string): string {
+  if (!title) return '';
+  return title
+    .replace(/^4k\s*(desktop\s*)?(wallpaper)?\s*(\((.*?)\))?/i, (_, _d, _w, _p, cat) => cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : '')
+    .replace(/\s*4k\s*(uhd)?$/i, '')
+    .trim() || title;
+}
+
+export function formatWallpaperCreditAuthor(author: string): string {
+  if (!author) return '';
+  return author
+    .replace(/\s*4k\s*curated$/i, '')
+    .trim() || author;
+}
 
 // Session-level flag: only run the entrance animation once on initial application launch
 let hasAnimatedInitialLaunch = false;
 
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     transition: { staggerChildren: 0.04, delayChildren: 0.01 }
   }
 };
 
 const itemVariants: any = {
   hidden: { opacity: 0, y: 10 },
-  visible: { 
-    opacity: 1, 
-    y: 0, 
+  visible: {
+    opacity: 1,
+    y: 0,
     transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] }
   }
 };
 
-export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({ 
+export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   onNavigate,
   onNewTab,
   searchEngine = 'google',
@@ -203,38 +325,26 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const abortControllerRef = useRef<AbortController | null>(null);
   const suggestionRequestIdRef = useRef<number>(0);
 
-  const [speedDials, setSpeedDials] = useState(() => {
-    // Incognito: never read persistent storage
-    if (isIncognito) return DEFAULT_SPEED_DIALS;
-    try {
-      const saved = localStorage.getItem('nova_speed_dials');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .filter(d => d && typeof d.url === 'string')
-            .map(d => {
-              const url = normalizeNavigationUrl(d.url);
-              const domain = d.domain || getCleanDomain(url);
-              return { ...d, url, domain };
-            })
-            .filter(d => isSafeNavigationUrl(d.url));
-        }
-      }
-    } catch (err) {
-      logger.warn('NewTabPage', 'Failed to parse nova_speed_dials from localStorage', err);
-    }
-    return DEFAULT_SPEED_DIALS;
-  });
+  // Shared across every new tab in the window: a per-instance copy plus a
+  // write-back effect meant the last tab to touch the list overwrote the rest.
+  const [speedDials, setSpeedDials] = useSharedLocalStorageState<SpeedDial[]>(
+    'nova_speed_dials',
+    parseSpeedDials,
+    () => DEFAULT_SPEED_DIALS,
+    !isIncognito && !isDemo
+  );
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingDial, setEditingDial] = useState<{name: string, url: string, index: number | null}>({ name: '', url: '', index: null });
+  // The open editor is identified by dial id, never by position: it survives a
+  // tab switch, and the shared list can shrink underneath it. See
+  // {@link updateSpeedDial}.
+  const [editingDial, setEditingDial] = useState<{name: string, url: string, id: string | null}>({ name: '', url: '', id: null });
   const [urlError, setUrlError] = useState('');
   const editModalRef = useRef<HTMLDivElement>(null);
 
   const handleCloseEditModal = useCallback(() => {
     setIsEditModalOpen(false);
-    setEditingDial({ name: '', url: '', index: null });
+    setEditingDial({ name: '', url: '', id: null });
     setUrlError('');
   }, []);
 
@@ -253,43 +363,33 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     if (previewDomain) {
       return previewDomain.charAt(0).toUpperCase() + previewDomain.slice(1);
     }
-    return editingDial.index !== null ? 'Shortcut' : (language === 'tr' ? 'Kısayol Önizleme' : 'Shortcut Preview');
-  }, [editingDial.name, previewDomain, editingDial.index, language]);
+    return editingDial.id !== null ? 'Shortcut' : (language === 'tr' ? 'Kısayol Önizleme' : 'Shortcut Preview');
+  }, [editingDial.name, previewDomain, editingDial.id, language]);
 
-  const [todos, setTodos] = useState<Todo[]>(() => {
-    // Incognito: never read persistent storage
-    if (isIncognito) return [];
-    try {
-      const saved = localStorage.getItem('nova_todos');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (err) {
-      logger.warn('NewTabPage', 'Failed to parse nova_todos from localStorage', err);
-    }
-    return [];
-  });
+  const [todos, setTodos] = useSharedLocalStorageState<Todo[]>(
+    'nova_todos',
+    useCallback((raw: string): Todo[] | null => {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? (parsed as Todo[]) : null;
+    }, []),
+    () => [],
+    !isIncognito && !isDemo
+  );
   const [newTodo, setNewTodo] = useState('');
 
   // Resolved Daily 4K Ultra HD Wallpaper (only loads if wallpaper mode is active)
   const { photo: unsplashPhoto, photoUrl: unsplashUrl, shuffleNext: shuffleWallpaper } = useLiveUnsplashPhoto(newTabBackground === 'unsplash');
 
   // Refined wallpaper metadata for minimal premium pill display
-  const formattedWallpaperTitle = useMemo(() => {
-    if (!unsplashPhoto?.title) return '';
-    return unsplashPhoto.title
-      .replace(/^4k\s*(desktop\s*)?(wallpaper)?\s*(\((.*?)\))?/i, (_, _d, _w, _p, cat) => cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : '')
-      .replace(/\s*4k\s*(uhd)?$/i, '')
-      .trim() || unsplashPhoto.title;
-  }, [unsplashPhoto?.title]);
+  const formattedWallpaperTitle = useMemo(
+    () => formatWallpaperCreditTitle(unsplashPhoto?.title || ''),
+    [unsplashPhoto?.title]
+  );
 
-  const formattedWallpaperAuthor = useMemo(() => {
-    if (!unsplashPhoto?.author) return '';
-    return unsplashPhoto.author
-      .replace(/\s*4k\s*curated$/i, '')
-      .trim() || unsplashPhoto.author;
-  }, [unsplashPhoto?.author]);
+  const formattedWallpaperAuthor = useMemo(
+    () => formatWallpaperCreditAuthor(unsplashPhoto?.author || ''),
+    [unsplashPhoto?.author]
+  );
 
   // Close suggestions on outside click
   useEffect(() => {
@@ -357,15 +457,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     };
   }, [query, isFocused, searchEngine, language]);
 
-  useEffect(() => {
-    if (isIncognito || isDemo) return; // Incognito or Demo: never persist
-    try {
-      localStorage.setItem('nova_todos', JSON.stringify(todos));
-    } catch (err) {
-      logger.warn('NewTabPage', 'Failed to persist nova_todos to localStorage', err);
-    }
-  }, [todos, isIncognito, isDemo]);
-
   const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
@@ -384,15 +475,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const clearCompletedTodos = () => {
     setTodos(todos.filter(t => !t.completed));
   };
-
-  useEffect(() => {
-    if (isIncognito || isDemo) return; // Incognito or Demo: never persist
-    try {
-      localStorage.setItem('nova_speed_dials', JSON.stringify(speedDials));
-    } catch (err) {
-      logger.warn('NewTabPage', 'Failed to persist nova_speed_dials to localStorage', err);
-    }
-  }, [speedDials, isIncognito, isDemo]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
@@ -446,12 +528,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       }
       const rawName = (editingDial.name || '').trim();
       const name = rawName || (domain.charAt(0).toUpperCase() + domain.slice(1));
-      if (editingDial.index !== null) {
-        const updated = [...speedDials];
-        updated[editingDial.index] = { name, url, domain };
+      if (editingDial.id !== null) {
+        const updated = updateSpeedDial(speedDials, editingDial.id, { name, url, domain });
+        if (!updated) {
+          // Another tab deleted the row while this editor was open. Say so
+          // rather than appending a phantom shortcut under a stale position.
+          setUrlError(language === 'tr'
+            ? 'Bu kısayol başka bir sekmede silindi.'
+            : 'This shortcut was deleted in another tab.');
+          return;
+        }
         setSpeedDials(updated);
       } else {
-        setSpeedDials([...speedDials, { name, url, domain }]);
+        setSpeedDials(addSpeedDial(speedDials, { name, url, domain }));
       }
     } catch (e) {
       setUrlError(language === 'tr' ? 'Adres işlenirken bir hata oluştu.' : 'Failed to process address.');
@@ -474,8 +563,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     onNavigate(url);
   };
 
-  const handleDeleteSpeedDial = (index: number) => {
-    setSpeedDials(speedDials.filter((_: any, i: number) => i !== index));
+  const handleDeleteSpeedDial = (id: string) => {
+    setSpeedDials(removeSpeedDial(speedDials, id));
   };
 
 
@@ -518,10 +607,17 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const isDarkTheme = theme === 'dark' || (theme === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
   const hasWallpaper = useMemo(() => {
-    return newTabBackground === 'unsplash' || 
-           newTabBackground === 'custom_url' || 
+    return newTabBackground === 'unsplash' ||
+           newTabBackground === 'custom_url' ||
            ['matrix', 'nebula', 'hyper_space', 'fireflies', 'cyber_grid', 'aurora_waves', 'mesh', 'glass'].includes(newTabBackground);
   }, [newTabBackground]);
+
+  // The grid dereferences `dial.id`, `dial.name` and `dial.url` on every row, so
+  // one unusable entry would render the whole new tab into the ErrorBoundary.
+  const renderableSpeedDials = useMemo(
+    () => speedDials.filter(isRenderableSpeedDial),
+    [speedDials]
+  );
 
   const getBackgroundStyle = () => {
     if (hasWallpaper) {
@@ -570,7 +666,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   if (isIncognito) {
     return (
       <div className="w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100">
-        <motion.div 
+        <motion.div
           variants={shouldAnimate ? containerVariants : undefined}
           initial={shouldAnimate ? "hidden" : false}
           animate="visible"
@@ -598,8 +694,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 placeholder={t('newtab.incognitoPlaceholder')}
                 className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
               />
-              <button 
+              <button
                 type="submit"
+                aria-label={t('newtab.search')}
                 className="absolute inset-y-0 right-2 flex items-center justify-center w-10 my-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer"
               >
                 <ArrowRight className="h-5 w-5" />
@@ -625,7 +722,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={shouldAnimate ? { opacity: 0 } : false}
       animate={{ opacity: 1 }}
       transition={shouldAnimate ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
@@ -636,22 +733,22 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       }}
       className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
-      
+
       {/* Unsplash Background */}
       {newTabBackground === 'unsplash' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div 
+          <div
             key={unsplashUrl}
             className="absolute inset-0 bg-cover bg-center transition-all duration-700 animate-in fade-in duration-1000"
-            style={{ 
-              backgroundImage: `url('${(unsplashUrl || '').replace(/["'\r\n\\]/g, '')}')` 
+            style={{
+              backgroundImage: `url('${(unsplashUrl || '').replace(/["'\r\n\\]/g, '')}')`
             }}
           />
           <div className="absolute inset-0 bg-black/25"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/45"></div>
           {/* Subtle central backlight behind clock & search widget for enhanced contrast on vibrant wallpapers */}
           <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[360px] bg-black/25 blur-3xl rounded-full pointer-events-none" />
-          
+
           {/* Daily 4K Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
             <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
@@ -682,16 +779,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'custom_url' && isSafeBgUrl && safeBgCssUrl && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           {isVideoBg ? (
-            <video 
-              autoPlay 
-              loop 
-              muted 
+            <video
+              autoPlay
+              loop
+              muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover"
               src={backgroundCustomUrl}
             />
           ) : (
-            <div 
+            <div
               className="absolute inset-0 bg-cover bg-center transition-all duration-700 scale-105"
               style={{ backgroundImage: `url('${safeBgCssUrl}')` }}
             />
@@ -715,8 +812,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           backdrop filter over an animated layer doubles GPU cost per frame. */}
       {newTabBackground === 'gradient' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div 
-            animate={isActive ? { 
+          <motion.div
+            animate={isActive ? {
               x: ['0%', '25%', '0%'],
             } : false}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
@@ -747,19 +844,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {/* Fluid Mesh Aurora */}
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <motion.div 
+          <motion.div
             animate={isActive ? { x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.08, 1] } : false}
             transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
             className="absolute -top-[15%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-purple-600/20 blur-[60px]"
             style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
-          <motion.div 
+          <motion.div
             animate={isActive ? { x: [0, -40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] } : false}
             transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
             className="absolute -bottom-[15%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-blue-600/20 blur-[60px]"
             style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
-          <motion.div 
+          <motion.div
             animate={isActive ? { scale: [1, 1.15, 1], opacity: [0.15, 0.28, 0.15] } : false}
             transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
             className="absolute top-[25%] right-[20%] w-[35vw] h-[35vw] rounded-full bg-teal-500/15 blur-[50px]"
@@ -771,15 +868,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {/* Aurora Waves */}
       {newTabBackground === 'aurora_waves' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
-          <motion.div 
-            animate={isActive ? { 
+          <motion.div
+            animate={isActive ? {
               x: ['0%', '-33.33%', '0%'],
             } : false}
             transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
             className={`absolute top-[-30%] bottom-[-30%] left-0 w-[300%] blur-[48px] ${isDarkTheme ? 'opacity-60' : 'opacity-30'}`}
             style={{
-              background: isDarkTheme 
-                ? 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)' 
+              background: isDarkTheme
+                ? 'linear-gradient(-45deg, #4338ca, #ec4899, #7c3aed, #06b6d4, #4338ca)'
                 : 'linear-gradient(-45deg, #818cf8, #f472b6, #a855f7, #38bdf8, #818cf8)',
               willChange: 'transform',
               transform: 'translateZ(0)'
@@ -794,16 +891,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           {/* Horizon Glow Sun */}
           <div className="absolute top-[35%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40vw] h-[40vw] rounded-full bg-gradient-to-b from-cyan-500/20 via-purple-500/15 to-transparent blur-[60px]" />
-          
-          <div 
+
+          <div
             className="absolute inset-0 overflow-hidden"
             style={{
               perspective: '500px',
               perspectiveOrigin: '50% 50%',
             }}
           >
-            <motion.div 
-              animate={isActive ? { 
+            <motion.div
+              animate={isActive ? {
                 y: ['0px', '48px'],
               } : false}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
@@ -940,16 +1037,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       )}
 
       {/* Main Content Area */}
-      <motion.div 
+      <motion.div
         variants={shouldAnimate ? containerVariants : undefined}
         initial={shouldAnimate ? "hidden" : false}
         animate="visible"
         className="w-full max-w-2xl flex flex-col items-center gap-8 z-10"
       >
         {/* Clock & Greeting */}
-        <Clock 
-          variants={shouldAnimate ? itemVariants : undefined} 
-          isActive={isActive} 
+        <Clock
+          variants={shouldAnimate ? itemVariants : undefined}
+          isActive={isActive}
           hasWallpaper={hasWallpaper}
           isDarkTheme={isDarkTheme}
         />
@@ -973,11 +1070,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               aria-label={t('nav.newTab')}
               className="w-full py-4 ps-12 pe-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20"
             />
-            
+
             <div className="absolute end-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
               {query && (
                 <button
                   type="button"
+                  aria-label={t('newtab.clearSearch')}
                   onClick={() => {
                     setQuery('');
                     setSuggestions([]);
@@ -991,6 +1089,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               )}
               <button
                 type="submit"
+                aria-label={t('newtab.search')}
                 className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white transition-all shadow-md shadow-cyan-500/30 active:scale-95 font-bold cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
@@ -1019,8 +1118,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 text-start text-sm transition-colors cursor-pointer ${
-                      idx === selectedIndex 
-                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-s-2 border-cyan-500' 
+                      idx === selectedIndex
+                        ? 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300 font-semibold border-s-2 border-cyan-500'
                         : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/5 font-normal'
                     }`}
                   >
@@ -1037,8 +1136,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
           {/* Privacy Indicator */}
           <div className={`flex items-center justify-between px-3 mt-2 text-xs font-medium transition-colors ${
-            hasWallpaper || isDarkTheme 
-              ? 'text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]' 
+            hasWallpaper || isDarkTheme
+              ? 'text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
               : 'text-slate-600 dark:text-slate-300 drop-shadow-sm'
           }`}>
             <div className="flex items-center gap-1.5">
@@ -1061,9 +1160,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         {/* Speed Dials */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full">
           <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
-            {speedDials.map((dial: any, idx: number) => (
-              <motion.div 
-                key={`${dial.name}-${dial.url}-${idx}`} 
+            {renderableSpeedDials.map((dial) => (
+              <motion.div
+                key={dial.id}
                 whileHover={{ y: -4 }}
                 whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -1080,33 +1179,41 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   </div>
                   <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-200 group-hover:text-cyan-500 dark:group-hover:text-cyan-300 transition-colors drop-shadow-2xs">{dial.name}</span>
                 </button>
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
-                  <button 
+                {/* group-hover alone hid these from keyboard users entirely: the
+                    buttons were focusable but stayed at opacity 0, so the controls
+                    existed and could not be seen. group-focus-within reveals the
+                    group as soon as focus lands inside it. */}
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
+                  <button
+                    type="button"
+                    aria-label={t('newtab.editSpeedDial', { name: dial.name })}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setEditingDial({ name: dial.name, url: dial.url, index: idx });
+                      setEditingDial({ name: dial.name, url: dial.url, id: dial.id });
                       setUrlError('');
                       setIsEditModalOpen(true);
                     }}
-                    className="p-1 text-slate-300 hover:text-white rounded cursor-pointer"
+                    className="p-1.5 text-slate-300 hover:text-white rounded cursor-pointer"
                   >
-                    <Edit2 className="w-3 h-3" />
+                    <Edit2 className="w-4 h-4" />
                   </button>
-                  <button 
+                  <button
+                    type="button"
+                    aria-label={t('newtab.removeSpeedDial', { name: dial.name })}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteSpeedDial(idx);
+                      handleDeleteSpeedDial(dial.id);
                     }}
-                    className="p-1 text-red-400 hover:text-red-300 rounded cursor-pointer"
+                    className="p-1.5 text-red-400 hover:text-red-300 rounded cursor-pointer"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-4 h-4" />
                   </button>
                 </div>
               </motion.div>
             ))}
 
-            {speedDials.length < 10 && (
-              <motion.div 
+            {renderableSpeedDials.length < 10 && (
+              <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
@@ -1114,7 +1221,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               >
                 <button
                   onClick={() => {
-                    setEditingDial({ name: '', url: '', index: null });
+                    setEditingDial({ name: '', url: '', id: null });
                     setUrlError('');
                     setIsEditModalOpen(true);
                   }}
@@ -1137,7 +1244,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
       {/* ToDo / Tasks Widget */}
       {showTasksWidget && (
-      <motion.div 
+      <motion.div
         initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
@@ -1168,7 +1275,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className="flex-1 overflow-y-auto p-2.5 space-y-1 scrollbar-hide">
           <AnimatePresence initial={false}>
             {todos.map(todo => (
-              <motion.div 
+              <motion.div
                 key={todo.id}
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1190,8 +1297,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={`w-5 h-5 rounded-lg flex items-center justify-center transition-colors ${
-                    todo.completed 
-                      ? 'bg-accent text-white shadow-xs shadow-accent/30' 
+                    todo.completed
+                      ? 'bg-accent text-white shadow-xs shadow-accent/30'
                       : 'border-2 border-slate-300 dark:border-slate-600 group-hover:border-accent'
                   }`}>
                     {todo.completed && <Check className="w-3.5 h-3.5 stroke-[3]" />}
@@ -1203,12 +1310,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   </span>
                 </div>
 
-                <button 
+                <button
                   onClick={(e) => {
                     e.stopPropagation();
                     deleteTodo(todo.id);
                   }}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors shrink-0 cursor-pointer"
+                  className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors shrink-0 cursor-pointer"
                   title={t('newtab.deleteTask')}
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -1234,11 +1341,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               className="w-full bg-slate-500/10 px-3 py-2 pr-8 rounded-xl text-sm outline-none placeholder-opacity-50 transition-colors focus:ring-2 focus:ring-accent/40 text-slate-800 dark:text-white placeholder-slate-500 dark:placeholder-slate-400"
             />
             {newTodo.trim() && (
-              <button 
-                type="submit" 
-                className="absolute right-2 p-1 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-xs cursor-pointer"
+              <button
+                type="submit"
+                aria-label={t('newtab.addTask')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 bg-accent text-white rounded-lg hover:bg-accent-hover transition-colors shadow-xs cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -1249,7 +1357,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {/* Edit/Add Modal */}
       <AnimatePresence>
       {isEditModalOpen && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -1257,7 +1365,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 backdrop-blur-md p-4 select-auto"
           onClick={handleCloseEditModal}
         >
-          <motion.div 
+          <motion.div
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
@@ -1278,16 +1386,16 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 </div>
                 <div>
                   <h3 id="shortcut-modal-title" className="text-base font-semibold text-slate-900 dark:text-slate-100 leading-tight">
-                    {editingDial.index !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}
+                    {editingDial.id !== null ? t('newtab.editShortcutTitle') : t('newtab.addShortcutTitle')}
                   </h3>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                    {editingDial.index !== null
+                    {editingDial.id !== null
                       ? (language === 'tr' ? 'Kısayol bilgilerini güncelleyin' : 'Update shortcut details')
                       : (language === 'tr' ? 'Hızlı erişim için yeni bir web sitesi ekleyin' : 'Add a new website for quick access')}
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={handleCloseEditModal}
                 aria-label={t('common.close')}
@@ -1321,9 +1429,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <label htmlFor="shortcut-name-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
                   {t('newtab.shortcutName')}
                 </label>
-                <input 
+                <input
                   id="shortcut-name-input"
-                  type="text" 
+                  type="text"
                   value={editingDial.name}
                   onChange={(e) => {
                     setEditingDial({ ...editingDial, name: e.target.value });
@@ -1338,9 +1446,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <label htmlFor="shortcut-url-input" className="text-xs font-semibold text-slate-700 dark:text-slate-300 block mb-1.5">
                   {t('newtab.shortcutUrl')}
                 </label>
-                <input 
+                <input
                   id="shortcut-url-input"
-                  type="text" 
+                  type="text"
                   value={editingDial.url}
                   onChange={(e) => {
                     setEditingDial({ ...editingDial, url: e.target.value });
@@ -1349,8 +1457,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder={language === 'tr' ? 'Örn. https://youtube.com veya youtube.com' : 'e.g. https://youtube.com or youtube.com'}
                   className={`w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
-                    urlError 
-                      ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20' 
+                    urlError
+                      ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
                       : 'border-slate-200/90 dark:border-slate-700/80 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20'
                   }`}
                 />
@@ -1364,12 +1472,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
             {/* Footer Actions */}
             <div className="flex items-center justify-between gap-2 mt-6 pt-4 border-t border-slate-100 dark:border-white/10">
-              {editingDial.index !== null ? (
-                <button 
+              {editingDial.id !== null ? (
+                <button
                   type="button"
                   onClick={() => {
-                    if (editingDial.index !== null) {
-                      handleDeleteSpeedDial(editingDial.index);
+                    if (editingDial.id !== null) {
+                      handleDeleteSpeedDial(editingDial.id);
                       handleCloseEditModal();
                     }
                   }}
@@ -1382,14 +1490,14 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <div />
               )}
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   type="button"
                   onClick={handleCloseEditModal}
                   className="px-4 py-2 border border-slate-200 dark:border-slate-700/80 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
                 >
                   {t('common.cancel')}
                 </button>
-                <button 
+                <button
                   type="button"
                   onClick={handleAddSpeedDial}
                   className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-cyan-500/25 active:scale-[0.98] cursor-pointer"

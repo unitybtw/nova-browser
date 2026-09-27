@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from '../src/utils/verticalTabs';
 import { computeLiveAndSuspendedTabs } from '../src/utils/tabManager';
-import { defaultSettings } from '../src/types/browser';
-import type { Folder, Tab, Workspace } from '../src/types/browser';
+import { defaultSettings, type Folder, type Tab, type Workspace } from '../src/types/browser';
 
 console.log('\n--- Workspace State & Tab Management Comprehensive Suite ---');
 
@@ -84,14 +83,14 @@ assert.equal(closedTabStack.length, 1);
 
 // 5. Sole Tab In-Place Reset Verification (Prevents Rightward Drift & Animation Glitches)
 function simulateCloseTab(
-  tabsList: Tab[], 
-  idToClose: string, 
+  tabsList: Tab[],
+  idToClose: string,
   activeWs: string,
   closedStack: Tab[]
 ): { nextTabs: Tab[]; nextActiveId: string } {
   const targetTab = tabsList.find(t => t.id === idToClose);
   const workspaceTabs = tabsList.filter(t => (t.workspaceId || 'default') === activeWs);
-  
+
   if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === idToClose)) {
     if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
       closedStack.push(targetTab);

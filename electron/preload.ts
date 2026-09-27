@@ -53,6 +53,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('update-download-progress', handler);
     return () => ipcRenderer.removeListener('update-download-progress', handler);
   },
+  /**
+   * Asks the main process to resolve the destination and confirm every address
+   * is public. The renderer cannot do this itself, so agent navigation calls
+   * this after its own synchronous check and before it navigates.
+   */
+  checkAgentNavigationHost: (url: string) =>
+    ipcRenderer.invoke('agent-navigation-host-check', url),
   onUpdateDownloaded: (callback: (event: any, info: any) => void) => {
     const handler = (_event: any, info: any) => callback(null, info);
     ipcRenderer.on('update-downloaded', handler);
@@ -108,6 +115,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   secureStoreSet: (key: string, value: string) => ipcRenderer.invoke('secure-store-set', key, value),
   secureStoreGet: (key: string) => ipcRenderer.invoke('secure-store-get', key),
   secureStoreDelete: (key: string) => ipcRenderer.invoke('secure-store-delete', key),
+  modelCacheGet: (url: string) => ipcRenderer.invoke('model-cache-get', url),
+  modelCacheSet: (url: string, data: ArrayBuffer | ArrayBufferView) => ipcRenderer.invoke('model-cache-set', url, data),
   // Password Manager: fire-and-forget send channel (not invoke)
   savePassword: (data: { hostname: string; username: string; password: string }) => ipcRenderer.send('save-password', data),
   storeSet: (key: string, value: string) => ipcRenderer.invoke('store-set', key, value),

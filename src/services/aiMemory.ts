@@ -1,4 +1,5 @@
 import { generateId } from '../utils/idGenerator';
+import { backupCorruptData } from '../utils/safeStorage';
 
 export interface MemoryItem {
   id: string;
@@ -23,11 +24,11 @@ export interface TaskSummary {
 // v2: adds the `source` provenance field. Legacy v1 data is migrated safely:
 // entries are treated as source:'user', EXCEPT instruction-category entries
 // which are dropped entirely (they may be persisted prompt injections).
-const STORAGE_KEY = 'browser_ai_memory_vault_v2';
-const LEGACY_STORAGE_KEY = 'browser_ai_memory_vault_v1';
+export const STORAGE_KEY = 'browser_ai_memory_vault_v2';
+export const LEGACY_STORAGE_KEY = 'browser_ai_memory_vault_v1';
 const TASK_STORAGE_KEY = 'browser_ai_task_history_v1';
 
-class AIMemoryService {
+export class AIMemoryService {
   private memories: MemoryItem[] = [];
   private taskHistory: TaskSummary[] = [];
 
@@ -49,9 +50,10 @@ class AIMemoryService {
           }
         } catch (parseErr) {
           console.warn('Corrupted AI memories in localStorage, backing up and resetting:', parseErr);
-          try {
-            localStorage.setItem(`${STORAGE_KEY}_backup_${Date.now()}`, data);
-          } catch (_) {}
+          // backupCorruptData keeps the raw value AND caps how many copies it
+          // keeps (MAX_BACKUPS_PER_KEY), so a repeatedly corrupt payload cannot
+          // fill localStorage and trip the destructive halving in saveMemories.
+          backupCorruptData(STORAGE_KEY, data);
           this.memories = [];
           return;
         }
@@ -60,15 +62,28 @@ class AIMemoryService {
       // instruction-category entries (possible persisted prompt injections).
       const legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
       if (legacy) {
+        let migrated = false;
         try {
           const parsed = JSON.parse(legacy);
           if (Array.isArray(parsed)) {
             this.memories = parsed
               .filter((m: any) => m && typeof m.fact === 'string' && m.category !== 'instruction')
               .map((m: any) => ({ ...m, source: 'user' as const }));
+            migrated = true;
           }
-        } catch (_) {}
-        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        } catch (parseErr) {
+          // The v2 path three lines above backs up before resetting, so both
+          // paths have to agree: a parse failure here used to fall through to
+          // removeItem() below and destroy the only copy of the user's memories.
+          console.warn('Corrupted legacy AI memory vault, backing up and keeping the legacy copy:', parseErr);
+          backupCorruptData(LEGACY_STORAGE_KEY, legacy);
+        }
+        if (migrated) {
+          // Write the migrated vault BEFORE dropping the legacy copy, otherwise a
+          // quit between here and the next save loses the memories outright.
+          this.saveMemories();
+          localStorage.removeItem(LEGACY_STORAGE_KEY);
+        }
       }
     } catch (e) {
       console.error('Failed to load AI memories from localStorage', e);

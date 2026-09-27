@@ -63,34 +63,6 @@ export const getSupabaseConfig = (): SupabaseConfig => {
   return DEFAULT_CONFIG;
 };
 
-export const saveSupabaseConfig = (url: string, anonKey: string): void => {
-  const cleanUrl = url.trim().replace(/\/$/, '');
-  const cleanKey = anonKey.trim();
-
-  if (!cleanUrl || !cleanKey) {
-    localStorage.removeItem(STORAGE_KEY);
-    cachedClient = null;
-    currentConfigKey = '';
-    clientPromise = null;
-    return;
-  }
-
-  if (!isValidCustomSupabaseUrl(cleanUrl)) {
-    throw new Error('Invalid or untrusted Supabase URL. Must be an HTTPS URL pointing to a valid host.');
-  }
-
-  const newConfig: SupabaseConfig = {
-    url: cleanUrl,
-    anonKey: cleanKey,
-    isCustom: true
-  };
-
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(newConfig));
-  cachedClient = null;
-  currentConfigKey = '';
-  clientPromise = null;
-};
-
 // --- Secure session storage -------------------------------------------------
 
 export const hasElectronSecureStore = (): boolean =>

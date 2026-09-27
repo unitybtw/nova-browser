@@ -11,25 +11,23 @@ import { useDownloads } from './hooks/useDownloads';
 import { useHistoryRecorder } from './hooks/useHistoryRecorder';
 import { usePermissionRequests } from './hooks/usePermissionRequests';
 import { useTabHibernation } from './hooks/useTabHibernation';
-import type { 
-  DownloadItem, 
-  HistoryItem, 
-  UserSettings, 
-  BrowserDemoOptions, 
-  VpnLocation, 
-  Tab, 
-  Folder, 
-  Bookmark, 
-  Extension, 
-  Workspace, 
+import type {
+  DownloadItem,
+  HistoryItem,
+  UserSettings,
+  BrowserDemoOptions,
+  VpnLocation,
+  Tab,
+  Folder,
+  Bookmark,
+  Extension,
+  Workspace,
   ShortcutConfig
 } from './types/browser';
-import { defaultSettings } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
 import type { BlockedSiteAlertData } from './components/BlockedSiteModal';
 import { SidebarTabs } from './components/SidebarTabs';
-import { isSafeNavigationUrl } from './utils/safeNavigation';
-import { canMoveTabToFolder, repairTabFolderAssignments, reorderTabsWithinGroup } from './utils/verticalTabs';
+import { repairTabFolderAssignments } from './utils/verticalTabs';
 import { generateId } from './utils/idGenerator';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/safeStorage';
 import { showConfirm, showAlert } from './utils/confirmDialog';
@@ -105,8 +103,7 @@ const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(
 // without allocating a new object per render.
 const VPN_ANCHOR_REF: React.RefObject<HTMLButtonElement> = { current: null };
 
-import { aiAgent } from './services/aiAgent';
-import { tabThumbnailCache } from './services/thumbnailCache';
+import { isTombstonedRow } from './services/syncService';
 import { logger } from './utils/logger';
 import {
   EMPTY_ARRAY,
@@ -228,7 +225,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     ];
   });
-  
+
   const [activeTabId, setActiveTabId] = useState<string>(() => {
     if (demoParams.isDemo) return tabs[0]?.id || '1';
     const saved = localStorage.getItem('active_tab_session');
@@ -247,10 +244,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   tabsRef.current = tabs;
   const activeSplitTabIdRef = useRef<string | null>(null);
 
+  // `folders`/`workspaces` are the live views (deleted rows are held as
+  // tombstones in `folderRows`/`workspaceRows`, which is what sync sends and
+  // what persistence writes — see useWorkspaces).
   const {
     folders,
+    folderRows,
     setFolders,
     workspaces,
+    workspaceRows,
     setWorkspaces,
     workspacesRef,
     activeWorkspaceId,
@@ -286,11 +288,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     isSidebarCollapsed,
     setIsSidebarCollapsed,
     closeAllModals: closePanelModals,
-  } = usePanels({ 
+  } = usePanels({
     initialSidePanelOpen: demoParams.isDemo && demoParams.feature === 'ai',
     initialAccountModalOpen: demoParams.isDemo && demoParams.feature === 'sync'
   });
   const [helpInitialTab, setHelpInitialTab] = useState<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>('help');
+
+  // Reader mode belongs to the tab it was opened for. Captured in the same state
+  // that opens the reader, so switching tabs cannot swap the extracted article
+  // under the reader (ReaderMode derives its content from its own tabId) and its
+  // `isActive` is a real signal instead of a constant true.
+  const [readerTabId, setReaderTabId] = useState<string | null>(null);
+  const readerTab = useMemo(
+    () => (readerTabId ? tabs.find(t => t.id === readerTabId) : undefined),
+    [tabs, readerTabId]
+  );
 
   // Tab listesi uzlaştırması: aynı `tabs` değişiminde üç ayrı effect üç ayrı
   // O(n) tarama yapıyordu. Üçü de aynı anda aynı girdilere bağlı olduğu için
@@ -361,7 +373,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);
   // Extension listesi & operations: useExtensions'a taşındı.
-  const { extensions, setExtensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
+  const { extensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
@@ -479,10 +491,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // (extracted to useHistoryRecorder)
   const { history, setHistory, recordVisit, flushHistory, clearHistory: handleClearHistory, removeHistoryItem: handleRemoveHistoryItem } = useHistoryRecorder({ isDemo: demoParams.isDemo });
 
-  const foldersRef = useRef(folders);
-  useEffect(() => { foldersRef.current = folders; }, [folders]);
+  // Persist the raw folder rows, not the live view: a tombstone that never
+  // reaches disk would be lost on restart and the folder would come back.
+  const foldersRef = useRef(folderRows);
+  useEffect(() => { foldersRef.current = folderRows; }, [folderRows]);
   const {
     bookmarks,
+    bookmarkRows,
     setBookmarks,
     bookmarksRef,
     handleToggleBookmark,
@@ -539,11 +554,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Cloud sync handler + background auto-sync + realtime listener
   const { handlePerformSync } = useAppSync({
-    bookmarks,
-    folders,
+    bookmarkRows,
+    folderRows,
     history,
     settings,
-    workspaces,
+    workspaceRows,
     setBookmarks,
     setFolders,
     setHistory,
@@ -570,7 +585,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setActiveWorkspaceId(tabWs);
       }
       setTabs(prev => [...prev, tabToRestore]);
-      setActiveTabId(tabToRestore.id);
+      // `tabToRestore` is the closed tab verbatim, so it can still carry
+      // `isSuspended: true` (e.g. purged, then closed). Route the activation
+      // through the hook's single primitive so the revived tab cannot come up
+      // showing the "Tab Suspended" card.
+      activateTab(tabToRestore.id);
     },
   });
 
@@ -592,6 +611,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Tab CRUD & lifecycle operations (extracted to useTabOperations)
   const {
+    activateTab,
     handleSelectTab,
     handleSuspendTab,
     handlePurgeMemory,
@@ -711,7 +731,16 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleUpdateWorkspaces = useCallback((newWorkspaces: Workspace[]) => {
     const validIds = new Set(newWorkspaces.map(w => w.id));
-    setWorkspaces(newWorkspaces);
+    setWorkspaces(prev => {
+      // A workspace missing from the incoming list was deleted by the user, so
+      // keep its row as a tombstone instead of dropping it — that is what makes
+      // the delete propagate (see mergeSyncedCollection in syncService).
+      const deletedAt = Date.now();
+      const tombstones = prev
+        .filter(w => !validIds.has(w.id) && !isTombstonedRow(w))
+        .map(w => ({ ...w, deletedAt }));
+      return [...newWorkspaces, ...tombstones];
+    });
     setTabs(prev => prev.map(t => {
       if (t.workspaceId && !validIds.has(t.workspaceId)) {
         return { ...t, workspaceId: newWorkspaces[0]?.id || 'default' };
@@ -808,7 +837,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // App data export & import (extracted to useAppDataBackup)
   const { handleExportData, handleImportData } = useAppDataBackup({
-    bookmarks,
+    bookmarkRows,
     history,
     settings,
     setBookmarks,
@@ -818,11 +847,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleCloseShare = useCallback(() => setIsShareOpen(false), []);
   const handleCloseSpotlight = useCallback(() => setIsSpotlightOpen(false), []);
-  const handleCloseReaderMode = useCallback(() => setIsReaderModeOpen(false), []);
+  const handleCloseReaderMode = useCallback(() => {
+    setIsReaderModeOpen(false);
+    setReaderTabId(null);
+  }, []);
   const handleCloseWorkspaceManager = useCallback(() => setIsWorkspaceManagerOpen(false), []);
   const handleCloseExtensions = useCallback(() => setIsExtensionsOpen(false), []);
   const handleCloseScreenshot = useCallback(() => setIsScreenshotOpen(false), []);
   const handleCloseVpnPopover = useCallback(() => setIsVpnPopoverOpen(false), []);
+  const handleCloseHelp = useCallback(() => setIsHelpOpen(false), []);
+  const handleCloseAccountModal = useCallback(() => setIsAccountModalOpen(false), []);
+  const handleCloseBlockedSiteAlert = useCallback(() => setBlockedSiteAlert(null), []);
 
   const handleCollapseSidebar = useCallback(() => {
     setIsSidebarCollapsed(true);
@@ -927,7 +962,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       setActiveTabId(partnerTabId);
     }
   }, [activeTabId, tabs, activeWorkspaceId]);
-  const handleToggleReaderMode = useCallback(() => setIsReaderModeOpen(prev => !prev), []);
+  const handleToggleReaderMode = useCallback(() => {
+    // `isActive` inside ReaderMode is now the real signal (its tab is in front),
+    // so "open but bound to another tab" is not a showing reader: toggling here
+    // re-binds it to the active tab instead of only closing it.
+    if (isReaderModeOpen && activeTabId === readerTabId) {
+      setIsReaderModeOpen(false);
+      setReaderTabId(null);
+      return;
+    }
+    setReaderTabId(activeTabId);
+    setIsReaderModeOpen(true);
+  }, [isReaderModeOpen, readerTabId, activeTabId]);
   const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
   const handleOpenSpotlight = useCallback(() => setIsSpotlightOpen(true), []);
 
@@ -1058,7 +1104,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         e.preventDefault();
         handleNewTab();
         setTimeout(() => {
-          const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+          // Stable data hook on the omnibox input (both layouts); never match
+          // on placeholder text, which is localised and engine-dependent.
+          const searchInput = document.querySelector<HTMLInputElement>('input[data-omnibox-input]');
           if (searchInput) {
             searchInput.focus();
             searchInput.select();
@@ -1066,7 +1114,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         }, 100);
         return;
       }
-      
+
       if (matches('reopenTab')) {
         e.preventDefault();
         handleReopenClosedTab();
@@ -1100,7 +1148,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       // Focus Address / Search bar (⌘L / Ctrl+L)
       if (meta && key === 'l') {
         e.preventDefault();
-        const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+        const searchInput = document.querySelector<HTMLInputElement>('input[data-omnibox-input]');
         if (searchInput) {
           searchInput.focus();
           searchInput.select();
@@ -1303,24 +1351,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     );
   }
 
-  const handleCloseHelp = useCallback(() => setIsHelpOpen(false), []);
-  const handleCloseAccountModal = useCallback(() => setIsAccountModalOpen(false), []);
-  const handleCloseBlockedSiteAlert = useCallback(() => setBlockedSiteAlert(null), []);
-
   return (
     <MotionConfig reducedMotion="user">
-      <div 
+      <div
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
           activeTab?.isIncognito
             ? 'bg-slate-950 dark:bg-[#0a0812]'
             : 'bg-slate-100 dark:bg-slate-950'
         } transition-colors duration-300`}>
-      
+
       {/* Pinned Vertical Sidebar with smooth slide animation */}
       <AnimatePresence initial={false}>
         {useVerticalTabs && !isSidebarCollapsed && (
-          <motion.div 
+          <motion.div
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 250, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
@@ -1335,7 +1379,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onCloseTab={handleCloseTab}
               onNewTab={handleNewTab}
               onNewIncognitoTab={handleNewIncognitoTab}
-              onExitIncognito={handleExitIncognitoTab}
               onToggleMuteTab={handleToggleMuteTab}
               onDuplicateTab={handleDuplicateTab}
               onTogglePinTab={handleTogglePinTab}
@@ -1388,14 +1431,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       {useVerticalTabs && isSidebarCollapsed && (
         <>
           {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
-          <div 
+          <div
             className="fixed top-0 left-0 bottom-0 w-8 z-40 no-drag"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onMouseEnter={handleHoverSidebarOpen}
           />
 
           {/* Floating Expand Sidebar Button when Collapsed */}
-          <div 
+          <div
             className={`fixed top-2.5 ${isMac ? 'left-[82px]' : 'left-2.5'} z-45 flex items-center no-drag`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
@@ -1432,7 +1475,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onCloseTab={handleCloseTab}
                   onNewTab={handleNewTab}
                   onNewIncognitoTab={handleNewIncognitoTab}
-                  onExitIncognito={handleExitIncognitoTab}
                   onToggleMuteTab={handleToggleMuteTab}
                   onDuplicateTab={handleDuplicateTab}
                   onTogglePinTab={handleTogglePinTab}
@@ -1487,13 +1529,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           PERF: transition is scoped to the properties that actually change on
           sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
           the compositor watch every property of this full-size container. */}
-      <div 
+      <div
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
-            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5' 
+            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5'
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
@@ -1506,7 +1548,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
               className="w-full shrink-0 relative z-50 overflow-visible"
             >
-              <TopBar 
+              <TopBar
                 tabs={workspaceTabs}
                 workspaces={workspaces}
                 activeWorkspaceId={activeWorkspaceId}
@@ -1554,7 +1596,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onCloseTab={handleCloseTab}
                 onNewTab={handleNewTab}
                 onNewIncognitoTab={handleNewIncognitoTab}
-                onExitIncognito={handleExitIncognitoTab}
                 onNavigate={handleNavigate}
                 onGoBack={handleGoBack}
                 onGoForward={handleGoForward}
@@ -1579,7 +1620,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         {/* Windows Controls Overlay Spacer & Drag Bar when Vertical Tabs is active */}
         {useVerticalTabs && isWindows && (
-          <div 
+          <div
             className="w-full h-8 shrink-0 flex items-center justify-between drag-region select-none px-3 bg-slate-100/60 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-white/5"
             style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
           >
@@ -1587,15 +1628,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               <span className="truncate max-w-sm text-[11px]">{activeTab?.title || 'Nova Browser'}</span>
             </div>
             {/* 140px reserved spacer so Windows native titlebar controls don't overlap web content */}
-            <div 
-              className="w-[140px] h-full shrink-0 select-none drag-region" 
-              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} 
+            <div
+              className="w-[140px] h-full shrink-0 select-none drag-region"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
             />
           </div>
         )}
 
       {/* MAIN BROWSER CONTENT */}
-      <main 
+      <main
         id="browser-content-main"
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className="flex-1 relative w-full h-full bg-white dark:bg-slate-900 flex overflow-hidden min-h-0"
@@ -1668,8 +1709,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         </React.Suspense>
 
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
-        <div 
-          id="browser-views-container" 
+        <div
+          id="browser-views-container"
           className="h-full relative flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden"
         >
           {sortedTabs.map((tab) => {
@@ -1750,10 +1791,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                       </span>
 
                       {tab.favicon ? (
-                        <img 
-                          src={tab.favicon} 
-                          alt="" 
-                          className="w-3.5 h-3.5 rounded-xs object-contain shrink-0" 
+                        <img
+                          src={tab.favicon}
+                          alt=""
+                          className="w-3.5 h-3.5 rounded-xs object-contain shrink-0"
                           onError={(e) => { (e.target as any).style.display = 'none'; }}
                         />
                       ) : (
@@ -1815,7 +1856,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                       </button>
 
                       {/* Close Tab */}
-                      <button 
+                      <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleCloseTab(tab.id);
@@ -1831,8 +1872,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
                 {/* Webview Container: Flex-1 ensures webview occupies 100% of remaining height beneath header */}
                 <div className="flex-1 min-h-0 w-full relative">
-                  <BrowserView 
-                    tab={tab} 
+                  <BrowserView
+                    tab={tab}
                     onNavigate={handleNavigate}
                     onUpdateTab={handleUpdateTab}
                     onNewTab={handleNewTab}
@@ -1866,7 +1907,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
           {/* Split Screen Resizer Handle */}
           {secondarySplitTab && (
-            <div 
+            <div
               id="split-resizer-handle"
               style={{ left: `${splitRatio}%` }}
               className="absolute top-0 bottom-0 w-1.5 -ml-[3px] cursor-col-resize hover:bg-blue-500 active:bg-blue-600 bg-slate-300/60 dark:bg-slate-700/60 z-30 transition-colors flex items-center justify-center select-none"
@@ -1884,7 +1925,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   const deltaX = latestPageX - startX;
                   let newRatio = startRatio + (deltaX / cachedContainerWidth) * 100;
                   newRatio = Math.max(20, Math.min(80, newRatio));
-                  
+
                   if (primarySplitTab) {
                     const primEl = document.getElementById(`tab-view-${primarySplitTab.id}`);
                     if (primEl) primEl.style.width = `${newRatio}%`;
@@ -1908,7 +1949,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     rafId = requestAnimationFrame(updateDOM);
                   }
                 };
-                
+
                 const handleMouseUp = (upEvent: MouseEvent) => {
                   if (rafId !== null) {
                     cancelAnimationFrame(rafId);
@@ -1916,13 +1957,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   }
                   document.removeEventListener('mousemove', handleMouseMove);
                   document.removeEventListener('mouseup', handleMouseUp);
-                  
+
                   const deltaX = upEvent.pageX - startX;
                   let finalRatio = startRatio + (deltaX / cachedContainerWidth) * 100;
                   finalRatio = Math.max(20, Math.min(80, finalRatio));
                   setSplitRatio(finalRatio);
                 };
-                
+
                 document.addEventListener('mousemove', handleMouseMove);
                 document.addEventListener('mouseup', handleMouseUp);
               }}
@@ -1932,8 +1973,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
         {/* AI Assistant Side Panel */}
         <React.Suspense fallback={null}>
-          <SidePanel 
-            isOpen={isSidePanelOpen} 
+          <SidePanel
+            isOpen={isSidePanelOpen}
             onClose={handleCloseSidePanel}
             activeTab={activeTab}
             pendingActions={pendingAIActions}
@@ -2021,26 +2062,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       </div>
 
       <React.Suspense fallback={null}>
-        {isReaderModeOpen && (
-          <ReaderMode 
-            url={activeTab?.url || ''} 
-            tabId={activeTabId} 
-            isActive={isReaderModeOpen} 
-            onClose={handleCloseReaderMode} 
+        {isReaderModeOpen && readerTabId && (
+          <ReaderMode
+            url={readerTab?.url || ''}
+            tabId={readerTabId}
+            isActive={activeTabId === readerTabId}
+            onClose={handleCloseReaderMode}
           />
         )}
       </React.Suspense>
 
       <React.Suspense fallback={null}>
         {isWorkspaceManagerOpen && (
-          <WorkspaceManager 
-            isOpen={isWorkspaceManagerOpen} 
-            onClose={handleCloseWorkspaceManager} 
-            workspaces={workspaces} 
-            onUpdateWorkspaces={handleUpdateWorkspaces} 
-            activeWorkspaceId={activeWorkspaceId} 
-            onSelectWorkspace={handleSelectWorkspace} 
-            isIncognito={activeTab?.isIncognito} 
+          <WorkspaceManager
+            isOpen={isWorkspaceManagerOpen}
+            onClose={handleCloseWorkspaceManager}
+            workspaces={workspaces}
+            onUpdateWorkspaces={handleUpdateWorkspaces}
+            activeWorkspaceId={activeWorkspaceId}
+            onSelectWorkspace={handleSelectWorkspace}
+            isIncognito={activeTab?.isIncognito}
           />
         )}
       </React.Suspense>

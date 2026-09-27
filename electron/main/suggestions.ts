@@ -67,7 +67,14 @@ function resolveLocaleDetails(clientLocale?: string) {
     ? clientLocale.trim()
     : (app.getLocale() || 'tr-TR');
   const parts = rawLocale.replace('_', '-').split('-');
-  const lang = (parts[0] || 'tr').toLowerCase();
+  // `lang` reaches third-party search URLs, the Accept-Language header and the
+  // cache key, and unlike `country` it was never validated — the renderer
+  // controls the locale, so `en&x=1` or a CRLF sequence flowed straight into
+  // the request line. Constrain it to an ISO-639 shape, the same treatment
+  // `country` already gets in normalizeCountry(). Every legitimate locale's
+  // primary subtag is 2-3 letters, so real values are unaffected.
+  const rawLang = (parts[0] || '').toLowerCase();
+  const lang = /^[a-z]{2,3}$/.test(rawLang) ? rawLang : 'tr';
   // Previously every region-less locale collapsed to "us", which made a German
   // user get gl=us. Fall back to the language's own country instead.
   const country = normalizeCountry(parts[1], lang);
@@ -111,11 +118,11 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
         return [];
       }
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         const chromeMajor = chromeVer.split('.')[0] || '134';
         const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
-        const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${lang}&gl=${country}`;
+        const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${encodeURIComponent(lang)}&gl=${encodeURIComponent(country)}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
@@ -129,7 +136,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Sec-Fetch-Site': 'same-site'
           }
         });
-        clearTimeout(timeout);
         if (res.status === 429 || res.status === 403) {
           googleRateLimitUntil = Date.now() + 60_000;
           return [];
@@ -148,7 +154,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
 
     const fetchDuckDuckGo = async (): Promise<string[]> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
         const res = await fetch(url, {
@@ -158,7 +164,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Accept-Language': acceptLanguage
           }
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
@@ -173,10 +178,10 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
 
     const fetchBing = async (): Promise<string[]> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         const market = `${lang}-${country.toUpperCase()}`;
-        const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${lang}&setmkt=${market}`;
+        const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${encodeURIComponent(lang)}&setmkt=${encodeURIComponent(market)}`;
         const res = await fetch(url, {
           signal: controller.signal,
           headers: {
@@ -184,7 +189,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Accept-Language': acceptLanguage
           }
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
@@ -199,7 +203,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
 
     const fetchBrave = async (): Promise<string[]> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         // Brave expects a bare ISO country code (e.g. "TR", "DE"); without it
         // the API falls back to the request IP's region, which yields results
@@ -213,7 +217,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Accept-Language': acceptLanguage
           }
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
@@ -228,7 +231,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
 
     const fetchEcosia = async (): Promise<string[]> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list&locale=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}`;
         const res = await fetch(url, {
@@ -238,7 +241,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Accept-Language': acceptLanguage
           }
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
@@ -253,7 +255,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
 
     const fetchYahoo = async (): Promise<string[]> => {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 650);
+      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
       try {
         const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
         const res = await fetch(url, {
@@ -263,7 +265,6 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
             'Accept-Language': acceptLanguage
           }
         });
-        clearTimeout(timeout);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
@@ -295,6 +296,18 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
     // As soon as any provider yields valid non-empty suggestions, remaining pending
     // stagger timers are cancelled to minimize redundant network requests.
     const FALLBACK_STAGGER_MS = 150;
+
+/**
+ * Deadline for one provider request, covering the BODY as well as the headers.
+ *
+ * Every provider used to call clearTimeout immediately after `await fetch(...)`,
+ * which disarmed the AbortController the moment the response headers arrived and
+ * left `res.json()` with no deadline at all. A server that sends headers and then
+ * an endless chunked body parks the promise forever and buffers into main-process
+ * memory; the fan-out only settles once all three do, so one such host wedges
+ * suggestions entirely. The deadline is therefore only cleared in `finally`.
+ */
+const PROVIDER_TIMEOUT_MS = 3_000;
     const resultsByPriority = new Map<number, string[]>();
     let anyNonEmpty = false;
     let activeRuns = 0;

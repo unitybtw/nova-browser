@@ -15,11 +15,14 @@
     "reload": "Yenile",
     "copy": "Kopyala",
     "copied": "Kopyalandı",
-    "showMore": "Daha fazla göster ({remaining} kayıt kaldı)"
+    "showMore": "Daha fazla göster ({remaining} kayıt kaldı)",
+    "showMore_one": "Daha fazla göster ({remaining} kayıt kaldı)",
+    "showMore_other": "Daha fazla göster ({remaining} kayıt kaldı)"
   },
   "nav": {
     "newTab": "Yeni Sekme",
     "searchPlaceholder": "{engine} ile arayın veya web adresi girin",
+    "aiPlaceholder": "AI: Ne yapmamı istersiniz? (örn. bu sayfayı özetle)",
     "addShortcut": "Ekle",
     "bookmarks": "Yer İmleri",
     "history": "Geçmiş",
@@ -69,13 +72,28 @@
     "clearCache": "YZ Önbelleğini Temizle",
     "clearCacheDesc": "Disk alanı kazanmak için indirilen yerel yapay zeka modellerini temizleyin.",
     "model": "Model",
-    "status": "Durum"
+    "status": "Durum",
+    "voiceMicDenied": "Mikrofon erişimi reddedildi. {settings} bölümünden Nova Browser için mikrofonu etkinleştirin.",
+    "voiceNoDevice": "Kullanılabilir mikrofon cihazı bulunamadı. Bir mikrofon bağlı olduğundan emin olun.",
+    "voiceInaccessible": "Mikrofona erişilemedi: {reason}",
+    "voiceUnsupported": "Sesli giriş için güvenli bir uygulama penceresi gerekiyor ve burada kullanılamıyor.",
+    "voiceModelDownloading": "Cihaz içi ses modeli hazırlanıyor… %{percent}",
+    "voiceTranscribing": "Cihazda çevriliyor…",
+    "voiceNoSpeech": "Konuşma algılanmadı. Mikrofona biraz daha yakın olarak tekrar deneyin.",
+    "voiceTooShort": "Bu kayıt çeviri için çok kısa kaldı.",
+    "voiceFailed": "Cihaz içi çeviri başarısız oldu: {reason}",
+    "voiceNetwork": "Ses modeli indirilemedi. Bağlantınızı kontrol edip tekrar deneyin.",
+    "voiceSettingsWin": "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon",
+    "voiceSettingsMac": "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon",
+    "voiceSettingsLinux": "Sistem Ses ve Giriş Ayarları",
+    "voiceSettingsGeneric": "sistem gizlilik ayarlarınız"
   },
   "security": {
     "safe": "Güvenli Bağlantı",
     "dangerous": "Aldatıcı Site Uyarısı",
     "blocked": "Bağlantı Engellendi",
-    "blockedDesc": "Bu web adresi güvenliğiniz için engellendi."
+    "blockedDesc": "Bu web adresi güvenliğiniz için engellendi.",
+    "siteInfo": "Site bilgileri ve izinler"
   },
   "vpn": {
     "active": "Proxy / VPN Aktif",
@@ -105,6 +123,8 @@
     "searchEngine": "Motor: {engine}",
     "tasks": "Görevler",
     "tasksLeft": "{count} kaldı",
+    "tasksLeft_one": "{count} kaldı",
+    "tasksLeft_other": "{count} kaldı",
     "clearCompletedTasks": "Temizle",
     "noTasks": "Bugün için görev yok. Hepsi tamam!",
     "addTaskPlaceholder": "Yeni görev ekleyin...",
@@ -114,11 +134,18 @@
     "editShortcutTitle": "Kısayolu Düzenle",
     "shortcutName": "Ad",
     "shortcutUrl": "URL",
-    "shuffleWallpaper": "Yeni Günün Fotoğrafı"
+    "shuffleWallpaper": "Yeni Günün Fotoğrafı",
+    "editSpeedDial": "{name} kısayolunu düzenle",
+    "removeSpeedDial": "{name} kısayolunu kaldır",
+    "search": "Ara",
+    "clearSearch": "Aramayı temizle",
+    "addTask": "Görev ekle"
   },
   "history": {
     "title": "Geçmiş",
     "pagesRecorded": "{count} sayfa kaydedildi",
+    "pagesRecorded_one": "{count} sayfa kaydedildi",
+    "pagesRecorded_other": "{count} sayfa kaydedildi",
     "clearBrowsingData": "Tarama verilerini temizle",
     "searchPlaceholder": "Geçmişte ara...",
     "noHistory": "Geçmiş bulunamadı",
@@ -153,6 +180,8 @@
     "interrupted": "Kesintiye Uğradı",
     "progressing": "İndiriliyor...",
     "totalItems": "{count} öğe",
+    "totalItems_one": "{count} öğe",
+    "totalItems_other": "{count} öğe",
     "openFile": "Dosyayı Aç"
   },
   "find": {
@@ -176,9 +205,16 @@
     "noChanges": "Seçili filtreyle eşleşen değişiklik bulunamadı.",
     "liveSync": "GitHub Canlı Eşitleme",
     "releasesCount": "{count} sürüm",
+    "releasesCount_one": "{count} sürüm",
+    "releasesCount_other": "{count} sürüm",
     "current": "Güncel",
     "keyHighlights": "Öne Çıkanlar",
     "allChanges": "Tüm Değişiklikler",
+    "everythingElse": "Değişikliklerin tamamı",
+    "clearFilters": "Filtreleri temizle",
+    "resultsCount": "{total} değişiklikten {count} tanesi eşleşiyor",
+    "resultsCount_one": "{total} değişiklikten {count} tanesi eşleşiyor",
+    "resultsCount_other": "{total} değişiklikten {count} tanesi eşleşiyor",
     "categoryFeature": "Özellik",
     "categoryFix": "Düzeltme",
     "categorySecurity": "Güvenlik",

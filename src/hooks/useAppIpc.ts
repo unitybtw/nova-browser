@@ -1,5 +1,4 @@
-import { useEffect } from 'react';
-import type { Dispatch, SetStateAction, MutableRefObject } from 'react';
+import { useEffect, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import type { Tab, UserSettings } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert } from '../utils/confirmDialog';
@@ -147,7 +146,11 @@ export function useAppIpc({
         } else if (command === 'settings') {
           handlersRef.current.handleOpenSettings();
         } else if (command === 'focus-url') {
-          const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="Search"]');
+          // Select on the stable data hook, not on placeholder text: the
+          // omnibox placeholder is localised and the AI-mode one never matched
+          // a literal "Search" match anyway. `data-omnibox-input` is on the
+          // address bar in both the horizontal and vertical-tabs layouts.
+          const searchInput = document.querySelector<HTMLInputElement>('input[data-omnibox-input]');
           if (searchInput) {
             searchInput.focus();
             searchInput.select();
@@ -221,7 +224,7 @@ export function useAppIpc({
     const handleOpenWorkspaceManager = () => setIsWorkspaceManagerOpen(true);
     const handleOpenAccountModal = () => setIsAccountModalOpen(true);
     const handleOpenChangelog = () => handlersRef.current.handleNewTab('nova://changelog', undefined, { reuseBlank: false });
-    
+
     window.addEventListener('ai-quick-action', handleQuickAIAction);
     window.addEventListener('open-ai-sidepanel', handleOpenSidePanel);
     window.addEventListener('open-workspace-manager', handleOpenWorkspaceManager);

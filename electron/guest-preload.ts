@@ -208,9 +208,12 @@ if (protocol === 'https:' || protocol === 'http:') {
   // Secure credential filling listener: received from host when user selects an account in native UI
   ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string; expectedHostname?: string }) => {
     if (!cred) return;
-    if (cred.expectedHostname && typeof cred.expectedHostname === 'string' && window.location.hostname !== cred.expectedHostname) {
-      return;
-    }
+    // Security: fail CLOSED on the origin binding. This is the last hop before
+    // a stored secret crosses into a page, so an absent, empty or non-string
+    // expectedHostname must NOT be read as "fill on any origin" — it must
+    // abort. Only an exact hostname match may receive the password.
+    if (typeof cred.expectedHostname !== 'string' || cred.expectedHostname.length === 0) return;
+    if (window.location.hostname !== cred.expectedHostname) return;
     try {
       const activeEl = document.activeElement as HTMLElement | null;
       const root = activeEl?.closest('form') || activeEl?.closest('fieldset') || activeEl?.parentElement || document;

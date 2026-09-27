@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Search, FolderOpen } from 'lucide-react';
-import { useTranslation, t as translateFn } from '../services/i18n';
+import { useTranslation, t as translateFn, type SupportedLanguage } from '../services/i18n';
+import { formatBytes } from '../utils/formatBytes';
 
 export interface DownloadItemPage {
   id: string;
@@ -21,28 +22,31 @@ interface DownloadsPageProps {
 interface DownloadRowItemProps {
   item: DownloadItemPage;
   t: typeof translateFn;
+  /**
+   * Not read by the component body: it exists purely to invalidate the memo
+   * when the app language changes. `t` is a module level function with a
+   * stable identity, so a shallow prop compare alone cannot see a language
+   * switch and would leave every status label in the previous language.
+   */
+  language: SupportedLanguage;
+  /**
+   * Not read by the component body either: it is the shared module level
+   * formatter, so its reference never changes and the memo below can rely on
+   * that. A per-render arrow would defeat React.memo for all 100 visible rows.
+   */
   formatBytes: (bytes: number) => string;
 }
 
-// Module level so the reference handed to every memoized row is stable; a
-// per-render arrow here would defeat React.memo for all 100 visible rows.
-const formatBytes = (bytes: number) => {
-  if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-};
-
 // Extracted so a list re-render (search keystroke, show more, parent state) can
 // skip re-rendering rows whose item did not change. `t` is the module level
-// translation function, so its reference never changes.
+// translation function, so its reference never changes — `language` is compared
+// explicitly to compensate for exactly that.
 const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
   item,
   t,
   formatBytes
 }) => {
-  const percent = item.totalBytes > 0 
+  const percent = item.totalBytes > 0
     ? Math.min(100, Math.round((item.receivedBytes / item.totalBytes) * 100))
     : 0;
 
@@ -83,7 +87,7 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
       {/* Progress Bar */}
       {item.state === 'progressing' && (
         <div className="w-full bg-slate-200 dark:bg-slate-700/80 h-1.5 rounded-full overflow-hidden">
-          <div 
+          <div
             className="bg-cyan-500 h-full transition-[width] duration-300 rounded-full"
             style={{ width: `${percent}%` }}
           />
@@ -139,27 +143,31 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
       </div>
     </div>
   );
-});
+}, (prev, next) =>
+  prev.item === next.item &&
+  prev.formatBytes === next.formatBytes &&
+  prev.language === next.language
+);
 
 export const DownloadsPage: React.FC<DownloadsPageProps> = ({
   downloads,
   onClearDownloads
 }) => {
-  const { t } = useTranslation();
+  const { t, language } = useTranslation();
   const [filterText, setFilterText] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
 
   const filteredDownloads = useMemo(() => {
     const q = filterText.trim().toLowerCase();
     if (!q) return downloads;
-    return downloads.filter(d => 
+    return downloads.filter(d =>
       (d.filename && d.filename.toLowerCase().includes(q)) ||
       (d.url && d.url.toLowerCase().includes(q))
     );
   }, [downloads, filterText]);
 
   return (
-    <div 
+    <div
       style={{ backgroundColor: 'var(--nova-frame-bg)' }}
       className="w-full h-full bg-slate-50 dark:bg-[#0b0f17] overflow-y-auto flex justify-center py-10 px-4 select-text"
     >
@@ -215,7 +223,7 @@ export const DownloadsPage: React.FC<DownloadsPageProps> = ({
             ) : (
               <>
                 {filteredDownloads.slice(0, visibleCount).map((item) => (
-                  <DownloadRowItem key={item.id} item={item} t={t} formatBytes={formatBytes} />
+                  <DownloadRowItem key={item.id} item={item} t={t} language={language} formatBytes={formatBytes} />
                 ))}
                 {filteredDownloads.length > visibleCount && (
                   <button

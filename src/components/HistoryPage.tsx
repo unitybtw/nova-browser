@@ -84,10 +84,11 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
             </p>
             <button
               onClick={() => onNavigate(item.url)}
-              className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-cyan-500 transition-opacity"
+              className="p-1.5 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
               title={t('history.openUrl')}
+              aria-label={t('history.openUrl')}
             >
-              <ArrowUpRight className="w-3.5 h-3.5" />
+              <ArrowUpRight className="w-4 h-4" />
             </button>
           </div>
           <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5" title={item.url}>{item.url}</p>
@@ -97,8 +98,9 @@ const HistoryRowItem: React.FC<HistoryRowItemProps> = React.memo(({
         <span className="text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap font-mono">{formatTime(item.timestamp)}</span>
         <button
           onClick={() => onRemoveHistoryItem(item.id)}
-          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-lg transition-colors opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
           title={t('history.removeFromHistory')}
+          aria-label={t('history.removeFromHistory')}
         >
           <Trash2 className="w-4 h-4" />
         </button>

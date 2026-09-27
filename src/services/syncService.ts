@@ -66,7 +66,8 @@ export interface SyncDataBundle {
   userId: string;
   bookmarks?: Bookmark[];
   folders?: Folder[];
-  history?: HistoryItem[];
+  /** Carries tombstones for cleared visits — they are never merged into a live log. */
+  history?: TombstoneRow<HistoryItem>[];
   passwords?: SavedPassword[];
   encryptedPasswords?: string;
   passwordsSalt?: string;
@@ -122,6 +123,1026 @@ const PASSWORD_HASH_FORMAT = 'pbkdf2';
 const PBKDF2_ITERATIONS = 600_000;
 const PBKDF2_SALT_BYTES = 16;
 const PBKDF2_HASH_BYTES = 32;
+
+/** Hard ceiling for one full sync round-trip against Supabase. */
+const SYNC_RUN_TIMEOUT_MS = 60_000;
+
+/**
+ * Upper bounds on how many items of each collection a single synced vault
+ * envelope may carry.
+ *
+ * The merge below never drops a row outright: deletions are carried as
+ * tombstone rows until TOMBSTONE_RETENTION_MS purges them, so a collection can
+ * only shrink in retention-sized steps. Without a cap the vault grows
+ * monotonically and can never shrink. Once the encrypted envelope passes what
+ * the backend accepts — or the 10MB `store-set` ceiling in the main process —
+ * the *read* half fails first, `remoteUnusable` is set, and the push is
+ * aborted "to protect your data". That is a permanent, self-inflicted
+ * dead end: the vault can no longer be written, so it can never be trimmed
+ * back down either. Capping at assembly time keeps the envelope writable.
+ *
+ * The values are deliberately far above any real usage (a few thousand
+ * bookmarks, a couple of hundred workspaces) so they act purely as a growth
+ * guard, not as a quota. They bound the *pushed* envelope only: the merged set
+ * is still returned to the caller in `mergedData`, so local data beyond a cap
+ * is never truncated out of the user's own store.
+ *
+ * Union order is local-first, so the entries that survive a cap are the ones
+ * already on the device doing the push.
+ */
+const MAX_SYNCED_BOOKMARKS = 5_000;
+const MAX_SYNCED_FOLDERS = 1_000;
+/**
+ * Ceiling on tombstones in one push.
+ *
+ * Without it the live cap above is meaningless for the payload size: the cap
+ * bounds live rows but tombstones rode along unbounded, so clearing 5 000
+ * bookmarks produced 5 000 tombstone rows — each still carrying the full row,
+ * because the content is what lets a tombstone suppress a same-URL bookmark
+ * minted with a different id on another device — and that payload was re-pushed
+ * on every sync for the whole 30-day retention window.
+ *
+ * The newest are kept: a fresh tombstone is the one a not-yet-synced device is
+ * most likely to need, and an old one has already been offered to every device
+ * for the longest time. The dropped ones are exactly the ones closest to the
+ * retention purge, so what is lost is the smallest possible amount of
+ * suppression for the shortest possible time.
+ */
+const MAX_TOMBSTONES_PER_PUSH = 2_000;
+/**
+ * Exported because the post-sync re-merge has to apply the same bound: a log
+ * that grew past it would stop matching what the vault carries, so the two would
+ * disagree about which entries exist.
+ */
+export const MAX_SYNCED_HISTORY = 300;
+const MAX_SYNCED_PASSWORDS = 2_000;
+const MAX_SYNCED_WORSPACES = 200;
+
+/**
+ * Schema version of the encrypted vault payload.
+ *
+ * v3 = per-row `deletedAt` soft deletes (tombstones) on every id-keyed synced
+ * collection. v4 = the same mechanism extended to the last two synced
+ * collections, history and saved passwords, whose delete sites drop the row
+ * instead of stamping it, so their tombstones are minted at sync time from the
+ * device's push index and only ever travel in the payload. Still a forward-only
+ * migration: an older bundle is accepted verbatim, because `deletedAt` is
+ * optional and a row without it means "live" — exactly how every row written
+ * before v3 behaved. `migrateSyncBundle()` performs that forward step (a version
+ * stamp, no data rewrite), so upgrading users keep their vault and no row is
+ * reinterpreted as deleted.
+ */
+export const SYNC_BUNDLE_VERSION = 4;
+
+/**
+ * How long a tombstone is kept before it is purged, on every sync.
+ *
+ * The window has to outlive the longest plausible gap between a delete on one
+ * device and the next sync of the others; 30 days is comfortably longer than
+ * the sync interval and than a typical "I forgot about this old laptop"
+ * absence. Purging is safe precisely because the window is that long: every
+ * device that comes back within it receives the delete, and one that stays
+ * offline longer than the window has already missed far more than a single
+ * deletion. The trade-off is bounded (unlike a never-purged table) — see
+ * `mergeSyncedCollection()`.
+ */
+export const TOMBSTONE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+/**
+ * Forward-only migration of a decrypted remote bundle to the current schema.
+ * Idempotent, and a no-op for data: tombstones are opt-in per row, so a legacy
+ * bundle needs no rewrite beyond the version stamp.
+ */
+export function migrateSyncBundle(bundle: SyncDataBundle | null | undefined): SyncDataBundle | null {
+  if (!bundle) return bundle ?? null;
+  if (bundle.version === SYNC_BUNDLE_VERSION) return bundle;
+  return { ...bundle, version: SYNC_BUNDLE_VERSION };
+}
+
+/** Wall-clock time a row was deleted, or null when the row is live. */
+export function tombstoneTimestamp(row: unknown): number | null {
+  const value = (row as { deletedAt?: unknown } | null)?.deletedAt;
+  // Anything that is not a positive finite number (absent, null, a string from
+  // a hand-edited store) reads as "live", which is the safe default: it is what
+  // every pre-v3 row means, and it never hides a row from the user.
+  return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+/** True while a row is a tombstone, i.e. deleted but not yet purged. */
+export function isTombstonedRow(row: unknown): boolean {
+  return tombstoneTimestamp(row) !== null;
+}
+
+/**
+ * Last-write stamp of a row, used to decide whether an incoming copy predates
+ * a local delete. Only collections whose rows carry a creation timestamp can be
+ * compared precisely; a row without one (folders, workspaces) reports 0 and
+ * therefore always loses to a delete. That is the safe direction: an undated
+ * copy cannot prove it was written after the delete, and a row id is minted
+ * once at creation, so an undated copy is by definition the pre-delete one.
+ */
+export function rowVersion(row: unknown): number {
+  const stamp = (row as { timestamp?: unknown } | null)?.timestamp;
+  return typeof stamp === 'number' && Number.isFinite(stamp) ? stamp : 0;
+}
+
+/**
+ * Canonical bookmark URL used as the collection's secondary key. Bookmarked
+ * pages dedupe by URL rather than id (two devices bookmarking the same page
+ * mint different ids), so the same normalization has to be used by the merge
+ * and by the tombstone that must suppress such a row.
+ *
+ * Total by contract. This runs unguarded on EVERY row of every collection on
+ * every sync, and a row without a `url` is accepted by the store (a legacy row,
+ * a hand-edited localStorage, a vault written by an older build) — so a throw
+ * here aborted the sync before the push, and since nothing had been uploaded
+ * the next sync hit the same row and failed identically: sync wedged for good,
+ * with no clue which row did it. Such a row simply has no secondary key; the
+ * merge keys it by id instead.
+ */
+export function normalizeBookmarkUrl(url: unknown): string {
+  if (typeof url !== 'string' || url.length === 0) return '';
+  try {
+    const parsed = new URL(url);
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith('/')) {
+      parsed.pathname = path.slice(0, -1);
+    }
+    return parsed.href.toLowerCase();
+  } catch {
+    return (url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url).toLowerCase();
+  }
+}
+
+export interface TombstoneMergeOptions<T> {
+  /** Stable row identity (the row id). */
+  keyOf: (row: T) => string;
+  /**
+   * Secondary identity for rows two devices may have created independently.
+   * A tombstone claims it as well, so deleting a page on device A also
+   * suppresses the same page on device B even though B minted its own id.
+   */
+  aliasKeyOf?: (row: T) => string | null;
+  /** Clock used to expire tombstones past the retention window. */
+  now: number;
+  /**
+   * What happens when two LIVE rows claim the same key. A key is not
+   * necessarily unique data — two devices bookmarking the same page collapse
+   * into one row by design — but for a collection whose key is coarser than
+   * the row it identifies (saved passwords are keyed by host+user, which two
+   * entries differing only by port or scheme share) a collision means one of
+   * them is lost. `keep-first` (the default) preserves the union semantics the
+   * id-keyed collections have always had; `keep-newer` makes the survivor
+   * deterministic and last-write-wins on `rowVersion` instead of position.
+   * Either way the count is logged: a row that is not carried is never silent.
+   */
+  collision?: 'keep-first' | 'keep-newer';
+}
+
+/**
+ * A row can only take part in a union merge if it can be keyed at all: a
+ * readable object and a non-empty string identity. Anything else used to be
+ * admitted under an `undefined` map key, where every such row collided with the
+ * first one and was discarded from the survivors — and therefore also excluded
+ * from the pushed vault. That is silent, permanent loss written to the vault, so
+ * the row is refused up front and the count is reported.
+ *
+ * `keyOf` is only reached for an object: callers read a field off the row, so
+ * asking it about a `null` entry would throw inside the merge instead of
+ * refusing the row.
+ */
+function isObjectRow(row: unknown): row is Record<string, unknown> {
+  return row !== null && typeof row === 'object';
+}
+
+function isUsableKey(key: unknown): key is string {
+  return typeof key === 'string' && key.length > 0;
+}
+
+/**
+ * Union merge for an id-keyed synced collection, tombstone-aware.
+ *
+ * Rules, in order of precedence:
+ *
+ * 1. A row that cannot be keyed (no object, no non-empty string identity) is
+ *    refused and counted; it is not part of the union in either direction.
+ * 2. A row with `deletedAt` is a tombstone: it never appears among the live
+ *    rows, but it IS returned so the caller keeps pushing it until every device
+ *    has seen it and the retention window purges it.
+ * 3. A live row is dropped when a tombstone claims one of its keys with
+ *    `deletedAt >= rowVersion(row)`. This is the rule that stops a device which
+ *    has not synced since the delete from resurrecting the row: the copy it
+ *    uploads was necessarily written before the delete it never saw, so the
+ *    comparison has to be row-version vs delete-time (bundle-level timestamps
+ *    cannot work here — a device that pushes *after* the delete while still
+ *    holding the old row would carry a newer bundle timestamp and win).
+ * 4. Two tombstones for the same key merge last-write-wins on `deletedAt`, so
+ *    a delete stays suppressed for a full retention window measured from the
+ *    most recent delete. A tombstone a newer live row beats on any of the keys
+ *    it claims is obsolete and is dropped, so a delete that lost last-write-wins
+ *    does not sit in the payload pretending to be current. Identical tombstones
+ *    arriving from both sides collapse to one.
+ * 5. Live rows keep the previous union behaviour: local first, first key wins.
+ *    A second live row that claims a key already taken is a COLLISION rather
+ *    than a union member. With `collision: 'keep-first'` the key is the row's
+ *    identity, so the overlap is the union working as before; with
+ *    `collision: 'keep-newer'` the key is coarser than the row, the merge has to
+ *    choose which copy the user keeps, and the count is reported.
+ * 6. Tombstones older than TOMBSTONE_RETENTION_MS are ignored entirely — they
+ *    no longer suppress anything, which is what keeps the table bounded.
+ */
+export function mergeSyncedCollection<T>(local: T[], remote: T[], options: TombstoneMergeOptions<T>): T[] {
+  const { keyOf, aliasKeyOf, now, collision = 'keep-first' } = options;
+
+  const keysOf = (row: T): string[] => {
+    const keys = [keyOf(row)];
+    const alias = aliasKeyOf?.(row);
+    if (alias && alias !== keys[0]) keys.push(alias);
+    return keys;
+  };
+
+  const deletedAt = new Map<string, number>();
+  const tombstones: T[] = [];
+  const live = new Map<string, T>();
+  let unkeyed = 0;
+  let collided = 0;
+
+  for (const row of [...local, ...remote]) {
+    // keyOf is only reached for an object: callers read a field off the row, so
+    // asking it about a `null` entry would throw inside the merge.
+    const primary = isObjectRow(row) ? keyOf(row) : null;
+    if (!isUsableKey(primary)) {
+      unkeyed++;
+      continue;
+    }
+    const deletedAtValue = tombstoneTimestamp(row);
+    if (deletedAtValue !== null) {
+      if (now - deletedAtValue >= TOMBSTONE_RETENTION_MS) continue; // purged
+      if (!tombstones.includes(row)) tombstones.push(row);
+      for (const key of keysOf(row)) {
+        deletedAt.set(key, Math.max(deletedAt.get(key) ?? 0, deletedAtValue));
+      }
+      continue;
+    }
+    const alias = aliasKeyOf?.(row);
+    // Dedupe by the secondary identity when the row HAS one, by id alone when
+    // it does not: an absent alias is not an empty alias, and using the empty
+    // string as a map key collapses every row without a secondary identity onto
+    // whichever one was seen first.
+    const dedupeKey = isUsableKey(alias) && alias !== primary ? alias : primary;
+    const held = live.get(dedupeKey);
+    if (held === undefined) {
+      live.set(dedupeKey, row);
+      continue;
+    }
+    if (collision !== 'keep-newer') continue;
+    // `keep-first` is the union: the key IS the row's identity, so meeting the
+    // same row on both sides is the normal case and the local copy winning is
+    // what the union has always meant. `keep-newer` is a content decision — the
+    // key is coarser than the row, so the merge has to choose WHICH of the two
+    // the user keeps — and that decision is counted and reported.
+    collided++;
+    if (rowVersion(row) > rowVersion(held)) live.set(dedupeKey, row);
+  }
+
+  if (unkeyed > 0) {
+    logger.warn(
+      'SyncService:mergeSyncedCollection',
+      `Refused ${unkeyed} synced row(s) with no usable id — they are in neither the merged set nor the pushed vault.`
+    );
+  }
+  if (collided > 0) {
+    logger.warn(
+      'SyncService:mergeSyncedCollection',
+      `${collided} synced row(s) claimed a key already taken by a different row; kept the newest copy, the other(s) are not carried.`
+    );
+  }
+
+  const survivors: T[] = [];
+  for (const row of live.values()) {
+    // Only a key that is actually claimed by a tombstone can block. Treating
+    // "no claim" as 0 would compare 0 >= rowVersion() and drop every undated
+    // row in the collection (folders, workspaces carry no timestamp).
+    const blocked = keysOf(row).some(key => {
+      const claimedAt = deletedAt.get(key);
+      return claimedAt !== undefined && claimedAt >= rowVersion(row);
+    });
+    if (!blocked) survivors.push(row);
+  }
+
+  // Tombstone collapse: a tombstone is kept only for the keys it still wins.
+  // `claimed` is what stops the payload doubling on every sync — the same delete
+  // comes back from the vault as a structurally identical but *distinct* object
+  // (it was serialized and re-encrypted in between), so identity dedupe is not
+  // enough and the keys themselves have to be tracked.
+  //
+  // The newest version each key reaches among the SURVIVORS is collected first:
+  // a tombstone is obsolete only when a surviving row that actually claims one
+  // of its keys is newer than the delete. Comparing the delete against every
+  // survivor's version instead would let an unrelated row — a bookmark added
+  // anywhere in the collection after the delete — retire a delivered deletion,
+  // and the other devices would resurrect the row the moment the tombstone left
+  // the payload.
+  const survivorVersionByKey = new Map<string, number>();
+  for (const row of survivors) {
+    for (const key of keysOf(row)) {
+      const version = rowVersion(row);
+      if (version > (survivorVersionByKey.get(key) ?? 0)) survivorVersionByKey.set(key, version);
+    }
+  }
+  const claimed = new Set<string>();
+  const retained: T[] = [];
+  for (const tombstone of tombstones) {
+    const at = tombstoneTimestamp(tombstone)!;
+    const fresh = keysOf(tombstone).filter(key => !claimed.has(key));
+    if (fresh.length === 0) continue;                        // same delete, already carried
+    if (fresh.some(key => deletedAt.get(key) !== at)) continue; // a newer delete owns these keys
+    if (fresh.some(key => (survivorVersionByKey.get(key) ?? 0) > at)) continue; // beaten by a live row
+    for (const key of fresh) claimed.add(key);
+    retained.push(tombstone);
+  }
+
+  return [...survivors, ...retained];
+}
+
+/**
+ * Drops tombstones past the retention window, so the rows leave the local store
+ * and not just the payload. mergeSyncedCollection() applies the same rule
+ * inline; this is the path for a collection with no remote counterpart (first
+ * sync, or its sync pref is off), where a device would otherwise keep its own
+ * tombstones forever.
+ */
+export function purgeExpiredTombstones<T>(rows: T[], now: number): T[] {
+  return rows.filter(row => {
+    const deletedAtValue = tombstoneTimestamp(row);
+    return deletedAtValue === null || now - deletedAtValue < TOMBSTONE_RETENTION_MS;
+  });
+}
+
+/**
+ * Applies a collection's push cap without letting tombstones crowd live rows
+ * out of the envelope: the cap bounds the live set exactly as before (union
+ * order is local-first, so the rows that survive are the pushing device's) and
+ * the surviving tombstones ride along after it.
+ *
+ * `keyOf` is the collection's own key extractor, used only to break a tie
+ * between tombstones that share a `deletedAt` (see below). It is a parameter
+ * because the id/url probe below is meaningless for a collection keyed by
+ * something else — a saved-password row has no `id`.
+ */
+export function capSyncedCollection<T>(
+  rows: T[],
+  liveCap: number,
+  tombstoneCap = MAX_TOMBSTONES_PER_PUSH,
+  keyOf?: (row: T) => string
+): T[] {
+  const live: T[] = [];
+  const tombstones: T[] = [];
+  for (const row of rows) {
+    if (isTombstonedRow(row)) tombstones.push(row);
+    else live.push(row);
+  }
+  // Newest first, and ties broken by something derived from the ROW rather than
+  // from its position: a mass delete stamps Date.now() once, so a whole burst
+  // shares one deletedAt, and then the sort key cannot order them. Breaking that
+  // tie by array index looks stable but is not — two devices hold the same
+  // tombstones in whatever order they merged them, so an index tiebreak makes
+  // them truncate to DIFFERENT sets and a delete silently dies on one of them.
+  const tiebreakKey = (row: T): string => {
+    const keyed = keyOf?.(row);
+    if (typeof keyed === 'string' && keyed) return keyed;
+    const id = (row as any)?.id;
+    if (typeof id === 'string' && id) return id;
+    const url = (row as any)?.url;
+    if (typeof url === 'string' && url) return url;
+    return '';
+  };
+  const newestFirst = tombstones
+    .slice()
+    .sort((a, b) => {
+      const delta = (tombstoneTimestamp(b) ?? 0) - (tombstoneTimestamp(a) ?? 0);
+      if (delta !== 0) return delta;
+      const keys = tiebreakKey(a).localeCompare(tiebreakKey(b));
+      return keys !== 0 ? keys : 0;
+    })
+    .slice(0, tombstoneCap);
+  return [...live.slice(0, liveCap), ...newestFirst];
+}
+
+/**
+ * A synced row that may carry the soft-delete marker.
+ *
+ * `HistoryItem` and `SavedPassword` do not declare `deletedAt`: their delete
+ * sites (Clear browsing history, the password list's trash button) drop the row
+ * from the store rather than stamping it, so there is no moment at which the
+ * store holds a tombstone for them. Their tombstones are minted at sync time
+ * from `deletionTombstones()` below and only ever live in the encrypted
+ * payload, never in the local store or the UI — hence the extended type.
+ */
+export type TombstoneRow<T> = T & { deletedAt?: number | null };
+
+/** The collections whose deletions propagate, i.e. every synced collection. */
+export interface TombstoneAwareCollections {
+  bookmarks: Bookmark[];
+  folders: Folder[];
+  workspaces: Workspace[];
+  /**
+   * Optional because their delete sites drop rows instead of stamping them, so
+   * only a sync that has deletion evidence for them (a recorded push index)
+   * passes them in. Absent ⇒ the collection is not part of this merge.
+   */
+  history?: TombstoneRow<HistoryItem>[];
+  passwords?: TombstoneRow<SavedPassword>[];
+}
+
+/**
+ * `TombstoneAwareCollections` with every collection required — the shape the
+ * keying map is built from. It has to be this and not the interface itself: a
+ * mapped type over `keyof T` keeps the optionality of T's members, so keying one
+ * straight off the interface would make every `keyOf` optional.
+ */
+type KeyedCollections = Required<TombstoneAwareCollections>;
+
+/** The row type of one synced collection. */
+type SyncedCollectionRow<K extends keyof KeyedCollections> = KeyedCollections[K][number];
+
+/**
+ * Drop the tombstones from a merged collection, keeping the row order.
+ *
+ * The merge returns live rows followed by tombstones on purpose: the tombstones
+ * have to be pushed so the deletion reaches the other devices, but they are
+ * delete markers, not data. Anything that leaves the sync as a *live* collection
+ * (the caller's local store, the secure store, the UI) is this list, so a
+ * tombstone can never be rendered, autofilled or re-read as a real row.
+ */
+export function liveRowsOnly<T>(rows: T[]): T[] {
+  return rows.filter(row => !isTombstonedRow(row));
+}
+
+/** The key of a saved-password row; the separator cannot occur in a host or a user name. */
+const PASSWORD_KEY_SEPARATOR = ' ';
+
+/**
+ * Stable identity of a saved password.
+ *
+ * Host + user name, the pair the password manager itself matches on. The
+ * separator is a space rather than the previous '_' so a host or a user name
+ * containing an underscore cannot make two different credentials produce the
+ * same key — '_' is legal in both and silently collapsed them. The host is
+ * case-folded because it comes from `new URL().hostname`, which is already
+ * lower-case; the user name keeps its case because the app treats `Bob` and
+ * `bob` as different accounts.
+ *
+ * The key is still COARSER than the credential: two entries for the same host
+ * and user name on different ports or schemes are indistinguishable, because
+ * `SavedPassword` carries no port or scheme to tell them apart. That is why the
+ * passwords collection merges with `collision: 'keep-newer'` and logs the
+ * count, instead of dropping one of them the way a map key collision did.
+ */
+export function passwordRowKey(row: SavedPassword): string {
+  const host = String(row?.hostname ?? '').trim().toLowerCase();
+  const user = String(row?.username ?? '').trim();
+  return `${host}${PASSWORD_KEY_SEPARATOR}${user}`;
+}
+
+/**
+ * How each synced collection is keyed, defined ONCE.
+ *
+ * Both the sync merge and the post-sync re-merge (below) read it, so a change to
+ * a collection's identity — say a new secondary key — cannot be applied to the
+ * path that runs during a sync and forgotten on the path that runs after one,
+ * which would quietly reintroduce the exact duplication/resurrection the merge
+ * exists to prevent.
+ */
+const SYNCED_COLLECTION_KEYING: {
+  [K in keyof KeyedCollections]: Omit<TombstoneMergeOptions<SyncedCollectionRow<K>>, 'now'>
+} = {
+  bookmarks: {
+    keyOf: (b: Bookmark) => b.id,
+    // A bookmark is also identified by its URL: ids are minted per device, so a
+    // delete on one device has to suppress the same page another device booked
+    // under its own id.
+    aliasKeyOf: (b: Bookmark) => normalizeBookmarkUrl(b.url)
+  },
+  folders: { keyOf: (f: Folder) => f.id },
+  workspaces: { keyOf: (w: Workspace) => w.id },
+  history: {
+    // No secondary key: two visits to the same page are two different rows, so
+    // the URL cannot identify one. A cleared visit is suppressed by its own id.
+    keyOf: (h: TombstoneRow<HistoryItem>) => historyRowKey(h)
+  },
+  passwords: {
+    keyOf: (p: TombstoneRow<SavedPassword>) => passwordRowKey(p),
+    // The host+user key is lossy (see passwordRowKey), so a second row claiming
+    // it is a real conflict and the newer save wins rather than "whichever was
+    // seen first" — a device that changed a password must be able to hand the
+    // new one to the other devices.
+    collision: 'keep-newer'
+  }
+};
+
+/** The merge configuration for one collection, with the clock the caller wants. */
+function syncedCollectionMergeOptions<K extends keyof KeyedCollections>(
+  collection: K,
+  now: number
+): TombstoneMergeOptions<SyncedCollectionRow<K>> {
+  return { ...SYNCED_COLLECTION_KEYING[collection], now };
+}
+
+/** The key extractor of one collection, without the merge options around it. */
+export function syncedCollectionKey<K extends keyof KeyedCollections>(
+  collection: K
+): (row: SyncedCollectionRow<K>) => string {
+  return SYNCED_COLLECTION_KEYING[collection].keyOf;
+}
+
+/**
+ * Re-merge a collection after a sync round trip, for callers that hold the
+ * collection somewhere other than the service (the credentials blob lives in the
+ * secure store, not in React state). Same policy as the in-service merge, so a
+ * deletion made during the round trip is not resurrected.
+ */
+export function remergeSyncedCollectionOf<K extends keyof KeyedCollections>(
+  collection: K,
+  current: SyncedCollectionRow<K>[],
+  synced: SyncedCollectionRow<K>[]
+): SyncedCollectionRow<K>[] {
+  return mergeSyncedCollection(current, synced, {
+    ...SYNCED_COLLECTION_KEYING[collection],
+    now: Date.now(),
+  });
+}
+
+/**
+ * Single entry point for the tombstone-aware merges `executeSyncData` runs, so
+ * the two-device behaviour is driven by one production function rather than by
+ * logic duplicated in a test. A collection with no remote counterpart is only
+ * purged, never re-deduped, so this cannot change what a first sync returns.
+ */
+export function mergeSyncedCollections(
+  local: TombstoneAwareCollections,
+  remote: Partial<TombstoneAwareCollections> | null | undefined,
+  prefs: { syncBookmarks: boolean; syncWorkspaces: boolean; syncHistory?: boolean; syncPasswords?: boolean },
+  now: number
+): TombstoneAwareCollections {
+  return {
+    bookmarks: prefs.syncBookmarks && remote?.bookmarks
+      ? mergeSyncedCollection(local.bookmarks, remote.bookmarks, syncedCollectionMergeOptions('bookmarks', now))
+      : purgeExpiredTombstones(local.bookmarks, now),
+    folders: prefs.syncBookmarks && remote?.folders
+      ? mergeSyncedCollection(local.folders, remote.folders, syncedCollectionMergeOptions('folders', now))
+      : purgeExpiredTombstones(local.folders, now),
+    workspaces: prefs.syncWorkspaces && remote?.workspaces
+      ? mergeSyncedCollection(local.workspaces, remote.workspaces, syncedCollectionMergeOptions('workspaces', now))
+      : purgeExpiredTombstones(local.workspaces, now),
+    history: local.history
+      ? (prefs.syncHistory && remote?.history
+          ? mergeSyncedCollection(local.history, remote.history, syncedCollectionMergeOptions('history', now))
+          : purgeExpiredTombstones(local.history, now))
+      : local.history,
+    passwords: local.passwords
+      ? (prefs.syncPasswords && remote?.passwords
+          ? mergeSyncedCollection(local.passwords, remote.passwords, syncedCollectionMergeOptions('passwords', now))
+          : purgeExpiredTombstones(local.passwords, now))
+      : local.passwords
+  };
+}
+
+/**
+ * Fold a completed sync's result back into rows that may have changed while the
+ * round-trip was in flight.
+ *
+ * The merge a sync returns was computed from the rows as they were when the
+ * request went out — two PBKDF2 derivations, a read and an upsert sit between
+ * that snapshot and the answer — so applying it verbatim reverts anything the
+ * user did in the meantime, and since the pushed bundle was built from the same
+ * snapshot, that change was never uploaded either. Merging with the CURRENT rows
+ * as the local side keeps it: the current rows win for the keys they hold (which
+ * is also the order the sync merge itself used, so nothing it decided is undone),
+ * while remote-only rows, remote tombstones and retention purges still land.
+ */
+export function remergeSyncedCollection<K extends keyof KeyedCollections>(
+  collection: K,
+  current: TombstoneAwareCollections[K],
+  synced: TombstoneAwareCollections[K],
+  now: number = Date.now()
+): TombstoneAwareCollections[K] {
+  // The casts only restore the pairing a generic indexed type cannot state: the
+  // caller names ONE collection, so both arrays are that collection's row type.
+  return mergeSyncedCollection(
+    current as SyncedCollectionRow<K>[],
+    synced as SyncedCollectionRow<K>[],
+    syncedCollectionMergeOptions(collection, now)
+  ) as TombstoneAwareCollections[K];
+}
+
+/** Stable identity of a history entry; rows from before `id` existed fall back to url+time. */
+function historyRowKey(item: HistoryItem): string {
+  return item?.id || `${item?.url}_${item?.timestamp}`;
+}
+
+/**
+ * Union of two history logs: one entry per identity, newest first, bounded by
+ * `cap`. Used by the post-sync re-merge in the app, so it produces the same log
+ * the sync itself produced instead of one replacing the other.
+ *
+ * A tombstoned row is dropped rather than unioned: it is a delete marker, not a
+ * visit, and this function's result is what lands in the local log and from
+ * there in the history UI. History tombstones only ever have to survive in the
+ * encrypted payload, which the sync's own merge guarantees.
+ */
+export function mergeSyncedHistory(
+  local: HistoryItem[],
+  synced: HistoryItem[],
+  cap: number = MAX_SYNCED_HISTORY
+): HistoryItem[] {
+  const byKey = new Map<string, HistoryItem>();
+  for (const item of [...local, ...synced]) {
+    if (!item || typeof item !== 'object') continue;
+    if (isTombstonedRow(item)) continue;
+    const key = historyRowKey(item);
+    if (!byKey.has(key)) byKey.set(key, item);
+  }
+  return Array.from(byKey.values())
+    .sort((a, b) => b.timestamp - a.timestamp)
+    .slice(0, cap);
+}
+
+/**
+ * What this device contributed to the vault at its last successful push, per
+ * collection: every LIVE row's key mapped to the row version that was pushed.
+ *
+ * It exists for the two collections whose delete site drops the row instead of
+ * stamping it (history, passwords): with no record of what this device once
+ * held, a locally missing row is indistinguishable from one this device never
+ * had, and a union merge has to treat the second case as "pull it down" — which
+ * is exactly why "Clear browsing history" used to be a no-op and why a deleted
+ * password came straight back.
+ *
+ * Tombstones are deliberately NOT indexed: a delete that has been pushed must
+ * not be re-minted with a fresh `deletedAt` on every later sync, which would
+ * keep the retention window rolling forward forever. The tombstone is already
+ * in the vault, and the vault is what carries it to the other devices.
+ *
+ * The index is written only after a successful push, from the rows the vault
+ * then holds. The one thing it cannot see is the caller applying the merged
+ * rows to its own state: a tab closed in that window leaves rows the index
+ * claims missing locally, and the next sync reads them as deletions. That is
+ * the same class of assumption as the tombstone retention window itself, and
+ * erring towards "this device deleted it" is the direction the vault already
+ * resolves deletions in.
+ */
+export type PushedRowIndex = Record<string, number>;
+
+/** The collections whose deletions are reconstructed from a push index. */
+export const INDEXED_DELETION_COLLECTIONS = ['history', 'passwords'] as const;
+export type IndexedDeletionCollection = (typeof INDEXED_DELETION_COLLECTIONS)[number];
+
+/** Per-user storage of the push index, so wiping localStorage also drops the evidence. */
+const PUSHED_INDEX_KEY_PREFIX = 'nova_sync_pushed_index_';
+
+export interface DeletionTombstoneOptions<T> {
+  keyOf: (row: T) => string;
+  /** Rebuilds a tombstone row for a key the index knows about. */
+  tombstoneFor: (key: string, deletedAt: number) => T | null;
+  /**
+   * Keys pushed at a version older than this were dropped by the collection's
+   * own row bound rather than by the user, so their absence is not a deletion.
+   * 0 disables the exemption (see `evictionFloor`).
+   */
+  evictedBelow?: number;
+}
+
+/**
+ * The version below which a row missing from a bounded collection was EVICTED
+ * by that bound rather than deleted by the user: the oldest row a full log
+ * still keeps.
+ *
+ * The history log is capped in the app as well as in the payload, so its oldest
+ * rows leave on their own as new visits arrive. Without this exemption each of
+ * those would read as "the user deleted it" and become a tombstone, deleting
+ * the other devices' history rows on a plain browse. A log shorter than its
+ * bound has evicted nothing, so it returns 0 and every absent row counts.
+ *
+ * The one case this cannot tell apart is deleting the single oldest entry of a
+ * log that is already at its bound: that is indistinguishable from the entry
+ * being evicted, and eviction is the common case, so it is not propagated.
+ */
+export function evictionFloor<T>(rows: T[], versionOf: (row: T) => number, bound: number): number {
+  if (!Number.isFinite(bound) || bound <= 0 || rows.length < bound) return 0;
+  let oldest = Number.POSITIVE_INFINITY;
+  for (const row of rows) {
+    const version = versionOf(row);
+    if (version > 0 && version < oldest) oldest = version;
+  }
+  return Number.isFinite(oldest) ? oldest : 0;
+}
+
+/**
+ * Tombstones for the rows this device pushed and no longer holds.
+ *
+ * These are ordinary tombstone rows handed to the same `mergeSyncedCollection`
+ * the other three collections use: the local side carries them like any other
+ * row, they suppress the same stale copies, they ride along in the payload for
+ * the other devices and are purged after the same retention window. The only
+ * thing specific to these two collections is WHEN the tombstone is minted — the
+ * delete site dropped the row, so the deletion is reconstructed here from the
+ * push index instead of being read off the store.
+ */
+export function deletionTombstones<T>(
+  local: T[],
+  pushed: PushedRowIndex | null | undefined,
+  now: number,
+  options: DeletionTombstoneOptions<T>
+): T[] {
+  // No index: nothing is known about what this device held, so nothing may be
+  // called deleted (a device that never synced the collection must adopt it).
+  if (!pushed) return [];
+  const { keyOf, tombstoneFor } = options;
+  const evictedBelow = options.evictedBelow ?? 0;
+
+  const present = new Set<string>();
+  for (const row of local) {
+    if (!isObjectRow(row)) continue;
+    const key = keyOf(row);
+    if (isUsableKey(key)) present.add(key);
+  }
+
+  const tombstones: T[] = [];
+  let unreconstructable = 0;
+  for (const [key, version] of Object.entries(pushed)) {
+    if (present.has(key)) continue;
+    if (Number.isFinite(version) && version > 0 && version < evictedBelow) continue; // evicted, not deleted
+    const tombstone = tombstoneFor(key, now);
+    if (!tombstone) {
+      unreconstructable++;
+      continue;
+    }
+    tombstones.push(tombstone);
+  }
+  if (unreconstructable > 0) {
+    logger.warn(
+      'SyncService:deletionTombstones',
+      `Could not rebuild ${unreconstructable} deleted synced row(s) from the push index — those deletions are not propagated.`
+    );
+  }
+  return tombstones;
+}
+
+/** Index every live row of a collection by its key and row version. */
+export function indexPushedRows<T>(rows: T[], keyOf: (row: T) => string, versionOf: (row: T) => number): PushedRowIndex {
+  const index: PushedRowIndex = {};
+  for (const row of rows) {
+    if (!isObjectRow(row) || isTombstonedRow(row)) continue;
+    const key = keyOf(row);
+    if (isUsableKey(key)) index[key] = versionOf(row);
+  }
+  return index;
+}
+
+/** A history tombstone carries the visit's identity and nothing else. */
+function historyTombstoneFor(key: string, deletedAt: number): TombstoneRow<HistoryItem> {
+  // No url/title and no visit time: the tombstone only has to key the row it
+  // suppresses, so a cleared log of 300 visits costs 300 tiny rows instead of
+  // 300 full ones, and there is no stale page content left lying in the vault.
+  return { id: key, url: '', title: '', timestamp: 0, deletedAt };
+}
+
+/**
+ * A password tombstone carries the credential's identity and NOTHING else — no
+ * password — so a vault whose passwords were all deleted shrinks instead of
+ * growing, and no secret travels in a row whose only job is to say "this is
+ * gone".
+ */
+function passwordTombstoneFor(key: string, deletedAt: number): TombstoneRow<SavedPassword> | null {
+  const split = key.indexOf(PASSWORD_KEY_SEPARATOR);
+  if (split < 0) return null; // an index written by a build that keyed differently
+  return {
+    hostname: key.slice(0, split),
+    username: key.slice(split + 1),
+    deletedAt
+  };
+}
+
+/**
+ * The deletion tombstones for every indexed collection, ready to be handed to
+ * the local side of the merge. One call so the collections cannot drift apart:
+ * they share the detection, the merge, the retention window and the push cap.
+ */
+export function pendingDeletionTombstones(
+  local: { history: HistoryItem[]; passwords: SavedPassword[] },
+  pushed: Partial<Record<IndexedDeletionCollection, PushedRowIndex | null>> | null | undefined,
+  now: number,
+  enabled: { syncHistory: boolean; syncPasswords: boolean }
+): { history: TombstoneRow<HistoryItem>[]; passwords: TombstoneRow<SavedPassword>[] } {
+  return {
+    history: enabled.syncHistory
+      ? deletionTombstones(local.history, pushed?.history ?? null, now, {
+          keyOf: (h: HistoryItem) => historyRowKey(h),
+          tombstoneFor: historyTombstoneFor,
+          evictedBelow: evictionFloor(local.history, (h: HistoryItem) => rowVersion(h), MAX_SYNCED_HISTORY)
+        })
+      : [],
+    passwords: enabled.syncPasswords
+      ? deletionTombstones(local.passwords, pushed?.passwords ?? null, now, {
+          keyOf: (p: SavedPassword) => passwordRowKey(p),
+          tombstoneFor: passwordTombstoneFor
+        })
+      : []
+  };
+}
+
+/** Read the per-user push index. Never throws; a damaged record reads as absent. */
+export function loadPushedIndex(userId: string): Partial<Record<IndexedDeletionCollection, PushedRowIndex>> | null {
+  if (!userId || typeof localStorage === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(`${PUSHED_INDEX_KEY_PREFIX}${userId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    const out: Partial<Record<IndexedDeletionCollection, PushedRowIndex>> = {};
+    for (const collection of INDEXED_DELETION_COLLECTIONS) {
+      const section = (parsed as Record<string, unknown>)[collection];
+      if (!section || typeof section !== 'object') continue;
+      const index: PushedRowIndex = {};
+      for (const [key, version] of Object.entries(section as Record<string, unknown>)) {
+        if (typeof version === 'number' && Number.isFinite(version) && version > 0) index[key] = version;
+      }
+      out[collection] = index;
+    }
+    return out;
+  } catch (e) {
+    logger.warn('SyncService:loadPushedIndex', 'Failed to read the sync push index', e);
+    return null;
+  }
+}
+
+/** Persist the push index for the next sync's deletion detection. Best effort. */
+export function savePushedIndex(
+  userId: string,
+  index: Partial<Record<IndexedDeletionCollection, PushedRowIndex>>
+): void {
+  if (!userId || typeof localStorage === 'undefined') return;
+  try {
+    localStorage.setItem(`${PUSHED_INDEX_KEY_PREFIX}${userId}`, JSON.stringify(index));
+  } catch (e) {
+    // An unavailable or overfull Web Storage costs deletion propagation until
+    // the next successful write; it must never fail the sync itself.
+    logger.warn('SyncService:savePushedIndex', 'Could not persist the sync push index', e);
+  }
+}
+
+/**
+ * Fold a sync's settings result into the CURRENT settings, per field.
+ *
+ * `synced` is the per-field LWW merge computed against the settings as they were
+ * when the request went out, so a field the user flipped in that window still
+ * holds their value in `current` while `synced` carries the older one — spreading
+ * `synced` over `current` would silently undo it. `snapshot` is the settings that
+ * were actually pushed, and that is what makes "changed since the request went
+ * out" decidable without a per-field clock: a field still equal to the snapshot
+ * was left alone and takes the synced value, a field that differs was touched and
+ * keeps the user's value. Fields the sync says nothing about are left untouched
+ * rather than being replaced wholesale.
+ */
+export function mergeSyncedSettings<T extends object>(
+  current: T,
+  synced: Partial<T> | null | undefined,
+  snapshot: Partial<T> | null | undefined
+): T {
+  const merged = { ...current } as Record<string, unknown>;
+  const pushed = (snapshot ?? {}) as Record<string, unknown>;
+  const incoming = (synced ?? {}) as Record<string, unknown>;
+  for (const key of Object.keys(incoming)) {
+    if (merged[key] === pushed[key]) merged[key] = incoming[key];
+  }
+  return merged as T;
+}
+
+export interface SettingsLwwResult {
+  settings: UserSettings;
+  /** The timestamp map to persist: the per-field write clock, advanced by the merge. */
+  timestamps: Record<string, number>;
+}
+
+/**
+ * Per-field last-write-wins between the local settings and the vault's.
+ *
+ * A field is compared by WHEN ITS VALUE WAS WRITTEN, which is why the local
+ * stamp must be taken at the user's edit (`stampPersistedSettings`) and not at
+ * the last sync: a stamp taken at sync time makes the comparison circular — the
+ * local value can only be as new as the sync that last saw it, so an edit the
+ * user made after a remote change would always lose, forever, and the setting
+ * would be frozen on whichever device synced first. Both sides therefore carry
+ * a per-field write clock, and the newer write wins.
+ *
+ * `timestamps` is returned rather than mutated so the caller decides when to
+ * persist it: a sync that loses its write race must not leave the stamps of an
+ * attempt whose bundle never reached the vault.
+ */
+export function mergeSettingsLastWriteWins(
+  local: UserSettings,
+  remote: Partial<UserSettings> | null | undefined,
+  localTimestamps: Record<string, number>,
+  remoteTimestamps: Record<string, number> | null | undefined,
+  options: { fallbackRemoteTimestamp?: number; now?: number } = {}
+): SettingsLwwResult {
+  const remoteSettings = (remote ?? {}) as Record<string, unknown>;
+  const localSettings = (local ?? {}) as unknown as Record<string, unknown>;
+  const stamps = { ...(localTimestamps ?? {}) };
+  const remoteStamps = (remoteTimestamps ?? {}) as Record<string, unknown>;
+  const fallbackRemoteTs = options.fallbackRemoteTimestamp ?? 0;
+  const now = options.now ?? Date.now();
+  const merged: Record<string, unknown> = { ...localSettings };
+
+  const allKeys = new Set([...Object.keys(localSettings), ...Object.keys(remoteSettings)]);
+
+  allKeys.forEach(key => {
+    const localTs = stamps[key] || 0;
+    const remoteTs = (typeof remoteStamps[key] === 'number' ? remoteStamps[key] : fallbackRemoteTs) as number;
+
+    if (key in remoteSettings && (remoteTs > localTs || !(key in localSettings))) {
+      merged[key] = remoteSettings[key];
+      // The local value IS the remote value now, so it inherits the remote's
+      // write clock: this is what lets the next local edit beat it.
+      stamps[key] = remoteTs;
+    } else if (key in localSettings) {
+      merged[key] = localSettings[key];
+      // Only a key that was never stamped gets one here. Re-stamping a key that
+      // already holds a write clock would claim the value was just written when
+      // the user may not have touched it, and turn LWW into "local always wins".
+      if (!stamps[key]) stamps[key] = now;
+    }
+  });
+
+  return { settings: merged as unknown as UserSettings, timestamps: stamps };
+}
+
+/**
+ * Record that the user's settings were persisted, stamping the per-field write
+ * clock for the fields whose value actually changed.
+ *
+ * This is the fix for the frozen-settings bug and it has to happen at the write:
+ * nothing else observes the edit, and a sync cannot tell a user edit from a
+ * value it adopted from the vault. Called by the settings persistence path
+ * (useSessionPersistence) with the settings as they are about to be written and
+ * the settings as they were written last time.
+ *
+ * Only CHANGED fields are stamped: stamping everything would make a device
+ * claim every field on every settings write and never adopt the cloud
+ * configuration again (the "newly paired device inherits settings" case).
+ */
+export function stampPersistedSettings(
+  persisted: Partial<UserSettings>,
+  previousPersisted: Partial<UserSettings> | null | undefined,
+  at: number = Date.now(),
+  timestamps: Record<string, number> = {}
+): Record<string, number> {
+  const next = { ...(timestamps ?? {}) };
+  const previous = (previousPersisted ?? {}) as Record<string, unknown>;
+  for (const [key, value] of Object.entries((persisted ?? {}) as Record<string, unknown>)) {
+    // Compared as written, not by reference: `shortcuts` and the other object
+    // settings are replaced wholesale on every render, so reference equality
+    // would stamp them on every keystroke, while a change deep inside one of
+    // them is still a real change of the field.
+    if (JSON.stringify(previous[key]) === JSON.stringify(value)) continue;
+    next[key] = at;
+  }
+  return next;
+}
+
+/** The localStorage key the settings persistence path writes. */
+const PERSISTED_SETTINGS_KEY = 'user_settings';
+
+/** The last settings this process saw persisted; seeds the per-field diff. */
+let lastPersistedSettingsSnapshot: Partial<UserSettings> | null = null;
+
+/**
+ * Stamp the fields that changed since the last persisted settings snapshot.
+ *
+ * Order-independent: the first call in a process adopts whatever is already in
+ * `user_settings` as the baseline (that IS the last persisted state) and stamps
+ * nothing, so hydrating the app on launch — which re-persists the same values —
+ * can never be mistaken for a user edit and make this device win every field.
+ */
+export function recordPersistedSettings(
+  settings: Partial<UserSettings>,
+  at: number = Date.now(),
+  timestamps: Record<string, number> = {}
+): Record<string, number> {
+  let baseline = lastPersistedSettingsSnapshot;
+  if (baseline === null) {
+    try {
+      const raw = typeof localStorage !== 'undefined' ? localStorage.getItem(PERSISTED_SETTINGS_KEY) : null;
+      baseline = raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      logger.warn('SyncService:recordPersistedSettings', 'Could not read the persisted settings baseline', e);
+    }
+    if (!baseline || typeof baseline !== 'object') return { ...timestamps };
+  }
+  lastPersistedSettingsSnapshot = { ...settings };
+  return stampPersistedSettings(settings, baseline, at, timestamps);
+}
 
 /**
  * Constant-time byte comparison: XOR-accumulate loop over two
@@ -220,7 +1241,209 @@ const DEFAULT_PREFERENCES: SyncPreferences = {
   syncWorkspaces: true,
 };
 
-class NovaSyncService {
+/** The table the encrypted vault lives in. */
+export const SYNC_VAULT_TABLE = 'nova_sync_vaults';
+
+/**
+ * How many times one sync will re-read, re-merge and re-write the vault when it
+ * loses the write race. Bounded because the race is not guaranteed to end: a
+ * device that keeps losing gives up and reports the error instead of hammering
+ * the backend forever.
+ */
+export const SYNC_WRITE_ATTEMPTS = 3;
+
+/**
+ * A vault write that was rejected because the row changed under it. Only this
+ * is retried; every other failure aborts the sync.
+ */
+export class SyncConflictError extends Error {
+  constructor(message = 'Another device synced first — your changes were not lost, try again.') {
+    super(message);
+    this.name = 'SyncConflictError';
+  }
+}
+
+export function isSyncConflictError(error: unknown): error is SyncConflictError {
+  return error instanceof SyncConflictError;
+}
+
+/**
+ * Re-run the whole read-merge-write cycle when — and only when — the write lost
+ * its race. Everything is recomputed from the fresh read, because the bundle the
+ * failed attempt built was derived from a vault that no longer exists.
+ */
+export async function retryOnVaultConflict<T>(
+  attempt: (round: number) => Promise<T>,
+  attempts: number = SYNC_WRITE_ATTEMPTS
+): Promise<T> {
+  const max = Math.max(1, Math.floor(attempts));
+  for (let round = 1; ; round++) {
+    try {
+      return await attempt(round);
+    } catch (error) {
+      if (!isSyncConflictError(error) || round >= max) throw error;
+      logger.warn(
+        'SyncService:retryOnVaultConflict',
+        `Vault write lost a race (attempt ${round}/${max}) — re-reading and merging again.`
+      );
+    }
+  }
+}
+
+/** One row of `nova_sync_vaults` as far as the sync is concerned. */
+export interface VaultRow {
+  envelope?: EncryptedSyncEnvelope | null;
+  updated_at?: string | null;
+}
+
+/** PostgREST's `{ data, error }` pair. */
+export interface VaultResponse<T> {
+  data: T;
+  error: unknown;
+}
+
+/**
+ * The builder chain the vault read and the conditional write use, named
+ * structurally so the write can be driven by a fake in a test instead of a live
+ * project. The real Supabase builder satisfies it; the single cast at the call
+ * site is the price of not pulling the whole PostgREST type surface into the
+ * signature.
+ */
+export interface VaultChain {
+  eq(column: string, value: unknown): VaultChain;
+  select(columns?: string): VaultChain;
+  maybeSingle(): Promise<VaultResponse<VaultRow | null>>;
+  then<TResolved = unknown>(
+    onfulfilled?: ((value: VaultResponse<VaultRow[]>) => TResolved | PromiseLike<TResolved>) | null,
+    onrejected?: ((reason: unknown) => never) | null
+  ): PromiseLike<TResolved>;
+}
+
+export interface VaultTable {
+  select(columns?: string): VaultChain;
+  upsert(values: Record<string, unknown>): VaultChain;
+}
+
+export interface VaultSnapshot {
+  row: VaultRow | null;
+  /**
+   * The `updated_at` the read observed. It is the precondition of the write
+   * that follows, and null means "there is no row to be stale about".
+   */
+  updatedAt: string | null;
+}
+
+/**
+ * Read the vault row together with its `updated_at`.
+ *
+ * Both are needed: the envelope is the data, and `updated_at` is the only
+ * version the row has, so it is the only thing a conditional write can be
+ * conditioned on. Reading them in separate queries would leave a window in which
+ * the two describe different rows.
+ *
+ * Throws when the row exists but carries no version. Writing such a row would
+ * mean overwriting it with no precondition at all, which is the blind write this
+ * whole mechanism exists to remove — so the sync reports the vault as
+ * unverifiable and aborts rather than risking another device's data.
+ */
+export async function readVaultSnapshot(table: VaultTable, userId: string): Promise<VaultSnapshot> {
+  const { data, error } = await table.select('envelope, updated_at').eq('user_id', userId).maybeSingle();
+  if (error) throw error;
+  const row = data ?? null;
+  const updatedAt = typeof row?.updated_at === 'string' ? row.updated_at : null;
+  if (row && updatedAt === null) {
+    throw new Error('Vault row has no updated_at — the write cannot be guarded.');
+  }
+  return { row, updatedAt };
+}
+
+export interface VaultWriteResult {
+  /** The vault row now holds the envelope we built. */
+  written: boolean;
+  /** Somebody else wrote between our read and our write. */
+  conflict: boolean;
+  error: unknown;
+}
+
+/** Postgres unique-violation, i.e. two devices inserting the row at once. */
+function isDuplicateKeyError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === '23505' || code === 23505;
+}
+
+/**
+ * Write the vault ONLY if it has not changed since `expectedUpdatedAt`.
+ *
+ * The sync reads the vault, spends the whole decrypt+encrypt round trip on it
+ * (two PBKDF2 derivations plus two network hops) and only then writes. Without
+ * a precondition that window is a lost update: two devices read the same row,
+ * the second one to write silently discards the first one's rename. Tombstones
+ * do not help here — they only cover deletions, and a content edit carries no
+ * row version at all.
+ *
+ * So the write is conditional on the `updated_at` the read observed, and — the
+ * part that is easy to get wrong — the RESULT is verified. PostgREST answers a
+ * filtered upsert that matched nothing with an empty array and NO error, so an
+ * unchecked call reports a successful sync that wrote nothing: the other
+ * device's data stays, this device believes its own change was uploaded, and it
+ * is not. An empty result is therefore a conflict, never a success.
+ */
+export async function writeVaultIfUnchanged(
+  table: VaultTable,
+  params: { userId: string; envelope: EncryptedSyncEnvelope; expectedUpdatedAt: string | null; nowIso: string }
+): Promise<VaultWriteResult> {
+  const payload = {
+    user_id: params.userId,
+    envelope: params.envelope,
+    updated_at: params.nowIso
+  };
+
+  if (params.expectedUpdatedAt === null) {
+    // No row to be stale about (first sync for this account): write
+    // unconditionally, but a concurrent first sync from another device races on
+    // the primary key, and Postgres reports that as 23505 — a conflict to
+    // retry, not a failure to surface.
+    const { data, error } = await table.upsert(payload).select('updated_at');
+    if (error) {
+      return isDuplicateKeyError(error)
+        ? { written: false, conflict: true, error: null }
+        : { written: false, conflict: false, error };
+    }
+    if (!Array.isArray(data) || data.length === 0) return { written: false, conflict: true, error: null };
+    return { written: true, conflict: false, error: null };
+  }
+
+  const { data, error } = await table
+    .upsert(payload)
+    .eq('updated_at', params.expectedUpdatedAt)
+    .select('updated_at');
+  if (error) return { written: false, conflict: false, error };
+  if (!Array.isArray(data) || data.length === 0) return { written: false, conflict: true, error: null };
+  return { written: true, conflict: false, error: null };
+}
+
+/** The local rows one sync round works from. */
+export interface SyncLocalData {
+  bookmarks: Bookmark[];
+  folders: Folder[];
+  history: HistoryItem[];
+  passwords: SavedPassword[];
+  settings: UserSettings;
+  workspaces: Workspace[];
+}
+
+/** What a completed sync hands back. */
+export interface SyncResult {
+  mergedData: SyncLocalData;
+  syncedItemsCount: {
+    bookmarks: number;
+    history: number;
+    passwords: number;
+    workspaces: number;
+  };
+}
+
+export class NovaSyncService {
   private currentUser: NovaUser | null = null;
   private token: string | null = null;
   private isSyncing = false;
@@ -1176,17 +2399,27 @@ class NovaSyncService {
     this.usedLegacyKeyThisSync = false;
     this.lastSyncedAt = null;
 
-    localStorage.removeItem(STORAGE_KEYS.TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.SYNC_STATUS);
-    // Legacy cleanup: older builds leaked the master key into Web Storage.
-    localStorage.removeItem(STORAGE_KEYS.MASTER_KEY);
-    sessionStorage.removeItem(STORAGE_KEYS.MASTER_KEY);
-    // Cloud sessions now live in the Electron secure store via the
-    // supabase-js storage adapter; scrub any JWT copy that older installs
-    // persisted in localStorage.
-    localStorage.removeItem(SUPABASE_AUTH_STORAGE_KEY);
-
-    this.notify();
+    // Web Storage access can throw on its own (partitioned storage, ITP,
+    // Firefox's resistFingerprinting): it is the *getter* that throws, not just
+    // the method. An unguarded removeItem here would skip the scrub AND the
+    // notify() below, leaving subscribers rendering a signed-in session.
+    try {
+      for (const key of [
+        STORAGE_KEYS.TOKEN,
+        STORAGE_KEYS.SYNC_STATUS,
+        // Legacy cleanup: older builds leaked the master key into Web Storage.
+        STORAGE_KEYS.MASTER_KEY,
+        // Cloud sessions now live in the Electron secure store via the
+        // supabase-js storage adapter; scrub any JWT copy that older installs
+        // persisted in localStorage.
+        SUPABASE_AUTH_STORAGE_KEY,
+      ]) {
+        try { localStorage.removeItem(key); } catch (_) {}
+      }
+      try { sessionStorage.removeItem(STORAGE_KEYS.MASTER_KEY); } catch (_) {}
+    } finally {
+      this.notify();
+    }
   }
 
   public updatePreferences(prefs: Partial<SyncPreferences>) {
@@ -1203,58 +2436,34 @@ class NovaSyncService {
 
   // --- DATA SYNC ENGINE ---
 
-  public syncData(localData: {
-    bookmarks: Bookmark[];
-    folders: Folder[];
-    history: HistoryItem[];
-    passwords: SavedPassword[];
-    settings: UserSettings;
-    workspaces: Workspace[];
-  }): Promise<{
-    mergedData: {
-      bookmarks: Bookmark[];
-      folders: Folder[];
-      history: HistoryItem[];
-      passwords: SavedPassword[];
-      settings: UserSettings;
-      workspaces: Workspace[];
-    };
-    syncedItemsCount: {
-      bookmarks: number;
-      history: number;
-      passwords: number;
-      workspaces: number;
-    };
-  }> {
+  public syncData(localData: SyncLocalData): Promise<SyncResult> {
     const run = () => this.executeSyncData(localData);
     const queued = this.syncQueue.then(run, run);
-    this.syncQueue = queued.catch(() => {});
-    return queued;
+    // supabase-js sets no default timeout on PostgREST calls, and a TCP stall
+    // that is never closed (captive portal, VPN transition, sleep/resume) would
+    // leave `queued` pending forever. `this.syncQueue` chains onto that promise,
+    // so one stall wedges every later sync AND pins `isSyncing` on. Bound the
+    // run so a stuck request can never poison the queue.
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const guard = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(
+        () => reject(new Error('Sync timed out — check your connection and try again.')),
+        SYNC_RUN_TIMEOUT_MS
+      );
+    });
+    const guarded = Promise.race([queued, guard]).finally(() => {
+      if (timeoutId) clearTimeout(timeoutId);
+    }) as Promise<SyncResult>;
+
+    this.syncQueue = guarded.catch(() => {});
+    return guarded;
   }
 
-  private async executeSyncData(localData: {
-    bookmarks: Bookmark[];
-    folders: Folder[];
-    history: HistoryItem[];
-    passwords: SavedPassword[];
-    settings: UserSettings;
-    workspaces: Workspace[];
-  }): Promise<{
-    mergedData: {
-      bookmarks: Bookmark[];
-      folders: Folder[];
-      history: HistoryItem[];
-      passwords: SavedPassword[];
-      settings: UserSettings;
-      workspaces: Workspace[];
-    };
-    syncedItemsCount: {
-      bookmarks: number;
-      history: number;
-      passwords: number;
-      workspaces: number;
-    };
-  }> {
+  /**
+   * Validate the session, then run the vault round-trip, retrying the WHOLE
+   * read-merge-write when it loses the race to another device.
+   */
+  private async executeSyncData(localData: SyncLocalData): Promise<SyncResult> {
     if (!this.currentUser || !this.token) {
       throw new Error('User is not logged in');
     }
@@ -1279,288 +2488,354 @@ class NovaSyncService {
     this.usedLegacyKeyThisSync = false;
     this.notify();
 
+    // The settings merge compares per-field write clocks, so every attempt has to
+    // start from the clocks as they were BEFORE this sync: an attempt that loses
+    // the race has already written the stamps of a bundle that never landed, and
+    // inheriting them would let values that only existed in a discarded attempt
+    // beat the vault forever.
+    const baselineSettingsTimestamps = this.getSettingsTimestamps();
+    const prefs = this.currentUser.syncPreferences || DEFAULT_PREFERENCES;
+    const user = this.currentUser;
+    const masterKey = this.masterKey;
+
     try {
-      const prefs = this.currentUser.syncPreferences || DEFAULT_PREFERENCES;
-      let remoteBundle: SyncDataBundle | null = null;
-      let remoteUnusable = false;
-
-      // 1. Fetch and decrypt the remote vault. A missing vault (0 rows) is a
-      // normal first-sync; an unreadable one must ABORT the push or we would
-      // clobber another device's data with a local-only merge.
-      try {
-        const supabase = await getSupabaseClient();
-        const { data, error } = await supabase
-          .from('nova_sync_vaults')
-          .select('*')
-          .eq('user_id', this.currentUser.id)
-          .maybeSingle();
-
-        if (error) {
-          remoteUnusable = true;
-          logger.warn('SyncService:syncData', 'Failed to fetch remote vault', error);
-        } else if (data && !data.envelope) {
-          // A row exists but carries no envelope (legacy schema: plain
-          // bookmarks/history columns). It must NOT be treated as "no remote
-          // data", or the local-only merge below would be pushed and clobber
-          // the legacy remote state.
-          remoteUnusable = true;
-          logger.warn('SyncService:syncData', 'Remote vault row has no envelope (legacy format) — aborting push');
-        } else if (data?.envelope) {
-          try {
-            remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, this.masterKey);
-          } catch (decErr) {
-            // Compat: the vault may predate the dedicated sync key and be
-            // encrypted under the raw account password. Fall back to the
-            // retained legacy key for decryption; the push below re-encrypts
-            // everything under the dedicated key, completing the migration.
-            const legacyKey = await this.getLegacyFallbackKey();
-            if (legacyKey) {
-              try {
-                remoteBundle = await decryptSyncPayload<SyncDataBundle>(data.envelope, legacyKey);
-                this.usedLegacyKeyThisSync = true;
-                logger.info('SyncService:syncData', 'Vault decrypted with legacy key; re-encrypting under dedicated sync key');
-              } catch {
-                remoteUnusable = true;
-                logger.warn('SyncService:syncData', 'Failed to decrypt remote vault with current and legacy keys — aborting push');
-              }
-            } else {
-              remoteUnusable = true;
-              logger.warn('SyncService:syncData', 'Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
-            }
-          }
-        }
-      } catch (e) {
-        remoteUnusable = true;
-        logger.warn('SyncService:syncData', 'Remote vault lookup failed', e);
-      }
-
-      if (remoteUnusable) {
-        throw new Error('Could not verify remote encrypted vault — sync aborted to protect your data.');
-      }
-
-      let mergedBookmarks = [...localData.bookmarks];
-      let mergedFolders = [...localData.folders];
-      let mergedHistory = [...localData.history];
-      let mergedPasswords = [...localData.passwords];
-      let mergedSettings = { ...localData.settings };
-      let mergedWorkspaces = [...localData.workspaces];
-
-      if (remoteBundle) {
-        const vaultVersion = typeof remoteBundle.version === 'number' ? remoteBundle.version : 1;
-        logger.info('SyncService:syncData', `Processing remote encrypted vault v${vaultVersion}`);
-        if (vaultVersion > 2) {
-          logger.warn('SyncService:syncData', `Remote vault has higher schema version (${vaultVersion}) than client (2)`);
-        }
-
-        if (prefs.syncBookmarks && remoteBundle.bookmarks) {
-          const normalizeBmUrl = (u: string) => {
-            try {
-              const p = new URL(u);
-              let path = p.pathname;
-              if (path.length > 1 && path.endsWith('/')) {
-                p.pathname = path.slice(0, -1);
-              }
-              return p.href.toLowerCase();
-            } catch {
-              return (u.length > 1 && u.endsWith('/') ? u.slice(0, -1) : u).toLowerCase();
-            }
-          };
-
-          const localUrlMap = new Map<string, Bookmark>();
-          const localIdMap = new Map<string, Bookmark>();
-          localData.bookmarks.forEach(b => {
-            localUrlMap.set(normalizeBmUrl(b.url), b);
-            localIdMap.set(b.id, b);
-          });
-          remoteBundle.bookmarks.forEach(rb => {
-            const norm = normalizeBmUrl(rb.url);
-            if (!localUrlMap.has(norm) && !localIdMap.has(rb.id)) {
-              localUrlMap.set(norm, rb);
-              localIdMap.set(rb.id, rb);
-            }
-          });
-          mergedBookmarks = Array.from(localUrlMap.values());
-        }
-
-        if (prefs.syncBookmarks && remoteBundle.folders) {
-          const folderMap = new Map(localData.folders.map(f => [f.id, f]));
-          remoteBundle.folders.forEach(rf => {
-            if (!folderMap.has(rf.id)) folderMap.set(rf.id, rf);
-          });
-          mergedFolders = Array.from(folderMap.values());
-        }
-
-        if (prefs.syncHistory && remoteBundle.history) {
-          const historyMap = new Map(localData.history.map(h => [h.id || `${h.url}_${h.timestamp}`, h]));
-          remoteBundle.history.forEach(rh => {
-            const key = rh.id || `${rh.url}_${rh.timestamp}`;
-            if (!historyMap.has(key)) historyMap.set(key, rh);
-          });
-          mergedHistory = Array.from(historyMap.values())
-            .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, 300);
-        } else {
-          mergedHistory = mergedHistory.slice(0, 300);
-        }
-
-        if (prefs.syncPasswords && remoteBundle.encryptedPasswords && remoteBundle.passwordsSalt && remoteBundle.passwordsIv && this.masterKey) {
-          try {
-            const decryptedRemotePasswords = await this.decryptPasswords(
-              remoteBundle.encryptedPasswords,
-              remoteBundle.passwordsSalt,
-              remoteBundle.passwordsIv,
-              this.masterKey
-            );
-            const passKey = (p: SavedPassword) => `${p.hostname || ''}_${p.username || ''}`;
-            const passMap = new Map<string, SavedPassword>(localData.passwords.map(p => [passKey(p), p]));
-            decryptedRemotePasswords.forEach((rp: SavedPassword) => {
-              const k = passKey(rp);
-              if (!passMap.has(k)) passMap.set(k, rp);
-            });
-            mergedPasswords = Array.from(passMap.values());
-          } catch (e) {
-            // Compat: the inner blob may still be encrypted under the raw
-            // password — retry with the retained legacy key. Either way the
-            // merged passwords are re-encrypted under the dedicated key below.
-            const legacyKey = await this.getLegacyFallbackKey();
-            if (legacyKey) {
-              try {
-                const decryptedRemotePasswords = await this.decryptPasswords(
-                  remoteBundle.encryptedPasswords,
-                  remoteBundle.passwordsSalt,
-                  remoteBundle.passwordsIv,
-                  legacyKey
-                );
-                this.usedLegacyKeyThisSync = true;
-                const passKey = (p: SavedPassword) => `${p.hostname || ''}_${p.username || ''}`;
-                const passMap = new Map<string, SavedPassword>(localData.passwords.map(p => [passKey(p), p]));
-                decryptedRemotePasswords.forEach((rp: SavedPassword) => {
-                  const k = passKey(rp);
-                  if (!passMap.has(k)) passMap.set(k, rp);
-                });
-                mergedPasswords = Array.from(passMap.values());
-              } catch (legacyErr) {
-                logger.warn('SyncService:syncData', 'Skipping password decrypt (current and legacy keys failed)', legacyErr);
-              }
-            } else {
-              logger.warn('SyncService:syncData', 'Skipping password decrypt', e);
-            }
-          }
-        }
-
-        if (prefs.syncSettings && remoteBundle.settings) {
-          // Per-field Last-Write-Wins (LWW) conflict resolution using timestamps.
-          // Solves "setting freeze" where remote overwrote local settings upon every sync,
-          // while ensuring newly paired devices inherit cloud configuration cleanly.
-          const localTimestamps = this.getSettingsTimestamps();
-          const remoteTimestamps = remoteBundle.settingsTimestamps || {};
-          const fallbackRemoteTs = remoteBundle.timestamp || 0;
-          const merged: UserSettings = { ...localData.settings };
-
-          const allKeys = new Set([
-            ...Object.keys(localData.settings || {}),
-            ...Object.keys(remoteBundle.settings || {})
-          ]) as Set<keyof UserSettings>;
-
-          allKeys.forEach((key) => {
-            const localTs = localTimestamps[key] || 0;
-            const remoteTs = remoteTimestamps[key] ?? fallbackRemoteTs;
-
-            if (key in remoteBundle.settings! && (remoteTs > localTs || !(key in (localData.settings || {})))) {
-              (merged as any)[key] = remoteBundle.settings![key];
-              localTimestamps[key] = remoteTs;
-            } else if (key in (localData.settings || {})) {
-              (merged as any)[key] = (localData.settings as any)[key];
-              if (!localTimestamps[key]) {
-                localTimestamps[key] = Date.now();
-              }
-            }
-          });
-
-          mergedSettings = merged;
-          this.saveSettingsTimestamps(localTimestamps);
-        }
-
-        if (prefs.syncWorkspaces && remoteBundle.workspaces) {
-          const wsMap = new Map(localData.workspaces.map(w => [w.id, w]));
-          remoteBundle.workspaces.forEach(rw => {
-            if (!wsMap.has(rw.id)) wsMap.set(rw.id, rw);
-          });
-          mergedWorkspaces = Array.from(wsMap.values());
-        }
-      }
-
-      let encryptedPassPayload: { ciphertext: string; salt: string; iv: string } | undefined;
-      if (prefs.syncPasswords && this.masterKey && mergedPasswords.length > 0) {
-        encryptedPassPayload = await this.encryptPasswords(mergedPasswords, this.masterKey);
-      }
-
-      const syncTimestamp = Date.now();
-
-      // Build the encrypted vault payload. It is never stored in Web Storage.
-      const newBundle: SyncDataBundle = {
-        version: 2,
-        timestamp: syncTimestamp,
-        userId: this.currentUser.id,
-        bookmarks: prefs.syncBookmarks ? mergedBookmarks : undefined,
-        folders: prefs.syncBookmarks ? mergedFolders : undefined,
-        history: prefs.syncHistory ? mergedHistory.slice(0, 300) : undefined,
-        encryptedPasswords: encryptedPassPayload?.ciphertext,
-        passwordsSalt: encryptedPassPayload?.salt,
-        passwordsIv: encryptedPassPayload?.iv,
-        settings: prefs.syncSettings ? mergedSettings : undefined,
-        settingsTimestamps: prefs.syncSettings ? this.getSettingsTimestamps() : undefined,
-        workspaces: prefs.syncWorkspaces ? mergedWorkspaces : undefined
-      };
-
-      const envelope = await encryptSyncPayload(newBundle, this.masterKey);
-      this.lastPushedCiphertext = envelope.ciphertext;
-      const supabase = await getSupabaseClient();
-      const { error: upsertError } = await supabase.from('nova_sync_vaults').upsert({
-        user_id: this.currentUser.id,
-        envelope,
-        updated_at: new Date().toISOString()
+      return await retryOnVaultConflict(async round => {
+        this.saveSettingsTimestamps(baselineSettingsTimestamps);
+        return this.runSyncAttempt(localData, prefs, { userId: user.id, masterKey }, round);
       });
-      if (upsertError) throw upsertError;
-
-      // The remote vault is now encrypted under the dedicated sync key, so
-      // the retained legacy raw-password material is no longer needed — wipe
-      // it from memory and the secure store.
-      if (this.usedLegacyKeyThisSync) {
-        this.usedLegacyKeyThisSync = false;
-        this.legacyMasterKey = null;
-        void this.writeSecureStore(this.legacyMasterKeyStoreName(), '');
-      }
-
-      this.lastSyncedAt = syncTimestamp;
-      localStorage.setItem(STORAGE_KEYS.SYNC_STATUS, JSON.stringify({ lastSyncedAt: this.lastSyncedAt }));
-
-      const syncedCounts = {
-        bookmarks: mergedBookmarks.length,
-        history: mergedHistory.length,
-        passwords: mergedPasswords.length,
-        workspaces: mergedWorkspaces.length
-      };
-
-      this.isSyncing = false;
-      this.notify();
-
-      return {
-        mergedData: {
-          bookmarks: mergedBookmarks,
-          folders: mergedFolders,
-          history: mergedHistory,
-          passwords: mergedPasswords,
-          settings: mergedSettings,
-          workspaces: mergedWorkspaces
-        },
-        syncedItemsCount: syncedCounts
-      };
     } catch (err: unknown) {
+      this.saveSettingsTimestamps(baselineSettingsTimestamps);
       this.isSyncing = false;
       this.lastError = err instanceof Error ? (err.message || 'Sync failed') : 'Sync failed';
       this.notify();
       throw err;
+    }
+  }
+
+  /**
+   * Remember what this device contributed, per user, for the deletions the
+   * delete sites of history and passwords do not record themselves.
+   *
+   * Only the rows the vault now holds are indexed, and only once the write has
+   * succeeded: the index is the evidence that this device holds these rows, and
+   * a failed (or lost) push delivered nothing, so the deletions it would prove
+   * must be detected again on the next sync.
+   *
+   * A collection whose sync preference is off is NOT indexed: while it is off
+   * this device's copy of it is not meant to be authoritative and the absence of
+   * a row says nothing. The previous index is dropped rather than kept, so
+   * turning the preference back on treats the collection as new (adopt what is
+   * in the vault) instead of reading the rows synced before the pause as
+   * deletions.
+   */
+  private recordPushedIndex(
+    userId: string,
+    prefs: SyncPreferences,
+    pushed: { history: HistoryItem[]; passwords: SavedPassword[] }
+  ): void {
+    const previous = loadPushedIndex(userId) ?? {};
+    const next: Partial<Record<IndexedDeletionCollection, PushedRowIndex>> = { ...previous };
+    if (prefs.syncHistory) {
+      next.history = indexPushedRows(pushed.history, h => historyRowKey(h), h => rowVersion(h));
+    } else {
+      delete next.history;
+    }
+    if (prefs.syncPasswords) {
+      next.passwords = indexPushedRows(pushed.passwords, p => passwordRowKey(p), p => rowVersion(p));
+    } else {
+      delete next.passwords;
+    }
+    savePushedIndex(userId, next);
+  }
+
+  /**
+   * One read-merge-write cycle against the vault.
+   *
+   * Kept as a unit of work so a lost write race can be retried by re-running the
+   * entire cycle — the bundle an attempt builds is derived from the vault it
+   * read, so a retry that reused it would overwrite exactly the rows it was
+   * supposed to merge with. Throws `SyncConflictError` when the conditional
+   * write is rejected; every other failure propagates.
+   */
+  private async runSyncAttempt(
+    localData: SyncLocalData,
+    prefs: SyncPreferences,
+    session: { userId: string; masterKey: string },
+    round: number
+  ): Promise<SyncResult> {
+    const tombstoneNow = Date.now();
+    const supabase = await getSupabaseClient();
+    // The structural type names the four chain calls made below; the real
+    // PostgREST builder satisfies it.
+    const table = supabase.from(SYNC_VAULT_TABLE) as unknown as VaultTable;
+
+    // 1. Fetch and decrypt the remote vault. A missing vault (0 rows) is a
+    // normal first-sync; an unreadable one must ABORT the push or we would
+    // clobber another device's data with a local-only merge.
+    let remoteBundle: SyncDataBundle | null = null;
+    let remoteUnusable = false;
+    let remoteUpdatedAt: string | null = null;
+    try {
+      const snapshot = await readVaultSnapshot(table, session.userId);
+      remoteUpdatedAt = snapshot.updatedAt;
+      if (snapshot.row && !snapshot.row.envelope) {
+        // A row exists but carries no envelope (legacy schema: plain
+        // bookmarks/history columns). It must NOT be treated as "no remote
+        // data", or the local-only merge below would be pushed and clobber
+        // the legacy remote state.
+        remoteUnusable = true;
+        logger.warn('SyncService:syncData', 'Remote vault row has no envelope (legacy format) — aborting push');
+      } else if (snapshot.row?.envelope) {
+        try {
+          remoteBundle = migrateSyncBundle(await decryptSyncPayload<SyncDataBundle>(snapshot.row.envelope, session.masterKey));
+        } catch (decErr) {
+          // Compat: the vault may predate the dedicated sync key and be
+          // encrypted under the raw account password. Fall back to the
+          // retained legacy key for decryption; the push below re-encrypts
+          // everything under the dedicated key, completing the migration.
+          const legacyKey = await this.getLegacyFallbackKey();
+          if (legacyKey) {
+            try {
+              remoteBundle = migrateSyncBundle(await decryptSyncPayload<SyncDataBundle>(snapshot.row.envelope, legacyKey));
+              this.usedLegacyKeyThisSync = true;
+              logger.info('SyncService:syncData', 'Vault decrypted with legacy key; re-encrypting under dedicated sync key');
+            } catch {
+              remoteUnusable = true;
+              logger.warn('SyncService:syncData', 'Failed to decrypt remote vault with current and legacy keys — aborting push');
+            }
+          } else {
+            remoteUnusable = true;
+            logger.warn('SyncService:syncData', 'Failed to decrypt remote vault — aborting push to prevent data loss', decErr);
+          }
+        }
+      }
+    } catch (e) {
+      remoteUnusable = true;
+      logger.warn('SyncService:syncData', 'Remote vault lookup failed', e);
+    }
+
+    if (remoteUnusable) {
+      throw new Error('Could not verify remote encrypted vault — sync aborted to protect your data.');
+    }
+
+    // 2. Decrypt the remote password blob, which lives in its own envelope and
+    // therefore cannot travel through the row merge.
+    let remotePasswords: TombstoneRow<SavedPassword>[] | undefined;
+    if (remoteBundle && prefs.syncPasswords && remoteBundle.encryptedPasswords && remoteBundle.passwordsSalt && remoteBundle.passwordsIv) {
+      remotePasswords = await this.decryptRemotePasswords(
+        remoteBundle.encryptedPasswords,
+        remoteBundle.passwordsSalt,
+        remoteBundle.passwordsIv,
+        session.masterKey
+      );
+    }
+
+    // 3. Reconstruct the deletions this device made since its last push, for
+    // the two collections whose delete sites drop the row instead of stamping
+    // it. They are ordinary tombstones from here on.
+    const deletedLocally = pendingDeletionTombstones(
+      { history: localData.history, passwords: localData.passwords },
+      loadPushedIndex(session.userId),
+      tombstoneNow,
+      prefs
+    );
+
+    // 4. Union of local and remote. Deletions propagate through tombstones: a
+    // deleted row stays in the store as a row carrying `deletedAt`, is carried
+    // in the bundle like any other row, and suppresses any copy that predates
+    // the delete when it comes back down (mergeSyncedCollections).
+    const tombstoneAware = mergeSyncedCollections(
+      {
+        bookmarks: localData.bookmarks,
+        folders: localData.folders,
+        workspaces: localData.workspaces,
+        history: [...localData.history, ...deletedLocally.history],
+        passwords: [...localData.passwords, ...deletedLocally.passwords]
+      },
+      remoteBundle ? { ...remoteBundle, passwords: remotePasswords } : null,
+      prefs,
+      tombstoneNow
+    );
+    const mergedBookmarks = tombstoneAware.bookmarks;
+    const mergedFolders = tombstoneAware.folders;
+    const mergedWorkspaces = tombstoneAware.workspaces;
+
+    // History is a newest-first, bounded log, so the cap has to keep the
+    // NEWEST rows: the merge's own order is local-first, and the live rows are
+    // sorted before capping. Tombstones ride along after the live cap.
+    const historyRows = tombstoneAware.history ?? purgeExpiredTombstones(localData.history, tombstoneNow);
+    const pushedHistory = prefs.syncHistory
+      ? capSyncedCollection(
+          [...historyRows].sort((a, b) => rowVersion(b) - rowVersion(a)),
+          MAX_SYNCED_HISTORY,
+          undefined,
+          h => historyRowKey(h)
+        )
+      : historyRows; // opted out: the local log is returned untouched, as for the other collections
+    const mergedHistory = liveRowsOnly(pushedHistory) as HistoryItem[];
+
+    // Passwords are pushed as a separately-encrypted blob, so the cap has to be
+    // applied to the encryption input — capping it in `newBundle` below would
+    // bound nothing, because the blob is already sealed by then.
+    const passwordRows = tombstoneAware.passwords ?? purgeExpiredTombstones(localData.passwords, tombstoneNow);
+    const pushedPasswords = prefs.syncPasswords
+      ? capSyncedCollection(passwordRows, MAX_SYNCED_PASSWORDS, undefined, p => passwordRowKey(p))
+      : passwordRows; // opted out: the local credentials are returned untouched
+    // A tombstone is a delete marker, not a credential: it must not reach the
+    // secure store, or it would be re-read as a password row with no password.
+    // The returned list is the UNCAPPED live set, so a user with more
+    // credentials than the push cap does not lose the overflow on every sync —
+    // the cap only bounds what the envelope carries.
+    const mergedPasswords = liveRowsOnly(passwordRows) as SavedPassword[];
+
+    let mergedSettings = { ...localData.settings };
+
+    if (remoteBundle) {
+      const vaultVersion = typeof remoteBundle.version === 'number' ? remoteBundle.version : 1;
+      logger.info('SyncService:syncData', `Processing remote encrypted vault v${vaultVersion}`);
+      if (vaultVersion > SYNC_BUNDLE_VERSION) {
+        logger.warn('SyncService:syncData', `Remote vault has higher schema version (${vaultVersion}) than client (${SYNC_BUNDLE_VERSION})`);
+      }
+
+      if (prefs.syncSettings && remoteBundle.settings) {
+        const lww = mergeSettingsLastWriteWins(
+          localData.settings,
+          remoteBundle.settings,
+          this.getSettingsTimestamps(),
+          remoteBundle.settingsTimestamps,
+          { fallbackRemoteTimestamp: remoteBundle.timestamp || 0, now: tombstoneNow }
+        );
+        mergedSettings = lww.settings;
+        this.saveSettingsTimestamps(lww.timestamps);
+      }
+    }
+
+    let encryptedPassPayload: { ciphertext: string; salt: string; iv: string } | undefined;
+    if (prefs.syncPasswords && pushedPasswords.length > 0) {
+      encryptedPassPayload = await this.encryptPasswords(pushedPasswords, session.masterKey);
+    }
+
+    const syncTimestamp = Date.now();
+
+    // Build the encrypted vault payload. It is never stored in Web Storage.
+    // Each collection is capped here so the envelope stays writable; see the
+    // MAX_SYNCED_* comment at the constants for why unbounded growth is
+    // unrecoverable. `undefined` still means "opted out" and is preserved.
+    const newBundle: SyncDataBundle = {
+      version: SYNC_BUNDLE_VERSION,
+      timestamp: syncTimestamp,
+      userId: session.userId,
+      bookmarks: prefs.syncBookmarks ? capSyncedCollection(mergedBookmarks, MAX_SYNCED_BOOKMARKS) : undefined,
+      folders: prefs.syncBookmarks ? capSyncedCollection(mergedFolders, MAX_SYNCED_FOLDERS) : undefined,
+      history: prefs.syncHistory ? pushedHistory : undefined,
+      encryptedPasswords: encryptedPassPayload?.ciphertext,
+      passwordsSalt: encryptedPassPayload?.salt,
+      passwordsIv: encryptedPassPayload?.iv,
+      settings: prefs.syncSettings ? mergedSettings : undefined,
+      settingsTimestamps: prefs.syncSettings ? this.getSettingsTimestamps() : undefined,
+      workspaces: prefs.syncWorkspaces ? capSyncedCollection(mergedWorkspaces, MAX_SYNCED_WORSPACES) : undefined
+    };
+
+    // 5. Conditional write. The vault is only overwritten if it still holds the
+    // revision this attempt read; otherwise the attempt lost the race and the
+    // whole cycle has to run again from a fresh read.
+    const envelope = await encryptSyncPayload(newBundle, session.masterKey);
+    this.lastPushedCiphertext = envelope.ciphertext;
+    const write = await writeVaultIfUnchanged(table, {
+      userId: session.userId,
+      envelope,
+      expectedUpdatedAt: remoteUpdatedAt,
+      nowIso: new Date().toISOString()
+    });
+    if (write.error) throw write.error;
+    if (write.conflict) throw new SyncConflictError();
+
+    // The vault holds this bundle now, so this device holds the rows in it: that
+    // is what the next sync compares its store against to tell a deletion from
+    // a row it never had.
+    this.recordPushedIndex(session.userId, prefs, {
+      history: mergedHistory,
+      passwords: liveRowsOnly(pushedPasswords) as SavedPassword[]
+    });
+
+    // The remote vault is now encrypted under the dedicated sync key, so
+    // the retained legacy raw-password material is no longer needed — wipe
+    // it from memory and the secure store.
+    if (this.usedLegacyKeyThisSync) {
+      this.usedLegacyKeyThisSync = false;
+      this.legacyMasterKey = null;
+      void this.writeSecureStore(this.legacyMasterKeyStoreName(), '');
+    }
+
+    // Bookkeeping only — the vault upsert above has already succeeded, so
+    // this must not be able to fail the whole sync. An unguarded setItem
+    // throws QuotaExceededError when Web Storage is full or blocked, the
+    // outer catch sets lastError and rejects, and the caller therefore never
+    // applies `mergedData`: remote-only bookmarks stop coming down and the
+    // user is shown a failure for a sync that actually worked. The
+    // in-memory timestamp is always kept; only the persistence is best-effort.
+    this.lastSyncedAt = syncTimestamp;
+    try {
+      localStorage.setItem(STORAGE_KEYS.SYNC_STATUS, JSON.stringify({ lastSyncedAt: this.lastSyncedAt }));
+    } catch (e) {
+      logger.warn('SyncService:syncData', 'Could not persist last-synced timestamp to localStorage', e);
+    }
+
+    if (round > 1) {
+      logger.info('SyncService:syncData', `Sync completed after ${round} attempts (lost write races were re-merged)`);
+    }
+
+    this.isSyncing = false;
+    this.notify();
+
+    return {
+      mergedData: {
+        bookmarks: mergedBookmarks,
+        folders: mergedFolders,
+        history: mergedHistory,
+        passwords: mergedPasswords,
+        settings: mergedSettings,
+        workspaces: mergedWorkspaces
+      },
+      syncedItemsCount: {
+        bookmarks: mergedBookmarks.length,
+        history: mergedHistory.length,
+        passwords: mergedPasswords.length,
+        workspaces: mergedWorkspaces.length
+      }
+    };
+  }
+
+  /**
+   * Decrypt the vault's inner password blob, retrying with the retained legacy
+   * key for blobs written before the parameter unification.
+   *
+   * Returns undefined — leaving the local passwords untouched — when the blob
+   * cannot be read at all: guessing then would mean either dropping the user's
+   * credentials or overwriting the vault's ones with an empty list.
+   */
+  private async decryptRemotePasswords(
+    ciphertext: string,
+    salt: string,
+    iv: string,
+    masterKey: string
+  ): Promise<TombstoneRow<SavedPassword>[] | undefined> {
+    try {
+      return await this.decryptPasswords(ciphertext, salt, iv, masterKey);
+    } catch (e) {
+      const legacyKey = await this.getLegacyFallbackKey();
+      if (!legacyKey) {
+        logger.warn('SyncService:syncData', 'Skipping password decrypt', e);
+        return undefined;
+      }
+      try {
+        const passwords = await this.decryptPasswords(ciphertext, salt, iv, legacyKey);
+        this.usedLegacyKeyThisSync = true;
+        return passwords;
+      } catch (legacyErr) {
+        logger.warn('SyncService:syncData', 'Skipping password decrypt (current and legacy keys failed)', legacyErr);
+        return undefined;
+      }
     }
   }
 
@@ -1600,44 +2875,41 @@ class NovaSyncService {
   }
 
   // --- SYNC CHAIN & PAIRING ---
+  //
+  // Device pairing by sync code is NOT implemented: there is no pairing
+  // registry, no invitation store and no transport that a second device could
+  // reach (the `createPairingToken`/`hashPairingToken` primitives in
+  // syncCrypto.ts have no caller). The previous implementations minted a random
+  // code, stored it on the local user, ignored the data bundle they were handed
+  // — including the secure-store password blob — and returned success, so the UI
+  // reported "Device paired!" while nothing was ever shared.
+  //
+  // Both entry points now fail loudly instead of pretending. Pairing needs to be
+  // built on the real primitives before these can be reinstated.
+  private static readonly PAIRING_UNAVAILABLE =
+    'Device pairing is not available in this build. Sign in with your Nova Cloud account to sync.';
+
+  /**
+   * Whether the pairing UI should be offered at all.
+   *
+   * The `nova_pairing_invitations` table and its RLS exist, but the join flow
+   * does not: a second device cannot read an invitation by `token_hash`, and so
+   * cannot reach the owner's vault. Until those policies and the client flow
+   * land, the buttons would only ever surface the error above, so the UI hides
+   * them instead of advertising an action that cannot work. Flip this to `true`
+   * once the SQL in supabase_schema.sql has been applied and the RPC exists.
+   */
+  public static readonly PAIRING_AVAILABLE = false;
 
   public static normalizeSyncCode = normalizeSyncCode;
   public static formatSyncCode = formatSyncCode;
 
-  public async generateSyncChainCode(currentData?: Partial<SyncDataBundle>): Promise<string> {
-    const rawHex = Array.from(crypto.getRandomValues(new Uint8Array(12)))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('')
-      .toUpperCase();
-    const code = NovaSyncService.formatSyncCode(rawHex);
-
-    if (this.currentUser) {
-      this.currentUser.syncCode = code;
-      void this.writeStoredUser(this.currentUser).catch(() => {
-        // Best-effort only — sync code generation must not fail on persistence.
-      });
-    }
-    this.notify();
-    return code;
+  public async generateSyncChainCode(_currentData?: Partial<SyncDataBundle>): Promise<string> {
+    throw new Error(NovaSyncService.PAIRING_UNAVAILABLE);
   }
 
-  public async joinSyncChain(code: string): Promise<boolean> {
-    if (!code || typeof code !== 'string' || code.trim().length === 0) {
-      throw new Error('Invalid sync chain code: code is required');
-    }
-    const cleanCode = NovaSyncService.normalizeSyncCode(code);
-    if (!/^[0-9A-F]{16,32}$/.test(cleanCode)) {
-      throw new Error('Invalid sync chain code: expected format nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx or 16-32 hexadecimal characters');
-    }
-    const formattedCode = NovaSyncService.formatSyncCode(cleanCode);
-    if (this.currentUser) {
-      this.currentUser.syncCode = formattedCode;
-      await this.writeStoredUser(this.currentUser).catch(() => {
-        // Best-effort only — joining must not fail on persistence.
-      });
-    }
-    this.notify();
-    return true;
+  public async joinSyncChain(_code: string): Promise<boolean> {
+    throw new Error(NovaSyncService.PAIRING_UNAVAILABLE);
   }
 
   public getSettingsTimestamps(): Record<string, number> {
@@ -1652,6 +2924,21 @@ class NovaSyncService {
     try {
       localStorage.setItem('nova_settings_timestamps', JSON.stringify(timestamps));
     } catch (_) {}
+  }
+
+  /**
+   * Record that the user persisted these settings, stamping the per-field write
+   * clock for the fields that changed.
+   *
+   * This is the one call the settings write path has to make (see
+   * `recordPersistedSettings`), and it is what unfreezes per-field LWW: the sync
+   * compares a local field against the remote one by when each was WRITTEN, and
+   * without a stamp taken at the write the local clock can only ever be as old
+   * as the last sync, so a setting this user changed after a remote change would
+   * lose every time and the field would be stuck on the other device's value.
+   */
+  public recordSettingsPersist(settings: Partial<UserSettings>, at: number = Date.now()): void {
+    this.saveSettingsTimestamps(recordPersistedSettings(settings, at, this.getSettingsTimestamps()));
   }
 
   private notify() {

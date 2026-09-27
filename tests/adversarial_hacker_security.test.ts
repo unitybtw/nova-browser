@@ -1,136 +1,97 @@
 import assert from "assert";
 import { fileURLToPath } from "url";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import { loadSafeCrxZip } from "../electron/main/crxInstaller";
+import JSZip from "jszip";
 
 console.log("\n--- Adversarial Hacker Security & Vulnerability Remediation Suite ---");
 
-// 1. Test Command-Line Argument Sanitization for Second-Instance
-function sanitizeCommandLineUrl(commandLine: string[]): string | null {
-  const possibleUrl = commandLine.find(arg => {
-    try {
-      const u = new URL(arg);
-      return (u.protocol === "http:" || u.protocol === "https:") && !u.username && !u.password;
-    } catch {
-      return false;
-    }
-  });
-  return possibleUrl || null;
-}
+// 1. Command-Line Argument Sanitization for Second-Instance — REMOVED
+//
+// `sanitizeCommandLineUrl` re-declared `isValidDeepLinkUrl`
+// (electron/main.ts:1181) and was asserted against itself, and the copy had
+// drifted from the shipped predicate: the real one also rejects anything over
+// 2048 characters, rejects embedded credentials, and ACCEPTS `nova:` deep links
+// from an allowlist of pages. The copy only accepted http/https, so it would
+// have reported a rejection for a URL production routes to a new tab, and it
+// applied no length bound at all.
+//
+// NEEDED EXPORT: `isValidDeepLinkUrl(targetUrl: unknown): boolean` from
+// electron/main.ts:1181. As with the other main-process predicates this cannot
+// be imported directly, so the right end state is an extracted module (e.g.
+// electron/main/deepLink.ts) that electron/main.ts imports and a test can too.
+// Note that the `app.on('second-instance')` handler at electron/main.ts:1209
+// also does `possibleUrl.trim()` after the predicate, so an extracted helper
+// should return the trimmed URL rather than a boolean if it is to replace the
+// whole expression.
 
-const safeHttp = sanitizeCommandLineUrl(["nova", "https://example.com/search?q=test"]);
-assert.strictEqual(safeHttp, "https://example.com/search?q=test", "Safe HTTPS URL must be accepted");
+// 2. openExternal Permission Rejection — REMOVED (tautology)
+//
+// The body was `if (permission === "openExternal") return false; return true;`
+// and the suite asserted that it returns false for "openExternal" and true for
+// "media". No production code was involved; it could not fail.
+//
+// NEEDED EXPORT: the permission gate from the `setPermissionRequestHandler` in
+// electron/main.ts (the `openExternal` branch that unconditionally denies) as a
+// pure `shouldGrantPermission(permission, requestingOrigin, details): boolean`
+// in an extracted electron/main/ module, so the deny decision and the origin
+// check that accompanies it can be driven for real.
 
-const rejectedFlags = sanitizeCommandLineUrl(["nova", "--remote-debugging-port=9222", "--disable-web-security"]);
-assert.strictEqual(rejectedFlags, null, "Hostile flags must not be treated as URLs");
+// 3. Popup Burst Rate Limiter — REMOVED
+//
+// `PopupRateLimiter` was a class written in this file re-implementing the
+// `popupHistory` closure inside the real `setWindowOpenHandler`
+// (electron/main.ts:3393-3420) — same 2s window, same threshold of 3 — and was
+// asserted against itself. Two further details of the shipped handler had no
+// counterpart here at all: the history is deleted on the webContents'
+// `destroyed` event, and a permitted URL is only routed to a new tab when it is
+// http/https without credentials, or a `chrome-extension:` URL whose hostname
+// matches the id character set without credentials.
+//
+// NEEDED EXPORT: an extracted module exposing the sliding-window state as a
+// pure value, e.g. `createPopupRateLimiter({ windowMs, max })` with
+// `limiter.check(id, now): boolean` and `limiter.forget(id)`, plus
+// `classifyPopupUrl(url): { action: 'allow-tab' } | { action: 'deny' }`, used
+// by the real handler. A timer-free pure limiter is directly testable.
 
-const rejectedJavascript = sanitizeCommandLineUrl(["nova", "javascript:alert(document.cookie)"]);
-assert.strictEqual(rejectedJavascript, null, "javascript: scheme must be blocked");
+// 4. Dynamic MCP Port SSRF Filter — REMOVED
+//
+// `isMcpPortBlocked` restated the two-line check at electron/main.ts:4943-4946
+// and asserted itself. The surrounding SSRF policy is substantial — private IP
+// rejection, DNS pinning, scheme checks — and none of it was covered.
+//
+// NEEDED EXPORT: the SSRF guard from electron/main.ts (~4900-4950) as an
+// extracted `electron/main/ssrfGuard.ts` exporting something like
+// `resolveExternalUrl(candidate, { activeMcpPort }): { url: URL; pinnedIp: string } | { error: string }`.
+// The private-IP classifier is already extracted and importable today as
+// `isPrivateIP` (electron/main/ipAddress.ts:88).
 
-const rejectedFile = sanitizeCommandLineUrl(["nova", "file:///etc/passwd"]);
-assert.strictEqual(rejectedFile, null, "file: scheme must be blocked from external CLI arguments");
+// 5. IPv6 Loopback Host Header Verification — REMOVED
+//
+// `isAllowedHostHeader` was a local allowlist asserted against itself.
+//
+// NEEDED EXPORT: the host-header allowlist from the MCP server's HTTP request
+// handler (electron/mcpServer.ts) as a pure `isAllowedMcpHostHeader(host, port)`
+// that the handler calls, so the real allowlist — not a copy of it — is checked.
 
-const rejectedCreds = sanitizeCommandLineUrl(["nova", "https://admin:secret@malicious.com"]);
-assert.strictEqual(rejectedCreds, null, "URLs with embedded credentials must be rejected");
+// 6. Webstore Subframe Isolation — REMOVED
+//
+// `isAuthorizedWebstoreSender` restated the host/path condition and was
+// asserted against itself. The shipped form is at electron/main.ts:3476.
+//
+// NEEDED EXPORT: the Web Store sender authorisation predicate shared by
+// electron/main.ts and electron/webstore-preload.ts, e.g.
+// `isAuthorizedWebstoreFrame({ isMainWindow, isMainFrame, frameUrl }): boolean`.
+// Both files should import the one function so the main process and the preload
+// cannot disagree.
 
-console.log("[PASS] [Hacker-Defense-1] Command-line second instance argument sanitization safely rejects injection vectors.");
-
-// 2. Test openExternal Permission Rejection
-function simulatePermissionRequest(permission: string, url: string): boolean {
-  if (permission === "openExternal") {
-    return false; // Blocked unconditionally
-  }
-  return true;
-}
-
-assert.strictEqual(simulatePermissionRequest("openExternal", "https://evil.com"), false, "openExternal must be rejected");
-assert.strictEqual(simulatePermissionRequest("media", "https://trusted.com"), true, "Standard media permissions can be evaluated");
-
-console.log("[PASS] [Hacker-Defense-2] openExternal permission request blocked unconditionally for web content.");
-
-// 3. Test Popup Burst Rate Limiter
-class PopupRateLimiter {
-  private history = new Map<number, number[]>();
-
-  public handleOpen(contentsId: number, url: string, now = Date.now()): boolean {
-    const list = (this.history.get(contentsId) || []).filter(ts => now - ts < 2000);
-    if (list.length >= 3) {
-      this.history.set(contentsId, list);
-      return false; // Denied
-    }
-    list.push(now);
-    this.history.set(contentsId, list);
-    return true; // Allowed
-  }
-}
-
-const limiter = new PopupRateLimiter();
-const webContentsId = 42;
-const t0 = 100000;
-
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://a.com", t0), true, "Popup 1 allowed");
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://b.com", t0 + 100), true, "Popup 2 allowed");
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://c.com", t0 + 200), true, "Popup 3 allowed");
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://d.com", t0 + 300), false, "Popup 4 blocked (flood)");
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://e.com", t0 + 400), false, "Popup 5 blocked (flood)");
-assert.strictEqual(limiter.handleOpen(webContentsId, "https://f.com", t0 + 2500), true, "Popup after sliding window reset allowed");
-
-console.log("[PASS] [Hacker-Defense-3] Sliding-window popup rate limiter halts Denial of Service flooding.");
-
-// 4. Test Dynamic MCP Port SSRF Filter
-function isMcpPortBlocked(port: string, activeMcpPort: number): boolean {
-  return port === "3020" || port === String(activeMcpPort);
-}
-
-assert.strictEqual(isMcpPortBlocked("3020", 3020), true, "Default port 3020 blocked");
-assert.strictEqual(isMcpPortBlocked("3025", 3025), true, "Dynamic active MCP port 3025 blocked");
-assert.strictEqual(isMcpPortBlocked("443", 3025), false, "Standard HTTPS port 443 allowed");
-assert.strictEqual(isMcpPortBlocked("80", 3025), false, "Standard HTTP port 80 allowed");
-
-console.log("[PASS] [Hacker-Defense-4] Dynamic MCP port SSRF filter prevents intranet pivot.");
-
-// 5. Test IPv6 Loopback Host Header Verification
-function isAllowedHostHeader(host: string, port: number): boolean {
-  const allowed = [
-    `localhost:${port}`,
-    `127.0.0.1:${port}`,
-    `[::1]:${port}`,
-    "localhost",
-    "127.0.0.1",
-    "[::1]"
-  ];
-  return allowed.includes(host.toLowerCase());
-}
-
-assert.strictEqual(isAllowedHostHeader("localhost:3020", 3020), true, "localhost:port allowed");
-assert.strictEqual(isAllowedHostHeader("127.0.0.1:3020", 3020), true, "127.0.0.1:port allowed");
-assert.strictEqual(isAllowedHostHeader("[::1]:3020", 3020), true, "IPv6 loopback [::1]:port allowed");
-assert.strictEqual(isAllowedHostHeader("[::1]", 3020), true, "IPv6 loopback [::1] allowed");
-assert.strictEqual(isAllowedHostHeader("attacker.com:3020", 3020), false, "Attacker host rejected");
-assert.strictEqual(isAllowedHostHeader("evil.com", 3020), false, "DNS rebinding host rejected");
-
-console.log("[PASS] [Hacker-Defense-5] IPv6 loopback and DNS rebinding Host header defense validated.");
-
-// 6. Test Webstore Subframe Isolation
-function isAuthorizedWebstoreSender(isMainWindow: boolean, isMainFrame: boolean, frameUrl: string): boolean {
-  if (isMainWindow) return true;
-  if (!isMainFrame) return false;
-  try {
-    const u = new URL(frameUrl);
-    return u.protocol === "https:" &&
-      (u.hostname === "chromewebstore.google.com" ||
-       (u.hostname === "chrome.google.com" && u.pathname.startsWith("/webstore/")));
-  } catch {
-    return false;
-  }
-}
-
-assert.strictEqual(isAuthorizedWebstoreSender(true, false, "any"), true, "Main window always trusted");
-assert.strictEqual(isAuthorizedWebstoreSender(false, true, "https://chromewebstore.google.com/detail/xyz"), true, "Top-level Web Store tab authorized");
-assert.strictEqual(isAuthorizedWebstoreSender(false, false, "https://chromewebstore.google.com/detail/xyz"), false, "Subframe iframe in Web Store rejected");
-assert.strictEqual(isAuthorizedWebstoreSender(false, true, "https://evil.com/fake-store"), false, "Malicious site rejected");
-
-console.log("[PASS] [Hacker-Defense-6] Webstore extension installer subframe isolation strictly enforced.");
-
-// 7. Test fileURLToPath Safety
+// 7. fileURLToPath Safety — KEPT
+//
+// This one is not a production copy: it imports Node's own `fileURLToPath` and
+// asserts this suite's own file-URL handling, so it is a harness guard rather
+// than a false assurance about Nova code.
 const testFileUrl = process.platform === "win32"
   ? "file:///C:/path/to/my%20file.txt"
   : "file:///path/to/my%20file.txt";
@@ -140,55 +101,184 @@ assert.ok(resolvedPath.includes("my file.txt"), "fileURLToPath decodes percent e
 console.log("[PASS] [Hacker-Defense-7] Standard fileURLToPath cross-platform resolution verified.");
 
 // 8. Test CRX3 Inner Zip Offset Calculation
-function getCrxInnerZipTest(buffer: Buffer): Buffer {
-  if (buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04) {
-    return buffer;
-  }
-  const readU32 = (offset: number) => buffer.readUInt32LE(offset);
-  const version = buffer[4];
-  if (version === 3) {
-    const headerSize = readU32(8);
-    return buffer.subarray(12 + headerSize);
-  }
-  throw new Error("Unsupported format");
+// This used to be a LOCAL re-implementation of the CRX3 offset parser, which
+// checked only the version byte, never validated the "Cr24" magic, and applied
+// no bound to headerSize. It drifted away from the real parser while still
+// reporting "offset accurately isolates zip payload" - a false assurance that
+// let the real installer ship 100% broken for an entire audit round. It now
+// drives the shipped parser instead.
+(async () => {
+  // A real zip with one entry. The shipped parser requires a local file header
+  // at the declared offset and then loads the archive, so neither a 4-byte fake
+  // nor an empty zip would do.
+  const REAL_ZIP: Buffer = await JSZip()
+    .file("manifest.json", '{"name":"t","version":"1.0.0","manifest_version":3}')
+    .generateAsync({ type: "nodebuffer" });
+  const buildCrx3 = (headerSize: number, magic = "Cr24", version = 3): Buffer => {
+    const buf = Buffer.concat([
+      Buffer.from(magic, "ascii"),
+      (() => { const v = Buffer.alloc(4); v.writeUInt32LE(version, 0); return v; })(),
+      (() => { const h = Buffer.alloc(4); h.writeUInt32LE(headerSize >>> 0, 0); return h; })(),
+      Buffer.alloc(headerSize),
+      REAL_ZIP
+    ]);
+    return buf;
+  };
+
+  // A well-formed CRX3 must be accepted and must yield the zip payload.
+  // loadSafeCrxZip returns the LOADED archive, so proving the offset is right
+  // means reading an entry back out of it - a stronger check than comparing bytes.
+  const good = await loadSafeCrxZip(buildCrx3(16), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-")));
+  const entry = await good.file("manifest.json")?.async("string");
+  assert.strictEqual(entry, '{"name":"t","version":"1.0.0","manifest_version":3}',
+    "a well-formed CRX3 must isolate exactly the zip payload at the declared offset");
+
+  // The exact cases the local copy waved through.
+  await assert.rejects(
+    () => loadSafeCrxZip(buildCrx3(16, "Cr25"), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-"))),
+    /magic|Unsupported|CRX/i,
+    "a CRX3 with the wrong magic must be refused, not sliced"
+  );
+  await assert.rejects(
+    () => loadSafeCrxZip(buildCrx3(16, "Cr24", 9), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-"))),
+    /version|Unsupported|CRX/i,
+    "an unknown CRX version must be refused"
+  );
+  await assert.rejects(
+    () => loadSafeCrxZip(buildCrx3(0xffffff00), fs.mkdtempSync(path.join(os.tmpdir(), "adv-crx3-"))),
+    /offset|out of bounds|CRX|zip/i,
+    "an out-of-range CRX3 headerSize must be refused before any slicing"
+  );
+
+  console.log("[PASS] [Hacker-Defense-8] CRX3 container header extraction validated against the shipped parser.");
+})();
+
+// 8b. Extension Popup Blur Grace Period — REMOVED
+//
+// `PopupLifecycle` was a class in this file with a 50ms timer, asserted against
+// its own `isClosed` field one tick later. It modelled the grace period rather
+// than exercising it, and the async assertion could not observe the transition
+// it claimed to test (handleBlur ran before the timer that grants the grace
+// period had any chance to fire).
+//
+// NEEDED EXPORT: the grace-period gate from the extension-popup window handling
+// in src/components/ExtensionsModal.tsx (or the Electron side that owns the
+// window), as a pure `createBlurGracePeriod(delayMs)` with `grant()` and
+// `shouldCloseOnBlur()`, so the real timer is the one under test.
+
+// 9. Shipped source guards for the predicates that cannot be imported
+//
+// electron/main.ts is the Electron entry point and electron/webstore-preload.ts
+// is a preload script; neither can be imported by a Node test. Until the
+// extractions described in sections 1-6 and 9 above are done, reading the
+// shipped source is the only way to assert anything true about them.
+//
+// Unlike the copies these guards replace, each one is falsifiable against
+// production: weaken or delete the guard in the source and the assertion fails.
+// The exact strings named are the ones the deleted local reimplementations
+// claimed to cover, so the guarantee is reattached to the real code.
+const mainSource = fs.readFileSync(
+  path.join(process.cwd(), "electron", "main.ts"),
+  "utf-8"
+).replace(/\r\n/g, "\n");
+const webstorePreloadSource = fs.readFileSync(
+  path.join(process.cwd(), "electron", "webstore-preload.ts"),
+  "utf-8"
+).replace(/\r\n/g, "\n");
+
+const SHIPPED_GUARDS: Array<{ source: "main" | "preload"; needle: string; desc: string }> = [
+  // Section 1: deep link validation (electron/main.ts:1181).
+  {
+    source: "main",
+    needle: "if (typeof targetUrl !== 'string' || !targetUrl.trim() || targetUrl.length > 2048) return false;",
+    desc: "isValidDeepLinkUrl bounds deep link length and rejects non-strings (the local copy had no length bound)",
+  },
+  {
+    source: "main",
+    needle: "const allowedPages = new Set(['newtab', 'settings', 'history', 'downloads', 'changelog', 'whats-new', 'extensions']);",
+    desc: "nova: deep links are restricted to the allowlisted pages (the local copy rejected nova: outright)",
+  },
+  {
+    source: "main",
+    needle: "if (u.username || u.password) return false;",
+    desc: "deep links carrying embedded credentials are refused",
+  },
+  // Section 2: openExternal (electron/main.ts:1592).
+  {
+    source: "main",
+    needle: "if (permission === 'openExternal') {",
+    desc: "openExternal is gated in the real setPermissionRequestHandler",
+  },
+  {
+    source: "main",
+    needle: "return callback(false);",
+    desc: "the openExternal branch denies unconditionally rather than falling through",
+  },
+  // Section 3: popup rate limiter (electron/main.ts:3393-3420).
+  {
+    source: "main",
+    needle: "const popupHistory = new Map<number, number[]>();",
+    desc: "popup bursts are tracked per webContents",
+  },
+  {
+    source: "main",
+    needle: "popupHistory.delete(contents.id);",
+    desc: "popup history is released when the webContents is destroyed, so ids cannot leak",
+  },
+  {
+    source: "main",
+    needle: "const history = (popupHistory.get(id) || []).filter(ts => now - ts < 2000);",
+    desc: "the popup limiter uses the 2s sliding window",
+  },
+  {
+    source: "main",
+    needle: "if (history.length >= 3) {",
+    desc: "the popup limiter denies the fourth request inside the window",
+  },
+  {
+    source: "main",
+    needle: "const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;",
+    desc: "only http(s) and credential-free, id-shaped chrome-extension: popups are routed to a tab",
+  },
+  // Section 4: MCP port SSRF block (electron/main.ts:4945).
+  {
+    source: "main",
+    needle: "return { error: 'Requests to MCP server port are blocked.' };",
+    desc: "requests to the default and live MCP port are refused",
+  },
+  {
+    source: "main",
+    needle: "if (port === '3020' || port === activeMcpPort) {",
+    desc: "both the hardcoded default port and the live port are blocked",
+  },
+  // Section 6: Web Store subframe isolation (electron/webstore-preload.ts:15).
+  {
+    source: "preload",
+    needle: "const WEBSTORE_HOSTS: readonly string[] = ['chromewebstore.google.com', 'chrome.google.com'];",
+    desc: "the preload authorises exactly two Web Store hosts",
+  },
+  {
+    source: "preload",
+    needle: "const isWebStoreOrigin = (origin: string): boolean =>",
+    desc: "preload Web Store authorisation is origin-exact, not a suffix match",
+  },
+  {
+    source: "preload",
+    needle: "const EXTENSION_ID_SOURCE = '^[a-p]{32}$';",
+    desc: "extension ids stay anchored to 32 a-p characters, shared by the page-side check and the injected shim",
+  },
+];
+
+for (const guard of SHIPPED_GUARDS) {
+  const haystack = guard.source === "main" ? mainSource : webstorePreloadSource;
+  assert.ok(
+    haystack.includes(guard.needle),
+    `[Hacker-Defense-9] shipped ${guard.source === "main" ? "electron/main.ts" : "electron/webstore-preload.ts"} guard: ${guard.desc}`,
+    `expected to find: ${guard.needle.slice(0, 90)}`
+  );
 }
 
-// Build a mock CRX3 buffer: Cr24 (4B), version 3 (4B), headerSize 16 (4B), header (16B), PK\x03\x04 (zip)
-const mockCrx3 = Buffer.alloc(12 + 16 + 4);
-mockCrx3.write("Cr24", 0, "ascii");
-mockCrx3.writeUInt32LE(3, 4); // version = 3
-mockCrx3.writeUInt32LE(16, 8); // headerSize = 16
-mockCrx3.write("PK\x03\x04", 12 + 16, "ascii"); // inner zip start
-const extractedZip = getCrxInnerZipTest(mockCrx3);
-assert.strictEqual(extractedZip.subarray(0, 4).toString("ascii"), "PK\x03\x04", "CRX3 offset accurately isolates zip payload");
-
-console.log("[PASS] [Hacker-Defense-8] CRX3 container header extraction validated.");
-
-// 9. Test Extension Popup Blur Grace Period
-class PopupLifecycle {
-  public isClosed = false;
-  private canCloseOnBlur = false;
-
-  public show() {
-    setTimeout(() => {
-      this.canCloseOnBlur = true;
-    }, 50);
-  }
-
-  public handleBlur() {
-    if (this.canCloseOnBlur) {
-      this.isClosed = true;
-    }
-  }
-}
-
-const popup = new PopupLifecycle();
-popup.show();
-// Immediate blur during launch transition:
-popup.handleBlur();
-assert.strictEqual(popup.isClosed, false, "Popup must ignore blur during startup grace period");
-
-console.log("[PASS] [Hacker-Defense-9] Extension popup blur grace period prevents premature window destruction.");
+console.log(`[PASS] [Hacker-Defense-9] ${SHIPPED_GUARDS.length} shipped main-process/preload security guards are still present in source.`);
 
 // 10. Test Genuine VPN Proxy Security Validation and Chromium Normalization
 import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt } from "../electron/main/proxySecurity";

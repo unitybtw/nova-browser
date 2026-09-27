@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Cloud, Check, ShieldAlert, ShieldCheck, RefreshCw, Link2, Laptop, Bookmark, Key, Settings, FolderTree, Sparkles } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
-import { syncService, SyncStatus, SyncPreferences } from '../../services/syncService';
+import { syncService, NovaSyncService, SyncStatus, SyncPreferences } from '../../services/syncService';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
@@ -175,7 +175,8 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               </div>
             </div>
 
-            {/* Pair Another Device Card */}
+            {/* Pair Another Device Card - hidden until the pairing join flow exists */}
+            {NovaSyncService.PAIRING_AVAILABLE && (
             <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-sm">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -226,6 +227,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </button>
               </div>
             </div>
+            )}
 
             {/* Synced Categories List */}
             <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-sm">
@@ -277,7 +279,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               </div>
             </div>
           </div>
-        ) : (
+        ) : NovaSyncService.PAIRING_AVAILABLE ? (
           /* PAIRING SETUP (NO EMAIL / NO PASSWORD) */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Option 1: Enter Code */}
@@ -376,6 +378,21 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </button>
               </div>
             </div>
+          </div>
+        ) : (
+          /* Pairing is not built yet: offering a code that can never be redeemed
+             is worse than saying so, so this states the one route that works. */
+          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-8 flex flex-col items-center text-center gap-3 shadow-sm">
+            <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+              <Laptop className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
+              Sign in to sync this browser
+            </h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-sm">
+              Your bookmarks, history, tabs and workspaces sync through your Nova Cloud
+              account. Pairing a second device with a sync code is not available yet.
+            </p>
           </div>
         )}
       </section>

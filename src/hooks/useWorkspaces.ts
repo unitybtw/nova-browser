@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Workspace, Folder } from '../types/browser';
 import { safeParseArrayWithBackup } from '../utils/safeStorage';
+import { isTombstonedRow } from '../services/syncService';
 import { getElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
 
@@ -16,7 +17,9 @@ const DEFAULT_WORKSPACES: Workspace[] = [
 ];
 
 export function useWorkspaces(options: UseWorkspacesOptions = {}) {
-  const [folders, setFolders] = useState<Folder[]>(() => {
+  // Row stores: tombstones (deleted rows) stay in these arrays so deletes can
+  // be synced; the live views below are what the UI renders.
+  const [folderRows, setFolders] = useState<Folder[]>(() => {
     if (options.isDemo && options.demoFeature === 'vertical_tabs') {
       return [
         { id: 'f1', name: 'Frontend Stack', isExpanded: true, workspaceId: 'default' },
@@ -28,12 +31,15 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
     return safeParseArrayWithBackup<Folder>('folders_session', saved, []);
   });
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>(() => {
+  const [workspaceRows, setWorkspaces] = useState<Workspace[]>(() => {
     if (options.isDemo) return DEFAULT_WORKSPACES;
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('workspaces_session') : null;
     const parsed = safeParseArrayWithBackup<Workspace>('workspaces_session', saved, []);
     return parsed.length > 0 ? parsed : DEFAULT_WORKSPACES;
   });
+
+  const folders = useMemo(() => folderRows.filter(row => !isTombstonedRow(row)), [folderRows]);
+  const workspaces = useMemo(() => workspaceRows.filter(row => !isTombstonedRow(row)), [workspaceRows]);
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(() => {
     if (options.isDemo) return 'default';
@@ -43,15 +49,15 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
   const activeWorkspaceIdRef = useRef(activeWorkspaceId);
   useEffect(() => { activeWorkspaceIdRef.current = activeWorkspaceId; }, [activeWorkspaceId]);
 
-  const workspacesRef = useRef(workspaces);
-  useEffect(() => { workspacesRef.current = workspaces; }, [workspaces]);
+  const workspacesRef = useRef(workspaceRows);
+  useEffect(() => { workspacesRef.current = workspaceRows; }, [workspaceRows]);
 
   // Debounced 500ms workspace persistence with error logging (no silent failure)
   useEffect(() => {
     if (options.isDemo) return;
     const timer = setTimeout(() => {
       try {
-        const serialized = JSON.stringify(workspaces);
+        const serialized = JSON.stringify(workspaceRows);
         localStorage.setItem('workspaces_session', serialized);
         getElectronAPI()?.storeSet?.('workspaces_session', serialized);
       } catch (err) {
@@ -63,7 +69,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
         logger.warn('useWorkspaces', 'Failed to persist active_workspace_session to storage', err);
       }
       try {
-        const serializedFolders = JSON.stringify(folders);
+        const serializedFolders = JSON.stringify(folderRows);
         localStorage.setItem('folders_session', serializedFolders);
         getElectronAPI()?.storeSet?.('folders_session', serializedFolders);
       } catch (err) {
@@ -71,7 +77,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [workspaces, activeWorkspaceId, folders, options.isDemo]);
+  }, [workspaceRows, activeWorkspaceId, folderRows, options.isDemo]);
 
   useEffect(() => {
     if (workspaces.length === 0) return;
@@ -82,8 +88,10 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
 
   return {
     folders,
+    folderRows,
     setFolders,
     workspaces,
+    workspaceRows,
     setWorkspaces,
     workspacesRef,
     activeWorkspaceId,

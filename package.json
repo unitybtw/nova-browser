@@ -128,7 +128,7 @@
     "dev:web": "vite",
     "build:electron": "tsc --noEmit && esbuild electron/main.ts electron/preload.ts electron/webstore-preload.ts electron/guest-preload.ts --outdir=dist-electron --platform=node --bundle --external:electron --external:@cliqz/adblocker-electron --external:express --external:jsdom --format=cjs --out-extension:.js=.cjs",
     "build": "tsc && vite build && npm run build:electron",
-    "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs && node dist-test/runAll.cjs",
+    "test:e2e": "esbuild tests/runAll.ts --bundle --platform=node --outfile=dist-test/runAll.cjs --external:electron && node dist-test/runAll.cjs",
     "test": "npm run test:e2e",
     "benchmark": "esbuild tests/benchmark_suite.ts --bundle --platform=node --outfile=dist-test/benchmark_suite.cjs && node dist-test/benchmark_suite.cjs",
     "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
@@ -148,6 +148,7 @@
   "dependencies": {
     "@assistant-ui/react": "^0.15.21",
     "@cliqz/adblocker-electron": "^1.34.0",
+    "@huggingface/transformers": "^4.3.0",
     "@mlc-ai/web-llm": "^0.2.84",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",

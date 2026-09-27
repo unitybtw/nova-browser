@@ -33,6 +33,26 @@ import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
 import { NovaAISparkle } from './ui/NovaAISparkle';
 
+/**
+ * Takes the next supersession token for a model load.
+ *
+ * `aiAgent.setModel` terminates the worker, so switching models while a
+ * download is still in flight makes the *superseded* attempt reject. Its `catch`
+ * and `finally` used to run anyway, and its `finally` cleared the progress card
+ * in the middle of the newer download — so the card disappeared, the user
+ * concluded the model was ready, typed a prompt, and landed on
+ * "AI engine could not be started" while the replacement was still downloading.
+ * Each attempt takes a token and only the newest one may touch this state, the
+ * same way `requestIdRef` guards `handleSendPrompt`.
+ */
+export function beginModelRequest(ref: { current: number }): number {
+  return ++ref.current;
+}
+
+export function isCurrentModelRequest(ref: { current: number }, requestId: number): boolean {
+  return ref.current === requestId;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -239,7 +259,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
 
       {/* Action Buttons on Assistant Message */}
       {!isUser && (
-        <div className="flex items-center gap-1 px-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-1 px-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={() => onCopy(msg.content, idx)}
@@ -309,6 +329,10 @@ export const SidePanel = React.memo(({
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
   const requestIdRef = useRef<number>(0);
+  // Separate counter: a model switch and a chat request supersede each other
+  // but not in lockstep — `handleSendPrompt` awaits `handleInit`, so sharing one
+  // counter would let a chat cancel the download it is waiting for.
+  const modelRequestIdRef = useRef<number>(0);
   // Object URLs minted for attachment previews; revoked on reset/unmount.
   const blobUrlsRef = useRef<string[]>([]);
   const revokeBlobUrls = useCallback(() => {
@@ -400,12 +424,16 @@ export const SidePanel = React.memo(({
 
   // Listen to pending actions from outside
   useEffect(() => {
+    // handleSendPrompt returns early while a request is streaming. Consuming the
+    // action anyway made it vanish with no feedback and nothing sent, so wait
+    // for the stream to finish — the queue entry stays put until then.
+    if (isLoading) return;
     if (pendingActions && pendingActions.length > 0) {
       const action = pendingActions[0];
       handleSendPrompt(action.text);
       onPendingActionConsumed?.(action.id);
     }
-  }, [pendingActions, onPendingActionConsumed]);
+  }, [pendingActions, onPendingActionConsumed, isLoading]);
 
   // Model download / init handler
   const handleInit = useCallback(async () => {
@@ -413,16 +441,20 @@ export const SidePanel = React.memo(({
       setIsReady(true);
       return;
     }
+    const modelRequestId = beginModelRequest(modelRequestIdRef);
     setIsInitializing(true);
     setDownloadProgress(0);
     setDownloadStatusText(isTr ? 'AI Modeli hazırlanıyor...' : 'Preparing AI model...');
     try {
       await aiAgent.init((p, text) => {
+        if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
         setDownloadProgress(Math.round(p));
         setDownloadStatusText(text);
       });
+      if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
       setIsReady(true);
     } catch (err: any) {
+      if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
       console.error('[SidePanel] Init error:', err);
       const errMsg = err?.message || String(err);
       setMessages((prev) => [
@@ -435,7 +467,7 @@ export const SidePanel = React.memo(({
         },
       ]);
     } finally {
-      setIsInitializing(false);
+      if (isCurrentModelRequest(modelRequestIdRef, modelRequestId)) setIsInitializing(false);
     }
   }, [isTr]);
 
@@ -680,6 +712,10 @@ export const SidePanel = React.memo(({
   const handleSelectModel = useCallback(async (modelId: string) => {
     if (modelId === selectedModelId && isReady) return;
 
+    // Claim the token before any await: `setModel` unloads the worker, which
+    // rejects whichever earlier attempt is still in flight, and that rejection
+    // must not reach this component's state.
+    const modelRequestId = beginModelRequest(modelRequestIdRef);
     setSelectedModelId(modelId);
     setIsReady(false);
     setIsInitializing(true);
@@ -687,14 +723,17 @@ export const SidePanel = React.memo(({
     try {
       await aiAgent.setModel(modelId);
       await aiAgent.init((p, text) => {
+        if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
         setDownloadProgress(p);
         setDownloadStatusText(text);
       });
+      if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
       setIsReady(true);
     } catch (err: any) {
+      if (!isCurrentModelRequest(modelRequestIdRef, modelRequestId)) return;
       console.error('[SidePanel] Model switch error:', err);
     } finally {
-      setIsInitializing(false);
+      if (isCurrentModelRequest(modelRequestIdRef, modelRequestId)) setIsInitializing(false);
     }
   }, [selectedModelId, isReady]);
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Download, RefreshCw, ExternalLink, X } from 'lucide-react';
+import { Check, Download, RefreshCw, ExternalLink, X, AlertTriangle } from 'lucide-react';
 
 interface UpdateInfo {
   version: string;
@@ -25,6 +25,12 @@ export const UpdateWidget = () => {
   const [releaseNotes, setReleaseNotes] = React.useState('');
   const [downloadUrl, setDownloadUrl] = React.useState('');
   const [downloadedFilePath, setDownloadedFilePath] = React.useState('');
+  // Whether the downloaded package was checked against a published digest.
+  // `null` until a download completes. Electron cannot verify a CRX signature
+  // (it loads extensions unpacked), so the published SHA-256 from the GitHub
+  // release asset is the only integrity check there is - when it is absent the
+  // user must be told, rather than the download quietly counting as verified.
+  const [integrityVerified, setIntegrityVerified] = React.useState<boolean | null>(null);
   const [isRestarting, setIsRestarting] = React.useState(false);
   const [showNotesModal, setShowNotesModal] = React.useState(false);
 
@@ -67,6 +73,7 @@ export const UpdateWidget = () => {
         setUpdateVersion(info?.version || '');
         if (info?.filePath) setDownloadedFilePath(info.filePath);
         if (info?.releaseNotes) setReleaseNotes(info.releaseNotes);
+        setIntegrityVerified(info?.integrityVerified !== false);
       }));
       if (api.onUpdateError) unsubs.push(api.onUpdateError((_: any, err: string) => {
         setStatus('error');
@@ -157,7 +164,10 @@ export const UpdateWidget = () => {
         if (ok) return;
       } catch (_) {}
     }
-    window.open(url, '_blank');
+    // No window.open fallback on purpose: it carries a URL straight from the
+    // update feed with no scheme check, and the main window now denies popups
+    // outright. Surface the URL instead of silently doing nothing.
+    setErrorMsg(`Could not open the download automatically. Open it manually: ${url}`);
   };
 
   if (status === 'downloaded') {
@@ -189,6 +199,16 @@ export const UpdateWidget = () => {
             </button>
           )}
         </div>
+        {integrityVerified === false && (
+          <div className="flex items-start gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] leading-snug text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-px h-3 w-3 shrink-0" />
+            <span>
+              This release published no checksum, so the package could not be
+              integrity-checked. It was downloaded from the official GitHub
+              release over HTTPS, but it is not verified.
+            </span>
+          </div>
+        )}
         <p className="text-[11px] text-slate-400 dark:text-slate-500">
           Nova Browser will close, apply update, and automatically restart.
         </p>

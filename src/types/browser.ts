@@ -23,14 +23,26 @@ export interface Tab {
   translatedLang?: string;
 }
 
-export interface Folder {
+/**
+ * Soft-delete column carried by every synced collection.
+ *
+ * `deletedAt` is the wall-clock time the row was deleted; absent (rows written
+ * before tombstones existed) or null means the row is live. A tombstoned row
+ * stays in the store and in the sync payload so the deletion can be replayed
+ * on the user's other devices — see `mergeSyncedCollection()` in syncService.
+ */
+export interface Tombstoneable {
+  deletedAt?: number | null;
+}
+
+export interface Folder extends Tombstoneable {
   id: string;
   name: string;
   isExpanded: boolean;
   workspaceId: string;
 }
 
-export interface Workspace {
+export interface Workspace extends Tombstoneable {
   id: string;
   name: string;
   color: string;
@@ -49,7 +61,7 @@ export interface Extension {
   homepageUrl?: string;
 }
 
-export interface Bookmark {
+export interface Bookmark extends Tombstoneable {
   id: string;
   url: string;
   title: string;

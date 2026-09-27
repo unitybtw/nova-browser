@@ -5,6 +5,7 @@ import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { generateId } from '../utils/idGenerator';
 import { isValidProxyUrl, SECURE_PROXY_ERROR } from '../utils/proxyValidation';
 import { useTranslation } from '../services/i18n';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 export interface VpnLocation {
   id: string;
@@ -53,6 +54,7 @@ export const VpnPopover: React.FC<VpnPopoverProps> = ({
 }) => {
   const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
+  useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
 
   const [isAdding, setIsAdding] = useState(false);

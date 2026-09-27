@@ -1,5 +1,6 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, Check, Copy } from 'lucide-react';
+import { copyTextToClipboard } from '../utils/clipboard';
 
 interface Props {
   children?: ReactNode;
@@ -9,6 +10,7 @@ interface State {
   hasError: boolean;
   error: Error | null;
   errorInfo: ErrorInfo | null;
+  copyState: 'idle' | 'copied' | 'failed';
 }
 
 export class ErrorBoundary extends Component<Props, State> {
@@ -16,9 +18,11 @@ export class ErrorBoundary extends Component<Props, State> {
     hasError: false,
     error: null,
     errorInfo: null,
+    copyState: 'idle',
   };
 
   private cleanupTimer: NodeJS.Timeout | null = null;
+  private unmounted = false;
 
   public componentDidMount() {
     // If the application loaded successfully, clear the chunk reload retry flag
@@ -32,11 +36,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentWillUnmount() {
+    this.unmounted = true;
     if (this.cleanupTimer) clearTimeout(this.cleanupTimer);
   }
 
   public static getDerivedStateFromError(error: Error): Partial<State> {
-    return { hasError: true, error };
+    return { hasError: true, error, copyState: 'idle' };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -62,7 +67,19 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  // navigator.clipboard.writeText rejects outright in an insecure context, and
+  // the old call ignored the promise: an unhandled rejection plus a button that
+  // looked like it had done something. The helper resolves true only on a real
+  // write, so the button can report what actually happened.
+  private handleCopyError = async () => {
+    if (!this.state.error) return;
+    const copied = await copyTextToClipboard(this.state.error.toString());
+    if (this.unmounted) return;
+    this.setState({ copyState: copied ? 'copied' : 'failed' });
+  };
+
   public render() {
+
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center h-screen w-screen bg-[#090d16] text-white p-6 select-none">
@@ -81,14 +98,17 @@ export class ErrorBoundary extends Component<Props, State> {
             )}
             <div className="flex gap-2 pt-1">
               <button
-                onClick={() => {
-                  if (this.state.error) {
-                    navigator.clipboard.writeText(this.state.error.toString());
-                  }
-                }}
-                className="py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex-1"
+                onClick={this.handleCopyError}
+                className="py-2.5 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex-1 flex items-center justify-center gap-1.5"
               >
-                Copy Error
+                {this.state.copyState === 'copied' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                <span>
+                  {this.state.copyState === 'copied'
+                    ? 'Copied!'
+                    : this.state.copyState === 'failed'
+                      ? 'Copy Failed'
+                      : 'Copy Error'}
+                </span>
               </button>
               <button
                 onClick={this.handleReload}
@@ -97,6 +117,11 @@ export class ErrorBoundary extends Component<Props, State> {
                 Reload App
               </button>
             </div>
+            {this.state.copyState === 'failed' && (
+              <p role="alert" className="text-[11px] text-red-400/90">
+                The clipboard is not available here — select the error text above and copy it manually.
+              </p>
+            )}
           </div>
         </div>
       );

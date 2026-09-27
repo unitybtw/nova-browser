@@ -1,5 +1,4 @@
-import { useCallback } from 'react';
-import type { Dispatch, SetStateAction, MutableRefObject } from 'react';
+import { useCallback, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import type { Tab } from '../types/browser';
 import { generateId } from '../utils/idGenerator';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
@@ -39,6 +38,22 @@ export function useTabOperations({
   recordVisit,
   setIsExtensionsOpen,
 }: UseTabOperationsOptions) {
+  // THE single activation primitive. Any path that puts a tab in front (select,
+  // close/promote-neighbour, close-other-tabs, close-to-right, duplicate, new
+  // tab, navigate, reopen) must route through this, because BrowserView renders
+  // the "Tab Suspended" placeholder instead of the webview while `isSuspended`
+  // is set — a tab that is active but still flagged suspended shows a dead card
+  // and needs a manual Reload. Waking here also stamps `lastAccessed`, which the
+  // LRU hibernation motor uses.
+  //
+  // Call order matters: when the same batch also replaces `tabs` with a value
+  // computed from a snapshot (`setTabs(toKeep)`), call activateTab AFTER it so
+  // the wake lands on the surviving list.
+  const activateTab = useCallback((id: string) => {
+    setActiveTabId(id);
+    setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
+  }, [setActiveTabId, setTabs]);
+
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
     // Performance: skip the setTabs cascade when re-selecting the active tab
@@ -47,9 +62,8 @@ export function useTabOperations({
       return;
     }
     if (!tabsRef.current.some(t => t.id === id)) return;
-    setActiveTabId(id);
-    setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
-  }, [activeTabIdRef, tabsRef, setActiveTabId, setTabs]);
+    activateTab(id);
+  }, [activeTabIdRef, tabsRef, activateTab]);
 
   // Manual tab suspension
   const handleSuspendTab = useCallback((id: string) => {
@@ -118,12 +132,13 @@ export function useTabOperations({
             folderId: undefined,
             zoomFactor: undefined,
             isMuted: false,
+            isSuspended: false,
             lastAccessed: Date.now()
           };
         }
         return t.splitWith === id ? { ...t, splitWith: undefined } : t;
       }));
-      setActiveTabId(id);
+      activateTab(id);
       return;
     }
 
@@ -152,6 +167,7 @@ export function useTabOperations({
         folderId: undefined,
         zoomFactor: undefined,
         isMuted: false,
+        isSuspended: false,
         lastAccessed: Date.now()
       })));
       return;
@@ -166,10 +182,16 @@ export function useTabOperations({
       pushClosedTab(targetTab);
     }
 
+    // Resolve the promoted tab id here, but activate it AFTER `setTabs(newTabs)`
+    // below: activateTab's wake is a functional update, and the direct
+    // `setTabs(newTabs)` value queued after it would overwrite the wake — which
+    // is exactly how a suspended neighbour ended up in front showing the
+    // "Tab Suspended" card after the active tab was closed.
+    let promotedTabId: string | null = null;
     if (activeTabIdRef.current === id && newTabs.length > 0) {
       const partnerTab = targetTab?.splitWith ? newTabs.find(t => t.id === targetTab.splitWith) : null;
       if (partnerTab) {
-        setActiveTabId(partnerTab.id);
+        promotedTabId = partnerTab.id;
       } else {
         const targetWs = targetTab?.workspaceId || activeWs;
         const remainingWsTabs = newTabs.filter(t => (t.workspaceId || 'default') === targetWs);
@@ -178,10 +200,10 @@ export function useTabOperations({
           const wsTargetIdx = workspaceTabs.findIndex(t => t.id === id);
           const nextWsIdx = Math.min(Math.max(0, wsTargetIdx), remainingWsTabs.length - 1);
           const nextCandidate = (targetTab?.isIncognito && normalTab) ? normalTab : remainingWsTabs[nextWsIdx];
-          setActiveTabId(nextCandidate.id);
+          promotedTabId = nextCandidate.id;
         } else {
           const nextActiveIdx = Math.min(Math.max(0, targetIdx), newTabs.length - 1);
-          setActiveTabId(newTabs[nextActiveIdx].id);
+          promotedTabId = newTabs[nextActiveIdx].id;
         }
       }
     }
@@ -199,7 +221,8 @@ export function useTabOperations({
     }
 
     setTabs(newTabs);
-  }, [activeWorkspaceId, pushClosedTab, tabsRef, activeWorkspaceIdRef, setTabs, setActiveTabId, activeTabIdRef]);
+    if (promotedTabId) activateTab(promotedTabId);
+  }, [activeWorkspaceId, pushClosedTab, tabsRef, activeWorkspaceIdRef, setTabs, activateTab, activeTabIdRef]);
 
   // Tab Reordering (Drag and Drop)
   const handleReorderTabs = useCallback((draggedId: string, targetId: string) => {
@@ -239,8 +262,8 @@ export function useTabOperations({
     const newTabs = [...prev];
     newTabs.splice(idx + 1, 0, newTab);
     setTabs(newTabs);
-    setActiveTabId(newTab.id);
-  }, [tabsRef, setTabs, setActiveTabId]);
+    activateTab(newTab.id);
+  }, [tabsRef, setTabs, activateTab]);
 
   const handleTogglePinTab = useCallback((tabId: string) => {
     setTabs(prev => {
@@ -275,9 +298,11 @@ export function useTabOperations({
     toClose.forEach(t => tabThumbnailCache.remove(t.id));
     pushClosedTabs(toClose);
     const toKeep = prev.filter(t => !toClose.some(c => c.id === t.id));
-    setActiveTabId(tabId);
+    // activateTab must come after the snapshot-derived setTabs(toKeep): its wake
+    // is a functional update and would be overwritten by that direct value.
     setTabs(toKeep);
-  }, [pushClosedTabs, tabsRef, setActiveTabId, setTabs]);
+    activateTab(tabId);
+  }, [pushClosedTabs, tabsRef, setTabs, activateTab]);
 
   const handleCloseTabsToRight = useCallback((target: number | string) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
@@ -310,11 +335,13 @@ export function useTabOperations({
     closeIds.forEach(id => tabThumbnailCache.remove(id));
     pushClosedTabs(tabsToClose);
     const nextTabs = prev.filter(t => !closeIds.has(t.id));
-    if (!nextTabs.some(t => t.id === activeTabIdRef.current)) {
-      setActiveTabId(targetTab.id);
-    }
     setTabs(nextTabs);
-  }, [pushClosedTabs, tabsRef, activeWorkspaceIdRef, activeTabIdRef, setActiveTabId, setTabs]);
+    // Same ordering rule as handleCloseOtherTabs: activate after the
+    // snapshot-derived setTabs so the wake is not discarded.
+    if (!nextTabs.some(t => t.id === activeTabIdRef.current)) {
+      activateTab(targetTab.id);
+    }
+  }, [pushClosedTabs, tabsRef, activeWorkspaceIdRef, activeTabIdRef, setTabs, activateTab]);
 
   const handleNewTabRight = useCallback((target: number | string) => {
     const prev = tabsRef.current;
@@ -355,8 +382,8 @@ export function useTabOperations({
       newTabs.push(newTab);
       return newTabs;
     });
-    setActiveTabId(newId);
-  }, [tabsRef, activeWorkspaceIdRef, setTabs, setActiveTabId]);
+    activateTab(newId);
+  }, [tabsRef, activeWorkspaceIdRef, setTabs, activateTab]);
 
   const handlePrintPage = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
@@ -388,18 +415,18 @@ export function useTabOperations({
 
   const handleNewTab = useCallback((url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; isIncognito?: boolean }) => {
     let finalUrl = typeof url === 'string' ? url : 'nova://newtab';
-    
+
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
     if (!isSafeNavigationUrl(finalUrl)) {
       finalUrl = 'nova://newtab';
     }
-    
+
     // Extensions page handling: open extensions modal directly
     if (finalUrl === 'nova://extensions' || finalUrl === 'chrome://extensions') {
       setIsExtensionsOpen(true);
       return;
     }
-    
+
     let initialTitle = 'New Tab';
     if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
     else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
@@ -410,7 +437,7 @@ export function useTabOperations({
     // navigate current tab instead of spawning a redundant new tab
     const targetSourceId = sourceTabId || activeTabIdRef.current;
     const currentTarget = tabsRef.current.find(t => t.id === targetSourceId);
-    const isCurrentBlank = currentTarget && 
+    const isCurrentBlank = currentTarget &&
       (currentTarget.url === 'nova://newtab' || currentTarget.url === 'about:blank' || !currentTarget.url) &&
       !currentTarget.isLoading &&
       !currentTarget.canGoBack;
@@ -423,10 +450,10 @@ export function useTabOperations({
         title: initialTitle,
         isLoading: !isInternalPage
       } : tab));
-      setActiveTabId(currentTarget.id);
+      activateTab(currentTarget.id);
       return;
     }
-    
+
     // Determine incognito status:
     // - If explicitly requested via opts.isIncognito, respect that.
     // - If opened from an internal link/window.open inside a tab (sourceTabId provided), inherit the source tab's incognito status.
@@ -448,8 +475,8 @@ export function useTabOperations({
       lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-  }, [activeWorkspaceId, setIsExtensionsOpen, activeTabIdRef, tabsRef, setTabs, setActiveTabId]);
+    activateTab(newTab.id);
+  }, [activeWorkspaceId, setIsExtensionsOpen, activeTabIdRef, tabsRef, setTabs, activateTab]);
 
   const handleExitIncognitoTab = useCallback(() => {
     const currentTab = tabsRef.current.find(t => t.id === activeTabIdRef.current);
@@ -504,12 +531,12 @@ export function useTabOperations({
       lastAccessed: Date.now()
     };
     setTabs(prev => [...prev, newTab]);
-    setActiveTabId(newTab.id);
-  }, [activeWorkspaceId, setTabs, setActiveTabId]);
+    activateTab(newTab.id);
+  }, [activeWorkspaceId, setTabs, activateTab]);
 
   const handleNavigate = useCallback((url: string, explicitTabId?: string) => {
     if (!url || typeof url !== 'string') return;
-    
+
     // Security: Block malicious protocols (shared blocklist — see safeNavigation.ts)
     if (!isSafeNavigationUrl(url)) {
       console.warn('Blocked malicious navigation protocol:', url);
@@ -534,7 +561,7 @@ export function useTabOperations({
         canGoForward: false,
         workspaceId: activeWorkspaceIdRef.current
       }]);
-      setActiveTabId(newTabId);
+      activateTab(newTabId);
       return;
     }
 
@@ -544,7 +571,7 @@ export function useTabOperations({
     }
 
     const currentActiveId = activeTabIdRef.current;
-    const targetTab = explicitTabId 
+    const targetTab = explicitTabId
       ? (prev.find(t => t.id === explicitTabId) || prev.find(t => t.id === currentActiveId) || prev[0])
       : (prev.find(t => t.id === currentActiveId) || prev[0]);
     const targetId = targetTab ? targetTab.id : (prev.find(t => t.id === currentActiveId)?.id || prev[0].id);
@@ -562,7 +589,9 @@ export function useTabOperations({
     const isInternalPage = !!newTitle;
 
     if (targetId !== currentActiveId) {
-      setActiveTabId(targetId);
+      // Safe to run before the navigation setTabs below: both are functional
+      // updates, so the wake survives (the later updater spreads `...t`).
+      activateTab(targetId);
     }
 
     if (targetTab && targetTab.url === url) {
@@ -581,7 +610,7 @@ export function useTabOperations({
       isLoading: !isInternalPage,
       ...(newTitle ? { title: newTitle } : {})
     } : t));
-  }, [setIsExtensionsOpen, tabsRef, activeWorkspaceIdRef, setActiveTabId, activeTabIdRef, setTabs]);
+  }, [setIsExtensionsOpen, tabsRef, activeWorkspaceIdRef, activateTab, activeTabIdRef, setTabs]);
 
   const handleUpdateTab = useCallback((id: string, updates: Partial<Tab>) => {
     const current = tabsRef.current.find(t => t.id === id);
@@ -644,6 +673,7 @@ export function useTabOperations({
   }, []);
 
   return {
+    activateTab,
     handleSelectTab,
     handleSuspendTab,
     handlePurgeMemory,

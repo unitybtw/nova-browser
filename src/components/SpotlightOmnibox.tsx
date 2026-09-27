@@ -5,7 +5,8 @@ import { Tab, UserSettings } from '../types/browser';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
-import { getLocale, getLanguage } from '../services/i18n';
+import { getLocale, getLanguage, useTranslation } from '../services/i18n';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface SpotlightOmniboxProps {
   isOpen: boolean;
@@ -36,8 +37,12 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   const [isAIMode, setIsAIMode] = useState(false);
   const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
   const inputRef = useRef<HTMLInputElement>(null);
+  // Reactive: the placeholder is localised, so it repaints on language change.
+  const { t } = useTranslation();
 
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
   const suggestionRequestIdRef = useRef<number>(0);
@@ -106,7 +111,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   }, [inputValue, isAIMode, searchEngine, clientLanguage]);
 
   // Compute matching items for list navigation
-  type ActionItem = 
+  type ActionItem =
     | { type: 'tab'; tab: Tab }
     | { type: 'suggestion'; text: string };
 
@@ -119,7 +124,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
 
     if (query) {
       // Matching tabs
-      const matched = tabs.filter(t => 
+      const matched = tabs.filter(t =>
         (t.title && t.title.toLowerCase().includes(query)) ||
         (t.url && t.url.toLowerCase().includes(query))
       );
@@ -188,27 +193,27 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
   return (
     <AnimatePresence>
       {isOpen && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.15 }}
           className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
         >
-          <div 
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" 
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
             onClick={onClose}
           />
-          
-          <motion.div 
+
+          <motion.div
             ref={containerRef}
             initial={{ opacity: 0, scale: 0.96, y: -10 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -10 }}
             transition={{ type: 'spring', stiffness: 500, damping: 32 }}
             className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden outline-none transition-colors duration-300 ${
-              isAIMode 
-                ? 'bg-purple-950/95 border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.25)]' 
+              isAIMode
+                ? 'bg-purple-950/95 border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.25)]'
                 : 'bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-white/10'
             }`}
             tabIndex={-1}
@@ -240,10 +245,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                     setSelectedIndex(prev => (prev > 0 ? prev - 1 : items.length - 1));
                   }
                 }}
-                placeholder={isAIMode ? "AI: What would you like me to do? (e.g. Find product comparisons on Amazon)" : `Search ${getSearchEngineName(searchEngine)}, enter URL, or switch tabs...`}
+                placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
                 className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-all duration-300 ${
-                  isAIMode 
-                    ? 'text-purple-100 placeholder-purple-400/80' 
+                  isAIMode
+                    ? 'text-purple-100 placeholder-purple-400/80'
                     : 'text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500'
                 }`}
                 autoFocus
@@ -297,10 +302,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                         >
                           <div className="flex items-center gap-3 overflow-hidden min-w-0">
                             {item.tab.favicon && !failedFavicons.has(item.tab.id) ? (
-                              <img 
-                                src={item.tab.favicon} 
-                                className="w-4 h-4 rounded-xs object-contain shrink-0" 
-                                alt="" 
+                              <img
+                                src={item.tab.favicon}
+                                className="w-4 h-4 rounded-xs object-contain shrink-0"
+                                alt=""
                                 onError={() => setFailedFavicons(prev => new Set(prev).add(item.tab.id))}
                               />
                             ) : (
@@ -319,10 +324,10 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                                   e.stopPropagation();
                                   onCloseTab(item.tab.id);
                                 }}
-                                className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
                                 title="Close Tab"
                               >
-                                <X className="w-3.5 h-3.5" />
+                                <X className="w-4 h-4" />
                               </button>
                             )}
                           </div>

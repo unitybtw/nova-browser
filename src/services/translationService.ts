@@ -27,15 +27,6 @@ export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी' },
 ];
 
-export interface PageTranslationState {
-  isTranslated: boolean;
-  sourceLang: string;
-  targetLang: string;
-  isLoading: boolean;
-  error?: string | null;
-  detectedLangName?: string;
-}
-
 /**
  * Returns JavaScript code to extract all visible text nodes from the webview DOM.
  * Tags the text nodes with IDs and preserves original values.
@@ -49,7 +40,7 @@ export function getExtractTextNodesScript(): string {
         }
 
         const ignoredTags = new Set([
-          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE', 
+          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE',
           'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'CANVAS', 'AUDIO', 'VIDEO'
         ]);
 
@@ -64,7 +55,7 @@ export function getExtractTextNodesScript(): string {
             acceptNode: (node) => {
               const parent = node.parentElement;
               if (!parent || ignoredTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
-              
+
               // Skip hidden elements
               const style = window.getComputedStyle(parent);
               if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
@@ -131,7 +122,7 @@ export function getApplyTranslationScript(translatedTexts: string[], targetLang:
         }
 
         const ignoredTags = new Set([
-          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE', 
+          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE',
           'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'CANVAS', 'AUDIO', 'VIDEO'
         ]);
 
@@ -142,7 +133,7 @@ export function getApplyTranslationScript(translatedTexts: string[], targetLang:
             acceptNode: (node) => {
               const parent = node.parentElement;
               if (!parent || ignoredTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
-              
+
               const style = window.getComputedStyle(parent);
               if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
                 return NodeFilter.FILTER_REJECT;
@@ -190,7 +181,7 @@ export function getRestoreOriginalScript(): string {
         }
 
         const ignoredTags = new Set([
-          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE', 
+          'SCRIPT', 'STYLE', 'NOSCRIPT', 'IFRAME', 'SVG', 'CODE', 'PRE',
           'TEXTAREA', 'INPUT', 'SELECT', 'OPTION', 'CANVAS', 'AUDIO', 'VIDEO'
         ]);
 
@@ -201,7 +192,7 @@ export function getRestoreOriginalScript(): string {
             acceptNode: (node) => {
               const parent = node.parentElement;
               if (!parent || ignoredTags.has(parent.tagName)) return NodeFilter.FILTER_REJECT;
-              
+
               const style = window.getComputedStyle(parent);
               if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
                 return NodeFilter.FILTER_REJECT;

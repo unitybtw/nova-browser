@@ -76,14 +76,26 @@ export function encryptDataWithFallback(plainText: string, userDataPath: string,
   let secret: Buffer;
   if (fs.existsSync(secretPath)) {
     secret = fs.readFileSync(secretPath);
+    // A torn or empty secret is still valid scrypt input, so the only symptom
+    // would be a GCM auth failure much later and a value that reads as null.
+    if (secret.length !== 32) {
+      throw new Error(
+        `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
+        'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
+      );
+    }
   } else {
     secret = crypto.randomBytes(32);
+    // Only a chmod failure is tolerable. Swallowing the write leaves the secret
+    // in memory only, so everything encrypted with it is unreadable next launch.
     try {
       fs.writeFileSync(secretPath, secret, { mode: 0o600 });
       if (process.platform !== 'win32') {
-        fs.chmodSync(secretPath, 0o600);
+        try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
       }
-    } catch (_) {}
+    } catch (err: any) {
+      if (err?.code !== 'ENOENT') throw err;
+    }
   }
 
   const machineSalt = getMachineSalt('nova-secure-salt');
@@ -113,6 +125,7 @@ export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeS
       const secretPath = path.join(userDataPath, '.machine_secret');
       if (fs.existsSync(secretPath)) {
         const secret = fs.readFileSync(secretPath);
+        if (secret.length !== 32) return null;
         const machineSalt = getMachineSalt('nova-secure-salt');
         const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
         const iv = raw.subarray(4, 16);

@@ -125,7 +125,7 @@ const DailyWallpaperSection = () => {
                     loading="lazy"
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-1.5">
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex flex-col justify-end p-1.5">
                     <p className="text-[10px] text-white font-medium truncate">{p.title}</p>
                     <p className="text-[9px] text-white/70 truncate">{p.author}</p>
                   </div>

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { UserSettings } from '../types/browser';
-import { defaultSettings } from '../types/browser';
+import { defaultSettings, type UserSettings } from '../types/browser';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
 
 export interface UseSettingsOptions {

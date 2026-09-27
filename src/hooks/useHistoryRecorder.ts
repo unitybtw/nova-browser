@@ -25,12 +25,18 @@ function cleanUrlForHistory(url: string): { cleanUrl: string; canonicalKey: stri
       parsed.pathname = pathname.slice(0, -1);
     }
     const cleanUrl = parsed.href;
-    // Canonical key ignores in-page hash and casing for deduplication so anchor jumps do not spam history
+    // Canonical key ignores the in-page hash and the host casing for deduplication
+    // so anchor jumps do not spam history. Only scheme + host are
+    // case-insensitive; the path and query are not, so lower-casing them would
+    // collapse distinct pages (/Users vs /users) into a single entry. Built from
+    // protocol + host rather than `origin` because origin is "null" for
+    // non-special schemes, which would merge every chrome-extension:// page.
     parsed.hash = '';
-    return { cleanUrl, canonicalKey: parsed.href.toLowerCase() };
+    const hostKey = `${parsed.protocol}//${parsed.host.toLowerCase()}`;
+    return { cleanUrl, canonicalKey: `${hostKey}${parsed.pathname}${parsed.search}` };
   } catch {
     const clean = url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
-    return { cleanUrl: clean, canonicalKey: clean.split('#')[0].toLowerCase() };
+    return { cleanUrl: clean, canonicalKey: clean.split('#')[0] };
   }
 }
 

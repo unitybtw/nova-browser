@@ -91,10 +91,11 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Application Language</p>
+              <p id="setting-app-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Application Language</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Select interface language. Arabic automatically switches UI to RTL layout.</p>
             </div>
             <select
+              aria-labelledby="setting-app-language"
               value={settings.language || 'en'}
               onChange={(e) => onUpdateSettings({ language: e.target.value as any })}
               className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -165,10 +166,11 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
         <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Default Target Language</p>
+              <p id="setting-target-language" className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Default Target Language</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Foreign web pages will be translated to this language in 1-click.</p>
             </div>
             <select
+              aria-labelledby="setting-target-language"
               value={settings.defaultTranslationLanguage || 'en'}
               onChange={(e) => onUpdateSettings({ defaultTranslationLanguage: e.target.value })}
               className="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-700/80 border border-slate-200 dark:border-slate-600 text-xs font-semibold text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cyan-500"

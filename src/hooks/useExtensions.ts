@@ -1,17 +1,24 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { Extension } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert, showConfirm } from '../utils/confirmDialog';
 
 export function useExtensions() {
   const [extensions, setExtensions] = useState<Extension[]>([]);
+  // Monotonic request token: a slow listExtensions() response must not
+  // overwrite a list fetched after it (bursts of onExtensionChanged events).
+  const listRequestIdRef = useRef(0);
 
   // Load extensions on mount
   useEffect(() => {
     const fetchExtensions = async () => {
+      const requestId = ++listRequestIdRef.current;
       try {
         if (window.electronAPI?.listExtensions) {
           const loaded = await window.electronAPI.listExtensions();
+          // Same staleness guard as the topbar suggestion fetch: a superseded
+          // response is dropped rather than clobbering the newer list.
+          if (listRequestIdRef.current !== requestId) return;
           setExtensions(loaded || []);
         }
       } catch (err) {

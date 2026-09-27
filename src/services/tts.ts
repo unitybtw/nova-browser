@@ -2,30 +2,52 @@ import { logger } from '../utils/logger';
 
 /**
  * Language detection helper based on script characters and common stop-words.
+ *
+ * Every language is scored and the winner is the highest score. The previous
+ * version returned on the first language that cleared an absolute threshold in
+ * a fixed order, so shared tokens decided everything: "de" is both a French and
+ * a Spanish function word, and "in"/"is"/"a" style English text could reach the
+ * German threshold, which made Spanish read aloud with Turkish phonetics.
  */
 export function detectLanguage(text: string): string {
   if (!text) return 'tr-TR';
   const sample = text.substring(0, 1200).toLowerCase();
 
-  // Turkish specific characters & stop words
-  const turkishMatches = (sample.match(/[çğışöü]/gi) || []).length;
-  const turkishWords = /\b(ve|bir|bu|da|de|için|ile|gibi|olan|olarak|çok|en|daha|ne|zaman|gün|yeni|iyi|son|ancak|kadar|sonra|üzerine|göre|önce|ben|sen|o|biz|siz|onlar)\b/gi;
-  const trWordCount = (sample.match(turkishWords) || []).length;
-  if (turkishMatches >= 2 || trWordCount >= 3) return 'tr-TR';
+  // Turkish-specific characters are near-decisive on their own: no other
+  // supported language uses ç/ğ/ı/ş/ö/ü in its alphabet.
+  const turkishChars = (sample.match(/[çğışöü]/g) || []).length;
+  if (turkishChars >= 2) return 'tr-TR';
 
-  // German stop words
-  const deWordCount = (sample.match(/\b(und|der|die|das|in|von|zu|mit|sich|des|auf|für|ist|nicht|ein|eine|als|auch)\b/gi) || []).length;
-  if (deWordCount >= 4) return 'de-DE';
+  const count = (re: RegExp) => (sample.match(re) || []).length;
 
-  // French stop words
-  const frWordCount = (sample.match(/\b(le|la|les|et|de|des|du|en|un|une|que|est|dans|pour|qui|sur|pas|par)\b/gi) || []).length;
-  if (frWordCount >= 4) return 'fr-FR';
+  const scores: Array<{ locale: string; score: number }> = [
+    {
+      locale: 'tr-TR',
+      score: count(/\b(ve|bir|bu|için|ile|gibi|olan|olarak|çok|daha|zaman|gün|yeni|iyi|sonra|ancak|kadar|üzerine|göre|önce|ben|sen|biz|siz|onlar|her|biraz)\b/g),
+    },
+    {
+      locale: 'de-DE',
+      score: count(/\b(und|der|die|das|von|zu|mit|sich|des|auf|für|ist|nicht|ein|eine|als|auch|dass|wird|werden|einen|durch)\b/g),
+    },
+    {
+      locale: 'fr-FR',
+      score: count(/\b(le|la|les|et|des|du|une|est|dans|pour|qui|sur|pas|par|avec|sur|plus|nous|vous|être)\b/g),
+    },
+    {
+      locale: 'es-ES',
+      score: count(/\b(el|los|las|que|una|por|con|para|como|más|pero|sus|este|esta|del|son|muy|también|está)\b/g),
+    },
+    {
+      locale: 'en-US',
+      score: count(/\b(the|of|to|is|that|for|with|this|are|was|were|have|has|not|but|from|they|you|which|about)\b/g),
+    },
+  ];
 
-  // Spanish stop words
-  const esWordCount = (sample.match(/\b(el|la|los|las|y|en|de|que|un|una|por|con|para|no|es|se|su|al|como)\b/gi) || []).length;
-  if (esWordCount >= 4) return 'es-ES';
-
-  return 'en-US';
+  let best = scores[0];
+  for (const entry of scores) {
+    if (entry.score > best.score) best = entry;
+  }
+  return best.score > 0 ? best.locale : 'en-US';
 }
 
 /**
@@ -33,7 +55,7 @@ export function detectLanguage(text: string): string {
  */
 export function splitIntoSentences(text: string): string[] {
   if (!text) return [];
-  
+
   if (typeof Intl !== 'undefined' && (Intl as any).Segmenter) {
     try {
       const segmenter = new (Intl as any).Segmenter(undefined, { granularity: 'sentence' });
@@ -90,8 +112,8 @@ export function getBestVoice(voices: SpeechSynthesisVoice[], langCode: string): 
   const pool = langVoices.length > 0 ? langVoices : voices;
 
   const roboticNames = [
-    'alex', 'fred', 'zarvox', 'trinoids', 'bells', 'boing', 'cellos', 
-    'deranged', 'good news', 'hysterical', 'pipe organ', 'whisper', 
+    'alex', 'fred', 'zarvox', 'trinoids', 'bells', 'boing', 'cellos',
+    'deranged', 'good news', 'hysterical', 'pipe organ', 'whisper',
     'bad news', 'albert', 'junior', 'ralph', 'bahh', 'bubbles', 'organ'
   ];
 
@@ -99,7 +121,7 @@ export function getBestVoice(voices: SpeechSynthesisVoice[], langCode: string): 
     let score = 0;
     const name = v.name.toLowerCase();
     const vLang = v.lang.toLowerCase();
-    
+
     if (roboticNames.some(r => name.includes(r))) return -100;
 
     if (vLang === langCode.toLowerCase()) score += 25;
@@ -154,7 +176,7 @@ class TTSService {
 
   public async speak(text: string, lang?: string, voiceName?: string, rate: number = 1.0): Promise<void> {
     if (!text || typeof text !== 'string') return;
-    
+
     // Stop any existing speech and increment session
     this.stop();
     const sessionId = ++this.currentSessionId;
@@ -238,12 +260,12 @@ class TTSService {
             resolve();
           }
         };
-        utt.onerror = () => { 
+        utt.onerror = () => {
           if (sessionId === this.currentSessionId) {
-            this._isSpeaking = false; 
+            this._isSpeaking = false;
             this.notify();
           }
-          resolve(); 
+          resolve();
         };
 
         this.utterance = utt;

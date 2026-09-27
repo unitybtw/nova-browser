@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';

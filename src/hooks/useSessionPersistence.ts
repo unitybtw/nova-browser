@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Bookmark, Folder, Tab, UserSettings, Workspace } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { logger } from '../utils/logger';
+import { recordPersistedSettings } from '../services/syncService';
 
 /**
  * Tab fields that represent durable state and must therefore trigger a
@@ -121,6 +122,10 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
         const serialized = JSON.stringify(settings);
         localStorage.setItem('user_settings', serialized);
         getElectronAPI()?.storeSet?.('user_settings', serialized);
+        // Per-field LWW needs the time of the WRITE, and this write site is the
+        // only place that knows it. Without the stamp a local edit is always
+        // older than the remote value and the field is frozen forever.
+        recordPersistedSettings(settings);
       } catch (err) {
         logger.warn('App:Settings', 'Failed to persist user_settings to storage', err);
       }
@@ -155,6 +160,7 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
         const serializedSettings = JSON.stringify(settingsRef.current);
         localStorage.setItem('user_settings', serializedSettings);
         getElectronAPI()?.storeSet?.('user_settings', serializedSettings);
+        recordPersistedSettings(settingsRef.current);
 
         const serializedBookmarks = JSON.stringify(bookmarksRef.current);
         localStorage.setItem('bookmarks', serializedBookmarks);
@@ -200,19 +206,35 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   // 300ms, which used to cause a continuous `JSON.stringify` + localStorage +
   // storeSet (disk) write storm on ad-heavy pages. We fingerprint only the
   // durable fields (PERSISTED_TAB_FIELDS) and skip the debounce entirely when
-  // nothing structural changed. The signature is recorded as soon as the write
-  // is *scheduled* so bursts inside the 500ms window also collapse into one
-  // write. Transient counters are still flushed by the beforeunload /
-  // visibilitychange handler above, which reads live refs.
+  // nothing structural changed.
+  //
+  // The signature must be recorded when the write actually *happens*, not when
+  // it is scheduled: the previous run is cancelled by the next one, and a
+  // transient-only update in between would otherwise match the recorded
+  // signature, return early, and drop the pending write forever (the session
+  // then silently stops persisting until a *durable* change occurs).
   const lastPersistedTabsSignature = useRef<string | null>(null);
+  const scheduledTabsSignature = useRef<string | null>(null);
+  const pendingTabsWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (isDemo || !isHydrated) return;
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
     const signature = buildTabSignature(sessionTabs);
-    if (lastPersistedTabsSignature.current === signature) return;
-    lastPersistedTabsSignature.current = signature;
-    const timer = setTimeout(() => {
+
+    // Already written, or already covered by a pending write. This is the hot
+    // path for the 300ms ad-block churn and must stay allocation-free.
+    if (signature === scheduledTabsSignature.current) return;
+    scheduledTabsSignature.current = null;
+    if (signature === lastPersistedTabsSignature.current) return;
+
+    // Durable state changed: drop the superseded write and debounce a new one.
+    if (pendingTabsWrite.current) clearTimeout(pendingTabsWrite.current);
+    scheduledTabsSignature.current = signature;
+    pendingTabsWrite.current = setTimeout(() => {
+      pendingTabsWrite.current = null;
+      scheduledTabsSignature.current = null;
+      lastPersistedTabsSignature.current = signature;
       try {
         const serialized = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serialized);
@@ -221,8 +243,6 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
         logger.warn('App:Session', 'Failed to persist session_tabs to storage', err);
       }
     }, 500);
-
-    return () => clearTimeout(timer);
   }, [tabs, isDemo, isHydrated]);
 
   useEffect(() => {

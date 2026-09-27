@@ -4,10 +4,10 @@ import { Moon, Zap, Key } from 'lucide-react';
 import { Tab, HistoryItem, UserSettings } from '../types/browser';
 import type { DownloadItemPage } from './DownloadsPage';
 import { tabThumbnailCache } from '../services/thumbnailCache';
-import { 
-  getExtractTextNodesScript, 
-  getApplyTranslationScript, 
-  getRestoreOriginalScript 
+import {
+  getExtractTextNodesScript,
+  getApplyTranslationScript,
+  getRestoreOriginalScript
 } from '../services/translationService';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
@@ -46,7 +46,7 @@ function addPreconnectHint(origin: string) {
   preconnectLinkElements.push(hint);
 }
 
-interface BrowserViewProps {
+export interface BrowserViewProps {
   tab?: Tab | null;
   isActive: boolean;
   onUpdateTab: (id: string, updates: Partial<Tab>) => void;
@@ -73,6 +73,173 @@ interface BrowserViewProps {
   onPurgeMemory?: () => Promise<void> | void;
   onPerformSync?: (mergedData: any) => Promise<void> | void;
   isDemo?: boolean;
+}
+
+/** Mirrors the `isSettingsTab` / `isHistoryTab` / `isDownloadsTab` predicates in
+ *  the component body. The memo comparator has to gate on exactly the URL that
+ *  decides which child receives a prop, otherwise it either re-renders every
+ *  tab or lets a tab keep a stale callback. */
+const isSettingsUrl = (url?: string): boolean =>
+  Boolean(url?.startsWith('nova://settings') || url?.startsWith('about:settings'));
+const isHistoryUrl = (url?: string): boolean =>
+  url === 'nova://history' || url === 'about:history';
+const isDownloadsUrl = (url?: string): boolean =>
+  url === 'nova://downloads' || url === 'about:downloads';
+
+/** Webview and always-rendered callbacks. Referentially stable in `App.tsx`
+ *  (`useCallback` over refs and setters only), so comparing them is free and
+ *  closes the same staleness the data-derived callbacks used to suffer from:
+ *  a changed `onUpdateTab` left the tab with listeners bound to the old one. */
+const ALWAYS_COMPARED_CALLBACKS = [
+  'onUpdateTab',
+  'onNewTab',
+  'onNavigate',
+  'onActivate',
+  'onFoundInPage',
+] as const;
+
+/** Callbacks that only `SettingsPage` renders. `onExportData` closes over
+ *  `bookmarkRows`/`history`/`settings` and `onPerformSync` over `bookmarkRows`/
+ *  `folderRows`/`history`/`settings`/`workspaceRows`, so they change identity on
+ *  any data edit and MUST be compared — see {@link browserViewPropsEqual}. */
+const SETTINGS_PAGE_CALLBACKS = [
+  'onUpdateSettings',
+  'onExportData',
+  'onImportData',
+  'onPurgeMemory',
+  'onPerformSync',
+] as const;
+
+/**
+ * The whole `React.memo` contract for `BrowserView`: true when nothing the tab
+ * renders has changed.
+ *
+ * The bug this replaces compared only `isActive` plus a few scalars and never
+ * looked at the callback props at all. Because `onExportData` and
+ * `onPerformSync` close over the app's data rows, a bookmark deleted in another
+ * tab gave them a new identity, App re-rendered, the comparator bailed — and the
+ * Settings tab kept the closures captured before the deletion. Pressing
+ * "Sync Now" then pushed those pre-deletion rows straight back through
+ * `setBookmarks(mergedData.bookmarks)`, resurrecting the bookmark the user had
+ * just deleted and republishing it to every other device; Export produced a
+ * backup missing everything that changed since the tab last rendered.
+ *
+ * Callback props are split in two rather than compared flat:
+ *
+ * - {@link ALWAYS_COMPARED_CALLBACKS} are compared everywhere. They are
+ *   referentially stable, so this costs no extra renders and no extra
+ *   webview-listener churn.
+ * - {@link SETTINGS_PAGE_CALLBACKS} and the history/downloads handlers are
+ *   compared only on the page that actually receives them. `onPurgeMemory`
+ *   closes over `activeTabId`, so comparing it on a web tab would re-render
+ *   every tab on every tab switch — the exact cost the memo exists to avoid.
+ */
+export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewProps): boolean {
+  if (prev.isActive !== next.isActive) return false;
+  if (prev.isIncognito !== next.isIncognito) return false;
+  if (prev.privacyShield !== next.privacyShield) return false;
+  if (prev.searchEngine !== next.searchEngine) return false;
+  if (prev.newTabBackground !== next.newTabBackground) return false;
+  if (prev.disableTasksWidget !== next.disableTasksWidget) return false;
+  if (prev.isDemo !== next.isDemo) return false;
+  if (prev.onExitIncognito !== next.onExitIncognito) return false;
+
+  // Tab properties comparison
+  if (prev.tab?.id !== next.tab?.id) return false;
+  if (prev.tab?.url !== next.tab?.url) return false;
+  if (prev.tab?.title !== next.tab?.title) return false;
+  if (prev.tab?.favicon !== next.tab?.favicon) return false;
+  if (prev.tab?.isLoading !== next.tab?.isLoading) return false;
+  if (prev.tab?.canGoBack !== next.tab?.canGoBack) return false;
+  if (prev.tab?.canGoForward !== next.tab?.canGoForward) return false;
+  if (prev.tab?.isMuted !== next.tab?.isMuted) return false;
+  if (prev.tab?.isPinned !== next.tab?.isPinned) return false;
+  if (prev.tab?.isIncognito !== next.tab?.isIncognito) return false;
+  if (prev.tab?.thumbnail !== next.tab?.thumbnail) return false;
+  if (prev.tab?.zoomFactor !== next.tab?.zoomFactor) return false;
+  if (prev.tab?.isPlayingAudio !== next.tab?.isPlayingAudio) return false;
+  if (prev.tab?.blockedAdsCount !== next.tab?.blockedAdsCount) return false;
+  if (prev.tab?.webContentsId !== next.tab?.webContentsId) return false;
+  if (prev.tab?.isSuspended !== next.tab?.isSuspended) return false;
+  if (prev.tab?.isTranslated !== next.tab?.isTranslated) return false;
+  if (prev.tab?.splitWith !== next.tab?.splitWith) return false;
+
+  // Settings comparison. Whitelisted rather than blacklisted: a web tab reads
+  // `fontSize` (zoom) and, through `latestSettingsRef`,
+  // `passwordManagerEnabled`/`aiLinkPreviewEnabled`/`preloadDnsEnabled`. A new
+  // field read by a web tab has to be added here, which is the point — the
+  // omission is invisible otherwise.
+  if (prev.settings?.passwordManagerEnabled !== next.settings?.passwordManagerEnabled) return false;
+  if (prev.settings?.fontSize !== next.settings?.fontSize) return false;
+  if (prev.settings?.doNotTrack !== next.settings?.doNotTrack) return false;
+  if (prev.settings?.searchEngine !== next.settings?.searchEngine) return false;
+  if (prev.settings?.newTabBackground !== next.settings?.newTabBackground) return false;
+  if (prev.settings?.backgroundCustomUrl !== next.settings?.backgroundCustomUrl) return false;
+  if (prev.settings?.aiLinkPreviewEnabled !== next.settings?.aiLinkPreviewEnabled) return false;
+  if (prev.settings?.privacyShield !== next.settings?.privacyShield) return false;
+  if (prev.settings?.theme !== next.settings?.theme) return false;
+  if (prev.settings?.browserColor !== next.settings?.browserColor) return false;
+  if (prev.settings?.customBrowserColor !== next.settings?.customBrowserColor) return false;
+  if (prev.settings?.accentColor !== next.settings?.accentColor) return false;
+  if (prev.settings?.customAccentColor !== next.settings?.customAccentColor) return false;
+  if (prev.settings?.showTasksWidget !== next.settings?.showTasksWidget) return false;
+  if (prev.settings?.energySaverMode !== next.settings?.energySaverMode) return false;
+  if (prev.settings?.preloadDnsEnabled !== next.settings?.preloadDnsEnabled) return false;
+  if (prev.settings?.smoothScrollingEnabled !== next.settings?.smoothScrollingEnabled) return false;
+
+  for (const key of ALWAYS_COMPARED_CALLBACKS) {
+    if (prev[key] !== next[key]) return false;
+  }
+
+  // Internal pages hand their whole state object straight to a child, so any
+  // new object is a change. Internal covers the new tab too, which renders
+  // seven `settings` fields.
+  const isInternalTab = prev.tab?.url?.startsWith('nova://') ||
+                        prev.tab?.url?.startsWith('about:') ||
+                        prev.tab?.url === 'https://newtab';
+  if (isInternalTab && prev.settings !== next.settings) return false;
+
+  // Page-specific props are compared only where they are rendered, so a change
+  // in unrelated app data cannot re-render tabs that do not use it.
+  if (isSettingsUrl(next.tab?.url)) {
+    for (const key of SETTINGS_PAGE_CALLBACKS) {
+      if (prev[key] !== next[key]) return false;
+    }
+  }
+  if (isHistoryUrl(next.tab?.url)) {
+    if (prev.history !== next.history) return false;
+    if (prev.onClearHistory !== next.onClearHistory) return false;
+    if (prev.onRemoveHistoryItem !== next.onRemoveHistoryItem) return false;
+  }
+  if (isDownloadsUrl(next.tab?.url)) {
+    if (prev.downloads !== next.downloads) return false;
+    if (prev.onClearDownloads !== next.onClearDownloads) return false;
+  }
+
+  return true;
+}
+
+/**
+ * Post-await currency check for a credential lookup.
+ *
+ * `secureStoreGet` is a promise. Focus a login field on site A, navigate to site
+ * B before it resolves, and the result belongs to a page that is no longer on
+ * screen: a "Saved Accounts" popup listing site A's usernames floats over site
+ * B. The credential itself is still not leaked — `handleSelectAutofill`
+ * re-checks the host before filling — but the wrong account list is visible.
+ * So the webview must still be the mounted one, still be alive, and still be on
+ * the hostname the query was made for.
+ */
+export function isAutofillLookupCurrent(
+  mountedWebview: unknown,
+  liveWebview: unknown,
+  currentHostname: string,
+  expectedHostname: string
+): boolean {
+  if (!liveWebview || mountedWebview !== liveWebview) return false;
+  const isDestroyed = (liveWebview as { isDestroyed?: () => boolean }).isDestroyed;
+  if (typeof isDestroyed === 'function' && isDestroyed.call(liveWebview)) return false;
+  return Boolean(currentHostname) && currentHostname === expectedHostname;
 }
 
 export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
@@ -118,7 +285,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const isNewTab = React.useMemo(() => (
     !tab?.url || tab.url === 'about:blank' || tab.url === 'nova://newtab' || tab.url === 'https://newtab'
   ), [tab?.url]);
-  
+
   const [passwordPrompt, setPasswordPrompt] = useState<{
     isOpen: boolean;
     hostname: string;
@@ -132,7 +299,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     password: '',
     isUpdate: false
   });
-  
+
   const [aiPreview, setAiPreview] = useState<{ isOpen: boolean; x: number; y: number; url: string }>({
     isOpen: false,
     x: 0,
@@ -190,27 +357,38 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
     setAutofillMenu(null);
   }, []);
-  
+
   const isSettingsTab = React.useMemo(() => (
     Boolean(tab?.url?.startsWith('nova://settings') || tab?.url?.startsWith('about:settings'))
   ), [tab?.url]);
-  
+
   const isHistoryTab = React.useMemo(() => (
     tab?.url === 'nova://history' || tab?.url === 'about:history'
   ), [tab?.url]);
-  
+
   const isDownloadsTab = React.useMemo(() => (
     tab?.url === 'nova://downloads' || tab?.url === 'about:downloads'
   ), [tab?.url]);
 
   const isChangelogTab = React.useMemo(() => (
     Boolean(
-      tab?.url?.startsWith('nova://changelog') || 
-      tab?.url?.startsWith('nova://whats-new') || 
-      tab?.url === 'about:changelog' || 
+      tab?.url?.startsWith('nova://changelog') ||
+      tab?.url?.startsWith('nova://whats-new') ||
+      tab?.url === 'about:changelog' ||
       tab?.url === 'about:whats-new'
     )
   ), [tab?.url]);
+
+  // Whether this tab currently renders a real <webview> element. Internal
+  // pages return a completely different tree, which unmounts the webview; when
+  // the tab navigates back the webview is a *new* DOM element that needs its
+  // event listeners attached again. The webview effects depend on this flag so
+  // a settings/history/downloads/changelog round trip cannot leave the tab with
+  // an inert webview (dead password manager, dead title/crash/find-in-page).
+  const rendersWebview = React.useMemo(
+    () => !(isNewTab || isSettingsTab || isHistoryTab || isDownloadsTab || isChangelogTab),
+    [isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, isChangelogTab]
+  );
 
   const latestTabRef = useRef(tab);
   // Latest-settings ref: the main webview effect intentionally does NOT depend
@@ -283,7 +461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         if (isMain) {
           const targetUrl = e?.url || (typeof webview.getURL === 'function' ? webview.getURL() : '');
           const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
-          const updates: Partial<Tab> = { 
+          const updates: Partial<Tab> = {
             isLoading: true,
             isTranslated: false,
             translatedLang: undefined,
@@ -410,11 +588,32 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         // Security: only allow https:// favicons or safe data:image/ URIs.
         // Reject javascript:, data:text/, vbscript:, file: and other dangerous sources.
         const raw = e.favicons[0] as string;
+        // Loopback dev servers (Vite, local APIs) legitimately serve favicons over
+        // http, so localhost/127.0.0.1 stay allowed. `e.favicons` is fully
+        // page-controlled and the value is rendered as <img src> in the tab strip,
+        // so the host MUST be matched exactly: a prefix test accepted
+        // 'http://localhost.evil.com/x.png' and 'http://localhost@evil.com/x.png',
+        // letting any site fire a plaintext third-party beacon from the trusted
+        // app shell. Parsing also rejects credentials, which is the userinfo trick
+        // ('http://localhost@evil.com' parses to hostname 'evil.com' anyway).
+        const isLoopback = (() => {
+          if (typeof raw !== 'string') return false;
+          try {
+            const parsed = new URL(raw);
+            if (parsed.username || parsed.password) return false;
+            // Same intent as the old 'http://localhost' / 'http://127.0.0.1'
+            // prefix tests (https:// already passes via the branch below), just
+            // with a real host boundary instead of a string prefix.
+            if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+            return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+          } catch (_) {
+            return false;
+          }
+        })();
         const isSafe =
           (typeof raw === 'string') &&
           (raw.startsWith('https://') ||
-            raw.startsWith('http://localhost') ||
-            raw.startsWith('http://127.0.0.1') ||
+            isLoopback ||
             /^data:image\/(png|jpeg|jpg|gif|webp|svg\+xml|x-icon|vnd\.microsoft\.icon);base64,/.test(raw));
         if (isSafe) {
           onUpdateTab(tab.id, { favicon: raw });
@@ -540,6 +739,17 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         if (!hostname || !actualHostname || actualHostname !== hostname) return;
 
         (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
+          // Same post-await race `handlePasswordDetected` guards. `actualHostname`
+          // and `data.rect` were both read before the await and applied
+          // unconditionally, so a navigation during the secure-store read opened
+          // the previous site's saved accounts over the new page.
+          let currentHostname = '';
+          try {
+            const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
+            currentHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+          } catch (_) {}
+          if (!isAutofillLookupCurrent(webviewRef.current, webview, currentHostname, actualHostname)) return;
+
           if (!raw) return;
           try {
             const all = JSON.parse(raw);
@@ -651,7 +861,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       webview.removeEventListener('media-paused', handleMediaPaused);
       webview.removeEventListener('ipc-message', handleIpcMessage);
     };
-  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab]);
+  }, [tab?.id, tab?.isSuspended, onUpdateTab, onNewTab, onNavigate, onActivate, onFoundInPage, isNewTab, rendersWebview]);
 
   useEffect(() => {
     const webview = webviewRef.current;
@@ -721,15 +931,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       isWebviewReady.current = true;
     };
     wv.addEventListener('dom-ready', onReady);
-    
+
     return () => {
       wv.removeEventListener('dom-ready', onReady);
     };
-  }, [tab?.isSuspended]);
+  }, [tab?.isSuspended, rendersWebview]);
 
   useEffect(() => {
-    if (!tab?.url || isNewTab || isSettingsTab || isHistoryTab || isDownloadsTab) return;
-    
+    if (!tab?.url || !rendersWebview) return;
+
     const targetUrl = tab.url;
     const wv = webviewRef.current as any;
     if (!wv) return;
@@ -749,7 +959,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     } catch (e) {}
 
     lastLoadedUrl.current = targetUrl;
-    
+
     if (isWebviewReady.current && typeof wv.loadURL === 'function') {
       wv.loadURL(targetUrl).catch((err: any) => {
         if (err?.code !== 'ERR_ABORTED') console.error('loadURL failed:', err);
@@ -772,7 +982,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         wv.removeEventListener('dom-ready', pendingLoad);
       };
     }
-  }, [tab?.url, isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab]);
+  }, [tab?.url, rendersWebview]);
 
   // Handle Page Translation & Restore events
   useEffect(() => {
@@ -784,15 +994,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           // 1. Extract text nodes
           const extractScript = getExtractTextNodesScript();
           const extractResult = await webview.executeJavaScript(extractScript);
-          
+
           if (extractResult && extractResult.success && Array.isArray(extractResult.texts) && extractResult.texts.length > 0) {
             // 2. Translate via IPC batch
             const targetLang = detail.targetLang || 'tr';
             const sourceLang = detail.sourceLang || 'auto';
-            
+
             if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {
               const response = await (window as any).electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
-              
+
               if (response && Array.isArray(response.translations) && response.translations.length > 0) {
                 // 3. Apply translations
                 const applyScript = getApplyTranslationScript(response.translations, targetLang);
@@ -845,7 +1055,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (tab.isSuspended) {
     return (
-      <div 
+      <div
         onClick={() => onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() })}
         className="w-full h-full flex flex-col items-center justify-center p-6 select-none bg-slate-950 text-slate-100 cursor-pointer relative overflow-hidden group"
       >
@@ -862,7 +1072,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           <p className="text-sm text-slate-400 mb-8 leading-relaxed">
             This tab was suspended to save memory. Click to wake it up instantly.
           </p>
-          <button 
+          <button
             onClick={(e) => {
               e.stopPropagation();
               onUpdateTab(tab.id, { isSuspended: false, lastAccessed: Date.now() });
@@ -879,14 +1089,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isNewTab) {
     return (
-      <div 
+      <div
         className="w-full h-full relative"
         onMouseDownCapture={() => {
           if (tab?.id && onActivate) onActivate(tab.id);
         }}
       >
         <Suspense fallback={<div className="w-full h-full bg-slate-900" />}>
-          <NewTabPage 
+          <NewTabPage
             isActive={isActive}
             onNavigate={(url) => {
               if (onNavigate) {
@@ -894,7 +1104,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               } else {
                 onUpdateTab(tab.id, { url, isLoading: !(url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab') });
               }
-            }} 
+            }}
             onNewTab={(url) => {
               if (onNewTab) onNewTab(url, tab.id);
             }}
@@ -918,7 +1128,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isSettingsTab) {
     return (
-      <div 
+      <div
         className="w-full h-full relative"
         onMouseDownCapture={() => {
           if (tab?.id && onActivate) onActivate(tab.id);
@@ -942,7 +1152,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isHistoryTab) {
     return (
-      <div 
+      <div
         className="w-full h-full relative"
         onMouseDownCapture={() => {
           if (tab?.id && onActivate) onActivate(tab.id);
@@ -968,7 +1178,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isDownloadsTab) {
     return (
-      <div 
+      <div
         className="w-full h-full relative"
         onMouseDownCapture={() => {
           if (tab?.id && onActivate) onActivate(tab.id);
@@ -986,7 +1196,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   if (isChangelogTab) {
     return (
-      <div 
+      <div
         className="w-full h-full relative"
         onMouseDownCapture={() => {
           if (tab?.id && onActivate) onActivate(tab.id);
@@ -1009,7 +1219,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   }
 
   return (
-    <div 
+    <div
       style={!isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
       onMouseDownCapture={() => {
         if (tab?.id && onActivate) onActivate(tab.id);
@@ -1021,21 +1231,21 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         {tab.isLoading && (
           <motion.div
             initial={{ opacity: 1, scaleX: 0.15 }}
-            animate={{ 
+            animate={{
               scaleX: [0.15, 0.75, 0.94],
-              transition: { 
+              transition: {
                 duration: 1.0,
                 ease: [0.22, 1, 0.36, 1],
                 times: [0, 0.35, 1]
-              } 
+              }
             }}
-            exit={{ 
-              scaleX: 1, 
+            exit={{
+              scaleX: 1,
               opacity: 0,
-              transition: { 
+              transition: {
                 scaleX: { duration: 0.12, ease: 'easeOut' },
                 opacity: { duration: 0.15, delay: 0.05 }
-              } 
+              }
             }}
             style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)' }}
             className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500 z-50 shadow-md"
@@ -1208,17 +1418,17 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               try {
                 const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
                 let passwords = raw ? JSON.parse(raw) : [];
-                
+
                 // Remove existing password for this host & username if any
                 passwords = passwords.filter((p: any) => !(p.hostname === passwordPrompt.hostname && p.username === finalUsername));
-                
+
                 passwords.push({
                   hostname: passwordPrompt.hostname,
                   username: finalUsername,
                   password: finalPassword,
                   timestamp: Date.now()
                 });
-                
+
                 await (window as any).electronAPI?.secureStoreSet?.('passwords', JSON.stringify(passwords));
               } catch (e) {
                 console.error('Failed to save password', e);
@@ -1228,10 +1438,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
           />
         </Suspense>
       )}
-      
+
       {isActive && (settings.aiLinkPreviewEnabled ?? true) && (
         <Suspense fallback={null}>
-          <AILinkPreview 
+          <AILinkPreview
             url={aiPreview.url}
             x={aiPreview.x}
             y={aiPreview.y}
@@ -1241,60 +1451,4 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       )}
     </div>
   );
-}, (prevProps, nextProps) => {
-  if (prevProps.isActive !== nextProps.isActive) return false;
-  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  if (prevProps.onExitIncognito !== nextProps.onExitIncognito) return false;
-  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
-  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
-  if (prevProps.newTabBackground !== nextProps.newTabBackground) return false;
-  if (prevProps.disableTasksWidget !== nextProps.disableTasksWidget) return false;
-
-  // Tab properties comparison
-  if (prevProps.tab?.id !== nextProps.tab?.id) return false;
-  if (prevProps.tab?.url !== nextProps.tab?.url) return false;
-  if (prevProps.tab?.title !== nextProps.tab?.title) return false;
-  if (prevProps.tab?.favicon !== nextProps.tab?.favicon) return false;
-  if (prevProps.tab?.isLoading !== nextProps.tab?.isLoading) return false;
-  if (prevProps.tab?.canGoBack !== nextProps.tab?.canGoBack) return false;
-  if (prevProps.tab?.canGoForward !== nextProps.tab?.canGoForward) return false;
-  if (prevProps.tab?.isMuted !== nextProps.tab?.isMuted) return false;
-  if (prevProps.tab?.isPinned !== nextProps.tab?.isPinned) return false;
-  if (prevProps.tab?.isIncognito !== nextProps.tab?.isIncognito) return false;
-  if (prevProps.tab?.thumbnail !== nextProps.tab?.thumbnail) return false;
-  if (prevProps.tab?.zoomFactor !== nextProps.tab?.zoomFactor) return false;
-  if (prevProps.tab?.isPlayingAudio !== nextProps.tab?.isPlayingAudio) return false;
-  if (prevProps.tab?.blockedAdsCount !== nextProps.tab?.blockedAdsCount) return false;
-  if (prevProps.tab?.webContentsId !== nextProps.tab?.webContentsId) return false;
-  if (prevProps.tab?.isSuspended !== nextProps.tab?.isSuspended) return false;
-  if (prevProps.tab?.isTranslated !== nextProps.tab?.isTranslated) return false;
-
-  // Settings comparison
-  if (prevProps.settings?.passwordManagerEnabled !== nextProps.settings?.passwordManagerEnabled) return false;
-  if (prevProps.settings?.fontSize !== nextProps.settings?.fontSize) return false;
-  if (prevProps.settings?.doNotTrack !== nextProps.settings?.doNotTrack) return false;
-  if (prevProps.settings?.searchEngine !== nextProps.settings?.searchEngine) return false;
-  if (prevProps.settings?.newTabBackground !== nextProps.settings?.newTabBackground) return false;
-  if (prevProps.settings?.backgroundCustomUrl !== nextProps.settings?.backgroundCustomUrl) return false;
-  if (prevProps.settings?.aiLinkPreviewEnabled !== nextProps.settings?.aiLinkPreviewEnabled) return false;
-  if (prevProps.settings?.privacyShield !== nextProps.settings?.privacyShield) return false;
-  if (prevProps.settings?.theme !== nextProps.settings?.theme) return false;
-  if (prevProps.settings?.browserColor !== nextProps.settings?.browserColor) return false;
-  if (prevProps.settings?.customBrowserColor !== nextProps.settings?.customBrowserColor) return false;
-  if (prevProps.settings?.accentColor !== nextProps.settings?.accentColor) return false;
-  if (prevProps.settings?.customAccentColor !== nextProps.settings?.customAccentColor) return false;
-  if (prevProps.settings?.showTasksWidget !== nextProps.settings?.showTasksWidget) return false;
-  if (prevProps.settings?.energySaverMode !== nextProps.settings?.energySaverMode) return false;
-  if (prevProps.settings?.preloadDnsEnabled !== nextProps.settings?.preloadDnsEnabled) return false;
-  if (prevProps.settings?.smoothScrollingEnabled !== nextProps.settings?.smoothScrollingEnabled) return false;
-
-  // Deep comparison for settings object changes that affect internal pages
-  const isInternalTab = prevProps.tab?.url?.startsWith('nova://') || 
-                        prevProps.tab?.url?.startsWith('about:') || 
-                        prevProps.tab?.url === 'https://newtab';
-  if (isInternalTab && prevProps.settings !== nextProps.settings) return false;
-  if ((prevProps.tab?.url?.startsWith('nova://history') || prevProps.tab?.url?.startsWith('about:history')) && prevProps.history !== nextProps.history) return false;
-  if ((prevProps.tab?.url?.startsWith('nova://downloads') || prevProps.tab?.url?.startsWith('about:downloads')) && prevProps.downloads !== nextProps.downloads) return false;
-
-  return true;
-});
+}, browserViewPropsEqual);

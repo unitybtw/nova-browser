@@ -4,6 +4,7 @@ import { X, Puzzle, Power, Trash2, Settings, ExternalLink, FolderOpen, Play, Shi
 import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { showAlert } from '../utils/confirmDialog';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 interface ExtensionPermission {
   name: string;
@@ -175,6 +176,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   onPermissionReviewResponse
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
 
   const handleLaunchExtension = (ext: Extension, e?: React.MouseEvent) => {
@@ -245,6 +247,9 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
             // Regular Extensions Modal
             <motion.div
               ref={containerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Extensions"
               onClick={(e) => e.stopPropagation()}
               tabIndex={-1}
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
@@ -308,7 +313,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                           <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 truncate">{ext.description || 'No description available'}</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
                         {(ext.popupUrl || ext.optionsUrl) && (
                           <button 
                             onClick={(e) => handleLaunchExtension(ext, e)}

@@ -11,6 +11,9 @@ console.log('Executing all test suites...');
 import './e2e/tier1_feature_coverage.test';
 import './e2e/tier2_boundary_corner.test';
 import './e2e/tier3_cross_feature.test';
+// Must precede every other i18n suite: it asserts that tr/de/ar are NOT loaded
+// yet, so any suite that seeds them first would make its assertions false.
+import './i18n_loading.test';
 import './e2e/tier4_real_world.test';
 import './e2e/tier5_adversarial_stress.test';
 import './challenger2_empirical_verification';
@@ -26,6 +29,13 @@ import './securityHardening.test';
 import './page_translation.test';
 import './security_regression_audit.test';
 import './ssrf_ip_policy.test';
+import './extension_archive_extraction.test';
+import './update_integrity.test';
+import './agent_navigation_guard.test';
+import './sync_pairing_ui.test';
+import './backup_tombstone.test';
+import './dialog_a11y.test';
+import './hover_only_controls.test';
 import './vertical_tabs.test';
 import './safe_navigation_comprehensive.test';
 import './search_engine_formatting.test';
@@ -53,9 +63,18 @@ import './zoom_factors.test';
 import './tab_operations_deep.test';
 import './split_view_mechanics.test';
 import './safe_storage_resilience.test';
+import './component_correctness_regressions.test';
 import './id_generator_entropy.test';
 import './permission_prompts_lifecycle.test';
 import './history_recorder_lifecycle.test';
 import './hook_architecture_hardening.test';
 import './search_localization_captcha.test';
 import './sync_service_vault.test';
+import './sync_state_remerge.test';
+import './sync_deletion_and_conflict.test';
+import './local_persistence_data_safety.test';
+import './format_bytes.test';
+// Last on purpose: this one renders a component in jsdom and temporarily
+// installs window/document globals while it does.
+import './clipboard_qr_failure.test';
+import './download_open_policy.test';

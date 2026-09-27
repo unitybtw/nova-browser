@@ -1,5 +1,4 @@
-import { useState, useCallback } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, useCallback, type Dispatch, type SetStateAction } from 'react';
 import type { Tab } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert } from '../utils/confirmDialog';

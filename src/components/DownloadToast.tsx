@@ -1,22 +1,22 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DownloadItem } from '../types/browser';
-import { 
-  CheckCircle2, 
-  AlertCircle, 
-  FileText, 
-  Folder as FolderIcon, 
-  X, 
-  Pause, 
-  Play, 
+import {
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Folder as FolderIcon,
+  X,
+  Pause,
+  Play,
   FileCheck,
   FileArchive,
   FileCode,
   FileImage,
   FileVideo,
-  FileAudio,
-  Download
+  FileAudio
 } from 'lucide-react';
+import { formatBytes } from '../utils/formatBytes';
 
 interface DownloadToastProps {
   /** Aktif indirme öğesi; App.tsx tarafından seçilip tekil prop olarak geçirilir. */
@@ -41,14 +41,6 @@ function getFileIcon(filename: string) {
     return <FileCode className="w-5 h-5 text-emerald-500" />;
   }
   return <FileText className="w-5 h-5 text-cyan-500" />;
-}
-
-function formatBytes(bytes?: number): string {
-  if (!bytes || isNaN(bytes) || bytes <= 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
 }
 
 export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeDownload }) => {
@@ -90,8 +82,8 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
     if (activeToast) setDismissedId(activeToast.id);
   };
 
-  const progress = activeToast?.totalBytes 
-    ? Math.min(100, Math.round((activeToast.receivedBytes / activeToast.totalBytes) * 100)) 
+  const progress = activeToast?.totalBytes
+    ? Math.min(100, Math.round((activeToast.receivedBytes / activeToast.totalBytes) * 100))
     : 0;
   const isCompleted = activeToast?.state === 'completed';
   const isCancelled = activeToast?.state === 'cancelled';
@@ -121,13 +113,13 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
               getFileIcon(activeToast.filename)
             )}
           </div>
-          
+
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex justify-between items-start mb-0.5">
               <div className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate pr-2" title={activeToast.filename}>
                 {activeToast.filename}
               </div>
-              <button 
+              <button
                 onClick={(e) => { e.stopPropagation(); dismissToast(); }}
                 className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors shrink-0 p-0.5 rounded-md"
                 title="Dismiss"
@@ -135,7 +127,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
-            
+
             {isProgressing && (
               <div className="mt-1">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 font-medium mb-1.5">
@@ -148,16 +140,16 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                   </span>
                 </div>
                 <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className={`h-full rounded-full transition-all duration-200 ${
                       activeToast.isPaused ? 'bg-amber-500' : 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
-                    }`} 
-                    style={{ width: `${Math.max(4, progress)}%` }} 
+                    }`}
+                    style={{ width: `${Math.max(4, progress)}%` }}
                   />
                 </div>
               </div>
             )}
-            
+
             {!isProgressing && (
               <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
                 {isCompleted ? (
@@ -198,7 +190,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                   </button>
                 </>
               )}
-              
+
               {isProgressing && (
                 <div className="flex items-center gap-2">
                   <button

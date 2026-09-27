@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { t, setLanguage, getLanguage, isRTL } from '../../src/services/i18n';
+import { t, setLanguage, getLanguage, isRTL, seedDictionary } from '../../src/services/i18n';
+import trDict from '../../src/locales/tr.json';
+import arDict from '../../src/locales/ar.json';
+import deDict from '../../src/locales/de.json';
 
 async function runTier4Tests() {
   const originalDoc = (globalThis as any).document;
@@ -29,6 +32,12 @@ async function runTier4Tests() {
   assert.equal(t('tabs.sleeping'), 'Tab is Sleeping');
 
   // Switch to Turkish
+  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
+  // suite that awaits here is suspended while the runner starts the NEXT suite
+  // synchronously - and that suite flips the shared language back to English,
+  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
+  // owns the loading policy; this suite only cares about switching and RTL.
+  seedDictionary('tr', trDict as any);
   setLanguage('tr');
   assert.equal(getLanguage(), 'tr');
   assert.equal(isRTL(), false);
@@ -38,6 +47,12 @@ async function runTier4Tests() {
   assert.equal(t('tabs.sleeping'), 'Sekme Uyku Modunda');
 
   // Switch to Arabic (RTL)
+  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
+  // suite that awaits here is suspended while the runner starts the NEXT suite
+  // synchronously - and that suite flips the shared language back to English,
+  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
+  // owns the loading policy; this suite only cares about switching and RTL.
+  seedDictionary('ar', arDict as any);
   setLanguage('ar');
   assert.equal(getLanguage(), 'ar');
   assert.equal(isRTL(), true);
@@ -47,6 +62,12 @@ async function runTier4Tests() {
   assert.equal(t('tabs.sleeping'), 'التبويب في وضع السكون');
 
   // Switch to German
+  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
+  // suite that awaits here is suspended while the runner starts the NEXT suite
+  // synchronously - and that suite flips the shared language back to English,
+  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
+  // owns the loading policy; this suite only cares about switching and RTL.
+  seedDictionary('de', deDict as any);
   setLanguage('de');
   assert.equal(getLanguage(), 'de');
   assert.equal(isRTL(), false);

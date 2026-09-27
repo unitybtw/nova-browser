@@ -1,5 +1,4 @@
-import { useMemo, useCallback } from 'react';
-import type { Dispatch, SetStateAction, MutableRefObject } from 'react';
+import { useMemo, useCallback, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
 import type { Tab } from '../types/browser';
 import { generateId } from '../utils/idGenerator';
 
@@ -35,9 +34,9 @@ export function useSplitView({
     setTabs(prev => prev.map(t => {
       if (tab1Id || tab2Id) {
         if (
-          t.id === tab1Id || 
-          t.id === tab2Id || 
-          (tab1Id && t.splitWith === tab1Id) || 
+          t.id === tab1Id ||
+          t.id === tab2Id ||
+          (tab1Id && t.splitWith === tab1Id) ||
           (tab2Id && t.splitWith === tab2Id)
         ) {
           return { ...t, splitWith: undefined };

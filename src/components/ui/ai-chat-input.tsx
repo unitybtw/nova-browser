@@ -1,8 +1,8 @@
-import * as React from "react";
-import { useRef, useState, useEffect, useCallback } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
-import { getLocale } from "../../services/i18n";
+import { getLocale, useTranslation } from "../../services/i18n";
+import { transcribeAudio } from "../../services/localSpeechRecognition";
 
 // ----------------------------------------------------------------------
 // Transition Physics
@@ -72,6 +72,16 @@ function StopIcon() {
   );
 }
 
+/** Shown while the recorded clip is transcribed on-device. */
+function LoaderIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="animate-spin">
+      <circle cx="7" cy="7" r="5.25" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" className="opacity-25" />
+      <path d="M7 1.75a5.25 5.25 0 0 1 5.25 5.25" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function PlusIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -109,45 +119,61 @@ function AttachmentThumb({
   const btnRef = useRef<HTMLButtonElement | null>(null);
 
   return (
-    <button
-      ref={(el) => {
-        btnRef.current = el;
-        registerRef(attachment.id, el);
-      }}
-      type="button"
-      onMouseDown={(e) => e.preventDefault()}
+    <div
+      // The hover state now covers the whole tile, because the remove control is
+      // a sibling of the preview button instead of a child of it.
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (btnRef.current) {
-          onOpen(attachment, btnRef.current.getBoundingClientRect());
-        }
-      }}
       style={{ animationDelay: `${index * 35}ms`, animationFillMode: "backwards" }}
       className={cn(
-        "group relative size-12 shrink-0 overflow-hidden rounded-xl border border-border bg-muted outline-none",
-        "transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.04] active:scale-[0.96]",
+        "group relative size-12 shrink-0",
         "animate-in fade-in slide-in-from-top-3 zoom-in-90 duration-400"
       )}
-      aria-label={`Open preview of ${attachment.name}`}
     >
-      <img src={attachment.url} alt={attachment.name} className="size-full object-cover" draggable={false} />
-      <span className={cn("absolute inset-0 flex items-start justify-end bg-black/0 transition-colors duration-200", isHovered && "bg-black/25")}>
+      <button
+        ref={(el) => {
+          btnRef.current = el;
+          registerRef(attachment.id, el);
+        }}
+        type="button"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (btnRef.current) {
+            onOpen(attachment, btnRef.current.getBoundingClientRect());
+          }
+        }}
+        className={cn(
+          "relative size-full overflow-hidden rounded-xl border border-border bg-muted outline-none",
+          "transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.04] active:scale-[0.96]"
+        )}
+        aria-label={`Open preview of ${attachment.name}`}
+      >
+        <img src={attachment.url} alt={attachment.name} className="size-full object-cover" draggable={false} />
         <span
-          role="button" tabIndex={-1}
-          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
-          onClick={(e) => { e.stopPropagation(); onRemove(attachment.id); }}
-          className={cn(
-            "m-1 flex size-4 items-center justify-center rounded-full bg-background/90 text-foreground/70 shadow-sm transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-background hover:text-foreground hover:scale-110",
-            isHovered ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none"
-          )}
-          aria-label={`Remove ${attachment.name}`}
-        >
-          <CloseIcon />
-        </span>
-      </span>
-    </button>
+          aria-hidden="true"
+          className={cn("pointer-events-none absolute inset-0 flex items-start justify-end bg-black/0 transition-colors duration-200", isHovered && "bg-black/25")}
+        />
+      </button>
+      {/* Sibling of the preview button, never a child: a <button> inside a <button>
+          is invalid nesting and is unreachable by keyboard. pointer-events-none
+          while hidden still leaves it in the tab order, and focus-visible brings
+          it back so keyboard users can always see what they are hitting. */}
+      <button
+        type="button"
+        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        onClick={(e) => { e.stopPropagation(); onRemove(attachment.id); }}
+        className={cn(
+          "absolute right-1 top-1 z-10 flex size-4 items-center justify-center rounded-full bg-background/90 text-foreground/70 shadow-sm transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:bg-background hover:text-foreground hover:scale-110",
+          isHovered ? "opacity-100 scale-100" : "opacity-0 scale-50 pointer-events-none",
+          "focus:pointer-events-auto focus:opacity-100 focus:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+        )}
+        aria-label={`Remove ${attachment.name}`}
+        title={`Remove ${attachment.name}`}
+      >
+        <CloseIcon />
+      </button>
+    </div>
   );
 }
 
@@ -298,6 +324,23 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       propSelectedModel || (models.length > 0 ? models[0] : "Qwen 2.5 0.5B")
     );
     const [isModelSelectOpen, setIsModelSelectOpen] = useState(false);
+    const { t } = useTranslation();
+
+    // Points the user at the right OS privacy screen when the microphone is
+    // blocked. Keyed per platform so the message is actionable.
+    const settingsHintFor = useCallback(
+      (platform: string) =>
+        t(
+          platform === 'win32'
+            ? 'ai.voiceSettingsWin'
+            : platform === 'linux'
+            ? 'ai.voiceSettingsLinux'
+            : platform === 'darwin'
+            ? 'ai.voiceSettingsMac'
+            : 'ai.voiceSettingsGeneric'
+        ),
+      [t]
+    );
 
     useEffect(() => {
       if (propSelectedModel && propSelectedModel !== selectedModel) {
@@ -310,6 +353,9 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
     // Audio/Voice recording states
     const [isRecording, setIsRecording] = useState(false);
+    const [isTranscribing, setIsTranscribing] = useState(false);
+    /** 0..1 while the on-device model downloads, null once it is ready. */
+    const [modelProgress, setModelProgress] = useState<number | null>(null);
     const [audioData, setAudioData] = useState<number[]>(new Array(5).fill(0));
     const [voiceError, setVoiceError] = useState<string | null>(null);
     const valueRef = useRef(controlledValue !== undefined ? controlledValue : localValue);
@@ -321,16 +367,28 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       return () => clearTimeout(timer);
     }, [voiceError]);
 
-    // Refs for Web Audio & Speech Recognition cleanup
+    // Refs for Web Audio & MediaRecorder cleanup
     const streamRef = useRef<MediaStream | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
     const rafRef = useRef<number | null>(null);
-    const recognitionRef = useRef<any>(null);
+    const recorderRef = useRef<MediaRecorder | null>(null);
+    const recordedChunksRef = useRef<BlobPart[]>([]);
+    const transcribeAbortRef = useRef<AbortController | null>(null);
     const isRecordingRef = useRef(false);
     const isExplicitlyStoppedRef = useRef(false);
+    // True from mount until unmount. The recording path spans several awaits
+    // (OS permission check, requestMicrophonePermission, getUserMedia), and
+    // anything resolved after unmount would otherwise resurrect the stream and
+    // the visualizer rAF loop on a component that no longer exists.
+    const isMountedRef = useRef(true);
+    const isStartingRecordingRef = useRef(false);
+    useEffect(() => {
+      isMountedRef.current = true;
+      return () => {
+        isMountedRef.current = false;
+      };
+    }, []);
     const initialTextRef = useRef('');
-    const restartAttemptsRef = useRef(0);
-    const lastRestartTimeRef = useRef(0);
 
     const [hoverStyle, setHoverStyle] = useState({ opacity: 0, transform: "translateY(0px) scale(0.95)", transition: "none" });
     const [containerHeight, setContainerHeight] = useState(116);
@@ -352,6 +410,11 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     // URL is never revoked while still displayed, nor revoked twice.
     const attachmentsRef = useRef(attachments);
     attachmentsRef.current = attachments;
+    // Object URLs that are still being decoded by a detached <img>. A URL only
+    // reaches attachmentsRef from img.onload, so an unmount in between left it
+    // with no owner and no way to ever be revoked (onerror never fires for an
+    // image that was never in the document) — the blob leaked for good.
+    const pendingAttachmentUrlsRef = useRef<Set<string>>(new Set());
     const revokedUrlsRef = useRef<Set<string>>(new Set());
     const safeRevokeUrl = (url: string) => {
       if (!url || revokedUrlsRef.current.has(url)) return;
@@ -382,13 +445,13 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     };
 
     const handleValueChange = useCallback((val: string) => {
-      setIsSmoothResize(true); 
+      setIsSmoothResize(true);
       if (!isControlled) setLocalValue(val);
       onChange?.(val);
     }, [isControlled, onChange]);
 
     const expand = () => {
-      setIsSmoothResize(false); 
+      setIsSmoothResize(false);
       setExpanded(true);
       requestAnimationFrame(() => {
         textareaRef.current?.focus();
@@ -396,19 +459,79 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     };
 
     // --- Voice Recording Logic ---
-    const stopRecording = useCallback(() => {
+    //
+    // Recording and transcription are two separate phases. MediaRecorder keeps
+    // capturing the microphone; on stop the clip is transcribed on-device (see
+    // services/localSpeechRecognition) and the text lands in the composer.
+    const runTranscription = useCallback(
+      async (blob: Blob) => {
+        const controller = new AbortController();
+        transcribeAbortRef.current = controller;
+        setIsTranscribing(true);
+        setModelProgress(null);
+        try {
+          const text = await transcribeAudio(blob, {
+            locale: getLocale(),
+            signal: controller.signal,
+            onProgress: p => {
+              if (!isMountedRef.current) return;
+              if (p.status === 'ready' || p.status === 'done') {
+                setModelProgress(null);
+              } else if (typeof p.ratio === 'number') {
+                setModelProgress(p.ratio);
+              }
+            },
+          });
+
+          if (!isMountedRef.current) return;
+          if (controller.signal.aborted) return;
+
+          if (!text) {
+            setVoiceError(t('ai.voiceNoSpeech'));
+            return;
+          }
+          const base = initialTextRef.current || valueRef.current || '';
+          const prefix = base.trim() ? base.replace(/\s+$/, '') + ' ' : '';
+          handleValueChange((prefix + text).trim());
+        } catch (err: any) {
+          if (!isMountedRef.current) return;
+          if (controller.signal.aborted || err?.name === 'AbortError') return;
+          const reason = String(err?.message || err);
+          // A fetch/CORS failure here means the model shards or the ONNX
+          // runtime could not be fetched, which is a connectivity problem, not
+          // a recognition one.
+          if (/fetch|network|failed to load|NetworkError|ERR_/i.test(reason)) {
+            setVoiceError(t('ai.voiceNetwork'));
+          } else if (/too short/i.test(reason)) {
+            setVoiceError(t('ai.voiceTooShort'));
+          } else if (/no audio was recorded/i.test(reason)) {
+            setVoiceError(t('ai.voiceNoSpeech'));
+          } else {
+            setVoiceError(t('ai.voiceFailed', { reason }));
+          }
+        } finally {
+          if (isMountedRef.current) {
+            setIsTranscribing(false);
+            setModelProgress(null);
+          }
+          if (transcribeAbortRef.current === controller) transcribeAbortRef.current = null;
+        }
+      },
+      [handleValueChange, t]
+    );
+
+    const releaseMicrophone = useCallback(() => {
       isExplicitlyStoppedRef.current = true;
       isRecordingRef.current = false;
-      restartAttemptsRef.current = 0;
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch {}
-        recognitionRef.current = null;
-      }
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
+      }
+      if (recorderRef.current) {
+        try {
+          if (recorderRef.current.state !== 'inactive') recorderRef.current.stop();
+        } catch {}
+        recorderRef.current = null;
       }
       if (streamRef.current) {
         try {
@@ -419,34 +542,75 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         streamRef.current = null;
       }
       if (audioContextRef.current) {
-        try {
-          audioContextRef.current.close();
-        } catch {}
+        try { audioContextRef.current.close(); } catch {}
         audioContextRef.current = null;
       }
       setIsRecording(false);
       setAudioData(new Array(5).fill(0));
     }, []);
 
-    const startRecording = useCallback(async () => {
-      setVoiceError(null);
-      setIsSmoothResize(false);
-      setExpanded(true);
+    const stopRecording = useCallback(() => {
+      const recorder = recorderRef.current;
+      const chunks = recordedChunksRef.current;
+      const wasRecording = isRecordingRef.current;
+      const mimeType = recorder?.mimeType || 'audio/webm';
 
-      const isTr = (getLocale ? getLocale() : 'tr-TR').startsWith('tr');
+      // Order matters. MediaRecorder.stop() flips `state` to "inactive"
+      // SYNCHRONOUSLY and only then queues the final `dataavailable` and
+      // `stop` tasks. So the listener has to be attached BEFORE anything calls
+      // stop() — releaseMicrophone() stops the recorder, which is why the old
+      // ordering made the `stop` branch unreachable and every dictation lost
+      // its final ~250ms chunk.
+      const finish = () => {
+        if (chunks.length === 0) {
+          // A tap shorter than one MediaRecorder timeslice produces no data
+          // at all. Say so instead of silently resetting the button.
+          recordedChunksRef.current = [];
+          setVoiceError(t('ai.voiceTooShort'));
+          return;
+        }
+        const blob = new Blob(chunks, { type: mimeType });
+        recordedChunksRef.current = [];
+        void runTranscription(blob);
+      };
 
-      // Check SpeechRecognition API early before acquiring media stream
-      const SpeechRecognition =
-        (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-      if (!SpeechRecognition) {
-        setVoiceError(
-          isTr
-            ? "Tarayıcı ortamında konuşma tanıma (SpeechRecognition API) desteklenmiyor."
-            : "SpeechRecognition API is not supported in this browser environment."
-        );
-        return;
+      if (wasRecording && recorder) {
+        if (recorder.state !== 'inactive') {
+          try {
+            recorder.addEventListener('stop', finish, { once: true });
+            // Flush what is buffered so the tail is in `chunks` before the
+            // final dataavailable task runs.
+            recorder.requestData?.();
+            recorder.stop();
+            releaseMicrophone();
+            return;
+          } catch {
+            // fall through to transcribing whatever already arrived
+          }
+        } else {
+          // Already stopped (e.g. the recorder ended on its own).
+          releaseMicrophone();
+          finish();
+          return;
+        }
       }
+
+      releaseMicrophone();
+      finish();
+    }, [releaseMicrophone, runTranscription, t]);
+
+
+    const startRecording = useCallback(async () => {
+      // Re-entrancy guard: the mic button stays enabled during the awaits below
+      // (setIsRecording only runs after the media stream is acquired), so two
+      // clicks used to open two streams while stopRecording released only the
+      // last one — leaving the OS microphone indicator on with no UI to stop it.
+      if (isStartingRecordingRef.current || isRecordingRef.current) return;
+      isStartingRecordingRef.current = true;
+      try {
+        setVoiceError(null);
+        setIsSmoothResize(false);
+        setExpanded(true);
 
       let currentPlatform = 'unknown';
       // 1. Electron OS-level permission checks (macOS / Windows / Linux)
@@ -456,17 +620,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
             const check = await window.electronAPI.checkMicrophonePermission();
             if (check.platform) currentPlatform = check.platform;
             if (check.status === 'denied' || check.status === 'restricted') {
-              const settingsName =
-                currentPlatform === 'win32'
-                  ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
-                  : currentPlatform === 'linux'
-                  ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
-                  : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
-
               setVoiceError(
-                isTr
-                  ? `Mikrofon izni kapalı. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
-                  : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
+                t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) })
               );
               return;
             }
@@ -475,18 +630,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
             const permResult = await window.electronAPI.requestMicrophonePermission();
             if (permResult.platform) currentPlatform = permResult.platform;
             if (!permResult.granted) {
-              const settingsName =
-                currentPlatform === 'win32'
-                  ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
-                  : currentPlatform === 'linux'
-                  ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
-                  : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
-
-              setVoiceError(
-                isTr
-                  ? `Mikrofon izni verilmedi. ${settingsName} bölümünden Nova Browser için izni etkinleştirin.`
-                  : `Microphone access denied. Please enable microphone for Nova Browser in ${settingsName}.`
-              );
+              setVoiceError(t('ai.voiceMicDenied', { settings: settingsHintFor(currentPlatform) }));
               return;
             }
           }
@@ -503,31 +647,13 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         }
       } catch (err: any) {
         console.warn("[ai-chat-input] Microphone access error:", err);
-        const settingsName =
-          currentPlatform === 'win32'
-            ? (isTr ? "Windows Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "Windows Settings > Privacy & Security > Microphone")
-            : currentPlatform === 'linux'
-            ? (isTr ? "Sistem Ses ve Giriş Ayarları" : "System Sound and Input Settings")
-            : (isTr ? "macOS Sistem Ayarları > Gizlilik ve Güvenlik > Mikrofon" : "macOS System Settings > Privacy & Security > Microphone");
-
-        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
-          setVoiceError(
-            isTr
-              ? `Mikrofon erişim izni verilmedi. Lütfen ${settingsName} bölümünden mikrofonu etkinleştirin.`
-              : `Microphone access was denied. Please allow microphone permissions in ${settingsName}.`
-          );
-        } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError') {
-          setVoiceError(
-            isTr
-              ? "Kullanılabilir mikrofon cihazı bulunamadı. Lütfen bir mikrofon bağlı olduğundan emin olun."
-              : "No microphone device found on this system. Please check your microphone connection."
-          );
+        const settingsName = settingsHintFor(currentPlatform);
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError' || err?.name === 'SecurityError') {
+          setVoiceError(t('ai.voiceMicDenied', { settings: settingsName }));
+        } else if (err?.name === 'NotFoundError' || err?.name === 'DevicesNotFoundError' || err?.name === 'OverconstrainedError') {
+          setVoiceError(t('ai.voiceNoDevice'));
         } else {
-          setVoiceError(
-            isTr
-              ? "Mikrofona erişilemedi: " + (err?.message || "Bilinmeyen hata")
-              : "Could not access microphone: " + (err?.message || "Unknown error")
-          );
+          setVoiceError(t('ai.voiceInaccessible', { reason: err?.message || '' }));
         }
         return;
       }
@@ -536,6 +662,20 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       isRecordingRef.current = true;
       initialTextRef.current = valueRef.current;
       setIsRecording(true);
+
+      // The panel can be closed while the OS permission prompt is still open.
+      // At that point the unmount cleanup has already run and nothing will ever
+      // read streamRef again, so the stream we just acquired would stay open
+      // (mic indicator on, no UI to release it). Hand it back and bail.
+      if (!isMountedRef.current) {
+        isRecordingRef.current = false;
+        try {
+          stream?.getTracks().forEach((track) => {
+            try { track.stop(); } catch {}
+          });
+        } catch {}
+        return;
+      }
 
       if (stream) {
         streamRef.current = stream;
@@ -553,6 +693,10 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
           const updateVisualizer = () => {
+            if (!isMountedRef.current || !isRecordingRef.current) {
+              rafRef.current = null;
+              return;
+            }
             analyser.getByteFrequencyData(dataArray);
             const bands = new Array(5).fill(0);
             const step = Math.floor(dataArray.length / 5);
@@ -572,103 +716,44 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
         }
       }
 
-      try {
-        const recognition = new SpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        const currentLocale = getLocale ? getLocale() : 'tr-TR';
-        recognition.lang = currentLocale || navigator.language || 'tr-TR';
-
-        recognition.onresult = (event: any) => {
-          let sessionFinal = "";
-          let sessionInterim = "";
-
-          for (let i = 0; i < event.results.length; ++i) {
-            const item = event.results[i];
-            if (item && item[0]?.transcript) {
-              if (item.isFinal) {
-                sessionFinal += item[0].transcript;
-              } else {
-                sessionInterim += item[0].transcript;
-              }
-            }
-          }
-
-          const prefix = initialTextRef.current ? initialTextRef.current + " " : "";
-          const combined = (prefix + sessionFinal + (sessionInterim ? " " + sessionInterim : "")).trim();
-          handleValueChange(combined);
-        };
-
-        recognition.onerror = (e: any) => {
-          if (e.error === 'no-speech') return;
-          console.warn("[ai-chat-input] Speech recognition error:", e.error);
-          if (e.error === 'not-allowed') {
-            setVoiceError(
-              isTr
-                ? "Ses tanıma izni verilmedi. Mikrofon izinlerini kontrol edin."
-                : "Speech recognition permission denied."
-            );
-          } else if (e.error === 'network') {
-            setVoiceError(
-              isTr
-                ? "Ses tanıma ağına bağlanılamadı. İnternet bağlantınızı kontrol edin."
-                : "Speech recognition network error."
-            );
-          } else if (e.error === 'audio-capture') {
-            setVoiceError(
-              isTr
-                ? "Mikrofon sesi yakalayamadı."
-                : "Microphone failed to capture audio."
-            );
-          }
-          stopRecording();
-        };
-
-        recognition.onend = () => {
-          if (isExplicitlyStoppedRef.current || !isRecordingRef.current) {
-            stopRecording();
-          } else {
-            const now = Date.now();
-            if (now - lastRestartTimeRef.current < 2500) {
-              restartAttemptsRef.current += 1;
-            } else {
-              restartAttemptsRef.current = 1;
-            }
-            lastRestartTimeRef.current = now;
-
-            // Cap rapid restarts to prevent indefinite mic capture loop
-            if (restartAttemptsRef.current > 4) {
-              console.warn('[ai-chat-input] SpeechRecognition max rapid restarts reached, stopping recording.');
-              stopRecording();
-              return;
-            }
-
-            // User paused speech; restart recognition seamlessly without dropping recording
-            try {
-              if (recognitionRef.current && isRecordingRef.current) {
-                initialTextRef.current = valueRef.current;
-                recognitionRef.current.start();
-              } else {
-                stopRecording();
-              }
-            } catch {
-              stopRecording();
-            }
-          }
-        };
-
-        recognitionRef.current = recognition;
-        recognition.start();
-      } catch (recErr: any) {
-        console.warn("[ai-chat-input] Failed to start SpeechRecognition:", recErr);
-        setVoiceError(
-          isTr
-            ? "Konuşma tanıma başlatılamadı: " + (recErr?.message || "Hata")
-            : "Failed to start speech recognition: " + (recErr?.message || "Error")
-        );
-        stopRecording();
+      // 3. Capture raw microphone audio. Transcription runs on stop, on-device
+      //    (services/localSpeechRecognition). The previous webkitSpeechRecognition
+      //    path could never work in Electron: Chromium's cloud recognizer needs
+      //    the Google Speech API key that only the Chrome binary ships, so it
+      //    opened the microphone successfully and then always failed with
+      //    `network` — no permission, adblocker or CSP was involved.
+      if (!stream || typeof MediaRecorder === 'undefined') {
+        releaseMicrophone();
+        setVoiceError(t('ai.voiceUnsupported'));
+        return;
       }
-    }, [handleValueChange, stopRecording]);
+
+      const mimeType =
+        ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'].find(
+          m => MediaRecorder.isTypeSupported?.(m)
+        ) || '';
+      try {
+        const recorder = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+        recordedChunksRef.current = [];
+        recorder.ondataavailable = (event: BlobEvent) => {
+          if (event.data && event.data.size > 0) recordedChunksRef.current.push(event.data);
+        };
+        // A timeslice flushes chunks continuously, so an interrupted take is
+        // never lost entirely.
+        recorder.start(250);
+        recorderRef.current = recorder;
+      } catch (recErr: any) {
+        console.warn('[ai-chat-input] MediaRecorder failed:', recErr);
+        releaseMicrophone();
+        setVoiceError(t('ai.voiceFailed', { reason: String(recErr?.message || recErr) }));
+        return;
+      }
+      } finally {
+        isStartingRecordingRef.current = false;
+      }
+    }, [handleValueChange, releaseMicrophone, t]);
 
     // Keep textarea auto-scrolled to bottom while recording
     useEffect(() => {
@@ -679,13 +764,22 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
     // Ensure cleanup of mic/streams on unmount. Attachments are NOT in deps:
     // revoking here must only ever run for URLs that are already dead.
+    // Note: `releaseMicrophone`, not `stopRecording` — tearing the component
+    // down must not kick off a transcription for a component that no longer
+    // exists.
     useEffect(() => {
       return () => {
-        stopRecording();
+        releaseMicrophone();
+        transcribeAbortRef.current?.abort();
         attachmentsRef.current.forEach((a) => safeRevokeUrl(a.url));
+        // Sweep URLs that were still decoding: their onload/onerror will never
+        // run for a component that no longer exists, so this is the last chance
+        // to reclaim them.
+        pendingAttachmentUrlsRef.current.forEach((url) => safeRevokeUrl(url));
+        pendingAttachmentUrlsRef.current.clear();
       };
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stopRecording]);
+    }, [releaseMicrophone]);
 
 
     useEffect(() => {
@@ -713,24 +807,24 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     useEffect(() => {
       if (!textareaRef.current) return;
       const el = textareaRef.current;
-      
+
       const currentHeight = el.style.height;
       el.style.transition = 'none';
       el.style.height = "0px";
       const scrollHeight = el.scrollHeight;
       el.style.height = currentHeight;
-      void el.offsetHeight; 
+      void el.offsetHeight;
       el.style.transition = '';
-      
+
       const newHeight = Math.max(68, Math.min(scrollHeight, 160));
       el.style.height = `${newHeight}px`;
-      
+
       setTextareaHeight(newHeight);
       setIsScrolling(scrollHeight > 160);
-      
+
       setTimeout(updateFades, 0);
       // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [value, expanded]); 
+    }, [value, expanded]);
 
     useEffect(() => {
       setContainerHeight(Math.max(116, textareaHeight + 48));
@@ -780,21 +874,32 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
       const files = Array.from(e.target.files ?? []).filter(
         (f) => f.type.startsWith("image/") && f.type !== "image/svg+xml" && f.size <= MAX_IMAGE_BYTES
       );
-      e.target.value = ""; 
+      e.target.value = "";
 
       if (files.length === 0) return;
       const room = Math.max(0, maxAttachments - attachments.length);
       const accepted = files.slice(0, room);
 
-      if (!expanded) { setIsSmoothResize(false); setExpanded(true); } 
+      if (!expanded) { setIsSmoothResize(false); setExpanded(true); }
       else { setIsSmoothResize(true); }
 
       for (const file of accepted) {
         const url = URL.createObjectURL(file);
+        // Claim the URL until the decode settles, so the unmount sweep can find
+        // it if this component goes away first.
+        pendingAttachmentUrlsRef.current.add(url);
         const img = new Image();
-        img.onload = () => addAttachment(file, url, img.naturalWidth, img.naturalHeight);
+        // Both terminal paths release the claim: onload hands ownership to the
+        // attachment list, onerror revokes the URL outright.
+        img.onload = () => {
+          pendingAttachmentUrlsRef.current.delete(url);
+          addAttachment(file, url, img.naturalWidth, img.naturalHeight);
+        };
         // Undecodable files (e.g. renamed executables) are rejected, not accepted blindly.
-        img.onerror = () => safeRevokeUrl(url);
+        img.onerror = () => {
+          pendingAttachmentUrlsRef.current.delete(url);
+          safeRevokeUrl(url);
+        };
         img.src = url;
       }
     };
@@ -815,14 +920,31 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     };
 
     // Calculate action button states
-    const showArrow = hasValue && !isRecording && !isLoading;
-    const showStop = isRecording || isLoading;
-    const showMic = !hasValue && !isRecording && !isLoading;
+    const showArrow = hasValue && !isRecording && !isTranscribing && !isLoading;
+    // The stop button also covers the transcribing phase: the microphone is
+    // already released, and pressing it cancels the transcription.
+    const showStop = isRecording || isTranscribing || isLoading;
+    const showMic = !hasValue && !isRecording && !isTranscribing && !isLoading;
+
+    // Shown on the action button while the on-device model downloads on first
+    // use, so the wait is explained instead of looking like a dead button.
+    const modelDownloadPercent =
+      typeof modelProgress === 'number' ? Math.round(modelProgress * 100) : null;
+
+    const actionLabel = isTranscribing
+      ? t('ai.voiceTranscribing')
+      : showArrow
+      ? "Send prompt"
+      : showStop
+      ? "Stop recording"
+      : "Use voice input";
 
     const onActionButtonClick = (e: React.MouseEvent) => {
       e.preventDefault();
       if (isLoading) {
         onStop?.();
+      } else if (isTranscribing) {
+        transcribeAbortRef.current?.abort();
       } else if (isRecording) {
         stopRecording();
       } else if (hasValue) {
@@ -867,7 +989,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                     onClick={() => window.electronAPI?.openSystemSettings?.('microphone')}
                     className="px-1.5 py-0.5 text-[11px] font-medium bg-amber-500/20 hover:bg-amber-500/30 rounded transition-colors text-amber-700 dark:text-amber-300"
                   >
-                    {(getLocale ? getLocale() : 'tr-TR').startsWith('tr') ? "Ayarları Aç" : "Open Settings"}
+                    {getLocale().startsWith('tr') ? "Ayarları Aç" : "Open Settings"}
                   </button>
                 )}
                 <button
@@ -997,8 +1119,8 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
             <div
               ref={bottomFadeRef}
               className="absolute left-4 right-12 z-[2] h-8 bg-gradient-to-t from-card via-card/90 to-transparent pointer-events-none"
-              style={{ 
-                opacity: 0, 
+              style={{
+                opacity: 0,
                 top: `${textareaHeight - 32}px`,
                 transition: isSmoothResize ? "top 0.15s ease-out" : "top 0.3s cubic-bezier(0.16, 1, 0.3, 1)"
               }}
@@ -1028,7 +1150,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
               <div className="relative">
                 <button
                   type="button"
-                  onMouseDown={(e) => e.preventDefault()} 
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsModelSelectOpen((prev) => !prev);
@@ -1069,7 +1191,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                         onMouseEnter={() => {
                           setHoverStyle((prev) => ({
                             opacity: 1, transform: `translateY(${idx * 34}px) scale(1)`,
-                            transition: prev.opacity === 0 ? "opacity 0.15s ease-out" : "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease", 
+                            transition: prev.opacity === 0 ? "opacity 0.15s ease-out" : "transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.15s ease",
                           }));
                         }}
                         onClick={(e) => {
@@ -1122,9 +1244,10 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
 
             <button
               type="button"
-              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }} 
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
               onClick={onActionButtonClick}
-              aria-label={showArrow ? "Send prompt" : showStop ? "Stop recording" : "Use voice input"}
+              aria-label={actionLabel}
+              title={isTranscribing ? t('ai.voiceTranscribing') : modelDownloadPercent !== null ? t('ai.voiceModelDownloading', { percent: modelDownloadPercent }) : undefined}
               style={{ borderRadius: 9999 }}
               className="absolute right-2 bottom-2 z-[10] flex h-8 w-8 items-center justify-center bg-primary text-primary-foreground transition-all duration-300 hover:opacity-90 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-default"
             >
@@ -1136,9 +1259,35 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
                   <MicIcon />
                 </span>
                 <span className={cn("absolute inset-0 flex items-center justify-center transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]", showStop ? "opacity-100 scale-100 rotate-0 blur-none" : "opacity-0 scale-50 rotate-45 blur-[1px] pointer-events-none")}>
-                  <StopIcon />
+                  {isTranscribing ? <LoaderIcon /> : <StopIcon />}
                 </span>
+                {modelDownloadPercent !== null && (
+                  // Circular download indicator for the first-run model fetch.
+                  <svg
+                    viewBox="0 0 36 36"
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full -rotate-90"
+                  >
+                    <circle cx="18" cy="18" r="16" fill="none" strokeWidth="2.5" className="stroke-current opacity-25" />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="16"
+                      fill="none"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 16}
+                      strokeDashoffset={2 * Math.PI * 16 * (1 - modelDownloadPercent / 100)}
+                      className="stroke-current"
+                    />
+                  </svg>
+                )}
               </span>
+              {modelDownloadPercent !== null && (
+                <span className="pointer-events-none absolute -top-7 right-0 whitespace-nowrap rounded-md bg-foreground px-1.5 py-0.5 text-[10px] font-medium text-background shadow-sm">
+                  {t('ai.voiceModelDownloading', { percent: modelDownloadPercent })}
+                </span>
+              )}
             </button>
           </div>
         </div>

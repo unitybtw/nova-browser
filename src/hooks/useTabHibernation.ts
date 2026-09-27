@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react';
-import type { Dispatch, SetStateAction } from 'react';
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import type { Tab, UserSettings } from '../types/browser';
 import { computeLiveAndSuspendedTabs } from '../utils/tabManager';
 

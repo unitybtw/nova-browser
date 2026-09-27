@@ -91,25 +91,29 @@ assert(sanitizeWallpaperPhoto(null) === null, 'Null object should return null');
 assert(sanitizeWallpaperPhoto({ imageUrl: 'invalid' }) === null, 'Invalid imageUrl should return null');
 console.log('[PASS] [Wallpaper-Sync-7] Wallpaper photo metadata sanitization and normalization verified.');
 
-// 8. Wallpaper Minimal Credit Title & Author Formatting
-function formatWallpaperCreditTitle(title: string): string {
-  return title
-    .replace(/^4k\s*(desktop\s*)?(wallpaper)?\s*(\((.*?)\))?/i, (_, _d, _w, _p, cat) => cat ? (cat.charAt(0).toUpperCase() + cat.slice(1)) : '')
-    .replace(/\s*4k\s*(uhd)?$/i, '')
-    .trim() || title;
-}
-function formatWallpaperCreditAuthor(author: string): string {
-  return author
-    .replace(/\s*4k\s*curated$/i, '')
-    .trim() || author;
-}
-
-assert(formatWallpaperCreditTitle('4K Desktop Wallpaper (anime)') === 'Anime', 'Wallhaven category extraction failed');
-assert(formatWallpaperCreditTitle('Alpine Lake & Mountain Panorama 4K') === 'Alpine Lake & Mountain Panorama', '4K suffix strip failed');
-assert(formatWallpaperCreditTitle('Mount Fuji & Spring Blossom 4K UHD') === 'Mount Fuji & Spring Blossom', '4K UHD suffix strip failed');
-assert(formatWallpaperCreditAuthor('Wallhaven 4K Curated') === 'Wallhaven', 'Wallhaven 4K Curated strip failed');
-assert(formatWallpaperCreditAuthor('Luca Bravo') === 'Luca Bravo', 'Standard author name altered');
-console.log('[PASS] [Wallpaper-Sync-8] Wallpaper credit title and author minimal formatting verified.');
+// 8. Wallpaper Credit Title & Author Formatting — REMOVED
+//
+// `formatWallpaperCreditTitle` and `formatWallpaperCreditAuthor` were declared in
+// this file as a verbatim copy of the `useMemo` bodies at
+// src/components/NewTabPage.tsx:273-287, then asserted against themselves. The
+// two `|| title` fallbacks in the original also mean the copy could not fail on
+// an empty result: whatever the regexes produced, `|| original` guaranteed a
+// non-empty string, so no vector could distinguish correct stripping from a
+// regex that matched nothing.
+//
+// Sections 6 and 7 above are unaffected: `isValidWallpaperUrl` and
+// `sanitizeWallpaperPhoto` were already imported from the real module
+// src/utils/unsplash.ts, not re-implemented here.
+//
+// NEEDED EXPORTS from src/components/NewTabPage.tsx (the src/components owner),
+// lifted out of the two useMemos so they are importable:
+//   - `formatWallpaperCreditTitle(title: string): string`  (from
+//     src/components/NewTabPage.tsx:273-280)
+//   - `formatWallpaperCreditAuthor(author: string): string` (from
+//     src/components/NewTabPage.tsx:282-288)
+// src/components/unsplashCredit.ts would be the natural home, with the memos
+// calling it. Once those two are exported, the five vectors this section used to
+// fake can be re-added verbatim against the real functions.
 
 
 
