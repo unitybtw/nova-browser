@@ -66,7 +66,7 @@ async function defaultExport(context) {
     ['RunAsNode', FuseV1Options.RunAsNode, false],
     ['EnableNodeOptionsEnvironmentVariable', FuseV1Options.EnableNodeOptionsEnvironmentVariable, false],
     ['EnableNodeCliInspectArguments', FuseV1Options.EnableNodeCliInspectArguments, false],
-    ['GrantFileProtocolExtraPrivileges', FuseV1Options.GrantFileProtocolExtraPrivileges, false],
+    ['GrantFileProtocolExtraPrivileges', FuseV1Options.GrantFileProtocolExtraPrivileges, true],
     ['EnableCookieEncryption', FuseV1Options.EnableCookieEncryption, true],
     ['OnlyLoadAppFromAsar', FuseV1Options.OnlyLoadAppFromAsar, asarEnabled],
     ['EnableEmbeddedAsarIntegrityValidation', FuseV1Options.EnableEmbeddedAsarIntegrityValidation, enableAsarIntegrity]

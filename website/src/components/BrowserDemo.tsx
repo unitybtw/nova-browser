@@ -315,7 +315,7 @@ export const BrowserDemo: React.FC = React.memo(() => {
               {/* Quick Launch Dials */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-md mx-auto pt-2">
                 {[
-                  { name: 'GitHub Repo', tag: 'v1.4.9', icon: Code2, color: 'text-indigo-400' },
+                  { name: 'GitHub Repo', tag: 'v1.5.0', icon: Code2, color: 'text-indigo-400' },
                   { name: 'MLC-LLM Core', tag: 'WebGPU', icon: Cpu, color: 'text-cyan-400' },
                   { name: 'AdBlocker', tag: '100% Rust', icon: ShieldCheck, color: 'text-emerald-400' },
                   { name: 'Cloud Sync', tag: 'E2EE AES', icon: Zap, color: 'text-amber-400' }
@@ -351,7 +351,7 @@ export const BrowserDemo: React.FC = React.memo(() => {
                   </div>
                 </div>
                 <span className="rounded-full bg-indigo-500/20 px-3 py-1 font-mono text-xs text-indigo-300 font-semibold border border-indigo-500/30">
-                  Release v1.4.9
+                  Release v1.5.0
                 </span>
               </div>
               <div className="rounded-xl border border-white/[0.08] bg-black/40 p-4 font-mono text-xs space-y-2 text-slate-300">
@@ -474,7 +474,7 @@ export const BrowserDemo: React.FC = React.memo(() => {
         </div>
         <div className="flex items-center gap-3">
           <span>Latency: 0.2ms</span>
-          <span className="text-cyan-400">v1.4.9 Release</span>
+          <span className="text-cyan-400">v1.5.0 Release</span>
         </div>
       </div>
     </div>

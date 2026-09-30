@@ -41,10 +41,10 @@ interface Milestone {
 
 const VERIFIED_MILESTONES: Milestone[] = [
   {
-    version: 'v1.4.9',
+    version: 'v1.5.0',
     date: 'Current Release',
     tag: 'Latest',
-    description: 'Private Tab Navigation, E2EE Vault Conflict Resolution & Local Whisper AI'
+    description: 'Electron 43+ Fuse Fix (GrantFileProtocolExtraPrivileges), AdBlocker Isolation & Local Whisper AI'
   },
   {
     version: 'v1.4.0',
