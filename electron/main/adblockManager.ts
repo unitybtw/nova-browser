@@ -153,8 +153,8 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
   try {
     const engine = await ElectronBlocker.fromLists(fetch, adsAndTrackingLists, {
       // Electron 43+ deprecates session.setPreloads/getPreloads which the cosmetic
-      // filter injection requires. Using these deprecated APIs corrupts the renderer's
-      // preload startup sequence, resulting in a blank window (empty DOM).
+      // filter injection requires. These deprecated API calls corrupt the renderer's
+      // preload startup sequence, causing a completely blank window after update.
       // Disabling cosmetic filters eliminates the deprecated API calls entirely.
       // Network-level ad and tracker blocking (easylist + easyprivacy) is fully preserved.
       loadCosmeticFilters: false,
@@ -171,6 +171,14 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
         try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }
       },
     });
+
+    // Regardless of whether the engine was loaded from cache or built fresh,
+    // force loadCosmeticFilters off. A cached engine serialized with
+    // loadCosmeticFilters:true would otherwise still call the deprecated
+    // session.setPreloads/getPreloads inside enableBlockingInSession,
+    // corrupting the renderer preload sequence and producing a blank window.
+    // Use Object.assign to override the readonly typed property at runtime.
+    Object.assign(engine.config, { loadCosmeticFilters: false });
 
     blocker = engine;
 
@@ -200,7 +208,7 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
       }
     });
 
-    console.log('[AdBlocker] Engine initialized successfully with offline cache');
+    console.log('[AdBlocker] Engine initialized successfully');
     return blocker;
   } catch (err) {
     console.error('[AdBlocker] Failed to initialize adblocker engine:', err);
