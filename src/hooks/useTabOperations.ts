@@ -92,6 +92,22 @@ export function useTabOperations({
     }
   }, [activeTabId, splitTabId, setTabs]);
 
+  const cleanupIncognitoSessions = (closedTabs: Tab[], remainingTabs: Tab[]) => {
+    const closedIncognito = closedTabs.filter(t => t.isIncognito);
+    if (closedIncognito.length > 0) {
+      const api = getElectronAPI();
+      if (api?.clearIncognitoSession) {
+        closedIncognito.forEach(t => {
+          api.clearIncognitoSession(t.id)?.catch((e: any) => console.error(e));
+        });
+        const remainingIncognito = remainingTabs.some(t => t.isIncognito);
+        if (!remainingIncognito) {
+          api.clearIncognitoSession()?.catch((e: any) => console.error(e));
+        }
+      }
+    }
+  };
+
   // Tab Close Handler (Graceful Navigation & Multi-Process Cleanup)
   // All side effects (closed-tabs stack, active-tab selection, incognito session
   // cleanup) are computed from tabsRef OUTSIDE the setState updater so every
@@ -104,12 +120,8 @@ export function useTabOperations({
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
-      if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
-        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
-        const remainingIncognitoTabs = prevTabs.some(t => t.isIncognito && t.id !== id);
-        if (!remainingIncognitoTabs) {
-          getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
-        }
+      if (targetTab?.isIncognito) {
+        cleanupIncognitoSessions([targetTab], prevTabs.filter(t => t.id !== id));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         pushClosedTab(targetTab);
@@ -143,12 +155,8 @@ export function useTabOperations({
     }
 
     if (prevTabs.length <= 1) {
-      if (targetTab?.isIncognito && getElectronAPI()?.clearIncognitoSession) {
-        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
-        const remainingIncognitoTabs = prevTabs.some(t => t.isIncognito && t.id !== id);
-        if (!remainingIncognitoTabs) {
-          getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
-        }
+      if (targetTab?.isIncognito) {
+        cleanupIncognitoSessions([targetTab], prevTabs.filter(t => t.id !== id));
       }
       if (targetTab && (targetTab.url !== 'nova://newtab' || targetTab.canGoBack)) {
         pushClosedTab(targetTab);
@@ -208,16 +216,8 @@ export function useTabOperations({
       }
     }
 
-    // If closing an incognito tab, always clear that tab's specific partition immediately.
-    // If no more incognito tabs remain, also clear the legacy shared partition for safety.
     if (targetTab?.isIncognito) {
-      if (getElectronAPI()?.clearIncognitoSession) {
-        getElectronAPI()?.clearIncognitoSession(targetTab.id)?.catch((e: any) => console.error(e));
-      }
-      const remainingIncognitoTabs = newTabs.some(t => t.isIncognito);
-      if (!remainingIncognitoTabs && getElectronAPI()?.clearIncognitoSession) {
-        getElectronAPI()?.clearIncognitoSession()?.catch((e: any) => console.error(e));
-      }
+      cleanupIncognitoSessions([targetTab], newTabs);
     }
 
     setTabs(newTabs);
@@ -298,6 +298,7 @@ export function useTabOperations({
     toClose.forEach(t => tabThumbnailCache.remove(t.id));
     pushClosedTabs(toClose);
     const toKeep = prev.filter(t => !toClose.some(c => c.id === t.id));
+    cleanupIncognitoSessions(toClose, toKeep);
     // activateTab must come after the snapshot-derived setTabs(toKeep): its wake
     // is a functional update and would be overwritten by that direct value.
     setTabs(toKeep);
@@ -335,6 +336,7 @@ export function useTabOperations({
     closeIds.forEach(id => tabThumbnailCache.remove(id));
     pushClosedTabs(tabsToClose);
     const nextTabs = prev.filter(t => !closeIds.has(t.id));
+    cleanupIncognitoSessions(tabsToClose, nextTabs);
     setTabs(nextTabs);
     // Same ordering rule as handleCloseOtherTabs: activate after the
     // snapshot-derived setTabs so the wake is not discarded.
@@ -598,7 +600,11 @@ export function useTabOperations({
       // URL is exactly the same, force a reload if it's a webview
       if (!isInternalPage) {
         const webview = document.querySelector(`webview[data-tab-id="${targetId}"]`) as any;
-        if (webview) webview.reload();
+        try {
+          if (typeof webview?.reload === 'function') {
+            webview.reload();
+          }
+        } catch (_) {}
       }
       setTabs(p => p.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t));
       return;

@@ -42,10 +42,57 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.5.0',
+    date: 'October 2026',
+    title: 'Webview Stability, Anti-Bot Compatibility & Hardened Session Lifecycle',
+    badge: 'Latest Release',
+    lede: 'Eliminated automated bot false-positives across search engines, resolved webview redirect loops affecting modern dynamic web apps like YouTube, and unified partition cleanup across multi-tab teardown.',
+    hero: {
+      src: './screenshots/newtab.png',
+      alt: 'Nova Browser v1.5.0 interface.',
+      caption: 'Nova v1.5.0: Smooth navigation, authentic webview identity, and robust streaming media playback.',
+    },
+    highlights: [
+      'Standardized webview client identity and prototype emulation to prevent search engine CAPTCHA false-positives.',
+      'Dynamic URL equivalence matching resolving infinite reload loops on complex SPA and video platforms including YouTube.',
+      'Adblocker network filter safeguards ensuring critical video playback scripts and authentication endpoints are never interrupted.',
+      'Incognito partition teardown centralized across batch tab closure operations, preventing memory leaks and orphaned states.',
+      'Stabilized omnibox suggestion lifecycle and webview reload safety wrappers.',
+    ],
+    sections: [
+      {
+        eyebrow: 'Compatibility & Web',
+        title: 'Seamless search and streaming',
+        body: 'Restored full compatibility with modern web applications and bot detection systems. Search engines no longer flag requests as automated scrapers, and video platforms like YouTube render smoothly without blank screens or navigation loops.',
+        points: [
+          'Authentic Chrome client brands and prototype definitions injected into guest frames.',
+          'Domain and path equivalence check prevents redundant webview reloads.',
+          'Streamlined adblock exception rules for essential media endpoints.',
+        ],
+      },
+      {
+        eyebrow: 'Reliability & Tabs',
+        title: 'Deterministic session hygiene',
+        body: 'Batch tab closure operations now strictly purge isolated incognito partitions without leaving residual memory or sessions behind.',
+        points: [
+          'Centralized partition teardown for Close Other and Close Right actions.',
+          'Safe reload wrapper prevents uncaught exceptions during active tab navigation.',
+          'Omnibox bookmark change tracking stays fully synchronized.',
+        ],
+      },
+    ],
+    changes: [
+      { category: 'fix', text: 'Resolved search engine CAPTCHA loops by aligning webview User-Agent and Client Hints with authentic browser standards.' },
+      { category: 'fix', text: 'Fixed YouTube blank screen caused by URL normalizer reload collisions.' },
+      { category: 'improvement', text: 'Whitelisted essential video player and authentication CDNs in adblock manager.' },
+      { category: 'security', text: 'Centralized incognito session cleanup for batch tab closing operations.' },
+      { category: 'performance', text: 'Optimized omnibox bookmark lookup dependencies and webview safe reload executions.' },
+    ],
+  },
+  {
     version: '1.4.9',
     date: 'September 2026',
     title: 'Private Tab Navigation, E2EE Vault Conflict Resolution & Local Whisper AI',
-    badge: 'Latest Release',
     lede: 'Seamless switching between private and normal tabs, deterministic E2EE synchronization with race condition resilience, on-device Whisper voice transcription, and strict boundary defense across every subsystem.',
     hero: {
       src: './screenshots/newtab.png',

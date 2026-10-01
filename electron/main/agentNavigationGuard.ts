@@ -89,18 +89,23 @@ export async function isAgentNavigationHostPublic(
   }
 
   let entries: Array<{ address: string; family?: number }>;
+  let timer: NodeJS.Timeout | undefined;
   try {
+    const lookupPromise = lookup(host);
+    lookupPromise.catch(() => {});
     entries = await Promise.race([
-      lookup(host),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('DNS lookup timeout')), LOOKUP_TIMEOUT_MS)
-      ),
+      lookupPromise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('DNS lookup timeout')), LOOKUP_TIMEOUT_MS);
+      }),
     ]);
   } catch (err: any) {
     return {
       allowed: false,
       reason: `DNS resolution failed (${err?.message || 'unknown error'})`
     };
+  } finally {
+    if (timer) clearTimeout(timer);
   }
   return classifyResolvedAddresses(entries);
 }

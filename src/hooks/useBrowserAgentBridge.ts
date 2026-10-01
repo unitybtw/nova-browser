@@ -446,17 +446,21 @@ export function useBrowserAgentBridge({
           const timeoutPromise = new Promise((_, reject) => {
             timer = setTimeout(() => reject(new Error('Script execution timed out')), timeoutMs);
           });
+          const scriptPromise = webview.executeJavaScript(script);
+          if (typeof scriptPromise?.catch === 'function') {
+            scriptPromise.catch(() => {});
+          }
           try {
             const res = await Promise.race([
-              webview.executeJavaScript(script),
+              scriptPromise,
               timeoutPromise
             ]);
-            clearTimeout(timer);
             return res;
           } catch (e) {
-            clearTimeout(timer);
             console.warn("AI execution error or timeout:", e);
             throw e;
+          } finally {
+            if (timer) clearTimeout(timer);
           }
         }
 

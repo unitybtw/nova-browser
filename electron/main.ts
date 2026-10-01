@@ -200,6 +200,10 @@ export function getStandardUserAgent(): string {
   return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 }
 
+try {
+  app.userAgentFallback = getStandardUserAgent();
+} catch (_) {}
+
 // Portable Mode: If running as a portable executable on Windows, isolate user data
 // into a local directory on the portable device instead of host %APPDATA%
 if (process.env.PORTABLE_EXECUTABLE_DIR) {
@@ -659,13 +663,11 @@ function createWindow() {
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
     try {
-      // Keep Electron/Chromium's native UA and Client Hints in sync. Only the
-      // language preference is customized for the user's selected app locale.
-      targetSession.setUserAgent(targetSession.getUserAgent(), currentAcceptLanguages);
+      // Keep Electron/Chromium's native UA and Client Hints in sync with standard Chrome
+      targetSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
     } catch (_) {}
 
-    // Apply user-selected language and privacy signals without fabricating a
-    // Chrome identity; Chromium generates its own consistent Client Hints.
+    // Apply user-selected language, standard browser headers, and privacy signals
     targetSession.webRequest.onBeforeSendHeaders((details, callback) => {
       const requestHeaders = { ...details.requestHeaders };
 
@@ -677,6 +679,21 @@ function createWindow() {
 
       if (isHttp) {
         requestHeaders['Accept-Language'] = currentAcceptLanguages;
+
+        // Strip any residual Electron / NovaBrowser branding from User-Agent
+        if (requestHeaders['User-Agent']) {
+          requestHeaders['User-Agent'] = requestHeaders['User-Agent']
+            .replace(/\s*Electron\/[0-9.]+/gi, '')
+            .replace(/\s*NovaBrowser\/[0-9.]+/gi, '')
+            .trim();
+        }
+        // Clean sec-ch-ua brand header to remove "Electron"
+        if (requestHeaders['sec-ch-ua']) {
+          requestHeaders['sec-ch-ua'] = requestHeaders['sec-ch-ua']
+            .replace(/,\s*"Electron";v="[^"]*"/gi, '')
+            .replace(/"Electron";v="[^"]*",?\s*/gi, '')
+            .trim();
+        }
       }
 
       if (isPrivacyShieldEnabled || isDoNotTrackEnabled) {
@@ -3169,11 +3186,16 @@ fi
         // `fetch-page-html` genuinely pins, by injecting the vetted address as
         // the agent's `lookup`. Closing this needs the same treatment or a
         // Chromium-side resolver; see agentNavigationGuard for the same caveat.
+        let dnsTimeoutTimer: NodeJS.Timeout | undefined;
         try {
           const lookupHost = (host.startsWith('[') && host.endsWith(']')) ? host.slice(1, -1) : host;
+          const lookupPromise = dnsLookup(lookupHost, { all: true }) as Promise<any>;
+          lookupPromise.catch(() => {});
           const dnsResult = await Promise.race([
-            dnsLookup(lookupHost, { all: true }) as Promise<any>,
-            new Promise<never>((_, reject) => setTimeout(() => reject(new Error('DNS lookup timeout')), 3000)),
+            lookupPromise,
+            new Promise<never>((_, reject) => {
+              dnsTimeoutTimer = setTimeout(() => reject(new Error('DNS lookup timeout')), 3000);
+            }),
           ]);
           const addrList = Array.isArray(dnsResult) ? dnsResult : [dnsResult];
           if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address ?? String(entry ?? '')))) {
@@ -3183,6 +3205,8 @@ fi
         } catch (dnsErr: any) {
           console.warn(`[Security] Blocked open-external, DNS resolution failed for host: ${host}`, dnsErr?.message || dnsErr);
           return false;
+        } finally {
+          if (dnsTimeoutTimer) clearTimeout(dnsTimeoutTimer);
         }
         // Security: Block embedded credentials in URLs (phishing, SSRF, or credential harvesting vector)
         if (parsed.username || parsed.password) {
@@ -3790,12 +3814,12 @@ ipcMain.handle('set-app-language', async (event, lang: unknown) => {
   currentAcceptLanguages = getAcceptLanguagesForLocale(cleanLang);
 
   try {
-    session.defaultSession.setUserAgent(session.defaultSession.getUserAgent(), currentAcceptLanguages);
-    session.fromPartition('incognito').setUserAgent(session.fromPartition('incognito').getUserAgent(), currentAcceptLanguages);
+    session.defaultSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
+    session.fromPartition('incognito').setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
     for (const partName of hardenedIncognitoPartitions) {
       try {
         const targetSession = session.fromPartition(partName, { cache: false });
-        targetSession.setUserAgent(targetSession.getUserAgent(), currentAcceptLanguages);
+        targetSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
       } catch (_) {}
     }
   } catch (_) {}

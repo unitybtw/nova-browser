@@ -302,7 +302,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, bookmarks]);
+  }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, matchedBookmarks]);
 
   return (
     <div className="flex-1 flex w-full mx-1 duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
