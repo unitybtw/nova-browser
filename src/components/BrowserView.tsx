@@ -21,6 +21,23 @@ const ChangelogPage = lazy(() => import('./ChangelogPage').then(m => ({ default:
 
 const NOOP = () => {};
 
+export function areUrlsEquivalent(urlA?: string, urlB?: string): boolean {
+  if (!urlA || !urlB) return false;
+  if (urlA === urlB) return true;
+  if (urlA.replace(/\/$/, '') === urlB.replace(/\/$/, '')) return true;
+  try {
+    const a = new URL(urlA);
+    const b = new URL(urlB);
+    const hostA = a.hostname.toLowerCase().replace(/^www\./, '');
+    const hostB = b.hostname.toLowerCase().replace(/^www\./, '');
+    const pathA = a.pathname.replace(/\/$/, '');
+    const pathB = b.pathname.replace(/\/$/, '');
+    return a.protocol === b.protocol && hostA === hostB && pathA === pathB && a.search === b.search;
+  } catch {
+    return false;
+  }
+}
+
 // Origins already hinted via <link rel="preconnect">. LRU bounded to max 50 entries
 // so document.head does not accumulate unbounded link DOM nodes over long sessions.
 const MAX_PRECONNECT_HINTS = 50;
@@ -444,7 +461,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       // 4. Ensure current URL is synchronized on DOM ready
       try {
         const currentUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-        if (currentUrl && currentUrl !== 'about:blank' && tab?.id && currentUrl !== latestTabRef.current?.url) {
+        if (currentUrl && currentUrl !== 'about:blank' && tab?.id && !areUrlsEquivalent(currentUrl, latestTabRef.current?.url)) {
           lastLoadedUrl.current = currentUrl;
           onUpdateTab(tab.id, {
             url: currentUrl,
@@ -944,15 +961,15 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const wv = webviewRef.current as any;
     if (!wv) return;
 
-    // Prevent duplicate reload if this URL is already loaded
-    if (lastLoadedUrl.current === targetUrl) {
+    // Prevent duplicate reload if this URL or an equivalent one is already loaded
+    if (areUrlsEquivalent(lastLoadedUrl.current, targetUrl)) {
       return;
     }
 
-    // Check if the webview is already at this URL to prevent duplicate navigation/refresh
+    // Check if the webview is already at an equivalent URL to prevent duplicate navigation/refresh
     try {
       const currentWvUrl = wv.getURL?.();
-      if (currentWvUrl && (currentWvUrl === targetUrl || currentWvUrl.replace(/\/$/, '') === targetUrl.replace(/\/$/, ''))) {
+      if (currentWvUrl && areUrlsEquivalent(currentWvUrl, targetUrl)) {
         lastLoadedUrl.current = targetUrl;
         return;
       }
@@ -969,7 +986,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         wv.removeEventListener('dom-ready', pendingLoad);
         try {
           const currentWvUrl = wv.getURL?.();
-          if (currentWvUrl && (currentWvUrl === targetUrl || currentWvUrl.replace(/\/$/, '') === targetUrl.replace(/\/$/, ''))) {
+          if (currentWvUrl && areUrlsEquivalent(currentWvUrl, targetUrl)) {
             return;
           }
         } catch (e) {}
@@ -1204,7 +1221,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       >
         <Suspense fallback={<div className="w-full h-full bg-slate-50 dark:bg-slate-950" />}>
           <ChangelogPage
-            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.4.9'}
+            currentVersion={typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.5.0'}
             onNavigate={(url) => {
               if (onNavigate) {
                 onNavigate(url, tab.id);

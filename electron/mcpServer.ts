@@ -721,7 +721,7 @@ export class BrowserMCPServer {
         // Authenticated: return detailed info, build string included. Read the
         // version only on this branch so an unauthenticated probe never causes
         // it to be computed at all.
-        const appVersion = electronApp?.getVersion?.() || '1.4.9';
+        const appVersion = electronApp?.getVersion?.() || '1.5.0';
         res.json({
           status: 'ok',
           server: 'nova-browser-mcp',

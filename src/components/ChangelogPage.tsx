@@ -44,7 +44,7 @@ const CATEGORY_ORDER: ChangelogItem['category'][] = [
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 export const ChangelogPage: React.FC<ChangelogPageProps> = ({
-  currentVersion = '1.4.9',
+  currentVersion = '1.5.0',
   onNavigate,
 }) => {
   const reduceMotion = useReducedMotion();

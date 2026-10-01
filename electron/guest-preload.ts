@@ -1,4 +1,4 @@
-import { ipcRenderer } from 'electron';
+import { ipcRenderer, webFrame } from 'electron';
 
 /**
  * Isolated guest preload script for general webview instances.
@@ -10,6 +10,94 @@ import { ipcRenderer } from 'electron';
 // Origin validation: only execute for secure HTTP/HTTPS web contexts
 const protocol = window.location.protocol;
 if (protocol === 'https:' || protocol === 'http:') {
+  // Synchronously sanitize main world prototype before any page scripts run:
+  // Purge any Electron branding from navigator and userAgentData to prevent
+  // Google bot detection (CAPTCHA/robot checks) and YouTube blank screens.
+  try {
+    const chromeVer = (typeof process !== 'undefined' && process.versions && process.versions.chrome) || '134.0.0.0';
+    const majorVer = chromeVer.split('.')[0] || '134';
+    const plat = typeof process !== 'undefined' ? process.platform : 'darwin';
+    const arch = typeof process !== 'undefined' ? process.arch : 'x64';
+
+    let platformName = 'macOS';
+    let platformVersion = '15.0.0';
+    let architecture = arch === 'arm64' ? 'arm' : 'x86';
+    let osUserAgent = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+
+    if (plat === 'win32') {
+      platformName = 'Windows';
+      platformVersion = '10.0.0';
+      architecture = 'x86';
+      osUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    } else if (plat === 'linux') {
+      platformName = 'Linux';
+      platformVersion = '6.5.0';
+      architecture = 'x86';
+      osUserAgent = `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
+    }
+
+    const mainWorldSanitizer = `
+      (() => {
+        try {
+          if ('webdriver' in Navigator.prototype) {
+            delete Navigator.prototype.webdriver;
+          }
+        } catch (_) {}
+
+        try {
+          const dynamicBrands = [
+            { brand: 'Not(A:Brand', version: '99' },
+            { brand: 'Chromium', version: ${JSON.stringify(majorVer)} },
+            { brand: 'Google Chrome', version: ${JSON.stringify(majorVer)} }
+          ];
+
+          Object.defineProperty(Navigator.prototype, 'userAgentData', {
+            get: () => ({
+              brands: dynamicBrands,
+              mobile: false,
+              platform: ${JSON.stringify(platformName)},
+              getHighEntropyValues: async () => ({
+                architecture: ${JSON.stringify(architecture)},
+                bitness: '64',
+                brands: dynamicBrands,
+                mobile: false,
+                model: '',
+                platform: ${JSON.stringify(platformName)},
+                platformVersion: ${JSON.stringify(platformVersion)},
+                uaFullVersion: ${JSON.stringify(chromeVer)}
+              }),
+              toJSON: function() {
+                return { brands: this.brands, mobile: this.mobile, platform: this.platform };
+              }
+            }),
+            configurable: true,
+            enumerable: true
+          });
+        } catch (_) {}
+
+        try {
+          Object.defineProperty(Navigator.prototype, 'userAgent', {
+            get: () => ${JSON.stringify(osUserAgent)},
+            configurable: true,
+            enumerable: true
+          });
+          Object.defineProperty(Navigator.prototype, 'appVersion', {
+            get: () => ${JSON.stringify(osUserAgent.replace(/^Mozilla\//, ''))},
+            configurable: true,
+            enumerable: true
+          });
+          Object.defineProperty(Navigator.prototype, 'vendor', {
+            get: () => 'Google Inc.',
+            configurable: true,
+            enumerable: true
+          });
+        } catch (_) {}
+      })();
+    `;
+
+    webFrame.executeJavaScriptInIsolatedWorld(0, [{ code: mainWorldSanitizer }]);
+  } catch (_) {}
+
   let lastEnteredUsername = '';
   let lastSubmitTime = 0;
   let lastSubmittedPayload = '';

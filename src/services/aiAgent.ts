@@ -1910,13 +1910,16 @@ CRITICAL RULES:
           });
         };
 
+        let timeoutHandle: any = null;
         try {
-          let timeoutHandle: any = null;
           const timeoutPromise = new Promise((_, reject) => {
             timeoutHandle = setTimeout(() => reject(new Error('Source visit timeout')), 5500);
           });
-          await Promise.race([visitSingleSource(), timeoutPromise]);
-          clearTimeout(timeoutHandle);
+          const visitPromise = visitSingleSource();
+          if (typeof (visitPromise as any)?.catch === 'function') {
+            (visitPromise as any).catch(() => {});
+          }
+          await Promise.race([visitPromise, timeoutPromise]);
         } catch (sourceErr) {
           logger.warn('AIAgent:webResearch', `Source ${i + 1} timed out or failed, using snippet fallback`, sourceErr);
           visitedSources.push({
@@ -1927,6 +1930,8 @@ CRITICAL RULES:
             snippet: target.snippet,
             content: target.snippet || ''
           });
+        } finally {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
         }
 
         // Brief pause between sources
@@ -1971,6 +1976,7 @@ CRITICAL RULES:
 
     // If local LLM engine is initialized and ready, ask it to synthesize without emojis (with 10s timeout)
     if (this.engine && hasVisitedContent) {
+      let llmTimer: any = null;
       try {
         const sourcesContext = visitedSources.map((s, idx) => {
           let text = `[Source ${idx + 1}: ${s.title}]\nURL: ${s.url}\n`;
@@ -1989,29 +1995,33 @@ CRITICAL RULES:
           ? `Kullanici su konuyu arastirdi: "${searchTopic}".\nOtonom olarak webde arandi, asagidaki kaynak sayfalar ziyaret edilip okundu:\n\n${sourcesContext}\n\nLutfen bu kaynaklardaki somut haber ve bilgileri temel alarak net, kapsamli, Turkce ve profesyonel bir ozet rapor sun. One cikan guncel haber mansetlerini ve gelismeleri maddeler halinde vurgula. ASLA emoji kullanma. Raporun sonuna "### Incelenen Kaynaklar" basligi altinda her kaynagi [Baslik](URL) seklinde ekle.`
           : `The user requested research on: "${searchTopic}".\nYou autonomously searched the web and extracted the following visited source pages:\n\n${sourcesContext}\n\nSynthesize an informative, clear, and comprehensive research report based on these real-time web findings. Highlight actual breaking headlines and key developments with bullet points. NEVER use any emojis. Conclude with a "### Consulted Sources" section listing each source as a markdown link [Title](URL).`;
 
-        let llmTimer: any = null;
         const llmTimeout = new Promise((_, reject) => {
           llmTimer = setTimeout(() => reject(new Error('LLM synthesis timeout')), 10000);
         });
-
-        const completion = await Promise.race([
-          this.engine.chat.completions.create({
+          const llmPromise = this.engine.chat.completions.create({
             messages: [{ role: 'user', content: synthesisPrompt }],
             temperature: 0.25,
             max_tokens: 800,
             stream: false
-          }),
-          llmTimeout
-        ]) as any;
-        clearTimeout(llmTimer);
+          });
+          if (typeof (llmPromise as any)?.catch === 'function') {
+            (llmPromise as any).catch(() => {});
+          }
 
-        const llmContent = completion?.choices?.[0]?.message?.content;
-        if (llmContent && llmContent.trim().length > 50) {
-          finalReport = llmContent;
+          const completion = await Promise.race([
+            llmPromise,
+            llmTimeout
+          ]) as any;
+
+          const llmContent = completion?.choices?.[0]?.message?.content;
+          if (llmContent && llmContent.trim().length > 50) {
+            finalReport = llmContent;
+          }
+        } catch (err) {
+          logger.warn('AIAgent:webResearch', 'LLM synthesis timed out or failed, falling back to structured synthesis', err);
+        } finally {
+          if (llmTimer) clearTimeout(llmTimer);
         }
-      } catch (err) {
-        logger.warn('AIAgent:webResearch', 'LLM synthesis timed out or failed, falling back to structured synthesis', err);
-      }
     }
 
     // Fallback structured synthesis if LLM unavailable or timed out (Strictly NO emojis)

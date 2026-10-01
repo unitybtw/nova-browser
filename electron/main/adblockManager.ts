@@ -8,14 +8,22 @@ import { adsAndTrackingLists } from '@cliqz/adblocker';
 let blocker: ElectronBlocker | null = null;
 let currentWhitelistFilters: any[] = [];
 
-// Essential CAPTCHA & verification domains that must never be blocked by adblocker
+// Essential CAPTCHA, verification, and critical streaming infrastructure domains that must never be blocked by adblocker
 export const CAPTCHA_WHITELIST_RULES = [
   'google.com/recaptcha',
   'gstatic.com/recaptcha',
   'recaptcha.net',
   'challenges.cloudflare.com',
   'hcaptcha.com',
-  'newassets.hcaptcha.com'
+  'newassets.hcaptcha.com',
+  'googlevideo.com',
+  's.ytimg.com',
+  'i.ytimg.com',
+  'youtubei.googleapis.com',
+  'www.youtube.com',
+  'youtube.com',
+  'apis.google.com',
+  'consent.google.com'
 ];
 
 export function getBlocker(): ElectronBlocker | null {
