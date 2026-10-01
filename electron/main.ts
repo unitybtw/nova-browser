@@ -391,7 +391,10 @@ function isTrustedAppOrigin(urlStr: string): boolean {
       const allowedPath = path.resolve(path.join(__dirname, '../dist/index.html'));
       try {
         const navPath = fileURLToPath(urlStr);
-        return path.resolve(navPath) === allowedPath;
+        const resolvedNav = path.resolve(navPath);
+        return process.platform === 'win32'
+          ? resolvedNav.toLowerCase() === allowedPath.toLowerCase()
+          : resolvedNav === allowedPath;
       } catch {
         return false;
       }
@@ -1429,6 +1432,26 @@ function cleanStaleUpdateArtifacts(): void {
         }
       } catch (_) {}
     }
+
+    // 6. Clean orphaned store and secure-store temporary write files in userData
+    try {
+      const userDataDir = app.getPath('userData');
+      if (fs.existsSync(userDataDir)) {
+        const uEntries = fs.readdirSync(userDataDir);
+        for (const entry of uEntries) {
+          if ((entry.startsWith('store_') || entry.startsWith('secure_')) && entry.endsWith('.tmp')) {
+            const tmpFile = path.join(userDataDir, entry);
+            try {
+              const stat = fs.statSync(tmpFile);
+              // If older than 15 minutes, it is an abandoned crash leftover
+              if ((Date.now() - stat.mtimeMs) > 15 * 60 * 1000) {
+                fs.unlinkSync(tmpFile);
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
   } catch (e) {
     console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
   }
