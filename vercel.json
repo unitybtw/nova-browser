@@ -1,6 +1,7 @@
 {
   "version": 2,
-  "buildCommand": "npm --prefix website ci && npm --prefix website run build",
+  "installCommand": "npm --prefix website ci",
+  "buildCommand": "npm --prefix website run build",
   "outputDirectory": "website/dist",
   "framework": "vite",
   "ignoreCommand": "bash scripts/ignore-vercel-build.sh",

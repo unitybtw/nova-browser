@@ -13,7 +13,7 @@ import Faq from './components/Faq';
 import Footer from './components/Footer';
 
 export default function App() {
-  const [showNav, setShowNav] = useState(false);
+  const [showNav, setShowNav] = useState(true);
 
   useEffect(() => {
     if ('scrollRestoration' in history) {
@@ -47,35 +47,18 @@ export default function App() {
       lenisRafId = requestAnimationFrame(raf);
     }
 
-    let scrollTicking = false;
     let isScrollingTimer: ReturnType<typeof setTimeout> | null = null;
-    let lastPastManifesto: boolean | null = null;
 
     const stopScrolling = () => {
       window.__isScrolling = false;
-    };
-
-    const updateScrollState = () => {
-      const isPast = window.scrollY > window.innerHeight * 0.35;
-      if (isPast !== lastPastManifesto) {
-        lastPastManifesto = isPast;
-        setShowNav(isPast);
-      }
-      scrollTicking = false;
     };
 
     const handleScroll = () => {
       window.__isScrolling = true;
       if (isScrollingTimer) clearTimeout(isScrollingTimer);
       isScrollingTimer = setTimeout(stopScrolling, 90);
-
-      if (!scrollTicking) {
-        scrollTicking = true;
-        requestAnimationFrame(updateScrollState);
-      }
     };
 
-    updateScrollState();
     window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('scrollend', stopScrolling, { passive: true });
 

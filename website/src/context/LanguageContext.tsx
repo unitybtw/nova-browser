@@ -18,10 +18,23 @@ const LanguageContext = createContext<LanguageContextType | undefined>(undefined
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [lang, setLangState] = useState<Language>(() => {
     if (typeof window === 'undefined') return 'en';
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const queryLang = urlParams.get('lang')?.toLowerCase();
+      if (queryLang === 'en' || queryLang === 'tr') {
+        localStorage.setItem(STORAGE_KEY, queryLang);
+        return queryLang;
+      }
+    } catch {
+      // Ignore URL parsing errors
+    }
     const saved = localStorage.getItem(STORAGE_KEY) as Language | null;
     if (saved === 'en' || saved === 'tr') return saved;
-    const browserLang = navigator.language?.toLowerCase() || '';
-    return browserLang.startsWith('tr') ? 'tr' : 'en';
+    const navLangs = Array.isArray(navigator.languages) && navigator.languages.length > 0
+      ? navigator.languages
+      : [navigator.language || ''];
+    const hasTr = navLangs.some((l) => typeof l === 'string' && l.toLowerCase().startsWith('tr'));
+    return hasTr ? 'tr' : 'en';
   });
 
   const [isTransitioning, setIsTransitioning] = useState(false);

@@ -111,7 +111,9 @@ export class StampType {
     );
     this.metrics.clear();
     this.drawnTick = -1;
-    if (!this.running) this.draw(this.stillTick());
+    const cycle = PASS_PITCH * this.worlds.length;
+    const tick = Math.floor(this.acc / TICK_MS) % cycle;
+    this.draw(this.running ? tick : this.stillTick());
   }
 
   resize() {
