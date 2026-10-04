@@ -2,8 +2,10 @@ import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { StampTypeCard } from './stamptype/StampTypeCard';
+import { useLanguage } from '../context/LanguageContext';
 
 export const ManifestoHero: React.FC = React.memo(() => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
 
   const handleScrollDown = () => {
@@ -24,7 +26,7 @@ export const ManifestoHero: React.FC = React.memo(() => {
     >
       {/* Full-bleed Edge-to-Edge Kinetic Typography Canvas */}
       <div className="absolute inset-0 h-full w-full">
-        <StampTypeCard className="h-full w-full" />
+        <StampTypeCard className="h-full w-full" worlds={t.manifesto.worlds} />
       </div>
 
       {/* Bottom atmospheric gradient fade transitioning into page content */}
@@ -41,7 +43,7 @@ export const ManifestoHero: React.FC = React.memo(() => {
         animate={prefersReducedMotion ? undefined : { opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
         className="group absolute bottom-8 left-1/2 z-20 -translate-x-1/2 cursor-pointer p-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white rounded-full bg-[#12141c]/90 border border-white/20 hover:border-white/60 hover:bg-[#181b26] transition-colors shadow-lg"
-        aria-label="Scroll down to main content"
+        aria-label={t.manifesto.scrollAria}
       >
         <motion.div
           animate={

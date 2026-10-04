@@ -1,53 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { ChevronDown, HelpCircle } from 'lucide-react';
-
-interface FaqItem {
-  question: string;
-  answer: string;
-  category: string;
-}
-
-const FAQS: FaqItem[] = [
-  {
-    question: 'Is Nova Browser really 100% free and open-source?',
-    answer:
-      'Yes. Nova is completely free and licensed under the permissive MIT Open Source License. There are no paywalls, premium tiers, or hidden subscriptions. The entire codebase is auditable on GitHub.',
-    category: 'LICENSING',
-  },
-  {
-    question: 'Does Nova send any of my browsing data or AI queries to the cloud?',
-    answer:
-      'No. Nova operates under a zero-telemetry architecture. All autonomous AI synthesis, deep research sidepanel agents, and local memory vault operations execute client-side using local WebGPU shaders and hardware-backed storage. Zero background pings are sent to any analytics servers.',
-    category: 'PRIVACY',
-  },
-  {
-    question: 'Can I import my bookmarks and Chrome extensions?',
-    answer:
-      'Yes. Because Nova is built on modern Chromium and Electron, standard Chromium extensions (Manifest V3) and standard HTML bookmark files can be imported directly into your workspace.',
-    category: 'ECOSYSTEM',
-  },
-  {
-    question: 'What are the system requirements for on-device AI?',
-    answer:
-      'Nova runs smoothly on any Apple Silicon Mac (M1/M2/M3/M4) and modern Windows 10/11 PCs with 8GB+ RAM and DirectX 12 / Vulkan compatible GPUs. For systems without dedicated WebGPU acceleration, lightweight fallback CPU pipelines are supported.',
-    category: 'HARDWARE',
-  },
-  {
-    question: 'How does 1-click page translation work?',
-    answer:
-      'Nova packages extracted DOM text nodes into concurrent batch payloads and translates them via high-speed dictionary bridges, cleanly replacing node text in place without altering page layout, styles, or event listeners.',
-    category: 'ENGINE',
-  },
-  {
-    question: 'How does tab hibernation save memory compared to Chrome?',
-    answer:
-      'When background tabs become inactive, Nova suspends their rendering pipeline and pauses inactive background execution cycles while preserving full navigation state. Clicking a suspended tab restores it instantly without losing session context.',
-    category: 'PERFORMANCE',
-  },
-];
+import { useLanguage } from '../context/LanguageContext';
 
 export const Faq: React.FC = () => {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<number | null>(0);
   const prefersReducedMotion = useReducedMotion();
 
@@ -60,19 +17,19 @@ export const Faq: React.FC = () => {
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-          TRANSPARENCY & FREQUENTLY ASKED QUESTIONS
+          {t.faq.badge}
         </span>
         <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-[#171717] tracking-tight mt-3">
-          Clear <span className="text-[#4338ca]">Answers</span>.
+          {t.faq.headline} <span className="text-[#4338ca]">{t.faq.headlineAccent}</span>
         </h2>
         <p className="font-sans text-neutral-600 mt-4 text-sm sm:text-base leading-relaxed">
-          Everything you need to know about Nova Browser’s security model, local runtime, and architecture.
+          {t.faq.subtitle}
         </p>
       </div>
 
       {/* Accordion List */}
       <div className="space-y-4">
-        {FAQS.map((faq, idx) => {
+        {t.faq.items.map((faq, idx) => {
           const isOpen = openIndex === idx;
           return (
             <div

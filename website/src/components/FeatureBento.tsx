@@ -1,64 +1,66 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Bot, Lock, Columns, Shield, Terminal } from 'lucide-react';
 import { CodeTrailCard } from './codetrail/CodeTrailCard';
 import { TextRevealCard } from './textreveal/TextRevealCard';
-
-const MODULES = [
-  {
-    id: 'agent',
-    span: 'lg:col-span-8',
-    title: 'Autonomous Local AI Agent',
-    tag: 'WEBGPU NEURAL RUNTIME',
-    description: 'On-device neural inference with Llama 3.2 3B & Phi 3.5 Vision. Deep DOM parsing, shader execution, and intelligent code synthesis with 0% cloud transmission.',
-    icon: Bot,
-    stats: '100% LOCAL WEBGPU',
-    hasVisual: true,
-  },
-  {
-    id: 'vault',
-    span: 'lg:col-span-4',
-    title: 'Zero-Knowledge Crypto Vault',
-    tag: 'AES-256-GCM E2EE',
-    description: 'Client-side PBKDF2 key derivation. Your open tabs, history, and passwords sync without servers having decryption keys.',
-    icon: Lock,
-    stats: 'END-TO-END',
-    hasVisual: false,
-  },
-  {
-    id: 'split',
-    span: 'lg:col-span-4',
-    title: 'Dual-View Split Screen',
-    tag: 'PARALLEL TILING',
-    description: 'Work simultaneously across two independent webview sessions with synchronized scrolling and frame dragging.',
-    icon: Columns,
-    stats: 'SYNCHRONIZED',
-    hasVisual: false,
-  },
-  {
-    id: 'privacy',
-    span: 'lg:col-span-4',
-    title: 'Sub-ms Privacy Shield',
-    tag: 'NETWORK FILTER ENGINE',
-    description: 'Intercepts advertising beacons and tracking payloads at the network level before DOM parsing ever starts.',
-    icon: Shield,
-    stats: '<1ms DECISION',
-    hasVisual: false,
-  },
-  {
-    id: 'mcp',
-    span: 'lg:col-span-4',
-    title: 'Local MCP Server Bridge',
-    tag: 'PORT 3020 SSE',
-    description: 'Built-in Model Context Protocol server running locally to bridge terminal commands, scripts, and local LLMs.',
-    icon: Terminal,
-    stats: 'LOCALHOST ONLY',
-    hasVisual: false,
-  },
-];
+import { useLanguage } from '../context/LanguageContext';
 
 export const FeatureBento: React.FC = React.memo(() => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
+
+  const modules = useMemo(() => [
+    {
+      id: 'agent',
+      span: 'lg:col-span-8',
+      title: t.features.agentTitle,
+      tag: t.features.agentTag,
+      description: t.features.agentDesc,
+      icon: Bot,
+      stats: t.features.agentStat,
+      hasVisual: true,
+    },
+    {
+      id: 'vault',
+      span: 'lg:col-span-4',
+      title: t.features.vaultTitle,
+      tag: t.features.vaultTag,
+      description: t.features.vaultDesc,
+      icon: Lock,
+      stats: t.features.vaultStat,
+      hasVisual: false,
+    },
+    {
+      id: 'split',
+      span: 'lg:col-span-4',
+      title: t.features.splitTitle,
+      tag: t.features.splitTag,
+      description: t.features.splitDesc,
+      icon: Columns,
+      stats: t.features.splitStat,
+      hasVisual: false,
+    },
+    {
+      id: 'privacy',
+      span: 'lg:col-span-4',
+      title: t.features.privacyTitle,
+      tag: t.features.privacyTag,
+      description: t.features.privacyDesc,
+      icon: Shield,
+      stats: t.features.privacyStat,
+      hasVisual: false,
+    },
+    {
+      id: 'mcp',
+      span: 'lg:col-span-4',
+      title: t.features.mcpTitle,
+      tag: t.features.mcpTag,
+      description: t.features.mcpDesc,
+      icon: Terminal,
+      stats: t.features.mcpStat,
+      hasVisual: false,
+    },
+  ], [t]);
 
   return (
     <section id="features" className="section-deferred mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 sm:py-28 lg:py-32">
@@ -66,20 +68,20 @@ export const FeatureBento: React.FC = React.memo(() => {
       <div className="mb-12 flex flex-col gap-5 sm:mb-16 md:flex-row md:items-end md:justify-between md:gap-8">
         <div>
           <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-            ARCHITECTURE MATRIX
+            {t.features.badge}
           </span>
           <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-            Engineered for <span className="text-[#4338ca]">Autonomy</span>.
+            {t.features.headline} <span className="text-[#4338ca]">{t.features.headlineAccent}</span>
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-base leading-relaxed">
-          Modular architectural pillars built without compromise for sovereign computing.
+          {t.features.subtitle}
         </p>
       </div>
 
       {/* Bento Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {MODULES.map((mod, index) => (
+        {modules.map((mod) => (
           <motion.div
             key={mod.id}
             initial={prefersReducedMotion ? false : { opacity: 0, y: 30 }}
@@ -95,7 +97,7 @@ export const FeatureBento: React.FC = React.memo(() => {
                 <div className="rounded-xl border border-slate-100 bg-slate-50 p-3 text-[#4338ca] transition-colors duration-300 group-hover/bento:border-[#4338ca]/20 group-hover/bento:bg-[#4338ca] group-hover/bento:text-white">
                   {React.createElement(mod.icon, { className: 'w-5 h-5' })}
                 </div>
-                <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200 transition-colors duration-300 group-hover/bento:bg-indigo-50 group-hover/bento:text-[#4338ca] group-hover/bento:border-indigo-100">
+                <span className="font-mono text-[10px] font-bold text-[#171717] tracking-wider uppercase bg-slate-50 px-2.5 py-1 rounded-full border border-slate-200 transition-colors duration-300 group-hover/bento:bg-indigo-50 group-hover/bento:text-[#4338ca] group-hover/bento:border-indigo-100">
                   {mod.tag}
                 </span>
               </div>

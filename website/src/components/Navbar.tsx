@@ -1,23 +1,27 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Menu, X, Download, Github, ChevronRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { LanguageToggle } from './LanguageToggle';
 
 export interface NavbarProps {
   visible?: boolean;
 }
 
-const NAV_TABS = [
-  { label: 'Manifesto', href: '#top' },
-  { label: 'Features', href: '#features' },
-  { label: 'Community', href: '#community' },
-  { label: 'Benchmarks', href: '#benchmarks' },
-  { label: 'Download', href: '#download' },
-  { label: 'FAQ', href: '#faq' },
-];
-
 export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
+  const { t, lang } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const navTabs = useMemo(() => [
+    { label: t.nav.manifesto, href: '#top' },
+    { label: t.nav.features, href: '#features' },
+    { label: t.nav.community, href: '#community' },
+    { label: t.nav.benchmarks, href: '#benchmarks' },
+    { label: t.nav.download, href: '#download' },
+    { label: t.nav.faq, href: '#faq' },
+  ], [t]);
+
   const [position, setPosition] = useState({
     left: 0,
     width: 0,
@@ -51,7 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
       }, 30);
       return () => clearTimeout(timer);
     }
-  }, [selected, visible, updatePosition]);
+  }, [selected, visible, updatePosition, lang]);
 
   // Recalculate position on window resize and font load
   useEffect(() => {
@@ -250,9 +254,9 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
             className="relative flex items-center"
             role="menubar"
           >
-            {NAV_TABS.map((tab, i) => (
+            {navTabs.map((tab, i) => (
               <Tab
-                key={tab.label}
+                key={tab.href}
                 href={tab.href}
                 ref={(el) => {
                   tabsRef.current[i] = el;
@@ -288,6 +292,12 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           {/* Subtle Divider */}
           <div className="h-4 w-px bg-white/15" aria-hidden="true" />
 
+          {/* Language Toggle */}
+          <LanguageToggle variant="nav" />
+
+          {/* Subtle Divider */}
+          <div className="h-4 w-px bg-white/15" aria-hidden="true" />
+
           {/* Action Button: Download CTA */}
           <a
             href="#download"
@@ -298,7 +308,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
             className="inline-flex items-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold px-3.5 py-1.5 rounded-full transition-all shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
           >
             <Download className="w-3.5 h-3.5" aria-hidden="true" />
-            <span>Download</span>
+            <span>{t.nav.downloadCta}</span>
           </a>
         </div>
       </header>
@@ -311,12 +321,12 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
         }`}
       >
         {/* Mobile Top Pill */}
-        <div className="pointer-events-auto flex items-center justify-between px-4 py-2.5 rounded-2xl bg-[#0c0d12]/92 border border-white/15 backdrop-blur-md shadow-2xl text-white">
+        <div className="pointer-events-auto flex items-center justify-between px-3.5 py-2 rounded-2xl bg-[#0c0d12]/92 border border-white/15 backdrop-blur-md shadow-2xl text-white">
           {/* Logo & Brand */}
           <button
             type="button"
             onClick={() => handleTabClick(0, '#top')}
-            className="flex items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
+            className="flex items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
           >
             <img src="/logo.svg" alt="Nova" className="h-6 w-6 object-contain" />
             <span className="font-display font-extrabold text-base tracking-tight text-white">
@@ -325,14 +335,16 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
           </button>
 
           {/* Quick Action & Hamburger Button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
+            <LanguageToggle variant="nav" />
+
             <a
               href="#download"
               onClick={() => handleTabClick(4, '#download')}
-              className="inline-flex items-center justify-center gap-1.5 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold min-h-[44px] px-3.5 py-2 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
+              className="inline-flex items-center justify-center gap-1 bg-[#4338ca] hover:bg-indigo-600 text-white font-mono text-xs font-semibold min-h-[38px] px-3 py-1.5 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Get</span>
+              <span>{t.nav.getNova}</span>
             </a>
 
             <button
@@ -340,7 +352,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
               aria-expanded={mobileMenuOpen}
-              className="min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
+              className="min-h-[38px] min-w-[38px] flex items-center justify-center p-2 rounded-xl bg-white/10 text-white hover:bg-white/20 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] cursor-pointer"
             >
               {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -358,9 +370,9 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               className="pointer-events-auto mt-2 max-h-[calc(100dvh-5rem)] overflow-y-auto rounded-2xl bg-[#0c0d12]/96 border border-white/15 backdrop-blur-xl p-5 shadow-2xl text-white space-y-4"
             >
               <nav className="flex flex-col space-y-1">
-                {NAV_TABS.map((tab, idx) => (
+                {navTabs.map((tab, idx) => (
                   <button
-                    key={tab.label}
+                    key={tab.href}
                     type="button"
                     onClick={() => handleTabClick(idx, tab.href)}
                     className={`flex items-center justify-between w-full min-h-[44px] px-3.5 py-2.5 rounded-xl font-mono text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] ${
@@ -376,13 +388,15 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
               </nav>
 
               <div className="pt-2 border-t border-white/10 flex flex-col gap-2.5">
+                <LanguageToggle variant="mobile" />
+
                 <a
                   href="#download"
                   onClick={() => handleTabClick(4, '#download')}
                   className="flex items-center justify-center gap-2 w-full min-h-[44px] py-3 rounded-xl bg-white text-[#0c0d12] font-mono text-xs font-bold uppercase tracking-wider shadow-md hover:bg-neutral-100 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Nova Free</span>
+                  <span>{t.nav.downloadFree}</span>
                 </a>
 
                 <a
@@ -392,7 +406,7 @@ export const Navbar: React.FC<NavbarProps> = ({ visible = true }) => {
                   className="flex items-center justify-center gap-2 w-full min-h-[44px] py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-neutral-300 font-mono text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca]"
                 >
                   <Github className="w-4 h-4" />
-                  <span>GitHub Repository</span>
+                  <span>{t.nav.githubRepo}</span>
                 </a>
               </div>
             </motion.div>

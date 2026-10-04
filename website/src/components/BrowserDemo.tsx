@@ -18,6 +18,7 @@ import {
   Terminal,
   Bookmark
 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface MockTab {
   id: string;
@@ -27,36 +28,48 @@ interface MockTab {
   badge?: string;
 }
 
-const INITIAL_TABS: MockTab[] = [
-  {
-    id: 'tab-newtab',
-    title: 'New Tab — Nova AI',
-    url: 'nova://newtab',
-    icon: 'nova',
-    badge: 'Local AI'
-  },
-  {
-    id: 'tab-github',
-    title: 'unitybtw/nova-browser',
-    url: 'https://github.com/unitybtw/nova-browser',
-    icon: 'github',
-    badge: 'Open Source'
-  },
-  {
-    id: 'tab-arxiv',
-    title: 'On-Device LLM Benchmarks',
-    url: 'https://arxiv.org/abs/2403.07691',
-    icon: 'arxiv',
-    badge: 'Research'
-  }
-];
-
 export const BrowserDemo: React.FC = React.memo(() => {
-  const [tabs, setTabs] = useState<MockTab[]>(INITIAL_TABS);
+  const { t } = useLanguage();
   const [activeTabId, setActiveTabId] = useState<string>('tab-newtab');
   const [isAiPanelOpen, setIsAiPanelOpen] = useState(true);
   const [promptText, setPromptText] = useState('');
   const [activePromptPreset, setActivePromptPreset] = useState<string | null>(null);
+
+  const initialTabs: MockTab[] = [
+    {
+      id: 'tab-newtab',
+      title: t.browserDemo.newTabTitle,
+      url: 'nova://newtab',
+      icon: 'nova',
+      badge: 'Local AI'
+    },
+    {
+      id: 'tab-github',
+      title: t.browserDemo.githubTabTitle,
+      url: 'https://github.com/unitybtw/nova-browser',
+      icon: 'github',
+      badge: 'Open Source'
+    },
+    {
+      id: 'tab-arxiv',
+      title: t.browserDemo.researchTabTitle,
+      url: 'https://arxiv.org/abs/2403.07691',
+      icon: 'arxiv',
+      badge: 'Research'
+    }
+  ];
+
+  const [tabs, setTabs] = useState<MockTab[]>(initialTabs);
+
+  // Update tab labels on language change
+  React.useEffect(() => {
+    setTabs(prev => prev.map(tab => {
+      if (tab.id === 'tab-newtab') return { ...tab, title: t.browserDemo.newTabTitle };
+      if (tab.id === 'tab-github') return { ...tab, title: t.browserDemo.githubTabTitle };
+      if (tab.id === 'tab-arxiv') return { ...tab, title: t.browserDemo.researchTabTitle };
+      return tab;
+    }));
+  }, [t]);
 
   const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
 
@@ -400,10 +413,10 @@ export const BrowserDemo: React.FC = React.memo(() => {
                   </div>
                   <div>
                     <h4 className="font-display text-xs font-bold text-white">
-                      Nova AI Co-Pilot
+                      {t.browserDemo.aiTitle}
                     </h4>
                     <span className="font-mono text-[9px] text-emerald-400 block">
-                      Local WebGPU • Offline
+                      {t.browserDemo.aiSubtitle}
                     </span>
                   </div>
                 </div>
@@ -420,23 +433,23 @@ export const BrowserDemo: React.FC = React.memo(() => {
               {/* Chat Thread */}
               <div className="space-y-3 font-sans text-xs">
                 {/* User Message */}
-                <div className="rounded-xl bg-white/[0.06] p-3 text-slate-200 border border-white/[0.04]">
+                <div className="rounded-xl bg-white/[0.06] p-3 text-white border border-white/[0.04]">
                   <span className="font-mono text-[10px] text-cyan-400 block mb-0.5 font-semibold">You:</span>
-                  {promptText || activePromptPreset || 'Summarize active webpage and verify privacy trackers.'}
+                  {promptText || activePromptPreset || t.browserDemo.aiPromptPreset1}
                 </div>
 
-                {/* AI Response */}
-                <div className="rounded-xl bg-indigo-950/40 p-3 text-slate-200 border border-indigo-500/20 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-cyan-400 font-mono text-[10px] font-bold">
+                {/* AI Response - High contrast */}
+                <div className="rounded-xl bg-indigo-950/70 p-3 text-white border border-indigo-400/30 space-y-1.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 text-cyan-300 font-mono text-[10px] font-bold">
                     <Sparkles className="h-3 w-3" />
-                    <span>Nova Local Assistant</span>
+                    <span>{t.browserDemo.sampleResponseTitle}</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed text-slate-300">
-                    Verified current session: <strong>0 third-party cookies</strong>, <strong>0 analytic pings</strong>. Page structure parsed cleanly with 45 tok/sec on-device reasoning.
+                  <p className="text-[11px] leading-relaxed text-indigo-100">
+                    {t.browserDemo.sampleResponseP1}
                   </p>
-                  <div className="pt-1 flex items-center gap-1 font-mono text-[9px] text-emerald-400">
+                  <div className="pt-1 flex items-center gap-1 font-mono text-[9px] text-emerald-300">
                     <ShieldCheck className="h-3 w-3" />
-                    <span>Memory clean • SafeStorage encrypted</span>
+                    <span>{t.browserDemo.sampleResponseP2}</span>
                   </div>
                 </div>
               </div>
@@ -447,8 +460,8 @@ export const BrowserDemo: React.FC = React.memo(() => {
               <div className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] p-1.5">
                 <input
                   type="text"
-                  placeholder="Ask local model..."
-                  className="w-full bg-transparent px-2 text-xs text-white placeholder-slate-500 outline-none font-sans"
+                  placeholder={t.browserDemo.aiInputPlaceholder}
+                  className="w-full bg-transparent px-2 text-xs text-white placeholder-slate-400 outline-none font-sans"
                 />
                 <button
                   type="button"

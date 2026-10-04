@@ -305,7 +305,10 @@ const AnimatedCounter: React.FC<{
   );
 };
 
+import { useLanguage } from '../context/LanguageContext';
+
 export const Benchmarks: React.FC = () => {
+  const { t } = useLanguage();
   const [viewMode, setViewMode] = useState<'matrix' | 'benchmarks' | 'simulator'>('matrix');
   const [matrixFilter, setMatrixFilter] = useState<'all' | 'neural' | 'runtime' | 'privacy'>('all');
   const [selectedCategory, setSelectedCategory] = useState<'memory' | 'speed' | 'ai' | 'privacy'>('memory');
@@ -343,10 +346,10 @@ export const Benchmarks: React.FC = () => {
       <div className="mb-8 flex flex-col gap-6 sm:mb-12 md:flex-row md:items-end md:justify-between md:gap-8">
         <div className="max-w-2xl">
           <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight">
-            Architectural <span className="text-[#4338ca]">Comparison</span>
+            {t.benchmarks.headline} <span className="text-[#4338ca]">{t.benchmarks.headlineAccent}</span>
           </h2>
           <p className="mt-3.5 text-sm sm:text-base text-neutral-600 leading-relaxed font-sans">
-            Engineered on the Chromium Blink & Google V8 foundation. Re-architected with client-side WebGPU intelligence, dormant process suspension, and a zero-telemetry network layer.
+            {t.benchmarks.subtitle}
           </p>
         </div>
 

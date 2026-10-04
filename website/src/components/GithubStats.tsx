@@ -14,6 +14,8 @@ import {
   Boxes
 } from 'lucide-react';
 
+import { useLanguage } from '../context/LanguageContext';
+
 interface RepoData {
   stars: number;
   forks: number;
@@ -32,41 +34,8 @@ const FALLBACK_REPO_DATA: RepoData = {
 
 type RepoStatus = 'loading' | 'live' | 'cached';
 
-interface Milestone {
-  version: string;
-  date: string;
-  tag: string;
-  description: string;
-}
-
-const VERIFIED_MILESTONES: Milestone[] = [
-  {
-    version: 'v1.5.0',
-    date: 'Current Release',
-    tag: 'Latest',
-    description: 'Electron 43+ Fuse Fix (GrantFileProtocolExtraPrivileges), AdBlocker Isolation & Local Whisper AI'
-  },
-  {
-    version: 'v1.4.0',
-    date: 'Sep 2026',
-    tag: 'Stable',
-    description: 'Hardware-accelerated WebGPU local AI engine, split-screen workflows, and adblocker.'
-  },
-  {
-    version: 'v1.2.0',
-    date: 'Aug 2026',
-    tag: 'Release',
-    description: 'Workspace management, vertical tabs navigation, and zero-knowledge encrypted sync.'
-  },
-  {
-    version: 'v1.0.0',
-    date: 'Jul 2026',
-    tag: 'Initial',
-    description: 'Initial public launch of sovereign open-source browser core on Electron 39.'
-  }
-];
-
 export const GithubStats: React.FC = () => {
+  const { t } = useLanguage();
   const [repoData, setRepoData] = useState<RepoData>(FALLBACK_REPO_DATA);
   const [repoStatus, setRepoStatus] = useState<RepoStatus>('loading');
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -128,19 +97,15 @@ export const GithubStats: React.FC = () => {
           <div className="flex items-center gap-2 mb-2">
             <span className={`h-2 w-2 rounded-full ${repoStatus === 'live' ? 'bg-emerald-500 animate-ping' : repoStatus === 'loading' ? 'bg-amber-400 animate-pulse' : 'bg-indigo-400'}`} aria-hidden="true" />
             <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-              {repoStatus === 'live' ? 'LIVE GITHUB REPOSITORY METRICS' : repoStatus === 'loading' ? 'CONNECTING TO GITHUB API' : 'PUBLIC REPOSITORY BASELINE'}
+              {repoStatus === 'live' ? t.community.statusLive : repoStatus === 'loading' ? t.community.statusLoading : t.community.statusCached}
             </span>
           </div>
           <h2 className="font-display font-extrabold text-4xl sm:text-5xl text-[#171717] tracking-tight">
-            Open Source <span className="text-[#4338ca]">Velocity</span>.
+            {t.community.headline} <span className="text-[#4338ca]">{t.community.headlineAccent}</span>
           </h2>
         </div>
         <p className="font-sans text-neutral-600 max-w-md text-sm leading-relaxed">
-          {repoStatus === 'live'
-            ? 'Live repository metrics synchronized via GitHub API. Verified source code, audit trails, and transparent development.'
-            : repoStatus === 'loading'
-              ? 'Connecting to the public GitHub API. Metrics will update dynamically when the repository responds.'
-              : 'Displaying cached repository release metrics. Metrics synchronize automatically when GitHub API is reachable.'}
+          {t.community.subtitle}
         </p>
       </div>
 
@@ -247,7 +212,7 @@ export const GithubStats: React.FC = () => {
           </div>
 
           <div className="space-y-4">
-            {VERIFIED_MILESTONES.map((m) => (
+            {t.community.milestones.map((m) => (
               <div
                 key={m.version}
                 className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border border-neutral-100 bg-neutral-50/60 hover:bg-neutral-50 transition-colors gap-3"

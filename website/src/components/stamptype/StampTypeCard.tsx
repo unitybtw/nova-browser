@@ -1,18 +1,27 @@
 import React, { useEffect, useRef } from "react";
 import { StampType } from "./engine";
-import { WORLDS } from "./params";
+import { WORLDS, type World } from "./params";
 
 interface StampTypeCardProps {
   bare?: boolean;
   className?: string;
+  worlds?: World[];
 }
 
 export const StampTypeCard: React.FC<StampTypeCardProps> = React.memo(({
   bare = false,
   className = "",
+  worlds = WORLDS,
 }) => {
   void bare;
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const engineRef = useRef<StampType | null>(null);
+
+  useEffect(() => {
+    if (engineRef.current && worlds) {
+      engineRef.current.setWorlds(worlds);
+    }
+  }, [worlds]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,7 +47,8 @@ export const StampTypeCard: React.FC<StampTypeCardProps> = React.memo(({
     };
 
     // Instantiate engine immediately and start
-    engine = new StampType(canvas);
+    engine = new StampType(canvas, { worlds });
+    engineRef.current = engine;
     if (engine.ok) {
       engine.renderStill();
       if (!reduced) {

@@ -104,6 +104,16 @@ export class StampType {
     if (!this.running) this.draw(this.stillTick());
   }
 
+  setWorlds(worlds: World[]) {
+    this.worlds = worlds.length ? worlds : WORLDS;
+    this.lines = this.worlds.map((w) =>
+      w.lines.map((text, i) => ({ text, track: i })),
+    );
+    this.metrics.clear();
+    this.drawnTick = -1;
+    if (!this.running) this.draw(this.stillTick());
+  }
+
   resize() {
     const r = this.canvas.getBoundingClientRect();
     if (r.width <= 0 || r.height <= 0) return;

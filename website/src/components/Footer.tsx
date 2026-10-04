@@ -1,8 +1,11 @@
 import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Github, ArrowUp } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { LanguageToggle } from './LanguageToggle';
 
 export const Footer: React.FC = React.memo(() => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
 
   const scrollToTop = () => {
@@ -32,15 +35,18 @@ export const Footer: React.FC = React.memo(() => {
                 </span>
               </div>
               <h2 className="mb-4 font-display text-2xl font-extrabold leading-snug tracking-tight text-neutral-200 sm:text-3xl">
-                “The browser is no longer a window.<br />
-                <span className="text-indigo-400">It is the engine.</span>”
+                {t.footer.quoteLead}<br />
+                <span className="text-indigo-400">{t.footer.quoteAccent}</span>
               </h2>
               <p className="max-w-lg font-mono text-xs leading-relaxed text-neutral-400">
-                Nova is built for a post-cloud web. Local inference, hardened network layer, absolute autonomy.
+                {t.footer.description}
               </p>
             </div>
-            <div className="mt-8 font-mono text-xs text-neutral-500">
-              © {new Date().getFullYear()} Nova Browser. Open Source Under MIT.
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <span className="font-mono text-xs text-neutral-500">
+                © {new Date().getFullYear()} {t.footer.copyright}
+              </span>
+              <LanguageToggle variant="footer" />
             </div>
           </div>
 
@@ -48,7 +54,7 @@ export const Footer: React.FC = React.memo(() => {
           <div className="col-span-1 flex flex-col justify-between md:col-span-5 md:items-end lg:col-span-5">
             <div className="w-full md:max-w-xs md:text-right">
               <h4 className="mb-5 font-mono text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
-                RESOURCES & REPOSITORY
+                {t.footer.resourcesHeading}
               </h4>
               <ul className="space-y-3 font-mono text-xs text-neutral-300">
                 <li className="flex md:justify-end">
@@ -59,7 +65,7 @@ export const Footer: React.FC = React.memo(() => {
                     className="inline-flex min-h-10 items-center gap-2 rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
                     <Github className="h-4 w-4" />
-                    <span>GitHub Repository</span>
+                    <span>{t.footer.githubRepo}</span>
                   </a>
                 </li>
                 <li className="flex md:justify-end">
@@ -69,7 +75,7 @@ export const Footer: React.FC = React.memo(() => {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    Releases & Changelog
+                    {t.footer.releases}
                   </a>
                 </li>
                 <li className="flex md:justify-end">
@@ -79,7 +85,7 @@ export const Footer: React.FC = React.memo(() => {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    Security & Issues
+                    {t.footer.security}
                   </a>
                 </li>
                 <li className="flex md:justify-end">
@@ -89,7 +95,7 @@ export const Footer: React.FC = React.memo(() => {
                     rel="noopener noreferrer"
                     className="inline-flex min-h-10 items-center rounded-md px-2 py-1 text-neutral-300 transition-colors hover:bg-white/5 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
                   >
-                    MIT License
+                    {t.footer.license}
                   </a>
                 </li>
               </ul>
@@ -106,7 +112,7 @@ export const Footer: React.FC = React.memo(() => {
             aria-label="Back to top"
             className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-white/5 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0c0d12]"
           >
-            <span>BACK TO TOP</span>
+            <span>{t.footer.scrollToTop.toUpperCase()}</span>
             <ArrowUp className="h-3.5 w-3.5" />
           </button>
         </div>

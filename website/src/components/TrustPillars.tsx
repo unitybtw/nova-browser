@@ -2,57 +2,29 @@ import React from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { ShieldCheck, Lock, Cpu, Code2 } from 'lucide-react';
 import { BlurRevealCard } from './blurreveal/BlurRevealCard';
+import { useLanguage } from '../context/LanguageContext';
 
-const PILLARS = [
-  {
-    icon: ShieldCheck,
-    tag: 'PRIVACY & SECURITY',
-    title: 'Zero Telemetry & Offline Core',
-    description:
-      'Zero background pings, analytics trackers, or user telemetry. All network traffic originates strictly from user requests.',
-    stat: '0 KB Sent',
-  },
-  {
-    icon: Cpu,
-    tag: 'LOCAL HARDWARE',
-    title: 'On-Device WebGPU Inference',
-    description:
-      'Autonomous intelligence agents run locally via client-side WebGPU compute shaders without transmitting prompts to external servers.',
-    stat: '100% On-Device',
-  },
-  {
-    icon: Code2,
-    tag: 'OPEN SOURCE',
-    title: 'MIT Licensed & Verifiable',
-    description:
-      'Every line of Electron, Chromium, and IPC handler code is publicly accessible, open source, and forkable on GitHub.',
-    stat: 'Open Source',
-  },
-  {
-    icon: Lock,
-    tag: 'SECURE SANDBOX',
-    title: 'Zero-Knowledge Key Vault',
-    description:
-      'Passwords, cookies, and local database records are encrypted with AES-256-GCM using hardware-backed OS keychain primitives.',
-    stat: 'AES-256-GCM',
-  },
-];
+const PILLAR_ICONS = [ShieldCheck, Cpu, Code2, Lock];
 
 export const TrustPillars: React.FC = React.memo(() => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
 
   return (
     <section className="section-deferred mx-auto max-w-7xl border-t border-neutral-200/50 px-4 py-20 sm:px-6 lg:py-24">
       <div className="mb-10 flex flex-col gap-3 sm:mb-12 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4338ca]">Built on your side</span>
-          <h2 className="mt-3 max-w-xl font-display text-3xl font-extrabold tracking-tight text-[#171717] sm:text-4xl">Privacy is the product.</h2>
+          <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#4338ca]">{t.trustPillars.badge}</span>
+          <h2 className="mt-3 max-w-xl font-display text-3xl font-extrabold tracking-tight text-[#171717] sm:text-4xl">
+            {t.trustPillars.headline}{' '}
+            <span className="text-[#4338ca]">{t.trustPillars.headlineAccent}</span>
+          </h2>
         </div>
-        <p className="max-w-md text-sm leading-relaxed text-neutral-600 sm:text-right">A browser should make your device more capable—not make your personal context someone else’s dataset.</p>
+        <p className="max-w-md text-sm leading-relaxed text-neutral-600 sm:text-right">{t.trustPillars.subtitle}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {PILLARS.map((item, idx) => {
-          const Icon = item.icon;
+        {t.trustPillars.items.map((item, idx) => {
+          const Icon = PILLAR_ICONS[idx % PILLAR_ICONS.length];
           return (
             <motion.div
               key={item.title}
@@ -85,7 +57,7 @@ export const TrustPillars: React.FC = React.memo(() => {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-neutral-100 flex items-center justify-between font-mono text-[11px] transition-colors duration-300 group-hover/card:border-indigo-100">
-                  <span className="text-neutral-600 font-medium">Standard:</span>
+                  <span className="text-neutral-600 font-medium">{t.trustPillars.standardLabel}</span>
                   <span className="text-[#4338ca] font-bold">{item.stat}</span>
                 </div>
               </div>

@@ -3,10 +3,12 @@ import { motion, useReducedMotion } from 'framer-motion';
 import type { BezierDefinition } from 'framer-motion';
 import { ArrowUpRight, Download, Github } from 'lucide-react';
 import BrowserDemo from './BrowserDemo';
+import { useLanguage } from '../context/LanguageContext';
 
 const EASE: BezierDefinition = [0.16, 1, 0.3, 1];
 
 export const Hero: React.FC = React.memo(() => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
 
   const fadeUp = (delay: number) =>
@@ -31,9 +33,9 @@ export const Hero: React.FC = React.memo(() => {
         {...fadeUp(0.08)}
         className="max-w-5xl font-display text-[clamp(3rem,7.5vw,5.75rem)] font-black leading-[0.98] tracking-[-0.04em] text-[#171717]"
       >
-        Thought at the Speed of{' '}
+        {t.hero.titlePrefix}{' '}
         <span className="relative inline-block text-[#4338ca]">
-          Thought.
+          {t.hero.titleAccent}
         </span>
       </motion.h1>
 
@@ -42,7 +44,7 @@ export const Hero: React.FC = React.memo(() => {
         {...fadeUp(0.16)}
         className="mt-6 max-w-2xl font-sans text-base leading-relaxed text-[#525252] sm:text-lg md:text-xl"
       >
-        A fast, private desktop browser with on-device AI, native tracker blocking, and developer-grade workspaces—without sending your thinking to the cloud.
+        {t.hero.subtitle}
       </motion.p>
 
       {/* 4. Call to Action Buttons */}
@@ -55,7 +57,7 @@ export const Hero: React.FC = React.memo(() => {
           className="luxury-button group relative inline-flex min-h-12 items-center justify-center gap-2.5 overflow-hidden rounded-full bg-[#171717] px-7 py-3.5 font-mono text-xs font-semibold uppercase tracking-wider text-white shadow-[0_12px_30px_rgba(23,23,23,0.18)] hover:bg-[#4338ca] active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 sm:text-sm"
         >
           <Download className="h-4 w-4 transition-transform duration-200 group-hover:-translate-y-0.5" aria-hidden="true" />
-          <span>Download Nova</span>
+          <span>{t.hero.downloadButton}</span>
         </a>
 
         <a
@@ -65,7 +67,7 @@ export const Hero: React.FC = React.memo(() => {
           className="luxury-button group inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#d9d9df] bg-white/90 px-6 py-3.5 font-mono text-xs font-semibold uppercase tracking-wider text-[#171717] shadow-sm hover:border-[#4338ca]/40 hover:bg-white active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 sm:text-sm"
         >
           <Github className="h-4 w-4 transition-transform duration-200 group-hover:rotate-6" aria-hidden="true" />
-          <span>Explore the source</span>
+          <span>{t.hero.exploreSource}</span>
           <ArrowUpRight className="h-3.5 w-3.5 text-[#737373] transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
         </a>
       </motion.div>

@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Download, CheckCircle2, Github, Monitor, Apple, Terminal, Copy, Check, ShieldCheck, ExternalLink } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export const Downloads: React.FC = () => {
+  const { t } = useLanguage();
   const prefersReducedMotion = useReducedMotion();
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
@@ -47,13 +49,13 @@ export const Downloads: React.FC = () => {
       {/* Section Header */}
       <div className="mx-auto mb-10 max-w-2xl text-center sm:mb-16">
         <span className="font-mono text-xs uppercase tracking-widest text-[#4338ca] font-semibold">
-          GET STARTED TODAY
+          {t.downloads.badge}
         </span>
         <h2 className="font-display font-extrabold text-4xl sm:text-5xl lg:text-6xl text-[#171717] tracking-tight mt-3">
-          Download <span className="text-[#4338ca]">Nova Browser</span>.
+          {t.downloads.headline} <span className="text-[#4338ca]">{t.downloads.headlineAccent}</span>
         </h2>
         <p className="font-sans text-neutral-600 mt-4 text-base sm:text-lg leading-relaxed">
-          Free, open-source, and sovereign forever. Engineered for power users, developers, and researchers.
+          {t.downloads.subtitle}
         </p>
       </div>
 
@@ -73,14 +75,14 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Apple className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
+              <span className="font-mono text-[10px] font-bold text-[#171717] tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-indigo-900">
                 v1.5.0 // APPLE SILICON & INTEL
               </span>
             </div>
 
-            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">macOS</h3>
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">{t.downloads.macosTitle}</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Native binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel x86 Macs with Metal GPU acceleration.
+              {t.downloads.macosDesc}
             </p>
 
             {/* Architecture Chips */}
@@ -101,13 +103,13 @@ export const Downloads: React.FC = () => {
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-2.5 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" aria-hidden="true" />
-                <span>Apple Silicon (ARM64)</span>
+                <span>{t.downloads.macosAppleSiliconBtn}</span>
               </a>
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-x64.dmg"
                 className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98]"
               >
-                <span>Intel x86 (x64)</span>
+                <span>{t.downloads.macosIntelBtn}</span>
               </a>
             </div>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
@@ -143,14 +145,14 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Monitor className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
+              <span className="font-mono text-[10px] font-bold text-[#171717] tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-indigo-900">
                 v1.5.0 // X64
               </span>
             </div>
 
-            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">Windows</h3>
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">{t.downloads.windowsTitle}</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Standalone installer for Windows 10 & 11 (64-bit) with direct DirectX 12 & WebGPU hardware bindings.
+              {t.downloads.windowsDesc}
             </p>
 
             {/* Architecture Chips */}
@@ -171,13 +173,13 @@ export const Downloads: React.FC = () => {
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-2.5 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" aria-hidden="true" />
-                <span>Download .EXE (64-Bit)</span>
+                <span>{t.downloads.windowsInstallerBtn}</span>
               </a>
               <a
                 href="https://github.com/unitybtw/nova-browser/releases/latest"
                 className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98]"
               >
-                <span>Portable ZIP Archive</span>
+                <span>{t.downloads.windowsArmBtn}</span>
               </a>
             </div>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
@@ -213,14 +215,14 @@ export const Downloads: React.FC = () => {
               <div className="p-3 rounded-xl bg-neutral-100 border border-neutral-200/60 text-[#171717] transition-colors duration-300 group-hover/dlcard:bg-[#171717] group-hover/dlcard:text-white">
                 <Terminal className="w-6 h-6" />
               </div>
-              <span className="font-mono text-[10px] font-bold text-neutral-600 tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-[#4338ca]">
+              <span className="font-mono text-[10px] font-bold text-[#171717] tracking-wider uppercase bg-neutral-100 px-2.5 py-1 rounded-full transition-colors duration-300 group-hover/dlcard:bg-indigo-50 group-hover/dlcard:text-indigo-900">
                 v1.5.0 // LINUX
               </span>
             </div>
 
-            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">Linux</h3>
+            <h3 className="font-display font-bold text-xl mb-2 text-[#171717]">{t.downloads.linuxTitle}</h3>
             <p className="font-sans text-xs text-neutral-600 mb-6 leading-relaxed">
-              Universal AppImage and Debian/Ubuntu (.deb) builds with native Wayland & Vulkan acceleration.
+              {t.downloads.linuxDesc}
             </p>
 
             {/* Architecture Chips */}
@@ -241,7 +243,7 @@ export const Downloads: React.FC = () => {
                 className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#171717] px-5 py-2.5 text-[#fcfbf9] font-mono text-xs font-bold uppercase tracking-wider shadow-sm transition-colors hover:bg-[#4338ca] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4338ca] focus-visible:ring-offset-2 active:scale-[0.98]"
               >
                 <Download className="w-4 h-4" aria-hidden="true" />
-                <span>Download AppImage (x86_64)</span>
+                <span>{t.downloads.linuxAppImageBtn}</span>
               </a>
               <a
                 href="https://github.com/unitybtw/nova-browser/releases"
@@ -249,7 +251,7 @@ export const Downloads: React.FC = () => {
                 rel="noopener noreferrer"
                 className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 hover:border-neutral-300 hover:bg-neutral-50 text-neutral-700 font-mono text-xs font-medium tracking-wide transition-all active:scale-[0.98]"
               >
-                <span>Debian (.deb) & ARM64 Packages</span>
+                <span>{t.downloads.linuxDebBtn}</span>
               </a>
             </div>
             <p className="font-mono text-[10px] text-neutral-500 text-center mt-2.5">
@@ -284,9 +286,9 @@ export const Downloads: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-neutral-300 font-mono text-xs font-semibold">
               <Terminal aria-hidden="true" className="w-4 h-4 text-cyan-400" />
-              <span>TERMINAL PACKAGE MANAGER</span>
+              <span>{t.downloads.cliTitle}</span>
             </div>
-            <p className="mt-1 max-w-md text-[11px] leading-relaxed text-neutral-500">Choose a package manager, then copy the exact command for your system.</p>
+            <p className="mt-1 max-w-md text-[11px] leading-relaxed text-neutral-400">{t.downloads.cliSubtitle}</p>
           </div>
 
           {/* CLI Tabs */}
@@ -345,12 +347,12 @@ export const Downloads: React.FC = () => {
             {copiedTab === activeCliTab ? (
               <>
                 <Check className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="text-emerald-400">Copied</span>
+                <span className="text-emerald-400">{t.downloads.copiedLabel}</span>
               </>
             ) : (
               <>
                 <Copy className="w-3.5 h-3.5" />
-                <span>Copy</span>
+                <span>{t.downloads.copyLabel}</span>
               </>
             )}
           </button>
