@@ -99,8 +99,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mcp-action-request', handler);
     return () => ipcRenderer.removeListener('mcp-action-request', handler);
   },
-  respondMcpAction: (id: string, result: unknown) => {
-    ipcRenderer.send('mcp-action-response', { id, result });
+  respondMcpAction: (id: string, result?: unknown, error?: unknown) => {
+    ipcRenderer.send('mcp-action-response', { id, result, error });
   },
   clearIncognitoSession: (tabId?: string) => ipcRenderer.invoke('clear-incognito-session', tabId),
   // Security: Called by renderer when creating a new incognito tab so the main process can

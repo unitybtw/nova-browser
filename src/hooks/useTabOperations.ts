@@ -257,7 +257,8 @@ export function useTabOperations({
       canGoBack: false,
       canGoForward: false,
       isPinned: false,
-      splitWith: undefined
+      splitWith: undefined,
+      webContentsId: undefined
     };
     const newTabs = [...prev];
     newTabs.splice(idx + 1, 0, newTab);

@@ -657,7 +657,7 @@ export class BrowserMCPServer {
 
     // Special: browser_wait is handled directly
     if (toolName === 'browser_wait') {
-      const ms = Math.min(Number(args.ms) || 1000, 10000);
+      const ms = Math.max(0, Math.min(Number(args.ms) || 1000, 10000));
       await new Promise(r => setTimeout(r, ms));
       return `Waited ${ms}ms`;
     }
@@ -845,13 +845,14 @@ export class BrowserMCPServer {
       try {
         // Handle MCP protocol messages
         if (body.method === 'initialize') {
+          const appVersion = electronApp?.getVersion?.() || '1.5.0';
           const responsePayload = {
             jsonrpc: '2.0',
             id: body.id,
             result: {
               protocolVersion: '2024-11-05',
               capabilities: { tools: {} },
-              serverInfo: { name: 'nova-browser', version: '2.0.0' }
+              serverInfo: { name: 'nova-browser', version: appVersion }
             }
           };
           respondToClient(responsePayload);

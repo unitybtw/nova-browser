@@ -313,7 +313,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     }
 
     // Auto-install CRX extensions from Chrome Web Store
-    if (filename.endsWith('.crx')) {
+    if (filename.toLowerCase().endsWith('.crx')) {
       item.cancel();
       activeDownloads.delete(downloadId);
       return;

@@ -209,7 +209,14 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
               return;
             }
             if (options.onAdBlockedFlush) {
-              options.onAdBlockedFlush(pendingAdBlocks);
+              try {
+                options.onAdBlockedFlush(pendingAdBlocks);
+              } catch (e) {
+                console.error('[AdBlocker] Error in onAdBlockedFlush:', e);
+                pendingAdBlocks.clear();
+              }
+            } else {
+              pendingAdBlocks.clear();
             }
           }, 300);
         }

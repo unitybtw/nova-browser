@@ -170,7 +170,7 @@ export interface ElectronAPI {
   onMcpActionRequest: (
     callback: (id: string, toolName: string, args: unknown) => void
   ) => () => void;
-  respondMcpAction: (id: string, result: unknown) => void;
+  respondMcpAction: (id: string, result?: unknown, error?: unknown) => void;
   clearIncognitoSession: (tabId?: string) => Promise<boolean>;
   initIncognitoPartition: (tabId: string) => Promise<boolean>;
   resetRememberedPermissions: () => Promise<boolean>;

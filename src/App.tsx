@@ -576,9 +576,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     reopenLastClosed,
   } = useClosedTabs({
     onReopen: (lastTab) => {
-      let tabToRestore = lastTab;
+      let tabToRestore: Tab = {
+        ...lastTab,
+        isLoading: false,
+        webContentsId: undefined,
+        splitWith: undefined
+      };
       if (tabsRef.current.some(t => t.id === lastTab.id)) {
-        tabToRestore = { ...lastTab, id: generateId('tab') };
+        tabToRestore.id = generateId('tab');
       }
       const tabWs = tabToRestore.workspaceId || 'default';
       if (tabWs !== (activeWorkspaceIdRef.current || 'default')) {

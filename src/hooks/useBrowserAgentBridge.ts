@@ -504,17 +504,19 @@ export function useBrowserAgentBridge({
       },
       onPressKey: (key: string) => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        if (webview) {
-          webview.sendInputEvent({ type: 'keyDown', keyCode: key });
-          webview.sendInputEvent({ type: 'char', keyCode: key });
-          webview.sendInputEvent({ type: 'keyUp', keyCode: key });
+        if (webview && typeof webview.sendInputEvent === 'function') {
+          try {
+            webview.sendInputEvent({ type: 'keyDown', keyCode: key });
+            webview.sendInputEvent({ type: 'char', keyCode: key });
+            webview.sendInputEvent({ type: 'keyUp', keyCode: key });
+          } catch (_) {}
         }
       },
       onTakeScreenshot: async () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        if (webview) {
+        if (webview && typeof webview.capturePage === 'function') {
           const image = await webview.capturePage();
-          return image.toDataURL();
+          return image && typeof image.toDataURL === 'function' ? image.toDataURL() : '';
         }
         throw new Error("No active webview found");
       },
@@ -571,26 +573,38 @@ export function useBrowserAgentBridge({
       },
       onReloadPage: () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        if (webview && webview.reload) {
-          webview.reload();
-        } else if (webview && webview.executeJavaScript) {
-          webview.executeJavaScript('window.location.reload()');
+        if (webview) {
+          try {
+            if (typeof webview.reload === 'function') {
+              webview.reload();
+            } else if (typeof webview.executeJavaScript === 'function') {
+              webview.executeJavaScript('window.location.reload()').catch(() => {});
+            }
+          } catch (_) {}
         }
       },
       onGoBack: () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        if (webview && webview.canGoBack && webview.canGoBack()) {
-          webview.goBack();
-        } else if (webview && webview.goBack) {
-          webview.goBack();
+        if (webview) {
+          try {
+            if (typeof webview.canGoBack === 'function') {
+              if (webview.canGoBack()) webview.goBack();
+            } else if (typeof webview.goBack === 'function') {
+              webview.goBack();
+            }
+          } catch (_) {}
         }
       },
       onGoForward: () => {
         const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
-        if (webview && webview.canGoForward && webview.canGoForward()) {
-          webview.goForward();
-        } else if (webview && webview.goForward) {
-          webview.goForward();
+        if (webview) {
+          try {
+            if (typeof webview.canGoForward === 'function') {
+              if (webview.canGoForward()) webview.goForward();
+            } else if (typeof webview.goForward === 'function') {
+              webview.goForward();
+            }
+          } catch (_) {}
         }
       }
     });
