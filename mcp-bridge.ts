@@ -5,14 +5,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { EventSource } from 'eventsource';
 
 import os from 'os';
 import path from 'path';
 import fs from 'fs';
-
-// Required for SSEClientTransport in Node.js
-(global as any).EventSource = EventSource;
 
 function getUserDataPath(): string {
   const home = os.homedir();
@@ -42,14 +38,11 @@ function resolveMcpConfig(): { port: number; token?: string } {
     } catch (_) {}
   }
 
-  if (!token) {
-    try {
-      const tokenFile = path.join(getUserDataPath(), 'nova-mcp-token');
-      if (fs.existsSync(tokenFile)) {
-        const savedToken = fs.readFileSync(tokenFile, 'utf8').trim();
-        if (savedToken) token = savedToken;
-      }
-    } catch (_) {}
+  // Nova stores this credential with the OS keystore (or authenticated local
+  // encryption). A standalone Node process cannot read that file as plaintext.
+  // Settings → MCP → Copy Configuration supplies the explicit environment token.
+  if (!token || !/^[A-Za-z0-9._~-]{16,4096}$/.test(token)) {
+    throw new Error('Set a valid MCP_TOKEN using Nova Settings → MCP → Copy Configuration. The on-disk token is encrypted.');
   }
 
   return { port, token };

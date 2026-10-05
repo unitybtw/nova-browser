@@ -7,12 +7,17 @@ import path from 'path';
 // Security: browser_* tools are forwarded to the renderer over a
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
-import { requestRendererMcpAction } from './main/mcpBridge.js';
+import { requestRendererMcpAction, cancelPendingMcpActions } from './main/mcpBridge.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
+let screenLockGeneration = 0;
 try {
-  powerMonitor.on('lock-screen', () => { isScreenLocked = true; });
+  powerMonitor.on('lock-screen', () => {
+    isScreenLocked = true;
+    screenLockGeneration++;
+    cancelPendingMcpActions('MCP tool execution blocked: Nova Browser is currently locked.');
+  });
   powerMonitor.on('unlock-screen', () => { isScreenLocked = false; });
 } catch (_) {}
 
@@ -332,6 +337,7 @@ export class BrowserMCPServer {
   // orphans the first listener — an authenticated port stays bound while the
   // UI reports "stopped", and stop() only closes the one it still knows about.
   private starting: boolean = false;
+  private authorizationGeneration = 0;
   // Set by stop() when it lands while a start() is still in flight. The
   // in-flight start has no port to close yet, so it unwinds on bind instead
   // of leaving an orphan listener behind.
@@ -490,6 +496,9 @@ export class BrowserMCPServer {
   public getToken(): string { return this.token; }
 
   public rotateToken(): string {
+    this.authorizationGeneration++;
+    this.firstUseApproved = false;
+    cancelPendingMcpActions('MCP authentication token was revoked');
     // Security: rotating the token is documented as a hard revocation, so it
     // must actually evict live sessions. /message re-validates the bearer on
     // every request, so the old token can no longer issue commands — but
@@ -506,6 +515,7 @@ export class BrowserMCPServer {
   public getDisabledTools(): string[] { return Array.from(this.disabledTools); }
 
   public setToolEnabled(toolName: string, enabled: boolean) {
+    if (!enabled) cancelPendingMcpActions(`MCP tool '${toolName}' was disabled`, toolName);
     if (enabled) this.disabledTools.delete(toolName);
     else this.disabledTools.add(toolName);
     // Persist to userData
@@ -604,6 +614,8 @@ export class BrowserMCPServer {
     if (this.firstUseApproved) return true;
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return false;
 
+    const authorizationGeneration = this.authorizationGeneration;
+    const lockGeneration = screenLockGeneration;
     try {
       const result = await dialog.showMessageBox(this.mainWindow, {
         type: 'question',
@@ -615,6 +627,8 @@ export class BrowserMCPServer {
         detail: 'Do you want to allow this external client to interact with Nova Browser? Tool permissions can be managed in Settings.',
         noLink: true
       });
+      if (authorizationGeneration !== this.authorizationGeneration ||
+          lockGeneration !== screenLockGeneration || isScreenLocked) return false;
       if (result.response === 0) {
         this.firstUseApproved = true;
         return true;
@@ -626,6 +640,8 @@ export class BrowserMCPServer {
   }
 
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
+    const authorizationGeneration = this.authorizationGeneration;
+    const lockGeneration = screenLockGeneration;
     if (isScreenLocked) {
       throw new Error('MCP tool execution blocked: Nova Browser is currently locked.');
     }
@@ -635,6 +651,10 @@ export class BrowserMCPServer {
     }
 
     const approved = await this.ensureFirstUseApproved();
+    if (authorizationGeneration !== this.authorizationGeneration || lockGeneration !== screenLockGeneration) {
+      throw new Error('MCP authorization was revoked while awaiting approval.');
+    }
+    if (isScreenLocked) throw new Error('MCP tool execution blocked: Nova Browser is currently locked.');
     if (!approved) {
       throw new Error('Permission denied: MCP connection rejected by the user.');
     }
@@ -1012,11 +1032,13 @@ export class BrowserMCPServer {
 
         try {
           // Use requestedPort (0 = random ephemeral port assigned by OS)
-          this.server = app.listen(this.requestedPort, '127.0.0.1', () => {
+          this.server = app.listen(this.requestedPort, '127.0.0.1', (error?: Error) => {
+            if (error) return; // The error listener below handles rejection/fallback.
             // Capture the actual port assigned by the OS. No address means the
             // bind failed and express routed us here through its 'error'
-            // listener — settle below, but leave the reporting to the handler.
-            const address = this.server.address();
+            // listener. Only a successfully bound listener can resolve startup.
+            const address = this.server?.address();
+            if (!address || typeof address !== 'object') return;
             if (address && typeof address === 'object') {
               this.actualPort = address.port;
               // Persist the actual port for client reconnection
@@ -1034,8 +1056,10 @@ export class BrowserMCPServer {
             if (err.code === 'EADDRINUSE' && this.requestedPort !== 0) {
               console.warn(`[MCP Server] Port ${this.requestedPort} is in use, falling back to random available port...`);
               try {
-                this.server = app.listen(0, '127.0.0.1', () => {
-                  const address = this.server.address();
+                this.server = app.listen(0, '127.0.0.1', (error?: Error) => {
+                  if (error) return;
+                  const address = this.server?.address();
+                  if (!address || typeof address !== 'object') return;
                   if (address && typeof address === 'object') {
                     this.actualPort = address.port;
                     this.savePersistedPort(this.actualPort);
@@ -1094,6 +1118,9 @@ export class BrowserMCPServer {
   }
 
   public stop() {
+    this.authorizationGeneration++;
+    this.firstUseApproved = false;
+    cancelPendingMcpActions('MCP server was stopped');
     // A start() that is still in flight has not bound its port yet: reject it
     // so its promise always settles, and record the request so a listener that
     // binds afterwards is torn down instead of being orphaned.

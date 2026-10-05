@@ -14,9 +14,22 @@ interface PendingMcpAction {
   resolve: (value: unknown) => void;
   reject: (err: Error) => void;
   timer: NodeJS.Timeout;
+  win: BrowserWindow;
+  toolName: string;
 }
 
 const pendingMcpActions = new Map<string, PendingMcpAction>();
+
+/** Revoke pending approvals on timeout, server shutdown, or policy changes. */
+export function cancelPendingMcpActions(reason: string, toolName?: string): void {
+  for (const [id, pending] of pendingMcpActions) {
+    if (toolName && pending.toolName !== toolName) continue;
+    pendingMcpActions.delete(id);
+    clearTimeout(pending.timer);
+    try { pending.win.webContents.send('mcp-action-cancel', id); } catch (_) {}
+    pending.reject(new Error(reason));
+  }
+}
 
 let isTrustedSender: TrustedSenderCheck = () => false;
 
@@ -59,13 +72,15 @@ export function requestRendererMcpAction(win: BrowserWindow | null, toolName: st
       return;
     }
     const id = Date.now().toString(36) + '_' + randomBytes(8).toString('hex');
+    const deadline = Date.now() + 15000;
     const timer = setTimeout(() => {
       pendingMcpActions.delete(id);
+      try { win.webContents.send('mcp-action-cancel', id); } catch (_) {}
       reject(new Error(`MCP action '${toolName}' timed out waiting for renderer response`));
     }, 15000);
-    pendingMcpActions.set(id, { resolve, reject, timer });
+    pendingMcpActions.set(id, { resolve, reject, timer, win, toolName });
     try {
-      win.webContents.send('mcp-action-request', id, toolName, args);
+      win.webContents.send('mcp-action-request', id, toolName, args, deadline);
     } catch (err) {
       clearTimeout(timer);
       pendingMcpActions.delete(id);

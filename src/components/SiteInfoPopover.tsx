@@ -63,10 +63,12 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   const sec = getUrlSecurityInfo(url);
   let domain = '';
   let protocol = 'https:';
+  let origin = '';
   try {
     const parsed = new URL(url);
     domain = parsed.hostname;
     protocol = parsed.protocol;
+    origin = parsed.protocol === 'chrome-extension:' ? `chrome-extension://${parsed.hostname}` : parsed.origin;
   } catch {
     domain = url || 'New Tab';
   }
@@ -83,7 +85,6 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
     setSitePerms({});
     if (!isOpen || isInternal || !domain) return;
     let isCancelled = false;
-    const origin = `${protocol}//${domain}`;
     const api = (window as any).electronAPI;
     if (api?.getSitePermissions) {
       api.getSitePermissions(origin).then((perms: any) => {
@@ -97,7 +98,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [isOpen, isInternal, protocol, domain]);
+  }, [isOpen, isInternal, origin, domain]);
 
   const getPermStatus = (key: string) => {
     const p = sitePerms[key];
@@ -205,14 +206,14 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
                   <Camera className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="text-[11px] truncate">Camera:</span>
                 </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('media').color}`}>{getPermStatus('media').label}</span>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('media:video').color}`}>{getPermStatus('media:video').label}</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-1.5 truncate">
                   <Mic className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                   <span className="text-[11px] truncate">Microphone:</span>
                 </div>
-                <span className={`text-[11px] shrink-0 ${getPermStatus('media').color}`}>{getPermStatus('media').label}</span>
+                <span className={`text-[11px] shrink-0 ${getPermStatus('media:audio').color}`}>{getPermStatus('media:audio').label}</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-white/5">
                 <div className="flex items-center gap-1.5 truncate">

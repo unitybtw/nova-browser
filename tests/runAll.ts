@@ -79,3 +79,8 @@ import './format_bytes.test';
 import './clipboard_qr_failure.test';
 import './download_open_policy.test';
 import './renderer_recovery.test';
+
+import './permission_boundary_regressions.test';
+import './mcp_lifecycle_regressions.test';
+import './mcp_startup_regressions.test';
+import './mcp_bridge_config_regressions.test';

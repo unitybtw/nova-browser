@@ -227,7 +227,7 @@ Download the latest prebuilt installer for your operating system (DMG for macOS,
 ### Option B: Build from Source
 
 #### Prerequisites
-- [Node.js](https://nodejs.org/) (v20 or higher recommended)
+- [Node.js](https://nodejs.org/) (22.x ≥22.22.2, 24.x ≥24.15.0, or ≥26.0.0 required)
 - [npm](https://www.npmjs.com/) (v9 or higher)
 
 #### 1. Clone the repository

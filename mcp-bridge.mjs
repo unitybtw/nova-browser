@@ -1,70 +1,53 @@
 #!/usr/bin/env node
-
-// mcp-bridge.ts
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import os from 'os';
-import path from 'path';
-import fs from 'fs';
-import * as EventSourceLib from "eventsource";
-global.EventSource = EventSourceLib.default || EventSourceLib;
-
+import os from "os";
+import path from "path";
+import fs from "fs";
 function getUserDataPath() {
   const home = os.homedir();
-  if (process.platform === 'darwin') {
-    return path.join(home, 'Library', 'Application Support', 'nova-browser');
+  if (process.platform === "darwin") {
+    return path.join(home, "Library", "Application Support", "nova-browser");
   }
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'nova-browser');
+  if (process.platform === "win32") {
+    return path.join(process.env.APPDATA || path.join(home, "AppData", "Roaming"), "nova-browser");
   }
-  return path.join(home, '.config', 'nova-browser');
+  return path.join(home, ".config", "nova-browser");
 }
-
 function resolveMcpConfig() {
   let port = 3020;
   let token = process.env.MCP_TOKEN;
-
   if (process.env.MCP_PORT) {
     const parsed = parseInt(process.env.MCP_PORT, 10);
     if (!isNaN(parsed) && parsed > 0 && parsed < 65536) port = parsed;
   } else {
     try {
-      const portFile = path.join(getUserDataPath(), 'nova-mcp-port');
+      const portFile = path.join(getUserDataPath(), "nova-mcp-port");
       if (fs.existsSync(portFile)) {
-        const saved = parseInt(fs.readFileSync(portFile, 'utf8').trim(), 10);
+        const saved = parseInt(fs.readFileSync(portFile, "utf8").trim(), 10);
         if (!isNaN(saved) && saved > 0 && saved < 65536) port = saved;
       }
-    } catch (_) {}
+    } catch (_) {
+    }
   }
-
-  if (!token) {
-    try {
-      const tokenFile = path.join(getUserDataPath(), 'nova-mcp-token');
-      if (fs.existsSync(tokenFile)) {
-        const savedToken = fs.readFileSync(tokenFile, 'utf8').trim();
-        if (savedToken) token = savedToken;
-      }
-    } catch (_) {}
+  if (!token || !/^[A-Za-z0-9._~-]{16,4096}$/.test(token)) {
+    throw new Error("Set a valid MCP_TOKEN using Nova Settings \u2192 MCP \u2192 Copy Configuration. The on-disk token is encrypted.");
   }
-
   return { port, token };
 }
-
 async function main() {
   const config = resolveMcpConfig();
   const defaultUrl = `http://localhost:${config.port}/sse`;
   const sseUrl = new URL(process.env.MCP_SSE_URL || defaultUrl);
   const activeToken = process.env.MCP_TOKEN || config.token;
-
-  // Security: send the token via the Authorization header instead of the URL query string
   const sseTransport = new SSEClientTransport(sseUrl, activeToken ? {
     requestInit: {
       headers: { Authorization: `Bearer ${activeToken}` }
     }
-  } : undefined);
+  } : void 0);
   const client = new Client({ name: "mcp-bridge", version: "1.0.0" }, { capabilities: {} });
   try {
     await client.connect(sseTransport);

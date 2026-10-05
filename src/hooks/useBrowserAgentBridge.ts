@@ -21,6 +21,10 @@ import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
  */
 async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reason?: string }> {
   if (!isSafeAgentNavigationUrl(url)) return { ok: false, reason: 'destination is not a public address' };
+  // The synchronous policy already validates internal renderer routes. They
+  // have no network host; sending them to the HTTP-only DNS guard rejects them.
+  const protocol = new URL(url).protocol;
+  if (protocol !== 'http:' && protocol !== 'https:') return { ok: true };
   const api = (window as any).electronAPI;
   if (!api?.checkAgentNavigationHost) return { ok: true };
   try {
@@ -84,7 +88,7 @@ export function useBrowserAgentBridge({
     // VULN-11 FIX: Removed global window assignment to prevent any webpage or extension
     // from invoking browser control APIs. The MCP server in the main process can invoke
     // this function via webContents.executeJavaScript() instead of relying on a global.
-    const executeMcpAction = async (toolName: string, args: any) => {
+    const executeMcpAction = async (toolName: string, args: any, canExecute = () => true) => {
       if (!toolName || typeof toolName !== 'string') {
         return "Error: Invalid toolName parameter";
       }
@@ -104,6 +108,7 @@ export function useBrowserAgentBridge({
           // browser_read_page. See safeNavigation.ts for what this does and
           // does not cover.
           const gate = await agentNavigationAllowed(safeArgs.url);
+          if (!canExecute()) return "Error: MCP action was cancelled or expired.";
           if (!gate.ok) {
             return `Error: Navigation to this destination is blocked for security (${gate.reason}).`;
           }
@@ -237,6 +242,7 @@ export function useBrowserAgentBridge({
           // Same agent boundary as browser_navigate: a new tab at an internal
           // address is just as reachable by browser_read_page.
           const gate = await agentNavigationAllowed(newUrl);
+          if (!canExecute()) return "Error: MCP action was cancelled or expired.";
           if (!gate.ok) {
             return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
           }
@@ -614,12 +620,35 @@ export function useBrowserAgentBridge({
     // results go back through a sender-validated channel.
     const electronAPI = window.electronAPI;
     let unsubscribeMcpBridge: (() => void) | undefined;
+    let unsubscribeMcpCancel: (() => void) | undefined;
+    const pendingActions = new Map<string, { approvalId?: string; timer?: ReturnType<typeof setTimeout>; cancelled: boolean }>();
+    const cancelAction = (id: string) => {
+      const pending = pendingActions.get(id);
+      if (!pending) return;
+      pending.cancelled = true;
+      if (pending.timer) clearTimeout(pending.timer);
+      if (pending.approvalId) orchestrator.denyAction(pending.approvalId);
+      pendingActions.delete(id);
+    };
+
     if (electronAPI?.onMcpActionRequest && electronAPI.respondMcpAction) {
-      unsubscribeMcpBridge = electronAPI.onMcpActionRequest((id, toolName, args) => {
+      unsubscribeMcpBridge = electronAPI.onMcpActionRequest((id, toolName, args, deadline) => {
         if (!settingsRef.current?.mcpServerEnabled) {
           electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution rejected: MCP server is disabled in settings.' });
           return;
         }
+        if (!Number.isFinite(deadline) || Date.now() >= deadline) {
+          electronAPI.respondMcpAction?.(id, { error: 'MCP action expired before execution.' });
+          return;
+        }
+        const pending: { approvalId?: string; timer?: ReturnType<typeof setTimeout>; cancelled: boolean } = { cancelled: false };
+        pendingActions.set(id, pending);
+        pending.timer = setTimeout(() => cancelAction(id), Math.max(0, deadline - Date.now()));
+        const canExecute = () => !pending.cancelled && Date.now() < deadline && Boolean(settingsRef.current?.mcpServerEnabled);
+        const finish = () => {
+          if (pending.timer) clearTimeout(pending.timer);
+          pendingActions.delete(id);
+        };
         // Security (G-2): Harmless metadata tools execute directly.
         // Sensitive content inspection tools require user approval.
         const safeMetadataTools = new Set([
@@ -630,29 +659,48 @@ export function useBrowserAgentBridge({
         ]);
 
         const runAction = () => {
-          executeMcpAction(toolName, args)
-            .then(result => electronAPI.respondMcpAction?.(id, result))
-            .catch(err => electronAPI.respondMcpAction?.(id, { error: String(err) }));
+          if (!canExecute()) {
+            if (pending.approvalId) orchestrator.updateActionState(pending.approvalId, 'denied');
+            electronAPI.respondMcpAction?.(id, { error: 'MCP action was cancelled, expired, or disabled.' });
+            finish();
+            return;
+          }
+          if (pending.approvalId) orchestrator.updateActionState(pending.approvalId, 'executing');
+          executeMcpAction(toolName, args, canExecute)
+            .then(result => {
+              if (pending.approvalId) orchestrator.updateActionState(pending.approvalId, 'completed', result);
+              if (!pending.cancelled) electronAPI.respondMcpAction?.(id, result);
+            })
+            .catch(err => {
+              if (pending.approvalId) orchestrator.updateActionState(pending.approvalId, 'failed', undefined, String(err));
+              if (!pending.cancelled) electronAPI.respondMcpAction?.(id, { error: String(err) });
+            }).finally(finish);
         };
 
         if (safeMetadataTools.has(toolName)) {
           runAction();
         } else {
-          const { done } = orchestrator.enqueueAction(toolName, args);
+          const { id: approvalId, done } = orchestrator.enqueueAction(toolName, args);
+          pending.approvalId = approvalId;
           done.then(approved => {
             if (approved) {
               runAction();
             } else {
-              electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution denied by user approval policy.' });
+              if (!pending.cancelled) electronAPI.respondMcpAction?.(id, { error: 'MCP tool execution denied by user approval policy.' });
+              finish();
             }
           }).catch(err => {
-            electronAPI.respondMcpAction?.(id, { error: String(err) });
+            if (!pending.cancelled) electronAPI.respondMcpAction?.(id, { error: String(err) });
+            finish();
           });
         }
       });
+      unsubscribeMcpCancel = electronAPI.onMcpActionCancel?.(cancelAction);
     }
     return () => {
       unsubscribeMcpBridge?.();
+      unsubscribeMcpCancel?.();
+      for (const id of pendingActions.keys()) cancelAction(id);
       activeWaitTimersRef.current.forEach(clearTimeout);
       activeWaitTimersRef.current.clear();
       activeWaitResolversRef.current.forEach(resolve => resolve());

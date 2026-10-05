@@ -1523,6 +1523,9 @@ app.whenReady().then(async () => {
     mediaTypes?: string[];
     callback: (allow: boolean) => void;
     timeoutId: NodeJS.Timeout;
+    permissionKeys: string[];
+    decisions: Map<string, Map<string, { allow: boolean; ts: number }>>;
+    persistent: boolean;
   }
 
   const MAX_PENDING_PERMISSIONS = 20;
@@ -1534,6 +1537,50 @@ app.whenReady().then(async () => {
   const permissionRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
   const PERMISSIONS_FILE = path.join(app.getPath('userData'), 'remembered_permissions.json');
+
+  // Camera and microphone are separate capabilities. Old `media` records do
+  // not identify what was approved and deliberately require a fresh prompt.
+  function permissionKeys(permission: string, mediaTypes?: unknown): string[] | null {
+    if (permission !== 'media') return [permission];
+    if (!Array.isArray(mediaTypes) || mediaTypes.length === 0 ||
+        mediaTypes.some(type => type !== 'audio' && type !== 'video')) return null;
+    return [...new Set(mediaTypes as string[])].map(type => `media:${type}`);
+  }
+
+  function permissionOrigin(url: string): string {
+    if (isTrustedAppOrigin(url)) return 'app';
+    try {
+      const parsed = new URL(url);
+      if (parsed.username || parsed.password) return '';
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.origin;
+      // WHATWG URL.origin serializes every extension as "null". Keep each
+      // installed extension's identity separate; opaque origins get no grants.
+      if (parsed.protocol === 'chrome-extension:' && /^[a-p]{32}$/.test(parsed.hostname)) {
+        return `chrome-extension://${parsed.hostname}`;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function rememberedDecision(
+    decisions: typeof rememberedPermissions, origin: string, keys: string[]
+  ): boolean | undefined {
+    const entries = decisions.get(origin);
+    if (!entries) return undefined;
+    const now = Date.now();
+    const values = keys.map(key => {
+      const entry = entries.get(key);
+      if (!entry) return undefined;
+      if (!Number.isFinite(entry.ts) || entry.ts > now || now - entry.ts >= PERMISSION_TTL_MS) {
+        entries.delete(key);
+        return undefined;
+      }
+      return entry.allow;
+    });
+    if (entries.size === 0) decisions.delete(origin);
+    if (values.some(value => value === false)) return false;
+    return values.every(value => value === true) ? true : undefined;
+  }
 
   function loadRememberedPermissionsFromDisk(): void {
     try {
@@ -1623,16 +1670,19 @@ app.whenReady().then(async () => {
       if (remember && pending.origin) {
         // Purge stale entries periodically (piggyback on writes for efficiency)
         purgeExpiredRememberedPermissions();
-        if (!rememberedPermissions.has(pending.origin)) {
+        const decisions = pending.decisions;
+        if (!decisions.has(pending.origin)) {
           // Cap remembered origins to 200 to prevent unbounded memory growth in long sessions
-          if (rememberedPermissions.size >= 200) {
-            const oldest = rememberedPermissions.keys().next().value;
-            if (oldest) rememberedPermissions.delete(oldest);
+          if (decisions.size >= 200) {
+            const oldest = decisions.keys().next().value;
+            if (oldest) decisions.delete(oldest);
           }
-          rememberedPermissions.set(pending.origin, new Map());
+          decisions.set(pending.origin, new Map());
         }
-        rememberedPermissions.get(pending.origin)!.set(pending.permission, { allow, ts: Date.now() });
-        saveRememberedPermissionsToDisk();
+        for (const key of pending.permissionKeys) {
+          decisions.get(pending.origin)!.set(key, { allow, ts: Date.now() });
+        }
+        if (pending.persistent) saveRememberedPermissionsToDisk();
       }
       try {
         pending.callback(allow);
@@ -1645,8 +1695,14 @@ app.whenReady().then(async () => {
   });
 
   applyStrictSecurityToSession = (targetSession: Electron.Session) => {
+    // Each private partition owns an in-memory permission store. Never import
+    // normal grants or write private browsing origins to the shared disk file.
+    const persistent = targetSession === session.defaultSession;
+    const decisions: typeof rememberedPermissions = persistent ? rememberedPermissions : new Map();
     targetSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
       const url = details.requestingUrl || webContents.getURL() || '';
+      const keys = permissionKeys(permission, (details as any)?.mediaTypes);
+      if (!keys) return callback(false);
 
       // Internal app pages: Allow microphone (audio) only with explicit user confirmation/remember.
       // Other permissions (camera, location, clipboard, openExternal, etc.) remain strictly denied.
@@ -1678,8 +1734,8 @@ app.whenReady().then(async () => {
               }
             }
             // Check if app-level microphone permission was already remembered and allowed
-            const appPerm = rememberedPermissions.get('app')?.get('media') ||
-                            rememberedPermissions.get(url)?.get('media');
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            decisions.get(url)?.get('media:audio');
             if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
               return callback(appPerm.allow);
             }
@@ -1699,15 +1755,8 @@ app.whenReady().then(async () => {
         return callback(false);
       }
 
-      let origin = '';
-      try {
-        origin = new URL(url).origin;
-      } catch {
-        origin = url;
-      }
-      if (isTrustedAppOrigin(url)) {
-        origin = 'app';
-      }
+      const origin = permissionOrigin(url);
+      if (!origin) return callback(false);
 
       // Security: Rate-limiting to prevent permission request flooding attacks (max 5 per 10s per origin)
       const now = Date.now();
@@ -1735,19 +1784,8 @@ app.whenReady().then(async () => {
         }
       }
 
-      // Check remembered permissions for this origin (skip expired entries)
-      if (origin && rememberedPermissions.has(origin)) {
-        const originPerms = rememberedPermissions.get(origin)!;
-        if (originPerms.has(permission)) {
-          const entry = originPerms.get(permission)!;
-          if (Date.now() - entry.ts < PERMISSION_TTL_MS) {
-            return callback(entry.allow);
-          }
-          // Expired — remove and fall through to prompt user again
-          originPerms.delete(permission);
-          if (originPerms.size === 0) rememberedPermissions.delete(origin);
-        }
-      }
+      const decision = rememberedDecision(decisions, origin, keys);
+      if (decision !== undefined) return callback(decision);
 
       // Map permission names for Chrome-style UI
       const permissionNames: Record<string, string> = {
@@ -1798,7 +1836,10 @@ app.whenReady().then(async () => {
         permissionName,
         mediaTypes,
         callback,
-        timeoutId
+        timeoutId,
+        permissionKeys: keys,
+        decisions,
+        persistent
       });
 
       // Send sleek event to renderer TopBar
@@ -1817,6 +1858,8 @@ app.whenReady().then(async () => {
     targetSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
       // Security: Deny openExternal checks immediately
       if (permission === 'openExternal') return false;
+      const keys = permissionKeys(permission, [(details as any)?.mediaType]);
+      if (!keys) return false;
 
       // Fail-closed permission checking:
       // Internal pages: Permit microphone (audio) checks only if remembered/granted.
@@ -1834,8 +1877,8 @@ app.whenReady().then(async () => {
                 return false; // Fail closed!
               }
             }
-            const appPerm = rememberedPermissions.get('app')?.get('media') ||
-                            (requestingOrigin ? rememberedPermissions.get(requestingOrigin)?.get('media') : undefined);
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            (requestingOrigin ? decisions.get(requestingOrigin)?.get('media:audio') : undefined);
             if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
               return appPerm.allow;
             }
@@ -1845,19 +1888,8 @@ app.whenReady().then(async () => {
         return false;
       }
 
-      // For external websites, check if permission was previously remembered (TTL enforced)
-      if (requestingOrigin && rememberedPermissions.has(requestingOrigin)) {
-        const originPerms = rememberedPermissions.get(requestingOrigin)!;
-        if (originPerms.has(permission)) {
-          const entry = originPerms.get(permission)!;
-          if (Date.now() - entry.ts < PERMISSION_TTL_MS) return entry.allow;
-          // Expired — prune silently
-          originPerms.delete(permission);
-          if (originPerms.size === 0) rememberedPermissions.delete(requestingOrigin);
-        }
-      }
-
-      return false;
+      const origin = permissionOrigin(requestingOrigin);
+      return origin ? rememberedDecision(decisions, origin, keys) ?? false : false;
     });
   };
 
@@ -4778,13 +4810,9 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
             // secret exists in memory but never on disk, so every value
             // encrypted with it is unreadable on the next launch - silently,
             // with no log and nothing for the user to act on.
-            try {
-              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-              if (process.platform !== 'win32') {
-                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
-              }
-            } catch (err: any) {
-              if (err?.code !== 'ENOENT') throw err;
+            fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+            if (process.platform !== 'win32') {
+              try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
             }
           }
           // K-3: Bind salt to machine identity so copying userData to another machine/account fails
@@ -4836,7 +4864,7 @@ ipcMain.handle('secure-store-get', async (event, key: string) => {
         } catch (_) {}
       }
       // Check for fallback AES-256-GCM format
-      if (raw.length >= 36 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+      if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
         try {
           const secretPath = path.join(app.getPath('userData'), '.machine_secret');
           if (fs.existsSync(secretPath)) {

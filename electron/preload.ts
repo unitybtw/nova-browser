@@ -94,10 +94,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // MCP action bridge: the main process asks this trusted app page to execute
   // a browser_* tool via IPC; results return on a sender-validated channel.
   // Must be ipcRenderer.send — the main side listens with ipcMain.on.
-  onMcpActionRequest: (callback: (id: string, toolName: string, args: any) => void) => {
-    const handler = (_event: any, id: string, toolName: string, args: any) => callback(id, toolName, args);
+  onMcpActionRequest: (callback: (id: string, toolName: string, args: any, deadline: number) => void) => {
+    const handler = (_event: any, id: string, toolName: string, args: any, deadline: number) => callback(id, toolName, args, deadline);
     ipcRenderer.on('mcp-action-request', handler);
     return () => ipcRenderer.removeListener('mcp-action-request', handler);
+  },
+  onMcpActionCancel: (callback: (id: string) => void) => {
+    const handler = (_event: any, id: string) => callback(id);
+    ipcRenderer.on('mcp-action-cancel', handler);
+    return () => ipcRenderer.removeListener('mcp-action-cancel', handler);
   },
   respondMcpAction: (id: string, result?: unknown, error?: unknown) => {
     ipcRenderer.send('mcp-action-response', { id, result, error });

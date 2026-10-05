@@ -168,8 +168,9 @@ export interface ElectronAPI {
   setMcpToolEnabled: (toolName: string, enabled: boolean) => Promise<boolean>;
   // MCP action bridge (main process <-> renderer round-trip)
   onMcpActionRequest: (
-    callback: (id: string, toolName: string, args: unknown) => void
+    callback: (id: string, toolName: string, args: unknown, deadline: number) => void
   ) => () => void;
+  onMcpActionCancel: (callback: (id: string) => void) => () => void;
   respondMcpAction: (id: string, result?: unknown, error?: unknown) => void;
   clearIncognitoSession: (tabId?: string) => Promise<boolean>;
   initIncognitoPartition: (tabId: string) => Promise<boolean>;

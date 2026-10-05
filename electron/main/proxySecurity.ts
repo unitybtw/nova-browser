@@ -88,13 +88,9 @@ export function encryptDataWithFallback(plainText: string, userDataPath: string,
     secret = crypto.randomBytes(32);
     // Only a chmod failure is tolerable. Swallowing the write leaves the secret
     // in memory only, so everything encrypted with it is unreadable next launch.
-    try {
-      fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-      if (process.platform !== 'win32') {
-        try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
-      }
-    } catch (err: any) {
-      if (err?.code !== 'ENOENT') throw err;
+    fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+    if (process.platform !== 'win32') {
+      try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
     }
   }
 
@@ -120,7 +116,7 @@ export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeS
     } catch (_) {}
   }
 
-  if (raw.length >= 36 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+  if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
     try {
       const secretPath = path.join(userDataPath, '.machine_secret');
       if (fs.existsSync(secretPath)) {
