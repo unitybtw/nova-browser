@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" fill="none">
+  <defs>
+    <!-- Background Gradient: Deep Anodized Titanium & Obsidian Void -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#161821" />
+      <stop offset="40%" stop-color="#0b0c11" />
+      <stop offset="100%" stop-color="#030407" />
+    </linearGradient>
+
+    <!-- Subtle Specular Rim Lighting -->
+    <linearGradient id="rimStroke" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.24)" />
+      <stop offset="35%" stop-color="rgba(255, 255, 255, 0.08)" />
+      <stop offset="100%" stop-color="rgba(255, 255, 255, 0.02)" />
+    </linearGradient>
+
+    <!-- Ambient Center Flare / Luminescence -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.14" />
+      <stop offset="45%" stop-color="#0284c7" stop-opacity="0.05" />
+      <stop offset="100%" stop-color="#030407" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- The Star Fill: Apple Pure Silver-White Liquid Gradient -->
+    <linearGradient id="starGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="50%" stop-color="#f8fafc" />
+      <stop offset="85%" stop-color="#e2e8f0" />
+      <stop offset="100%" stop-color="#cbd5e1" />
+    </linearGradient>
+
+    <!-- Diamond Secondary Facet Fill -->
+    <linearGradient id="diamondGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="rgba(255, 255, 255, 0.55)" />
+      <stop offset="100%" stop-color="rgba(148, 163, 184, 0.25)" />
+    </linearGradient>
+
+    <!-- Subtle Optical Drop Shadow -->
+    <filter id="starShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="22" flood-color="#000000" flood-opacity="0.7" />
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#000000" flood-opacity="0.4" />
+    </filter>
+
+    <!-- Optical Center Core Glow -->
+    <radialGradient id="cyanCore" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="65%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </radialGradient>
+  </defs>
+
+  <!-- macOS App Squircle Base (Apple Golden Ratio Corner Radius) -->
+  <rect x="80" y="80" width="864" height="864" rx="200"
+        fill="url(#bgGrad)"
+        stroke="url(#rimStroke)"
+        stroke-width="3" />
+
+  <!-- Ambient Light Reflection -->
+  <rect x="80" y="80" width="864" height="864" rx="200"
+        fill="url(#centerGlow)" />
+
+  <!-- The Nova Star Glyph -->
+  <g filter="url(#starShadow)">
+    <!-- Primary 4-point parabolic star -->
+    <path d="M 512 140
+             C 512 360 360 512 140 512
+             C 360 512 512 664 512 884
+             C 512 664 664 512 884 512
+             C 664 512 512 360 512 140 Z"
+          fill="url(#starGrad)" />
+
+    <!-- Secondary 45-degree diamond facet -->
+    <polygon points="512,320 704,512 512,704 320,512"
+             fill="url(#diamondGrad)" />
+
+    <!-- Optical Center Aperture Outer Ring -->
+    <circle cx="512" cy="512" r="40" fill="#090a0f" />
+
+    <!-- Optical Center Aperture Lens -->
+    <circle cx="512" cy="512" r="24" fill="url(#cyanCore)" />
+
+    <!-- Inner White Spark Point -->
+    <circle cx="512" cy="512" r="8" fill="#ffffff" />
+  </g>
+</svg>

@@ -1,67 +1,32 @@
-# Nova Browser - Complete Technical Specification & Documentation
+# Nova Browser
 
-## 1. Overview
-Nova Browser is an open-source, AI-native desktop web browser built with Electron, React, Tailwind CSS, WebGPU, and high-performance network filtering. It is designed to provide sovereign, high-speed, and completely private web browsing with local AI capabilities.
+> A free, open-source desktop browser with local AI, workspaces, network filtering, encrypted sync, and native MCP integration.
 
-## 2. Core Architecture & Philosophy
+Nova is available for macOS (Apple Silicon and Intel), Windows x64, and Linux x64. It is built with Electron, React and TypeScript and licensed under MIT.
 
-### 2.1 Sovereign On-Device AI Engine
-- **Inference Technology**: Uses WebGPU hardware shaders to execute quantized Large Language Models (GGUF / MLC format) directly on client hardware (Metal on macOS, DirectX 12 / Vulkan on Windows).
-- **Supported Models**:
-  - Llama 3.2 3B Instruct (General reasoning, code analysis, document summarization)
-  - Phi-3.5 Vision Instruct (Visual screenshot analysis and multimodal UI understanding)
-  - Qwen 2.5 1.5B (Ultra-fast lightweight execution on lower-spec hardware)
-- **Data Privacy**: Zero prompts, history, or tokens leave the user device. 100% offline-capable.
+## Features
 
-### 2.2 Model Context Protocol (MCP) Integration
-- Nova features a built-in Model Context Protocol (MCP) server running on `localhost:3020`.
-- External AI clients (such as Claude Desktop, Cursor IDE, Antigravity, or custom local agents) can connect via SSE (Server-Sent Events) and control browser actions with granular permissions:
-  - `browser_navigate`: Navigate to any URL
-  - `browser_read_page`: Extract clean sanitized markdown text and link trees
-  - `browser_screenshot`: Capture viewport or element screenshots
-  - `browser_list_tabs`, `browser_switch_tab`, `browser_close_tab`, `browser_new_tab`
-  - `browser_click`, `browser_type`, `browser_scroll`, `browser_hover`
+- Local AI: supported models run on the device through WebGPU after a model download. Availability and performance depend on compatible hardware. External agents and providers have their own data handling.
+- Organization: workspaces, vertical or horizontal tabs, split view, and tab hibernation.
+- Privacy: network filtering blocks ads and known trackers.
+- Sync: bookmarks and passwords are encrypted on the device with AES-256-GCM. Keep pairing codes private.
+- Extensions: Chrome Web Store extension support; compatibility varies by extension.
+- Agents: a built-in local MCP server connects compatible coding agents.
 
-### 2.3 Zero-Latency Privacy & Ad-Blocker Engine
-- Integrates memory-mapped EasyList, EasyPrivacy, uBlock Origin, and Peter Lowe blocklists.
-- Stops cross-site trackers, crypto-miners, fingerprinting scripts, and intrusive banners before network dispatch.
-- Enforces strict Global Privacy Control (Sec-GPC) and Do-Not-Track (DNT) headers.
+## Official links
 
-### 2.4 Zero-Knowledge Cloud Sync (Nova Sync)
-- Synchronization of open tabs, workspaces, speed dials, bookmarks, and settings.
-- Uses client-side AES-256-GCM encryption with ephemeral device pairing codes.
-- The cloud backend (Supabase Realtime) only stores blinded ciphertext payloads, ensuring zero-knowledge privacy.
+- Website: https://nova-browser.org/
+- Source code: https://github.com/unitybtw/nova-browser
+- Latest release and installers: https://github.com/unitybtw/nova-browser/releases/latest
+- Report an issue: https://github.com/unitybtw/nova-browser/issues
+- License: https://github.com/unitybtw/nova-browser/blob/main/LICENSE
 
-## 3. Platform Availability & Installation
+The website offers English and Turkish copy. Download the installer matching your operating system and processor architecture from official GitHub releases.
 
-### macOS (Apple Silicon & Intel)
-- Homebrew Cask (Recommended):
-  ```bash
-  brew tap unitybtw/tap
-  brew install --cask nova-browser
-  ```
-- Direct DMG Downloads:
-  - Apple Silicon (ARM64): https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-arm64.dmg
-  - Intel (x64): https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-x64.dmg
+## Local AI requirements
 
-### Windows (10 & 11 64-bit)
-- Standalone NSIS Installer:
-  - https://github.com/unitybtw/nova-browser/releases/latest/download/Nova-Browser-Setup.exe
+An initial model download is required. Model support, speed and memory usage depend on the device. Local model inference runs on the device; this does not imply that all browser networking or external agent services run offline.
 
-## 4. Frequently Asked Questions (FAQ)
+## Sync pairing
 
-### What makes Nova Browser different from Arc, Brave, and Chrome?
-1. **Local AI Execution**: Arc and Chrome send AI tasks to cloud servers. Nova executes all LLMs on your local GPU via WebGPU.
-2. **True Open Source (MIT)**: Nova is 100% open source and community-governed.
-3. **Built-in MCP Server**: Nova is the first browser with native Model Context Protocol support for external AI agent pairing.
-4. **No Telemetry**: No tracking, no user profiling, no data collection.
-
-### Does Nova Browser require an internet connection for AI?
-No. Once the initial model weights are downloaded locally, the AI engine runs completely offline with zero internet dependency.
-
-### How do I update Nova Browser?
-- On macOS via Homebrew: `brew upgrade --cask nova-browser`
-- Direct installs auto-update via integrated GitHub release manifests.
-
-### Where is the source code?
-The repository is hosted publicly at: https://github.com/unitybtw/nova-browser
+Pair computers using a sync code without creating an email/password account. The sync code enables access to encrypted data and must be kept private.

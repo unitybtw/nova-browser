@@ -2,23 +2,23 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
   <url>
     <loc>https://nova-browser.org/</loc>
-    <lastmod>2026-08-27</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://nova-browser.org/preview.png</image:loc>
-      <image:title>Nova Browser - Sovereign On-Device AI Web Browser</image:title>
+      <image:loc>https://nova-browser.org/images/newtab.png</image:loc>
+      <image:title>Nova Browser — A little more space.</image:title>
     </image:image>
   </url>
   <url>
     <loc>https://nova-browser.org/llms.txt</loc>
-    <lastmod>2026-08-27</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
     <loc>https://nova-browser.org/llms-full.txt</loc>
-    <lastmod>2026-08-27</lastmod>
+    <lastmod>2026-10-05</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
