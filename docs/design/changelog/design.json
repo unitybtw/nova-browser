@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T05:55:29.001934+00:00",
+  "title": "Design System: Nova release journal",
+  "extensions": {
+    "motion": [
+      {
+        "name": "step-arrival",
+        "value": "journal-arrive 250ms ease-out",
+        "purpose": "Step detail arrival from opacity .6 and translateY(5px) to its resting state; suppressed for reduced motion."
+      },
+      {
+        "name": "refresh-rotation",
+        "value": "journal-spin 1s linear infinite",
+        "purpose": "Refresh icon while loading; suppressed for reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stacked-details",
+        "value": "1050px"
+      },
+      {
+        "name": "horizontal-versions",
+        "value": "650px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Version navigation",
+      "kind": "nav",
+      "description": "Version/date navigation; the selected version uses the journal wash.",
+      "html": "<nav class=\"ds-nav\"><button aria-current=\"true\">1.5.0<small>Release date</small></button><button>1.4.9<small>Previous release</small></button></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:6px;font-family:system-ui,sans-serif}.ds-nav button{text-align:left;border:0;border-radius:8px;padding:12px 14px;background:transparent;color:var(--journal-muted,#586478);font:inherit;cursor:pointer}.ds-nav small{display:block;font-size:10px;margin-top:2px}.ds-nav button:hover{background:var(--journal-surface,#fff)}.ds-nav button[aria-current]{background:var(--journal-wash,#eaf0fc);color:var(--journal-accent,#245de1)}.ds-nav button:focus-visible{outline:2px solid var(--journal-accent,#245de1);outline-offset:4px;}",
+      "refersTo": "version-selected"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "description": "Restrained opening action with an accent and directional icon.",
+      "html": "<button class=\"ds-action\">Read release notes <svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><path d=\"M7 17 17 7M7 7h10v10\"/></svg></button>",
+      "css": ".ds-action{border:0;background:transparent;display:inline-flex;align-items:center;gap:8px;color:var(--journal-accent,#245de1);font-family:system-ui,sans-serif;font-size:12px;font-weight:600;padding:0;cursor:pointer}.ds-action:focus-visible{outline:2px solid var(--journal-accent,#245de1);outline-offset:4px;}.ds-action:active{transform:none}",
+      "refersTo": "text-action"
+    },
+    {
+      "name": "Media choices",
+      "kind": "chip",
+      "description": "Named native buttons with a distinct pressed state.",
+      "html": "<div class=\"ds-choices\"><button aria-pressed=\"true\">New tab</button><button aria-pressed=\"false\">Assistant</button></div>",
+      "css": ".ds-choices{display:flex;gap:6px;flex-wrap:wrap}.ds-choices button{border:1px solid var(--journal-line,#dde2e9);background:transparent;color:var(--journal-muted,#586478);padding:8px 11px;font-family:system-ui,sans-serif;font-size:11px;border-radius:6px;cursor:pointer}.ds-choices button[aria-pressed=true]{background:var(--journal-ink,#202733);border-color:var(--journal-ink,#202733);color:var(--journal-bg,#f8f9fb)}.ds-choices button:focus-visible{outline:2px solid var(--journal-accent,#245de1);outline-offset:4px;}",
+      "refersTo": "media-choice-selected"
+    },
+    {
+      "name": "Search",
+      "kind": "input",
+      "description": "Single accessible field with a focus-within border.",
+      "html": "<label class=\"ds-search\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/></svg><input type=\"search\" aria-label=\"Search release notes\" placeholder=\"Search release notes\"/></label>",
+      "css": ".ds-search{display:flex;gap:12px;align-items:center;background:var(--journal-surface,#fff);border:1px solid var(--journal-line,#dde2e9);border-radius:8px;padding:10px 14px;color:var(--journal-muted,#586478)}.ds-search input{min-width:0;flex:1;border:0;background:transparent;color:var(--journal-ink,#202733);font-family:system-ui,sans-serif;font-size:13px;outline:none;caret-color:var(--journal-accent,#245de1)}.ds-search:focus-within{border-color:var(--journal-accent,#245de1)}.ds-search input:focus-visible{outline:2px solid var(--journal-accent,#245de1);outline-offset:4px;}",
+      "refersTo": "search"
+    },
+    {
+      "name": "Media stage",
+      "kind": "custom",
+      "description": "Matte, rounded container; runtime media remains supplied by React.",
+      "html": "<div class=\"ds-stage\"><span>Release media stage</span></div>",
+      "css": ".ds-stage{background:var(--journal-stage,#e7ebf1);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:center;aspect-ratio:16/10;overflow:hidden;color:var(--journal-muted,#586478);font-family:system-ui,sans-serif;font-size:12px}",
+      "refersTo": "media-stage"
+    },
+    {
+      "name": "Update step selection",
+      "kind": "nav",
+      "description": "A labeled three-button group; static preview does not imitate live updater state.",
+      "html": "<div class=\"ds-steps\" role=\"group\" aria-label=\"Update walkthrough\"><button aria-pressed=\"true\">Check</button><button aria-pressed=\"false\">Download</button><button aria-pressed=\"false\">Install</button></div>",
+      "css": ".ds-steps{display:flex;border-bottom:1px solid var(--journal-line,#dde2e9);gap:15px}.ds-steps button{background:none;border:0;border-bottom:2px solid transparent;color:var(--journal-muted,#586478);padding:10px 0 14px;font-family:system-ui,sans-serif;font-size:12px;flex:1;cursor:pointer}.ds-steps button[aria-pressed=true]{border-color:var(--journal-accent,#245de1);color:var(--journal-accent,#245de1)}.ds-steps button:focus-visible{outline:2px solid var(--journal-accent,#245de1);outline-offset:4px;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Nova release journal",
+    "overview": "This is a record of the implemented changelog surface, not a global identity replacement. A persistent version selector leads into a selected release, real product media, highlights, update guidance, and searchable notes. Quiet slate surfaces and cobalt actions follow Nova's light/dark preference and existing logo. Large regular-weight headings provide hierarchy without decorative statistics or repeated icon cards.",
+    "keyCharacteristics": [
+      "Version-first navigation with a readable, scrollable release story.",
+      "Real media attached to its matching release.",
+      "Flat tonal layers, fine dividers, and restrained action color.",
+      "Explicit separation between explanatory update steps and actual device status."
+    ],
+    "rules": [
+      {
+        "name": "The Local Palette Rule",
+        "body": "Keep journal variables scoped to the release journal; do not redefine the application's global theme through this surface.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do use the scoped light/dark palette and inherited system sans typography.",
+      "Do keep release media tied to its matching version and preserve historic notes.",
+      "Do keep the walkthrough explanatory and actual updater state in the device panel.",
+      "Do retain visible focus, localized captions, manual video playback, and narrow refresh access."
+    ],
+    "donts": [
+      "Don't introduce glows, decorative statistics, or repetitive icon cards into this journal.",
+      "Don't show the v1.5.0 curated gallery for unrelated releases.",
+      "Don't remount the Next step control on a step change or style fixed updater overlays as inline rows.",
+      "Don't treat the web fallback as desktop updater functionality."
+    ]
+  }
+}
