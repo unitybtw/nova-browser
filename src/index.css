@@ -441,7 +441,9 @@ button:active:not(:disabled) {
    to the controls above it; changing a shortcut tint or its edit controls
    does not mutate the element that captures the backdrop. */
 .nova-wallpaper-surface,
-.nova-newtab-glass {
+.nova-newtab-glass,
+.nova-newtab-clean .nova-clock,
+.nova-newtab-clean .nova-shortcut {
   isolation: isolate;
 }
 .nova-wallpaper-surface {
@@ -451,7 +453,9 @@ button:active:not(:disabled) {
   border: 1px solid rgb(255 255 255 / 0.18);
 }
 .nova-wallpaper-surface::before,
-.nova-newtab-glass::before {
+.nova-newtab-glass::before,
+.nova-newtab-clean .nova-clock::before,
+.nova-newtab-clean .nova-shortcut::before {
   content: "";
   position: absolute;
   inset: 0;
@@ -464,7 +468,8 @@ button:active:not(:disabled) {
   /* A stable compositor layer avoids promotion/demotion at hover boundaries. */
   transform: translateZ(0);
 }
-.nova-shortcut.nova-wallpaper-surface::after {
+.nova-shortcut.nova-wallpaper-surface::after,
+.nova-newtab-clean .nova-shortcut::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -474,7 +479,8 @@ button:active:not(:disabled) {
   background-color: transparent;
   transition: background-color 160ms ease;
 }
-.nova-shortcut.nova-wallpaper-surface:hover::after {
+.nova-shortcut.nova-wallpaper-surface:hover::after,
+.nova-newtab-clean .nova-shortcut:hover::after {
   background-color: rgb(255 255 255 / 0.06);
 }
 .nova-newtab-glass { --nova-glass-blur: 24px; }
@@ -485,5 +491,34 @@ button:active:not(:disabled) {
   .nova-shortcut.nova-wallpaper-surface::after { transition: none; }
 }
 
-/* The unlayered global heading face otherwise overrides font-sans utilities. */
-.nova-clock h1 { font-family: inherit; font-variant-numeric: tabular-nums; }
+/* Clean backgrounds use the same stable glass layer, with theme-aware tint. */
+.nova-newtab-clean {
+  --nova-clean-tint: rgb(255 255 255 / 0.5);
+  --nova-clean-border: rgb(148 163 184 / 0.3);
+}
+.nova-newtab-clean.dark {
+  --nova-clean-tint: rgb(255 255 255 / 0.06);
+  --nova-clean-border: rgb(255 255 255 / 0.14);
+}
+.nova-newtab-clean .nova-clock,
+.nova-newtab-clean .nova-shortcut,
+.nova-newtab-clean .nova-newtab-glass {
+  position: relative;
+  --nova-glass-tint: var(--nova-clean-tint);
+  background-color: transparent;
+  border: 1px solid var(--nova-clean-border);
+}
+.nova-newtab-clean .nova-clock {
+  padding: 24px 40px;
+  border-radius: 16px;
+}
+.nova-newtab-clean .nova-newtab-glass input {
+  background-color: transparent;
+  border-color: transparent;
+}
+.nova-newtab-clean .nova-newtab-glass:focus-within {
+  border-color: var(--nova-accent, #3b82f6);
+}
+@media (prefers-reduced-motion: reduce) {
+  .nova-newtab-clean .nova-shortcut::after { transition: none; }
+}

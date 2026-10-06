@@ -604,6 +604,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
            ['matrix', 'nebula', 'hyper_space', 'fireflies', 'cyber_grid', 'aurora_waves', 'mesh', 'glass'].includes(newTabBackground);
   }, [newTabBackground]);
 
+  const isCleanBackground = newTabBackground === 'default' || newTabBackground === 'plain';
+
   // The grid dereferences `dial.id`, `dial.name` and `dial.url` on every row, so
   // one unusable entry would render the whole new tab into the ErrorBoundary.
   const renderableSpeedDials = useMemo(
@@ -722,7 +724,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         // A dark fallback keeps glass surfaces readable while a photo loads.
         backgroundColor: hasWallpaper ? '#101820' : 'var(--nova-frame-bg)'
       }}
-      className={`nova-newtab w-full h-full relative overflow-x-hidden overflow-y-auto p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
+      className={`nova-newtab ${isCleanBackground ? "nova-newtab-clean" : ""} w-full h-full relative overflow-x-hidden overflow-y-auto p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
 
       {/* Unsplash Background */}
@@ -1045,7 +1047,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
         {/* Omnibox / Search Form */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
-          <form onSubmit={handleSearch} className={`relative group rounded-xl ${hasWallpaper ? "nova-newtab-glass" : ""}`}>
+          <form onSubmit={handleSearch} className="nova-newtab-glass relative group rounded-xl">
             <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -1214,10 +1216,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${hasWallpaper ? "nova-wallpaper-surface text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent"}`}
                   style={hasWallpaper ? { color: "white", textShadow: "0 1px 4px #000" } : undefined}
                 >
-                  <div className="w-11 h-11 flex items-center justify-center shrink-0" aria-hidden="true">
-                    <Plus className="w-6 h-6" />
-                  </div>
-                  <span className="text-xs font-medium">{t('nav.addShortcut')}</span>
+                  <Plus className="w-6 h-6" />
+                  <span className="text-xs font-semibold">{t('nav.addShortcut')}</span>
                 </button>
               </motion.div>
             )}
