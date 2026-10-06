@@ -742,7 +742,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
           {/* Daily 4K Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
-            <div className="absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
+            <div className="nova-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
               <span className="px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase font-mono bg-white/[0.08] group-hover:bg-white/[0.14] text-white/75 group-hover:text-white/95 rounded border border-white/10 transition-colors">
                 4K UHD
               </span>
@@ -1045,7 +1045,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
         {/* Omnibox / Search Form */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full relative z-30" ref={searchContainerRef}>
-          <form onSubmit={handleSearch} className="relative group">
+          <form onSubmit={handleSearch} className="nova-newtab-glass relative group rounded-xl">
             <div className="absolute inset-y-0 start-4 flex items-center pointer-events-none z-10 text-slate-400 group-focus-within:text-cyan-500 transition-colors">
               <Search className="w-5 h-5" />
             </div>
@@ -1060,7 +1060,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               onKeyDown={handleKeyDown}
               placeholder={t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
               aria-label={t('nav.newTab')}
-              className="w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25"
+              className="w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25"
             />
 
             <div className="absolute end-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">

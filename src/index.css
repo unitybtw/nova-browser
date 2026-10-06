@@ -437,16 +437,50 @@ button:active:not(:disabled) {
   .nova-newtab-layout:not(:has(.nova-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
 }
 
-/* Wallpaper glass stays translucent across themes and loading/hover states. */
+/* Keep backdrop capture on a permanent decorative layer. Hover/focus belongs
+   to the controls above it; changing a shortcut tint or its edit controls
+   does not mutate the element that captures the backdrop. */
+.nova-wallpaper-surface,
+.nova-newtab-glass {
+  isolation: isolate;
+}
 .nova-wallpaper-surface {
-  background-color: rgb(15 23 42 / 0.28);
+  position: relative;
+  --nova-glass-tint: rgb(15 23 42 / 0.28);
+  background-color: transparent;
   border: 1px solid rgb(255 255 255 / 0.18);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
 }
-.nova-shortcut.nova-wallpaper-surface:hover {
-  background-color: rgb(15 23 42 / 0.36);
+.nova-wallpaper-surface::before,
+.nova-newtab-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: var(--nova-glass-tint, transparent);
+  -webkit-backdrop-filter: blur(var(--nova-glass-blur, 16px));
+  backdrop-filter: blur(var(--nova-glass-blur, 16px));
+  /* A stable compositor layer avoids promotion/demotion at hover boundaries. */
+  transform: translateZ(0);
 }
+.nova-shortcut.nova-wallpaper-surface::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background-color: transparent;
+  transition: background-color 160ms ease;
+}
+.nova-shortcut.nova-wallpaper-surface:hover::after {
+  background-color: rgb(255 255 255 / 0.06);
+}
+.nova-newtab-glass { --nova-glass-blur: 24px; }
 @supports not (backdrop-filter: blur(1px)) {
-  .nova-wallpaper-surface { background-color: rgb(15 23 42 / 0.65); }
+  .nova-wallpaper-surface::before { background-color: rgb(15 23 42 / 0.65); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nova-shortcut.nova-wallpaper-surface::after { transition: none; }
 }
