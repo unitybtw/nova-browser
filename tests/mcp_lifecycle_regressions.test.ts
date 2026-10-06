@@ -47,7 +47,7 @@ async function run() {
   const settingsRef = { current: { mcpServerEnabled: true } };
   const hook = loadSource('src/hooks/useBrowserAgentBridge.ts', {
     window: { electronAPI: api, dispatchEvent: () => {} },
-    document: { querySelector: () => ({ executeJavaScript: async () => { clicks++; return { success: true, x: 1, y: 1 }; }, getBoundingClientRect: () => ({ left: 0, top: 0 }) }) },
+    document: { querySelectorAll: () => [], querySelector: () => ({ executeJavaScript: async () => { clicks++; return { success: true, x: 1, y: 1 }; }, getBoundingClientRect: () => ({ left: 0, top: 0 }) }) },
     CustomEvent: class {}, setTimeout, clearTimeout
   }, {
     react: { useEffect: (fn: Function) => fn(), useRef: (current: unknown) => ({ current }) },

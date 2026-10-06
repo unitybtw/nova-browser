@@ -16,8 +16,8 @@ import { isSafeAgentNavigationUrl } from '../utils/safeNavigation';
  * (or a rebind between the check and the connect) could aim the agent at
  * 127.0.0.1 or 169.254.169.254 and then read the response back through
  * browser_read_page. When the bridge runs outside Electron there is no main
- * process to ask, so the synchronous check stands alone and the gap is the
- * same one the pure-web build already has.
+ * process to ask, so network automation fails closed. This DNS preflight is
+ * not connection pinning; it does not prove the address Chromium connected to.
  */
 async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reason?: string }> {
   if (!isSafeAgentNavigationUrl(url)) return { ok: false, reason: 'destination is not a public address' };
@@ -26,7 +26,7 @@ async function agentNavigationAllowed(url: string): Promise<{ ok: boolean; reaso
   const protocol = new URL(url).protocol;
   if (protocol !== 'http:' && protocol !== 'https:') return { ok: true };
   const api = (window as any).electronAPI;
-  if (!api?.checkAgentNavigationHost) return { ok: true };
+  if (!api?.checkAgentNavigationHost) return { ok: false, reason: 'host authorization is unavailable' };
   try {
     const verdict = await api.checkAgentNavigationHost(url);
     if (!verdict?.allowed) return { ok: false, reason: verdict?.reason || 'destination failed the host check' };
@@ -84,6 +84,82 @@ export function useBrowserAgentBridge({
   const activeWaitResolversRef = useRef<Set<() => void>>(new Set());
 
   useEffect(() => {
+    // Bind authorization to the mounted guest and its navigation lifetime.
+    // URL equality alone misses reloads and A -> B -> A while approval waits.
+    const documentVersions = new WeakMap<object, { version: number }>();
+    const guestListeners = new WeakMap<object, () => void>();
+    const observeGuest = (guest: any) => {
+      if (!guest || documentVersions.has(guest)) return;
+      const state = { version: 0 };
+      documentVersions.set(guest, state);
+      const changed = (event: any) => { if (event?.isMainFrame !== false) state.version++; };
+      for (const name of ['did-start-navigation', 'did-navigate-in-page', 'render-process-gone', 'destroyed']) {
+        guest.addEventListener?.(name, changed);
+      }
+      guestListeners.set(guest, () => {
+        for (const name of ['did-start-navigation', 'did-navigate-in-page', 'render-process-gone', 'destroyed']) {
+          guest.removeEventListener?.(name, changed);
+        }
+      });
+    };
+    const currentGuest = () => Array.from(document.querySelectorAll('webview')).find(
+      (guest: any) => guest.getAttribute?.('data-tab-id') === browserDataRef.current.activeTabId
+    ) as any;
+    const captureTarget = () => {
+      const tabId = browserDataRef.current.activeTabId;
+      const guest = currentGuest();
+      observeGuest(guest);
+      let url = '';
+      try { url = guest ? guest.getURL() : (browserDataRef.current.tabs.find(t => t.id === tabId)?.url || ''); } catch (_) {}
+      return { tabId, guest, url, version: guest ? documentVersions.get(guest)?.version : undefined };
+    };
+    const targetIsCurrent = (target: ReturnType<typeof captureTarget>) => {
+      if (browserDataRef.current.activeTabId !== target.tabId || currentGuest() !== target.guest) return false;
+      if (!target.guest) return (browserDataRef.current.tabs.find(t => t.id === target.tabId)?.url || '') === target.url;
+      try {
+        return target.guest.getURL() === target.url && documentVersions.get(target.guest)?.version === target.version &&
+          !target.guest.isDestroyed?.() && !target.guest.isLoading?.();
+      } catch (_) { return false; }
+    };
+    const guardedGuest = (canExecute = () => true) => {
+      const target = captureTarget();
+      if (!target.guest) return null;
+      const assertCurrent = () => {
+        if (!canExecute() || !targetIsCurrent(target)) throw new Error('Agent action blocked: target document changed or action expired.');
+      };
+      const authorize = async () => {
+        assertCurrent();
+        // Renderer routes/extensions may be opened, but their privileged content
+        // is never available to website automation.
+        if (!/^https?:/.test(target.url)) throw new Error('Agent content access blocked: target is not a public website.');
+        const gate = await agentNavigationAllowed(target.url);
+        assertCurrent();
+        if (!gate.ok) throw new Error(`Agent content access blocked for security (${gate.reason}).`);
+      };
+      return new Proxy(target.guest, {
+        get(guest, key) {
+          const original = guest[key];
+          if (typeof original !== 'function') return original;
+          if (!['executeJavaScript', 'capturePage', 'sendInputEvent', 'goBack', 'goForward', 'reload', 'setZoomLevel'].includes(String(key))) {
+            return original.bind(guest);
+          }
+          return async (...args: any[]) => {
+            await authorize();
+            if (key === 'executeJavaScript') {
+              // The check runs in the same guest task as the operation, closing
+              // the cross-origin navigation gap between IPC dispatch and use.
+              args[0] = `if (window.location.href !== ${JSON.stringify(target.url)}) { throw new Error('Agent action blocked: target document changed.'); }\n${args[0]}`;
+            }
+            const result = await original.apply(guest, args);
+            // History/reload intentionally replace the document and return no
+            // sensitive content. Reads and captures must retain their binding.
+            if (key === 'executeJavaScript' || key === 'capturePage') assertCurrent();
+            return result;
+          };
+        }
+      });
+    };
+
     // 1. Define executeMcpAction as a local function (not exposed on window)
     // VULN-11 FIX: Removed global window assignment to prevent any webpage or extension
     // from invoking browser control APIs. The MCP server in the main process can invoke
@@ -94,7 +170,7 @@ export function useBrowserAgentBridge({
       }
       const safeArgs = (args && typeof args === 'object') ? args : {};
       const { activeTabId, tabs } = browserDataRef.current;
-      const activeWebview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
+      const activeWebview = guardedGuest(canExecute);
 
       switch (toolName) {
         case 'browser_navigate':
@@ -112,7 +188,7 @@ export function useBrowserAgentBridge({
           if (!gate.ok) {
             return `Error: Navigation to this destination is blocked for security (${gate.reason}).`;
           }
-          mcpHandlersRef.current.handleNavigate(safeArgs.url);
+          mcpHandlersRef.current.handleNavigate(safeArgs.url, activeTabId || undefined);
           return `Navigated to ${safeArgs.url}`;
 
         case 'browser_read_page':
@@ -246,27 +322,27 @@ export function useBrowserAgentBridge({
           if (!gate.ok) {
             return `Error: Navigation blocked for unsafe destination (${gate.reason}): ${newUrl}`;
           }
-          mcpHandlersRef.current.handleNewTab(newUrl);
+          mcpHandlersRef.current.handleNewTab(newUrl, undefined, { reuseBlank: false });
           return `Opened new tab: ${newUrl}`;
         }
 
         case 'browser_go_back':
           if (activeWebview && activeWebview.goBack) {
-            activeWebview.goBack();
+            await activeWebview.goBack();
             return "Navigated back";
           }
           return "Error: No active webview.";
 
         case 'browser_go_forward':
           if (activeWebview && activeWebview.goForward) {
-            activeWebview.goForward();
+            await activeWebview.goForward();
             return "Navigated forward";
           }
           return "Error: No active webview.";
 
         case 'browser_reload':
           if (activeWebview && activeWebview.reload) {
-            activeWebview.reload();
+            await activeWebview.reload();
             return "Page reloaded";
           }
           return "Error: No active webview.";
@@ -401,7 +477,7 @@ export function useBrowserAgentBridge({
         case 'browser_zoom':
           if (activeWebview && activeWebview.setZoomLevel) {
             const zoomLevel = Number(safeArgs.level) || 0;
-            activeWebview.setZoomLevel(zoomLevel);
+            await activeWebview.setZoomLevel(zoomLevel);
             return `Zoom level set to ${zoomLevel}`;
           }
           return "Error: No active webview.";
@@ -421,6 +497,8 @@ export function useBrowserAgentBridge({
         case 'browser_duplicate_tab': {
           const currentTab = tabs.find(t => t.id === activeTabId);
           if (currentTab) {
+            const gate = await agentNavigationAllowed(currentTab.url);
+            if (!canExecute() || !gate.ok) return "Error: Duplicate navigation blocked for security or changed target.";
             mcpHandlersRef.current.handleNewTab(currentTab.url);
             return `Duplicated tab: ${currentTab.url}`;
           }
@@ -437,15 +515,16 @@ export function useBrowserAgentBridge({
       onNavigate: async (url: string) => {
         // Same untrusted-input boundary as the MCP tools above: these URLs come
         // from LLM output, which page content can influence.
+        const target = captureTarget();
         const gate = await agentNavigationAllowed(url);
-        if (!gate.ok) {
+        if (!gate.ok || !targetIsCurrent(target)) {
           console.warn(`AI agent navigation refused (${gate.reason}):`, url);
           return;
         }
-        mcpHandlersRef.current.handleNavigate(url);
+        mcpHandlersRef.current.handleNavigate(url, target.tabId || undefined);
       },
       onExecuteScript: async (script: string) => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        const webview = guardedGuest();
         if (webview && webview.executeJavaScript) {
           const timeoutMs = 3500;
           let timer: any = null;
@@ -493,7 +572,7 @@ export function useBrowserAgentBridge({
       onSwitchTab: (id: string) => mcpHandlersRef.current.handleSelectTab(id),
       onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: async (direction, amount) => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        const webview = guardedGuest();
         const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(amount) || 500)));
         if (webview && webview.executeJavaScript) {
           try {
@@ -508,18 +587,18 @@ export function useBrowserAgentBridge({
           console.warn("Cannot scroll iframes cross-origin.");
         }
       },
-      onPressKey: (key: string) => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+      onPressKey: async (key: string) => {
+        const webview = guardedGuest();
         if (webview && typeof webview.sendInputEvent === 'function') {
           try {
-            webview.sendInputEvent({ type: 'keyDown', keyCode: key });
-            webview.sendInputEvent({ type: 'char', keyCode: key });
-            webview.sendInputEvent({ type: 'keyUp', keyCode: key });
+            await webview.sendInputEvent({ type: 'keyDown', keyCode: key });
+            await webview.sendInputEvent({ type: 'char', keyCode: key });
+            await webview.sendInputEvent({ type: 'keyUp', keyCode: key });
           } catch (_) {}
         }
       },
       onTakeScreenshot: async () => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        const webview = guardedGuest();
         if (webview && typeof webview.capturePage === 'function') {
           const image = await webview.capturePage();
           return image && typeof image.toDataURL === 'function' ? image.toDataURL() : '';
@@ -547,7 +626,7 @@ export function useBrowserAgentBridge({
         });
       },
       onGetPageLinks: async () => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+        const webview = guardedGuest();
         if (webview) {
           // Cap the collected anchors (and clamp each field) so the IPC payload
           // itself stays bounded. Link-dense pages (Wikipedia, a sitemap, a large
@@ -577,38 +656,38 @@ export function useBrowserAgentBridge({
         const unique = Array.from(new Map(matches.map(item => [item.url, item])).values());
         return unique.slice(0, 10).map(u => ({ title: u.title, url: u.url }));
       },
-      onReloadPage: () => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+      onReloadPage: async () => {
+        const webview = guardedGuest();
         if (webview) {
           try {
             if (typeof webview.reload === 'function') {
-              webview.reload();
+              await webview.reload();
             } else if (typeof webview.executeJavaScript === 'function') {
-              webview.executeJavaScript('window.location.reload()').catch(() => {});
+              await webview.executeJavaScript('window.location.reload()');
             }
           } catch (_) {}
         }
       },
-      onGoBack: () => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+      onGoBack: async () => {
+        const webview = guardedGuest();
         if (webview) {
           try {
             if (typeof webview.canGoBack === 'function') {
-              if (webview.canGoBack()) webview.goBack();
+              if (webview.canGoBack()) await webview.goBack();
             } else if (typeof webview.goBack === 'function') {
-              webview.goBack();
+              await webview.goBack();
             }
           } catch (_) {}
         }
       },
-      onGoForward: () => {
-        const webview = document.querySelector(`webview[data-tab-id="${browserDataRef.current.activeTabId}"]`) as any;
+      onGoForward: async () => {
+        const webview = guardedGuest();
         if (webview) {
           try {
             if (typeof webview.canGoForward === 'function') {
-              if (webview.canGoForward()) webview.goForward();
+              if (webview.canGoForward()) await webview.goForward();
             } else if (typeof webview.goForward === 'function') {
-              webview.goForward();
+              await webview.goForward();
             }
           } catch (_) {}
         }
@@ -644,7 +723,10 @@ export function useBrowserAgentBridge({
         const pending: { approvalId?: string; timer?: ReturnType<typeof setTimeout>; cancelled: boolean } = { cancelled: false };
         pendingActions.set(id, pending);
         pending.timer = setTimeout(() => cancelAction(id), Math.max(0, deadline - Date.now()));
-        const canExecute = () => !pending.cancelled && Date.now() < deadline && Boolean(settingsRef.current?.mcpServerEnabled);
+        const approvedTarget = captureTarget();
+        const targetIndependent = new Set(['nova_browser_info', 'browser_list_tabs', 'browser_get_url', 'browser_wait', 'browser_new_tab']);
+        const canExecute = () => !pending.cancelled && Date.now() < deadline && Boolean(settingsRef.current?.mcpServerEnabled) &&
+          (targetIndependent.has(toolName) || targetIsCurrent(approvedTarget));
         const finish = () => {
           if (pending.timer) clearTimeout(pending.timer);
           pendingActions.delete(id);
@@ -698,6 +780,7 @@ export function useBrowserAgentBridge({
       unsubscribeMcpCancel = electronAPI.onMcpActionCancel?.(cancelAction);
     }
     return () => {
+      for (const guest of Array.from(document.querySelectorAll('webview'))) guestListeners.get(guest)?.();
       unsubscribeMcpBridge?.();
       unsubscribeMcpCancel?.();
       for (const id of pendingActions.keys()) cancelAction(id);

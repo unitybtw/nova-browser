@@ -84,3 +84,5 @@ import './permission_boundary_regressions.test';
 import './mcp_lifecycle_regressions.test';
 import './mcp_startup_regressions.test';
 import './mcp_bridge_config_regressions.test';
+
+import './agent_document_boundary.test';

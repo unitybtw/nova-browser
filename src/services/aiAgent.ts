@@ -114,21 +114,21 @@ const ATTACH_TOTAL_BUDGET_CHARS_LARGE = 8000;
 const ATTACH_TOTAL_BUDGET_CHARS_SMALL = 3000;
 
 export interface AIActionContext {
-  onNavigate: (url: string) => void;
+  onNavigate: (url: string) => void | Promise<void>;
   onExecuteScript: (script: string) => Promise<any>;
-  onCreateTab: (url: string) => void;
+  onCreateTab: (url: string) => void | Promise<void>;
   onCloseTab: (tabId?: string) => void;
   onSwitchTab: (tabId: string) => void;
   onGetAllTabs: () => { id: string, title: string, url: string }[];
-  onScrollPage: (direction: "up"|"down"|"top"|"bottom", amount?: number) => void;
-  onPressKey: (key: string) => void;
+  onScrollPage: (direction: "up"|"down"|"top"|"bottom", amount?: number) => void | Promise<void>;
+  onPressKey: (key: string) => void | Promise<void>;
   onTakeScreenshot: () => Promise<string>;
   onWait: (ms: number) => Promise<void>;
   onGetPageLinks: () => Promise<{text: string, href: string}[]>;
   onSearchHistory: (query: string) => { title: string; url: string }[];
-  onReloadPage?: () => void;
-  onGoBack?: () => void;
-  onGoForward?: () => void;
+  onReloadPage?: () => void | Promise<void>;
+  onGoBack?: () => void | Promise<void>;
+  onGoForward?: () => void | Promise<void>;
 }
 
 export type InitProgressHandler = (progress: number, text: string) => void;
@@ -1561,7 +1561,7 @@ CRITICAL RULES:
     }
 
     if (this.actionContext?.onNavigate) {
-      this.actionContext.onNavigate(searchUrl);
+      await this.actionContext.onNavigate(searchUrl);
     }
     await this.waitForPageLoadSettled(generation);
     // Extra settle time — Google's JS needs time to render the SERP
@@ -1694,7 +1694,7 @@ CRITICAL RULES:
       }
       const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(searchTopic)}`;
       if (this.actionContext?.onNavigate) {
-        this.actionContext.onNavigate(ddgUrl);
+        await this.actionContext.onNavigate(ddgUrl);
       }
       await this.waitForPageLoadSettled(generation);
       await new Promise(r => setTimeout(r, 1000));
@@ -1716,7 +1716,7 @@ CRITICAL RULES:
         ? `https://www.bing.com/news/search?q=${encodeURIComponent(searchTopic)}`
         : `https://www.bing.com/search?q=${encodeURIComponent(searchTopic)}`;
       if (this.actionContext?.onNavigate) {
-        this.actionContext.onNavigate(bingUrl);
+        await this.actionContext.onNavigate(bingUrl);
       }
       await this.waitForPageLoadSettled(generation);
       await new Promise(r => setTimeout(r, 1200));
@@ -1873,7 +1873,7 @@ CRITICAL RULES:
         // Wrap single source visit with strict 5.5s timeout so slow or hung pages never freeze the pipeline
         const visitSingleSource = async () => {
           if (this.actionContext?.onNavigate) {
-            this.actionContext.onNavigate(target.url);
+            await this.actionContext.onNavigate(target.url);
           }
           await this.waitForPageLoadSettled(generation);
           await new Promise(r => setTimeout(r, 600));
@@ -1888,7 +1888,7 @@ CRITICAL RULES:
           this.triggerVirtualCursor(readAreaX, readAreaY + 140, 'move');
 
           if (this.actionContext?.onScrollPage) {
-            this.actionContext.onScrollPage('down', 500);
+            await this.actionContext.onScrollPage('down', 500);
           }
           await new Promise(r => setTimeout(r, 350));
 
@@ -2344,7 +2344,7 @@ CRITICAL RULES:
         if (step.action === 'youtube_search_and_play') {
           const ytSearchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(step.target || '')}`;
           if (this.actionContext?.onNavigate) {
-            this.actionContext.onNavigate(ytSearchUrl);
+            await this.actionContext.onNavigate(ytSearchUrl);
           }
           await this.waitForPageLoadSettled(generation);
           await this.interruptibleSleep(1200, generation);
@@ -2401,7 +2401,7 @@ CRITICAL RULES:
 
             // Navigate to the video
             if (this.actionContext?.onNavigate) {
-              this.actionContext.onNavigate(videoInfo.url);
+              await this.actionContext.onNavigate(videoInfo.url);
             }
             await this.waitForPageLoadSettled(generation);
             await this.interruptibleSleep(1000, generation);
@@ -2433,7 +2433,7 @@ CRITICAL RULES:
         }
         else if (step.action === 'navigate') {
           if (this.actionContext?.onNavigate && step.target) {
-            this.actionContext.onNavigate(step.target);
+            await this.actionContext.onNavigate(step.target);
           }
           await this.waitForPageLoadSettled(generation);
           await this.interruptibleSleep(800, generation);
@@ -2453,7 +2453,7 @@ CRITICAL RULES:
         else if (step.action === 'search_and_extract') {
           const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(step.target || '')}&hl=${isTr ? 'tr' : 'en'}`;
           if (this.actionContext?.onNavigate) {
-            this.actionContext.onNavigate(searchUrl);
+            await this.actionContext.onNavigate(searchUrl);
           }
           await this.waitForPageLoadSettled(generation);
           await this.interruptibleSleep(1000, generation);
@@ -2463,7 +2463,7 @@ CRITICAL RULES:
           this.triggerVirtualCursor(searchOffset.left + 300, searchOffset.top + 220, 'move');
           await this.interruptibleSleep(200, generation);
           if (this.actionContext?.onScrollPage) {
-            this.actionContext.onScrollPage('down', 400);
+            await this.actionContext.onScrollPage('down', 400);
           }
           await this.interruptibleSleep(300, generation);
 
@@ -2524,7 +2524,7 @@ CRITICAL RULES:
         }
         else if (step.action === 'scroll') {
           if (this.actionContext?.onScrollPage) {
-            this.actionContext.onScrollPage('down', 600);
+            await this.actionContext.onScrollPage('down', 600);
           }
           await this.interruptibleSleep(400, generation);
           executedResults.push({
@@ -2730,7 +2730,7 @@ CRITICAL RULES:
           throw new Error(`Gecersiz URL: ${args.url}`);
         }
 
-        this.actionContext.onNavigate(url);
+        await this.actionContext.onNavigate(url);
         await this.waitForPageLoadSettled(generation);
 
         result = {
@@ -2742,7 +2742,7 @@ CRITICAL RULES:
 
       else if (functionName === "reload_page") {
         if (this.actionContext.onReloadPage) {
-          this.actionContext.onReloadPage();
+          await this.actionContext.onReloadPage();
         } else {
           await this.actionContext.onExecuteScript('window.location.reload()');
         }
@@ -2752,7 +2752,7 @@ CRITICAL RULES:
 
       else if (functionName === "go_back") {
         if (this.actionContext.onGoBack) {
-          this.actionContext.onGoBack();
+          await this.actionContext.onGoBack();
         } else {
           await this.actionContext.onExecuteScript('window.history.back()');
         }
@@ -2762,7 +2762,7 @@ CRITICAL RULES:
 
       else if (functionName === "go_forward") {
         if (this.actionContext.onGoForward) {
-          this.actionContext.onGoForward();
+          await this.actionContext.onGoForward();
         } else {
           await this.actionContext.onExecuteScript('window.history.forward()');
         }
@@ -3085,7 +3085,7 @@ CRITICAL RULES:
           const tabs = this.actionContext.onGetAllTabs();
           result = { success: true, tabs };
         } else if (action === "create") {
-          this.actionContext.onCreateTab(url as string || "https://google.com");
+          await this.actionContext.onCreateTab(url as string || "https://google.com");
           await new Promise(r => setTimeout(r, 1000));
           const tabs = this.actionContext.onGetAllTabs();
           result = { success: true, tabs, hint: "New tab created and focused. You can use navigate_to_url to open a specific page." };
@@ -3319,7 +3319,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       }
 
       else if (functionName === "create_tab") {
-        this.actionContext.onCreateTab(args.url);
+        await this.actionContext.onCreateTab(args.url);
         result = { success: true, url: args.url };
       }
 
@@ -3340,7 +3340,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
       else if (functionName === "press_key") {
         const { key } = args;
-        this.actionContext.onPressKey(key);
+        await this.actionContext.onPressKey(key);
         result = { success: true, key };
       }
 
