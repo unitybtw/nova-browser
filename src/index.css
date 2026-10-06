@@ -484,3 +484,6 @@ button:active:not(:disabled) {
 @media (prefers-reduced-motion: reduce) {
   .nova-shortcut.nova-wallpaper-surface::after { transition: none; }
 }
+
+/* The unlayered global heading face otherwise overrides font-sans utilities. */
+.nova-clock h1 { font-family: inherit; font-variant-numeric: tabular-nums; }
