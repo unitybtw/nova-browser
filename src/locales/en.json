@@ -126,7 +126,7 @@
     "tasksLeft_one": "{count} left",
     "tasksLeft_other": "{count} left",
     "clearCompletedTasks": "Clear",
-    "noTasks": "No tasks for today. All done!",
+    "noTasks": "No tasks yet.",
     "addTaskPlaceholder": "Add a new task...",
     "deleteTask": "Delete task",
     "clearTasksTitle": "Clear completed tasks",

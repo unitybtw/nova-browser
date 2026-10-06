@@ -368,34 +368,6 @@ button:active:not(:disabled) {
 .prompt-scrollbar::-webkit-scrollbar-thumb { background: transparent; border-radius: 4px; }
 .prompt-scrollbar:hover::-webkit-scrollbar-thumb { background: rgb(148 163 184 / 0.35); }
 
-/* NovaAISparkle animations (moved from per-instance <style> for strict CSP) */
-@keyframes nova-pulse {
-  0%, 100% { transform: scale(1) rotate(0deg); }
-  25% { transform: scale(1.08) rotate(3deg); }
-  50% { transform: scale(0.95) rotate(0deg); }
-  75% { transform: scale(1.05) rotate(-3deg); }
-}
-@keyframes nova-sparkle-tr {
-  0%, 100% { transform: scale(0.65) translate(0, 0); opacity: 0.35; }
-  50% { transform: scale(1.25) translate(0.5px, -0.5px); opacity: 1; }
-}
-@keyframes nova-sparkle-bl {
-  0%, 100% { transform: scale(1.2) translate(0, 0); opacity: 0.95; }
-  50% { transform: scale(0.55) translate(-0.5px, 0.5px); opacity: 0.25; }
-}
-@keyframes nova-orbit {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-.nova-star-main { transform-origin: 11px 11px; animation: nova-pulse 3.6s ease-in-out infinite; }
-.nova-spark-tr { transform-origin: 18.5px 5.5px; animation: nova-sparkle-tr 2.2s ease-in-out infinite; }
-.nova-spark-bl { transform-origin: 4.5px 17.5px; animation: nova-sparkle-bl 2.6s ease-in-out infinite; }
-.nova-orbit-ring { transform-origin: 11px 11px; animation: nova-orbit 9s linear infinite; }
-.nova-anim-active .nova-star-main { animation-duration: 2s; }
-.nova-anim-active .nova-spark-tr { animation-duration: 1.4s; }
-.nova-anim-active .nova-spark-bl { animation-duration: 1.6s; }
-.nova-anim-active .nova-orbit-ring { animation-duration: 5s; }
-
 /* Accessibility: Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -456,4 +428,27 @@ button:active:not(:disabled) {
 @keyframes spinner-fade {
   0% { opacity: 0; }
   100% { opacity: 1; }
+}
+/* Keep tasks in the document flow when the assistant narrows the new tab. */
+.nova-newtab { container-type: inline-size; }
+.nova-newtab-layout { position: relative; min-height: 100%; display: grid; justify-content: center; align-content: center; justify-items: center; gap: 32px; padding-block: 40px; }
+@container (min-width: 1100px) {
+  .nova-newtab-layout { grid-template-columns: minmax(0, 672px) 288px; gap: 48px; }
+  .nova-newtab-layout:not(:has(.nova-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
+}
+
+/* Wallpaper glass stays translucent across themes and loading/hover states. */
+.nova-wallpaper-surface {
+  background-color: rgb(15 23 42 / 0.28);
+  border: 1px solid rgb(255 255 255 / 0.18);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.nova-shortcut.nova-wallpaper-surface:hover,
+.nova-shortcut.nova-wallpaper-surface:focus-visible {
+  background-color: rgb(15 23 42 / 0.42);
+  border-color: rgb(255 255 255 / 0.35);
+}
+@supports not (backdrop-filter: blur(1px)) {
+  .nova-wallpaper-surface { background-color: rgb(15 23 42 / 0.65); }
 }

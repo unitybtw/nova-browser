@@ -33,3 +33,11 @@ The website is a static marketing surface. It does not implement browser functio
 - Turkish video captions load with the track in showing mode; MP4 metadata reports the expected 1080p and 27-second duration.
 - Isolated hook check passed: active navigation, product depth initialization, runtime reduced-motion fallback and listener cleanup.
 - Full video decode passed; soundtrack peak is about -10 dB with no clipping.
+
+## Tour and browser polish — 2026-10-06
+
+- Tour screenshots now show complete current renderer windows; sync uses a proportional frame around the complete dialog.
+- Checked desktop tour tabs and the 375px layout: no horizontal overflow.
+- Verified the clock and shortcut glass in light and dark wallpaper themes: translucent backgrounds and 16px backdrop blur stay present; hover retains translucency. A dark canvas fallback preserves contrast during photo loading.
+- Confirmed the assistant toggle and shortcut editor work in the local renderer preview. Tasks stay in flow when the assistant narrows the content.
+- Removed the obsolete Navbar source/style audit from the security regression suite: that component was removed in the earlier website replacement, and the assertion only checked a retired visual treatment.

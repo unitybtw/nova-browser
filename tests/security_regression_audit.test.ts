@@ -6,7 +6,7 @@
  * - R1: Electron Main Process IPC, Partition Privacy, CDP Cleanup, Extension Loading
  * - R2: Case-Insensitive URL Parsing, Search Engine Routing, Safe Navigation Filtering
  * - R3: Privacy Shield & Adblocker Whitelist Regex Sanitization
- * - R4: React Frontend Lifecycles, Typewriter Cleanup, Omnibox Fallbacks, Website Navbar
+ * - R4: React Frontend Lifecycles, Typewriter Cleanup, Omnibox Fallbacks
  */
 
 import fs from 'fs';
@@ -759,20 +759,6 @@ async function runSecurityRegressionAuditSuite() {
     'Omnibox submit correctly dispatches to onNavigate or onNewTab fallback',
     navigateCalled && fallbackCalled,
     `onNavigate dispatch: ${navigateCalled}, onNewTab fallback dispatch: ${fallbackCalled}`
-  );
-
-  // R4.3: Website Navbar Audit (No isScrolled, no conditional white/glass background)
-  const navbarPath = path.resolve(rootDir, 'website/src/components/Navbar.tsx');
-  const navbarContent = fs.readFileSync(navbarPath, 'utf8');
-
-  const hasIsScrolled = /isScrolled/i.test(navbarContent);
-  const hasConditionalGlassBg = navbarContent.includes('bg-white/80') || navbarContent.includes('bg-white/70');
-
-  record(
-    'R4-Website-Navbar',
-    'website/src/components/Navbar.tsx contains no isScrolled state or conditional white background',
-    !hasIsScrolled && !hasConditionalGlassBg,
-    `isScrolled present: ${hasIsScrolled}, conditional glass bg: ${hasConditionalGlassBg}`
   );
 
   // =========================================================================

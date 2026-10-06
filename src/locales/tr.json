@@ -126,7 +126,7 @@
     "tasksLeft_one": "{count} kaldı",
     "tasksLeft_other": "{count} kaldı",
     "clearCompletedTasks": "Temizle",
-    "noTasks": "Bugün için görev yok. Hepsi tamam!",
+    "noTasks": "Henüz görev yok.",
     "addTaskPlaceholder": "Yeni görev ekleyin...",
     "deleteTask": "Görevi sil",
     "clearTasksTitle": "Tamamlanan görevleri temizle",

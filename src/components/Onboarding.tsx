@@ -15,7 +15,7 @@ const SEARCH_ENGINES = [
   {
     id: 'google' as const,
     name: 'Google',
-    desc: 'Most popular, comprehensive results',
+    desc: 'Search with Google',
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -28,7 +28,7 @@ const SEARCH_ENGINES = [
   {
     id: 'duckduckgo' as const,
     name: 'DuckDuckGo',
-    desc: 'Does not track you, protects your privacy',
+    desc: 'Privacy-focused search',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#DE5833] flex items-center justify-center">
         <Shield className="w-5 h-5 text-white" />
@@ -38,7 +38,7 @@ const SEARCH_ENGINES = [
   {
     id: 'brave' as const,
     name: 'Brave Search',
-    desc: 'Independent, ad-free, fast',
+    desc: 'Independent search index',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#FB542B] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -48,7 +48,7 @@ const SEARCH_ENGINES = [
   {
     id: 'bing' as const,
     name: 'Bing',
-    desc: 'Powered by Microsoft AI',
+    desc: 'Search with Microsoft Bing',
     icon: (
       <svg viewBox="0 0 48 48" className="w-8 h-8">
         <path fill="#0078D4" d="M10 5l8 3v26l-8-5z"/>
@@ -61,7 +61,7 @@ const SEARCH_ENGINES = [
   {
     id: 'ecosia' as const,
     name: 'Ecosia',
-    desc: 'Plants trees with every search',
+    desc: 'Search with Ecosia',
     icon: (
       <div className="w-8 h-8 rounded-full bg-[#00894A] flex items-center justify-center">
         <Search className="w-5 h-5 text-white" />
@@ -181,7 +181,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         transition={{ delay: 0.45 }}
         className="text-slate-300 text-lg max-w-md leading-relaxed mb-10 font-normal select-none"
       >
-        A faster, more private, and smarter web experience awaits you. Let's set it up together.
+        Choose your theme, search engine, and privacy settings before you start.
       </motion.p>
       <motion.button
         initial={{ y: 20, opacity: 0 }}
@@ -190,7 +190,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         onClick={goNext}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
-        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all shadow-md shadow-cyan-500/20 no-drag cursor-pointer"
+        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all  no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         Let&apos;s Get Started
@@ -213,7 +213,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         <button
           onClick={handleImport}
           disabled={isImporting}
-          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-8 py-3 rounded-xl font-bold text-sm transition-colors mb-4 flex items-center gap-2 shadow-lg shadow-cyan-500/20 no-drag cursor-pointer"
+          className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-8 py-3 rounded-xl font-bold text-sm transition-colors mb-4 flex items-center gap-2  no-drag cursor-pointer"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
           {isImporting ? (
@@ -259,7 +259,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             onClick={() => setTheme(t.id)}
             className={`flex flex-col items-center gap-3 p-5 rounded-2xl border transition-all w-40 backdrop-blur-xl no-drag cursor-pointer ${
               theme === t.id
-                ? 'border-cyan-500 bg-cyan-500/15 scale-105 shadow-xl shadow-cyan-500/20'
+                ? 'border-cyan-500 bg-cyan-500/15 '
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
             }`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -292,7 +292,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
             onClick={() => setSearchEngine(engine.id)}
             className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl no-drag cursor-pointer ${
               searchEngine === engine.id
-                ? 'border-cyan-500 bg-cyan-500/15 shadow-lg shadow-cyan-500/20 scale-[1.02]'
+                ? 'border-cyan-500 bg-cyan-500/15  scale-[1.02]'
                 : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-md'
             }`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -318,7 +318,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 4 — Privacy Shield
     <motion.div key="privacy" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6 shadow-2xl shadow-emerald-500/20 text-emerald-400">
+      <div className="w-20 h-20 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-6  text-emerald-400">
         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
         </svg>
@@ -366,7 +366,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="w-24 h-24 rounded-3xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mb-6 shadow-2xl shadow-cyan-500/40 text-slate-950"
+        className="w-24 h-24 rounded-3xl bg-cyan-500/15 flex items-center justify-center mb-6  text-slate-950"
       >
         <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -407,7 +407,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         onClick={handleFinish}
         whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
         whileTap={{ scale: 0.95 }}
-        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all shadow-lg shadow-cyan-500/25 no-drag cursor-pointer"
+        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all  no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <span>Start Browsing</span>
@@ -442,31 +442,11 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         </div>
       </div>
 
-      {/* Dynamic blob background */}
-      <motion.div 
-        animate={{ 
-          x: [0, 50, -50, 0], 
-          y: [0, -50, 50, 0],
-          scale: [1, 1.1, 0.9, 1]
-        }}
-        transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-        className="absolute -top-20 -left-20 w-[30rem] h-[30rem] bg-cyan-600/20 rounded-full blur-[120px] pointer-events-none" 
-      />
-      <motion.div 
-        animate={{ 
-          x: [0, -60, 40, 0], 
-          y: [0, 60, -40, 0],
-          scale: [1, 1.2, 0.8, 1]
-        }}
-        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-        className="absolute top-1/2 right-0 w-[25rem] h-[25rem] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" 
-      />
-
       {/* Progress Bar */}
       {step > 0 && step < TOTAL_STEPS - 1 && (
         <div className="w-full h-1 bg-white/10 shrink-0 pointer-events-none">
           <motion.div
-            className="h-full bg-gradient-to-r from-cyan-500 to-blue-500"
+            className="h-full bg-cyan-500"
             initial={{ width: 0 }}
             animate={{ width: `${(step / (TOTAL_STEPS - 1)) * 100}%` }}
             transition={{ duration: 0.4, ease: 'easeInOut' }}
@@ -525,7 +505,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           </button>
           <button
             onClick={goNext}
-            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95 shadow-md shadow-cyan-500/20 no-drag cursor-pointer"
+            className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-7 py-2.5 rounded-xl font-bold text-xs transition-all hover:scale-105 active:scale-95  no-drag cursor-pointer"
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             {step === TOTAL_STEPS - 2 ? 'Complete' : 'Next'}

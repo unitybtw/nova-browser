@@ -31,7 +31,7 @@ import { copyTextToClipboard } from '../utils/clipboard';
 import { useSafeTimeout } from '../hooks/useSafeTimeout';
 import type { ChatCompletionMessageParam } from '@mlc-ai/web-llm';
 import { PromptInput } from './ui/ai-chat-input';
-import { NovaAISparkle } from './ui/NovaAISparkle';
+import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 
 /**
  * Takes the next supersession token for a model load.
@@ -782,7 +782,7 @@ export const SidePanel = React.memo(({
                 {/* Left: Brand title & model indicator */}
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-1.5 font-semibold text-xs text-slate-800 dark:text-slate-100">
-                    <NovaAISparkle size={15} active={isLoading || isInitializing} />
+                    <NovaAssistantIcon size={15} active={isLoading || isInitializing} />
                     <span className="tracking-tight font-medium">Nova AI</span>
                   </div>
                   {isInitializing ? (
@@ -860,15 +860,15 @@ export const SidePanel = React.memo(({
         {messages.length === 0 && !isLoading && (
           <div className="my-auto flex flex-col items-center justify-center text-center px-4 py-8">
             <div className="mb-3.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200/80 dark:border-white/10 text-cyan-500 shadow-2xs">
-              <NovaAISparkle size={20} active={false} />
+              <NovaAssistantIcon size={20} active={false} />
             </div>
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
               {isTr ? 'Nova Asistan' : 'Nova Assistant'}
             </h3>
             <p className="mt-1 max-w-[250px] text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
               {isTr
-                ? 'Web üzerinde araştırma yapın, sekmeleri yönetin ve yerel yapay zeka ile çalışın.'
-                : 'Research the web, manage tabs, and run local AI workflows on your machine.'}
+                ? 'Bu sayfa hakkında soru sorun, web’de arayın veya sekmelerinizi yönetin.'
+                : 'Ask about this page, search the web, or manage your tabs.'}
             </p>
 
             {/* Quick Starters */}

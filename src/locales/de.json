@@ -126,7 +126,7 @@
     "tasksLeft_one": "{count} übrig",
     "tasksLeft_other": "{count} übrig",
     "clearCompletedTasks": "Löschen",
-    "noTasks": "Keine Aufgaben für heute. Alles erledigt!",
+    "noTasks": "Noch keine Aufgaben.",
     "addTaskPlaceholder": "Neue Aufgabe hinzufügen...",
     "deleteTask": "Aufgabe löschen",
     "clearTasksTitle": "Erledigte Aufgaben löschen",

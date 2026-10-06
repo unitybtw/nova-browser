@@ -56,7 +56,7 @@ import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, D
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
-import { NovaAISparkle } from './ui/NovaAISparkle';
+import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -1408,22 +1408,22 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
         {/* Extensions / Action Controls / More Menu */}
         <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
-          {/* AI Copilot Pill with Animated SVG */}
+          {/* Assistant toggle */}
           <motion.button
-            whileHover={{ scale: 1.05 }}
+            whileHover={{ scale: 1 }}
             whileTap={{ scale: 0.95 }}
             onClick={onToggleAIAssistant}
             className={`group relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 font-semibold text-xs shrink-0 select-none cursor-pointer overflow-hidden ${
               isAIAssistantOpen
-                ? 'bg-gradient-to-r from-cyan-500/20 via-sky-500/15 to-blue-600/20 text-cyan-400 border border-cyan-400/40 shadow-[0_0_12px_rgba(6,182,212,0.3)] ring-1 ring-cyan-400/20'
+                ? 'bg-accent/15 text-accent border border-accent/40'
                 : isIncognito
                 ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40'
                 : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
             }`}
             title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
           >
-            <NovaAISparkle size={15} active={isAIAssistantOpen} />
-            <span className="font-bold tracking-wide text-[11px] text-cyan-600 dark:text-cyan-400 group-hover:brightness-110 transition-colors">
+            <NovaAssistantIcon size={15} active={isAIAssistantOpen} />
+            <span className="font-medium text-[11px]">
               AI
             </span>
           </motion.button>

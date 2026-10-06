@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Calendar, Compass } from 'lucide-react';
+import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass } from 'lucide-react';
 import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
@@ -93,46 +93,38 @@ export const Clock: React.FC<ClockProps> = React.memo(({
     return t(getGreetingKey(currentTime.getHours()));
   }, [currentTime, t, language]);
 
-  // When a wallpaper is active or dark theme is enabled, canvas is dark and requires crystal-clear white styling
+  // When a wallpaper is active or dark theme is enabled, use light text for contrast
   const useDarkCanvasStyle = hasWallpaper || isDarkTheme;
 
   return (
     <motion.div
       variants={variants}
-      className="flex flex-col items-center justify-center text-center mb-2 select-none relative"
+      className={`nova-clock flex flex-col items-center justify-center text-center mb-2 select-none relative ${hasWallpaper ? "nova-wallpaper-surface rounded-2xl px-10 py-6" : ""}`}
     >
-      {/* Date Badge Pill */}
-      <div
-        className={`flex items-center gap-2 mb-2.5 px-4 py-1.5 rounded-full text-xs font-medium tracking-wide transition-all duration-300 ${
-          useDarkCanvasStyle
-            ? 'bg-black/35 hover:bg-black/50 text-white/95 border border-white/20 backdrop-blur-xl shadow-[0_4px_16px_rgba(0,0,0,0.35)] ring-1 ring-inset ring-white/10'
-            : 'bg-slate-900/10 hover:bg-slate-900/15 text-slate-800 border border-slate-900/15 backdrop-blur-md shadow-sm'
-        }`}
-      >
-        <Calendar className={`w-3.5 h-3.5 ${useDarkCanvasStyle ? 'text-cyan-300' : 'text-slate-600'} shrink-0`} />
-        <span>{dateStr}</span>
-      </div>
+      <p className={`mb-3 text-sm ${useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500'}`}>
+        {dateStr}
+      </p>
 
-      {/* Main Time Display with Crisp Layered Shadows */}
+      {/* Time display */}
       <h1
         className={`text-7xl md:text-8xl font-light tracking-tight font-sans tabular-nums transition-colors duration-300 ${
           useDarkCanvasStyle
-            ? 'text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.85)] drop-shadow-[0_10px_28px_rgba(0,0,0,0.65)]'
-            : 'text-slate-900 drop-shadow-[0_2px_12px_rgba(0,0,0,0.15)]'
+            ? 'text-white'
+            : 'text-slate-900'
         }`}
-        style={useDarkCanvasStyle ? { textShadow: '0 2px 14px rgba(0, 0, 0, 0.45)' } : undefined}
+        style={hasWallpaper ? { textShadow: '0 2px 12px rgba(0, 0, 0, 0.4)' } : undefined}
       >
         {timeStr}
       </h1>
 
       {/* Greeting Subtitle */}
       <p
-        className={`text-xl md:text-2xl font-medium tracking-wide mt-2 transition-colors duration-300 ${
+        className={`text-base font-normal mt-3 transition-colors duration-300 ${
           useDarkCanvasStyle
-            ? 'text-white/95 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] drop-shadow-[0_6px_20px_rgba(0,0,0,0.55)]'
-            : 'text-slate-700 drop-shadow-[0_1px_8px_rgba(0,0,0,0.15)]'
+            ? 'text-white/80'
+            : 'text-slate-600'
         }`}
-        style={useDarkCanvasStyle ? { textShadow: '0 1px 8px rgba(0, 0, 0, 0.4)' } : undefined}
+        style={hasWallpaper ? { textShadow: '0 1px 6px rgba(0, 0, 0, 0.4)' } : undefined}
       >
         {greeting}
       </p>
@@ -727,11 +719,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       animate={{ opacity: 1 }}
       transition={shouldAnimate ? { duration: 0.2, ease: 'easeOut' } : { duration: 0 }}
       style={{
-        backgroundColor: (newTabBackground === 'unsplash' || newTabBackground === 'custom_url')
-          ? undefined
-          : 'var(--nova-frame-bg)'
+        // A dark fallback keeps glass surfaces readable while a photo loads.
+        backgroundColor: hasWallpaper ? '#101820' : 'var(--nova-frame-bg)'
       }}
-      className={`w-full h-full relative overflow-hidden flex flex-col items-center justify-center p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
+      className={`nova-newtab w-full h-full relative overflow-x-hidden overflow-y-auto p-6 select-none ${getBackgroundStyle()} ${isDarkTheme ? 'dark' : ''}`}
     >
 
       {/* Unsplash Background */}
@@ -1036,6 +1027,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </div>
       )}
 
+      <div className="nova-newtab-layout">
       {/* Main Content Area */}
       <motion.div
         variants={shouldAnimate ? containerVariants : undefined}
@@ -1068,7 +1060,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               onKeyDown={handleKeyDown}
               placeholder={t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
               aria-label={t('nav.newTab')}
-              className="w-full py-4 ps-12 pe-24 text-base rounded-2xl outline-none transition-all duration-300 shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20"
+              className="w-full py-4 ps-12 pe-24 text-base rounded-xl outline-none transition-colors duration-200 shadow-sm border bg-white/85 dark:bg-slate-900/70 backdrop-blur-2xl border-slate-200/80 dark:border-white/15 text-slate-900 dark:text-white placeholder-slate-400 focus:bg-white dark:focus:bg-slate-900/90 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-accent/25"
             />
 
             <div className="absolute end-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -1090,7 +1082,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="submit"
                 aria-label={t('newtab.search')}
-                className="p-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white transition-all shadow-md shadow-cyan-500/30 active:scale-95 font-bold cursor-pointer"
+                className="p-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors cursor-pointer"
               >
                 <ArrowRight className="w-4 h-4" />
               </button>
@@ -1159,25 +1151,25 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
         {/* Speed Dials */}
         <motion.div variants={shouldAnimate ? itemVariants : undefined} className="w-full">
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-5 px-2">
+          <div className="flex flex-wrap justify-center gap-3 sm:gap-4 px-2">
             {renderableSpeedDials.map((dial) => (
               <motion.div
                 key={dial.id}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="relative group w-[100px] sm:w-[110px]"
+                className="relative group w-[88px] sm:w-[96px]"
               >
                 <button
                   onClick={(e) => handleSpeedDialClick(e, dial.url)}
                   onAuxClick={(e) => { if (e.button === 1) handleSpeedDialClick(e, dial.url); }}
-                  className="w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border shadow-md bg-white/80 dark:bg-white/[0.07] backdrop-blur-xl border-slate-200/80 dark:border-white/15 hover:bg-white dark:hover:bg-white/[0.14] hover:border-cyan-400/50 hover:shadow-xl hover:shadow-cyan-500/10 cursor-pointer group select-none"
+                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer group select-none ${hasWallpaper ? "nova-wallpaper-surface" : "hover:bg-slate-100 dark:hover:bg-white/5"}`}
                   title={dial.name}
                 >
-                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800/90 flex items-center justify-center overflow-hidden p-2 shadow-xs shrink-0 border border-slate-100 dark:border-white/10 group-hover:scale-105 transition-transform">
+                  <div className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center overflow-hidden p-2 shrink-0 border border-slate-200 dark:border-white/10">
                     <SpeedDialIcon name={dial.name} url={dial.url} domain={dial.domain} />
                   </div>
-                  <span className="text-xs font-semibold truncate max-w-full text-slate-800 dark:text-slate-200 group-hover:text-cyan-500 dark:group-hover:text-cyan-300 transition-colors drop-shadow-2xs">{dial.name}</span>
+                  <span className={`text-xs font-medium truncate max-w-full ${hasWallpaper ? "text-white [text-shadow:0_1px_4px_#000]" : "text-slate-700 dark:text-slate-300"}`}>{dial.name}</span>
                 </button>
                 {/* group-hover alone hid these from keyboard users entirely: the
                     buttons were focusable but stayed at opacity 0, so the controls
@@ -1214,10 +1206,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
             {renderableSpeedDials.length < 10 && (
               <motion.div
-                whileHover={{ y: -2 }}
+                whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.96 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="relative group w-[100px] sm:w-[110px]"
+                className="relative group w-[88px] sm:w-[96px]"
               >
                 <button
                   onClick={() => {
@@ -1225,13 +1217,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     setUrlError('');
                     setIsEditModalOpen(true);
                   }}
-                  className={`w-full aspect-square rounded-2xl flex flex-col items-center justify-center p-3 gap-2 transition-all duration-300 border-2 border-dashed cursor-pointer backdrop-blur-xl ${
-                    hasWallpaper
-                      ? (isDarkTheme
-                          ? 'border-white/25 bg-black/25 hover:bg-black/40 hover:border-cyan-400 text-white/90 hover:text-cyan-300 shadow-[0_4px_20px_rgba(0,0,0,0.3)]'
-                          : 'border-white/60 bg-white/75 hover:bg-white/95 hover:border-cyan-500 text-slate-800 hover:text-cyan-600 shadow-md shadow-black/10')
-                      : 'border-slate-300 dark:border-white/20 bg-white/40 dark:bg-white/[0.04] hover:border-cyan-500 dark:hover:border-cyan-400 hover:bg-cyan-500/10 dark:hover:bg-cyan-500/10 text-slate-500 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-300 shadow-xs'
-                  }`}
+                  className={`nova-shortcut w-full aspect-square rounded-xl flex flex-col items-center justify-center p-3 gap-3 transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-accent cursor-pointer ${hasWallpaper ? "nova-wallpaper-surface text-white" : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-accent"}`}
+                  style={hasWallpaper ? { color: "white", textShadow: "0 1px 4px #000" } : undefined}
                 >
                   <Plus className="w-6 h-6" />
                   <span className="text-xs font-semibold">{t('nav.addShortcut')}</span>
@@ -1248,7 +1235,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         initial={shouldAnimate ? { opacity: 0, y: 15 } : false}
         animate={{ opacity: 1, y: 0 }}
         transition={shouldAnimate ? { duration: 0.35, ease: [0.16, 1, 0.3, 1], delay: 0.1 } : { duration: 0 }}
-        className="nova-tasks-widget absolute bottom-6 right-6 w-72 rounded-3xl overflow-hidden flex flex-col shadow-2xl border bg-white/85 dark:bg-slate-900/70 backdrop-blur-xl border-slate-200/90 dark:border-slate-700/60 dark:shadow-black/40"
+        className="nova-tasks-widget relative z-10 w-full max-w-72 justify-self-center rounded-xl overflow-hidden flex flex-col shadow-sm border bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border-slate-200/90 dark:border-slate-700/60"
         style={{ maxHeight: '380px' }}
       >
         <div className="px-5 py-3.5 border-b font-semibold text-sm flex justify-between items-center border-slate-200/80 dark:border-slate-700/50 text-slate-800 dark:text-white">
@@ -1324,7 +1311,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             ))}
           </AnimatePresence>
           {todos.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center text-xs opacity-50 space-y-1">
+            <div className="flex flex-col items-center justify-center py-6 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1">
               <CheckSquare className="w-6 h-6 stroke-[1.5] text-accent" />
               <span>{t('newtab.noTasks')}</span>
             </div>
@@ -1353,6 +1340,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         </form>
       </motion.div>
       )}
+
+      </div>
 
       {/* Edit/Add Modal */}
       <AnimatePresence>
@@ -1500,7 +1489,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <button
                   type="button"
                   onClick={handleAddSpeedDial}
-                  className="px-5 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-cyan-500/25 active:scale-[0.98] cursor-pointer"
+                  className="px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer"
                 >
                   {t('common.save')}
                 </button>

@@ -134,7 +134,7 @@
     "tasksLeft_many": "متبقي {count} مهمة",
     "tasksLeft_other": "متبقي {count} مهمة",
     "clearCompletedTasks": "مسح",
-    "noTasks": "لا توجد مهام اليوم. اكتمل كل شيء!",
+    "noTasks": "لا توجد مهام بعد.",
     "addTaskPlaceholder": "إضافة مهمة جديدة...",
     "deleteTask": "حذف المهمة",
     "clearTasksTitle": "مسح المهام المكتملة",

@@ -949,7 +949,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 }`}
                 title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
               >
-                <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-cyan-500 fill-cyan-500/20 animate-pulse' : 'text-cyan-600 dark:text-cyan-400'}`} />
+                <Sparkles className={`w-3.5 h-3.5 ${isAIAssistantOpen ? 'text-accent' : 'text-cyan-600 dark:text-cyan-400'}`} />
               </button>
             )}
           </div>
