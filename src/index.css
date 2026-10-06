@@ -444,10 +444,8 @@ button:active:not(:disabled) {
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
-.nova-shortcut.nova-wallpaper-surface:hover,
-.nova-shortcut.nova-wallpaper-surface:focus-visible {
-  background-color: rgb(15 23 42 / 0.42);
-  border-color: rgb(255 255 255 / 0.35);
+.nova-shortcut.nova-wallpaper-surface:hover {
+  background-color: rgb(15 23 42 / 0.36);
 }
 @supports not (backdrop-filter: blur(1px)) {
   .nova-wallpaper-surface { background-color: rgb(15 23 42 / 0.65); }

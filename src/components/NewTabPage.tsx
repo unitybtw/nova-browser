@@ -1155,9 +1155,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             {renderableSpeedDials.map((dial) => (
               <motion.div
                 key={dial.id}
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.96 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="relative group w-[88px] sm:w-[96px]"
               >
                 <button
@@ -1175,7 +1172,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     buttons were focusable but stayed at opacity 0, so the controls
                     existed and could not be seen. group-focus-within reveals the
                     group as soon as focus lands inside it. */}
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 backdrop-blur-xs z-10">
+                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 z-10">
                   <button
                     type="button"
                     aria-label={t('newtab.editSpeedDial', { name: dial.name })}
@@ -1206,9 +1203,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
             {renderableSpeedDials.length < 10 && (
               <motion.div
-                whileHover={{ y: -1 }}
-                whileTap={{ scale: 0.96 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
                 className="relative group w-[88px] sm:w-[96px]"
               >
                 <button
