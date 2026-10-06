@@ -42,7 +42,7 @@ export const copy = {
     desktopNote: 'Nova is a desktop browser. Download it on your computer.',
     footerLine: 'A more personal internet.', footerLinks: ['Source code', 'Release notes', 'Report an issue'],
     footerBottom: 'Made for the way you explore.', language: 'Switch to Turkish', menu: 'Open navigation', close: 'Close',
-    videoTitle: 'A closer look at Nova', videoDescription: 'A silent product walkthrough of Nova’s browsing interface.',
+    videoTitle: 'A closer look at Nova', videoDescription: 'A 27-second Nova product film with original ambient music. Captions are available in English and Turkish.',
   },
   tr: {
     nav: ['Deneyim', 'Senin için', 'Açık kaynak'], get: 'Nova’yı edin', skip: 'İçeriğe geç',
@@ -87,6 +87,6 @@ export const copy = {
     desktopNote: 'Nova bir masaüstü tarayıcısı. Bilgisayarından indirebilirsin.',
     footerLine: 'Daha kişisel bir internet.', footerLinks: ['Kaynak kodu', 'Sürüm notları', 'Sorun bildir'],
     footerBottom: 'Senin keşif biçimin için.', language: 'Switch to English', menu: 'Menüyü aç', close: 'Kapat',
-    videoTitle: 'Nova’ya yakından bak', videoDescription: 'Nova’nın tarayıcı arayüzünü gösteren sessiz ürün turu.',
+    videoTitle: 'Nova’ya yakından bak', videoDescription: 'Nova’yı tanıtan, özgün müzikli 27 saniyelik ürün filmi. İngilizce ve Türkçe altyazı seçeneği bulunur.',
   },
 }

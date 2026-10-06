@@ -16,9 +16,10 @@ Open http://127.0.0.1:5174. To produce a static site, run `npm run build`; deplo
 
 - English/Turkish copy with a remembered language preference
 - Responsive navigation, keyboard-operable product tabs, and platform selector
-- Real Nova screenshots and a native video dialog with keyboard dismissal
+- Real Nova screenshots and a 27-second 1080p product film with original music, bilingual captions, and keyboard dismissal
 - Expandable FAQ, official GitHub links, and direct release downloads
-- Reduced-motion support, local fonts and assets, no analytics or third-party scripts
+- Authored entrances, tour transitions, desktop depth, and reduced-motion support
+- Local fonts and assets, no analytics or third-party scripts
 
 Release links were verified against the public GitHub API on 2026-10-05 for **v1.5.0**. Update the `RELEASE` constant, platform file names, and displayed release labels in `src/App.tsx` when publishing a newer version. The release-page fallback always links to GitHub's latest release.
 
