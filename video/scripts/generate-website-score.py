@@ -1,7 +1,7 @@
 import math, wave, array
 from pathlib import Path
 rate=44100
-length=33
+length=36
 chord_length=length/4
 notes=[(146.832,183.498,220.0,293.665),(110.0,138.591,164.814,220.0),(123.471,146.832,184.997,246.942),(97.999,123.471,146.832,195.998)]
 # Original instrumental: soft D-major pad, felt-like arpeggio, restrained pulse.

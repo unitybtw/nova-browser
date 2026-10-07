@@ -1,22 +1,16 @@
 WEBVTT
 
-00:00.550 --> 00:03.900
+00:00.650 --> 00:05.401
 Nova ile tanış. Çalışma biçimine uyum sağlayan bir tarayıcı.
 
-00:05.000 --> 00:08.650
-Sade bir başlangıç sayfasıyla gününe odaklan,
+00:06.100 --> 00:12.528
+Sade bir başlangıç sayfası, esnek sekmeler ve ayrı çalışma alanlarıyla gününe odaklan.
 
-00:08.650 --> 00:11.650
-esnek sekmeler ve ayrı çalışma alanları kullan.
+00:15.100 --> 00:22.481
+Kenar çubuğundaki asistanla fikirlerini keşfet. Desteklenen modeller doğrudan cihazında yerel olarak çalışır.
 
-00:13.000 --> 00:16.450
-Kenar çubuğundaki asistanla fikirlerini keşfet.
-
-00:16.450 --> 00:20.650
-Desteklenen modeller WebGPU ile cihazında yerel olarak çalışır.
-
-00:21.500 --> 00:26.050
+00:24.100 --> 00:29.827
 Ücretsiz ve açık kaynaklı. Mac, Windows ve Linux için.
 
-00:27.800 --> 00:31.200
+00:30.900 --> 00:35.091
 Kendi alanını bul. Nova’ya yer aç.

@@ -43,7 +43,7 @@ export const copy = {
     footerLine: 'A more personal internet.', footerLinks: ['Source code', 'Release notes', 'Report an issue'],
     footerBottom: 'Made for the way you explore.', language: 'Switch to Turkish', menu: 'Open navigation', close: 'Close',
     videoError: 'The video could not load. Check your connection and try again.', retryVideo: 'Retry video',
-    videoTitle: 'A closer look at Nova', videoDescription: 'A 33-second tour of Nova with English narration and quiet original music. English and Turkish captions are available.',
+    videoTitle: 'A closer look at Nova', videoDescription: 'A 36-second Nova film with animated graphics, English female narration and quiet original music. English and Turkish captions are available.',
   },
   tr: {
     nav: ['Deneyim', 'Senin için', 'Açık kaynak'], get: 'Nova’yı edin', skip: 'İçeriğe geç',
@@ -89,6 +89,6 @@ export const copy = {
     footerLine: 'Daha kişisel bir internet.', footerLinks: ['Kaynak kodu', 'Sürüm notları', 'Sorun bildir'],
     footerBottom: 'Senin keşif biçimin için.', language: 'Switch to English', menu: 'Menüyü aç', close: 'Kapat',
     videoError: 'Video yüklenemedi. Bağlantını kontrol edip tekrar dene.', retryVideo: 'Videoyu yeniden dene',
-    videoTitle: 'Nova’ya yakından bak', videoDescription: 'Nova’yı tanıtan, İngilizce sesli anlatımlı ve hafif özgün müzikli 33 saniyelik video. İngilizce ve Türkçe altyazılar bulunur.',
+    videoTitle: 'Nova’ya yakından bak', videoDescription: 'Nova’yı tanıtan, hareketli grafikler, İngilizce kadın anlatımı ve hafif özgün müzik içeren 36 saniyelik video. İngilizce ve Türkçe altyazılar bulunur.',
   },
 }
