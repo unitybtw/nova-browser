@@ -1,16 +1,17 @@
 import math, wave, array
 from pathlib import Path
 rate=44100
-length=27
+length=33
+chord_length=length/4
 notes=[(146.832,183.498,220.0,293.665),(110.0,138.591,164.814,220.0),(123.471,146.832,184.997,246.942),(97.999,123.471,146.832,195.998)]
 # Original instrumental: soft D-major pad, felt-like arpeggio, restrained pulse.
 samples=array.array('h')
 for i in range(rate*length):
  t=i/rate
- chord_i=min(int(t/6.75),3)
- local=t-chord_i*6.75
+ chord_i=min(int(t/chord_length),3)
+ local=t-chord_i*chord_length
  chord=notes[chord_i]
- env=min(1,local/1.2)*min(1,(6.75-local)/1.4)
+ env=min(1,local/1.2)*min(1,(chord_length-local)/1.4)
  pad=sum(math.sin(2*math.pi*f*t)*.027+math.sin(2*math.pi*(f*1.002)*t)*.019+math.sin(2*math.pi*f*2*t)*.005 for f in chord)*env
  beat=0.75
  phase=t%beat
