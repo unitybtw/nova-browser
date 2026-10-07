@@ -328,6 +328,7 @@ export function useBrowserAgentBridge({
 
         case 'browser_go_back':
           if (activeWebview && activeWebview.goBack) {
+            if (activeWebview.canGoBack && !activeWebview.canGoBack()) return 'Error: No previous page in this tab history.';
             await activeWebview.goBack();
             return "Navigated back";
           }
@@ -335,6 +336,7 @@ export function useBrowserAgentBridge({
 
         case 'browser_go_forward':
           if (activeWebview && activeWebview.goForward) {
+            if (activeWebview.canGoForward && !activeWebview.canGoForward()) return 'Error: No next page in this tab history.';
             await activeWebview.goForward();
             return "Navigated forward";
           }
@@ -517,10 +519,8 @@ export function useBrowserAgentBridge({
         // from LLM output, which page content can influence.
         const target = captureTarget();
         const gate = await agentNavigationAllowed(url);
-        if (!gate.ok || !targetIsCurrent(target)) {
-          console.warn(`AI agent navigation refused (${gate.reason}):`, url);
-          return;
-        }
+        if (!gate.ok) throw new Error(`Navigation blocked for security (${gate.reason}).`);
+        if (!targetIsCurrent(target)) throw new Error('Navigation cancelled: target document changed.');
         mcpHandlersRef.current.handleNavigate(url, target.tabId || undefined);
       },
       onExecuteScript: async (script: string) => {
@@ -552,18 +552,15 @@ export function useBrowserAgentBridge({
         const iframe = document.querySelector(`iframe[data-tab-id="${browserDataRef.current.activeTabId}"]`) as HTMLIFrameElement;
         if (iframe) {
           console.warn("AI scripts cannot be executed in iframes due to cross-origin security. Please run the app in Electron.");
-          return "Error: Cannot read page content in web development mode. Please run the desktop app.";
+          throw new Error('Cannot read page content in web development mode. Please run the desktop app.');
         }
 
         throw new Error("No active webview or iframe found");
       },
       onCreateTab: async (url: string) => {
         const gate = await agentNavigationAllowed(url);
-        if (!gate.ok) {
-          console.warn(`AI agent tab creation refused (${gate.reason}):`, url);
-          return;
-        }
-        mcpHandlersRef.current.handleNewTab(url);
+        if (!gate.ok) throw new Error(`Tab creation blocked for security (${gate.reason}).`);
+        mcpHandlersRef.current.handleNewTab(url, undefined, { reuseBlank: false });
       },
       onCloseTab: (id?: string) => {
         const targetId = id || browserDataRef.current.activeTabId;
@@ -573,29 +570,20 @@ export function useBrowserAgentBridge({
       onGetAllTabs: () => browserDataRef.current.tabs.map(t => ({ id: t.id, title: t.title, url: t.url })),
       onScrollPage: async (direction, amount) => {
         const webview = guardedGuest();
+        if (!webview?.executeJavaScript) throw new Error('No active webview available for scrolling.');
         const cleanAmount = Math.min(10000, Math.max(0, Math.abs(Number(amount) || 500)));
-        if (webview && webview.executeJavaScript) {
-          try {
-            if (direction === 'up') await webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
-            else if (direction === 'down') await webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
-            else if (direction === 'top') await webview.executeJavaScript(`window.scrollTo(0, 0)`);
-            else if (direction === 'bottom') await webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
-          } catch (err) {
-            console.warn("Failed to scroll page:", err);
-          }
-        } else {
-          console.warn("Cannot scroll iframes cross-origin.");
-        }
+        if (direction === 'up') await webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
+        else if (direction === 'down') await webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
+        else if (direction === 'top') await webview.executeJavaScript(`window.scrollTo(0, 0)`);
+        else if (direction === 'bottom') await webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+        else throw new Error('Invalid scroll direction.');
       },
       onPressKey: async (key: string) => {
         const webview = guardedGuest();
-        if (webview && typeof webview.sendInputEvent === 'function') {
-          try {
-            await webview.sendInputEvent({ type: 'keyDown', keyCode: key });
-            await webview.sendInputEvent({ type: 'char', keyCode: key });
-            await webview.sendInputEvent({ type: 'keyUp', keyCode: key });
-          } catch (_) {}
-        }
+        if (!webview?.sendInputEvent) throw new Error('No active webview available for keyboard input.');
+        await webview.sendInputEvent({ type: 'keyDown', keyCode: key });
+        await webview.sendInputEvent({ type: 'char', keyCode: key });
+        await webview.sendInputEvent({ type: 'keyUp', keyCode: key });
       },
       onTakeScreenshot: async () => {
         const webview = guardedGuest();
@@ -658,39 +646,24 @@ export function useBrowserAgentBridge({
       },
       onReloadPage: async () => {
         const webview = guardedGuest();
-        if (webview) {
-          try {
-            if (typeof webview.reload === 'function') {
-              await webview.reload();
-            } else if (typeof webview.executeJavaScript === 'function') {
-              await webview.executeJavaScript('window.location.reload()');
-            }
-          } catch (_) {}
-        }
+        if (!webview) throw new Error('No active webview available to reload.');
+        if (typeof webview.reload === 'function') await webview.reload();
+        else if (typeof webview.executeJavaScript === 'function') await webview.executeJavaScript('window.location.reload()');
+        else throw new Error('Page reload is unavailable.');
       },
       onGoBack: async () => {
         const webview = guardedGuest();
-        if (webview) {
-          try {
-            if (typeof webview.canGoBack === 'function') {
-              if (webview.canGoBack()) await webview.goBack();
-            } else if (typeof webview.goBack === 'function') {
-              await webview.goBack();
-            }
-          } catch (_) {}
-        }
+        if (!webview) throw new Error('No active webview available for history navigation.');
+        if (typeof webview.canGoBack === 'function' && !webview.canGoBack()) throw new Error('No previous page in this tab history.');
+        if (typeof webview.goBack !== 'function') throw new Error('Back navigation is unavailable.');
+        await webview.goBack();
       },
       onGoForward: async () => {
         const webview = guardedGuest();
-        if (webview) {
-          try {
-            if (typeof webview.canGoForward === 'function') {
-              if (webview.canGoForward()) await webview.goForward();
-            } else if (typeof webview.goForward === 'function') {
-              await webview.goForward();
-            }
-          } catch (_) {}
-        }
+        if (!webview) throw new Error('No active webview available for history navigation.');
+        if (typeof webview.canGoForward === 'function' && !webview.canGoForward()) throw new Error('No next page in this tab history.');
+        if (typeof webview.goForward !== 'function') throw new Error('Forward navigation is unavailable.');
+        await webview.goForward();
       }
     });
 

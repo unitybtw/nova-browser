@@ -13,9 +13,14 @@ async function run() {
   let captures = 0;
   let duplicates = 0; let lastNewTabOptions: any;
   let resolveDns: (() => void) | undefined;
+  let failInput = false; let hasGuest = true; let canBack = false; let canForward = false;
+  let navigated = ''; let keyEvents = 0; let reloads = 0;
   const listeners = new Map<string, Set<Function>>();
   const fire = (name: string) => listeners.get(name)?.forEach(fn => fn({ isMainFrame: true }));
   const webview = {
+    canGoBack: () => canBack, canGoForward: () => canForward, goBack: () => {}, goForward: () => {},
+    reload: () => { reloads++; },
+    sendInputEvent: () => { if (failInput) throw new Error('Input dispatch failed'); keyEvents++; },
     getURL: () => url, getAttribute: () => 'tab', isLoading: () => false,
     addEventListener: (name: string, fn: Function) => { if (!listeners.has(name)) listeners.set(name, new Set()); listeners.get(name)!.add(fn); },
     removeEventListener: (name: string, fn: Function) => listeners.get(name)?.delete(fn),
@@ -49,10 +54,10 @@ async function run() {
     if (!(name in imports)) throw new Error(`Unexpected dependency ${name}`);
     return imports[name];
   }, URL, WeakMap, Map, Set, console, setTimeout, clearTimeout,
-  window: { electronAPI: api }, document: { querySelector: () => webview, querySelectorAll: () => [webview] } });
+  window: { electronAPI: api }, document: { querySelector: () => webview, querySelectorAll: () => hasGuest ? [webview] : [] } });
   module.exports.useBrowserAgentBridge({ activeTabId: 'tab', tabs: [{ id: 'tab', url }], history: [], bookmarks: [],
     settingsRef: { current: { mcpServerEnabled: true } }, activeWorkspaceIdRef: { current: 'default' },
-    setActiveWorkspaceId: () => {}, setActiveTabId: () => {}, setTabs: () => {}, handleNavigate: () => {},
+    setActiveWorkspaceId: () => {}, setActiveTabId: () => {}, setTabs: () => {}, handleNavigate: (nextUrl: string) => { navigated = nextUrl; },
     handleNewTab: (_url: string, _source: unknown, opts: any) => { duplicates++; lastNewTabOptions = opts; }, handleCloseTab: () => {}, handleSelectTab: () => {} });
   const call = async (tool: string) => {
     request(tool, tool, {}, Date.now() + 15000); approve(true);
@@ -87,6 +92,21 @@ async function run() {
   url = 'https://example.com/'; flipDuringCapture = true;
   await assert.rejects(context.onTakeScreenshot(), /target document changed/i, 'changed-document screenshot must never be returned');
   url = 'https://example.com/'; await call('browser_new_tab'); assert.equal(lastNewTabOptions?.reuseBlank, false, 'new tab must never consume a different blank tab');
+  await assert.rejects(context.onNavigate('http://127.0.0.1/'), /blocked|security|public/i, 'refused navigation must report failure');
+  await assert.rejects(context.onCreateTab('http://127.0.0.1/'), /blocked|security|public/i, 'refused tab creation must report failure');
+  await context.onCreateTab('https://example.com/'); assert.equal(lastNewTabOptions?.reuseBlank, false, 'AI create-tab must create a new tab');
+  await context.onNavigate('https://example.org/'); assert.equal(navigated, 'https://example.org/');
+  failInput = true;
+  await assert.rejects(context.onPressKey('Enter'), /Input dispatch failed/, 'input failure must reach tool result');
+  failInput = false; await context.onPressKey('Enter'); assert.equal(keyEvents, 3);
+  await assert.rejects(context.onGoBack(), /history|previous/i, 'missing history must not report success');
+  await assert.rejects(context.onGoForward(), /history|next/i);
+  canBack = true; canForward = true; await context.onGoBack(); await context.onGoForward();
+  await context.onReloadPage(); assert.equal(reloads, 1);
+  hasGuest = false;
+  for (const action of [() => context.onPressKey('Enter'), () => context.onReloadPage(), () => context.onScrollPage('down')]) {
+    await assert.rejects(action, /active webview/i, 'missing page must not silently succeed');
+  }
   console.log('[PASS] Agent private-document, screenshot, duplicate and stale-approval boundaries');
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });
