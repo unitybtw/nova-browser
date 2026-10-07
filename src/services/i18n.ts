@@ -1,76 +1,32 @@
-// Only English is bundled. The other three dictionaries cost ~31KB together and
-// exactly one is ever active, so they are fetched on demand and the first paint
-// waits for the right one (see ensureLanguageLoaded) rather than flashing English.
-// English stays static so a missing/failed chunk always has a working fallback.
+// Nova has a single, bundled English interface.
 import en from '../locales/en.json';
 import { useState, useEffect } from 'react';
-import { safeParseObjectWithBackup } from '../utils/safeStorage';
 
 export type SupportedLanguage = 'en' | 'tr' | 'ar' | 'de';
 
+// Retain legacy codes at the API boundary so old backups and callers remain
+// readable. They cannot select another interface language.
 type Dictionary = Record<string, any>;
+const dictionaries: Record<string, Dictionary> = { en };
+const activeLanguage: SupportedLanguage = 'en';
 
-const dictionaries: Partial<Record<SupportedLanguage, Dictionary>> = { en };
-/** In-flight loads, so N callers asking for `tr` share one chunk request. */
-const loading = new Map<SupportedLanguage, Promise<void>>();
-
-const LOADERS: Record<Exclude<SupportedLanguage, 'en'>, () => Promise<Dictionary>> = {
-  tr: () => import('../locales/tr.json').then(m => (m.default ?? m) as unknown as Dictionary),
-  de: () => import('../locales/de.json').then(m => (m.default ?? m) as unknown as Dictionary),
-  ar: () => import('../locales/ar.json').then(m => (m.default ?? m) as unknown as Dictionary),
-};
-
-/**
- * Load a dictionary if it is not present yet. Idempotent and safe to call on a
- * language that is already static.
- */
-export function ensureLanguageLoaded(lang: SupportedLanguage): Promise<void> {
-  if (dictionaries[lang]) return Promise.resolve();
-  const existing = loading.get(lang);
-  if (existing) return existing;
-  const loader = LOADERS[lang as Exclude<SupportedLanguage, 'en'>];
-  const task = loader()
-    .then((dict: Dictionary) => { dictionaries[lang] = dict; })
-    .catch((err: unknown) => {
-      // A failed chunk must not wedge the app in English forever: drop the
-      // in-flight marker so a later call can retry, and let the caller fall
-      // back to English.
-      console.warn(`[i18n] Failed to load the "${lang}" dictionary; falling back to English.`, err);
-    })
-    .finally(() => { loading.delete(lang); });
-  loading.set(lang, task);
-  return task;
+export function ensureLanguageLoaded(_lang?: SupportedLanguage): Promise<void> {
+  return Promise.resolve();
 }
 
-/**
- * Install a dictionary that is already in hand.
- *
- * The on-demand path is `ensureLanguageLoaded`, which fetches a chunk. This is
- * for a caller that already holds the JSON - a prefetch that resolved before the
- * first render, or a test that wants the loading policy under test without the
- * timing. It is deliberately synchronous so callers do not have to become async
- * to have strings available.
- */
-export function seedDictionary(lang: SupportedLanguage, dict: Dictionary): void {
-  dictionaries[lang] = dict;
-  loading.delete(lang);
-}
+/** Compatibility with older callers; the bundled English dictionary is fixed. */
+export function seedDictionary(_lang: SupportedLanguage, _dict: Dictionary): void {}
 
-/** True when the active language's strings are available right now. */
-export function isLanguageReady(lang: SupportedLanguage = activeLanguage): boolean {
-  return Boolean(dictionaries[lang]);
+export function isLanguageReady(_lang?: SupportedLanguage): boolean {
+  return true;
 }
 
 export const LOCALE_MAP: Record<SupportedLanguage, string> = {
-  en: 'en-US',
-  tr: 'tr-TR',
-  de: 'de-DE',
-  ar: 'ar-SA'
+  en: 'en-US', tr: 'en-US', de: 'en-US', ar: 'en-US'
 };
 
-export function getLocale(lang?: SupportedLanguage): string {
-  const current = lang || activeLanguage;
-  return LOCALE_MAP[current] || 'en-US';
+export function getLocale(_lang?: SupportedLanguage): string {
+  return 'en-US';
 }
 
 export function formatDate(date: Date | number, lang?: SupportedLanguage, options?: Intl.DateTimeFormatOptions): string {
@@ -85,92 +41,32 @@ export function formatTime(date: Date | number, lang?: SupportedLanguage, option
   return d.toLocaleTimeString(locale, options || { hour: '2-digit', minute: '2-digit' });
 }
 
-const RTL_LANGUAGES = new Set<string>(['ar']);
-
-const SUPPORTED_LANGUAGES: SupportedLanguage[] = ['en', 'tr', 'ar', 'de'];
-
-const isSupportedLanguage = (v: unknown): v is SupportedLanguage =>
-  typeof v === 'string' && (SUPPORTED_LANGUAGES as string[]).includes(v);
-
-const readSavedLanguage = (): SupportedLanguage => {
-  if (typeof localStorage !== 'undefined') {
-    // Single source of truth: user_settings.language first.
-    try {
-      const rawSettings = localStorage.getItem('user_settings');
-      if (rawSettings) {
-        const parsed = safeParseObjectWithBackup<{ language?: unknown }>('user_settings', rawSettings, {});
-        if (parsed && isSupportedLanguage(parsed.language)) {
-          return parsed.language;
-        }
-      }
-    } catch (_) {}
-    // Legacy fallback: standalone nova_language key.
-    try {
-      const saved = localStorage.getItem('nova_language');
-      if (isSupportedLanguage(saved)) {
-        return saved;
-      }
-    } catch (_) {}
-  }
-  try {
-    const nav = typeof navigator !== 'undefined' ? navigator.language?.slice(0, 2).toLowerCase() : '';
-    if (isSupportedLanguage(nav)) {
-      return nav;
-    }
-  } catch (_) {}
-  return 'en';
-};
-
-let activeLanguage: SupportedLanguage = readSavedLanguage();
-
 if (typeof document !== 'undefined') {
-  document.documentElement.lang = activeLanguage;
-  document.documentElement.dir = RTL_LANGUAGES.has(activeLanguage) ? 'rtl' : 'ltr';
+  document.documentElement.lang = 'en';
+  document.documentElement.dir = 'ltr';
 }
 
 const listeners = new Set<(lang: SupportedLanguage) => void>();
 
-export function isRTL(lang?: string): boolean {
-  return RTL_LANGUAGES.has(lang || activeLanguage);
+export function isRTL(_lang?: string): boolean {
+  return false;
 }
 
 export function getLanguage(): SupportedLanguage {
-  return activeLanguage;
+  return 'en';
 }
 
-export function setLanguage(lang: SupportedLanguage): void {
-  // An unsupported code still falls back, but a supported one whose chunk has
-  // not arrived yet must NOT be downgraded: that would show English to a
-  // Turkish user and then flip the UI language under them. Keep the language,
-  // start the load, and re-notify listeners when it lands.
-  if (!isSupportedLanguage(lang)) {
-    lang = 'en';
-  }
-  activeLanguage = lang;
-  if (!dictionaries[lang]) {
-    void ensureLanguageLoaded(lang).then(() => {
-      if (activeLanguage === lang) listeners.forEach(fn => fn(lang));
-    });
-  }
-  if (typeof localStorage !== 'undefined') {
-    // Only the standalone key is written from here. `user_settings` is owned by
-    // useSessionPersistence, which serialises live React state on a 500ms
-    // debounce; read-modify-writing it from here would race that flush and
-    // persist a stale on-disk snapshot, discarding any setting changed in the
-    // same tick. `settings.language` is the canonical source and the settings
-    // owner persists it for us.
-    try {
-      localStorage.setItem('nova_language', lang);
-    } catch (_) {}
-  }
+export function setLanguage(_lang: SupportedLanguage): void {
+  // Do not rewrite user_settings here: its persistence owner holds live state.
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem('nova_language', 'en');
+  } catch (_) {}
   if (typeof document !== 'undefined') {
-    document.documentElement.lang = lang;
-    document.documentElement.dir = isRTL(lang) ? 'rtl' : 'ltr';
+    document.documentElement.lang = 'en';
+    document.documentElement.dir = 'ltr';
   }
   listeners.forEach(fn => {
-    try {
-      fn(lang);
-    } catch (_) {}
+    try { fn('en'); } catch (_) {}
   });
 }
 

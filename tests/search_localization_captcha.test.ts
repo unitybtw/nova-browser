@@ -98,6 +98,6 @@ assert.ok(
 
 // 8. System language detection
 const detected = detectSystemLanguage();
-assert.ok(['en', 'tr', 'de', 'ar'].includes(detected), `detectSystemLanguage must return valid language, got: ${detected}`);
+assert.equal(detected, 'en', 'The interface must stay English regardless of system language');
 
 console.log('[PASS] [Search Localization & Anti-Bot] 15 search localization, backward compatibility, and system detection tests passed.');

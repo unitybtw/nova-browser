@@ -562,10 +562,10 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
   useEffect(() => {
     if (settings.language) {
       // setLanguage falls back to 'en' internally for unknown values.
-      setLanguage(settings.language as NonNullable<UserSettings['language']>);
+      setLanguage('en');
       // Sync with Electron session Accept-Language headers
       if (typeof window !== 'undefined' && window.electronAPI?.setAppLanguage) {
-        window.electronAPI.setAppLanguage(settings.language).catch(() => {});
+        window.electronAPI.setAppLanguage('en').catch(() => {});
       }
     }
   }, [settings.language]);

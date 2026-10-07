@@ -23,7 +23,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
   isTranslated,
   isLoading,
   currentSourceLang = 'auto',
-  currentTargetLang = 'tr',
+  currentTargetLang = 'en',
   error
 }) => {
   const [selectedTargetLang, setSelectedTargetLang] = useState<string>(currentTargetLang);

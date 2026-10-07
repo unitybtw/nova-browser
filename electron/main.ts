@@ -338,12 +338,8 @@ nativeTheme.on('updated', () => {
 });
 
 
-function getAcceptLanguagesForLocale(localeOrLang?: string): string {
-  const l = (localeOrLang || 'tr').toLowerCase();
-  if (l.startsWith('tr')) return 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7';
-  if (l.startsWith('de')) return 'de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7';
-  if (l.startsWith('ar')) return 'ar-SA,ar;q=0.9,en-US;q=0.8,en;q=0.7';
-  return 'en-US,en;q=0.9,tr-TR;q=0.8,tr;q=0.7';
+function getAcceptLanguagesForLocale(_localeOrLang?: string): string {
+  return 'en-US,en;q=0.9';
 }
 
 let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
@@ -5401,7 +5397,7 @@ ipcMain.handle('translate-text-batch', async (event, payload: unknown) => {
     return value;
   };
   const sLang = validLanguage(input.sourceLang, 'auto');
-  const tLang = validLanguage(input.targetLang, 'tr');
+  const tLang = validLanguage(input.targetLang, 'en');
   const texts = safeTexts;
 
   try {

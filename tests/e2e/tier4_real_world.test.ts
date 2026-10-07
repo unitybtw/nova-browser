@@ -1,8 +1,5 @@
 import assert from 'node:assert/strict';
-import { t, setLanguage, getLanguage, isRTL, seedDictionary } from '../../src/services/i18n';
-import trDict from '../../src/locales/tr.json';
-import arDict from '../../src/locales/ar.json';
-import deDict from '../../src/locales/de.json';
+import { t, setLanguage, getLanguage, isRTL } from '../../src/services/i18n';
 
 async function runTier4Tests() {
   const originalDoc = (globalThis as any).document;
@@ -31,50 +28,16 @@ async function runTier4Tests() {
   assert.equal(t('common.cancel'), 'Cancel');
   assert.equal(t('tabs.sleeping'), 'Tab is Sleeping');
 
-  // Switch to Turkish
-  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
-  // suite that awaits here is suspended while the runner starts the NEXT suite
-  // synchronously - and that suite flips the shared language back to English,
-  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
-  // owns the loading policy; this suite only cares about switching and RTL.
-  seedDictionary('tr', trDict as any);
-  setLanguage('tr');
-  assert.equal(getLanguage(), 'tr');
-  assert.equal(isRTL(), false);
-  assert.equal(mockDoc.lang, 'tr');
-  assert.equal(mockDoc.dir, 'ltr');
-  assert.equal(t('common.cancel'), 'İptal');
-  assert.equal(t('tabs.sleeping'), 'Sekme Uyku Modunda');
-
-  // Switch to Arabic (RTL)
-  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
-  // suite that awaits here is suspended while the runner starts the NEXT suite
-  // synchronously - and that suite flips the shared language back to English,
-  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
-  // owns the loading policy; this suite only cares about switching and RTL.
-  seedDictionary('ar', arDict as any);
-  setLanguage('ar');
-  assert.equal(getLanguage(), 'ar');
-  assert.equal(isRTL(), true);
-  assert.equal(mockDoc.lang, 'ar');
-  assert.equal(mockDoc.dir, 'rtl');
-  assert.equal(t('common.cancel'), 'إلغاء');
-  assert.equal(t('tabs.sleeping'), 'التبويب في وضع السكون');
-
-  // Switch to German
-  // Seeded, not awaited. The app fetches these dictionaries on demand, but a
-  // suite that awaits here is suspended while the runner starts the NEXT suite
-  // synchronously - and that suite flips the shared language back to English,
-  // so this one resumes and reads the wrong language. tests/i18n_loading.test.ts
-  // owns the loading policy; this suite only cares about switching and RTL.
-  seedDictionary('de', deDict as any);
-  setLanguage('de');
-  assert.equal(getLanguage(), 'de');
-  assert.equal(isRTL(), false);
-  assert.equal(mockDoc.lang, 'de');
-  assert.equal(mockDoc.dir, 'ltr');
-  assert.equal(t('common.cancel'), 'Abbrechen');
-  assert.equal(t('tabs.sleeping'), 'Tab schläft');
+  // Legacy requests must keep the interface in English and left-to-right.
+  for (const legacy of ['tr', 'ar', 'de'] as const) {
+    setLanguage(legacy);
+    assert.equal(getLanguage(), 'en');
+    assert.equal(isRTL(), false);
+    assert.equal(mockDoc.lang, 'en');
+    assert.equal(mockDoc.dir, 'ltr');
+    assert.equal(t('common.cancel'), 'Cancel');
+    assert.equal(t('tabs.sleeping'), 'Tab is Sleeping');
+  }
 
   // Test fallback for missing nested keys
   assert.equal(t('nonexistent.key.path'), 'nonexistent.key.path');

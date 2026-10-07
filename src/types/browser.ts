@@ -129,15 +129,7 @@ export interface UserSettings {
 }
 
 export function detectSystemLanguage(): 'en' | 'tr' | 'ar' | 'de' {
-  try {
-    if (typeof navigator !== 'undefined' && navigator.language) {
-      const code = navigator.language.slice(0, 2).toLowerCase();
-      if (code === 'tr' || code === 'de' || code === 'ar' || code === 'en') {
-        return code;
-      }
-    }
-  } catch (_) {}
-  return 'tr';
+  return 'en';
 }
 
 export const defaultSettings: UserSettings = {
@@ -168,7 +160,7 @@ export const defaultSettings: UserSettings = {
   preloadDnsEnabled: true,
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
-  defaultTranslationLanguage: 'tr',
+  defaultTranslationLanguage: 'en',
   language: detectSystemLanguage(),
   shortcuts: {
     newTab: { key: 't', shift: false, meta: true },

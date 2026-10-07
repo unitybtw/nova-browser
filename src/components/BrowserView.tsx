@@ -1014,7 +1014,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
           if (extractResult && extractResult.success && Array.isArray(extractResult.texts) && extractResult.texts.length > 0) {
             // 2. Translate via IPC batch
-            const targetLang = detail.targetLang || 'tr';
+            const targetLang = detail.targetLang || 'en';
             const sourceLang = detail.sourceLang || 'auto';
 
             if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {

@@ -114,7 +114,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   const [isTranslateOpen, setIsTranslateOpen] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
   const [translationError, setTranslationError] = useState<string | null>(null);
-  const [targetLang, setTargetLang] = useState<string>('tr');
+  const [targetLang, setTargetLang] = useState<string>('en');
   const [sourceLang, setSourceLang] = useState<string>('auto');
 
   const handleTranslatePage = async (tLang: string, sLang?: string) => {
@@ -168,7 +168,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       const unsub = getElectronAPI()?.onTriggerPageTranslation((data: any) => {
         if (activeTab?.id) {
           setIsTranslateOpen(true);
-          handleTranslatePageRef.current(data?.targetLang || 'tr', 'auto');
+          handleTranslatePageRef.current(data?.targetLang || 'en', 'auto');
         }
       });
       return () => unsub?.();

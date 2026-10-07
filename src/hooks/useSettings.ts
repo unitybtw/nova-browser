@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type Dispatch, type SetStateAction } from 'react';
 import { defaultSettings, type UserSettings } from '../types/browser';
 import { safeParseObjectWithBackup } from '../utils/safeStorage';
 
@@ -15,7 +15,7 @@ export interface UseSettingsOptions {
 export function useSettings(options: UseSettingsOptions = {}) {
   const isMac = options.isMac ?? (typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('mac'));
 
-  const [settings, setSettings] = useState<UserSettings>(() => {
+  const [settings, setSettingsState] = useState<UserSettings>(() => {
     const initialSettings: UserSettings = {
       ...defaultSettings,
       theme: options.isDemo && options.demoTheme ? options.demoTheme : defaultSettings.theme,
@@ -42,6 +42,7 @@ export function useSettings(options: UseSettingsOptions = {}) {
     const merged: UserSettings = {
       ...initialSettings,
       ...parsed,
+      language: 'en',
       shortcuts: {
         ...initialSettings.shortcuts,
         ...(parsed.shortcuts || {})
@@ -65,12 +66,21 @@ export function useSettings(options: UseSettingsOptions = {}) {
     return merged;
   });
 
+  // All restore/import/sync paths share this setter. Legacy preferences cannot
+  // re-enable an interface language after the initial migration.
+  const setSettings: Dispatch<SetStateAction<UserSettings>> = useCallback(update => {
+    setSettingsState(prev => {
+      const next = typeof update === 'function' ? update(prev) : update;
+      return next.language === 'en' ? next : { ...next, language: 'en' };
+    });
+  }, []);
+
   const settingsRef = useRef(settings);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
   const handleUpdateSettings = useCallback((newSettings: Partial<UserSettings>) => {
     setSettings(prev => ({ ...prev, ...newSettings }));
-  }, []);
+  }, [setSettings]);
 
   return {
     settings,

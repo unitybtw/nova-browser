@@ -5,36 +5,17 @@ import tr from '../src/locales/tr.json';
 import de from '../src/locales/de.json';
 import ar from '../src/locales/ar.json';
 
-console.log('\n--- i18n & Multi-Language Date/Time Localization Suite ---');
+console.log('\n--- i18n & English Date/Time Suite ---');
 
-// 1. Locale Mapping Verification
-assert.equal(LOCALE_MAP.en, 'en-US', 'en must map to en-US');
-assert.equal(LOCALE_MAP.tr, 'tr-TR', 'tr must map to tr-TR');
-assert.equal(LOCALE_MAP.de, 'de-DE', 'de must map to de-DE');
-assert.equal(LOCALE_MAP.ar, 'ar-SA', 'ar must map to ar-SA');
-
-assert.equal(getLocale('en'), 'en-US');
-assert.equal(getLocale('tr'), 'tr-TR');
-assert.equal(getLocale('de'), 'de-DE');
-assert.equal(getLocale('ar'), 'ar-SA');
-
-// 2. Date Formatting Across Locales
-const fixedDate = new Date(2026, 8, 4, 15, 30); // September 4, 2026 (Friday)
-const enDate = formatDate(fixedDate, 'en');
-const trDate = formatDate(fixedDate, 'tr');
-const deDate = formatDate(fixedDate, 'de');
-const arDate = formatDate(fixedDate, 'ar');
-
-assert.ok(enDate.includes('September') && enDate.includes('Friday'), `en date must have English month/day, got: ${enDate}`);
-assert.ok(trDate.includes('Eylül') && trDate.includes('Cuma'), `tr date must have Turkish month/day, got: ${trDate}`);
-assert.ok(deDate.includes('September') && deDate.includes('Freitag'), `de date must have German month/day, got: ${deDate}`);
-assert.ok(arDate.length > 0, 'ar date must format properly');
-
-// 3. Time Formatting Across Locales
-const enTime = formatTime(fixedDate, 'en');
-const trTime = formatTime(fixedDate, 'tr');
-assert.ok(typeof enTime === 'string' && enTime.length > 0);
-assert.ok(typeof trTime === 'string' && trTime.length > 0);
+// Legacy locale arguments all resolve to the single English interface.
+for (const code of ['en', 'tr', 'de', 'ar'] as SupportedLanguage[]) {
+  assert.equal(LOCALE_MAP[code], 'en-US');
+  assert.equal(getLocale(code), 'en-US');
+  const fixedDate = new Date(2026, 8, 4, 15, 30);
+  const date = formatDate(fixedDate, code);
+  assert.ok(date.includes('September') && date.includes('Friday'));
+  assert.ok(formatTime(fixedDate, code).length > 0);
+}
 
 // 4. Greetings in All Locales
 const getGreetingKey = (hour: number): string => {
@@ -109,4 +90,4 @@ for (const [langCode, dict] of Object.entries(dictionaries)) {
 // Reset language to en
 setLanguage('en');
 
-console.log('[PASS] [i18n Localization] Locale mapping, date/time formatting, greeting calculation, and reactive switching verified.');
+console.log('[PASS] [i18n Localization] English date/time formatting, greetings and legacy language compatibility verified.');

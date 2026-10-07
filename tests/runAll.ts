@@ -11,9 +11,9 @@ console.log('Executing all test suites...');
 import './e2e/tier1_feature_coverage.test';
 import './e2e/tier2_boundary_corner.test';
 import './e2e/tier3_cross_feature.test';
-// Must precede every other i18n suite: it asserts that tr/de/ar are NOT loaded
-// yet, so any suite that seeds them first would make its assertions false.
+// Verify the English-only interface policy and legacy setting compatibility.
 import './i18n_loading.test';
+import './english_settings_migration.test';
 import './e2e/tier4_real_world.test';
 import './e2e/tier5_adversarial_stress.test';
 import './challenger2_empirical_verification';
