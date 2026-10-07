@@ -109,13 +109,11 @@
   .tour-detail { display: block; font-size: 9px; line-height: 1.8; font-weight: 600; color: #59645e; margin-top: 24px; max-width: 260px; }
   .tour-arrow { position: absolute; bottom: 29px; left: 37px; color: #657667; }
   .tour-image-wrap { display: grid; place-items: center; padding: 32px; min-width: 0; animation: image-arrive 600ms var(--ease); }
-  .tour-media { position: relative; width: 100%; overflow: hidden; border: 1px solid #20282420; border-radius: 10px; background: #11121c; box-shadow: 0 12px 30px #1a292a14; }
+  .tour-media { position: relative; width: 100%; overflow: hidden; border: 1px solid #20282420; border-radius: 10px; background: #f4f6fa; box-shadow: 0 12px 30px #1a292a14; }
   .tour-image { display: block; width: 100%; height: auto; }
   .tour-panel-1 { background: #e7e9f1; }
   .tour-panel-2 { background: #e3edf0; }
-  .media-2 { max-width: 350px; aspect-ratio: 1024 / 983; }
-  /* Keep the complete sync dialog at its original proportions. */
-  .media-2 .tour-image { position: absolute; width: 281.25%; max-width: none; left: -90.625%; top: -41.607%; }
+  .media-2 { max-width: 460px; border-radius: 24px; }
   .screenshot-caption { margin-top: 13px; text-align: right; font-size: 9px; color: var(--muted); }
   .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   .feature-grid > article { border-radius: var(--radius); overflow: hidden; }
