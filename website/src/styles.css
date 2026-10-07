@@ -206,6 +206,8 @@
   .video-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 20px; }
   .video-heading h2 { font-size: 19px; }
   .video-dialog video { width: 100%; border-radius: 7px; background: #111; max-height: 70dvh; }
+  .video-error { padding: 16px; margin-top: 12px; border: 1px solid var(--line); border-radius: 8px; }
+  .video-error .button { margin-top: 12px; }
   .video-dialog p { margin-top: 12px; color: var(--muted); font-size: 11px; }
   .site-header { transition: box-shadow 250ms var(--ease), border-color 250ms var(--ease); }
   .site-header.is-scrolled { box-shadow: 0 5px 22px #1b322306; border-bottom-color: var(--line); }

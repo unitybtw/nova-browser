@@ -17,6 +17,11 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeTab, setActiveTab] = useState(0)
   const [platform, setPlatform] = useState(0)
+  const header = useRef<HTMLElement>(null)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const watchButton = useRef<HTMLButtonElement>(null)
+  const previousOverflow = useRef<string | null>(null)
+  const [videoError, setVideoError] = useState(false)
   const dialog = useRef<HTMLDialogElement>(null)
   const video = useRef<HTMLVideoElement>(null)
   const t = copy[lang]
@@ -28,13 +33,51 @@ export default function App() {
   }, [lang])
 
   useEffect(() => {
-    const onEscape = (event: globalThis.KeyboardEvent) => { if (event.key === 'Escape') setMenuOpen(false) }
+    if (!menuOpen) return
+    const onEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === 'Escape') { setMenuOpen(false); menuButton.current?.focus() }
+    }
+    const onOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !header.current?.contains(event.target)) setMenuOpen(false)
+    }
+    const desktop = window.matchMedia('(min-width: 768px)')
+    const onDesktop = (event: MediaQueryListEvent) => { if (event.matches) setMenuOpen(false) }
     window.addEventListener('keydown', onEscape)
-    return () => window.removeEventListener('keydown', onEscape)
-  }, [])
+    document.addEventListener('pointerdown', onOutside)
+    desktop.addEventListener('change', onDesktop)
+    return () => {
+      window.removeEventListener('keydown', onEscape)
+      document.removeEventListener('pointerdown', onOutside)
+      desktop.removeEventListener('change', onDesktop)
+    }
+  }, [menuOpen])
 
-  function openVideo() { dialog.current?.showModal(); document.body.style.overflow = 'hidden' }
-  function closeVideo() { dialog.current?.close(); video.current?.pause(); document.body.style.overflow = '' }
+  function releaseScrollLock() {
+    if (previousOverflow.current !== null) {
+      document.body.style.overflow = previousOverflow.current
+      previousOverflow.current = null
+    }
+  }
+  useEffect(() => () => releaseScrollLock(), [])
+
+  function openVideo() {
+    if (!dialog.current || dialog.current.open) return
+    setMenuOpen(false)
+    setVideoError(false)
+    dialog.current.showModal()
+    previousOverflow.current = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+  }
+  function closeVideo() {
+    if (dialog.current?.open) dialog.current.close()
+    video.current?.pause()
+    releaseScrollLock()
+  }
+  function onVideoClosed() {
+    video.current?.pause()
+    releaseScrollLock()
+    watchButton.current?.focus()
+  }
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, group: 'tour' | 'platform', current: number) {
     let next = current
     if (event.key === 'ArrowRight') next = (current + 1) % 3
@@ -49,16 +92,16 @@ export default function App() {
 
   return <>
     <a className="skip-link" href="#main">{t.skip}</a>
-    <header className="site-header">
+    <header ref={header} className="site-header">
       <div className="nav-wrap container">
-        <a href="#" className="brand" aria-label="Nova home"><img src="/images/nova-icon.svg" width="34" height="34" alt="" /><span>nova<span className="brand-period">.</span></span></a>
+        <a href="#" onClick={() => setMenuOpen(false)} className="brand" aria-label="Nova home"><img src="/images/nova-icon.svg" width="34" height="34" alt="" /><span>nova<span className="brand-period">.</span></span></a>
         <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} id="main-navigation" aria-label={lang === 'en' ? 'Main navigation' : 'Ana menü'}>
           {['experience', 'features', 'open-source'].map((id, i) => <a href={`#${id}`} key={id} onClick={() => setMenuOpen(false)}>{t.nav[i]}</a>)}
         </nav>
         <div className="nav-actions">
           <button className="language-button" onClick={() => setLang(lang === 'en' ? 'tr' : 'en')} aria-label={t.language}><Globe2 size={15} /><span>{lang.toUpperCase()}</span></button>
           <a className="button button-small button-dark" href="#download">{t.get}<ArrowDown size={15} /></a>
-          <button className="menu-button icon-button" aria-label={menuOpen ? t.close : t.menu} aria-controls="main-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
+          <button ref={menuButton} className="menu-button icon-button" aria-label={menuOpen ? t.close : t.menu} aria-controls="main-navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X /> : <Menu />}</button>
         </div>
       </div>
     </header>
@@ -69,7 +112,7 @@ export default function App() {
           <a className="release-note" href={`${REPO}/releases/tag/v1.5.0`} target="_blank" rel="noopener noreferrer"><span className="status-dot" />Nova 1.5<span className="release-divider" />{lang === 'en' ? 'A fresh perspective' : 'Yeni bir bakış açısı'}<ArrowUpRight size={13} /></a>
           <h1 id="hero-title"><span className="hero-line"><span>{t.hero[0]}</span></span><span className="hero-line"><span>{t.hero[1]}</span></span></h1>
           <p className="hero-intro">{t.intro}</p>
-          <div className="hero-actions"><a href="#download" className="button button-blue">{t.download}<ArrowDown size={18} /></a><button className="watch-button" onClick={openVideo}><span className="play-icon"><Play size={11} fill="currentColor" /></span>{t.watch}</button></div>
+          <div className="hero-actions"><a href="#download" className="button button-blue">{t.download}<ArrowDown size={18} /></a><button ref={watchButton} className="watch-button" onClick={openVideo}><span className="play-icon"><Play size={11} fill="currentColor" /></span>{t.watch}</button></div>
           <p className="availability"><span className="tiny-platforms"><Command /><Monitor /><Terminal /></span>{t.available}</p>
         </div>
         <div className="hero-stage">
@@ -83,8 +126,8 @@ export default function App() {
 
       <section className="experience section container" id="experience" aria-labelledby="experience-title">
         <div className="section-heading"><h2 id="experience-title">{t.experienceTitle[0]}<br /><span>{t.experienceTitle[1]}</span></h2><p>{t.experienceText}</p></div>
-        <div className="tour-tabs" data-active={activeTab} role="tablist" aria-label={t.nav[0]}>{t.tabs.map((title, i) => { const Icon = [Layers3, Sparkles, Monitor][i]; return <button key={title} id={`tour-tab-${i}`} role="tab" aria-selected={activeTab === i} aria-controls={`tour-panel-${i}`} tabIndex={activeTab === i ? 0 : -1} onClick={() => setActiveTab(i)} onKeyDown={e => moveTab(e, 'tour', i)}><Icon size={17} />{title}<span className="tab-index">0{i + 1}</span></button> })}</div>
-        <div className={`tour-panel tour-panel-${activeTab}`} id={`tour-panel-${activeTab}`} role="tabpanel" aria-labelledby={`tour-tab-${activeTab}`} tabIndex={0}>
+        <div className="tour-tabs" data-active={activeTab} role="tablist" aria-label={t.nav[0]}>{t.tabs.map((title, i) => { const Icon = [Layers3, Sparkles, Monitor][i]; return <button key={title} id={`tour-tab-${i}`} role="tab" aria-selected={activeTab === i} aria-controls="tour-panel" tabIndex={activeTab === i ? 0 : -1} onClick={() => setActiveTab(i)} onKeyDown={e => moveTab(e, 'tour', i)}><Icon size={17} />{title}<span className="tab-index">0{i + 1}</span></button> })}</div>
+        <div className={`tour-panel tour-panel-${activeTab}`} id="tour-panel" role="tabpanel" aria-labelledby={`tour-tab-${activeTab}`} tabIndex={0}>
           <div className="tour-copy" key={`copy-${activeTab}`}><span className="tour-number">0{activeTab + 1} / 03</span><h3>{t.tabTitles[activeTab]}</h3><p>{t.tabText[activeTab]}</p><span className="tour-detail">{t.tabDetails[activeTab]}</span><ArrowDownRight className="tour-arrow" size={38} strokeWidth={1} /></div>
           <div className="tour-image-wrap" key={`image-${activeTab}`}><div className={`tour-media media-${activeTab}`}><img className={`tour-image image-${activeTab}`} src={['/images/newtab-clean-light.jpg', '/images/assistant-clean-light.jpg', '/images/sync-clean-light.jpg'][activeTab]} alt={t.tabAlt[activeTab]} width={activeTab === 2 ? 512 : 1440} height={activeTab === 2 ? 281 : 900} loading="lazy" /></div></div>
         </div>
@@ -110,11 +153,11 @@ export default function App() {
 
       <section className="faq section container" aria-labelledby="faq-title"><h2 id="faq-title">{t.faqTitle}</h2><div className="faq-list">{t.faq.map(([q, a], i) => <details key={i} name="nova-faq"><summary>{q}<Plus size={19} /></summary><p>{a}</p></details>)}</div></section>
 
-      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/nova-icon.svg" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v1.5.0</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls={`platform-panel-${i}`} tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} />{name}</button>)}</div><div id={`platform-panel-${platform}`} role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-label={t.download} /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
+      <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/nova-icon.svg" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v1.5.0</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-label={t.download} /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
     </main>
 
     <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true">nova<span>✦</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Nova Browser</span><span>{t.footerBottom}</span><a href="#" aria-label={lang === 'en' ? 'Back to top' : 'Başa dön'}>{lang === 'en' ? 'Back to top' : 'Başa dön'}<ArrowRight size={15} /></a></div></footer>
 
-    <dialog ref={dialog} className="video-dialog" aria-labelledby="video-title" aria-describedby="video-description" onCancel={closeVideo} onClose={() => { video.current?.pause(); document.body.style.overflow = '' }} onClick={e => { if (e.target === e.currentTarget) closeVideo() }}><div className="video-dialog-inner"><div className="video-heading"><h2 id="video-title">{t.videoTitle}</h2><button className="icon-button" onClick={closeVideo} aria-label={t.close} autoFocus><X size={21} /></button></div><video ref={video} src="/images/nova-tour.mp4" poster="/images/nova-tour.poster.jpg" controls playsInline preload="none"><track key={lang} kind="captions" src={`/images/nova-tour.${lang}.vtt`} srcLang={lang} label={lang === 'en' ? 'English' : 'Türkçe'} default={lang === 'tr'} /></video><p id="video-description">{t.videoDescription}</p></div></dialog>
+    <dialog ref={dialog} className="video-dialog" aria-labelledby="video-title" aria-describedby="video-description" onCancel={closeVideo} onClose={onVideoClosed} onClick={e => { if (e.target === e.currentTarget) closeVideo() }}><div className="video-dialog-inner"><div className="video-heading"><h2 id="video-title">{t.videoTitle}</h2><button className="icon-button" onClick={closeVideo} aria-label={t.close} autoFocus><X size={21} /></button></div><video ref={video} src="/images/nova-tour.mp4" poster="/images/nova-tour.poster.jpg" controls playsInline preload="none" onError={() => setVideoError(true)}><track key={lang} kind="captions" src={`/images/nova-tour.${lang}.vtt`} srcLang={lang} label={lang === 'en' ? 'English' : 'Türkçe'} default /></video>{videoError && <div className="video-error" role="alert"><p>{t.videoError}</p><button className="button button-small button-dark" onClick={() => { setVideoError(false); video.current?.load() }}>{t.retryVideo}</button></div>}<p id="video-description">{t.videoDescription}</p></div></dialog>
   </>
 }
