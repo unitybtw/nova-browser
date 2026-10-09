@@ -15,6 +15,7 @@
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
+  [![CI](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml)
   [![Tests](https://img.shields.io/badge/Tests-640%2B%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
@@ -477,13 +478,21 @@ All checksums are generated and published automatically in the `publish-release`
 
 ## Contributing
 
-Contributions are welcome! Feel free to submit a Pull Request or open an Issue on GitHub:
+Contributions from the developer and open-source community are warmly welcome.
 
-1. Fork the repository
-2. Create your branch: `git checkout -b feature/awesome-feature`
-3. Commit your changes: `git commit -m "feat: add awesome feature"`
-4. Push to branch: `git push origin feature/awesome-feature`
-5. Open a Pull Request
+Before getting started:
+- Read our [Contribution Guide](CONTRIBUTING.md) for local environment setup, architecture overview, and testing instructions.
+- Review the [Code of Conduct](CODE_OF_CONDUCT.md) to ensure an inclusive and productive collaboration.
+- Review our [Security Policy](SECURITY.md) for responsible vulnerability disclosure.
+
+### Quick Workflow
+
+1. Fork the repository on GitHub.
+2. Clone your fork and create a branch: `git checkout -b feature/your-feature-name`.
+3. Implement your changes following project conventions and verify with `npm test` and `npm run build:electron`.
+4. Commit using conventional commit format: `git commit -m "feat(scope): concise description"`.
+5. Push to your fork: `git push origin feature/your-feature-name`.
+6. Open a Pull Request against `main`.
 
 ---
 

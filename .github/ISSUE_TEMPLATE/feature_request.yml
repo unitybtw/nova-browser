@@ -1,0 +1,55 @@
+name: Feature Request
+description: Propose an idea, feature, or enhancement for Nova Browser
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an enhancement for Nova Browser. Please check existing issues to ensure the idea has not already been submitted.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem or developer workflow friction?
+      placeholder: "A clear and concise description of what the problem is. For example: When attempting to..."
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the solution or capability you would like to see added.
+      placeholder: "A clear description of the expected user experience and technical behavior."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Describe any alternative solutions, extensions, or workarounds you have considered.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Component Area
+      description: Which subsystem of Nova Browser does this proposal primarily affect?
+      options:
+        - Core Browser & Webview
+        - Model Context Protocol (MCP) Server
+        - AI Assistant & On-Device Models
+        - Tabs & Split View Management
+        - Adblocker & Network Privacy Shield
+        - Sync & Password Vault
+        - Settings & UI / Customization
+        - Developer Tools & Extensions
+    validations:
+      required: true
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have verified this feature has not already been proposed.
+          required: true
+        - label: I am willing to contribute code or test a pull request for this feature.
+          required: false
