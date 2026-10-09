@@ -29,17 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck TypeScript
-        run: npx tsc --noEmit
+      - name: Build application and Electron bundles
+        run: npm run build
 
       - name: Run automated test suite
         run: npm test
 
-      - name: Build Electron main and preloads
-        run: npm run build:electron
-
   website-build:
-    name: Website Build
+    name: Website Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -50,8 +47,14 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install root dependencies
+        run: npm ci
+
       - name: Install website dependencies
         run: npm --prefix website ci
 
       - name: Build website bundle
         run: npm --prefix website run build
+
+      - name: Run website regression tests
+        run: npm --prefix website test
