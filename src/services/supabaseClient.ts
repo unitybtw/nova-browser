@@ -91,9 +91,11 @@ const electronSecureStorage = {
   },
   removeItem: async (key: string): Promise<void> => {
     try {
-      // No remove API in the preload bridge — overwrite with an empty string
-      // instead (same approach as the sync service's keychain wipe).
-      await (window as any).electronAPI.secureStoreSet(key, '');
+      if (typeof (window as any).electronAPI?.secureStoreDelete === 'function') {
+        await (window as any).electronAPI.secureStoreDelete(key);
+      } else {
+        await (window as any).electronAPI?.secureStoreSet(key, '');
+      }
     } catch {
       // Best-effort only.
     }

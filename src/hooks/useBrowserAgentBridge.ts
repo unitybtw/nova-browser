@@ -307,7 +307,7 @@ export function useBrowserAgentBridge({
             if (direction === 'up') await activeWebview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
             else if (direction === 'down') await activeWebview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
             else if (direction === 'top') await activeWebview.executeJavaScript(`window.scrollTo(0, 0)`);
-            else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+            else if (direction === 'bottom') await activeWebview.executeJavaScript(`window.scrollTo(0, (document.body ? document.body.scrollHeight : (document.documentElement ? document.documentElement.scrollHeight : 0)))`);
             return `Scrolled ${direction}`;
           }
           return "Error: No active webview.";
@@ -575,7 +575,7 @@ export function useBrowserAgentBridge({
         if (direction === 'up') await webview.executeJavaScript(`window.scrollBy(0, -${cleanAmount})`);
         else if (direction === 'down') await webview.executeJavaScript(`window.scrollBy(0, ${cleanAmount})`);
         else if (direction === 'top') await webview.executeJavaScript(`window.scrollTo(0, 0)`);
-        else if (direction === 'bottom') await webview.executeJavaScript(`window.scrollTo(0, document.body.scrollHeight)`);
+        else if (direction === 'bottom') await webview.executeJavaScript(`window.scrollTo(0, (document.body ? document.body.scrollHeight : (document.documentElement ? document.documentElement.scrollHeight : 0)))`);
         else throw new Error('Invalid scroll direction.');
       },
       onPressKey: async (key: string) => {
@@ -756,7 +756,7 @@ export function useBrowserAgentBridge({
       for (const guest of Array.from(document.querySelectorAll('webview'))) guestListeners.get(guest)?.();
       unsubscribeMcpBridge?.();
       unsubscribeMcpCancel?.();
-      for (const id of pendingActions.keys()) cancelAction(id);
+      for (const id of Array.from(pendingActions.keys())) cancelAction(id);
       activeWaitTimersRef.current.forEach(clearTimeout);
       activeWaitTimersRef.current.clear();
       activeWaitResolversRef.current.forEach(resolve => resolve());

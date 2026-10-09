@@ -4125,7 +4125,7 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
 
   if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
     try {
-      const resp = await fetch(currentUrl);
+      const resp = await fetch(currentUrl, { signal: AbortSignal.timeout(8000) });
       // Bounded like every sibling fetch path: an adversarially large or
       // never-ending body would otherwise be buffered into the main process and
       // then serialised a second time into the viewer, twice over.
@@ -4149,15 +4149,21 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
   sourceWin.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   sourceWin.webContents.on('will-navigate', (navEvt) => navEvt.preventDefault());
 
-  await sourceWin.loadURL('about:blank');
-  await sourceWin.webContents.executeJavaScript(`
-    document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
-    document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
-    const pre = document.createElement('pre');
-    pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
-    pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
-    document.body.appendChild(pre);
-  `);
+  try {
+    if (!sourceWin.isDestroyed()) {
+      await sourceWin.loadURL('about:blank');
+      if (!sourceWin.isDestroyed()) {
+        await sourceWin.webContents.executeJavaScript(`
+          document.title = ${JSON.stringify(`Source: ${currentUrl}`)};
+          document.body.style.cssText = 'margin:0;padding:16px;background:#0f172a;color:#e2e8f0;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:13px;line-height:1.5;overflow-x:auto;';
+          const pre = document.createElement('pre');
+          pre.style.cssText = 'margin:0;white-space:pre-wrap;word-break:break-all;';
+          pre.textContent = ${JSON.stringify(htmlSource || '<!-- No source available -->')};
+          document.body.appendChild(pre);
+        `);
+      }
+    }
+  } catch {}
 
   return sourceWin;
 }
@@ -6557,6 +6563,7 @@ ipcMain.handle('native-tts-speak', async (event, text: string, voiceName?: strin
           activeTtsProcess = null;
         }
       }, 120000);
+      sayTimeout.unref?.();
       const finish = (result: { success: boolean; error?: string }) => {
         if (settled) return;
         settled = true;

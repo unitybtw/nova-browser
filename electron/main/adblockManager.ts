@@ -219,6 +219,7 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
               pendingAdBlocks.clear();
             }
           }, 300);
+          adBlockFlushTimer.unref?.();
         }
       }
     });

@@ -142,18 +142,28 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
    * reach the other.
    */
   const resolveContainedDownloadPath = (pathStr: string): string | null => {
-    const downloadsPath = app.getPath('downloads');
-    const realPath = fs.realpathSync(path.resolve(pathStr));
-    const realDownloads = fs.realpathSync(downloadsPath);
-    const win = process.platform === 'win32';
-    const normPath = win ? realPath.toLowerCase() : realPath;
-    const normDownloads = win ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
-    const isUnderDownloads = normPath.startsWith(normDownloads);
-    const isKnown = win
-      ? Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath)
-      : knownDownloadPaths.has(realPath);
-    if (!isUnderDownloads && !isKnown) return null;
-    return fs.existsSync(realPath) ? realPath : null;
+    try {
+      if (!pathStr || typeof pathStr !== 'string') return null;
+      const resolvedTarget = path.resolve(pathStr);
+      if (!fs.existsSync(resolvedTarget)) return null;
+      const downloadsPath = app.getPath('downloads');
+      if (!fs.existsSync(downloadsPath)) {
+        try { fs.mkdirSync(downloadsPath, { recursive: true }); } catch (_) {}
+      }
+      const realPath = fs.realpathSync(resolvedTarget);
+      const realDownloads = fs.realpathSync(downloadsPath);
+      const win = process.platform === 'win32';
+      const normPath = win ? realPath.toLowerCase() : realPath;
+      const normDownloads = win ? (realDownloads + path.sep).toLowerCase() : (realDownloads + path.sep);
+      const isUnderDownloads = normPath.startsWith(normDownloads);
+      const isKnown = win
+        ? Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath)
+        : knownDownloadPaths.has(realPath);
+      if (!isUnderDownloads && !isKnown) return null;
+      return fs.existsSync(realPath) ? realPath : null;
+    } catch {
+      return null;
+    }
   };
 
   ipcMain.handle('open-download', async (event, pathStr: string) => {

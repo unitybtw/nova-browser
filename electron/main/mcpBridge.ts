@@ -16,6 +16,7 @@ interface PendingMcpAction {
   timer: NodeJS.Timeout;
   win: BrowserWindow;
   toolName: string;
+  onClosed?: () => void;
 }
 
 const pendingMcpActions = new Map<string, PendingMcpAction>();
@@ -26,6 +27,9 @@ export function cancelPendingMcpActions(reason: string, toolName?: string): void
     if (toolName && pending.toolName !== toolName) continue;
     pendingMcpActions.delete(id);
     clearTimeout(pending.timer);
+    if (pending.onClosed) {
+      try { pending.win.removeListener('closed', pending.onClosed); } catch (_) {}
+    }
     try { pending.win.webContents.send('mcp-action-cancel', id); } catch (_) {}
     pending.reject(new Error(reason));
   }
@@ -47,6 +51,9 @@ export function initMcpBridge(trustedSenderCheck: TrustedSenderCheck): void {
     if (!pending) return;
     pendingMcpActions.delete(id);
     clearTimeout(pending.timer);
+    if (pending.onClosed) {
+      try { pending.win.removeListener('closed', pending.onClosed); } catch (_) {}
+    }
 
     if (payload?.error) {
       pending.reject(new Error(typeof payload.error === 'string' ? payload.error : JSON.stringify(payload.error)));
@@ -74,15 +81,33 @@ export function requestRendererMcpAction(win: BrowserWindow | null, toolName: st
     const id = Date.now().toString(36) + '_' + randomBytes(8).toString('hex');
     const deadline = Date.now() + 15000;
     const timer = setTimeout(() => {
-      pendingMcpActions.delete(id);
+      const p = pendingMcpActions.get(id);
+      if (p) {
+        pendingMcpActions.delete(id);
+        if (p.onClosed) {
+          try { win.removeListener('closed', p.onClosed); } catch (_) {}
+        }
+      }
       try { win.webContents.send('mcp-action-cancel', id); } catch (_) {}
       reject(new Error(`MCP action '${toolName}' timed out waiting for renderer response`));
     }, 15000);
-    pendingMcpActions.set(id, { resolve, reject, timer, win, toolName });
+    timer.unref?.();
+
+    const onClosed = () => {
+      pendingMcpActions.delete(id);
+      clearTimeout(timer);
+      reject(new Error('Nova Browser window was closed'));
+    };
+    try {
+      win.once('closed', onClosed);
+    } catch (_) {}
+
+    pendingMcpActions.set(id, { resolve, reject, timer, win, toolName, onClosed });
     try {
       win.webContents.send('mcp-action-request', id, toolName, args, deadline);
     } catch (err) {
       clearTimeout(timer);
+      try { win.removeListener('closed', onClosed); } catch (_) {}
       pendingMcpActions.delete(id);
       reject(err instanceof Error ? err : new Error(String(err)));
     }

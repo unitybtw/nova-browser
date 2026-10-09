@@ -807,6 +807,7 @@ export class BrowserMCPServer {
       const keepAlive = setInterval(() => {
         try { res.write(': ping\n\n'); } catch (_) { clearInterval(keepAlive); }
       }, 15000);
+      keepAlive.unref?.();
 
       req.on('close', () => {
         clearInterval(keepAlive);
