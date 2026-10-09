@@ -53,10 +53,11 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       setSuggestions([]);
       setSelectedIndex(0);
       setIsAIMode(false);
-      setTimeout(() => {
+      const focusTimer = setTimeout(() => {
         inputRef.current?.focus();
         inputRef.current?.select();
       }, 30);
+      return () => clearTimeout(focusTimer);
     }
   }, [isOpen]);
 

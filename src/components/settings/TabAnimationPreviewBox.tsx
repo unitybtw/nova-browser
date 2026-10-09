@@ -10,6 +10,8 @@ export interface TabAnimationPreviewBoxProps {
 export const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = React.memo(({ preset, isActive }) => {
   const [tabVisible, setTabVisible] = useState(true);
 
+  const restartTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     let timeoutId: any;
     let isMounted = true;
@@ -26,13 +28,15 @@ export const TabAnimationPreviewBox: React.FC<TabAnimationPreviewBoxProps> = Rea
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
     };
   }, []);
 
   const handleRestart = (e: React.MouseEvent) => {
     e.stopPropagation();
     setTabVisible(false);
-    setTimeout(() => setTabVisible(true), 100);
+    if (restartTimeoutRef.current) clearTimeout(restartTimeoutRef.current);
+    restartTimeoutRef.current = setTimeout(() => setTabVisible(true), 100);
   };
 
   const animConfig = React.useMemo(() => {

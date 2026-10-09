@@ -45,6 +45,7 @@ const preconnectedOrigins = new Set<string>();
 const preconnectLinkElements: HTMLLinkElement[] = [];
 
 function addPreconnectHint(origin: string) {
+  if (typeof document === 'undefined') return;
   if (!origin || origin.startsWith('null') || preconnectedOrigins.has(origin)) return;
   if (preconnectedOrigins.size >= MAX_PRECONNECT_HINTS) {
     const oldestOrigin = preconnectedOrigins.values().next().value;

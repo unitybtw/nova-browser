@@ -187,7 +187,7 @@ const DOM_SCAN_SCRIPT = `(() => {
     };
   });
 
-  const text = document.body.innerText.replace(/\\s+/g, ' ').substring(0, 500);
+  const text = (document.body?.innerText || document.documentElement?.innerText || '').replace(/\\s+/g, ' ').substring(0, 500);
   return JSON.stringify({ text, interactable_elements: items });
 })();`;
 
@@ -2773,7 +2773,7 @@ CRITICAL RULES:
       else if (functionName === "read_page_content") {
         let text = '';
         try {
-          const raw = await this.actionContext.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getPageContentMaxChars()})`);
+          const raw = await this.actionContext.onExecuteScript(`(document.body?.innerText || document.documentElement?.innerText || '').replace(/\\s+/g, ' ').substring(0, ${this.getPageContentMaxChars()})`);
           // Security: sanitize DOM content to prevent indirect prompt injection attacks
           // from hostile web pages embedding system override instructions in page text.
           text = sanitizeAgentInput(typeof raw === 'string' ? raw : JSON.stringify(raw));
@@ -3054,6 +3054,7 @@ CRITICAL RULES:
             setTimeout(() => { typeBox.remove(); cursor.remove(); highlight.remove(); }, 300);
           } catch(e) {}
 
+          el.value = ${safeValue};
           el.setAttribute('value', ${safeValue});
           el.dispatchEvent(new Event('input', { bubbles: true }));
           el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -3690,7 +3691,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
           } else if (funcName === 'read_page_content') {
             let pageText = '';
             try {
-              pageText = await this.actionContext?.onExecuteScript(`document.body.innerText.replace(/\\s+/g, ' ').substring(0, ${this.getDirectIntentPageChars()})`) || '';
+              pageText = await this.actionContext?.onExecuteScript(`(document.body?.innerText || document.documentElement?.innerText || '').replace(/\\s+/g, ' ').substring(0, ${this.getDirectIntentPageChars()})`) || '';
             } catch {}
 
             const sanitizedPageText = sanitizeAgentInput(pageText);

@@ -7,6 +7,7 @@
 // (~216KB vendor chunk) is NOT pulled into the entry bundle. The runtime
 // module is loaded via dynamic import on first getSupabaseClient() call.
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { getElectronAPI } from '../utils/electronBridge';
 
 export interface SupabaseConfig {
   url: string;
@@ -65,10 +66,10 @@ export const getSupabaseConfig = (): SupabaseConfig => {
 
 // --- Secure session storage -------------------------------------------------
 
-export const hasElectronSecureStore = (): boolean =>
-  typeof window !== 'undefined' &&
-  Boolean((window as any).electronAPI?.secureStoreSet) &&
-  Boolean((window as any).electronAPI?.secureStoreGet);
+export const hasElectronSecureStore = (): boolean => {
+  const api = getElectronAPI();
+  return Boolean(api?.secureStoreSet && api?.secureStoreGet);
+};
 
 /**
  * supabase-js storage adapter backed by the Electron secure store
@@ -78,7 +79,9 @@ export const hasElectronSecureStore = (): boolean =>
 const electronSecureStorage = {
   getItem: async (key: string): Promise<string | null> => {
     try {
-      const value = await (window as any).electronAPI.secureStoreGet(key);
+      const api = getElectronAPI();
+      if (!api?.secureStoreGet) return null;
+      const value = await api.secureStoreGet(key);
       // The bridge has no remove API; logout overwrites with ''. Treat that
       // (and any other empty value) as "no session".
       return typeof value === 'string' && value.length > 0 ? value : null;
@@ -87,14 +90,18 @@ const electronSecureStorage = {
     }
   },
   setItem: async (key: string, value: string): Promise<void> => {
-    await (window as any).electronAPI.secureStoreSet(key, value);
+    const api = getElectronAPI();
+    if (api?.secureStoreSet) {
+      await api.secureStoreSet(key, value);
+    }
   },
   removeItem: async (key: string): Promise<void> => {
     try {
-      if (typeof (window as any).electronAPI?.secureStoreDelete === 'function') {
-        await (window as any).electronAPI.secureStoreDelete(key);
-      } else {
-        await (window as any).electronAPI?.secureStoreSet(key, '');
+      const api = getElectronAPI();
+      if (api?.secureStoreDelete) {
+        await api.secureStoreDelete(key);
+      } else if (api?.secureStoreSet) {
+        await api.secureStoreSet(key, '');
       }
     } catch {
       // Best-effort only.
