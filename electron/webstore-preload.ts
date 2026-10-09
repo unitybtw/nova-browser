@@ -266,7 +266,7 @@ if ((window as any).__novaPreloadInjected) {
           return;
         }
 
-        const listener = (event: MessageEvent) => {
+        const listener = (event) => {
           if (event.source !== window || event.origin !== window.location.origin || !event.data || event.data.type !== 'NOVA_INSTALL_RESULT') return;
           window.removeEventListener('message', listener);
 

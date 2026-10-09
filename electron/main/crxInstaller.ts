@@ -486,10 +486,33 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       return { error: 'Invalid extension URL or ID' };
     }
 
-    // Extract ID: 32 characters of a-p
-    const match = urlOrId.match(/[a-p]{32}/);
-    if (!match) return { error: 'Invalid extension URL or ID' };
-    const extensionId = match[0];
+    // Extract ID: exact 32 characters [a-p] or from validated Chrome Web Store URL path segment
+    let extensionId = '';
+    const trimmed = urlOrId.trim();
+    if (/^[a-p]{32}$/i.test(trimmed)) {
+      extensionId = trimmed.toLowerCase();
+    } else {
+      try {
+        const parsed = new URL(trimmed);
+        if (
+          parsed.protocol === 'https:' &&
+          (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')
+        ) {
+          const segments = parsed.pathname.split('/').filter(Boolean);
+          const lastSeg = segments[segments.length - 1];
+          if (lastSeg && /^[a-p]{32}$/i.test(lastSeg)) {
+            extensionId = lastSeg.toLowerCase();
+          }
+        }
+      } catch (_) {}
+      if (!extensionId) {
+        const match = trimmed.match(/(?:^|[\/=])([a-p]{32})(?:[\/?#]|$)/i);
+        if (match && match[1]) {
+          extensionId = match[1].toLowerCase();
+        }
+      }
+    }
+    if (!extensionId) return { error: 'Invalid extension URL or ID' };
 
     const platformMap: Record<string, string> = {
       darwin: 'mac',

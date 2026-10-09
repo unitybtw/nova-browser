@@ -3444,14 +3444,16 @@ fi
   });
 
   // Wait 15 seconds before background update check on startup to not slow down initialization
-  setTimeout(() => {
+  const startupTimer = setTimeout(() => {
     checkForUpdatesInternal().catch(err => console.error("[Updater] Startup background check error:", err));
   }, 15000);
+  startupTimer.unref?.();
 
   // Periodically check for updates every 4 hours
-  setInterval(() => {
+  const updateInterval = setInterval(() => {
     checkForUpdatesInternal().catch(err => console.error("[Updater] Periodic background check error:", err));
   }, 4 * 60 * 60 * 1000);
+  updateInterval.unref?.();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
