@@ -293,8 +293,12 @@ if (protocol === 'https:' || protocol === 'http:') {
     }, true);
   };
 
+  // Security: Credential capture, autofill detection and filling run strictly in the top-level frame.
+  const isTopFrame = window === window.top;
+
   // Secure credential filling listener: received from host when user selects an account in native UI
   ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string; expectedHostname?: string }) => {
+    if (!isTopFrame) return;
     if (!cred) return;
     // Security: fail CLOSED on the origin binding. This is the last hop before
     // a stored secret crosses into a page, so an absent, empty or non-string
@@ -374,13 +378,17 @@ if (protocol === 'https:' || protocol === 'http:') {
 
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', () => {
-      setupPasswordCapture();
-      setupPasswordFocusDetection();
+      if (isTopFrame) {
+        setupPasswordCapture();
+        setupPasswordFocusDetection();
+      }
       setupLinkHoverDetection();
     });
   } else {
-    setupPasswordCapture();
-    setupPasswordFocusDetection();
+    if (isTopFrame) {
+      setupPasswordCapture();
+      setupPasswordFocusDetection();
+    }
     setupLinkHoverDetection();
   }
 }

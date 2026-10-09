@@ -4042,8 +4042,12 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
     let metricsOverridden = false;
     try {
       const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
-      const width = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
-      const height = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
+      const MAX_SCREENSHOT_WIDTH = 8192;
+      const MAX_SCREENSHOT_HEIGHT = 16384;
+      const rawWidth = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
+      const rawHeight = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
+      const width = Math.min(Math.max(Number.isFinite(rawWidth) ? rawWidth : 1920, 320), MAX_SCREENSHOT_WIDTH);
+      const height = Math.min(Math.max(Number.isFinite(rawHeight) ? rawHeight : 1080, 200), MAX_SCREENSHOT_HEIGHT);
 
       // Force the viewport to expand to the full height of the page to ensure off-screen content is rendered
       await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
@@ -5085,6 +5089,8 @@ ipcMain.handle('store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
+    const RESTRICTED_STORE_KEYS = ['passwords', 'secrets', 'auth'];
+    if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) return null;
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     return await fs.promises.readFile(keyPath, 'utf-8');
   } catch (err) {
@@ -5158,8 +5164,16 @@ async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarge
   }
 
   let pinnedIp = '';
+  let dnsTimeoutTimer: NodeJS.Timeout | undefined;
   try {
-    const addresses = await dnsLookup(hostname, { all: true }) as any;
+    const lookupPromise = dnsLookup(hostname, { all: true }) as Promise<any>;
+    lookupPromise.catch(() => {});
+    const addresses = await Promise.race([
+      lookupPromise,
+      new Promise<never>((_, reject) => {
+        dnsTimeoutTimer = setTimeout(() => reject(new Error('DNS lookup timeout')), 3000);
+      })
+    ]);
     const addrList = Array.isArray(addresses) ? addresses : [addresses];
     if (addrList.length === 0 || addrList.some((entry: any) => isPrivateIP(entry?.address))) {
       return { error: 'Requests to private/internal IP addresses are blocked.' };
@@ -5170,6 +5184,8 @@ async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarge
     }
   } catch {
     return { error: 'DNS resolution failed.' };
+  } finally {
+    if (dnsTimeoutTimer) clearTimeout(dnsTimeoutTimer);
   }
 
   const port = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
