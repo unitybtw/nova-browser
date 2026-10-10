@@ -121,7 +121,13 @@
       "synopsis": "Open-source sovereign desktop browser",
       "category": "Network;WebBrowser",
       "artifactName": "Nova-Browser-${arch}.${ext}",
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "extraFiles": [
+        {
+          "from": "build/com.nova.browser.metainfo.xml",
+          "to": "usr/share/metainfo/com.nova.browser.metainfo.xml"
+        }
+      ]
     }
   },
   "scripts": {
