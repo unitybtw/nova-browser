@@ -8,9 +8,8 @@ Nova Browser operates on a rolling release cadence. Security patches and hardeni
 
 | Version | Supported | Notes |
 | :--- | :--- | :--- |
-| 1.5.x | Yes | Current active release branch with active security patches |
-| 1.4.x | Yes | Security maintenance updates |
-| < 1.4.0 | No | Unsupported legacy versions |
+| >= 1.5.0 | Yes | Current active supported release series with active security patches |
+| < 1.5.0 | No | End of life / Unsupported legacy versions. Upgrade to v1.5.0+ required. |
 
 ## Threat Model & Security Architecture
 
