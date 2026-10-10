@@ -11,6 +11,16 @@ function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T
   return safeParseArrayWithBackup<T>(key, raw, []);
 }
 
+function safeParsePasswords<T>(raw: string | null): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 function safeParseObject<T extends object>(raw: string | null, fallback: T, key: string = 'unknown_object'): T {
   return safeParseObjectWithBackup<T>(key, raw, fallback);
 }
@@ -119,7 +129,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                           bookmarks: safeParseArray(rawB),
                           folders: safeParseArray(rawF),
                           history: safeParseArray(rawH),
-                          passwords: safeParseArray(rawP),
+                          passwords: safeParsePasswords(rawP),
                           settings: safeParseObject(rawS, {} as any),
                           workspaces: safeParseArray(rawW)
                         });
@@ -203,7 +213,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                         bookmarks: safeParseArray(rawB),
                         folders: safeParseArray(rawF),
                         history: safeParseArray(rawH),
-                        passwords: safeParseArray(rawP),
+                        passwords: safeParsePasswords(rawP),
                         settings: safeParseObject(rawS, {} as any),
                         workspaces: safeParseArray(rawW)
                       });
@@ -354,7 +364,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                         bookmarks: safeParseArray(rawB),
                         folders: safeParseArray(rawF),
                         history: safeParseArray(rawH),
-                        passwords: safeParseArray(rawP),
+                        passwords: safeParsePasswords(rawP),
                         settings: safeParseObject(rawS, {} as any),
                         workspaces: safeParseArray(rawW)
                       });

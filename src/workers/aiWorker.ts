@@ -6,5 +6,8 @@ import { WebWorkerMLCEngineHandler } from '@mlc-ai/web-llm';
 const handler = new WebWorkerMLCEngineHandler();
 
 self.onmessage = (msg: MessageEvent) => {
+  if (msg.origin && self.location?.origin && msg.origin !== self.location.origin) {
+    return;
+  }
   handler.onmessage(msg);
 };

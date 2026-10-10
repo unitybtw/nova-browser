@@ -141,8 +141,11 @@ app.whenReady().then(async () => {
   let sawNonArxivAfterArxiv = false;
   let boundaryFound = false;
   while (Date.now() < deadline) {
-    const url = await readOmnibox();
-    const isArxiv = /arxiv\.org/.test(url);
+    let isArxiv = false;
+    try {
+      const host = new URL(url).hostname.toLowerCase();
+      isArxiv = host === 'arxiv.org' || host.endsWith('.arxiv.org');
+    } catch {}
     if (isArxiv) seenArxiv = true;
     else if (seenArxiv && url) sawNonArxivAfterArxiv = true;
     if (seenArxiv && sawNonArxivAfterArxiv && isArxiv) {

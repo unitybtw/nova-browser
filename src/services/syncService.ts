@@ -1118,12 +1118,14 @@ export function stampPersistedSettings(
   const next = { ...(timestamps ?? {}) };
   const previous = (previousPersisted ?? {}) as Record<string, unknown>;
   for (const [key, value] of Object.entries((persisted ?? {}) as Record<string, unknown>)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    if (!Object.prototype.hasOwnProperty.call(persisted, key)) continue;
     // Compared as written, not by reference: `shortcuts` and the other object
     // settings are replaced wholesale on every render, so reference equality
     // would stamp them on every keystroke, while a change deep inside one of
     // them is still a real change of the field.
     if (JSON.stringify(previous[key]) === JSON.stringify(value)) continue;
-    next[key] = at;
+    Object.defineProperty(next, key, { value: at, writable: true, enumerable: true, configurable: true });
   }
   return next;
 }

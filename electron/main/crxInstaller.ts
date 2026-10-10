@@ -611,11 +611,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       throw new Error('Extension package identity mismatch (CRX header ID does not match expected extension ID).');
     }
 
-    const tempPath = path.join(app.getPath('userData'), 'temp_extensions');
-    if (!fs.existsSync(tempPath)) fs.mkdirSync(tempPath, { recursive: true });
-
-    crxFilePath = path.join(tempPath, `${extensionId}.crx`);
-    fs.writeFileSync(crxFilePath, buffer);
+    // In-memory buffer is extracted directly into stagingPath without writing intermediate archive to disk.
 
     const extensionsBaseDir = path.join(app.getPath('userData'), 'extensions');
     if (!fs.existsSync(extensionsBaseDir)) fs.mkdirSync(extensionsBaseDir, { recursive: true });

@@ -169,11 +169,16 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
     }, {
       path: ADBLOCKER_CACHE_PATH,
       read: async (p) => {
-        const stat = await fs.promises.stat(p);
-        if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
-          throw new Error('adblocker cache expired');
+        const handle = await fs.promises.open(p, 'r');
+        try {
+          const stat = await handle.stat();
+          if (Date.now() - stat.mtimeMs > ADBLOCKER_CACHE_MAX_AGE_MS) {
+            throw new Error('adblocker cache expired');
+          }
+          return await handle.readFile();
+        } finally {
+          await handle.close();
         }
-        return fs.promises.readFile(p);
       },
       write: async (p, buffer) => {
         try { await fs.promises.writeFile(p, buffer); } catch { /* non-fatal */ }

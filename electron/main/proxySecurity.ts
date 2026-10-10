@@ -74,23 +74,23 @@ export function encryptDataWithFallback(plainText: string, userDataPath: string,
   // Fallback: AES-256-GCM using machine-bound secret
   const secretPath = path.join(userDataPath, '.machine_secret');
   let secret: Buffer;
-  if (fs.existsSync(secretPath)) {
+  try {
     secret = fs.readFileSync(secretPath);
-    // A torn or empty secret is still valid scrypt input, so the only symptom
-    // would be a GCM auth failure much later and a value that reads as null.
     if (secret.length !== 32) {
       throw new Error(
         `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
         'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
       );
     }
-  } else {
-    secret = crypto.randomBytes(32);
-    // Only a chmod failure is tolerable. Swallowing the write leaves the secret
-    // in memory only, so everything encrypted with it is unreadable next launch.
-    fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-    if (process.platform !== 'win32') {
-      try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') {
+      secret = crypto.randomBytes(32);
+      fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+      if (process.platform !== 'win32') {
+        try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+      }
+    } else {
+      throw err;
     }
   }
 

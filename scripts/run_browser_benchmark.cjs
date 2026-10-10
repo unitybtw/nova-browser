@@ -208,7 +208,9 @@ async function main() {
     }
     const good = runs.filter(r => r.status === 'ok');
     if (!good.length) {
-      console.log(` unavailable (${runs.map(r => r.reason).filter(Boolean)[0] || 'no successful runs'})`);
+      const rawReason = String(runs.map(r => r.reason).filter(Boolean)[0] || 'no successful runs');
+      const safeReason = rawReason.replace(/[\r\n\x00-\x1f]/g, ' ');
+      console.log(` unavailable (${safeReason})`);
       report.browsers.push({ name: browser.name, status: runs[0]?.status || 'error', runs });
       continue;
     }
@@ -227,7 +229,10 @@ async function main() {
       userAgent: good[0].userAgent,
       runs
     };
-    console.log(` median startup=${summary.startupMs}ms load=${summary.loadEventMs}ms rss=${summary.rssMB}MB`);
+    const sStartup = Number(summary.startupMs) || 0;
+    const sLoad = Number(summary.loadEventMs) || 0;
+    const sRss = Number(summary.rssMB) || 0;
+    console.log(` median startup=${sStartup}ms load=${sLoad}ms rss=${sRss}MB`);
     report.browsers.push(summary);
   }
 

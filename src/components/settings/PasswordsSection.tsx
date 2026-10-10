@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Key, Eye, EyeOff, Trash2 } from 'lucide-react';
-import { safeParseArrayWithBackup } from '../../utils/safeStorage';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 
-function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
-  return safeParseArrayWithBackup<T>(key, raw, []);
+function safeParseArray<T>(raw: string | null): T[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as T[]) : [];
+  } catch {
+    return [];
+  }
 }
 
 const PasswordList = () => {

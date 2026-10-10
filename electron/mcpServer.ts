@@ -406,16 +406,20 @@ export class BrowserMCPServer {
   private getFallbackMcpKey(): Buffer {
     const secretPath = path.join(electronApp.getPath('userData'), '.machine_secret');
     let secret: Buffer;
-    if (fs.existsSync(secretPath)) {
+    try {
       secret = fs.readFileSync(secretPath);
-    } else {
-      secret = randomBytes(32);
-      try {
-        fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-        if (process.platform !== 'win32') {
-          fs.chmodSync(secretPath, 0o600);
-        }
-      } catch (_) {}
+    } catch (err: any) {
+      if (err?.code === 'ENOENT') {
+        secret = randomBytes(32);
+        try {
+          fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+          if (process.platform !== 'win32') {
+            fs.chmodSync(secretPath, 0o600);
+          }
+        } catch (_) {}
+      } else {
+        throw err;
+      }
     }
     let username = 'unknown';
     try {
@@ -521,9 +525,10 @@ export class BrowserMCPServer {
     // Persist to userData
     try {
       const settingsPath = path.join(electronApp.getPath('userData'), 'mcp-tool-settings.json');
-      const current: Record<string, boolean> = fs.existsSync(settingsPath)
-        ? JSON.parse(fs.readFileSync(settingsPath, 'utf-8'))
-        : {};
+      let current: Record<string, boolean> = {};
+      try {
+        current = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      } catch {}
       current[toolName] = enabled;
       fs.writeFileSync(settingsPath, JSON.stringify(current));
     } catch {}
@@ -532,8 +537,12 @@ export class BrowserMCPServer {
   public loadToolSettings() {
     try {
       const settingsPath = path.join(electronApp.getPath('userData'), 'mcp-tool-settings.json');
-      if (!fs.existsSync(settingsPath)) return;
-      const settings: Record<string, boolean> = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      let settings: Record<string, boolean>;
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+      } catch {
+        return;
+      }
       for (const [tool, enabled] of Object.entries(settings)) {
         this.setToolEnabled(tool, enabled);
       }

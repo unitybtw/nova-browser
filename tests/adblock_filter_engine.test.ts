@@ -17,24 +17,24 @@ const KNOWN_TRACKER_PATTERNS = [
   'clarity.ms'
 ];
 
-interface FilterRule {
+interface TrackerRule {
   domain: string;
-  isRegex: boolean;
-  regex?: RegExp;
+  pathPrefix?: string;
 }
 
-const compiledRules: FilterRule[] = KNOWN_TRACKER_PATTERNS.map(p => {
-  if (p.includes('/')) {
-    const escaped = p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    return { domain: p, isRegex: true, regex: new RegExp(escaped, 'i') };
-  }
-  return { domain: p.toLowerCase(), isRegex: false };
+const compiledRules: TrackerRule[] = KNOWN_TRACKER_PATTERNS.map(p => {
+  const parts = p.split('/');
+  return {
+    domain: parts[0].toLowerCase(),
+    pathPrefix: parts.length > 1 ? '/' + parts.slice(1).join('/') : undefined
+  };
 });
 
 function shouldBlockRequest(urlStr: string, whitelist: string[] = []): boolean {
   try {
     const parsed = new URL(urlStr);
     const host = parsed.hostname.toLowerCase();
+    const pathname = parsed.pathname;
 
     // Check user whitelist first
     for (const allowed of whitelist) {
@@ -45,10 +45,8 @@ function shouldBlockRequest(urlStr: string, whitelist: string[] = []): boolean {
 
     // Check domain and path rules
     for (const rule of compiledRules) {
-      if (rule.isRegex && rule.regex) {
-        if (rule.regex.test(urlStr)) return true;
-      } else {
-        if (host === rule.domain || host.endsWith('.' + rule.domain)) {
+      if (host === rule.domain || host.endsWith('.' + rule.domain)) {
+        if (!rule.pathPrefix || pathname.startsWith(rule.pathPrefix)) {
           return true;
         }
       }

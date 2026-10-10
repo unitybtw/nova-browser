@@ -45,7 +45,9 @@ function sanitizeArticleHtml(rawHtml: string): string {
       }
 
       let safeTag = token;
-      safeTag = safeTag.replace(/\son\w+=(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+      while (/\son\w+=(?:'[^']*'|"[^"]*"|[^\s>]+)/i.test(safeTag)) {
+        safeTag = safeTag.replace(/\son\w+=(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+      }
       safeTag = safeTag.replace(/(href|src)=(?:'javascript:[^']*'|"javascript:[^"]*")/gi, '$1="#"');
       result.push(safeTag);
     } else {

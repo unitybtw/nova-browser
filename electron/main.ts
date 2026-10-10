@@ -46,18 +46,18 @@ function appendCrashLog(entry: string): void {
     } catch {
       crashDir = path.join(require('os').homedir(), '.nova-browser');
     }
-    if (!fs.existsSync(crashDir)) {
+    try {
       fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
-    }
+    } catch {}
     const logPath = path.join(crashDir, 'crash.log');
-    if (fs.existsSync(logPath)) {
+    try {
       const stats = fs.statSync(logPath);
       if (stats.size > MAX_CRASH_LOG_BYTES) {
         const existing = fs.readFileSync(logPath, 'utf8');
         const trimmed = existing.slice(-100 * 1024); // retain last 100 KB
         fs.writeFileSync(logPath, trimmed, { encoding: 'utf8', mode: 0o600 });
       }
-    }
+    } catch {}
     fs.appendFileSync(logPath, entry, { encoding: 'utf8', mode: 0o600 });
   } catch {}
 }
@@ -2912,34 +2912,23 @@ fi
       if (totalBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
         throw new Error('Update package exceeds the 1 GB size limit');
       }
-      const parsedUrl = new URL(targetUrl);
       const defaultExt = process.platform === 'darwin' ? 'dmg' : process.platform === 'win32' ? 'exe' : 'AppImage';
-      let filename = assetName || path.basename(parsedUrl.pathname) || `Nova-Browser-Setup-${targetVersion || 'update'}.${defaultExt}`;
-      if (process.platform === 'darwin' && !filename.toLowerCase().endsWith('.dmg') && !filename.toLowerCase().endsWith('.zip')) {
-        filename = `${filename}.dmg`;
-      }
-      const safeFilename = sanitizeDownloadFilename(filename);
       const updatesDir = path.join(app.getPath('userData'), 'updates');
-      if (!fs.existsSync(updatesDir)) {
+      try {
         fs.mkdirSync(updatesDir, { recursive: true });
-      } else {
-        // Clean any leftover .download_* chunks before downloading
-        try {
-          const existingFiles = fs.readdirSync(updatesDir);
-          for (const f of existingFiles) {
-            if (f.includes('.download_') || f.endsWith('.download')) {
-              try { fs.unlinkSync(path.join(updatesDir, f)); } catch (_) {}
-            }
+      } catch {}
+      // Clean any leftover .download_* chunks before downloading
+      try {
+        const existingFiles = fs.readdirSync(updatesDir);
+        for (const f of existingFiles) {
+          if (f.includes('.download_') || f.endsWith('.download')) {
+            try { fs.unlinkSync(path.join(updatesDir, f)); } catch (_) {}
           }
-        } catch (_) {}
-      }
-      const targetFilePath = path.join(updatesDir, safeFilename);
-      if (!path.resolve(targetFilePath).startsWith(path.resolve(updatesDir) + path.sep)) {
-        throw new Error('Invalid update filename: path escapes updates directory');
-      }
-      // pid+uuid, like store-set and model-cache-set: Date.now() collides
-      // between two calls in the same millisecond, and createWriteStream follows a
-      // pre-planted symlink and truncates its target.
+        }
+      } catch (_) {}
+
+      // Constant safe filename within updatesDir to prevent path traversal or untrusted filename injection
+      const targetFilePath = path.join(updatesDir, `Nova-Browser-Update.${defaultExt}`);
       tempFilePath = `${targetFilePath}.download_${process.pid}_${crypto.randomUUID()}`;
 
       const fileStream = updateFileStream = fs.createWriteStream(tempFilePath);
@@ -4809,25 +4798,23 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
         const getFallbackKey = (): Buffer => {
           const secretPath = path.join(app.getPath('userData'), '.machine_secret');
           let secret: Buffer;
-          if (fs.existsSync(secretPath)) {
+          try {
             secret = fs.readFileSync(secretPath);
-            // A truncated or empty secret still "works" as scrypt input, so the
-            // only symptom is a GCM auth failure much later. Fail here, loudly.
             if (secret.length !== 32) {
               throw new Error(
                 `Corrupt .machine_secret (${secret.length} bytes, expected 32). ` +
                 'Values encrypted with it cannot be recovered; restore a backup or clear secure storage.'
               );
             }
-          } else {
-            secret = crypto.randomBytes(32);
-            // Only a chmod failure is tolerable. Swallowing the write means the
-            // secret exists in memory but never on disk, so every value
-            // encrypted with it is unreadable on the next launch - silently,
-            // with no log and nothing for the user to act on.
-            fs.writeFileSync(secretPath, secret, { mode: 0o600 });
-            if (process.platform !== 'win32') {
-              try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+          } catch (err: any) {
+            if (err?.code === 'ENOENT') {
+              secret = crypto.randomBytes(32);
+              fs.writeFileSync(secretPath, secret, { mode: 0o600 });
+              if (process.platform !== 'win32') {
+                try { fs.chmodSync(secretPath, 0o600); } catch (_) {}
+              }
+            } else {
+              throw err;
             }
           }
           // K-3: Bind salt to machine identity so copying userData to another machine/account fails
@@ -4964,15 +4951,20 @@ ipcMain.handle('model-cache-get', async (event, url: unknown) => {
   const filePath = modelCachePathFor(url);
   if (!filePath) return null;
   try {
-    const stat = await fs.promises.stat(filePath);
-    if (!stat.isFile() || stat.size === 0 || stat.size > MAX_MODEL_CACHE_FILE_BYTES) return null;
-    const buffer = await fs.promises.readFile(filePath);
-    // Transfer as a plain ArrayBuffer so the structured clone copies the bytes
-    // instead of exposing a Node Buffer to the renderer.
-    return buffer.buffer.slice(
-      buffer.byteOffset,
-      buffer.byteOffset + buffer.byteLength
-    );
+    const handle = await fs.promises.open(filePath, 'r');
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size === 0 || stat.size > MAX_MODEL_CACHE_FILE_BYTES) return null;
+      const buffer = await handle.readFile();
+      // Transfer as a plain ArrayBuffer so the structured clone copies the bytes
+      // instead of exposing a Node Buffer to the renderer.
+      return buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      );
+    } finally {
+      await handle.close();
+    }
   } catch (err: any) {
     // A bare `return null` is indistinguishable from "not cached" in the
     // renderer, and forwarded renderer output can be redacted — so the main
@@ -6338,15 +6330,20 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     // implausibly large files outright, and cap the node walk below.
     const MAX_BOOKMARKS_FILE_BYTES = 32 * 1024 * 1024;
     const MAX_IMPORTED_BOOKMARKS = 20000;
-    const fileSize = fs.statSync(bookmarksPath).size;
-    if (fileSize > MAX_BOOKMARKS_FILE_BYTES) {
-      return {
-        success: false,
-        error: `Bookmarks file is too large to import safely (${(fileSize / (1024 * 1024)).toFixed(1)} MB, limit 32 MB).`
-      };
+    const fd = fs.openSync(bookmarksPath, 'r');
+    let data: any;
+    try {
+      const fileSize = fs.fstatSync(fd).size;
+      if (fileSize > MAX_BOOKMARKS_FILE_BYTES) {
+        return {
+          success: false,
+          error: `Bookmarks file is too large to import safely (${(fileSize / (1024 * 1024)).toFixed(1)} MB, limit 32 MB).`
+        };
+      }
+      data = JSON.parse(fs.readFileSync(fd, 'utf8'));
+    } finally {
+      fs.closeSync(fd);
     }
-
-    const data = JSON.parse(fs.readFileSync(bookmarksPath, 'utf8'));
     const importedBookmarks: any[] = [];
     let truncated = false;
 
