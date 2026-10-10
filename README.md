@@ -406,110 +406,85 @@ npm run benchmark
 Nova Browser employs a multi-process Electron architecture with context isolation, a React-based renderer with WebGPU neural execution, and a dedicated AI integration layer via the Model Context Protocol (MCP).
 
 ```mermaid
-graph TD
-    subgraph Electron["Electron (Main Process)"]
-        main["main.ts - App Lifecycle & IPC Dispatcher"]
-        mcp["mcpServer.ts - Native MCP Server (Port 3020 - 25 Tools)"]
-        adblock["AdBlocker & Privacy Shield (Network Layer Filter)"]
-        security["proxySecurity.ts - SSRF, Phishing & TOCTOU Defense"]
-        crx["crxInstaller.ts - Chrome Web Store Engine"]
-        downloads["downloads.ts - Downloads Manager"]
-        keychain["safeStorage Engine - OS Keychain Store"]
-        tts["tts.ts - Native OS Speech Synthesis Bridge"]
+flowchart TB
+    subgraph Clients["External AI Agents (MCP Clients)"]
+        agentClient["Claude Desktop / Cursor / Windsurf / Antigravity"]
     end
 
-    subgraph Preload["Context Bridge (Preload Security)"]
-        api["preload.ts (window.electronAPI)"]
-        webstore["webstore-preload.ts (Web Store Bridge)"]
-        guest["guest-preload.ts (Sandboxed Webview Bridge)"]
+    subgraph Main["Electron Main Process (Privileged Host)"]
+        mcp["Native MCP Server<br/>Port 3020 / 25 Tools"]
+        ipcMain["IPC Hub & Dispatcher<br/>isTrustedSender Origin Guard"]
+        netShield["Privacy Shield & AdBlock<br/>EasyList Network Filter & Anti-SSRF"]
+        osBridge["Native OS & Storage<br/>safeStorage Keychain / CRX3 / TTS"]
     end
 
-    subgraph Renderer["React 18 + TypeScript (Renderer Process)"]
-        app["App.tsx - Coordinator Shell"]
-
-        subgraph ModularHooks["Modular Hooks Architecture (src/hooks/)"]
-            tabOps["useTabOperations.ts - Tab CRUD & Virtualization"]
-            appIpc["useAppIpc.ts - Central IPC Hub & Listeners"]
-            agentBridge["useBrowserAgentBridge.ts - ReAct Agent & Cursor"]
-            workspaces["useWorkspaces.ts & useFolders.ts - Organization"]
-            splitView["useSplitView.ts - Dual-View Canvas"]
-            syncHook["useAppSync.ts & useAppDataBackup.ts - Sync & Backup"]
-            hibernation["useTabHibernation.ts - Memory & Tab Eviction"]
-        end
-
-        subgraph AISubsystem["AI & Neural Subsystem"]
-            agent["aiAgent.ts - ReAct Engine & Intent Parser"]
-            whisper["localSpeechRecognition.ts - Local Whisper STT (ONNX)"]
-            memory["aiMemory.ts - Persistent Info Vault"]
-            cursor["AICursorOverlay.tsx - Glowing Agent Cursor"]
-            preview["AILinkPreview.tsx - Hover Preview & Summary"]
-            worker["workers/aiWorker.ts - WebLLM Neural Runtime"]
-            sidepanel["SidePanel.tsx - AI Assistant & Tool Tracing"]
-        end
-
-        subgraph CoreUI["Views, Tabs & Navigation"]
-            browserView["BrowserView.tsx - Sandboxed Webview Host"]
-            sidebarTabs["SidebarTabs.tsx & TopBar.tsx"]
-            spotlight["SpotlightOmnibox.tsx - Command Palette"]
-        end
-
-        subgraph InternalPages["Internal Views & Pages"]
-            settings["SettingsPage.tsx (nova://settings)"]
-            history["HistoryPage.tsx (nova://history)"]
-            newtab["NewTabPage.tsx (nova://newtab)"]
-            downloadsPage["DownloadsPage.tsx (nova://downloads)"]
-            reader["ReaderMode.tsx (Reader Mode View)"]
-            extModal["ExtensionsModal.tsx (nova://extensions)"]
-        end
+    subgraph Boundary["Security Boundary (Context Isolation)"]
+        preloadAPI["Preload Context Bridge<br/>window.electronAPI"]
+        guestPreload["Guest Webview Bridge<br/>contextIsolation: true / nodeIntegration: false"]
     end
 
-    subgraph Cloud["Cloud Infrastructure"]
-        supabase["Supabase Realtime Vault - Encrypted Blobs"]
+    subgraph Renderer["React 18 Renderer (Sandboxed UI)"]
+        uiShell["Browser UI Shell<br/>Vertical/Top Tabs / Split View / Omnibox"]
+        hookEngine["Modular Hook Architecture<br/>27 Specialized State Hooks"]
+        viewHost["Sandboxed Webview Container<br/>BrowserView Host"]
     end
 
-    subgraph External["External AI Agents (MCP Clients)"]
-        claude["Claude Desktop / Cursor / Windsurf / Antigravity"]
+    subgraph Neural["On-Device AI & Sync Vault"]
+        whisperEngine["Local Whisper STT<br/>ONNX whisper-tiny / 0 KB to Cloud"]
+        webgpuEngine["WebGPU Neural Runtime<br/>Llama 3.2 / Phi 3.5 / Qwen 2.5"]
+        syncVault["Zero-Knowledge E2EE Vault<br/>AES-256-GCM / Supabase Realtime"]
     end
 
-    main <-->|Secure IPC Bridge| api
-    main <-->|Chrome Web Store Bridge| webstore
-    main <-->|Sandbox Security Policy| guest
-    guest <-->|Guest DOM Protection| browserView
-    api <-->|Typed API Invocations| app
-    app --> ModularHooks
-    app --> CoreUI
-    app --> InternalPages
-    app --> AISubsystem
+    agentClient <-->|"JSON-RPC / SSE"| mcp
+    mcp <-->|"CDP Automation"| ipcMain
+    ipcMain <-->|"Strict IPC"| preloadAPI
+    preloadAPI <-->|"Typed API"| uiShell
+    ipcMain --> netShield
+    ipcMain --> osBridge
 
-    ModularHooks <--> CoreUI
-    agent <-->|Off-thread Web Worker| worker
-    agent <-->|Local Audio Pipeline| whisper
-    agent <-->|Read and Write| memory
-    agent --> cursor
-    agent --> preview
+    uiShell --> hookEngine
+    uiShell --> viewHost
+    viewHost <-->|"Sandboxed Webview"| guestPreload
 
-    syncHook <-->|Encrypted WebSocket AES-256-GCM| supabase
+    uiShell <-->|"Web Audio PCM"| whisperEngine
+    uiShell <-->|"Off-Thread Web Worker"| webgpuEngine
+    hookEngine <-->|"AES-256-GCM Ciphertext"| syncVault
 
-    main --> adblock
-    main --> security
-    main --> crx
-    main --> downloads
-    main --> keychain
-    main --> tts
+    style Main fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style Boundary fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#f8fafc
+    style Renderer fill:#022c22,stroke:#10b981,stroke-width:2px,color:#f8fafc
+    style Neural fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#f8fafc
+    style Clients fill:#172554,stroke:#60a5fa,stroke-width:1.5px,color:#f8fafc
 
-    claude <-->|JSON-RPC over SSE Port 3020| mcp
-    mcp <-->|CDP & Main Process Bridge| browserView
+    style mcp fill:#1e293b,stroke:#38bdf8,stroke-width:1px,color:#f8fafc
+    style ipcMain fill:#1e293b,stroke:#38bdf8,stroke-width:1px,color:#f8fafc
+    style netShield fill:#1e293b,stroke:#38bdf8,stroke-width:1px,color:#f8fafc
+    style osBridge fill:#1e293b,stroke:#38bdf8,stroke-width:1px,color:#f8fafc
 
-    style Electron fill:#1e293b,stroke:#47848F,stroke-width:2px,color:#fff
-    style Preload fill:#334155,stroke:#94a3b8,stroke-width:2px,color:#fff
-    style Renderer fill:#0f172a,stroke:#61DAFB,stroke-width:2px,color:#fff
-    style ModularHooks fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#fff
-    style AISubsystem fill:#1e1b4b,stroke:#818cf8,stroke-width:1.5px,color:#fff
-    style CoreUI fill:#064e3b,stroke:#10b981,stroke-width:1.5px,color:#fff
-    style InternalPages fill:#1e293b,stroke:#94a3b8,stroke-width:1.5px,color:#fff
-    style Cloud fill:#042f2e,stroke:#059669,stroke-width:2px,color:#fff
-    style External fill:#172554,stroke:#3b82f6,stroke-width:2px,color:#fff
+    style preloadAPI fill:#334155,stroke:#94a3b8,stroke-width:1px,color:#f8fafc
+    style guestPreload fill:#334155,stroke:#94a3b8,stroke-width:1px,color:#f8fafc
+
+    style uiShell fill:#064e3b,stroke:#10b981,stroke-width:1px,color:#f8fafc
+    style hookEngine fill:#064e3b,stroke:#10b981,stroke-width:1px,color:#f8fafc
+    style viewHost fill:#064e3b,stroke:#10b981,stroke-width:1px,color:#f8fafc
+
+    style whisperEngine fill:#312e81,stroke:#818cf8,stroke-width:1px,color:#f8fafc
+    style webgpuEngine fill:#312e81,stroke:#818cf8,stroke-width:1px,color:#f8fafc
+    style syncVault fill:#312e81,stroke:#818cf8,stroke-width:1px,color:#f8fafc
+
+    style agentClient fill:#1e3a8a,stroke:#60a5fa,stroke-width:1px,color:#f8fafc
 ```
+
+### Process Architecture & Security Boundaries
+
+| Process / Layer | Security Boundary & Context | Primary Responsibilities | Key Source Files |
+| :--- | :--- | :--- | :--- |
+| **Main Process** | Privileged Node.js runtime (`sandbox: false`) | Lifecycle, window management, network request interception, native OS keychain, MCP HTTP/SSE server | `electron/main.ts`, `electron/mcpServer.ts`, `electron/main/*` |
+| **Preload Bridge** | Context bridge barrier (`contextIsolation: true`) | Selective unidirectional API exposure via `window.electronAPI`, guest webview isolation | `electron/preload.ts`, `electron/guest-preload.ts` |
+| **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
+| **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
+| **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
+| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 25 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity |
 
 ### Architectural Subsystem Breakdown
 
