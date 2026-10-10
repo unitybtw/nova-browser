@@ -8,7 +8,7 @@ const KNOWN_TRACKER_PATTERNS = [
   'googletagmanager.com',
   'facebook.net/tr',
   'adnxs.com',
-  'c.amazon-adsystem.com',
+  'amazon-adsystem.com',
   'scorecardresearch.com',
   'taboola.com',
   'outbrain.com',

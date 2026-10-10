@@ -614,19 +614,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       return;
     }
 
+    let host = '';
     try {
       const parsed = new URL(finalUrl);
       if (!parsed.hostname) return;
+      host = parsed.hostname.toLowerCase();
     } catch (_) {
       return;
     }
 
     let iconType: FavoriteApp['iconType'] = 'custom';
-    if (finalUrl.includes('youtube.com')) iconType = 'youtube';
-    else if (finalUrl.includes('github.com')) iconType = 'github';
-    else if (finalUrl.includes('x.com') || finalUrl.includes('twitter.com')) iconType = 'x';
-    else if (finalUrl.includes('chatgpt.com') || finalUrl.includes('openai.com')) iconType = 'chatgpt';
-    else if (finalUrl.includes('google.com')) iconType = 'google';
+    if (host === 'youtube.com' || host.endsWith('.youtube.com')) iconType = 'youtube';
+    else if (host === 'github.com' || host.endsWith('.github.com')) iconType = 'github';
+    else if (host === 'x.com' || host.endsWith('.x.com') || host === 'twitter.com' || host.endsWith('.twitter.com')) iconType = 'x';
+    else if (host === 'chatgpt.com' || host.endsWith('.chatgpt.com') || host === 'openai.com' || host.endsWith('.openai.com')) iconType = 'chatgpt';
+    else if (host === 'google.com' || host.endsWith('.google.com')) iconType = 'google';
 
     const newFav: FavoriteApp = {
       id: generateId('fav'),

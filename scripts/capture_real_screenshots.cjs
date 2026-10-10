@@ -14,7 +14,7 @@ app.whenReady().then(async () => {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false,
+      webSecurity: true,
     }
   });
 

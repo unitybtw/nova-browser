@@ -13,19 +13,49 @@ interface ParsedArticle {
 
 function sanitizeArticleHtml(rawHtml: string): string {
   if (!rawHtml) return '';
-  return rawHtml
-    // Strip scripts, iframes, styles, objects, embeds
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    // Strip inline event handlers (e.g. onload=, onclick=, onerror=)
-    .replace(/\s+on[a-z]+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
-    // Strip javascript: hrefs and data: uris
-    .replace(/href\s*=\s*['"]javascript:[^'"]*['"]/gi, 'href="#"')
-    .replace(/src\s*=\s*['"]javascript:[^'"]*['"]/gi, 'src=""')
-    .trim();
+  const ALLOWED_TAGS = new Set(['article', '/article', 'h1', '/h1', 'p', '/p', 'img', 'a', '/a']);
+  const tokens = rawHtml.split(/(<[^>]*>)/g);
+  const result: string[] = [];
+  let inDisallowedBlock = false;
+  let disallowedBlockTag = '';
+
+  for (const token of tokens) {
+    if (!token) continue;
+    if (token.startsWith('<') && token.endsWith('>')) {
+      const tagContent = token.slice(1, -1).trim();
+      const tagNameMatch = tagContent.match(/^(\/?[a-zA-Z0-9]+)/);
+      const tagName = tagNameMatch ? tagNameMatch[1].toLowerCase() : '';
+
+      if (inDisallowedBlock) {
+        if (tagName === `/${disallowedBlockTag}`) {
+          inDisallowedBlock = false;
+          disallowedBlockTag = '';
+        }
+        continue;
+      }
+
+      if (['script', 'iframe', 'style', 'object', 'embed'].includes(tagName)) {
+        inDisallowedBlock = true;
+        disallowedBlockTag = tagName;
+        continue;
+      }
+
+      if (!ALLOWED_TAGS.has(tagName)) {
+        continue;
+      }
+
+      let safeTag = token;
+      safeTag = safeTag.replace(/\son\w+=(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '');
+      safeTag = safeTag.replace(/(href|src)=(?:'javascript:[^']*'|"javascript:[^"]*")/gi, '$1="#"');
+      result.push(safeTag);
+    } else {
+      if (!inDisallowedBlock) {
+        result.push(token);
+      }
+    }
+  }
+
+  return result.join('').trim();
 }
 
 function calculateReadingTime(textContent: string, wordsPerMinute = 200): number {

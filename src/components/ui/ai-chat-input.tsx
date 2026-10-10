@@ -22,6 +22,18 @@ interface Attachment {
   height?: number;
 }
 
+function sanitizeBlobUrl(url: string): string {
+  if (typeof url === 'string' && url.startsWith('blob:')) {
+    return url;
+  }
+  return '';
+}
+
+function sanitizeAttachmentName(name: string): string {
+  if (typeof name !== 'string') return 'attachment';
+  return name.replace(/[<>"'&]/g, '').slice(0, 100);
+}
+
 // ----------------------------------------------------------------------
 // Sub-components
 // ----------------------------------------------------------------------
@@ -147,9 +159,9 @@ function AttachmentThumb({
           "relative size-full overflow-hidden rounded-xl border border-border bg-muted outline-none",
           "transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.04] active:scale-[0.96]"
         )}
-        aria-label={`Open preview of ${attachment.name}`}
+        aria-label={`Open preview of ${sanitizeAttachmentName(attachment.name)}`}
       >
-        <img src={attachment.url} alt={attachment.name} className="size-full object-cover" draggable={false} />
+        <img src={sanitizeBlobUrl(attachment.url)} alt={sanitizeAttachmentName(attachment.name)} className="size-full object-cover" draggable={false} />
         <span
           aria-hidden="true"
           className={cn("pointer-events-none absolute inset-0 flex items-start justify-end bg-black/0 transition-colors duration-200", isHovered && "bg-black/25")}
@@ -255,7 +267,7 @@ function AttachmentGalleryModal({
         onTransitionEnd={() => { if (phase === "closing") onClose(); }}
         onClick={(e) => e.stopPropagation()}
       >
-        <img ref={imgRef} src={attachment.url} alt={attachment.name} className="size-full object-cover" draggable={false} />
+        <img ref={imgRef} src={sanitizeBlobUrl(attachment.url)} alt={sanitizeAttachmentName(attachment.name)} className="size-full object-cover" draggable={false} />
       </div>
 
       <button

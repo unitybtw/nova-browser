@@ -952,16 +952,25 @@ export function pendingDeletionTombstones(
   };
 }
 
+/** In-memory pushed indices to prevent storing sensitive password metadata in unencrypted localStorage */
+const inMemoryPushedIndices = new Map<string, Partial<Record<IndexedDeletionCollection, PushedRowIndex>>>();
+
 /** Read the per-user push index. Never throws; a damaged record reads as absent. */
 export function loadPushedIndex(userId: string): Partial<Record<IndexedDeletionCollection, PushedRowIndex>> | null {
-  if (!userId || typeof localStorage === 'undefined') return null;
+  if (!userId) return null;
+  const mem = inMemoryPushedIndices.get(userId);
+  if (typeof localStorage === 'undefined') return mem ?? null;
   try {
     const raw = localStorage.getItem(`${PUSHED_INDEX_KEY_PREFIX}${userId}`);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== 'object') return null;
-    const out: Partial<Record<IndexedDeletionCollection, PushedRowIndex>> = {};
+    if (!raw && !mem) return null;
+    const parsed = raw ? JSON.parse(raw) : {};
+    if (!parsed || typeof parsed !== 'object') return mem ?? null;
+    const out: Partial<Record<IndexedDeletionCollection, PushedRowIndex>> = { ...mem };
     for (const collection of INDEXED_DELETION_COLLECTIONS) {
+      if (collection === 'passwords') {
+        if (mem?.passwords) out.passwords = mem.passwords;
+        continue;
+      }
       const section = (parsed as Record<string, unknown>)[collection];
       if (!section || typeof section !== 'object') continue;
       const index: PushedRowIndex = {};
@@ -982,9 +991,17 @@ export function savePushedIndex(
   userId: string,
   index: Partial<Record<IndexedDeletionCollection, PushedRowIndex>>
 ): void {
-  if (!userId || typeof localStorage === 'undefined') return;
+  if (!userId) return;
+  inMemoryPushedIndices.set(userId, { ...index });
+  if (typeof localStorage === 'undefined') return;
   try {
-    localStorage.setItem(`${PUSHED_INDEX_KEY_PREFIX}${userId}`, JSON.stringify(index));
+    // Only persist non-sensitive collections (history) to DOM localStorage.
+    // Sensitive credentials index (passwords) is kept strictly memory-resident.
+    const nonSensitiveIndex: Partial<Record<IndexedDeletionCollection, PushedRowIndex>> = {};
+    if (index.history) {
+      nonSensitiveIndex.history = index.history;
+    }
+    localStorage.setItem(`${PUSHED_INDEX_KEY_PREFIX}${userId}`, JSON.stringify(nonSensitiveIndex));
   } catch (e) {
     // An unavailable or overfull Web Storage costs deletion propagation until
     // the next successful write; it must never fail the sync itself.
@@ -1544,32 +1561,25 @@ export class NovaSyncService {
     }
   }
 
-  /** Session-scoped (tab lifetime) Web Storage read; null when unavailable/empty. Never throws. */
+  /** In-memory fallback storage for sessions when OS secureStore is not active. Never leaks secrets into DOM Web Storage. */
+  private sessionMemoryStore = new Map<string, string>();
+
+  /** Session-scoped read; null when unavailable/empty. Never throws. */
   private readSessionValue(key: string): string | null {
-    try {
-      if (typeof sessionStorage !== 'undefined') return sessionStorage.getItem(key);
-    } catch {
-      // Storage blocked (e.g. private mode) — treat as empty.
+    if (this.sessionMemoryStore.has(key)) {
+      return this.sessionMemoryStore.get(key) ?? null;
     }
     return null;
   }
 
-  /** Session-scoped (tab lifetime) Web Storage write; never throws. */
+  /** Session-scoped write kept strictly memory-only to prevent DOM cleartext storage of tokens/credentials. */
   private writeSessionValue(key: string, value: string): void {
-    try {
-      if (typeof sessionStorage !== 'undefined') sessionStorage.setItem(key, value);
-    } catch {
-      logger.warn('SyncService:writeSessionValue', `sessionStorage unavailable — "${key}" kept memory-only for this session.`);
-    }
+    this.sessionMemoryStore.set(key, value);
   }
 
-  /** Session-scoped Web Storage delete; never throws. */
+  /** Session-scoped delete; never throws. */
   private removeSessionValue(key: string): void {
-    try {
-      if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(key);
-    } catch {
-      // Best-effort only.
-    }
+    this.sessionMemoryStore.delete(key);
   }
 
   /** Read user profile from OS keychain / secureStore with session + legacy fallbacks. */

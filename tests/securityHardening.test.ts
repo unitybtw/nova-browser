@@ -12,7 +12,7 @@ async function run() {
   const envelope = await encryptSyncPayload(payload, 'correct horse battery staple');
 
   assert.equal(envelope.version, 2);
-  assert.equal(envelope.ciphertext.includes('example.com'), false, 'ciphertext must not expose plaintext');
+  assert.equal(envelope.ciphertext.includes('bookmark-1'), false, 'ciphertext must not expose plaintext');
   assert.deepEqual(await decryptSyncPayload(envelope, 'correct horse battery staple'), payload);
   await assert.rejects(() => decryptSyncPayload(envelope, 'wrong passphrase'));
 

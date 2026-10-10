@@ -39,19 +39,26 @@ app.on('render-process-gone', (_event, contents, details) => {
 
 function appendCrashLog(entry: string): void {
   try {
-    // Not a bare 'crash.log': that resolves against the process CWD, which is '/'
-    // for a packaged macOS app (write fails, entry lost) and the repo root in dev.
-    const crashDir = app.isReady() ? app.getPath('userData') : require('os').tmpdir();
+    // Avoid shared os.tmpdir() to prevent insecure temporary file / symlink attacks.
+    let crashDir: string;
+    try {
+      crashDir = app.isReady() ? app.getPath('userData') : path.join(require('os').homedir(), '.nova-browser');
+    } catch {
+      crashDir = path.join(require('os').homedir(), '.nova-browser');
+    }
+    if (!fs.existsSync(crashDir)) {
+      fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
+    }
     const logPath = path.join(crashDir, 'crash.log');
     if (fs.existsSync(logPath)) {
       const stats = fs.statSync(logPath);
       if (stats.size > MAX_CRASH_LOG_BYTES) {
         const existing = fs.readFileSync(logPath, 'utf8');
         const trimmed = existing.slice(-100 * 1024); // retain last 100 KB
-        fs.writeFileSync(logPath, trimmed, 'utf8');
+        fs.writeFileSync(logPath, trimmed, { encoding: 'utf8', mode: 0o600 });
       }
     }
-    fs.appendFileSync(logPath, entry);
+    fs.appendFileSync(logPath, entry, { encoding: 'utf8', mode: 0o600 });
   } catch {}
 }
 
@@ -5380,14 +5387,17 @@ function escapeHtmlForTranslation(str: string): string {
     .replace(/"/g, '&quot;');
 }
 
+const TRANSLATION_HTML_ENTITY_MAP: Record<string, string> = {
+  '&lt;': '<',
+  '&gt;': '>',
+  '&quot;': '"',
+  '&#39;': "'",
+  '&nbsp;': ' ',
+  '&amp;': '&'
+};
+
 function unescapeHtmlForTranslation(str: string): string {
-  return str
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ');
+  return str.replace(/&(?:lt|gt|quot|#39|nbsp|amp);/g, (match) => TRANSLATION_HTML_ENTITY_MAP[match] || match);
 }
 
 // IPC Handlers for One-Click Page Translation

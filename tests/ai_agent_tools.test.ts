@@ -90,7 +90,8 @@ assert.equal(intentGh?.arguments?.url, 'https://github.com/unitybtw/nova-browser
 
 const intentWiki = detectDirectIntent('wikipedia web browser');
 assert.equal(intentWiki?.name, 'navigate_to_url');
-assert.equal(intentWiki?.arguments?.url?.includes('wikipedia.org'), true);
+const wikiParsed = new URL(intentWiki?.arguments?.url || 'http://localhost');
+assert.equal(wikiParsed.hostname === 'wikipedia.org' || wikiParsed.hostname.endsWith('.wikipedia.org'), true);
 
 const intentScroll = detectDirectIntent('en alta kaydır');
 assert.equal(intentScroll?.name, 'scroll_page');

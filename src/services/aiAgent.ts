@@ -3658,19 +3658,34 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
             }
           } else if (funcName === 'navigate_to_url') {
             const u = directIntent.arguments.url;
-            if (u.includes('youtube.com/results?search_query=')) {
-              const q = decodeURIComponent(u.split('search_query=')[1] || '');
+            let host = '';
+            let pathname = '';
+            let searchParams: URLSearchParams | null = null;
+            try {
+              const parsed = new URL(u);
+              host = parsed.hostname.toLowerCase();
+              pathname = parsed.pathname;
+              searchParams = parsed.searchParams;
+            } catch {}
+
+            const isYt = host === 'youtube.com' || host.endsWith('.youtube.com');
+            const isGoogle = host === 'google.com' || host.endsWith('.google.com');
+            const isDdg = host === 'duckduckgo.com' || host.endsWith('.duckduckgo.com');
+            const isWiki = host === 'wikipedia.org' || host.endsWith('.wikipedia.org');
+
+            if (isYt && searchParams?.has('search_query')) {
+              const q = searchParams.get('search_query') || '';
               friendlyResponse = isTr ? `YouTube'da "${q}" arandı.` : `Searched for "${q}" on YouTube.`;
-            } else if (u.includes('youtube.com')) {
+            } else if (isYt) {
               friendlyResponse = isTr ? "YouTube açıldı." : "YouTube opened.";
-            } else if (u.includes('google.com/search')) {
-              const q = decodeURIComponent(u.split('q=')[1]?.split('&')[0] || '');
+            } else if (isGoogle && (pathname === '/search' || pathname.startsWith('/search')) && searchParams?.has('q')) {
+              const q = searchParams.get('q') || '';
               friendlyResponse = isTr ? `Google'da "${q}" arandı.` : `Searched for "${q}" on Google.`;
-            } else if (u.includes('duckduckgo.com/?q=')) {
-              const q = decodeURIComponent(u.split('q=')[1]?.split('&')[0] || '');
+            } else if (isDdg && searchParams?.has('q')) {
+              const q = searchParams.get('q') || '';
               friendlyResponse = isTr ? `DuckDuckGo'da "${q}" arandı.` : `Searched for "${q}" on DuckDuckGo.`;
-            } else if (u.includes('wikipedia.org/wiki/Special:Search?search=')) {
-              const q = decodeURIComponent(u.split('search=')[1]?.split('&')[0] || '');
+            } else if (isWiki && searchParams?.has('search')) {
+              const q = searchParams.get('search') || '';
               friendlyResponse = isTr ? `Wikipedia'da "${q}" arandı.` : `Searched for "${q}" on Wikipedia.`;
             } else {
               friendlyResponse = isTr ? `${u} açıldı.` : `Opened ${u}.`;

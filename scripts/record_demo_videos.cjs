@@ -66,7 +66,7 @@ app.whenReady().then(async () => {
       contextIsolation: true,
       nodeIntegration: false,
       backgroundThrottling: false,
-      webSecurity: false,
+      webSecurity: true,
     },
   });
   target.webContents.setFrameRate(FRAME_RATE);

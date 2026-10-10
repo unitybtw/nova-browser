@@ -28,7 +28,14 @@ console.log('[PASS] [History Recorder] Trailing slash normalization verified acr
 function shouldRecordHistory(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   if (url === 'about:blank' || url === 'about:newtab' || url === 'nova://newtab') return false;
-  if (url.startsWith('nova://') || url.startsWith('javascript:') || url.startsWith('data:') || url.startsWith('blob:')) {
+  if (
+    url.startsWith('nova://') ||
+    url.startsWith('javascript:') ||
+    url.startsWith('vbscript:') ||
+    url.startsWith('data:') ||
+    url.startsWith('blob:') ||
+    url.startsWith('file:')
+  ) {
     return false;
   }
   return true;
@@ -40,8 +47,10 @@ assert.strictEqual(shouldRecordHistory('about:blank'), false);
 assert.strictEqual(shouldRecordHistory('nova://newtab'), false);
 assert.strictEqual(shouldRecordHistory('nova://settings'), false);
 assert.strictEqual(shouldRecordHistory('javascript:void(0)'), false);
+assert.strictEqual(shouldRecordHistory('vbscript:msgbox(1)'), false);
 assert.strictEqual(shouldRecordHistory('data:text/html,test'), false);
 assert.strictEqual(shouldRecordHistory('blob:https://example.com/uuid'), false);
+assert.strictEqual(shouldRecordHistory('file:///etc/passwd'), false);
 
 console.log('[PASS] [History Recorder] Internal schemes, blank pages, and dangerous protocols excluded from history');
 
