@@ -67,13 +67,15 @@ export function useTabOperations({
 
   // Manual tab suspension
   const handleSuspendTab = useCallback((id: string) => {
-    setTabs(prev => prev.map(t => (t.id === id && t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio) ? { ...t, isSuspended: true } : t));
-  }, [activeTabId, splitTabId, setTabs]);
+    const curActiveId = activeTabIdRef.current;
+    setTabs(prev => prev.map(t => (t.id === id && t.id !== curActiveId && t.id !== splitTabId && !t.isPlayingAudio) ? { ...t, isSuspended: true } : t));
+  }, [splitTabId, setTabs, activeTabIdRef]);
 
   // Instant RAM & Cache Purge Engine
   const handlePurgeMemory = useCallback(async () => {
+    const curActiveId = activeTabIdRef.current;
     // 1. Suspend all background inactive tabs immediately
-    setTabs(prev => prev.map(t => (t.id !== activeTabId && t.id !== splitTabId && !t.isPlayingAudio && !t.isPinned) ? { ...t, isSuspended: true } : t));
+    setTabs(prev => prev.map(t => (t.id !== curActiveId && t.id !== splitTabId && !t.isPlayingAudio && !t.isPinned) ? { ...t, isSuspended: true } : t));
     // 2. Clear thumbnail memory cache
     tabThumbnailCache.clear();
     // 3. Terminate background AI worker and release GPU VRAM
@@ -90,7 +92,7 @@ export function useTabOperations({
     } catch (err) {
       console.error('Purge system memory error:', err);
     }
-  }, [activeTabId, splitTabId, setTabs]);
+  }, [splitTabId, setTabs, activeTabIdRef]);
 
   const cleanupIncognitoSessions = (closedTabs: Tab[], remainingTabs: Tab[]) => {
     const closedIncognito = closedTabs.filter(t => t.isIncognito);

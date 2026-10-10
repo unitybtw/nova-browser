@@ -613,6 +613,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     [speedDials]
   );
 
+  const shouldAnimateBg = isActive && !energySaverMode;
+
   const getBackgroundStyle = () => {
     if (hasWallpaper) {
       return 'text-white';
@@ -806,7 +808,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'gradient' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
-            animate={isActive ? {
+            animate={shouldAnimateBg ? {
               x: ['0%', '25%', '0%'],
             } : false}
             transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
@@ -838,19 +840,19 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'mesh' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <motion.div
-            animate={isActive ? { x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.08, 1] } : false}
+            animate={shouldAnimateBg ? { x: [0, 30, 0], y: [0, -20, 0], scale: [1, 1.08, 1] } : false}
             transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
             className="absolute -top-[15%] -left-[10%] w-[50vw] h-[50vw] rounded-full bg-purple-600/20 blur-[60px]"
             style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
           <motion.div
-            animate={isActive ? { x: [0, -40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] } : false}
+            animate={shouldAnimateBg ? { x: [0, -40, 0], y: [0, 30, 0], scale: [1, 1.1, 1] } : false}
             transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
             className="absolute -bottom-[15%] -right-[10%] w-[50vw] h-[50vw] rounded-full bg-blue-600/20 blur-[60px]"
             style={{ willChange: 'transform', transform: 'translateZ(0)' }}
           />
           <motion.div
-            animate={isActive ? { scale: [1, 1.15, 1], opacity: [0.15, 0.28, 0.15] } : false}
+            animate={shouldAnimateBg ? { scale: [1, 1.15, 1], opacity: [0.15, 0.28, 0.15] } : false}
             transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
             className="absolute top-[25%] right-[20%] w-[35vw] h-[35vw] rounded-full bg-teal-500/15 blur-[50px]"
             style={{ willChange: 'transform, opacity', transform: 'translateZ(0)' }}
@@ -862,7 +864,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
       {newTabBackground === 'aurora_waves' && (
         <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <motion.div
-            animate={isActive ? {
+            animate={shouldAnimateBg ? {
               x: ['0%', '-33.33%', '0%'],
             } : false}
             transition={{ duration: 24, repeat: Infinity, ease: 'linear' }}
@@ -893,7 +895,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             }}
           >
             <motion.div
-              animate={isActive ? {
+              animate={shouldAnimateBg ? {
                 y: ['0px', '48px'],
               } : false}
               transition={{ duration: 1.6, repeat: Infinity, ease: 'linear' }}
@@ -928,7 +930,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 willChange: 'transform, opacity',
                 transform: 'translateZ(0)'
               }}
-              animate={isActive ? {
+              animate={shouldAnimateBg ? {
                 scale: [0.7, 1.4, 0.7],
                 opacity: [0.2, 0.95, 0.2],
               } : false}
@@ -960,7 +962,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 willChange: 'transform, opacity',
                 transform: 'translateZ(0)'
               }}
-              animate={isActive ? {
+              animate={shouldAnimateBg ? {
                 y: [0, fly.driftY, 0],
                 x: [0, fly.driftX, 0],
                 opacity: [0.15, 0.9, 0.35, 0.9, 0.15],
@@ -982,7 +984,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ backgroundColor: 'var(--nova-frame-bg)' }}>
           <div className="absolute inset-0 opacity-40 bg-[radial-gradient(circle_at_center,rgba(147,51,234,0.3)_0%,rgba(7,7,11,1)_70%)]" />
           <motion.div
-            animate={isActive ? {
+            animate={shouldAnimateBg ? {
               rotate: [0, 360],
               scale: [1, 1.1, 1]
             } : false}
@@ -1015,7 +1017,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 willChange: 'transform',
                 transform: 'translateZ(0)'
               }}
-              animate={isActive ? {
+              animate={shouldAnimateBg ? {
                 y: ['0vh', '140vh'],
               } : false}
               transition={{

@@ -50,7 +50,10 @@ export function useTabHibernation({
   useEffect(() => {
     const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
     if (!isHibernationEnabled || isDemo) return;
-    const timeoutMs = (settings.hibernationTimeoutMinutes || 10) * 60 * 1000;
+    const isEnergySaver = settings.energySaverMode ?? false;
+    const baseTimeoutMinutes = settings.hibernationTimeoutMinutes || 10;
+    const effectiveTimeoutMinutes = isEnergySaver ? Math.min(baseTimeoutMinutes, 3) : baseTimeoutMinutes;
+    const timeoutMs = effectiveTimeoutMinutes * 60 * 1000;
 
     const interval = setInterval(() => {
       const now = Date.now();
@@ -94,9 +97,9 @@ export function useTabHibernation({
     }, 30000); // Check every 30s
 
     return () => clearInterval(interval);
-  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, isDemo]);
+  }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, settings.energySaverMode, isDemo]);
 
-  // Webview LRU Pool: cap concurrent live tabs to max 6 to prevent Chromium process explosion only when hibernation is enabled
+  // Webview LRU Pool: cap concurrent live tabs to max 6 (or 3 in energy saver mode) to prevent Chromium process explosion only when hibernation is enabled
   // Staggered wake-up ref: tracks the interval used to gradually restore suspended tabs
   // when hibernation is disabled, preventing simultaneous Chromium renderer process spawning.
   const staggeredWakeRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -134,7 +137,8 @@ export function useTabHibernation({
       };
     }
 
-    const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, MAX_LIVE_WEBVIEWS);
+    const liveLimit = settings.energySaverMode ? 3 : MAX_LIVE_WEBVIEWS;
+    const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, liveLimit);
     if (tabsToSuspend.size > 0) {
       setTabs(prev => {
         // Identity guard (Effect 1 ile aynı desen): `tabs` bu effect'in dep
@@ -151,5 +155,5 @@ export function useTabHibernation({
         return changed ? updated : prev;
       });
     }
-  }, [tabs, activeTabId, splitTabId, settings.tabHibernationEnabled]);
+  }, [tabs, activeTabId, splitTabId, settings.tabHibernationEnabled, settings.energySaverMode]);
 }

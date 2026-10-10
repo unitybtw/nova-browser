@@ -658,7 +658,14 @@ const MemoizedTabItem = React.memo(({
     prevProps.index === nextProps.index &&
     prevProps.wasJustUnsplit === nextProps.wasJustUnsplit &&
     prevProps.isActive === nextProps.isActive &&
-    prevProps.activeTabId === nextProps.activeTabId &&
+    // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
+    // For split tabs, we only care whether this tab or the split partner is the active one.
+    (
+      !prevProps.splitTab && !nextProps.splitTab
+        ? true
+        : (prevProps.activeTabId === prevProps.tab.id) === (nextProps.activeTabId === nextProps.tab.id) &&
+          (prevProps.activeTabId === prevProps.splitTab?.id) === (nextProps.activeTabId === nextProps.splitTab?.id)
+    ) &&
     prevProps.splitTab?.id === nextProps.splitTab?.id &&
     prevProps.splitTab?.title === nextProps.splitTab?.title &&
     prevProps.splitTab?.url === nextProps.splitTab?.url &&

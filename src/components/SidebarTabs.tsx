@@ -456,7 +456,14 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
     prev.isActive === next.isActive &&
     prev.isDragOver === next.isDragOver &&
     prev.isNested === next.isNested &&
-    prev.activeTabId === next.activeTabId &&
+    // For non-split tabs, activeTabId doesn't affect rendering because isActive captures whether this tab is active.
+    // For split tabs, we only care whether this tab or the split partner is the active one.
+    (
+      !prev.splitTab && !next.splitTab
+        ? true
+        : (prev.activeTabId === prev.tab.id) === (next.activeTabId === next.tab.id) &&
+          (prev.activeTabId === prev.splitTab?.id) === (next.activeTabId === next.splitTab?.id)
+    ) &&
     prev.tabsLength === next.tabsLength &&
     prev.tab.id === next.tab.id &&
     prev.tab.url === next.tab.url &&

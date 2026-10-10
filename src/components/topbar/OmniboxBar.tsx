@@ -673,4 +673,25 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       </div>
     </div>
   );
+}, (prevProps: OmniboxBarProps, nextProps: OmniboxBarProps): boolean => {
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.useVerticalTabs !== nextProps.useVerticalTabs) return false;
+  if (prevProps.isBookmarked !== nextProps.isBookmarked) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+  if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
+  if (prevProps.onNavigate !== nextProps.onNavigate) return false;
+  if (prevProps.onToggleReaderMode !== nextProps.onToggleReaderMode) return false;
+  if (prevProps.onToggleBookmark !== nextProps.onToggleBookmark) return false;
+  if (prevProps.onResetZoom !== nextProps.onResetZoom) return false;
+  if (prevProps.onRespondPermission !== nextProps.onRespondPermission) return false;
+  if (prevProps.onDismissPermission !== nextProps.onDismissPermission) return false;
+
+  // Omnibox only reads and renders activeTab's url, id, zoomFactor, and isTranslated
+  if (prevProps.activeTab?.id !== nextProps.activeTab?.id) return false;
+  if (prevProps.activeTab?.url !== nextProps.activeTab?.url) return false;
+  if (prevProps.activeTab?.zoomFactor !== nextProps.activeTab?.zoomFactor) return false;
+  if (prevProps.activeTab?.isTranslated !== nextProps.activeTab?.isTranslated) return false;
+
+  return true;
 });
