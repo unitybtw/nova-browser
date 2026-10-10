@@ -194,7 +194,7 @@
     "electron": "^43.7.7",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
-    "remotion": "^4.0.518",
+    "remotion": "^4.0.534",
     "tailwindcss": "^4.3.3",
     "terser": "^5.49.0",
     "typescript": "~5.6.2",
