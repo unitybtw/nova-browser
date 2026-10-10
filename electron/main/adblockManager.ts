@@ -127,9 +127,10 @@ export function updateAdblockWhitelist(whitelist: string[]): void {
 export function applyAdBlockerToSession(sess: Electron.Session, enable: boolean): void {
   if (!blocker) return;
   try {
-    if (enable) {
+    const isCurrentlyEnabled = blocker.isBlockingEnabled(sess);
+    if (enable && !isCurrentlyEnabled) {
       blocker.enableBlockingInSession(sess);
-    } else {
+    } else if (!enable && isCurrentlyEnabled) {
       blocker.disableBlockingInSession(sess);
     }
   } catch (e) {

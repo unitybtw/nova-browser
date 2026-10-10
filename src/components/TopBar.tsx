@@ -164,13 +164,14 @@ interface TopBarProps {
   onDismissPermission?: (requestId: string) => void;
 }
 
-const MemoizedTabItem = React.memo(({
-  tab, activeTabId, index, isActive, splitTab, tabStyle, tabAnimation, isIncognito,
-  wasJustUnsplit,
-  onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
-  onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
-  tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave
-}: any) => {
+const MemoizedTabItem = React.memo(
+  React.forwardRef<any, any>(({
+    tab, activeTabId, index, isActive, splitTab, tabStyle, tabAnimation, isIncognito,
+    wasJustUnsplit,
+    onTabDragStart, onTabDrag, onTabDragEnd, onDropToSplitScreen,
+    onSelectTab, onCloseSplit, onToggleMuteTab, onTogglePip, onCloseTab,
+    tabsLength, onUpdateGhost, onOpenContextMenu, onTabHover, onTabLeave
+  }: any, ref: any) => {
   // No early return before the first hook. A `isSplitChild` bail-out used to sit
   // here; it is gone because nothing ever passed the prop and `visibleTabs`
   // already drops a split partner, so the branch could only ever have been a
@@ -334,6 +335,7 @@ const MemoizedTabItem = React.memo(({
 
   return (
     <Reorder.Item
+      ref={ref}
       key={tab.id}
       value={tab}
       layout="position"
@@ -653,7 +655,7 @@ const MemoizedTabItem = React.memo(({
       )}
     </Reorder.Item>
   );
-}, (prevProps: any, nextProps: any) => {
+  }), (prevProps: any, nextProps: any) => {
   return (
     prevProps.index === nextProps.index &&
     prevProps.wasJustUnsplit === nextProps.wasJustUnsplit &&
