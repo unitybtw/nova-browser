@@ -150,7 +150,7 @@
     "@assistant-ui/react": "^0.15.21",
     "@cliqz/adblocker-electron": "^1.34.0",
     "@huggingface/transformers": "^4.3.0",
-    "@mlc-ai/web-llm": "^0.2.84",
+    "@mlc-ai/web-llm": "^0.2.85",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@mozilla/readability": "^0.6.0",
     "@supabase/supabase-js": "^2.112.3",
