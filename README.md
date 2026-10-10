@@ -34,7 +34,8 @@
     <a href="#quick-start">Quick Start</a> •
     <a href="#testing--verification">Testing</a> •
     <a href="#architecture">Architecture</a> •
-    <a href="#security--privacy-commitment">Security</a>
+    <a href="#security--privacy-commitment">Security</a> •
+    <a href="#star-history">Star History</a>
   </p>
 
 </div>
@@ -580,6 +581,22 @@ sha256sum -c SHA256SUMS.txt
 $hash = Get-FileHash Nova-Browser-Setup-*.exe -Algorithm SHA256
 # Compare $hash.Hash against the corresponding value in SHA256SUMS.txt
 ```
+
+---
+
+## Star History
+
+<div align="center">
+
+<a href="https://star-history.com/#unitybtw/nova-browser&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=unitybtw/nova-browser&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=unitybtw/nova-browser&type=Date" />
+   <img alt="Nova Browser Star History Chart" src="https://api.star-history.com/svg?repos=unitybtw/nova-browser&type=Date" width="750" />
+ </picture>
+</a>
+
+</div>
 
 ---
 
