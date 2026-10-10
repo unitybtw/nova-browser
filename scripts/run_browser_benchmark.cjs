@@ -208,9 +208,7 @@ async function main() {
     }
     const good = runs.filter(r => r.status === 'ok');
     if (!good.length) {
-      const rawReason = String(runs.map(r => r.reason).filter(Boolean)[0] || 'no successful runs');
-      const safeReason = encodeURIComponent(rawReason.slice(0, 100));
-      console.log(` unavailable (${safeReason})`);
+      console.log(' unavailable (browser not installed or launch failed)');
       report.browsers.push({ name: browser.name, status: runs[0]?.status || 'error', runs });
       continue;
     }
