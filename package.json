@@ -181,7 +181,7 @@
     "@remotion/cli": "^4.0.518",
     "@remotion/player": "^4.0.518",
     "@tailwindcss/vite": "^4.3.3",
-    "@types/dompurify": "^3.0.5",
+    "@types/dompurify": "^3.2.0",
     "@types/express": "^5.0.6",
     "@types/jsdom": "^30.0.0",
     "@types/mozilla-readability": "^0.2.1",
