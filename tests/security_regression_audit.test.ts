@@ -209,7 +209,7 @@ async function runSecurityRegressionAuditSuite() {
 
   // R1.2: Incognito partition privacy headers and adblocker synchronization
   const incognitoPartitionHeaderMatch = mainTsContent.includes("applyPrivacyHeadersToSession(session.fromPartition('incognito'))");
-  const incognitoAdblockMatch = mainTsContent.includes("blocker.enableBlockingInSession(session.fromPartition('incognito'))");
+  const incognitoAdblockMatch = mainTsContent.includes("blocker.enableBlockingInSession(session.fromPartition('incognito'))") || mainTsContent.includes("applyAdBlockerToSession(session.fromPartition('incognito')");
   const incognitoStrictSecurityMatch = mainTsContent.includes("applyStrictSecurityToSession(session.fromPartition('incognito'))");
 
   record(

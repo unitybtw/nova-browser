@@ -42,10 +42,59 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.5.1',
+    date: 'October 2026',
+    title: 'CodeQL Security Remediation, On-Device Whisper STT & 25 Native MCP Tools',
+    badge: 'Latest Release',
+    lede: 'Comprehensive remediation of all 28 CodeQL static security alerts, offline Whisper speech recognition runtime, expanded 25-tool Model Context Protocol (MCP) server, and hardened tab virtualization.',
+    hero: {
+      src: './screenshots/newtab.png',
+      alt: 'Nova Browser v1.5.1 interface.',
+      caption: 'Nova v1.5.1: Zero CodeQL security alerts, private offline speech transcription, and native agent automation.',
+    },
+    highlights: [
+      'Remediated 28 CodeQL security alerts across main process and renderer (DOM XSS, file TOCTOU race conditions, regex anchors).',
+      'Local on-device Whisper speech-to-text integration using ONNX whisper-tiny with 0 KB audio data leaving the machine.',
+      'Model Context Protocol (MCP) server upgraded to 25 native tools for autonomous agent inspection and control.',
+      'Optimized TopBar tab virtualization, memoization comparators, and AnimatePresence popLayout ref handling.',
+      'Hardened adblocker session state guards and incognito partition synchronization.',
+    ],
+    sections: [
+      {
+        eyebrow: 'Security & Integrity',
+        title: 'Zero CodeQL security alerts',
+        body: 'Exhaustive static code analysis and audit remediating all potential injection vectors, file racing scenarios, and boundary protections.',
+        points: [
+          'TOCTOU file race protection and atomic file operations across cache and download stores.',
+          'Safe DOM parsing and HTML sanitization across renderer components.',
+          'Strict regular expression anchoring preventing URL and hostname spoofing.',
+        ],
+      },
+      {
+        eyebrow: 'AI & Extensibility',
+        title: 'On-device intelligence and MCP automation',
+        body: 'Nova now exposes a dedicated Model Context Protocol server over port 3020 and includes a private WebAssembly speech pipeline.',
+        points: [
+          '25 native MCP tools enabling Claude Desktop, Cursor, and custom agents to navigate and inspect web content.',
+          'Local Whisper STT transcription running entirely in-memory with zero network telemetry.',
+        ],
+      },
+    ],
+    changes: [
+      { category: 'security', text: 'Resolved all 28 CodeQL static code analysis alerts across main and renderer processes.' },
+      { category: 'security', text: 'Hardened file downloads against TOCTOU race conditions and path traversal vectors.' },
+      { category: 'feature', text: 'Integrated local Whisper speech-to-text engine with ONNX whisper-tiny runtime.' },
+      { category: 'feature', text: 'Expanded Model Context Protocol (MCP) server to 25 tools for external agent automation.' },
+      { category: 'improvement', text: 'Optimized TopBar tab strip virtualization and decoupled omnibox re-renders.' },
+      { category: 'fix', text: 'Resolved React forwardRef warning in TopBar tab animation popLayout.' },
+      { category: 'fix', text: 'Guarded adblocker session enable/disable state transitions across default and incognito partitions.' },
+      { category: 'performance', text: 'Added energy saver mode pausing background motion and reclaiming idle tab resources.' },
+    ],
+  },
+  {
     version: '1.5.0',
     date: 'October 2026',
     title: 'Webview Stability, Anti-Bot Compatibility & Hardened Session Lifecycle',
-    badge: 'Latest Release',
     lede: 'Eliminated automated bot false-positives across search engines, resolved webview redirect loops affecting modern dynamic web apps like YouTube, and unified partition cleanup across multi-tab teardown.',
     hero: {
       src: './screenshots/newtab.png',

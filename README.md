@@ -10,7 +10,7 @@
   <br/>
 
   [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
-  [![Release](https://img.shields.io/badge/Release-v1.5.0-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser/releases)
+  [![Release](https://img.shields.io/badge/Release-v1.5.1-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser/releases)
   [![Electron](https://img.shields.io/badge/Electron-43.x-47848F?style=for-the-badge&logo=electron)](https://www.electronjs.org/)
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)

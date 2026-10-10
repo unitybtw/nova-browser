@@ -660,8 +660,15 @@ function createWindow() {
   // preload is assigned during attachment after the destination is validated.
 
   // Apply AdBlocker to sessions (default and incognito)
-  applyAdBlockerToSession(session.defaultSession, isPrivacyShieldEnabled);
-  applyAdBlockerToSession(session.fromPartition('incognito'), isPrivacyShieldEnabled);
+  const blocker = getBlocker();
+  if (isPrivacyShieldEnabled && blocker) {
+    applyAdBlockerToSession(session.defaultSession, true);
+    applyAdBlockerToSession(session.fromPartition('incognito'), true);
+    try { if (!blocker.isBlockingEnabled(session.fromPartition('incognito'))) blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
+  } else if (blocker) {
+    applyAdBlockerToSession(session.defaultSession, false);
+    applyAdBlockerToSession(session.fromPartition('incognito'), false);
+  }
 
   currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
 
