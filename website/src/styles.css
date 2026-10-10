@@ -23,6 +23,8 @@
   body { font-family: var(--font); font-size: 15px; line-height: 1.65; color: var(--ink); background: var(--paper); overflow-x: clip; -webkit-font-smoothing: antialiased; }
   ::selection { background: #cfddff; color: var(--ink); }
   :focus-visible { outline: 3px solid var(--blue); outline-offset: 5px; }
+  :focus:not(:focus-visible) { outline: none; }
+  main:focus { outline: none; }
   h1, h2, h3 { font-weight: 500; text-wrap: balance; }
   h1 { font-size: clamp(46px, 6.35vw, 88px); line-height: 1.1; letter-spacing: -.04em; }
   h2 { font-size: clamp(36px, 4.25vw, 56px); line-height: 1.14; letter-spacing: -.04em; }
@@ -46,7 +48,8 @@
   .main-nav a { transition: color .2s; }
   .main-nav a:hover { color: var(--blue); }
   .nav-actions { gap: 22px; }
-  .language-button { border: 0; background: transparent; display: flex; align-items: center; gap: 6px; padding: 10px 0; font-size: 11px; font-weight: 700; }
+  .language-button { border: 0; background: transparent; display: flex; align-items: center; gap: 6px; padding: 10px 4px; font-size: 11px; font-weight: 700; min-height: 44px; }
+  .mobile-menu-cta { display: none; }
   .button { min-height: 51px; padding: 14px 23px; display: inline-flex; align-items: center; justify-content: center; gap: 17px; border: 1px solid transparent; border-radius: 8px; font-size: 13px; font-weight: 650; transition: background .2s, transform .2s, box-shadow .2s; }
   .button:hover { transform: translateY(-2px); }
   .button svg { flex-shrink: 0; }
@@ -200,7 +203,7 @@
   .footer-bottom { border-top: 1px solid var(--line); padding: 24px 0 30px; display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 9px; color: var(--muted); }
   .footer-bottom a { display: flex; align-items: center; gap: 13px; }
   .footer-bottom a svg { transform: rotate(-90deg); }
-  .video-dialog { position: fixed; inset: 0; margin: auto; width: min(1050px, calc(100% - 40px)); max-height: calc(100dvh - 40px); padding: 0; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); color: var(--ink); }
+  .video-dialog { position: fixed; inset: 0; margin: auto; width: min(1050px, calc(100% - 40px)); max-height: calc(100dvh - 40px); overflow-y: auto; padding: 0; border: 1px solid var(--line); border-radius: 15px; background: var(--paper); color: var(--ink); }
   .video-dialog::backdrop { background: #101b22b5; backdrop-filter: blur(10px); }
   .video-dialog-inner { padding: 18px; }
   .video-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 20px; }
@@ -275,11 +278,14 @@
     .nav-wrap { gap: 12px; }
     .nav-actions { gap: 15px; }
     .nav-actions .button { display: none; }
-    .menu-button { display: grid; width: 32px; }
+    .menu-button { display: grid; width: 44px; height: 44px; }
     .main-nav { display: none; position: absolute; top: 71px; left: 0; right: 0; padding: 16px 20px 25px; background: var(--paper); border-bottom: 1px solid var(--line); box-shadow: 0 14px 15px #20342508; }
     .main-nav.is-open { display: flex; flex-direction: column; align-items: stretch; gap: 0; }
     .main-nav.is-open { animation: quiet-arrive 200ms var(--ease); }
     .main-nav a { padding: 13px 5px; font-size: 14px; }
+    .main-nav.is-open .mobile-menu-cta { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 12px 16px; background: var(--ink); color: var(--white); border-radius: 8px; font-weight: 600; font-size: 13px; }
+    .main-nav.is-open .mobile-menu-cta::after { display: none; }
+    .main-nav.is-open .mobile-menu-cta:hover { background: #3d4940; color: var(--white); }
     .hero { padding-top: 37px; }
     .release-note { font-size: 9px; padding: 5px 11px; }
     h1 { font-size: clamp(40px, 7vw, 58px); letter-spacing: -.04em; line-height: 1.12; }
@@ -344,7 +350,7 @@
     .footer-top nav { gap: 19px; }
     .footer-top a { font-size: 9px; gap: 5px; }
     .footer-top a svg { width: 12px; }
-    .footer-wordmark { font-size: 27vw; gap: 15px; margin-top: 13px; padding-right: 6px; }
+    .footer-wordmark { font-size: min(24vw, 92px); gap: 15px; margin-top: 13px; padding-right: 6px; }
     .footer-bottom { padding: 18px 0 25px; font-size: 8px; gap: 15px; }
     .footer-bottom > span:nth-child(2) { display: none; }
     .video-dialog { width: calc(100% - 24px); }

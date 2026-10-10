@@ -30,11 +30,17 @@ async function run() {
   assert.equal(document.activeElement?.id, 'tour-tab-2')
   assert.equal(document.querySelector('[role="tabpanel"]')?.getAttribute('aria-labelledby'), 'tour-tab-2')
   references()
+  await click(document.getElementById('platform-tab-1'))
+  const downloadLinks = [...document.querySelectorAll('.download-file')]
+  assert.equal(downloadLinks.length, 2, 'Windows platform must offer both Setup and Portable choices')
   await click(document.getElementById('platform-tab-2'))
   references()
   const menu = document.querySelector('.menu-button')!
   await click(menu)
   assert.equal(menu.getAttribute('aria-expanded'), 'true')
+  const mobileCta = document.querySelector('.mobile-menu-cta')
+  assert.ok(mobileCta, 'Mobile navigation menu must include a direct download CTA')
+  assert.equal(mobileCta.getAttribute('href'), '#download')
   await act(async () => document.querySelector('main')!.dispatchEvent(new w.MouseEvent('pointerdown', { bubbles: true })))
   assert.equal(menu.getAttribute('aria-expanded'), 'false', 'Outside click must dismiss the mobile menu')
   await click(menu)
@@ -47,7 +53,9 @@ async function run() {
   await click(button('Take a closer look'))
   const video = document.querySelector('video')!
   assert.equal(document.body.style.overflow, 'hidden')
-  assert.equal(document.querySelector('track')?.default, true, 'English captions should be enabled by default')
+  const tracks = [...document.querySelectorAll('track')]
+  assert.equal(tracks.length, 2, 'Video must provide both English and Turkish caption tracks')
+  assert.equal(tracks[0].default, true, 'English captions should be enabled by default')
   await act(async () => video.dispatchEvent(new w.Event('error')))
   assert.ok(document.querySelector('[role="alert"]'), 'Failed media needs a visible recovery state')
   await click(button('Retry video'))

@@ -25,6 +25,7 @@ export function useSiteMotion() {
         header?.classList.toggle('is-scrolled', window.scrollY > 24)
         const active = [...sections].reverse().find(section => section.getBoundingClientRect().top <= 180)
         links.forEach(link => {
+          if (link.classList.contains('mobile-menu-cta')) return
           if (link.hash === `#${active?.id}`) link.setAttribute('aria-current', 'location')
           else link.removeAttribute('aria-current')
         })
