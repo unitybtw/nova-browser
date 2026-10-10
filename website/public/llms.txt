@@ -9,7 +9,7 @@ Nova is available for macOS (Apple Silicon and Intel), Windows x64, and Linux x6
 - Local AI: supported models run on the device through WebGPU after a model download. Availability and performance depend on compatible hardware. External agents and providers have their own data handling.
 - Organization: workspaces, vertical or horizontal tabs, split view, and tab hibernation.
 - Privacy: network filtering blocks ads and known trackers.
-- Sync: bookmarks and passwords are encrypted on the device with AES-256-GCM. Keep pairing codes private.
+- Sync: bookmarks and passwords are encrypted on the device with AES-256-GCM using your Nova Cloud account. Pairing devices using a sync code is not available in this build.
 - Extensions: Chrome Web Store extension support; compatibility varies by extension.
 - Agents: a built-in local MCP server connects compatible coding agents.
 

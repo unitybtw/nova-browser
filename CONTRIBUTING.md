@@ -32,7 +32,7 @@ Before setting up the project locally, ensure you have the following installed:
 
 ```bash
 git clone https://github.com/unitybtw/nova-browser.git
-cd novabrowser
+cd nova-browser
 ```
 
 ### 2. Install Dependencies

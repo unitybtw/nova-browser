@@ -16,7 +16,7 @@
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
   [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
   [![CI](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml)
-  [![Tests](https://img.shields.io/badge/Tests-640%2B%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
+  [![Tests](https://img.shields.io/badge/Tests-1000%2B%20Passing-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
   [![Platforms](https://img.shields.io/badge/Platforms-macOS%20|%20Windows%20|%20Linux-6366F1?style=for-the-badge)](https://github.com/unitybtw/nova-browser)
 
   <p align="center">
@@ -129,10 +129,10 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 ## Key Features
 
-### 1-Click Nova Cloud Sync (Zero-Knowledge E2EE)
-- **1-Click Device Pairing**: Pair laptops and desktops instantly using a human-friendly pairing code (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`). No email, passwords, or account registration needed.
-- **End-to-End Encryption (AES-256-GCM)**: All saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted on your device with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before being sent to the cloud.
-- **Realtime WebSocket Sync**: Remote changes propagate seamlessly across your devices in real-time.
+### Nova Cloud Sync (Zero-Knowledge E2EE)
+- **End-to-End Encryption (AES-256-GCM)**: All saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted on your device with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
+- **Encrypted Multi-Device Sync**: Sign in with your Nova Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Encryption keys stay on your local device; the cloud server only ever receives encrypted ciphertext.
+- **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release (disabled in the current build to ensure strict cryptographic validation).
 
 ### AI Agent & Virtual Cursor (MCP Protocol)
 - **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Antigravity) to navigate, read pages, click elements, fill forms, and take screenshots.
@@ -399,7 +399,7 @@ graph TD
 
 4. **Client-Side E2EE Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
    - **Zero-Knowledge Cryptography**: Passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) with cryptographic salt and 256-bit AES-GCM before transmission.
-   - **Sovereign 1-Click Device Pairing**: High-entropy pairing codes (`nova-xxxx-xxxx-xxxx-xxxx-xxxx-xxxx`) enable instantaneous cross-device synchronization over Supabase Realtime WebSockets without centralized user accounts or plaintext storage.
+   - **Realtime Encrypted Sync**: Synchronizes client-encrypted vaults across devices over Supabase Realtime WebSockets without centralized plaintext storage. Code-based accountless pairing is planned for an upcoming milestone.
 
 5. **Performance & Tab Virtualization (`src/utils/tabManager.ts`, `src/hooks/useTabHibernation.ts`, `src/components/BrowserView.tsx`)**:
    - **Tab Hibernation Engine**: Dormant background tabs (>10 min idle) automatically unmount their active webview rendering pipelines while preserving navigation state, keeping 50+ tabs under 600 MB RAM.
@@ -435,14 +435,15 @@ To connect **Claude Desktop**, **Cursor**, or **Windsurf** to Nova Browser, add 
 
 - [x] Modern UI with Vertical Tabs & Workspaces
 - [x] Native MCP Autonomous AI Agent Protocol & Virtual Glowing Cursor
-- [x] Zero-Knowledge 1-Click Device Pairing Code Cloud Sync (E2EE)
+- [x] Zero-Knowledge Encrypted Cloud Sync (AES-256-GCM via Nova Cloud)
 - [x] Direct Chrome Web Store 1-Click Extension Installation
 - [x] Built-in Privacy Shield (AdBlock & Tracker Protection)
 - [x] Dual-View Split Screen with Drag-to-Resize Divider
 - [x] Reader Mode with High-Fidelity Native OS Text-to-Speech (TTS)
 - [x] Local Offline LLM Integration (Web-LLM / WebGPU)
 - [x] Persistent Info Vault & Task History Tracking
-- [x] Comprehensive Automated Test Suite (48 Test Suites, 640+ Regression, Security & Empirical Tests)
+- [x] Comprehensive Automated Test Suite (70+ Test Suites, 1,000+ Passing Regression, Security & Empirical Tests)
+- [ ] Code-based 1-Click Device Pairing (without account)
 - [ ] Mobile Companion Application
 
 ---

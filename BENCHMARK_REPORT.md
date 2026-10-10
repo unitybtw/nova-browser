@@ -77,7 +77,7 @@ To run the verification tests and microbenchmarks locally:
 # 1. Run internal microbenchmarks (V8 state throughput, bundle analysis)
 npm run benchmark
 
-# 2. Run the complete automated test suite (560+ tests)
+# 2. Run the complete automated test suite (1,000+ tests)
 npm test
 
 # 3. Build production bundle and inspect chunk sizes
