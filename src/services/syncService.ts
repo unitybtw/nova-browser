@@ -16,7 +16,7 @@
  * accounts cannot sync. Legacy sync-chain/pairing APIs are deprecated (throw).
  */
 
-import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings, SavedPassword } from '../types/browser';
+import { Bookmark, Folder, Tab, Workspace, HistoryItem, UserSettings, SavedPassword, defaultSettings } from '../types/browser';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabaseClient, isSupabaseConfigured, hasElectronSecureStore, SUPABASE_AUTH_STORAGE_KEY } from './supabaseClient';
 import { base64ToBytes, bytesToBase64, decryptSyncPayload, deriveKey as deriveSyncCryptoKey, encryptSyncPayload, EncryptedSyncEnvelope } from './syncCrypto';
@@ -1117,15 +1117,17 @@ export function stampPersistedSettings(
 ): Record<string, number> {
   const next = { ...(timestamps ?? {}) };
   const previous = (previousPersisted ?? {}) as Record<string, unknown>;
-  for (const [key, value] of Object.entries((persisted ?? {}) as Record<string, unknown>)) {
-    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-    if (!Object.prototype.hasOwnProperty.call(persisted, key)) continue;
+  const candidate = (persisted ?? {}) as Record<string, unknown>;
+  const validKeys = Object.keys(defaultSettings) as (keyof UserSettings)[];
+  for (const key of validKeys) {
+    if (!Object.prototype.hasOwnProperty.call(candidate, key)) continue;
+    const value = candidate[key];
     // Compared as written, not by reference: `shortcuts` and the other object
     // settings are replaced wholesale on every render, so reference equality
     // would stamp them on every keystroke, while a change deep inside one of
     // them is still a real change of the field.
     if (JSON.stringify(previous[key]) === JSON.stringify(value)) continue;
-    Object.defineProperty(next, key, { value: at, writable: true, enumerable: true, configurable: true });
+    next[key] = at;
   }
   return next;
 }

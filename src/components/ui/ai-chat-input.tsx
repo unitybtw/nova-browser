@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
+import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 import { Bot, Brain, Cpu, Sparkles, Zap, Image as ImageIcon, Check, AlertCircle, X } from "lucide-react";
 import { getLocale, useTranslation } from "../../services/i18n";
@@ -24,7 +25,7 @@ interface Attachment {
 
 function sanitizeBlobUrl(url: string): string {
   if (typeof url === 'string' && url.startsWith('blob:')) {
-    return url;
+    return DOMPurify.sanitize(url);
   }
   return '';
 }

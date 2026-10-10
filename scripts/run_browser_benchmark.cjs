@@ -209,7 +209,7 @@ async function main() {
     const good = runs.filter(r => r.status === 'ok');
     if (!good.length) {
       const rawReason = String(runs.map(r => r.reason).filter(Boolean)[0] || 'no successful runs');
-      const safeReason = rawReason.replace(/[\r\n\x00-\x1f]/g, ' ');
+      const safeReason = encodeURIComponent(rawReason.slice(0, 100));
       console.log(` unavailable (${safeReason})`);
       report.browsers.push({ name: browser.name, status: runs[0]?.status || 'error', runs });
       continue;

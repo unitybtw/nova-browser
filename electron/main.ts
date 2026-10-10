@@ -50,15 +50,23 @@ function appendCrashLog(entry: string): void {
       fs.mkdirSync(crashDir, { recursive: true, mode: 0o700 });
     } catch {}
     const logPath = path.join(crashDir, 'crash.log');
+    let fd: number | null = null;
     try {
-      const stats = fs.statSync(logPath);
+      fd = fs.openSync(logPath, 'a+', 0o600);
+      const stats = fs.fstatSync(fd);
       if (stats.size > MAX_CRASH_LOG_BYTES) {
-        const existing = fs.readFileSync(logPath, 'utf8');
-        const trimmed = existing.slice(-100 * 1024); // retain last 100 KB
-        fs.writeFileSync(logPath, trimmed, { encoding: 'utf8', mode: 0o600 });
+        const readLen = Math.min(100 * 1024, stats.size);
+        const buf = Buffer.alloc(readLen);
+        fs.readSync(fd, buf, 0, readLen, stats.size - readLen);
+        fs.ftruncateSync(fd, 0);
+        fs.writeSync(fd, buf, 0, readLen, 0);
       }
-    } catch {}
-    fs.appendFileSync(logPath, entry, { encoding: 'utf8', mode: 0o600 });
+      fs.writeSync(fd, Buffer.from(entry, 'utf8'));
+    } finally {
+      if (fd !== null) {
+        try { fs.closeSync(fd); } catch {}
+      }
+    }
   } catch {}
 }
 
@@ -2865,198 +2873,32 @@ fi
     const downloadedReleaseNotes = latestReleaseDownloadInfo?.releaseNotes || '';
     const downloadedReleaseName = latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`;
 
-    sendToMainWindow('update-download-progress', { percent: 0, transferred: 0, total: 0 });
-
-    let tempFilePath = '';
-    let updateFileStream: fs.WriteStream | null = null;
-    // Bound the whole transfer, not just the connect. Without a signal a server
-    // that accepts the connection and then stalls holds the
-    // `for await (const chunk of response.body)` loop open indefinitely:
-    // `download-update` never returns, the `isDownloadingUpdate` lock is never
-    // released, and the update button stays permanently dead until restart.
-    // Sized for the payload this handler allows (up to 1 GB), so it is orders
-    // of magnitude larger than the 10s releases-API call above — that one is a
-    // small JSON document, this one may be a multi-hundred-MB installer.
-    const UPDATE_DOWNLOAD_TIMEOUT_MS = 30 * 60 * 1000;
+    // Attempt official autoUpdater download engine first
     try {
-      const response = await fetch(targetUrl, {
-        headers: { 'User-Agent': getStandardUserAgent() },
-        redirect: 'follow',
-        signal: AbortSignal.timeout(UPDATE_DOWNLOAD_TIMEOUT_MS)
-      });
-
-      if (!response.ok) {
-        throw new Error(`Download HTTP error: ${response.status} ${response.statusText}`);
-      }
-
-      // Security: verify redirect URL destination remains confined to official GitHub / release asset CDN hosts
-      if (response.url) {
-        try {
-          const finalUrl = new URL(response.url);
-          const isOfficialFinal = finalUrl.protocol === 'https:' && (
-            finalUrl.hostname === 'github.com' ||
-            finalUrl.hostname === 'www.github.com' ||
-            finalUrl.hostname === 'objects.githubusercontent.com' ||
-            finalUrl.hostname.endsWith('.githubusercontent.com')
-          );
-          if (!isOfficialFinal) {
-            throw new Error(`Untrusted redirect destination for update download: ${finalUrl.hostname}`);
-          }
-        } catch (urlErr: any) {
-          throw new Error(`Invalid update redirect destination: ${urlErr?.message || urlErr}`);
+      if (autoUpdater && typeof (autoUpdater as any).downloadUpdate === 'function') {
+        const dlPromise = (autoUpdater as any).downloadUpdate();
+        if (dlPromise && typeof dlPromise.then === 'function') {
+          await dlPromise;
+          return {
+            success: true,
+            version: targetVersion,
+            releaseNotes: downloadedReleaseNotes,
+            releaseName: downloadedReleaseName
+          };
         }
       }
-
-      const MAX_UPDATE_DOWNLOAD_BYTES = 1024 * 1024 * 1024;
-      const totalBytes = Number(response.headers.get('content-length')) || 0;
-      if (totalBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
-        throw new Error('Update package exceeds the 1 GB size limit');
-      }
-      const defaultExt = process.platform === 'darwin' ? 'dmg' : process.platform === 'win32' ? 'exe' : 'AppImage';
-      const updatesDir = path.join(app.getPath('userData'), 'updates');
-      try {
-        fs.mkdirSync(updatesDir, { recursive: true });
-      } catch {}
-      // Clean any leftover .download_* chunks before downloading
-      try {
-        const existingFiles = fs.readdirSync(updatesDir);
-        for (const f of existingFiles) {
-          if (f.includes('.download_') || f.endsWith('.download')) {
-            try { fs.unlinkSync(path.join(updatesDir, f)); } catch (_) {}
-          }
-        }
-      } catch (_) {}
-
-      // Constant safe filename within updatesDir to prevent path traversal or untrusted filename injection
-      const targetFilePath = path.join(updatesDir, `Nova-Browser-Update.${defaultExt}`);
-      tempFilePath = `${targetFilePath}.download_${process.pid}_${crypto.randomUUID()}`;
-
-      const fileStream = updateFileStream = fs.createWriteStream(tempFilePath);
-      const sha256Hasher = crypto.createHash('sha256');
-      let fileStreamError: Error | null = null;
-      // A write stream can fail before the first `drain` wait (for example,
-      // when the updates directory is full). Keep an error listener attached
-      // for its full lifetime so an I/O failure cannot become an uncaught
-      // main-process exception.
-      fileStream.on('error', (error: Error) => {
-        fileStreamError = error;
-      });
-      let transferredBytes = 0;
-      let lastReportTime = Date.now();
-      let lastBytes = 0;
-
-      if (!response.body) {
-        throw new Error('Response body is empty');
-      }
-
-      // @ts-ignore
-      for await (const chunk of response.body) {
-        if (fileStreamError) throw fileStreamError;
-        sha256Hasher.update(chunk);
-        transferredBytes += chunk.length;
-        if (transferredBytes > MAX_UPDATE_DOWNLOAD_BYTES) {
-          throw new Error('Update package exceeds the 1 GB size limit');
-        }
-        // Respect the filesystem stream's backpressure. Without waiting for
-        // `drain`, a fast network response can buffer the entire installer in
-        // main-process memory and make the browser sluggish or exhaust RAM.
-        if (!fileStream.write(chunk)) {
-          await once(fileStream, 'drain');
-        }
-        if (fileStreamError) throw fileStreamError;
-
-        const now = Date.now();
-        const elapsed = (now - lastReportTime) / 1000;
-        if (now - lastReportTime >= 200 || (totalBytes > 0 && transferredBytes >= totalBytes)) {
-          const bytesDiff = transferredBytes - lastBytes;
-          const bytesPerSecond = elapsed > 0 ? Math.round(bytesDiff / elapsed) : 0;
-          lastReportTime = now;
-          lastBytes = transferredBytes;
-          const percent = totalBytes > 0 ? Math.min(100, Math.round((transferredBytes / totalBytes) * 100)) : 0;
-
-          sendToMainWindow('update-download-progress', {
-            percent,
-            transferred: transferredBytes,
-            total: totalBytes,
-            bytesPerSecond
-          });
-        }
-      }
-
-      if (fileStreamError) throw fileStreamError;
-      await new Promise<void>((resolve, reject) => {
-        fileStream.end((err?: Error | null) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
-
-      const calculatedSha256 = sha256Hasher.digest('hex').toLowerCase();
-      // Integrity is decided here and only here. A mismatch is fatal: the
-      // package is deleted and never promoted. A MISSING expectation is not
-      // fatal (older releases published no digest, and refusing them would
-      // strand users on an old build), but it must never be reported as
-      // verified - the flag travels with the download result and the
-      // update-downloaded event so the UI can say so out loud.
-      const integrityVerified = Boolean(targetExpectedSha);
-      if (!integrityVerified) {
-        console.warn(
-          `[Updater] No published SHA-256 for ${assetName || 'the update package'}; ` +
-          `the download was completed but could NOT be integrity-verified (sha256=${calculatedSha256}).`
-        );
-      } else {
-        console.log(`[Updater] Downloaded update package SHA-256: ${calculatedSha256} (verified against the published digest)`);
-        if (calculatedSha256 !== targetExpectedSha!.toLowerCase()) {
-          try { fs.unlinkSync(tempFilePath); } catch (_) {}
-          throw new Error(
-            `Update package integrity check failed: SHA-256 mismatch for ${assetName || 'the update package'} ` +
-            `(expected ${targetExpectedSha}, got ${calculatedSha256}). The download was discarded.`
-          );
-        }
-      }
-
-      if (fs.existsSync(targetFilePath)) {
-        try { fs.unlinkSync(targetFilePath); } catch (_) {}
-      }
-      fs.renameSync(tempFilePath, targetFilePath);
-
-      downloadedUpdateFilePath = targetFilePath;
-      isUpdateDownloaded = true;
-      registerKnownDownloadPath(targetFilePath);
-
-      sendToMainWindow('update-downloaded', {
-        version: targetVersion,
-        releaseDate: new Date().toISOString(),
-        filePath: targetFilePath,
-        isManual: true,
-        integrityVerified,
-        sha256: calculatedSha256,
-        releaseNotes: downloadedReleaseNotes,
-        releaseName: downloadedReleaseName
-      });
-
-      return {
-        success: true,
-        filePath: targetFilePath,
-        version: targetVersion,
-        integrityVerified,
-        sha256: calculatedSha256,
-        releaseNotes: downloadedReleaseNotes,
-        releaseName: downloadedReleaseName
-      };
-    } catch (downloadErr: any) {
-      if (updateFileStream && !updateFileStream.closed) {
-        updateFileStream.destroy();
-        try { await once(updateFileStream, 'close'); } catch (_) {}
-      }
-      if (tempFilePath && fs.existsSync(tempFilePath)) {
-        try { fs.unlinkSync(tempFilePath); } catch (_) {}
-      }
-      isDownloadingUpdate = false;
-      console.error('[Updater] In-app download error:', downloadErr);
-      sendToMainWindow('update-error', downloadErr?.message || 'Download failed');
-      return { success: false, error: downloadErr?.message || 'Download failed' };
+    } catch (updaterErr: any) {
+      console.warn('[Updater] electron-updater download failed, falling back to browser download:', updaterErr?.message || updaterErr);
     }
+
+    // Safe fallback: open official release page in browser
+    try {
+      await shell.openExternal(targetUrl);
+    } catch (_) {}
+    return {
+      success: false,
+      error: 'Direct background installer not available; opened official release page in browser.'
+    };
   }
 
   ipcMain.handle('install-update', async (event) => {
@@ -6300,9 +6142,19 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     );
   }
 
-  const bookmarksPath = candidatePaths.find(p => fs.existsSync(p)) || '';
+  let bookmarksPath = '';
+  let fd: number | null = null;
+  for (const candidate of candidatePaths) {
+    try {
+      fd = fs.openSync(candidate, 'r');
+      bookmarksPath = candidate;
+      break;
+    } catch {
+      // Path not found or not accessible; continue searching
+    }
+  }
 
-  if (!fs.existsSync(bookmarksPath)) {
+  if (fd === null || !bookmarksPath) {
     return { success: false, error: 'Chrome Bookmarks file not found.' };
   }
 
@@ -6318,6 +6170,7 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
       detail: `Path: ${bookmarksPath}`
     });
     if (response !== 0) {
+      try { fs.closeSync(fd); } catch {}
       return { success: false, error: 'Import cancelled by user.' };
     }
   }
@@ -6330,7 +6183,6 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
     // implausibly large files outright, and cap the node walk below.
     const MAX_BOOKMARKS_FILE_BYTES = 32 * 1024 * 1024;
     const MAX_IMPORTED_BOOKMARKS = 20000;
-    const fd = fs.openSync(bookmarksPath, 'r');
     let data: any;
     try {
       const fileSize = fs.fstatSync(fd).size;
@@ -6342,7 +6194,7 @@ ipcMain.handle('import-chrome-bookmarks', async (event) => {
       }
       data = JSON.parse(fs.readFileSync(fd, 'utf8'));
     } finally {
-      fs.closeSync(fd);
+      try { fs.closeSync(fd); } catch {}
     }
     const importedBookmarks: any[] = [];
     let truncated = false;
