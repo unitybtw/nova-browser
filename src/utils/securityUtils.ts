@@ -23,7 +23,7 @@ const INTERNAL_PROTOCOLS = ['nova:', 'about:', 'chrome-extension:'];
  */
 export function extractHostname(url: string): string {
   try {
-    return new URL(url).hostname.toLowerCase();
+    return new URL(url).hostname.toLowerCase().replace(/\.+$/, '');
   } catch {
     return '';
   }
@@ -177,7 +177,8 @@ export function checkPhishingDomain(url: string): boolean {
     return false;
   }
 
-  const hostname = parsed.hostname.toLowerCase();
+  const rawHostname = parsed.hostname.toLowerCase();
+  const hostname = rawHostname.replace(/\.+$/, '');
   if (!hostname) return false;
 
   // 1. Structural Phishing: Embedded authority credentials used to spoof URLs (e.g., https://paypal.com@phishing.com)
@@ -193,7 +194,8 @@ export function checkPhishingDomain(url: string): boolean {
   // 3. Cryptographically verified blocklist matching (exact or subdomain)
   if (cachedBlocklist && cachedBlocklist.length > 0) {
     const isBlocked = cachedBlocklist.some(blocked => {
-      return hostname === blocked || hostname.endsWith('.' + blocked);
+      const cleanBlocked = blocked.toLowerCase().trim().replace(/\.+$/, '');
+      return hostname === cleanBlocked || hostname.endsWith('.' + cleanBlocked);
     });
     if (isBlocked) return true;
   }
@@ -206,7 +208,10 @@ export function checkPhishingDomain(url: string): boolean {
  * The list is fetched via a custom protocol or passed via IPC from main.
  */
 export function setBlocklist(domains: string[]) {
-  cachedBlocklist = Array.from(new Set([...DEFAULT_BLOCKED_DOMAINS, ...domains.map(d => d.toLowerCase().trim())]));
+  cachedBlocklist = Array.from(new Set([
+    ...DEFAULT_BLOCKED_DOMAINS.map(d => d.toLowerCase().trim().replace(/\.+$/, '')),
+    ...domains.map(d => d.toLowerCase().trim().replace(/\.+$/, ''))
+  ]));
 }
 
 /**
@@ -334,7 +339,8 @@ export function formatDisplayUrl(url: string): string {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return url;
     }
-    let display = parsed.hostname + parsed.pathname;
+    const cleanHost = parsed.hostname.replace(/\.+$/, '');
+    let display = cleanHost + parsed.pathname;
     if (display.endsWith('/')) display = display.slice(0, -1);
     if (parsed.search) display += parsed.search;
     return display;
@@ -362,3 +368,64 @@ export function safeBase64(str: string): string {
     return wellFormed.replace(/[^a-zA-Z0-9_-]/g, '_');
   }
 }
+
+/**
+ * Match a target URL against an extension's declared host permissions.
+ * Supports <all_urls>, wildcard schemes, domain wildcards (*.example.com),
+ * and exact host/port patterns, while strictly rejecting internal schemes (about:, nova:).
+ */
+export function matchesExtensionHostPermission(patterns: string[], targetUrl: string): boolean {
+  if (!targetUrl || typeof targetUrl !== 'string') return false;
+  if (!Array.isArray(patterns) || patterns.length === 0) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return false;
+  }
+
+  // Extensions cannot get host permissions on internal browser pages
+  if (['nova:', 'about:', 'chrome:', 'chrome-extension:'].includes(parsed.protocol)) {
+    return false;
+  }
+
+  const targetScheme = parsed.protocol.replace(':', '').toLowerCase();
+  const targetHost = parsed.hostname.toLowerCase().replace(/\.+$/, '');
+
+  for (const rawPattern of patterns) {
+    if (typeof rawPattern !== 'string') continue;
+    const pat = rawPattern.trim();
+    if (pat === '<all_urls>') {
+      if (['http', 'https', 'ws', 'wss'].includes(targetScheme)) return true;
+      continue;
+    }
+    const match = pat.match(/^(\*|[a-z]+):\/\/(\*|\*\.[^:/]+|[^:/]+)(?::(\*|\d+))?(\/.*)?$/i);
+    if (!match) continue;
+    const [, pScheme, pHost, pPort] = match;
+
+    if (pScheme !== '*' && pScheme.toLowerCase() !== targetScheme) continue;
+    if (pScheme === '*' && !['http', 'https'].includes(targetScheme)) continue;
+
+    if (pPort && pPort !== '*') {
+      const targetPort = parsed.port || (targetScheme === 'https' ? '443' : '80');
+      if (targetPort !== pPort) continue;
+    }
+
+    const patHost = pHost.toLowerCase().replace(/\.+$/, '');
+    if (patHost === '*') {
+      return true;
+    }
+    if (patHost.startsWith('*.')) {
+      const rootDomain = patHost.slice(2);
+      if (targetHost === rootDomain || targetHost.endsWith('.' + rootDomain)) {
+        return true;
+      }
+    } else if (patHost === targetHost) {
+      return true;
+    }
+  }
+
+  return false;
+}
+

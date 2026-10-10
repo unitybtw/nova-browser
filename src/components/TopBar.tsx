@@ -1450,7 +1450,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         url: activeTab?.url,
                         title: activeTab?.title,
                         favIconUrl: activeTab?.favicon,
-                        webContentsId: activeTab?.webContentsId
+                        webContentsId: activeTab?.webContentsId,
+                        isIncognito: Boolean(isIncognito || activeTab?.isIncognito)
                       }
                     );
                   } else {
@@ -1554,7 +1555,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                         url: activeTab.url,
                         title: activeTab.title,
                         favIconUrl: activeTab.favicon,
-                        webContentsId: activeTab.webContentsId
+                        webContentsId: activeTab.webContentsId,
+                        isIncognito: Boolean(isIncognito || activeTab.isIncognito)
                       } : undefined
                     );
                   } else {

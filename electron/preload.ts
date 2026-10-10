@@ -162,6 +162,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   listExtensions: () => ipcRenderer.invoke('list-extensions'),
   removeExtension: (extensionId: string) => ipcRenderer.invoke('remove-extension', extensionId),
   openExtensionPopup: (url: string, bounds: any, activeTabInfo?: any) => ipcRenderer.invoke('open-extension-popup', url, bounds, activeTabInfo),
+  setExtensionIncognitoAccess: (extensionId: string, allowed: boolean) => ipcRenderer.invoke('set-extension-incognito-access', extensionId, allowed),
+  getExtensionIncognitoAccess: (extensionId: string) => ipcRenderer.invoke('get-extension-incognito-access', extensionId),
   selectExtensionFolder: () => ipcRenderer.invoke('select-extension-folder'),
   installFromWebStore: (urlOrId: string) => ipcRenderer.invoke('install-from-webstore', urlOrId),
   reviewExtensionPermissions: (extensionId: string, extractPath: string) => ipcRenderer.invoke('review-extension-permissions', extensionId, extractPath),

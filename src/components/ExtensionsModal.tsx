@@ -197,7 +197,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
             url: activeTab.url,
             title: activeTab.title,
             favIconUrl: activeTab.favicon,
-            webContentsId: activeTab.webContentsId
+            webContentsId: activeTab.webContentsId,
+            isIncognito: Boolean(activeTab.isIncognito)
           } : undefined
         );
         onClose();

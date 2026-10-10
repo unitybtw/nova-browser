@@ -306,12 +306,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
   const [passwordPrompt, setPasswordPrompt] = useState<{
     isOpen: boolean;
+    origin: string;
     hostname: string;
     username: string;
     password: string;
     isUpdate?: boolean;
   }>({
     isOpen: false,
+    origin: '',
     hostname: '',
     username: '',
     password: '',
@@ -328,7 +330,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
   const [autofillMenu, setAutofillMenu] = useState<{
     isOpen: boolean;
     rect: { left: number; top: number; bottom: number; right: number; width: number; height: number };
-    accounts: Array<{ username: string; password: string }>;
+    accounts: Array<{ username: string; password: string; origin?: string; hostname?: string }>;
+    origin: string;
     hostname: string;
   } | null>(null);
   const autofillBlurTimerRef = useRef<any>(null);
@@ -349,18 +352,37 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     }
   }, [tab?.id, tab?.url, onNavigate]);
 
-  const handleSelectAutofill = useCallback((account: { username: string; password: string }, expectedHostname?: string) => {
+  const handleSelectAutofill = useCallback((
+    account: { username: string; password: string; origin?: string; hostname?: string },
+    expectedOrigin?: string,
+    expectedHostname?: string
+  ) => {
     const webview = webviewRef.current;
     if (webview && !(typeof webview.isDestroyed === 'function' && webview.isDestroyed())) {
+      let currentOrigin = '';
       let currentHostname = '';
       try {
         const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-        currentHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+        const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+        currentOrigin = parsed.origin;
+        currentHostname = parsed.hostname;
       } catch (_) {}
 
-      // Security: verify target hostname has not changed since autofill menu was displayed
+      // Security: verify target origin and hostname have not changed since autofill menu was displayed
+      if (expectedOrigin && currentOrigin !== expectedOrigin) {
+        console.warn(`[Security] Autofill aborted: target origin changed from ${expectedOrigin} to ${currentOrigin}`);
+        setAutofillMenu(null);
+        return;
+      }
       if (expectedHostname && currentHostname !== expectedHostname) {
         console.warn(`[Security] Autofill aborted: target hostname changed from ${expectedHostname} to ${currentHostname}`);
+        setAutofillMenu(null);
+        return;
+      }
+
+      // Security: strictly forbid HTTP downgrade - never release HTTPS credentials on HTTP
+      if (expectedOrigin?.startsWith('https:') && currentOrigin.startsWith('http:')) {
+        console.warn(`[Security] Autofill aborted: refusing HTTP downgrade`);
         setAutofillMenu(null);
         return;
       }
@@ -369,6 +391,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         webview.send('fill-credentials', {
           username: account.username,
           password: account.password,
+          expectedOrigin: expectedOrigin || currentOrigin,
           expectedHostname: expectedHostname || currentHostname
         });
       } catch (_) {}
@@ -690,20 +713,23 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (tab?.id) onUpdateTab(tab.id, { isPlayingAudio: false });
     };
 
-    const handlePasswordDetected = async (hostname: string, username: string, password: string) => {
+    const handlePasswordDetected = async (origin: string, hostname: string, username: string, password: string) => {
       if (!latestSettingsRef.current?.passwordManagerEnabled) return;
 
-      // Derive the hostname at EVENT time from the live webview. The captured
-      // `tab?.url` closure goes stale after SPA navigations (this effect does
-      // not depend on tab.url), which previously caused credentials to be
-      // attributed to — and saved under — the wrong host.
+      // Derive the origin and hostname at EVENT time from the live webview.
       let actualHostname = '';
+      let actualOrigin = '';
       try {
         const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-        actualHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+        const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+        actualHostname = parsed.hostname;
+        actualOrigin = parsed.origin;
       } catch (_) {}
 
-      if (!(actualHostname && actualHostname === hostname && username && password)) return;
+      // Reject invalid origins and non-matching origins/hostnames
+      if (!actualOrigin || actualOrigin === 'null' || !actualHostname || !username || !password) return;
+      if (origin && origin !== actualOrigin) return;
+      if (hostname && hostname !== actualHostname) return;
 
       const cleanUser = String(username).substring(0, 100);
       const cleanPass = String(password).substring(0, 500);
@@ -713,7 +739,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
         if (raw) {
           const all = JSON.parse(raw);
-          const existing = all.find((p: any) => p.hostname === actualHostname && p.username === cleanUser);
+          const existing = all.find((p: any) => {
+            const matchOrigin = p.origin ? p.origin === actualOrigin : (p.hostname === actualHostname && !actualOrigin.startsWith('http://'));
+            return matchOrigin && p.username === cleanUser;
+          });
           if (existing) {
             if (existing.password === cleanPass) {
               return;
@@ -732,6 +761,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
       setPasswordPrompt({
         isOpen: true,
+        origin: actualOrigin,
         hostname: actualHostname,
         username: cleanUser,
         password: cleanPass,
@@ -741,42 +771,68 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
     const handleIpcMessage = (e: any) => {
       if (e.channel === 'password-form-submitted' && e.args?.[0]) {
-        const { hostname, username, password } = e.args[0];
-        handlePasswordDetected(hostname, username, password);
+        const { origin, hostname, username, password } = e.args[0];
+        handlePasswordDetected(origin, hostname, username, password);
       } else if (e.channel === 'login-field-focused' && e.args?.[0]) {
         if (!latestSettingsRef.current?.passwordManagerEnabled) return;
         let actualHostname = '';
+        let actualOrigin = '';
         try {
           const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-          actualHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+          const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+          actualHostname = parsed.hostname;
+          actualOrigin = parsed.origin;
         } catch (_) {}
 
         const data = e.args[0];
         const hostname = data.hostname || '';
-        // Security: strictly reject autofill queries where reported hostname does not match active webview origin
+        const origin = data.origin || '';
+        // Security: strictly reject autofill queries where reported origin/hostname does not match active webview
+        if (!actualOrigin || actualOrigin === 'null') return;
+        if (origin && origin !== actualOrigin) return;
         if (!hostname || !actualHostname || actualHostname !== hostname) return;
 
         (window as any).electronAPI?.secureStoreGet?.('passwords').then((raw: string) => {
-          // Same post-await race `handlePasswordDetected` guards. `actualHostname`
-          // and `data.rect` were both read before the await and applied
-          // unconditionally, so a navigation during the secure-store read opened
-          // the previous site's saved accounts over the new page.
           let currentHostname = '';
+          let currentOrigin = '';
           try {
             const liveUrl = typeof webview.getURL === 'function' ? webview.getURL() : '';
-            currentHostname = new URL(liveUrl || latestTabRef.current?.url || '').hostname;
+            const parsed = new URL(liveUrl || latestTabRef.current?.url || '');
+            currentHostname = parsed.hostname;
+            currentOrigin = parsed.origin;
           } catch (_) {}
-          if (!isAutofillLookupCurrent(webviewRef.current, webview, currentHostname, actualHostname)) return;
+          if (!isAutofillLookupCurrent(webviewRef.current, webview, currentOrigin, actualOrigin)) return;
 
           if (!raw) return;
           try {
             const all = JSON.parse(raw);
-            const matching = all.filter((p: any) => p.hostname === actualHostname && p.username && p.password);
+            const matching = all.filter((p: any) => {
+              if (!p.username || !p.password) return false;
+              // 1. Exact origin match
+              if (p.origin) {
+                return p.origin === actualOrigin;
+              }
+              // 2. Legacy record without origin:
+              // Strictly refuse releasing HTTPS-saved credentials to plain HTTP
+              if (actualOrigin.startsWith('http://')) return false;
+              // Only offer on standard HTTPS (port 443) on that hostname
+              if (actualOrigin.startsWith('https://') && p.hostname === actualHostname) {
+                try {
+                  const parsedOrigin = new URL(actualOrigin);
+                  if (!parsedOrigin.port || parsedOrigin.port === '443') {
+                    return true;
+                  }
+                } catch (_) {}
+              }
+              return false;
+            });
+
             if (matching.length > 0) {
               setAutofillMenu({
                 isOpen: true,
                 rect: data.rect,
                 accounts: matching,
+                origin: actualOrigin,
                 hostname: actualHostname
               });
             }
@@ -1409,7 +1465,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  handleSelectAutofill(acc, autofillMenu.hostname);
+                  handleSelectAutofill(acc, autofillMenu.origin, autofillMenu.hostname);
                 }}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-blue-600/20 hover:text-blue-300 text-slate-200 transition-colors flex flex-col gap-0.5"
               >
@@ -1437,10 +1493,16 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 const raw = await (window as any).electronAPI?.secureStoreGet?.('passwords');
                 let passwords = raw ? JSON.parse(raw) : [];
 
-                // Remove existing password for this host & username if any
-                passwords = passwords.filter((p: any) => !(p.hostname === passwordPrompt.hostname && p.username === finalUsername));
+                // Remove existing password for this origin (or hostname if legacy) & username if any
+                passwords = passwords.filter((p: any) => {
+                  const match = p.origin
+                    ? (p.origin === passwordPrompt.origin && p.username === finalUsername)
+                    : (p.hostname === passwordPrompt.hostname && p.username === finalUsername);
+                  return !match;
+                });
 
                 passwords.push({
+                  origin: passwordPrompt.origin,
                   hostname: passwordPrompt.hostname,
                   username: finalUsername,
                   password: finalPassword,

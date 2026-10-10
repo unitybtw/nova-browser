@@ -9,7 +9,7 @@ import { promisify } from 'util';
 import { once } from 'events';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
-import { checkPhishingDomain } from '../src/utils/securityUtils.js';
+import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
 import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 
@@ -170,7 +170,7 @@ function isSafeMediaDownloadUrl(urlStr: string, allowedTypes: ('image' | 'video'
 // Reusable helper: check if hostname belongs to localhost, intranet, or private networks
 export function isLocalOrIntranetHost(hostname: string): boolean {
   if (!hostname) return false;
-  const host = hostname.toLowerCase();
+  const host = hostname.toLowerCase().replace(/\.+$/, '');
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal') || host.endsWith('.lan')) {
     return true;
   }
@@ -5922,6 +5922,14 @@ ipcMain.handle('list-extensions', async (event) => {
   }));
 });
 
+const incognitoAllowedExtensions = new Set<string>();
+
+export function isExtensionAllowedInIncognito(extensionId: string, manifest: any): boolean {
+  if (!extensionId) return false;
+  if (manifest?.incognito === 'not_allowed') return false;
+  return incognitoAllowedExtensions.has(extensionId);
+}
+
 // Open Extension Popup Window
 ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?: number; y?: number; width?: number; height?: number } | null, activeTabInfo?: Record<string, unknown> | null) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
@@ -6069,7 +6077,44 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   // Inject active tab bridge into the extension popup
   const injectActiveTabBridge = () => {
     if (!activeTabInfo || !popupWin || popupWin.isDestroyed()) return;
-    const tabData = {
+
+    let extId = '';
+    try {
+      if (url.startsWith('chrome-extension://')) {
+        extId = new URL(url).hostname;
+      }
+    } catch {}
+
+    const ext: any = (extId ? session.defaultSession.getExtension(extId) : null) ||
+      loadedExtensions.find(e => e.id === extId) ||
+      (url.startsWith('file://') ? loadedExtensions.find(e => url.includes(e.id)) : null);
+
+    let manifest: any = ext?.manifest;
+    if (!manifest && ext?.path) {
+      try {
+        const mPath = path.join(ext.path, 'manifest.json');
+        if (fs.existsSync(mPath)) {
+          manifest = JSON.parse(fs.readFileSync(mPath, 'utf8'));
+        }
+      } catch {}
+    }
+
+    const effectiveId = extId || ext?.id || '';
+    const perms: string[] = Array.isArray(manifest?.permissions) ? manifest.permissions : [];
+    const optPerms: string[] = Array.isArray(manifest?.optional_permissions) ? manifest.optional_permissions : [];
+    const hostPerms: string[] = Array.isArray(manifest?.host_permissions) ? manifest.host_permissions : [];
+    const allPerms = [...perms, ...optPerms];
+
+    const hasTabsPermission = allPerms.includes('tabs') || allPerms.includes('activeTab');
+    const activeUrl = typeof activeTabInfo.url === 'string' ? activeTabInfo.url : '';
+    const hasHostPermission = matchesExtensionHostPermission([...hostPerms, ...perms], activeUrl);
+    const hasTabAccess = hasTabsPermission || hasHostPermission;
+
+    const isIncognito = Boolean(activeTabInfo.isIncognito);
+    const isAllowedInIncognito = isExtensionAllowedInIncognito(effectiveId, manifest);
+    const canExposeSensitiveData = hasTabAccess && (!isIncognito || isAllowedInIncognito);
+
+    const tabData: Record<string, unknown> = {
       id: activeTabInfo.webContentsId || 1,
       index: 0,
       windowId: win.id,
@@ -6077,14 +6122,17 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       active: true,
       selected: true,
       pinned: false,
-      url: activeTabInfo.url || 'about:blank',
-      title: activeTabInfo.title || 'New Tab',
-      favIconUrl: activeTabInfo.favIconUrl || '',
       status: 'complete',
-      incognito: false,
+      incognito: isIncognito,
       width: win.getContentBounds().width,
       height: win.getContentBounds().height
     };
+
+    if (canExposeSensitiveData && activeUrl) {
+      tabData.url = activeUrl;
+      tabData.title = typeof activeTabInfo.title === 'string' ? activeTabInfo.title : 'New Tab';
+      tabData.favIconUrl = typeof activeTabInfo.favIconUrl === 'string' ? activeTabInfo.favIconUrl : '';
+    }
 
     const bridgeCode = `
       (function() {
@@ -6434,6 +6482,24 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
     console.error('Failed to remove extension:', err);
     return { error: err?.message || 'Failed to remove extension' };
   }
+});
+
+// Extension incognito access management
+ipcMain.handle('set-extension-incognito-access', async (event, extensionId: unknown, allowed: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (typeof extensionId !== 'string' || !extensionId) return { error: 'Invalid extension ID' };
+  if (allowed === true) {
+    incognitoAllowedExtensions.add(extensionId);
+  } else {
+    incognitoAllowedExtensions.delete(extensionId);
+  }
+  return { success: true };
+});
+
+ipcMain.handle('get-extension-incognito-access', async (event, extensionId: unknown) => {
+  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (typeof extensionId !== 'string' || !extensionId) return false;
+  return incognitoAllowedExtensions.has(extensionId);
 });
 
 // Install from Chrome Web Store (CRX download + zip-slip guards live in main/crxInstaller.ts)

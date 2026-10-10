@@ -85,6 +85,7 @@ interface ElectronExtensionPopupTabInfo {
   title?: string;
   favIconUrl?: string;
   webContentsId?: number;
+  isIncognito?: boolean;
 }
 
 /**
@@ -226,6 +227,8 @@ export interface ElectronAPI {
     bounds?: ElectronExtensionPopupBounds,
     activeTabInfo?: ElectronExtensionPopupTabInfo
   ) => Promise<{ success?: boolean; toggled?: boolean; error?: string }>;
+  setExtensionIncognitoAccess: (extensionId: string, allowed: boolean) => Promise<{ success?: boolean; error?: string }>;
+  getExtensionIncognitoAccess: (extensionId: string) => Promise<boolean>;
   selectExtensionFolder: () => Promise<{ canceled: boolean; folderPath?: string }>;
   installFromWebStore: (urlOrId: string) => Promise<{
     success?: boolean;

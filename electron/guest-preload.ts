@@ -187,6 +187,7 @@ if (protocol === 'https:' || protocol === 'http:') {
 
     try {
       ipcRenderer.sendToHost('password-form-submitted', {
+        origin: window.location.origin,
         hostname,
         username,
         password
@@ -297,15 +298,21 @@ if (protocol === 'https:' || protocol === 'http:') {
   const isTopFrame = window === window.top;
 
   // Secure credential filling listener: received from host when user selects an account in native UI
-  ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string; expectedHostname?: string }) => {
+  ipcRenderer.on('fill-credentials', (_event, cred: { username?: string; password?: string; expectedOrigin?: string; expectedHostname?: string }) => {
     if (!isTopFrame) return;
     if (!cred) return;
-    // Security: fail CLOSED on the origin binding. This is the last hop before
-    // a stored secret crosses into a page, so an absent, empty or non-string
-    // expectedHostname must NOT be read as "fill on any origin" — it must
-    // abort. Only an exact hostname match may receive the password.
-    if (typeof cred.expectedHostname !== 'string' || cred.expectedHostname.length === 0) return;
-    if (window.location.hostname !== cred.expectedHostname) return;
+    // Security: fail CLOSED on origin binding.
+    // If expectedOrigin is provided, require exact window.location.origin match.
+    // Prohibit releasing HTTPS credentials to an unencrypted HTTP origin.
+    if (typeof cred.expectedOrigin === 'string' && cred.expectedOrigin.length > 0) {
+      if (window.location.origin !== cred.expectedOrigin) return;
+    } else if (typeof cred.expectedHostname === 'string' && cred.expectedHostname.length > 0) {
+      if (window.location.hostname !== cred.expectedHostname) return;
+      // Refuse releasing credentials to unencrypted HTTP
+      if (window.location.protocol === 'http:') return;
+    } else {
+      return;
+    }
     try {
       const activeEl = document.activeElement as HTMLElement | null;
       const root = activeEl?.closest('form') || activeEl?.closest('fieldset') || activeEl?.parentElement || document;
@@ -350,6 +357,7 @@ if (protocol === 'https:' || protocol === 'http:') {
           const rect = target.getBoundingClientRect();
           try {
             ipcRenderer.sendToHost('login-field-focused', {
+              origin: window.location.origin,
               hostname: window.location.hostname,
               rect: {
                 left: rect.left,
