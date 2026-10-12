@@ -414,7 +414,7 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
     const hasAttachments = attachments.length > 0;
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
-    const internalContainerRef = useRef<HTMLDivElement>(null);
+    const internalContainerRef = useRef<HTMLDivElement | null>(null);
     const topFadeRef = useRef<HTMLDivElement>(null);
     const bottomFadeRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -974,7 +974,6 @@ export const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           ref={(node) => {
             if (typeof ref === "function") ref(node);
             else if (ref) ref.current = node;
-            // @ts-ignore
             internalContainerRef.current = node;
           }}
           onBlur={handleBlur}
