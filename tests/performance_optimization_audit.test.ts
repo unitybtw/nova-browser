@@ -141,6 +141,137 @@ assertPerf(
   'Expected comparator to return false when active pane shifts in split tab'
 );
 
+// TopBar Component Level Memo Comparator: Decoupling background tab updates
+function topBarMemoComparator(prevProps: any, nextProps: any): boolean {
+  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
+  if (prevProps.splitTabId !== nextProps.splitTabId) return false;
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
+  if (prevProps.workspaces !== nextProps.workspaces) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+  if (prevProps.downloads !== nextProps.downloads) return false;
+  if ((prevProps.activeDownloadsCount || 0) !== (nextProps.activeDownloadsCount || 0)) return false;
+  if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
+
+  const prevTabs = prevProps.tabs;
+  const nextTabs = nextProps.tabs;
+  if (prevTabs === nextTabs) return true;
+  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
+  for (let i = 0; i < prevTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.url !== b.url ||
+      a.title !== b.title ||
+      a.favicon !== b.favicon ||
+      a.isLoading !== b.isLoading ||
+      a.isMuted !== b.isMuted ||
+      a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
+      a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isSuspended !== b.isSuspended ||
+      a.isTranslated !== b.isTranslated ||
+      a.splitWith !== b.splitWith
+    ) {
+      return false;
+    }
+    if (a.id === nextProps.activeTabId) {
+      if (
+        a.canGoBack !== b.canGoBack ||
+        a.canGoForward !== b.canGoForward ||
+        a.zoomFactor !== b.zoomFactor ||
+        a.blockedAdsCount !== b.blockedAdsCount ||
+        a.webContentsId !== b.webContentsId
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+const initialTopBarTabs = [
+  { id: 'tab-1', url: 'https://example.com/1', title: 'Tab 1', blockedAdsCount: 0, zoomFactor: 1, canGoBack: false, canGoForward: false, webContentsId: 1 },
+  { id: 'tab-2', url: 'https://example.com/2', title: 'Tab 2', blockedAdsCount: 0, zoomFactor: 1, canGoBack: false, canGoForward: false, webContentsId: 2 }
+];
+
+const topBarBaseProps = {
+  activeTabId: 'tab-1',
+  splitTabId: null,
+  isAIAssistantOpen: false,
+  workspaces: [],
+  bookmarks: [],
+  downloads: [],
+  activeDownloadsCount: 0,
+  permissionRequests: [],
+  tabs: initialTopBarTabs
+};
+
+// Inactive background tab (tab-2) blocks ads -> TopBar memo comparator MUST return true (skip re-render)
+const topBarBgAdsUpdate = {
+  ...topBarBaseProps,
+  tabs: [
+    initialTopBarTabs[0],
+    { ...initialTopBarTabs[1], blockedAdsCount: 14 }
+  ]
+};
+
+assertPerf(
+  topBarMemoComparator(topBarBaseProps, topBarBgAdsUpdate),
+  'TopBar Memoization',
+  'Skips TopBar re-render when background tab blockedAdsCount updates',
+  'Expected comparator to return true for background tab ad updates'
+);
+
+// Active tab (tab-1) blocks ads -> TopBar memo comparator MUST return false (re-renders to update badge)
+const topBarActiveAdsUpdate = {
+  ...topBarBaseProps,
+  tabs: [
+    { ...initialTopBarTabs[0], blockedAdsCount: 5 },
+    initialTopBarTabs[1]
+  ]
+};
+
+assertPerf(
+  !topBarMemoComparator(topBarBaseProps, topBarActiveAdsUpdate),
+  'TopBar Memoization',
+  'Invalidates TopBar memo when active tab blockedAdsCount updates',
+  'Expected comparator to return false for active tab ad updates'
+);
+
+// Inactive background tab updates zoom -> TopBar memo comparator MUST return true
+const topBarBgZoomUpdate = {
+  ...topBarBaseProps,
+  tabs: [
+    initialTopBarTabs[0],
+    { ...initialTopBarTabs[1], zoomFactor: 1.5 }
+  ]
+};
+
+assertPerf(
+  topBarMemoComparator(topBarBaseProps, topBarBgZoomUpdate),
+  'TopBar Memoization',
+  'Skips TopBar re-render when background tab zoomFactor updates',
+  'Expected comparator to return true for background tab zoom updates'
+);
+
+// Inactive background tab updates title -> TopBar memo comparator MUST return false (updates tab strip item)
+const topBarBgTitleUpdate = {
+  ...topBarBaseProps,
+  tabs: [
+    initialTopBarTabs[0],
+    { ...initialTopBarTabs[1], title: 'New Title' }
+  ]
+};
+
+assertPerf(
+  !topBarMemoComparator(topBarBaseProps, topBarBgTitleUpdate),
+  'TopBar Memoization',
+  'Invalidates TopBar memo when background tab title changes',
+  'Expected comparator to return false for tab title updates'
+);
+
 // =========================================================================
 // 2. OMNIBOXBAR REACT.MEMO COMPARATOR DECOUPLING
 // =========================================================================

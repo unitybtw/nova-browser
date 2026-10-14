@@ -1964,14 +1964,20 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       a.isPlayingAudio !== b.isPlayingAudio ||
       a.isSuspended !== b.isSuspended ||
       a.isTranslated !== b.isTranslated ||
-      a.splitWith !== b.splitWith ||
-      a.canGoBack !== b.canGoBack ||
-      a.canGoForward !== b.canGoForward ||
-      a.zoomFactor !== b.zoomFactor ||
-      a.blockedAdsCount !== b.blockedAdsCount ||
-      a.webContentsId !== b.webContentsId
+      a.splitWith !== b.splitWith
     ) {
       return false;
+    }
+    if (a.id === nextProps.activeTabId) {
+      if (
+        a.canGoBack !== b.canGoBack ||
+        a.canGoForward !== b.canGoForward ||
+        a.zoomFactor !== b.zoomFactor ||
+        a.blockedAdsCount !== b.blockedAdsCount ||
+        a.webContentsId !== b.webContentsId
+      ) {
+        return false;
+      }
     }
   }
   return true;
