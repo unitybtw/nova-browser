@@ -3493,22 +3493,26 @@ app.on('web-contents-created', (_event, contents) => {
         sendToMainWindow('blocked-site', { url: navigationUrl, reason: 'phishing' });
         const escapedUrl = navigationUrl.substring(0, 500);
         const safeUrlJson = JSON.stringify(escapedUrl);
-        contents.loadURL('about:blank').then(() => {
-          contents.executeJavaScript(`
-            (() => {
-              document.title = 'Dangerous Site Blocked';
-              document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-              const h1 = document.createElement('h1');
-              h1.textContent = 'Dangerous Site Blocked';
-              h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-              const p = document.createElement('p');
-              p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-              p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-              document.body.appendChild(h1);
-              document.body.appendChild(p);
-            })()
-          `).catch(() => {});
-        }).catch(() => {});
+        if (!contents.isDestroyed()) {
+          contents.loadURL('about:blank').then(() => {
+            if (!contents.isDestroyed()) {
+              contents.executeJavaScript(`
+                (() => {
+                  document.title = 'Dangerous Site Blocked';
+                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+                  const h1 = document.createElement('h1');
+                  h1.textContent = 'Dangerous Site Blocked';
+                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+                  const p = document.createElement('p');
+                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+                  document.body.appendChild(h1);
+                  document.body.appendChild(p);
+                })()
+              `).catch(() => {});
+            }
+          }).catch(() => {});
+        }
         return;
       }
 
@@ -3530,9 +3534,11 @@ app.on('web-contents-created', (_event, contents) => {
           // upgrade fails — a MITM can force that downgrade. Log and stay put.
           // navigationUrl is now in upgradedUrls, so an EXPLICIT user retry of
           // the http:// URL is still allowed through (see the check above).
-          contents.loadURL(httpsUrl).catch((upgradeErr: any) => {
-            console.warn('HTTPS upgrade failed, refusing to downgrade to HTTP for:', navigationUrl, upgradeErr?.message || upgradeErr);
-          });
+          if (!contents.isDestroyed()) {
+            contents.loadURL(httpsUrl).catch((upgradeErr: any) => {
+              console.warn('HTTPS upgrade failed, refusing to downgrade to HTTP for:', navigationUrl, upgradeErr?.message || upgradeErr);
+            });
+          }
         }
       } catch {}
     });
@@ -3559,22 +3565,26 @@ app.on('web-contents-created', (_event, contents) => {
         sendToMainWindow('blocked-site', { url: redirectUrl, reason: 'phishing' });
         const escapedUrl = redirectUrl.substring(0, 500);
         const safeUrlJson = JSON.stringify(escapedUrl);
-        contents.loadURL('about:blank').then(() => {
-          contents.executeJavaScript(`
-            (() => {
-              document.title = 'Dangerous Site Blocked';
-              document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
-              const h1 = document.createElement('h1');
-              h1.textContent = 'Dangerous Site Blocked';
-              h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
-              const p = document.createElement('p');
-              p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
-              p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
-              document.body.appendChild(h1);
-              document.body.appendChild(p);
-            })()
-          `).catch(() => {});
-        }).catch(() => {});
+        if (!contents.isDestroyed()) {
+          contents.loadURL('about:blank').then(() => {
+            if (!contents.isDestroyed()) {
+              contents.executeJavaScript(`
+                (() => {
+                  document.title = 'Dangerous Site Blocked';
+                  document.body.style.cssText = 'font-family:system-ui,-apple-system,sans-serif;text-align:center;padding:50px;color:#ef4444;background:#fef2f2;height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;margin:0;box-sizing:border-box;';
+                  const h1 = document.createElement('h1');
+                  h1.textContent = 'Dangerous Site Blocked';
+                  h1.style.cssText = 'font-size:24px;font-weight:700;margin-bottom:12px;color:#b91c1c;';
+                  const p = document.createElement('p');
+                  p.textContent = 'This site (' + ${safeUrlJson} + ') has been identified as containing phishing or malicious software and was blocked for your safety.';
+                  p.style.cssText = 'font-size:14px;color:#7f1d1d;max-width:600px;word-break:break-all;line-height:1.5;';
+                  document.body.appendChild(h1);
+                  document.body.appendChild(p);
+                })()
+              `).catch(() => {});
+            }
+          }).catch(() => {});
+        }
         return;
       }
 
@@ -3583,9 +3593,11 @@ app.on('web-contents-created', (_event, contents) => {
         e.preventDefault();
         addUpgradedUrl(redirectUrl);
         const httpsUrl = redirectUrl.replace(/^http:/i, 'https:');
-        contents.loadURL(httpsUrl).catch((err: any) => {
-          console.warn('HTTPS redirect upgrade failed; refusing HTTP:', redirectUrl, err?.message || err);
-        });
+        if (!contents.isDestroyed()) {
+          contents.loadURL(httpsUrl).catch((err: any) => {
+            console.warn('HTTPS redirect upgrade failed; refusing HTTP:', redirectUrl, err?.message || err);
+          });
+        }
       }
     });
   }
@@ -6064,7 +6076,9 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       })();
     `;
 
-    popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
+    if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
+      popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
+    }
   };
 
   // Graceful show & blur handling: only allow blur-close after popup is stably shown
@@ -6085,18 +6099,20 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
 
     // Auto-fit popup dimensions to content
     try {
-      const dimensions = await popupWin.webContents.executeJavaScript(`
-        ({
-          width: Math.max(document.body?.scrollWidth || 0, document.documentElement?.scrollWidth || 0, 320),
-          height: Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, 200)
-        })
-      `);
-      if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
-        const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
-        const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
+      if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
+        const dimensions = await popupWin.webContents.executeJavaScript(`
+          ({
+            width: Math.max(document.body?.scrollWidth || 0, document.documentElement?.scrollWidth || 0, 320),
+            height: Math.max(document.body?.scrollHeight || 0, document.documentElement?.scrollHeight || 0, 200)
+          })
+        `);
+        if (dimensions && typeof dimensions.width === 'number' && typeof dimensions.height === 'number') {
+          const fitWidth = Math.min(Math.max(dimensions.width, 320), 800);
+          const fitHeight = Math.min(Math.max(dimensions.height, 200), 700);
 
-        if (!popupWin.isDestroyed()) {
-          popupWin.setSize(fitWidth, fitHeight);
+          if (!popupWin.isDestroyed()) {
+            popupWin.setSize(fitWidth, fitHeight);
+          }
         }
       }
     } catch (_) {}
@@ -6130,9 +6146,12 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   });
 
   try {
-    await popupWin.loadURL(url);
-    showPopup();
-    return { success: true };
+    if (!popupWin.isDestroyed()) {
+      await popupWin.loadURL(url);
+      showPopup();
+      return { success: true };
+    }
+    return { error: 'Popup window was destroyed before load' };
   } catch (err: any) {
     if (!popupWin.isDestroyed()) popupWin.close();
     return { error: 'Failed to load extension popup: ' + err.message };

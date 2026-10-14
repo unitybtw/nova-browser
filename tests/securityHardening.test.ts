@@ -275,6 +275,8 @@ async function run() {
     reload: () => { throw new Error('Object has been destroyed'); },
     goBack: () => { throw new Error('Object has been destroyed'); },
     goForward: () => { throw new Error('Object has been destroyed'); },
+    loadURL: () => { throw new Error('Object has been destroyed'); },
+    executeJavaScript: () => { throw new Error('Object has been destroyed'); },
   };
 
   assert.doesNotThrow(() => {
@@ -286,6 +288,18 @@ async function run() {
   assert.doesNotThrow(() => {
     if (!mockDestroyedWc.isDestroyed()) {
       mockDestroyedWc.getURL();
+    }
+  });
+
+  assert.doesNotThrow(() => {
+    if (!mockDestroyedWc.isDestroyed()) {
+      mockDestroyedWc.loadURL();
+    }
+  });
+
+  assert.doesNotThrow(() => {
+    if (!mockDestroyedWc.isDestroyed()) {
+      mockDestroyedWc.executeJavaScript();
     }
   });
 
