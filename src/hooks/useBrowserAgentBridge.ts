@@ -282,7 +282,7 @@ export function useBrowserAgentBridge({
             if (targetWs !== (activeWorkspaceIdRef.current || 'default')) {
               setActiveWorkspaceId(targetWs);
             }
-            setActiveTabId(safeArgs.tabId);
+            mcpHandlersRef.current.handleSelectTab(safeArgs.tabId);
             return `Switched to tab ${safeArgs.tabId}`;
           }
           return `Error: Tab ${safeArgs.tabId} not found.`;

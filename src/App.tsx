@@ -326,7 +326,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       setTabs(prev => [...prev, initialWorkspaceTab]);
       setActiveTabId(newTabId);
     } else if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
-      setActiveTabId(visibleWorkspaceTabs[0].id);
+      const fallbackTarget = visibleWorkspaceTabs[0];
+      setActiveTabId(fallbackTarget.id);
+      if (fallbackTarget.isSuspended) {
+        setTabs(prev => prev.map(t => t.id === fallbackTarget.id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
+      }
     }
 
     // Geçersiz folderId'leri temizle. repairTabFolderAssignments değişiklik
@@ -347,7 +351,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }]);
       setActiveTabId(fallbackId);
     } else if (!tabs.some(t => t.id === activeTabId)) {
-      setActiveTabId(tabs[0].id);
+      const fallbackTarget = tabs[0];
+      setActiveTabId(fallbackTarget.id);
+      if (fallbackTarget.isSuspended) {
+        setTabs(prev => prev.map(t => t.id === fallbackTarget.id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
+      }
     }
   }, [tabs, activeTabId, activeWorkspaceId, folders]);
 
@@ -716,7 +724,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
     const workspaceTabs = tabsRef.current.filter(t => t.workspaceId === workspaceId || (!t.workspaceId && workspaceId === 'default'));
     if (workspaceTabs.length > 0) {
-      setActiveTabId(workspaceTabs[0].id);
+      activateTab(workspaceTabs[0].id);
     } else {
       // Create a new tab if empty workspace
       const newTab: Tab = {
@@ -730,9 +738,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         lastAccessed: Date.now()
       };
       setTabs(prev => [...prev, newTab]);
-      setActiveTabId(newTab.id);
+      activateTab(newTab.id);
     }
-  }, []);
+  }, [activateTab]);
 
   const handleUpdateWorkspaces = useCallback((newWorkspaces: Workspace[]) => {
     const validIds = new Set(newWorkspaces.map(w => w.id));
@@ -797,11 +805,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     closeAllModals();
     const existing = tabsRef.current.find(t => t.url === 'nova://downloads');
     if (existing) {
-      setActiveTabId(existing.id);
+      activateTab(existing.id);
     } else {
       handleNewTab('nova://downloads');
     }
-  }, [handleNewTab, closeAllModals]);
+  }, [handleNewTab, closeAllModals, activateTab]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
 
@@ -884,8 +892,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } else if (t && !t.workspaceId) {
       setActiveWorkspaceId('default');
     }
-    setActiveTabId(tabId);
-  }, []);
+    activateTab(tabId);
+  }, [activateTab]);
 
   // handleOnboardingComplete useOnboarding'dan gelir (yukarıda); settings merge +
   // importedBookmarks append callback'leri hook'a taşındı, davranış birebir aynı.
@@ -962,11 +970,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     });
 
     if (side === 'left') {
-      setActiveTabId(targetTabId);
+      activateTab(targetTabId);
     } else {
-      setActiveTabId(partnerTabId);
+      activateTab(partnerTabId);
     }
-  }, [activeTabId, tabs, activeWorkspaceId]);
+  }, [activeTabId, tabs, activeWorkspaceId, activateTab]);
   const handleToggleReaderMode = useCallback(() => {
     // `isActive` inside ReaderMode is now the real signal (its tab is in front),
     // so "open but bound to another tab" is not a showing reader: toggling here
@@ -1161,12 +1169,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Next / Previous Tab (Ctrl+Tab / Ctrl+Shift+Tab)
+      // Next / Previous Tab (Ctrl+Tab / Ctrl+Shift+Tab) within current workspace
       if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
         e.preventDefault();
         // Compute from refs OUTSIDE the updater (StrictMode-safe). Tabs are
-        // unchanged here — only the selection moves.
-        const currentTabs = tabsRef.current;
+        // unchanged here — only the selection moves within the active workspace.
+        const activeWs = activeWorkspaceIdRef.current || 'default';
+        const currentTabs = tabsRef.current.filter(t => (t.workspaceId || 'default') === activeWs);
         if (currentTabs.length > 1) {
           const currentIndex = currentTabs.findIndex(t => t.id === activeTabIdRef.current);
           let nextIndex = 0;
@@ -1175,7 +1184,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           } else {
             nextIndex = currentIndex >= currentTabs.length - 1 ? 0 : currentIndex + 1;
           }
-          setActiveTabId(currentTabs[nextIndex].id);
+          activateTab(currentTabs[nextIndex].id);
         }
         return;
       }
@@ -1231,17 +1240,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
-      // Hardcoded tab switching (Cmd + 1..9)
+      // Hardcoded tab switching (Cmd + 1..9) within current workspace
       if (meta && !shift && /^[1-9]$/.test(key)) {
         e.preventDefault();
         const num = parseInt(key, 10);
         // Compute from tabsRef OUTSIDE the updater (StrictMode-safe). Tabs are
-        // unchanged here — only the selection moves.
-        const currentTabs = tabsRef.current;
+        // unchanged here — only the selection moves within the active workspace.
+        const activeWs = activeWorkspaceIdRef.current || 'default';
+        const currentTabs = tabsRef.current.filter(t => (t.workspaceId || 'default') === activeWs);
         if (num === 9 && currentTabs.length > 0) {
-          setActiveTabId(currentTabs[currentTabs.length - 1].id);
+          activateTab(currentTabs[currentTabs.length - 1].id);
         } else if (num <= currentTabs.length) {
-          setActiveTabId(currentTabs[num - 1].id);
+          activateTab(currentTabs[num - 1].id);
         }
         return;
       }
@@ -1305,7 +1315,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature]);
+  }, [activeTabId, activateTab, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
   // DownloadToast tekil prop alıyor: öğe `downloads` dizisinden referansıyla
@@ -1766,9 +1776,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 onMouseDownCapture={() => {
                   if (secondarySplitTab) {
                     if (isSecondary && activeTabId !== secondarySplitTab.id) {
-                      setActiveTabId(secondarySplitTab.id);
+                      activateTab(secondarySplitTab.id);
                     } else if (isPrimary && primarySplitTab && activeTabId !== primarySplitTab.id) {
-                      setActiveTabId(primarySplitTab.id);
+                      activateTab(primarySplitTab.id);
                     }
                   }
                 }}
@@ -1777,7 +1787,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 {Boolean(secondarySplitTab) && (isPrimary || isSecondary) && (
                   <div
                     onClick={() => {
-                      if (activeTabId !== tab.id) setActiveTabId(tab.id);
+                      if (activeTabId !== tab.id) activateTab(tab.id);
                     }}
                     className={`h-8 min-h-[32px] px-3 flex items-center justify-between border-b select-none transition-all shrink-0 z-20 cursor-pointer ${
                       activeTabId === tab.id
@@ -1896,8 +1906,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     onCloseTab={handleCloseTab}
                     isIncognito={tab.isIncognito || false}
                     onExitIncognito={handleExitIncognitoTab}
-                    history={typeof tab?.url === 'string' && tab.url.includes('nova://history') ? history : EMPTY_ARRAY}
-                    downloads={typeof tab?.url === 'string' && tab.url.includes('nova://downloads') ? downloads : EMPTY_ARRAY}
+                    history={typeof tab?.url === 'string' && (tab.url.includes('nova://history') || tab.url === 'about:history') ? history : EMPTY_ARRAY}
+                    downloads={typeof tab?.url === 'string' && (tab.url.includes('nova://downloads') || tab.url === 'about:downloads') ? downloads : EMPTY_ARRAY}
                     onClearHistory={handleClearHistory}
                     onRemoveHistoryItem={handleRemoveHistoryItem}
                     onClearDownloads={handleClearDownloads}

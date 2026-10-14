@@ -1064,6 +1064,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       const detail = e.detail;
       if (detail?.tabId === tab?.id && webviewRef.current) {
         const webview = webviewRef.current;
+        if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
         try {
           // 1. Extract text nodes
           const extractScript = getExtractTextNodesScript();
@@ -1076,6 +1077,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
 
             if (typeof (window as any).electronAPI?.translateTextBatch === 'function') {
               const response = await (window as any).electronAPI.translateTextBatch(extractResult.texts, sourceLang, targetLang);
+
+              if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
 
               if (response && Array.isArray(response.translations) && response.translations.length > 0) {
                 // 3. Apply translations
@@ -1100,9 +1103,11 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     const handleRestoreTabEvent = async (e: any) => {
       const detail = e.detail;
       if (detail?.tabId === tab?.id && webviewRef.current) {
+        const webview = webviewRef.current;
+        if (typeof webview.isDestroyed === 'function' && webview.isDestroyed()) return;
         try {
           const restoreScript = getRestoreOriginalScript();
-          await webviewRef.current.executeJavaScript(restoreScript);
+          await webview.executeJavaScript(restoreScript);
           if (tab?.id) {
             onUpdateTab(tab.id, { isTranslated: false, translatedLang: undefined });
           }

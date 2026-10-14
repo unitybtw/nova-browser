@@ -124,3 +124,81 @@ assert.deepStrictEqual(reordered.map(t => t.id), ['tab-B', 'tab-A'], 'Tabs must 
 assert.deepStrictEqual(reorderTabs(testTabs3, -1, 5), testTabs3, 'Out of bounds reorder must return unchanged array');
 
 console.log('[PASS] [Tab Operations] Tab reordering with bounds checking verified');
+
+// 5. Split Partner Decoupling on Tab Closure (closeOtherTabs & closeTabsToRight)
+function closeOtherTabsWithDecouple(tabs: Tab[], keepId: string): Tab[] {
+  const keepTab = tabs.find(t => t.id === keepId);
+  if (!keepTab) return tabs;
+  const keepWorkspace = keepTab.workspaceId || 'default';
+  const toClose = tabs.filter(t => (t.workspaceId || 'default') === keepWorkspace && t.id !== keepId && !t.isPinned);
+  const closeIds = new Set(toClose.map(t => t.id));
+  return tabs
+    .filter(t => !closeIds.has(t.id))
+    .map(t => (t.splitWith && closeIds.has(t.splitWith)) ? { ...t, splitWith: undefined } : t);
+}
+
+function closeTabsToRightWithDecouple(tabs: Tab[], targetId: string): Tab[] {
+  const targetIndex = tabs.findIndex(t => t.id === targetId);
+  if (targetIndex === -1) return tabs;
+  const targetTab = tabs[targetIndex];
+  const targetWorkspace = targetTab.workspaceId || 'default';
+  const wsTabs = tabs.filter(t => (t.workspaceId || 'default') === targetWorkspace);
+  const wsTargetIdx = wsTabs.findIndex(t => t.id === targetId);
+  const toClose = wsTabs.slice(wsTargetIdx + 1).filter(t => !t.isPinned);
+  const closeIds = new Set(toClose.map(t => t.id));
+  return tabs
+    .filter(t => !closeIds.has(t.id))
+    .map(t => (t.splitWith && closeIds.has(t.splitWith)) ? { ...t, splitWith: undefined } : t);
+}
+
+const splitTestTabs: Tab[] = [
+  makeTab('tab-kept', { splitWith: 'tab-closed-1', workspaceId: 'default' }),
+  makeTab('tab-closed-1', { splitWith: 'tab-kept', workspaceId: 'default' }),
+  makeTab('tab-closed-2', { workspaceId: 'default' }),
+  makeTab('tab-other-ws', { workspaceId: 'dev' }),
+];
+
+const afterCloseOther = closeOtherTabsWithDecouple(splitTestTabs, 'tab-kept');
+assert.strictEqual(afterCloseOther.length, 2, 'Must keep target tab and other workspace tab');
+assert.strictEqual(afterCloseOther.find(t => t.id === 'tab-kept')?.splitWith, undefined, 'Kept tab must have splitWith cleared when partner is closed');
+
+const splitRightTabs: Tab[] = [
+  makeTab('tab-L', { splitWith: 'tab-R', workspaceId: 'default' }),
+  makeTab('tab-R', { splitWith: 'tab-L', workspaceId: 'default' }),
+];
+const afterCloseRight = closeTabsToRightWithDecouple(splitRightTabs, 'tab-L');
+assert.strictEqual(afterCloseRight.length, 1);
+assert.strictEqual(afterCloseRight[0].id, 'tab-L');
+assert.strictEqual(afterCloseRight[0].splitWith, undefined, 'Closing right split partner must decouple left tab splitWith');
+
+console.log('[PASS] [Tab Operations] splitWith decoupling on tab closure verified');
+
+// 6. Workspace-scoped tab switching
+function getNextWorkspaceTab(tabs: Tab[], currentActiveId: string, activeWorkspaceId: string, shiftKey: boolean): string | null {
+  const currentTabs = tabs.filter(t => (t.workspaceId || 'default') === activeWorkspaceId);
+  if (currentTabs.length <= 1) return null;
+  const currentIndex = currentTabs.findIndex(t => t.id === currentActiveId);
+  let nextIndex = 0;
+  if (shiftKey) {
+    nextIndex = currentIndex <= 0 ? currentTabs.length - 1 : currentIndex - 1;
+  } else {
+    nextIndex = currentIndex >= currentTabs.length - 1 ? 0 : currentIndex + 1;
+  }
+  return currentTabs[nextIndex].id;
+}
+
+const multiWsTabs: Tab[] = [
+  makeTab('w1-t1', { workspaceId: 'work' }),
+  makeTab('w1-t2', { workspaceId: 'work' }),
+  makeTab('w2-t1', { workspaceId: 'personal' }),
+  makeTab('w1-t3', { workspaceId: 'work' }),
+];
+
+assert.strictEqual(getNextWorkspaceTab(multiWsTabs, 'w1-t1', 'work', false), 'w1-t2');
+assert.strictEqual(getNextWorkspaceTab(multiWsTabs, 'w1-t2', 'work', false), 'w1-t3');
+assert.strictEqual(getNextWorkspaceTab(multiWsTabs, 'w1-t3', 'work', false), 'w1-t1'); // wraps around within 'work'
+assert.strictEqual(getNextWorkspaceTab(multiWsTabs, 'w1-t1', 'work', true), 'w1-t3'); // shift-tab backwards in 'work'
+assert.strictEqual(getNextWorkspaceTab(multiWsTabs, 'w2-t1', 'personal', false), null); // only 1 tab in personal, no cycle
+
+console.log('[PASS] [Tab Operations] Workspace-scoped tab switching verified');
+

@@ -300,7 +300,10 @@ export function useTabOperations({
     const toClose = prev.filter(t => (t.workspaceId || 'default') === targetWs && t.id !== tabId && !t.isPinned);
     toClose.forEach(t => tabThumbnailCache.remove(t.id));
     pushClosedTabs(toClose);
-    const toKeep = prev.filter(t => !toClose.some(c => c.id === t.id));
+    const closeIds = new Set(toClose.map(t => t.id));
+    const toKeep = prev
+      .filter(t => !closeIds.has(t.id))
+      .map(t => (t.splitWith && closeIds.has(t.splitWith)) ? { ...t, splitWith: undefined } : t);
     cleanupIncognitoSessions(toClose, toKeep);
     // activateTab must come after the snapshot-derived setTabs(toKeep): its wake
     // is a functional update and would be overwritten by that direct value.
@@ -338,7 +341,9 @@ export function useTabOperations({
     const closeIds = new Set(tabsToClose.map(t => t.id));
     closeIds.forEach(id => tabThumbnailCache.remove(id));
     pushClosedTabs(tabsToClose);
-    const nextTabs = prev.filter(t => !closeIds.has(t.id));
+    const nextTabs = prev
+      .filter(t => !closeIds.has(t.id))
+      .map(t => (t.splitWith && closeIds.has(t.splitWith)) ? { ...t, splitWith: undefined } : t);
     cleanupIncognitoSessions(tabsToClose, nextTabs);
     setTabs(nextTabs);
     // Same ordering rule as handleCloseOtherTabs: activate after the
