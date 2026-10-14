@@ -375,6 +375,10 @@ function isTrustedSender(event: Electron.IpcMainInvokeEvent | Electron.IpcMainEv
   if (!event.senderFrame || !mainWindow.webContents.mainFrame || event.senderFrame !== mainWindow.webContents.mainFrame) {
     return false;
   }
+  const frameUrl = event.senderFrame.url;
+  if (!frameUrl || !isTrustedAppOrigin(frameUrl)) {
+    return false;
+  }
   return true;
 }
 
@@ -3370,7 +3374,7 @@ app.on('web-contents-created', (_event, contents) => {
           return;
         }
 
-        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com')) {
+        if (parsed.protocol === 'https:' && (parsed.hostname === 'chromewebstore.google.com' || parsed.hostname === 'chrome.google.com') && (parsed.hostname === 'chromewebstore.google.com' || parsed.pathname.startsWith('/webstore/'))) {
           isAuthorizedWebstore = true;
         }
       } catch {
@@ -3982,7 +3986,21 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
     try {
       const validated = await validatePreviewUrl(currentUrl);
       if (!('error' in validated)) {
-        const resp = await fetch(currentUrl, { signal: AbortSignal.timeout(8000) });
+        const { url: parsedUrl, pinnedIp } = validated;
+        const isHttps = parsedUrl.protocol === 'https:';
+        const agentOptions = {
+          lookup: (_hostname: string, _opts: any, cb: any) => {
+            cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+          }
+        };
+        const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
+        const resp = await fetch(currentUrl, {
+          agent,
+          signal: AbortSignal.timeout(8000),
+          headers: {
+            'User-Agent': getStandardUserAgent()
+          }
+        } as any);
         // Bounded like every sibling fetch path: an adversarially large or
         // never-ending body would otherwise be buffered into the main process and
         // then serialised a second time into the viewer, twice over.
@@ -4466,7 +4484,7 @@ ipcMain.handle('copy-mcp-token', (event) => {
   const token = mcpServer?.getToken();
   if (token) {
     clipboard.writeText(token);
-    // Security: Auto-clear token from clipboard after 60 seconds to prevent unauthorized exfiltration
+    // Security: Auto-clear token from clipboard after 15 seconds to prevent unauthorized exfiltration
     if (clipboardTokenClearTimer) clearTimeout(clipboardTokenClearTimer);
     clipboardTokenClearTimer = setTimeout(() => {
       try {
@@ -4474,7 +4492,7 @@ ipcMain.handle('copy-mcp-token', (event) => {
           clipboard.clear();
         }
       } catch (_) {}
-    }, 60000);
+    }, 15000);
     return true;
   }
   return false;
@@ -4495,7 +4513,7 @@ ipcMain.handle('copy-mcp-config', (event) => {
     }
   }, null, 2);
   clipboard.writeText(config);
-  // Security: Auto-clear Bearer-bearing config from clipboard after 60s (same as copy-mcp-token)
+  // Security: Auto-clear Bearer-bearing config from clipboard after 15s (same as copy-mcp-token)
   if (clipboardConfigClearTimer) clearTimeout(clipboardConfigClearTimer);
   clipboardConfigClearTimer = setTimeout(() => {
     try {
@@ -4503,8 +4521,8 @@ ipcMain.handle('copy-mcp-config', (event) => {
         clipboard.clear();
       }
     } catch (_) {}
-  }, 60000);
-  return { ok: true, autoClearSec: 60 };
+  }, 15000);
+  return { ok: true, autoClearSec: 15 };
 });
 ipcMain.handle('get-mcp-token-status', (event) => {
   if (!isTrustedSender(event)) return { configured: false, prefix: '' };

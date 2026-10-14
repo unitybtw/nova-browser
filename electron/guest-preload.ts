@@ -102,6 +102,33 @@ if (protocol === 'https:' || protocol === 'http:') {
   let lastSubmitTime = 0;
   let lastSubmittedPayload = '';
 
+  const isExcludedFromUsername = (input: HTMLInputElement | null | undefined): boolean => {
+    if (!input) return true;
+    const type = (input.type || '').toLowerCase();
+    if (['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'image', 'range', 'color', 'hidden', 'password'].includes(type)) {
+      return true;
+    }
+    const autocomplete = (input.autocomplete || '').toLowerCase();
+    if (autocomplete.startsWith('cc-') || autocomplete === 'one-time-code' || autocomplete === 'transaction-amount' || autocomplete === 'transaction-currency') {
+      return true;
+    }
+
+    const hints = [
+      input.name || '',
+      input.id || '',
+      input.getAttribute('placeholder') || '',
+      input.getAttribute('aria-label') || '',
+      input.className || ''
+    ].join(' ').toLowerCase();
+
+    // Sensitive field heuristic: never treat payment, CVV, OTP, 2FA, PIN, or captcha as a username
+    if (/(?:cvv|cvc|card[-_]?num|credit|debit|expir|security[-_]?code|otp|totp|mfa|2fa|verification|verify|passcode|pin|captcha|csrf)/i.test(hints)) {
+      return true;
+    }
+
+    return false;
+  };
+
   const findUsernameForPassword = (pwdInput: HTMLInputElement, container?: Element | null): string => {
     const root = container || pwdInput.closest('form') || pwdInput.closest('div') || document;
 
@@ -119,7 +146,7 @@ if (protocol === 'https:' || protocol === 'http:') {
 
     for (const sel of specificSelectors) {
       const el = root.querySelector(sel) as HTMLInputElement;
-      if (el && el !== pwdInput && el.value && el.value.trim()) {
+      if (el && el !== pwdInput && !isExcludedFromUsername(el) && el.value && el.value.trim()) {
         return el.value.trim();
       }
     }
@@ -127,9 +154,12 @@ if (protocol === 'https:' || protocol === 'http:') {
     const allInputs = Array.from(root.querySelectorAll('input:not([type="hidden"]):not([type="password"])')) as HTMLInputElement[];
     if (allInputs.length > 0) {
       for (let i = allInputs.length - 1; i >= 0; i--) {
-        const val = allInputs[i].value?.trim();
-        if (val && val.length > 0 && !allInputs[i].disabled) {
-          return val;
+        const inp = allInputs[i];
+        if (inp && inp !== pwdInput && !inp.disabled && !isExcludedFromUsername(inp)) {
+          const val = inp.value?.trim();
+          if (val && val.length > 0) {
+            return val;
+          }
         }
       }
     }
@@ -140,8 +170,11 @@ if (protocol === 'https:' || protocol === 'http:') {
 
     const docInputs = Array.from(document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"]')) as HTMLInputElement[];
     for (const inp of docInputs) {
-      if (inp && inp.value?.trim()) {
-        return inp.value.trim();
+      if (inp && inp !== pwdInput && !inp.disabled && !isExcludedFromUsername(inp)) {
+        const val = inp.value?.trim();
+        if (val && val.length > 0) {
+          return val;
+        }
       }
     }
 
@@ -215,7 +248,7 @@ if (protocol === 'https:' || protocol === 'http:') {
           id.includes('email') ||
           id.includes('login');
 
-        if (isUserField && target.value && target.value.trim().length > 0) {
+        if (isUserField && !isExcludedFromUsername(target) && target.value && target.value.trim().length > 0) {
           lastEnteredUsername = target.value.trim();
         }
       }

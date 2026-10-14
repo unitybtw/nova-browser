@@ -397,7 +397,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     sendToMainWindow('download-update', {
       id: downloadId,
       filename: path.basename(item.getSavePath() || filename),
-      url: item.getURL(),
+      url: redactUrlForLog(item.getURL()),
       receivedBytes: 0,
       totalBytes,
       state: 'progressing',
@@ -411,7 +411,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
         sendToMainWindow('download-update', {
           id: downloadId,
           filename: path.basename(item.getSavePath() || filename),
-          url: item.getURL(),
+          url: redactUrlForLog(item.getURL()),
           receivedBytes: item.getReceivedBytes(),
           totalBytes,
           state: 'interrupted',
@@ -426,7 +426,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           sendToMainWindow('download-update', {
             id: downloadId,
             filename: path.basename(item.getSavePath() || filename),
-            url: item.getURL(),
+            url: redactUrlForLog(item.getURL()),
             receivedBytes: item.getReceivedBytes(),
             totalBytes,
             state: 'progressing',
@@ -442,7 +442,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       sendToMainWindow('download-update', {
         id: downloadId,
         filename: path.basename(item.getSavePath() || filename),
-        url: item.getURL(),
+        url: redactUrlForLog(item.getURL()),
         receivedBytes: item.getReceivedBytes(),
         totalBytes: item.getTotalBytes(),
         state: state === 'completed' ? 'completed' : (state === 'interrupted' ? 'interrupted' : 'cancelled'),

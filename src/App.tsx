@@ -31,6 +31,7 @@ import { repairTabFolderAssignments } from './utils/verticalTabs';
 import { generateId } from './utils/idGenerator';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/safeStorage';
 import { showConfirm, showAlert } from './utils/confirmDialog';
+import { isSafeNavigationUrl } from './utils/safeNavigation';
 import { matchesShortcut } from './utils/keyboardShortcuts';
 import { useBookmarks } from './hooks/useBookmarks';
 import { useVpn } from './hooks/useVpn';
@@ -135,19 +136,18 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useEffect(() => {
     if (demoParams.isDemo) {
       const handleMessage = (e: MessageEvent) => {
-        // Security: Validate message origin to prevent cross-origin state tampering
-        if (e.origin) {
-          try {
-            const originUrl = new URL(e.origin);
-            const isSameOrigin = e.origin === window.location.origin;
-            const isOfficialPages = originUrl.protocol === 'https:' && (originUrl.hostname === 'unitybtw.github.io' || originUrl.hostname === 'novabrowser.pages.dev');
-            const isLocal = (originUrl.protocol === 'http:' || originUrl.protocol === 'https:') && (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1');
-            if (!isSameOrigin && !isOfficialPages && !isLocal) {
-              return;
-            }
-          } catch (_) {
+        // Security: Validate message origin strictly to prevent cross-origin state tampering
+        if (!e.origin) return;
+        try {
+          const originUrl = new URL(e.origin);
+          const isSameOrigin = e.origin === window.location.origin;
+          const isOfficialPages = originUrl.protocol === 'https:' && (originUrl.hostname === 'unitybtw.github.io' || originUrl.hostname === 'novabrowser.pages.dev');
+          const isLocal = (originUrl.protocol === 'http:' || originUrl.protocol === 'https:') && (originUrl.hostname === 'localhost' || originUrl.hostname === '127.0.0.1');
+          if (!isSameOrigin && !isOfficialPages && !isLocal) {
             return;
           }
+        } catch (_) {
+          return;
         }
         if (e.data && e.data.type === 'NOVA_THEME_CHANGE') {
           const newTheme = e.data.theme === 'light' ? 'light' : 'dark';
@@ -205,10 +205,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (startupBehavior === 'continue') {
       const saved = localStorage.getItem('nova_session_tabs');
       const parsedTabs = safeParseArrayWithBackup<Tab>('nova_session_tabs', saved, []);
-      if (parsedTabs.length > 0) {
-        return parsedTabs.map((t, idx) => ({
+      const safeTabs = parsedTabs.filter(t => t && typeof t === 'object' && typeof t.id === 'string' && (!t.url || isSafeNavigationUrl(t.url)));
+      if (safeTabs.length > 0) {
+        return safeTabs.map((t, idx) => ({
           ...t,
-          lastAccessed: t.lastAccessed || (Date.now() - (parsedTabs.length - idx) * 1000)
+          lastAccessed: t.lastAccessed || (Date.now() - (safeTabs.length - idx) * 1000)
         }));
       }
     }

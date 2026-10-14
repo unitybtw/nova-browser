@@ -519,17 +519,26 @@ export class BrowserMCPServer {
   public getDisabledTools(): string[] { return Array.from(this.disabledTools); }
 
   public setToolEnabled(toolName: string, enabled: boolean) {
+    if (typeof toolName !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(toolName)) return;
+    if (toolName === '__proto__' || toolName === 'constructor' || toolName === 'prototype') return;
     if (!enabled) cancelPendingMcpActions(`MCP tool '${toolName}' was disabled`, toolName);
     if (enabled) this.disabledTools.delete(toolName);
     else this.disabledTools.add(toolName);
     // Persist to userData
     try {
       const settingsPath = path.join(electronApp.getPath('userData'), 'mcp-tool-settings.json');
-      let current: Record<string, boolean> = {};
+      const current = Object.create(null) as Record<string, boolean>;
       try {
-        current = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+          for (const [k, v] of Object.entries(raw)) {
+            if (typeof k === 'string' && /^[a-zA-Z0-9_-]+$/.test(k) && k !== '__proto__' && k !== 'constructor' && k !== 'prototype' && typeof v === 'boolean') {
+              current[k] = v;
+            }
+          }
+        }
       } catch {}
-      current[toolName] = enabled;
+      current[toolName] = Boolean(enabled);
       fs.writeFileSync(settingsPath, JSON.stringify(current));
     } catch {}
   }
@@ -543,8 +552,11 @@ export class BrowserMCPServer {
       } catch {
         return;
       }
+      if (!settings || typeof settings !== 'object' || Array.isArray(settings)) return;
       for (const [tool, enabled] of Object.entries(settings)) {
-        this.setToolEnabled(tool, enabled);
+        if (typeof tool === 'string' && /^[a-zA-Z0-9_-]+$/.test(tool) && tool !== '__proto__' && tool !== 'constructor' && tool !== 'prototype' && typeof enabled === 'boolean') {
+          this.setToolEnabled(tool, enabled);
+        }
       }
     } catch {}
   }
@@ -938,7 +950,11 @@ export class BrowserMCPServer {
         res.status(202).json({ status: 'accepted' });
 
       } catch (err: any) {
-        res.status(500).json({ error: err.message });
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        let safeMsg = typeof err?.message === 'string' ? err.message : 'Internal error';
+        if (homeDir) safeMsg = safeMsg.replaceAll(homeDir, '~');
+        safeMsg = safeMsg.replace(/([A-Za-z]:\\[^:\s]+|\/(?:Users|home|root|var|etc)\/[^\s:]+)/g, '<path>');
+        res.status(500).json({ error: safeMsg.slice(0, 200) });
       }
     });
 
@@ -963,7 +979,11 @@ export class BrowserMCPServer {
         const result = await this.executeTool(tool, args);
         res.json({ success: true, result });
       } catch (err: any) {
-        res.status(500).json({ success: false, error: err.message });
+        const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+        let safeMsg = typeof err?.message === 'string' ? err.message : 'Tool execution failed';
+        if (homeDir) safeMsg = safeMsg.replaceAll(homeDir, '~');
+        safeMsg = safeMsg.replace(/([A-Za-z]:\\[^:\s]+|\/(?:Users|home|root|var|etc)\/[^\s:]+)/g, '<path>');
+        res.status(500).json({ success: false, error: safeMsg.slice(0, 200) });
       }
     });
 
