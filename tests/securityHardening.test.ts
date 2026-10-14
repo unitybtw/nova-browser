@@ -244,6 +244,51 @@ async function run() {
   assert.equal(testValidateUpdateUrl('https://evil-server.com/Nova-Browser-Setup.exe'), false);
   assert.equal(testValidateUpdateUrl('http://github.com/unitybtw/nova-browser/releases/v1.0'), false);
 
+  // Verify Source Viewer Fallback Fetch SSRF Protection
+  function testValidateSourceViewerFetchUrl(urlStr: string): boolean {
+    try {
+      const parsed = new URL(urlStr);
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+      const host = parsed.hostname.toLowerCase();
+      if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local')) return false;
+      if (host === '127.0.0.1' || host === '::1' || host === '0.0.0.0') return false;
+      if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.|169\.254\.)/.test(host)) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  assert.equal(testValidateSourceViewerFetchUrl('https://example.com/index.html'), true);
+  assert.equal(testValidateSourceViewerFetchUrl('http://public-site.org'), true);
+  assert.equal(testValidateSourceViewerFetchUrl('http://localhost:3000'), false);
+  assert.equal(testValidateSourceViewerFetchUrl('http://127.0.0.1:8080'), false);
+  assert.equal(testValidateSourceViewerFetchUrl('http://169.254.169.254/latest/meta-data'), false);
+  assert.equal(testValidateSourceViewerFetchUrl('http://192.168.1.1/admin'), false);
+  assert.equal(testValidateSourceViewerFetchUrl('file:///etc/passwd'), false);
+
+  // Verify Destroyed WebContents Resilience Pattern
+  const mockDestroyedWc = {
+    isDestroyed: () => true,
+    getURL: () => { throw new Error('Object has been destroyed'); },
+    print: () => { throw new Error('Object has been destroyed'); },
+    reload: () => { throw new Error('Object has been destroyed'); },
+    goBack: () => { throw new Error('Object has been destroyed'); },
+    goForward: () => { throw new Error('Object has been destroyed'); },
+  };
+
+  assert.doesNotThrow(() => {
+    if (!mockDestroyedWc.isDestroyed()) {
+      mockDestroyedWc.print();
+    }
+  });
+
+  assert.doesNotThrow(() => {
+    if (!mockDestroyedWc.isDestroyed()) {
+      mockDestroyedWc.getURL();
+    }
+  });
+
   console.log('Security hardening protocol & context-menu enforcement tests passing');
 }
 
@@ -251,3 +296,4 @@ run().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+

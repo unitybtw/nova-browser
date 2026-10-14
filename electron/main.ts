@@ -3960,7 +3960,7 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
   if (isInternalPage || isViewSource) return null;
 
   let htmlSource = '';
-  if (wc && typeof wc.executeJavaScript === 'function') {
+  if (wc && !wc.isDestroyed() && typeof wc.executeJavaScript === 'function') {
     try {
       htmlSource = await wc.executeJavaScript('document.documentElement.outerHTML');
     } catch {}
@@ -3968,11 +3968,14 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
 
   if (!htmlSource && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
     try {
-      const resp = await fetch(currentUrl, { signal: AbortSignal.timeout(8000) });
-      // Bounded like every sibling fetch path: an adversarially large or
-      // never-ending body would otherwise be buffered into the main process and
-      // then serialised a second time into the viewer, twice over.
-      htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
+      const validated = await validatePreviewUrl(currentUrl);
+      if (!('error' in validated)) {
+        const resp = await fetch(currentUrl, { signal: AbortSignal.timeout(8000) });
+        // Bounded like every sibling fetch path: an adversarially large or
+        // never-ending body would otherwise be buffered into the main process and
+        // then serialised a second time into the viewer, twice over.
+        htmlSource = await readResponseTextWithLimit(resp, 8 * 1024 * 1024);
+      }
     } catch {}
   }
 
@@ -4079,7 +4082,9 @@ app.on('web-contents-created', (_event, wc) => {
           for (const suggestion of params.dictionarySuggestions) {
             menu.append(new MenuItem({
               label: suggestion,
-              click: () => wc.replaceMisspelling(suggestion)
+              click: () => {
+                if (!wc.isDestroyed()) wc.replaceMisspelling(suggestion);
+              }
             }));
           }
         } else {
@@ -4091,7 +4096,9 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ type: 'separator' }));
         menu.append(new MenuItem({
           label: labels.addToDictionary,
-          click: () => wc.session.addWordToSpellCheckerDictionary(params.misspelledWord)
+          click: () => {
+            if (!wc.isDestroyed()) wc.session.addWordToSpellCheckerDictionary(params.misspelledWord);
+          }
         }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
@@ -4114,8 +4121,10 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: labels.saveLinkAs,
             click: () => {
-              markNextDownloadAsSaveAs(wc.id);
-              wc.downloadURL(params.linkURL);
+              if (!wc.isDestroyed()) {
+                markNextDownloadAsSaveAs(wc.id);
+                wc.downloadURL(params.linkURL);
+              }
             }
           }));
         }
@@ -4141,8 +4150,10 @@ app.on('web-contents-created', (_event, wc) => {
           menu.append(new MenuItem({
             label: labels.saveImageAs,
             click: () => {
-              markNextDownloadAsSaveAs(wc.id);
-              wc.downloadURL(params.srcURL);
+              if (!wc.isDestroyed()) {
+                markNextDownloadAsSaveAs(wc.id);
+                wc.downloadURL(params.srcURL);
+              }
             }
           }));
         }
@@ -4150,7 +4161,7 @@ app.on('web-contents-created', (_event, wc) => {
           label: labels.copyImage,
           click: () => {
             try {
-              wc.copyImageAt(params.x, params.y);
+              if (!wc.isDestroyed()) wc.copyImageAt(params.x, params.y);
             } catch {
               if (isSafeImage) clipboard.writeText(params.srcURL);
             }
@@ -4183,13 +4194,21 @@ app.on('web-contents-created', (_event, wc) => {
           if (flags.canPlay) {
             menu.append(new MenuItem({
               label: flags.isPaused ? labels.play : labels.pause,
-              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {})
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) { if(el.paused) el.play(); else el.pause(); } })()`).catch(() => {});
+                }
+              }
             }));
           }
           if (flags.canMute) {
             menu.append(new MenuItem({
               label: flags.isMuted ? labels.unmute : labels.mute,
-              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.muted = !el.muted; })()`).catch(() => {})
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.muted = !el.muted; })()`).catch(() => {});
+                }
+              }
             }));
           }
           if (flags.canLoop) {
@@ -4197,7 +4216,11 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.loop,
               type: 'checkbox',
               checked: flags.isLooping,
-              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.loop = !el.loop; })()`).catch(() => {})
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.loop = !el.loop; })()`).catch(() => {});
+                }
+              }
             }));
           }
           if (flags.canShowControls) {
@@ -4205,13 +4228,21 @@ app.on('web-contents-created', (_event, wc) => {
               label: labels.showControls,
               type: 'checkbox',
               checked: flags.isShowingControls,
-              click: () => wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.controls = !el.controls; })()`).catch(() => {})
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${mediaTarget}; if(el) el.controls = !el.controls; })()`).catch(() => {});
+                }
+              }
             }));
           }
           if (isVideo && flags.canPictureInPicture) {
             menu.append(new MenuItem({
               label: labels.pictureInPicture,
-              click: () => wc.executeJavaScript(`(() => { const el = ${videoTarget}; if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {})
+              click: () => {
+                if (!wc.isDestroyed()) {
+                  wc.executeJavaScript(`(() => { const el = ${videoTarget}; if(el) { if(document.pictureInPictureElement) document.exitPictureInPicture(); else el.requestPictureInPicture(); } })()`).catch(() => {});
+                }
+              }
             }));
           }
           menu.append(new MenuItem({ type: 'separator' }));
@@ -4222,8 +4253,10 @@ app.on('web-contents-created', (_event, wc) => {
             menu.append(new MenuItem({
               label: isVideo ? labels.saveVideoAs : labels.saveAudioAs,
               click: () => {
-                markNextDownloadAsSaveAs(wc.id);
-                wc.downloadURL(params.srcURL);
+                if (!wc.isDestroyed()) {
+                  markNextDownloadAsSaveAs(wc.id);
+                  wc.downloadURL(params.srcURL);
+                }
               }
             }));
             menu.append(new MenuItem({
@@ -4251,7 +4284,9 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.print,
           accelerator: 'CmdOrCtrl+P',
-          click: () => wc.print()
+          click: () => {
+            if (!wc.isDestroyed()) wc.print();
+          }
         }));
         menu.append(new MenuItem({ type: 'separator' }));
       }
@@ -4276,19 +4311,25 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.back,
           accelerator: process.platform === 'darwin' ? 'Cmd+[' : 'Alt+Left',
-          click: () => wc.goBack(),
-          enabled: wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack()
+          click: () => {
+            if (!wc.isDestroyed()) wc.goBack();
+          },
+          enabled: !wc.isDestroyed() && (wc.navigationHistory ? wc.navigationHistory.canGoBack() : wc.canGoBack())
         }));
         menu.append(new MenuItem({
           label: labels.forward,
           accelerator: process.platform === 'darwin' ? 'Cmd+]' : 'Alt+Right',
-          click: () => wc.goForward(),
-          enabled: wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward()
+          click: () => {
+            if (!wc.isDestroyed()) wc.goForward();
+          },
+          enabled: !wc.isDestroyed() && (wc.navigationHistory ? wc.navigationHistory.canGoForward() : wc.canGoForward())
         }));
         menu.append(new MenuItem({
           label: labels.reload,
           accelerator: 'CmdOrCtrl+R',
-          click: () => wc.reload()
+          click: () => {
+            if (!wc.isDestroyed()) wc.reload();
+          }
         }));
         menu.append(new MenuItem({ type: 'separator' }));
 
@@ -4297,6 +4338,7 @@ app.on('web-contents-created', (_event, wc) => {
           label: labels.savePageAs,
           accelerator: 'CmdOrCtrl+S',
           click: async () => {
+            if (wc.isDestroyed()) return;
             const currentUrl = wc.getURL();
             if (currentUrl && (currentUrl.startsWith('http://') || currentUrl.startsWith('https://'))) {
               const safeTitle = (wc.getTitle() || 'page').replace(/[/\\?%*:|"<>]/g, '_').slice(0, 100);
@@ -4307,7 +4349,9 @@ app.on('web-contents-created', (_event, wc) => {
               });
               if (!saveRes.canceled && saveRes.filePath) {
                 try {
-                  await wc.savePage(saveRes.filePath, 'HTMLComplete');
+                  if (!wc.isDestroyed()) {
+                    await wc.savePage(saveRes.filePath, 'HTMLComplete');
+                  }
                 } catch (err) {
                   console.error('savePage error:', err);
                 }
@@ -4320,7 +4364,9 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({
           label: labels.print,
           accelerator: 'CmdOrCtrl+P',
-          click: () => wc.print()
+          click: () => {
+            if (!wc.isDestroyed()) wc.print();
+          }
         }));
 
         // View Page Source
@@ -4328,6 +4374,7 @@ app.on('web-contents-created', (_event, wc) => {
           label: labels.viewSource,
           accelerator: process.platform === 'darwin' ? 'Alt+Cmd+U' : 'Ctrl+U',
           click: async () => {
+            if (wc.isDestroyed()) return;
             const currentUrl = wc.getURL();
             try {
               await openPageSourceViewer(currentUrl, wc);
@@ -4337,12 +4384,14 @@ app.on('web-contents-created', (_event, wc) => {
           }
         }));
 
-        const activePageUrl = wc.getURL() || '';
+        const activePageUrl = !wc.isDestroyed() ? (wc.getURL() || '') : '';
         if (activePageUrl && (activePageUrl.startsWith('http://') || activePageUrl.startsWith('https://'))) {
           menu.append(new MenuItem({
             label: labels.translatePage,
             click: () => {
-              sendToMainWindow('trigger-page-translation', { targetLang: 'en', webContentsId: wc.id });
+              if (!wc.isDestroyed()) {
+                sendToMainWindow('trigger-page-translation', { targetLang: 'en', webContentsId: wc.id });
+              }
             }
           }));
         }
@@ -4355,10 +4404,12 @@ app.on('web-contents-created', (_event, wc) => {
         label: labels.inspect,
         accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
         click: () => {
-          if (wc.isDevToolsOpened()) {
-            wc.devToolsWebContents?.focus();
+          if (!wc.isDestroyed()) {
+            if (wc.isDevToolsOpened()) {
+              wc.devToolsWebContents?.focus();
+            }
+            wc.inspectElement(params.x, params.y);
           }
-          wc.inspectElement(params.x, params.y);
         }
       }));
 
