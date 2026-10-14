@@ -14,6 +14,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { SyncSection } from '../src/components/settings/SyncSection';
+import { AccountModal } from '../src/components/AccountModal';
 import { NovaSyncService } from '../src/services/syncService';
 
 console.log('--- Sync Section (pairing affordances) ---');
@@ -55,6 +56,26 @@ check(
 check(
   'it does not claim pairing is merely coming soon',
   !/coming soon|will be available/i.test(html)
+);
+check(
+  'SyncSection does not claim Sync Chain Active',
+  !html.includes('Sync Chain Active')
+);
+
+const accountModalHtml = renderToStaticMarkup(
+  React.createElement(AccountModal, { isOpen: true, onClose: () => {} })
+);
+check(
+  'AccountModal does not promise 1-click code pairing',
+  !accountModalHtml.includes('1-click code')
+);
+check(
+  'AccountModal does not claim Sync Chain',
+  !accountModalHtml.includes('Sync Chain')
+);
+check(
+  'AccountModal directs logged-out users to Nova Cloud account sync',
+  accountModalHtml.includes('Sign in with your Nova Cloud account to sync')
 );
 
 // The service must stay the backstop even though the UI no longer calls it:

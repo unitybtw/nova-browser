@@ -212,7 +212,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     )}
                   </h2>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {syncStatus.isLoggedIn ? 'Your browser data is securely synced across devices' : 'Pair and sync your browser with a 1-click code'}
+                    {syncStatus.isLoggedIn ? 'Your browser data is securely synced across devices' : 'Sign in with your Nova Cloud account to sync your browser data'}
                   </p>
                 </div>
               </div>
@@ -300,7 +300,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       <button
                         onClick={handleLeaveChain}
                         className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors cursor-pointer"
-                        title="Leave Sync Chain"
+                        title="Disconnect Sync"
                       >
                         <LogOut className="w-4 h-4" />
                       </button>

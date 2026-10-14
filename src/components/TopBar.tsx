@@ -73,7 +73,7 @@ const EMPTY_DOWNLOADS: DownloadItem[] = [];
  * nested interactive control rather than from the container's own surface.
  *
  * A split half is a `role="button"` container that wraps a real <button> (the
- * ✕). That ✕ only stopped propagation on `click`, never on `keydown`, so
+ * close button). That close button only stopped propagation on `click`, never on `keydown`, so
  * Enter on it ran the half's own handler and selected the tab it was closing.
  * This rejects any event that originated inside a nested form control, on
  * both paths. It is deliberately not a blanket
@@ -1675,14 +1675,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                                 {syncStatus.isLoggedIn ? (syncStatus.syncCode || 'Nova Sync') : 'Nova Sync'}
                               </span>
                               <span className="text-[10px] text-slate-400 truncate block">
-                                {syncStatus.isLoggedIn ? 'Sync Chain Active' : 'Pair & sync across devices'}
+                                {syncStatus.isLoggedIn ? 'Encrypted Sync Active' : 'Sign in to sync across devices'}
                               </span>
                             </div>
                           </div>
                           {syncStatus.isLoggedIn ? (
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                           ) : (
-                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Pair</span>
+                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Sync</span>
                           )}
                         </button>
                       </div>

@@ -444,7 +444,7 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
                       <p className="text-slate-500 dark:text-slate-400 text-[11px]">Hardware-accelerated adblocker strips tracking queries and malicious scripts before network execution.</p>
                     </div>
                     <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 space-y-1">
-                      <p className="font-bold text-slate-800 dark:text-slate-200">Zero-Knowledge 1-Click Sync</p>
+                      <p className="font-bold text-slate-800 dark:text-slate-200">Zero-Knowledge Encrypted Sync</p>
                       <p className="text-slate-500 dark:text-slate-400 text-[11px]">Multi-device synchronization encrypted with client-side AES-256-GCM keys.</p>
                     </div>
                   </div>

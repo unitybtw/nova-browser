@@ -9,8 +9,8 @@ export interface TabPoolResult {
  * Evaluates the webview LRU pool to prevent Chromium process explosion.
  * Preserves the active tab and split tab on screen. Fills the remaining slots
  * by priority: audio-playing > pinned > loading > LRU order (lastAccessed).
- * Caps live tabs strictly to maxLive — protected (audio/pinned/loading) tabs
- * may displace LRU tabs but can never push the live pool past maxLive.
+ * Caps live tabs to maxLive by displacing LRU tabs, while ensuring active audio
+ * playback tabs are preserved to prevent background audio dropouts.
  * Already-suspended tabs that are not active/split remain suspended and are never marked live.
  */
 export function computeLiveAndSuspendedTabs(

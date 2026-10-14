@@ -62,9 +62,9 @@ const WORKSPACE_COLORS: Record<string, string> = {
  * nested interactive control rather than from the container's own surface.
  *
  * A tab row / folder header is a `role="tab"` / `role="button"` container that
- * wraps real <button> children (the ✕). Those children only stopped
- * propagation on `click`, never on `keydown`, so Enter on a tab's ✕ ran the
- * row's own handler and selected the tab, and Enter on a folder's ✕ ran the
+ * wraps real <button> children (the close button). Those children only stopped
+ * propagation on `click`, never on `keydown`, so Enter on a tab's close button ran the
+ * row's own handler and selected the tab, and Enter on a folder's close button ran the
  * header's handler and collapsed the folder — the button's own action was
  * never reached. This rejects any event that originated inside a nested form
  * control, on both paths. It is deliberately not a blanket

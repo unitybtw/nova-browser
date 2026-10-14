@@ -73,7 +73,7 @@ async function run() {
     page.getURL = () => 'data:text/html,opaque';
     assert.equal(await request(normal, 'notifications'), false, 'opaque origins must not receive remembered grants');
 
-    for (const value of ['', 'a', 'ab', 'abc', 'ş', '🔐', 'normal value']) {
+    for (const value of ['', 'a', 'ab', 'abc', 'ş', 'unicode-key', 'normal value']) {
       assert.equal(decryptDataWithFallback(encryptDataWithFallback(value, userData), userData), value, 'all valid plaintext lengths must round-trip');
     }
     assert.throws(() => encryptDataWithFallback('secret', path.join(userData, 'missing')), /ENOENT/, 'missing key storage must fail instead of returning unrecoverable ciphertext');

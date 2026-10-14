@@ -75,7 +75,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
         title: 'On-device intelligence and MCP automation',
         body: 'Nova now exposes a dedicated Model Context Protocol server over port 3020 and includes a private WebAssembly speech pipeline.',
         points: [
-          '25 native MCP tools enabling Claude Desktop, Cursor, and custom agents to navigate and inspect web content.',
+          '26 native MCP tools enabling Claude Desktop, Cursor, and custom agents to navigate and inspect web content.',
           'Local Whisper STT transcription running entirely in-memory with zero network telemetry.',
         ],
       },
@@ -84,7 +84,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       { category: 'security', text: 'Resolved all 28 CodeQL static code analysis alerts across main and renderer processes.' },
       { category: 'security', text: 'Hardened file downloads against TOCTOU race conditions and path traversal vectors.' },
       { category: 'feature', text: 'Integrated local Whisper speech-to-text engine with ONNX whisper-tiny runtime.' },
-      { category: 'feature', text: 'Expanded Model Context Protocol (MCP) server to 25 tools for external agent automation.' },
+      { category: 'feature', text: 'Expanded Model Context Protocol (MCP) server to 26 tools for external agent automation.' },
       { category: 'improvement', text: 'Optimized TopBar tab strip virtualization and decoupled omnibox re-renders.' },
       { category: 'fix', text: 'Resolved React forwardRef warning in TopBar tab animation popLayout.' },
       { category: 'fix', text: 'Guarded adblocker session enable/disable state transitions across default and incognito partitions.' },

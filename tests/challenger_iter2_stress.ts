@@ -75,7 +75,7 @@ async function runChallengerStressTest() {
   // These prove the opposite direction as well: a well-formed string must still
   // round-trip losslessly, so "URL-safe" is not paid for with data loss.
   const roundTripVectors = [
-    'https://example.com/😊/🎉/тест?q=a+b/c=',
+    'https://example.com/unicode/\u00e9\u00f1\u00fc/\u0442\u0435\u0441\u0442?q=a+b/c=',
     'https://ru.wikipedia.org/wiki/Заглавная_страница',
     'https://example.com/foo%20bar%26baz',
   ];

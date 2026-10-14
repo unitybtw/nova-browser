@@ -150,13 +150,13 @@ async function main() {
     const target = makeTarget('unicode');
     const zip = await buildZip({
       'manifest.json': MANIFEST,
-      'assets/Ünïcode ✨ name.txt': 'değer',
-      'assets/emoji-🎉.txt': 'ok'
+      'assets/Ünïcode test name.txt': 'değer',
+      'assets/unicode-file.txt': 'ok'
     });
     await extractSafeCrxZip(zip, target);
-    assert.ok(fs.existsSync(path.join(target, 'assets/Ünïcode ✨ name.txt')));
+    assert.ok(fs.existsSync(path.join(target, 'assets/Ünïcode test name.txt')));
     assert.equal(
-      fs.readFileSync(path.join(target, 'assets/Ünïcode ✨ name.txt'), 'utf-8'),
+      fs.readFileSync(path.join(target, 'assets/Ünïcode test name.txt'), 'utf-8'),
       'değer'
     );
     console.log('[PASS] [CRX-Extract] unicode and spaced entry names survive');

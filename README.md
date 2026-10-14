@@ -46,7 +46,7 @@
 
 Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete developer and power-user requirements:
 
-- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 25 browser automation and inspection tools directly to coding agents (Claude Code, Cursor, Windsurf, Antigravity) with zero configuration.
+- **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 26 browser automation and inspection tools directly to coding agents (Claude Code, Cursor, Windsurf, Antigravity) with zero configuration.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
 - **Zero-Telemetry Network-Level Privacy Shield**: Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
@@ -71,7 +71,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 | **Core Engine** | **Chromium 134 / Blink** | Chromium 134 / Blink | Chromium 134 / Blink | WebKit |
 | **AI Assistant** | **100% On-Device WebGPU (0 KB Sent)** | Cloud Gemini (Account required) | Cloud Leo (Paid tier) | Apple Intelligence |
 | **Voice / Speech-to-Text** | **Local Whisper ONNX (0 KB Sent)** | Google Cloud Speech API | Not built-in | Siri Dictation |
-| **Model Context Protocol (MCP)** | **Native 25-Tool Server (Port 3020)** | Not available | Not available | Not available |
+| **Model Context Protocol (MCP)** | **Native 26-Tool Server (Port 3020)** | Not available | Not available | Not available |
 | **Ad & Tracker Protection** | **Built-in Session Engine (EasyList)** | Not built-in (Extensions needed) | Brave Shields | Content Blockers |
 | **Background Tab Strategy** | **Background Activity Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
 | **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
@@ -152,7 +152,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **Hands-Free Browser Navigation**: Voice queries automatically translate into direct browser actions (navigation, searching, tab management).
 
 ### AI Agent & Virtual Cursor (MCP Protocol)
-- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity) to navigate, read pages, click elements, fill forms, and take screenshots via 25 built-in tools.
+- **Model Context Protocol (MCP)**: Native integration for AI agents (Cursor, Claude Desktop, Windsurf, Antigravity) to navigate, read pages, click elements, fill forms, and take screenshots via 26 built-in tools.
 - **Glowing AI Cursor Overlay**: Watch autonomous AI subagents interact with live webpages in real-time with an animated glowing cursor overlay.
 - **Built-in Local AI Sidepanel**: Run lightweight local models offline directly on your GPU via WebGPU and WebLLM.
 - **Persistent Info & Memory Vault**: Automatically extracts user preferences and retains task history with category badges (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`).
@@ -187,7 +187,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 Nova Browser natively exposes an MCP endpoint on port `3020`, enabling external AI assistants and coding agents to interact with web pages autonomously.
 
-### Built-in MCP Tools (25 Tools)
+### Built-in MCP Tools (26 Tools)
 
 | Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
@@ -333,9 +333,9 @@ Nova Browser runs fully offline out of the box with zero required configuration.
 ### Option A: Download Official Release (Recommended)
 
 Download the latest prebuilt installer for your operating system directly from [GitHub Releases](https://github.com/unitybtw/nova-browser/releases):
-- **macOS**: `Nova-Browser-1.5.0-arm64.dmg` (Apple Silicon) or `Nova-Browser-1.5.0.dmg` (Intel)
-- **Windows**: `Nova-Browser-Setup-1.5.0.exe` (64-bit NSIS Installer)
-- **Linux**: `Nova-Browser-1.5.0.AppImage` or `nova-browser_1.5.0_amd64.deb`
+- **macOS**: `Nova-Browser-arm64.dmg` (Apple Silicon) or `Nova-Browser-x64.dmg` (Intel)
+- **Windows**: `Nova-Browser-Setup-1.5.1-x64.exe` (64-bit NSIS Installer)
+- **Linux**: `Nova-Browser-x86_64.AppImage` or `Nova-Browser-amd64.deb`
 
 ### Option B: Build from Source
 
@@ -412,7 +412,7 @@ flowchart TB
     end
 
     subgraph Main["Electron Main Process (Privileged Host)"]
-        mcp["Native MCP Server<br/>Port 3020 / 25 Tools"]
+        mcp["Native MCP Server<br/>Port 3020 / 26 Tools"]
         ipcMain["IPC Hub & Dispatcher<br/>isTrustedSender Origin Guard"]
         netShield["Privacy Shield & AdBlock<br/>EasyList Network Filter & Anti-SSRF"]
         osBridge["Native OS & Storage<br/>safeStorage Keychain / CRX3 / TTS"]
@@ -484,7 +484,7 @@ flowchart TB
 | **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
 | **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
 | **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
-| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 25 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity |
+| **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 26 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity |
 
 ### Architectural Subsystem Breakdown
 
@@ -492,7 +492,7 @@ flowchart TB
    - **Process Sandboxing & IPC Guards**: Every IPC channel strictly enforces `isTrustedSender(event)` verification (validating sender frame, origin, and protocol) to prevent untrusted guest frames from invoking privileged host operations. Webviews execute with `contextIsolation: true` and `nodeIntegration: false`.
    - **Atomic File Descriptors & Anti-TOCTOU**: Operations on crash logs, bookmarks, and caching avoid path-based checks before read/write operations. Instead, atomic descriptor operations (`fs.openSync`, `fs.fstatSync`, `fs.readSync`, `fs.ftruncateSync`, `fs.writeSync`) guarantee immunity against Time-of-Check to Time-of-Use (TOCTOU) file race conditions.
    - **Network Privacy Shield & Anti-SSRF**: High-performance request filtering via Chromium session webRequest hooks and `@cliqz/adblocker-electron` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters). In-memory hash set domain classification paired with DNS SSRF guards that fail closed against private RFC 1918, link-local, loopback, and CGNAT IP resolutions.
-   - **Native Model Context Protocol (MCP) Server**: Embedded HTTP/SSE server running on port `3020` with Bearer token authentication (`X-MCP-Token`), DNS rebinding protection via Host header verification, and rate limiting. Directly bridges 25 browser control and inspection tools to external AI coding agents.
+   - **Native Model Context Protocol (MCP) Server**: Embedded HTTP/SSE server running on port `3020` with Bearer token authentication (`X-MCP-Token`), DNS rebinding protection via Host header verification, and rate limiting. Directly bridges 26 browser control and inspection tools to external AI coding agents.
    - **In-Memory CRX3 Extension Engine**: Direct CRX3 package download, archive integrity validation, zip-slip directory traversal prevention, and extension permission auditing before installation.
 
 2. **Preload Security & Context Isolation (`electron/preload.ts`, `electron/webstore-preload.ts`, `electron/guest-preload.ts`)**:
@@ -556,7 +556,7 @@ flowchart TB
 - [x] Zero CodeQL Security Alerts & Full Static Analysis Hardening
 - [x] On-Device Whisper Voice Navigation & Speech Recognition
 - [x] Modern UI with Vertical Tabs & Workspaces
-- [x] Native MCP Autonomous AI Agent Protocol (25 Built-in Tools) & Virtual Glowing Cursor
+- [x] Native MCP Autonomous AI Agent Protocol (26 Built-in Tools) & Virtual Glowing Cursor
 - [x] Zero-Knowledge Encrypted Cloud Sync (AES-256-GCM via Nova Cloud)
 - [x] Direct Chrome Web Store 1-Click Extension Installation
 - [x] Built-in Privacy Shield (AdBlock & Tracker Protection)

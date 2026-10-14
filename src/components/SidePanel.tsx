@@ -217,9 +217,11 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
                 </span>
               )}
               {tc.state === 'error' || tc.error ? (
-                <span className="text-rose-500 font-bold" title={tc.error}>✕</span>
+                <span title={tc.error} className="inline-flex items-center">
+                  <X className="w-3 h-3 text-rose-500 stroke-[2.5]" />
+                </span>
               ) : (
-                <span className="text-emerald-500 font-bold">✓</span>
+                <Check className="w-3 h-3 text-emerald-500 stroke-[2.5]" />
               )}
             </div>
           ))}

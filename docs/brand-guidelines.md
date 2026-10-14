@@ -102,10 +102,10 @@ The Nova logo embodies precision navigation, exploration, and speed. It combines
 - **Web Favicon & Avatars:** `public/logo.png`, `public/nova-icon.png`
 
 ### Absolute Don'ts
-- ❌ Do not apply rainbow, violet, or multi-stop gradients across the star rays.
-- ❌ Do not rotate the compass away from the vertical cardinal axis.
-- ❌ Do not add tacky drop shadows, bevel emboss filters, or outer glow halos.
-- ❌ Do not distort, squeeze, or stretch the aspect ratio.
+- Prohibited: Do not apply rainbow, violet, or multi-stop gradients across the star rays.
+- Prohibited: Do not rotate the compass away from the vertical cardinal axis.
+- Prohibited: Do not add tacky drop shadows, bevel emboss filters, or outer glow halos.
+- Prohibited: Do not distort, squeeze, or stretch the aspect ratio.
 
 ---
 

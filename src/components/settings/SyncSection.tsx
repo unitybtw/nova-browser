@@ -91,7 +91,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Sync Chain Active</h3>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Nova Sync Active</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3" /> E2EE Protected
                     </span>
@@ -342,7 +342,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   <Sparkles className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                  Start New Sync Chain
+                  Start New Encrypted Sync
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                   Generate a secure 1-click pairing code on this computer to link your other laptops or desktops.
