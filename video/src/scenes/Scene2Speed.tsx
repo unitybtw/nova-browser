@@ -78,7 +78,7 @@ export const Scene2Speed: React.FC = () => {
           WebkitTextFillColor: 'transparent',
         }}
       >
-        Blazing Fast V8 Architecture
+        Efficient V8 State Architecture
       </h2>
 
       {/* Main Benchmark Grid Card */}
@@ -111,7 +111,7 @@ export const Scene2Speed: React.FC = () => {
         >
           <div>
             <div style={{ color: '#94a3b8', fontSize: 16, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Tab Indexing & Allocation Throughput
+              Tab Allocation & Virtualization
             </div>
             <div
               style={{
@@ -127,7 +127,7 @@ export const Scene2Speed: React.FC = () => {
               <span style={{ fontSize: 24, fontWeight: 600, color: '#94a3b8', marginLeft: 10 }}>ops/sec</span>
             </div>
             <div style={{ color: '#64748b', fontSize: 15 }}>
-              Zero-allocation React.memo reconciliation & instant tab lifecycle
+              In-memory React/V8 state dispatch & virtualized tab allocation
             </div>
           </div>
 
@@ -151,7 +151,7 @@ export const Scene2Speed: React.FC = () => {
           </div>
         </div>
 
-        {/* Metric 2: Switch Latency Comparison */}
+        {/* Metric 2: Hibernation Latency & Resource Management */}
         <div
           style={{
             background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
@@ -165,7 +165,7 @@ export const Scene2Speed: React.FC = () => {
         >
           <div>
             <div style={{ color: '#94a3b8', fontSize: 16, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Tab Switch Latency
+              Tab Hibernation Latency
             </div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '12px 0 6px 0' }}>
               <span
@@ -176,13 +176,12 @@ export const Scene2Speed: React.FC = () => {
                   textShadow: '0 0 35px rgba(74, 222, 128, 0.5)',
                 }}
               >
-                0.08 ms
+                0.02 ms
               </span>
-              <span style={{ fontSize: 20, color: '#94a3b8', fontWeight: 600 }}>Nova Browser</span>
+              <span style={{ fontSize: 20, color: '#94a3b8', fontWeight: 600 }}>Nova Memory Manager</span>
             </div>
-            <div style={{ color: '#ef4444', fontSize: 18, fontWeight: 700, margin: '6px 0' }}>
-              vs 28.4 ms{' '}
-              <span style={{ color: '#64748b', fontSize: 14, fontWeight: 500 }}>(Chrome / Chromium Default)</span>
+            <div style={{ color: '#64748b', fontSize: 15, margin: '6px 0' }}>
+              Instant state suspension to unmount idle webviews
             </div>
           </div>
 
@@ -190,8 +189,8 @@ export const Scene2Speed: React.FC = () => {
           <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#4ade80', fontWeight: 600, marginBottom: 4 }}>
-                <span>Nova (Instant Switch)</span>
-                <span>0.08 ms</span>
+                <span>Nova Active Webviews: Max 6 LRU Pool</span>
+                <span>Optimized Memory</span>
               </div>
               <div style={{ width: '100%', height: 8, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 999 }}>
                 <div style={{ width: `${96 * latencyProgress}%`, height: '100%', background: '#4ade80', borderRadius: 999, boxShadow: '0 0 12px #4ade80' }} />
@@ -199,12 +198,12 @@ export const Scene2Speed: React.FC = () => {
             </div>
 
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#ef4444', fontWeight: 600, marginBottom: 4 }}>
-                <span>Standard Browsers</span>
-                <span>28.4 ms (350x slower)</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>
+                <span>Standard Chromium: Unconstrained Webview Allocations</span>
+                <span>High Memory Footprint</span>
               </div>
               <div style={{ width: '100%', height: 8, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 999 }}>
-                <div style={{ width: `${14 * latencyProgress}%`, height: '100%', background: '#ef4444', borderRadius: 999 }} />
+                <div style={{ width: `${85 * latencyProgress}%`, height: '100%', background: '#64748b', borderRadius: 999 }} />
               </div>
             </div>
           </div>

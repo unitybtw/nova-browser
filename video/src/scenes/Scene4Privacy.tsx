@@ -164,7 +164,7 @@ export const Scene4Privacy: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: E2EE Sync Chain */}
+        {/* Card 3: Encrypted Sync */}
         <div
           style={{
             background: 'rgba(15, 23, 42, 0.85)',
@@ -180,7 +180,7 @@ export const Scene4Privacy: React.FC = () => {
         >
           <div>
             <div style={{ color: '#c084fc', fontSize: 14, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              AES-GCM-256 Sync Chain
+              AES-GCM-256 Encrypted Sync
             </div>
             <div
               style={{
@@ -193,7 +193,7 @@ export const Scene4Privacy: React.FC = () => {
               End-to-End
             </div>
             <div style={{ color: '#94a3b8', fontSize: 15, lineHeight: 1.4 }}>
-              Device-to-device encrypted bookmarks, history & workspace sync
+              Client-side encrypted bookmarks, history & workspace sync
             </div>
           </div>
           <div style={{ marginTop: 24, padding: '10px 14px', background: 'rgba(168, 85, 247, 0.1)', borderRadius: 12, border: '1px solid rgba(168, 85, 247, 0.25)', color: '#c084fc', fontSize: 13, fontWeight: 600 }}>

@@ -49,7 +49,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 - **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 25 browser automation and inspection tools directly to coding agents (Claude Code, Cursor, Windsurf, Antigravity) with zero configuration.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
 - **Zero-Telemetry Network-Level Privacy Shield**: Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
-- **Tab Hibernation & Memory Eviction**: Dormant background webviews automatically suspend active rendering execution after idle periods while preserving complete navigation state, keeping 50+ tabs under 600 MB RAM.
+- **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
 - **Hardened Security Architecture**: Audited against CodeQL static analysis with 0 open security alerts, TOCTOU-safe file descriptor operations, strict context isolation, and SSRF/DNS rebinding defense.
 
 ---
@@ -77,7 +77,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 | **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
 | **Split View Browsing** | **Native Dual Synchronized Canvas** | Not built-in | Not built-in | macOS Split View |
 | **Telemetry & Analytics** | **Zero Telemetry (0 KB)** | Extensive telemetry | Opt-out required | Telemetry enabled |
-| **Security Auditing** | **CodeQL Verified (0 Alerts)** | Proprietary Auditing | Internal Auditing | Proprietary Core |
+| **Security Auditing** | **CodeQL Static Analysis (0 Alerts)** | Chromium Security & Bug Bounty | Internal Security & Bug Bounty | Apple Security Engineering |
 | **Source Code & License** | **100% Open Source (MIT)** | Proprietary Core | MPL 2.0 | Proprietary Core |
 
 ---
@@ -517,7 +517,7 @@ flowchart TB
    - **Realtime Encrypted Sync**: Synchronizes client-encrypted vaults across devices over Supabase Realtime WebSockets without centralized plaintext storage. Remote property injection protections ensure settings deserialization cannot tamper with Object prototypes.
 
 6. **Tab Hibernation & Memory Management (`src/utils/tabManager.ts`, `src/hooks/useTabHibernation.ts`)**:
-   - **Dormant Tab Eviction**: Background tabs idle for more than 10 minutes automatically unmount their active webview rendering pipelines while preserving full navigation history and state, keeping memory consumption under 600 MB even with 50+ tabs open.
+   - **Dormant Tab Eviction**: Background tabs idle for more than 10 minutes (or beyond an LRU pool of 6 live webviews) automatically unmount their active webview rendering pipelines while preserving full navigation history and state, evicting dormant Chromium renderer processes to control aggregate memory consumption.
 
 ---
 
