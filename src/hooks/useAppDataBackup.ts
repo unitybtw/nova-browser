@@ -163,22 +163,37 @@ export function useAppDataBackup({
  * over explicitly: a sanitiser that forgets one field silently drops it, and a
  * dropped `deletedAt` turns a backup row back into a live one.
  */
+function resolveImportedBookmarkId(value: unknown, url: string, urlsById: Map<string, string>): string {
+  const urlKey = normalizeBookmarkUrl(url);
+  let id = typeof value === 'string' ? value.trim() : '';
+  // Live/tombstone versions of one URL can share an id; unrelated URLs cannot.
+  if (!id || (urlsById.has(id) && urlsById.get(id) !== urlKey)) {
+    do { id = generateId('bm'); } while (urlsById.has(id));
+  }
+  urlsById.set(id, urlKey);
+  return id;
+}
+
 export function sanitizeImportedBookmarks(raw: unknown): Bookmark[] {
   if (!Array.isArray(raw)) return [];
+  const urlsById = new Map<string, string>();
   return raw
     .filter((b: any) =>
       b && typeof b === 'object' && typeof b.url === 'string' && isSafeNavigationUrl(b.url)
     )
-    .map((b: any) => ({
-      id: typeof b.id === 'string' && b.id ? b.id : generateId('bm'),
-      title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
-      url: b.url,
-      timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
-      favicon: typeof b.favicon === 'string' && (b.favicon.startsWith('https://') || b.favicon.startsWith('data:image/')) ? b.favicon : undefined,
-      deletedAt: typeof b.deletedAt === 'number' && Number.isFinite(b.deletedAt) && b.deletedAt > 0
-        ? b.deletedAt
-        : undefined,
-    }));
+    .map((b: any) => {
+      const id = resolveImportedBookmarkId(b.id, b.url, urlsById);
+      return {
+        id,
+        title: typeof b.title === 'string' ? b.title.slice(0, 500) : 'Bookmark',
+        url: b.url,
+        timestamp: typeof b.timestamp === 'number' ? b.timestamp : (typeof b.createdAt === 'number' ? b.createdAt : Date.now()),
+        favicon: typeof b.favicon === 'string' && (b.favicon.startsWith('https://') || b.favicon.startsWith('data:image/')) ? b.favicon : undefined,
+        deletedAt: typeof b.deletedAt === 'number' && Number.isFinite(b.deletedAt) && b.deletedAt > 0
+          ? b.deletedAt
+          : undefined,
+      };
+    });
 }
 
 /**
@@ -190,7 +205,12 @@ export function sanitizeImportedBookmarks(raw: unknown): Bookmark[] {
  * without driving a file input.
  */
 export function mergeImportedBookmarks(current: Bookmark[], imported: Bookmark[]): Bookmark[] {
-  return mergeSyncedCollection(current, imported, {
+  const urlsById = new Map(current.map(row => [row.id, normalizeBookmarkUrl(row.url)]));
+  const safeImported = imported.map(row => {
+    const id = resolveImportedBookmarkId(row.id, row.url, urlsById);
+    return id === row.id ? row : { ...row, id };
+  });
+  return mergeSyncedCollection(current, safeImported, {
     keyOf: (b: Bookmark) => b.id,
     // A bookmark is identified by its URL too: ids are minted per device, so a
     // backup imported on a second machine would otherwise re-add rows the user

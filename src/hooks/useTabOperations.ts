@@ -9,6 +9,16 @@ import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert } from '../utils/confirmDialog';
 import { logger } from '../utils/logger';
 
+// These values belong to one loaded document, not to the tab's preferences.
+const EMPTY_DOCUMENT_STATE: Partial<Tab> = {
+  isPlayingAudio: false,
+  isTranslated: false,
+  translatedLang: undefined,
+  blockedAdsCount: 0,
+  webContentsId: undefined,
+  thumbnail: undefined,
+};
+
 export interface UseTabOperationsOptions {
   tabsRef: MutableRefObject<Tab[]>;
   activeTabId: string;
@@ -116,9 +126,10 @@ export function useTabOperations({
   // updater stays pure (StrictMode double-invokes updater functions in dev).
   const handleCloseTab = useCallback((id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    tabThumbnailCache.remove(id);
     const prevTabs = tabsRef.current;
     const targetTab = prevTabs.find(t => t.id === id);
+    if (!targetTab) return;
+    tabThumbnailCache.remove(id);
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
@@ -134,6 +145,7 @@ export function useTabOperations({
         if (t.id === id) {
           return {
             ...t,
+            ...EMPTY_DOCUMENT_STATE,
             url: 'nova://newtab',
             title: 'New Tab',
             isLoading: false,
@@ -165,6 +177,7 @@ export function useTabOperations({
       }
       setTabs(prev => prev.map(t => ({
         ...t,
+        ...EMPTY_DOCUMENT_STATE,
         url: 'nova://newtab',
         title: 'New Tab',
         isLoading: false,
@@ -251,6 +264,7 @@ export function useTabOperations({
     const original = prev[idx];
     const newTab: Tab = {
       ...original,
+      ...EMPTY_DOCUMENT_STATE,
       id: generateId('tab'),
       title: original.title,
       url: original.url,
@@ -499,6 +513,7 @@ export function useTabOperations({
     if (normalTabsInWs.length > 0) {
       handleCloseTab(currentTab.id);
     } else {
+      tabThumbnailCache.remove(currentTab.id);
       if (getElectronAPI()?.clearIncognitoSession) {
         getElectronAPI()?.clearIncognitoSession(currentTab.id)?.catch((e: any) => console.error(e));
         const remainingIncognito = prevTabs.some(t => t.isIncognito && t.id !== currentTab.id);
@@ -508,6 +523,7 @@ export function useTabOperations({
       }
       setTabs(prev => prev.map(t => t.id === currentTab.id ? {
         ...t,
+        ...EMPTY_DOCUMENT_STATE,
         isIncognito: false,
         url: 'nova://newtab',
         title: 'New Tab',

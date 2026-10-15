@@ -55,29 +55,14 @@ assert.strictEqual(imported[3].title.length, 500, 'an oversized title must be tr
 
 console.log('[PASS] [Data Backup] Import sanitization rejects dangerous schemes and recovers missing IDs/timestamps');
 
-// 1a. A real gap found while replacing the inline copy, recorded so it is not
-// lost. `sanitizeImportedBookmarks` (src/hooks/useAppDataBackup.ts:173) guards
-// the incoming id with `typeof b.id === 'string' && b.id`, i.e. a truthiness
-// check. A whitespace-only id such as `"  "` is truthy, so it is imported
-// verbatim. Two backup rows carrying `"  "` therefore land in the store with the
-// same id, and every later sync dedupes on `keyOf: b => b.id`, so one of them is
-// dropped without a trace. The vector below pins the current behaviour; the fix
-// belongs in src/hooks/useAppDataBackup.ts:173 (trim before the truthiness test),
-// which is outside this file's ownership.
+// Invalid imported ids must not collapse distinct bookmark URLs during sync.
 const whitespaceIdImported = sanitizeImportedBookmarks([
   { id: '  ', url: 'https://ws-a.example/', title: 'A' },
   { id: '  ', url: 'https://ws-b.example/', title: 'B' },
 ]);
-assert.strictEqual(
-  whitespaceIdImported.length,
-  2,
-  'both rows are imported'
-);
-assert.strictEqual(
-  whitespaceIdImported[0].id,
-  whitespaceIdImported[1].id,
-  'KNOWN GAP: a whitespace-only id is passed through verbatim, so two such rows collide on sync keyOf(id). src/hooks/useAppDataBackup.ts:173 needs a trim before the truthiness check.'
-);
+assert.strictEqual(whitespaceIdImported.length, 2);
+assert.ok(whitespaceIdImported.every(row => row.id.trim().length > 0));
+assert.notStrictEqual(whitespaceIdImported[0].id, whitespaceIdImported[1].id);
 
 // 1b. The second half of the import path — folding sanitised rows into the
 // store without resurrecting deleted rows — is deliberately NOT re-tested here.

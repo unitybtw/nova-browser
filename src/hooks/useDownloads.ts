@@ -121,12 +121,13 @@ export function useDownloads() {
   }, []);
 
   const handleClearDownloads = useCallback(() => {
-    setDownloads([]);
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-    } catch (_) {}
+    // Clearing history must leave running/paused transfers reachable so the
+    // user can still resume or cancel them until Electron reports completion.
+    setDownloads(prev => {
+      const active = prev.filter(item => item.state === 'progressing');
+      persistDownloadsToStorage(active);
+      return active;
+    });
   }, []);
 
   return { downloads, handleClearDownloads };

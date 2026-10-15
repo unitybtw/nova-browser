@@ -88,3 +88,5 @@ import './mcp_bridge_config_regressions.test';
 import './agent_document_boundary.test';
 import './codex_security_findings_remediation.test';
 import './performance_optimization_audit.test';
+
+import './tab_download_lifecycle_regressions.test';

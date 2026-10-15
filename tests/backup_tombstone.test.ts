@@ -242,3 +242,29 @@ function ccheck(name: string, cond: boolean, extra = '') {
 }
 
 console.log(`\n${capPassed} tombstone-cap checks passed\n`);
+
+// Invalid ids must not silently erase distinct URLs on restore.
+{
+  const result = restore([], [
+    { id: '  ', url: 'https://blank-a.example/', timestamp: NOW },
+    { id: '  ', url: 'https://blank-b.example/', timestamp: NOW },
+    { id: 'shared-id', url: 'https://duplicate-a.example/', timestamp: NOW },
+    { id: 'shared-id', url: 'https://duplicate-b.example/', timestamp: NOW },
+  ]);
+  check('invalid or reused ids cannot collapse unrelated imported bookmarks', live(result).length === 4);
+  check('restored bookmark ids are nonblank and unique', new Set(result.map(b => b.id)).size === 4 && result.every(b => b.id.trim().length > 0));
+  const sameUrl = restore([], [
+    bookmark('same-id', 'https://deleted-in-backup.example/', NOW - DAY),
+    bookmark('same-id', 'https://deleted-in-backup.example/', NOW - DAY, NOW),
+  ]);
+  check('duplicate representations of the same bookmark retain deletion semantics', live(sameUrl).length === 0);
+}
+
+// An unrelated imported identity must not delete or impersonate a local row.
+{
+  const local = [bookmark('local-id', 'https://local-only.example/', NOW - DAY)];
+  const after = restore(local, [bookmark(' local-id ', 'https://other-deleted.example/', NOW - DAY, NOW)]);
+  check('an unrelated imported tombstone cannot delete a local bookmark by id collision', live(after).some(b => b.url === local[0].url));
+  const withLive = restore(local, [bookmark('local-id', 'https://other-live.example/', NOW)]);
+  check('an imported live row gets a distinct id when the local store owns it', new Set(withLive.map(b => b.id)).size === 2);
+}
