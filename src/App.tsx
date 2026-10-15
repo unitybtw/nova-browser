@@ -245,6 +245,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   tabsRef.current = tabs;
   const activeSplitTabIdRef = useRef<string | null>(null);
 
+  // Storage hydration state for disk fallback vs localStorage
+  const [isHydrated, setIsHydrated] = useState(Boolean(demoParams.isDemo));
+
   // `folders`/`workspaces` are the live views (deleted rows are held as
   // tombstones in `folderRows`/`workspaceRows`, which is what sync sends and
   // what persistence writes — see useWorkspaces).
@@ -259,7 +262,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     activeWorkspaceId,
     setActiveWorkspaceId,
     activeWorkspaceIdRef
-  } = useWorkspaces({ isDemo: demoParams.isDemo, demoFeature: demoParams.feature });
+  } = useWorkspaces({ isDemo: demoParams.isDemo, demoFeature: demoParams.feature, isHydrated });
 
   // Panel/modal visibility booleans live in usePanels; names are destructured
   // 1:1 so every reader below (IPC, shortcuts, handlers, JSX) is untouched.
@@ -511,7 +514,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     bookmarksRef,
     handleToggleBookmark,
     flushBookmarks
-  } = useBookmarks({ isDemo: demoParams.isDemo });
+  } = useBookmarks({ isDemo: demoParams.isDemo, isHydrated });
 
   // Onboarding: showOnboarding state + ilk-açılış kontrolü + window.openOnboarding
   // + handleOnboardingComplete hook'ta. Settings/bookmarks yazma gövdeleri
@@ -530,8 +533,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Disk-backed storage hydration fallback: restore session tabs, folders,
   // workspaces, bookmarks and settings from Electron disk store if localStorage
   // was cleared/corrupted.
-  const { isHydrated } = useDiskHydrationFallback({
+  useDiskHydrationFallback({
     isDemo: demoParams.isDemo,
+    setIsHydrated,
     setSettings,
     setWorkspaces,
     setFolders,
@@ -660,6 +664,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     recordVisit,
     setIsExtensionsOpen,
   });
+
+  const handleNewTabRef = useRef(handleNewTab);
+  handleNewTabRef.current = handleNewTab;
+  const stableNewTab = useCallback((url?: any, sourceTabId?: string, opts?: any) => {
+    return handleNewTabRef.current(url, sourceTabId, opts);
+  }, []);
 
   // Tab hibernation motoru (idle-30sn timer + LRU-6 / staggered-wake) — hook'a taşındı, davranış aynen korunur.
   useTabHibernation({
@@ -1892,7 +1902,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     tab={tab}
                     onNavigate={handleNavigate}
                     onUpdateTab={handleUpdateTab}
-                    onNewTab={handleNewTab}
+                    onNewTab={stableNewTab}
                     onActivate={handleSelectTab}
                     onFoundInPage={handleFoundInPage}
                     searchEngine={settings.searchEngine}

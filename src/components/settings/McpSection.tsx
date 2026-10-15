@@ -84,8 +84,10 @@ export const McpSection: React.FC<McpSectionProps> = ({
       });
     }
     if ((window as any).electronAPI?.onMcpStatusChanged) {
-      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, isRunning: boolean) => {
-        setMcpStatus(prev => prev ? { ...prev, running: isRunning } : { running: isRunning, port: 3020, clientCount: 0, clients: [] });
+      cleanupStatus = (window as any).electronAPI.onMcpStatusChanged((_: any, status: any) => {
+        const isRunning = typeof status === 'object' && status !== null ? Boolean(status.running) : Boolean(status);
+        const port = typeof status === 'object' && status?.port ? Number(status.port) : 3020;
+        setMcpStatus(prev => prev ? { ...prev, running: isRunning, port: port || prev.port } : { running: isRunning, port, clientCount: 0, clients: [] });
       });
     }
     return () => {

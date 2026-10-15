@@ -3,7 +3,7 @@ import type { Bookmark, HistoryItem, UserSettings } from '../types/browser';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { generateId } from '../utils/idGenerator';
 import { showAlert } from '../utils/confirmDialog';
-import { mergeSyncedCollection, normalizeBookmarkUrl } from '../services/syncService';
+import { mergeSyncedCollection, normalizeBookmarkUrl, mergeSyncedHistory } from '../services/syncService';
 
 export interface UseAppDataBackupOptions {
   /**
@@ -100,7 +100,7 @@ export function useAppDataBackup({
               typedCount: typeof h.typedCount === 'number' ? h.typedCount : 0,
             }));
           if (sanitizedHistory.length > 0) {
-            setHistory(sanitizedHistory);
+            setHistory(current => mergeSyncedHistory(current, sanitizedHistory));
             importedSomething = true;
           }
         }

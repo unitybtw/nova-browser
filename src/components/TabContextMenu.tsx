@@ -242,13 +242,13 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
         <button
           role="menuitem"
           tabIndex={-1}
-          aria-label={isBookmarked ? 'Edit bookmark' : 'Bookmark tab'}
+          aria-label={isBookmarked ? 'Remove bookmark' : 'Bookmark tab'}
           onClick={() => { onBookmarkTab(tab); onClose(); }}
           className="flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-cyan-500/10 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors text-left cursor-pointer"
         >
           <span className="flex items-center gap-2">
             <Bookmark className={`w-3.5 h-3.5 ${isBookmarked ? 'text-amber-500 fill-amber-500' : 'opacity-70'}`} />
-            {isBookmarked ? 'Edit bookmark' : 'Bookmark tab'}
+            {isBookmarked ? 'Remove bookmark' : 'Bookmark tab'}
           </span>
           <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘D' : 'Ctrl+D'}</span>
         </button>

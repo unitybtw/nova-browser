@@ -80,8 +80,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('mcp-client-changed', handler);
     return () => ipcRenderer.removeListener('mcp-client-changed', handler);
   },
-  onMcpStatusChanged: (callback: (event: any, isRunning: boolean) => void) => {
-    const handler = (_event: any, isRunning: boolean) => callback(null, isRunning);
+  onMcpStatusChanged: (callback: (event: any, status: { running: boolean; port?: number } | boolean) => void) => {
+    const handler = (_event: any, status: any) => callback(null, status);
     ipcRenderer.on('mcp-status-changed', handler);
     return () => ipcRenderer.removeListener('mcp-status-changed', handler);
   },

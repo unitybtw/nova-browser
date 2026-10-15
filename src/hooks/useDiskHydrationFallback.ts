@@ -6,6 +6,7 @@ import { logger } from '../utils/logger';
 
 export interface UseDiskHydrationFallbackOptions {
   isDemo?: boolean;
+  setIsHydrated?: Dispatch<SetStateAction<boolean>>;
   setSettings: Dispatch<SetStateAction<UserSettings>>;
   setWorkspaces: Dispatch<SetStateAction<Workspace[]>>;
   setFolders: Dispatch<SetStateAction<Folder[]>>;
@@ -21,29 +22,37 @@ export interface UseDiskHydrationFallbackOptions {
  */
 export function useDiskHydrationFallback({
   isDemo,
+  setIsHydrated: externalSetIsHydrated,
   setSettings,
   setWorkspaces,
   setFolders,
   setBookmarks,
   setTabs,
 }: UseDiskHydrationFallbackOptions): { isHydrated: boolean } {
-  const [isHydrated, setIsHydrated] = useState(Boolean(isDemo));
+  const [internalHydrated, setInternalHydrated] = useState(Boolean(isDemo));
+
+  const setHydratedState = (val: boolean) => {
+    setInternalHydrated(val);
+    externalSetIsHydrated?.(val);
+  };
 
   useEffect(() => {
     if (isDemo) {
-      setIsHydrated(true);
+      setHydratedState(true);
       return;
     }
     const restoreFromDisk = async () => {
       try {
         const electronStore = getElectronAPI();
         if (!electronStore?.storeGet) {
-          setIsHydrated(true);
+          setHydratedState(true);
           return;
         }
 
+        const isMissingOrEmpty = (raw: string | null) => !raw || raw === '[]' || raw === '{}';
+
         // Restore settings if missing from localStorage
-        if (!localStorage.getItem('user_settings')) {
+        if (isMissingOrEmpty(localStorage.getItem('user_settings'))) {
           const diskSettings = await electronStore.storeGet('user_settings');
           if (diskSettings) {
             try {
@@ -59,7 +68,7 @@ export function useDiskHydrationFallback({
         }
 
         // Restore workspaces if missing
-        if (!localStorage.getItem('workspaces_session')) {
+        if (isMissingOrEmpty(localStorage.getItem('workspaces_session'))) {
           const diskWorkspaces = await electronStore.storeGet('workspaces_session');
           if (diskWorkspaces) {
             try {
@@ -75,7 +84,7 @@ export function useDiskHydrationFallback({
         }
 
         // Restore folders if missing
-        if (!localStorage.getItem('folders_session')) {
+        if (isMissingOrEmpty(localStorage.getItem('folders_session'))) {
           const diskFolders = await electronStore.storeGet('folders_session');
           if (diskFolders) {
             try {
@@ -91,7 +100,7 @@ export function useDiskHydrationFallback({
         }
 
         // Restore bookmarks if missing
-        if (!localStorage.getItem('bookmarks')) {
+        if (isMissingOrEmpty(localStorage.getItem('bookmarks'))) {
           const diskBookmarks = await electronStore.storeGet('bookmarks');
           if (diskBookmarks) {
             try {
@@ -107,7 +116,7 @@ export function useDiskHydrationFallback({
         }
 
         // Restore tabs if missing
-        if (!localStorage.getItem('nova_session_tabs')) {
+        if (isMissingOrEmpty(localStorage.getItem('nova_session_tabs'))) {
           const diskTabs = await electronStore.storeGet('session_tabs');
           if (diskTabs) {
             try {
@@ -129,12 +138,12 @@ export function useDiskHydrationFallback({
       } catch (err) {
         logger.warn('App:Storage', 'Fallback restore from disk encountered an error', err);
       } finally {
-        setIsHydrated(true);
+        setHydratedState(true);
       }
     };
 
     restoreFromDisk();
   }, [isDemo, setSettings, setWorkspaces, setFolders, setBookmarks, setTabs]);
 
-  return { isHydrated };
+  return { isHydrated: Boolean(isDemo || internalHydrated) };
 }

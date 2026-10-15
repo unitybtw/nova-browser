@@ -8,6 +8,7 @@ import { logger } from '../utils/logger';
 
 export interface UseBookmarksOptions {
   isDemo?: boolean;
+  isHydrated?: boolean;
 }
 
 /** Web Storage key the bookmark rows live under. */
@@ -85,11 +86,12 @@ export function useBookmarks(options: UseBookmarksOptions = {}) {
   // Save bookmarks to localStorage and Electron store (debounced 500ms)
   useEffect(() => {
     if (options.isDemo) return;
+    if (options.isHydrated === false) return;
     const timer = setTimeout(() => {
       persistBookmarks(bookmarkRows);
     }, 500);
     return () => clearTimeout(timer);
-  }, [bookmarkRows, options.isDemo]);
+  }, [bookmarkRows, options.isDemo, options.isHydrated]);
 
   const handleToggleBookmark = useCallback((tab: Tab) => {
     if (!tab.url || tab.url === 'nova://newtab' || tab.url === 'about:blank') return;

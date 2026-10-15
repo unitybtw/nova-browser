@@ -413,7 +413,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
           filename: path.basename(item.getSavePath() || filename),
           url: redactUrlForLog(item.getURL()),
           receivedBytes: item.getReceivedBytes(),
-          totalBytes,
+          totalBytes: item.getTotalBytes() || totalBytes,
           state: 'interrupted',
           isPaused: item.isPaused(),
           savePath: item.getSavePath() || undefined
@@ -428,7 +428,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
             filename: path.basename(item.getSavePath() || filename),
             url: redactUrlForLog(item.getURL()),
             receivedBytes: item.getReceivedBytes(),
-            totalBytes,
+            totalBytes: item.getTotalBytes() || totalBytes,
             state: 'progressing',
             isPaused: item.isPaused(),
             savePath: item.getSavePath() || undefined

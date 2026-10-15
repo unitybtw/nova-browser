@@ -160,7 +160,9 @@ export interface ElectronAPI {
   onMcpClientChanged: (
     callback: (event: null, data: { count: number; clients: ElectronMcpClientInfo[] }) => void
   ) => () => void;
-  onMcpStatusChanged: (callback: (event: null, isRunning: boolean) => void) => () => void;
+  onMcpStatusChanged: (
+    callback: (event: any, status: { running: boolean; port?: number } | boolean) => void
+  ) => () => void;
   copyMcpToken: () => Promise<boolean>;
   copyMcpConfig: () => Promise<{ ok: boolean; autoClearSec: number } | boolean>;
   getMcpTokenStatus: () => Promise<{ configured: boolean; prefix: string }>;

@@ -480,7 +480,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       }
 
       // Mute state must always be applied, regardless of feature gates
-      if (webview.setAudioMuted) webview.setAudioMuted(!!tab?.isMuted);
+      if (webview.setAudioMuted) webview.setAudioMuted(!!latestTabRef.current?.isMuted);
 
       // 4. Ensure current URL is synchronized on DOM ready
       try {
@@ -912,7 +912,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
         clearTimeout(autofillBlurTimerRef.current);
         autofillBlurTimerRef.current = null;
       }
-      isWebviewReady.current = false;
+      if (webviewRef.current !== webview) {
+        isWebviewReady.current = false;
+      }
       webview.removeEventListener('focus', handleFocus);
       webview.removeEventListener('dom-ready', handleDomReady);
       webview.removeEventListener('will-navigate', handleWillNavigate);

@@ -8,6 +8,7 @@ import { logger } from '../utils/logger';
 export interface UseWorkspacesOptions {
   isDemo?: boolean;
   demoFeature?: string;
+  isHydrated?: boolean;
 }
 
 const DEFAULT_WORKSPACES: Workspace[] = [
@@ -55,6 +56,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
   // Debounced 500ms workspace persistence with error logging (no silent failure)
   useEffect(() => {
     if (options.isDemo) return;
+    if (options.isHydrated === false) return;
     const timer = setTimeout(() => {
       try {
         const serialized = JSON.stringify(workspaceRows);
@@ -77,7 +79,7 @@ export function useWorkspaces(options: UseWorkspacesOptions = {}) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [workspaceRows, activeWorkspaceId, folderRows, options.isDemo]);
+  }, [workspaceRows, activeWorkspaceId, folderRows, options.isDemo, options.isHydrated]);
 
   useEffect(() => {
     if (workspaces.length === 0) return;

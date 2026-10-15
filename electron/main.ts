@@ -335,6 +335,7 @@ if (!app.isPackaged) {
 let mainWindow: BrowserWindow | null = null;
 let applyStrictSecurityToSession: (targetSession: Electron.Session) => void = () => {};
 let applyPrivacyHeadersToSession: (targetSession: Electron.Session) => void = () => {};
+const sessionsWithPrivacyHeaders = new WeakSet<Electron.Session>();
 
 // Sync Windows native titlebar buttons with theme updates. Registered once at
 // module scope: nativeTheme outlives any window, and re-registering inside
@@ -678,6 +679,8 @@ function createWindow() {
 
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
+    if (sessionsWithPrivacyHeaders.has(targetSession)) return;
+    sessionsWithPrivacyHeaders.add(targetSession);
     try {
       // Keep Electron/Chromium's native UA and Client Hints in sync with standard Chrome
       targetSession.setUserAgent(getStandardUserAgent(), currentAcceptLanguages);
@@ -3609,6 +3612,7 @@ app.on('web-contents-created', (_event, contents) => {
 
 
 let clearOnExitInFlight = false;
+let clearOnExitCompleted = false;
 /**
  * True from the moment an update install starts until the process is on its way
  * out. The update's shell script blocks on this PID exiting, so anything that
@@ -3637,29 +3641,37 @@ function readClearOnExitSetting(): boolean {
 }
 
 app.on('before-quit', (event) => {
-  // This has to happen HERE, in before-quit. It used to be done in will-quit,
-  // which fires at the very end of app.quit() - by then the guard below had
-  // already run, so the clear never happened at all, and the flag it left set
-  // made the NEXT quit defer for no reason. Electron does not await async work
-  // started from will-quit, so the setting was a silent no-op.
-  //
-  // It also must not run during an update: install-update calls app.quit() and
-  // the updater script is blocked on this process exiting, so deferring the quit
-  // on a hanging clearStorageData would leave the browser waiting forever.
-  if (app.isReady() && !clearOnExitInFlight && readClearOnExitSetting() && !isUpdateInstallInProgress()) {
+  // Clear-on-exit: execute once before process exit.
+  // Must not loop when app.quit() is called upon completion.
+  // Must not defer when an update installation is in progress.
+  if (app.isReady() && !clearOnExitInFlight && !clearOnExitCompleted && readClearOnExitSetting() && !isUpdateInstallInProgress()) {
     event.preventDefault();
     clearOnExitInFlight = true;
+    clearOnExitCompleted = true;
+    let finished = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       clearOnExitInFlight = false;
       app.quit();
     };
+    const watchdog = setTimeout(() => {
+      console.warn('[Quit] clear-on-exit timed out after 5s; proceeding with quit');
+      finish();
+    }, 5000);
+    if (typeof (watchdog as any).unref === 'function') (watchdog as any).unref();
+
     Promise.allSettled([
       session.defaultSession.clearStorageData(),
       session.defaultSession.clearCache(),
     ]).then(results => {
+      clearTimeout(watchdog);
       for (const r of results) {
         if (r.status === 'rejected') console.warn('[Quit] clear-on-exit step failed:', r.reason);
       }
+      finish();
+    }).catch(() => {
+      clearTimeout(watchdog);
       finish();
     });
     return;

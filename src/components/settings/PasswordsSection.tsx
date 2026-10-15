@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Key, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
@@ -17,34 +17,47 @@ const PasswordList = () => {
   const [passwords, setPasswords] = useState<any[]>([]);
   const [visibleIndexes, setVisibleIndexes] = useState<Set<number>>(new Set());
 
-  useEffect(() => {
-    const fetchPasswords = async () => {
-      try {
-        const raw = await getElectronAPI()?.secureStoreGet?.('passwords');
-        if (raw) {
-          const parsed = safeParseArray<any>(raw);
-          const valid = parsed.filter(p => p && typeof p.hostname === 'string' && typeof p.username === 'string');
-          setPasswords(valid);
-        }
-      } catch (e) {}
-    };
-    fetchPasswords();
+  const fetchPasswords = useCallback(async () => {
+    try {
+      const raw = await getElectronAPI()?.secureStoreGet?.('passwords');
+      if (raw) {
+        const parsed = safeParseArray<any>(raw);
+        const valid = parsed.filter(p => p && typeof p.hostname === 'string' && typeof p.username === 'string');
+        setPasswords(valid);
+      } else {
+        setPasswords([]);
+      }
+    } catch (e) {}
   }, []);
 
+  useEffect(() => {
+    fetchPasswords();
+    window.addEventListener('focus', fetchPasswords);
+    return () => window.removeEventListener('focus', fetchPasswords);
+  }, [fetchPasswords]);
+
   const handleDelete = async (index: number) => {
+    const target = passwords[index];
+    if (!target) return;
+
     const confirmed = await showConfirm({
       title: 'Delete Password',
-      message: 'Are you sure you want to delete this password?',
+      message: `Are you sure you want to delete the password for ${target.username} on ${target.hostname}?`,
       confirmLabel: 'Delete',
       cancelLabel: 'Cancel'
     });
     if (!confirmed) return;
-    const newPasses = [...passwords];
-    newPasses.splice(index, 1);
-    setPasswords(newPasses);
+
     try {
-      await getElectronAPI()?.secureStoreSet?.('passwords', JSON.stringify(newPasses));
-    } catch (e) {}
+      const raw = await getElectronAPI()?.secureStoreGet?.('passwords');
+      const current = raw ? safeParseArray<any>(raw) : [];
+      const updated = current.filter((p: any) => !(p.hostname === target.hostname && p.username === target.username));
+      await getElectronAPI()?.secureStoreSet?.('passwords', JSON.stringify(updated));
+      setPasswords(updated.filter(p => p && typeof p.hostname === 'string' && typeof p.username === 'string'));
+    } catch (e) {
+      const newPasses = passwords.filter((_, i) => i !== index);
+      setPasswords(newPasses);
+    }
   };
 
   const toggleVisibility = (index: number) => {

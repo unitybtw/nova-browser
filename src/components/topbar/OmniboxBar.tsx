@@ -147,6 +147,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
   // Listen for translation completion events
   useEffect(() => {
+    setIsTranslating(false);
+    setTranslationError(null);
     const handleDone = (e: any) => {
       if (e.detail?.tabId === activeTab?.id) {
         setIsTranslating(false);

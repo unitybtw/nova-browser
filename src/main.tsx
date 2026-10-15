@@ -5,6 +5,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 import { getLanguage, ensureLanguageLoaded } from './services/i18n';
 
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[Renderer] Unhandled rejection:', e.reason);
+});
+
 window.addEventListener('vite:preloadError', () => {
   try {
     const hasReloaded = sessionStorage.getItem('nova_preload_reload');

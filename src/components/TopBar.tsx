@@ -1046,7 +1046,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       });
     }
     if (getElectronAPI()?.onMcpStatusChanged) {
-      cleanupStatus = getElectronAPI()?.onMcpStatusChanged((_: any, isRunning: boolean) => {
+      cleanupStatus = getElectronAPI()?.onMcpStatusChanged((_: any, status: any) => {
+        const isRunning = typeof status === 'object' && status !== null ? Boolean(status.running) : Boolean(status);
         setMcpRunning(isRunning);
       });
     }
