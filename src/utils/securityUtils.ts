@@ -103,7 +103,7 @@ function decodePunycodeLabel(input: string): string {
     for (let k = BASE; ; k += BASE) {
       if (inIdx >= input.length) break;
       const c = input.charCodeAt(inIdx++);
-      const digit = c - 48 < 10 ? c - 22 : c - 65 < 26 ? c - 65 : c - 97 < 26 ? c - 97 : BASE;
+      const digit = (c >= 48 && c <= 57) ? c - 22 : (c >= 65 && c <= 90) ? c - 65 : (c >= 97 && c <= 122) ? c - 97 : BASE;
       i += digit * w;
       const t = k <= bias ? TMIN : k >= bias + TMAX ? TMAX : k - bias;
       if (digit < t) break;

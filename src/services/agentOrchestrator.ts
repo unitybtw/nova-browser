@@ -126,7 +126,7 @@ class AgentOrchestrator {
    * Queues a tool action and returns its queue id plus the approval promise
    * (S3). Auto-approved tools resolve immediately, so user actions execute promptly.
    */
-  public enqueueAction(toolName: string, args: any, forceAutoApprove?: boolean): { id: string; done: Promise<boolean> } {
+  public enqueueAction(toolName: string, args: any, forceAutoApprove?: boolean, requireApproval?: boolean): { id: string; done: Promise<boolean> } {
     const id = generateId('act');
     let clonedArgs: any = {};
     if (args && typeof args === 'object') {
@@ -142,7 +142,9 @@ class AgentOrchestrator {
     } else if (args !== undefined) {
       clonedArgs = args;
     }
-    const isAutoApproved = forceAutoApprove === true || AUTO_APPROVED_TOOLS.has(toolName);
+    const isAutoApproved = requireApproval === true
+      ? false
+      : (forceAutoApprove === true || AUTO_APPROVED_TOOLS.has(toolName));
     const action: QueuedAction = {
       id,
       toolName,

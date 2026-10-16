@@ -24,6 +24,7 @@ import { generateId } from '../utils/idGenerator';
 import { normalizeSyncCode, formatSyncCode } from '../utils/syncCodeUtils';
 import { logger } from '../utils/logger';
 import { getElectronAPI, type ElectronAPI } from '../utils/electronBridge';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
 export interface NovaUser {
   id: string;
@@ -687,7 +688,11 @@ export function mergeSyncedCollections(
 ): TombstoneAwareCollections {
   return {
     bookmarks: prefs.syncBookmarks && remote?.bookmarks
-      ? mergeSyncedCollection(local.bookmarks, remote.bookmarks, syncedCollectionMergeOptions('bookmarks', now))
+      ? mergeSyncedCollection(
+          local.bookmarks,
+          remote.bookmarks.filter(b => isTombstonedRow(b) || (typeof (b as any).url === 'string' && isSafeNavigationUrl((b as any).url))),
+          syncedCollectionMergeOptions('bookmarks', now)
+        )
       : purgeExpiredTombstones(local.bookmarks, now),
     folders: prefs.syncBookmarks && remote?.folders
       ? mergeSyncedCollection(local.folders, remote.folders, syncedCollectionMergeOptions('folders', now))
@@ -697,7 +702,11 @@ export function mergeSyncedCollections(
       : purgeExpiredTombstones(local.workspaces, now),
     history: local.history
       ? (prefs.syncHistory && remote?.history
-          ? mergeSyncedCollection(local.history, remote.history, syncedCollectionMergeOptions('history', now))
+          ? mergeSyncedCollection(
+              local.history,
+              remote.history.filter(h => isTombstonedRow(h) || (typeof (h as any).url === 'string' && isSafeNavigationUrl((h as any).url))),
+              syncedCollectionMergeOptions('history', now)
+            )
           : purgeExpiredTombstones(local.history, now))
       : local.history,
     passwords: local.passwords
@@ -891,11 +900,13 @@ export function deletionTombstones<T>(
 
 /** Index every live row of a collection by its key and row version. */
 export function indexPushedRows<T>(rows: T[], keyOf: (row: T) => string, versionOf: (row: T) => number): PushedRowIndex {
-  const index: PushedRowIndex = {};
+  const index: PushedRowIndex = Object.create(null);
   for (const row of rows) {
     if (!isObjectRow(row) || isTombstonedRow(row)) continue;
     const key = keyOf(row);
-    if (isUsableKey(key)) index[key] = versionOf(row);
+    if (isUsableKey(key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+      index[key] = versionOf(row);
+    }
   }
   return index;
 }
@@ -973,9 +984,11 @@ export function loadPushedIndex(userId: string): Partial<Record<IndexedDeletionC
       }
       const section = (parsed as Record<string, unknown>)[collection];
       if (!section || typeof section !== 'object') continue;
-      const index: PushedRowIndex = {};
+      const index: PushedRowIndex = Object.create(null);
       for (const [key, version] of Object.entries(section as Record<string, unknown>)) {
-        if (typeof version === 'number' && Number.isFinite(version) && version > 0) index[key] = version;
+        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype' && typeof version === 'number' && Number.isFinite(version) && version > 0) {
+          index[key] = version;
+        }
       }
       out[collection] = index;
     }
@@ -1075,11 +1088,23 @@ export function mergeSettingsLastWriteWins(
   const allKeys = new Set([...Object.keys(localSettings), ...Object.keys(remoteSettings)]);
 
   allKeys.forEach(key => {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') return;
+    if (!Object.prototype.hasOwnProperty.call(defaultSettings, key)) return;
+
     const localTs = stamps[key] || 0;
     const remoteTs = (typeof remoteStamps[key] === 'number' ? remoteStamps[key] : fallbackRemoteTs) as number;
 
     if (key in remoteSettings && (remoteTs > localTs || !(key in localSettings))) {
-      merged[key] = remoteSettings[key];
+      let val = remoteSettings[key];
+      if (key === 'mcpServerEnabled' && val === true && localSettings[key] !== true) {
+        val = false;
+      }
+      if ((key === 'backgroundCustomUrl' || key === 'searchEngineCustomUrl' || key === 'customApiBaseUrl') && typeof val === 'string' && val.trim() !== '') {
+        if (!isSafeNavigationUrl(val)) {
+          val = (defaultSettings as any)[key] ?? '';
+        }
+      }
+      merged[key] = val;
       // The local value IS the remote value now, so it inherits the remote's
       // write clock: this is what lets the next local edit beat it.
       stamps[key] = remoteTs;

@@ -4,7 +4,7 @@
  */
 
 const MAX_BACKUPS_PER_KEY = 3;
-const SENSITIVE_KEY_PATTERN = /(password|passwd|secret|token|credential|apiKey|api_key|privateKey|private_key|authToken|auth_token)/i;
+const SENSITIVE_KEY_PATTERN = /(password|passwd|secret|token|credential|apiKey|api_key|privateKey|private_key|authToken|auth_token|master_key|masterKey|sync_key|syncKey)/i;
 
 export function backupCorruptData(key: string, raw: string): void {
   // Never persist cleartext backups of sensitive data (tokens, passwords, keys) to localStorage.

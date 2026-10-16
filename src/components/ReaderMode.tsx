@@ -343,7 +343,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
             const range = walkDOM(contentRef.current, h.text);
             if (range) {
               const span = document.createElement('mark');
-              span.style.backgroundColor = h.color;
+              span.style.backgroundColor = /^#[0-9a-fA-F]{3,8}$/.test(h.color || '') ? h.color : '#fef08a';
               span.style.cursor = 'pointer';
               span.dataset.id = h.id;
               span.onclick = (e) => {
@@ -416,7 +416,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       updated = [...highlights, newHighlight];
 
       const span = document.createElement('mark');
-      span.style.backgroundColor = highlightColor;
+      span.style.backgroundColor = /^#[0-9a-fA-F]{3,8}$/.test(highlightColor) ? highlightColor : '#fef08a';
       span.style.cursor = 'pointer';
       span.dataset.id = id;
       span.onclick = (e) => {
@@ -475,7 +475,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     setHighlights(updated);
 
     if (contentRef.current) {
-      const mark = contentRef.current.querySelector(`mark[data-id="${targetId}"]`);
+      const escapedId = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(targetId) : targetId.replace(/["\\]/g, '\\$&');
+      const mark = contentRef.current.querySelector(`mark[data-id="${escapedId}"]`);
       if (mark && mark.parentNode) {
         const textNode = document.createTextNode(mark.textContent || '');
         mark.parentNode.replaceChild(textNode, mark);

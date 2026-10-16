@@ -150,6 +150,7 @@ function escapeForJSTemplate(str: string): string {
 
 // Shared DOM scanning script — extracted to avoid duplicating 40 lines in every tool call
 const DOM_SCAN_SCRIPT = `(() => {
+  document.querySelectorAll('[data-ai-id]').forEach(el => el.removeAttribute('data-ai-id'));
   const allInteractive = document.querySelectorAll('a, button, input, textarea, select, [role="button"], [tabindex]:not([tabindex="-1"])');
   const visibleEls = [];
   const vh = window.innerHeight || document.documentElement.clientHeight;
@@ -2638,7 +2639,7 @@ CRITICAL RULES:
     }
   }
 
-  public async handleToolCall(toolCall: any, generation?: number): Promise<string> {
+  public async handleToolCall(toolCall: any, generation?: number, requireApproval?: boolean): Promise<string> {
     if (generation !== undefined && !this.isOperationActive(generation)) {
       return JSON.stringify({ error: "Action cancelled." });
     }
@@ -2684,7 +2685,7 @@ CRITICAL RULES:
       // tools stay 'pending' until the user approves or denies the action card
       // in the AI side panel. On denial, denyAction() has already marked the
       // action 'denied' in the queue.
-      const { id: queuedId, done: approvalPromise } = orchestrator.enqueueAction(functionName, args);
+      const { id: queuedId, done: approvalPromise } = orchestrator.enqueueAction(functionName, args, undefined, requireApproval);
       actionId = queuedId;
 
       // If the orchestrator queued this as 'pending', tell status subscribers
@@ -3013,7 +3014,17 @@ CRITICAL RULES:
             typeBox.style.pointerEvents = 'none';
             typeBox.style.border = '1px solid rgba(255,255,255,0.4)';
             typeBox.style.boxShadow = '0 4px 15px rgba(0,0,0,0.1)';
-            typeBox.innerHTML = '<span style="color:' + color + '">AI Typing:</span> <span id="ai-typing-text"></span><span id="ai-cursor" style="animation: blink 1s step-end infinite; color:' + color + '">|</span>';
+            const spanLabel = document.createElement('span');
+            spanLabel.style.color = color;
+            spanLabel.textContent = 'AI Typing: ';
+            const spanText = document.createElement('span');
+            const spanCursor = document.createElement('span');
+            spanCursor.style.animation = 'blink 1s step-end infinite';
+            spanCursor.style.color = color;
+            spanCursor.textContent = '|';
+            typeBox.appendChild(spanLabel);
+            typeBox.appendChild(spanText);
+            typeBox.appendChild(spanCursor);
 
             // Add keyframes for cursor blink if not exists
             if (!document.getElementById('ai-blink-style')) {
@@ -3034,13 +3045,12 @@ CRITICAL RULES:
 
             // Typewriter effect
             const textToType = ${safeValue};
-            const spanText = document.getElementById('ai-typing-text');
             el.focus();
             el.value = '';
 
             for(let i=0; i<textToType.length; i++) {
               await new Promise(r => setTimeout(r, 20 + Math.random() * 30)); // random typing speed
-              spanText.innerText += textToType[i];
+              spanText.textContent += textToType[i];
               el.value += textToType[i];
               el.dispatchEvent(new Event('input', { bubbles: true }));
             }
@@ -3795,6 +3805,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       const MAX_LOOPS = 4;
       // Honest-failure bookkeeping: never claim success when nothing ran.
       let executedAnyTool = false;
+      let untrustedPageContentIngested = false;
       const executedToolSignatures: string[] = [];
       const isTr = isTurkishText(userQuery);
       const NO_VALID_OUTPUT_MSG = isTr
@@ -3865,16 +3876,45 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
           if (onChunk) onChunk(isTr ? `> Araç çalıştırılıyor: ${name}...\n\n` : `> Executing action: ${name}...\n\n`);
           let toolResult = '';
+          const SENSITIVE_POST_UNTRUSTED_TOOLS = new Set([
+            'navigate_to_url',
+            'browser_navigate',
+            'open_url',
+            'create_tab',
+            'switch_tab',
+            'close_tab',
+            'manage_tabs',
+            'browser_new_tab',
+            'browser_close_tab',
+            'browser_switch_tab',
+            'browser_duplicate_tab',
+            'search_history',
+            'browser_search_history',
+            'browser_search_bookmarks'
+          ]);
+          const requireApproval = untrustedPageContentIngested && SENSITIVE_POST_UNTRUSTED_TOOLS.has(name);
           try {
             toolResult = await this.handleToolCall({
               id: generateId('call'),
               type: 'function',
               function: { name, arguments: JSON.stringify(args) }
-            }, generation);
+            }, generation, requireApproval);
           } catch (err: any) {
             toolResult = JSON.stringify({ error: err.message || String(err) });
           }
           executedAnyTool = true;
+
+          const UNTRUSTED_CONTENT_SOURCES = new Set([
+            'read_page_content',
+            'browser_get_page_content',
+            'get_page_links',
+            'browser_get_page_links',
+            'browser_get_interactive_elements',
+            'web_research'
+          ]);
+          if (UNTRUSTED_CONTENT_SOURCES.has(name)) {
+            untrustedPageContentIngested = true;
+          }
 
           internalMessages.push({ role: 'assistant', content: assistantEcho } as ChatCompletionMessageParam);
           internalMessages.push({

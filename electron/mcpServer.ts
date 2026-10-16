@@ -355,6 +355,7 @@ export class BrowserMCPServer {
   private actualPort: number = 0;
   private portFilePath: string = '';
   private firstUseApproved: boolean = process.env.NODE_ENV === 'test' && !electronApp.isPackaged && Boolean(process.env.VITEST || process.env.JEST_WORKER_ID);
+  private pendingApprovalPromise: Promise<boolean> | null = null;
 
   constructor(private requestedPort: number = 3020) {
     // Performance: express/express-rate-limit are NOT required here — they are
@@ -634,30 +635,49 @@ export class BrowserMCPServer {
   private async ensureFirstUseApproved(): Promise<boolean> {
     if (this.firstUseApproved) return true;
     if (!this.mainWindow || this.mainWindow.isDestroyed()) return false;
+    if (this.pendingApprovalPromise) return this.pendingApprovalPromise;
 
     const authorizationGeneration = this.authorizationGeneration;
     const lockGeneration = screenLockGeneration;
-    try {
-      const result = await dialog.showMessageBox(this.mainWindow, {
-        type: 'question',
-        buttons: ['Allow', 'Deny'],
-        defaultId: 0,
-        cancelId: 1,
-        title: 'Nova Browser - MCP Authorization',
-        message: 'An external client is attempting to connect to Nova Browser via Model Context Protocol (MCP).',
-        detail: 'Do you want to allow this external client to interact with Nova Browser? Tool permissions can be managed in Settings.',
-        noLink: true
-      });
-      if (authorizationGeneration !== this.authorizationGeneration ||
-          lockGeneration !== screenLockGeneration || isScreenLocked) return false;
-      if (result.response === 0) {
-        this.firstUseApproved = true;
-        return true;
+
+    const askApproval = async (): Promise<boolean> => {
+      try {
+        const dialogPromise = dialog.showMessageBox(this.mainWindow!, {
+          type: 'question',
+          buttons: ['Allow', 'Deny'],
+          defaultId: 0,
+          cancelId: 1,
+          title: 'Nova Browser - MCP Authorization',
+          message: 'An external client is attempting to connect to Nova Browser via Model Context Protocol (MCP).',
+          detail: 'Do you want to allow this external client to interact with Nova Browser? Tool permissions can be managed in Settings.',
+          noLink: true
+        });
+
+        let timeoutHandle: NodeJS.Timeout | undefined;
+        const timeoutPromise = new Promise<{ response: number }>((resolve) => {
+          timeoutHandle = setTimeout(() => resolve({ response: 1 }), 60000);
+        });
+
+        const result = await Promise.race([dialogPromise, timeoutPromise]);
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+
+        if (authorizationGeneration !== this.authorizationGeneration ||
+            lockGeneration !== screenLockGeneration || isScreenLocked) return false;
+        if (result.response === 0) {
+          this.firstUseApproved = true;
+          return true;
+        }
+      } catch (err) {
+        console.warn('[MCP Server] Error prompting for first-use approval:', err);
       }
-    } catch (err) {
-      console.warn('[MCP Server] Error prompting for first-use approval:', err);
-    }
-    return false;
+      return false;
+    };
+
+    this.pendingApprovalPromise = askApproval().finally(() => {
+      this.pendingApprovalPromise = null;
+    });
+
+    return this.pendingApprovalPromise;
   }
 
   private async executeTool(toolName: string, args: Record<string, any>): Promise<string> {
@@ -1150,6 +1170,8 @@ export class BrowserMCPServer {
   public stop() {
     this.authorizationGeneration++;
     this.firstUseApproved = false;
+    this.pendingApprovalPromise = null;
+    this.actualPort = 0;
     cancelPendingMcpActions('MCP server was stopped');
     // A start() that is still in flight has not bound its port yet: reject it
     // so its promise always settles, and record the request so a listener that

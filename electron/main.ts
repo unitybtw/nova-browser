@@ -459,18 +459,23 @@ function applyProxyToSession(targetSession: Electron.Session, rules: string) {
   }
 }
 
-async function applyProxyToAllSessions(rules: string) {
-  activeChromiumProxyRules = rules;
-  const promises: Promise<void>[] = [
-    session.defaultSession.setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] defaultSession setProxy failed:', e)),
-    session.fromPartition('incognito').setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] incognito setProxy failed:', e)),
-  ];
-  for (const partName of hardenedIncognitoPartitions) {
-    try {
-      promises.push(session.fromPartition(partName, { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn(`[VPN] ${partName} setProxy failed:`, e)));
-    } catch (_) {}
-  }
-  await Promise.all(promises);
+let proxyMutex = Promise.resolve();
+async function applyProxyToAllSessions(rules: string): Promise<void> {
+  const op = async () => {
+    activeChromiumProxyRules = rules;
+    const promises: Promise<void>[] = [
+      session.defaultSession.setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] defaultSession setProxy failed:', e)),
+      session.fromPartition('incognito', { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn('[VPN] incognito setProxy failed:', e)),
+    ];
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      try {
+        promises.push(session.fromPartition(partName, { cache: false }).setProxy({ proxyRules: rules }).catch((e) => console.warn(`[VPN] ${partName} setProxy failed:`, e)));
+      } catch (_) {}
+    }
+    await Promise.all(promises);
+  };
+  proxyMutex = proxyMutex.then(op, op);
+  return proxyMutex;
 }
 
 function hardenIncognitoPartition(partitionName: string): boolean {
@@ -1713,7 +1718,10 @@ app.whenReady().then(async () => {
     return { success: false, error: 'Request not found or timed out' };
   });
 
+  const sessionsWithStrictSecurity = new WeakSet<Electron.Session>();
   applyStrictSecurityToSession = (targetSession: Electron.Session) => {
+    if (sessionsWithStrictSecurity.has(targetSession)) return;
+    sessionsWithStrictSecurity.add(targetSession);
     // Each private partition owns an in-memory permission store. Never import
     // normal grants or write private browsing origins to the shared disk file.
     const persistent = targetSession === session.defaultSession;
@@ -2774,7 +2782,11 @@ fi
   autoUpdater.on('update-downloaded', (info) => {
     isUpdateDownloaded = true;
     console.log('Update downloaded:', info.version);
-    sendToMainWindow('update-downloaded', { version: info.version, releaseDate: info.releaseDate });
+    sendToMainWindow('update-downloaded', {
+      version: info.version,
+      releaseDate: info.releaseDate,
+      integrityVerified: true
+    });
   });
 
   autoUpdater.on('error', (err) => {
@@ -4589,24 +4601,24 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
   try {
     if (tabId && typeof tabId === 'string' && /^[a-zA-Z0-9_-]+$/.test(tabId)) {
       const partitionName = `incognito-${tabId}`;
-      const sess = session.fromPartition(partitionName);
+      hardenedIncognitoPartitions.delete(partitionName);
+      const sess = session.fromPartition(partitionName, { cache: false });
       await sess.clearStorageData();
       await sess.clearCache();
-      // Remove from hardened set so the next open of this tabId gets fresh hardening
-      hardenedIncognitoPartitions.delete(partitionName);
     } else {
       // Clear all active per-tab incognito partitions
-      for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      const partitions = Array.from(hardenedIncognitoPartitions);
+      hardenedIncognitoPartitions.clear();
+      for (const partName of partitions) {
         try {
-          const sess = session.fromPartition(partName);
+          const sess = session.fromPartition(partName, { cache: false });
           await sess.clearStorageData();
           await sess.clearCache();
         } catch (_) {}
       }
-      hardenedIncognitoPartitions.clear();
 
       // Clear the legacy shared 'incognito' partition.
-      const legacySess = session.fromPartition('incognito');
+      const legacySess = session.fromPartition('incognito', { cache: false });
       await legacySess.clearStorageData();
       await legacySess.clearCache();
     }
@@ -4649,9 +4661,9 @@ ipcMain.handle('purge-system-memory', async (event) => {
     await defaultSess.clearAuthCache();
 
     // Deep purge memory cache for any active incognito partitions
-    for (const partName of hardenedIncognitoPartitions) {
+    for (const partName of Array.from(hardenedIncognitoPartitions)) {
       try {
-        const partSess = session.fromPartition(partName);
+        const partSess = session.fromPartition(partName, { cache: false });
         await partSess.clearCache();
         await partSess.clearHostResolverCache();
       } catch (_) {}
@@ -6457,7 +6469,7 @@ ipcMain.handle('set-extension-incognito-access', async (event, extensionId: unkn
 });
 
 ipcMain.handle('get-extension-incognito-access', async (event, extensionId: unknown) => {
-  if (!isTrustedSender(event)) return { error: 'Unauthorized' };
+  if (!isTrustedSender(event)) return false;
   if (typeof extensionId !== 'string' || !extensionId) return false;
   return incognitoAllowedExtensions.has(extensionId);
 });

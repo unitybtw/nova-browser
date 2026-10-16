@@ -94,8 +94,8 @@ const MARKDOWN_REMARK_PLUGINS = [remarkGfm];
 
 const MARKDOWN_COMPONENTS: Components = {
   a: ({ href, children }) => {
-    // AI output is untrusted: never render javascript:/data: URLs as links.
-    if (!href || !isSafeNavigationUrl(href)) {
+    // AI output is untrusted: only render http and https protocols as clickable links.
+    if (!href || !isSafeNavigationUrl(href) || !/^https?:\/\//i.test(href)) {
       return <span className="underline opacity-60 break-all">{children}</span>;
     }
     return (
