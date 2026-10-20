@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square,
@@ -135,6 +135,18 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   const [readingTime, setReadingTime] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const sanitizedContent = useMemo(() => {
+    if (!content) return '';
+    return DOMPurify.sanitize(content, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
+      ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
+      FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+    });
+  }, [content]);
 
   // Theme & Appearance with persistence
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>(() => {
@@ -1105,14 +1117,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   ref={contentRef}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
                   dangerouslySetInnerHTML={{
-                    __html: DOMPurify.sanitize(content, {
-                      USE_PROFILES: { html: true },
-                      ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
-                      ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
-                      FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
-                      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
-                      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-                    })
+                    __html: sanitizedContent
                   }}
                 />
               </motion.div>

@@ -335,9 +335,18 @@ export function isSafeAgentNavigationUrl(url: string): boolean {
     return false;
   }
 
-  // Only http(s) is a network destination. The nova:/about: pages the general
-  // predicate already blessed are renderer routes with no host to check.
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return true;
+  // Reject chrome-extension: and privileged internal routes for automated AI agent navigation
+  if (parsed.protocol === 'chrome-extension:') return false;
+  if (parsed.protocol === 'nova:') {
+    const target = (parsed.hostname || parsed.pathname.replace(/^\/\//, '')).toLowerCase();
+    return target === 'newtab';
+  }
+  if (parsed.protocol === 'about:') {
+    return parsed.pathname === 'blank';
+  }
+
+  // Only http(s) is allowed for external web destinations
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
 
   return !isNonPublicHost(parsed.hostname);
 }

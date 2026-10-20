@@ -22,7 +22,6 @@ const AUTO_APPROVED_TOOLS = new Set([
   'get_page_url',
   'get_page_links',
   'get_all_tabs',
-  'search_history',
   'take_screenshot',
   'wait',
   'browser_get_page_content',
@@ -31,8 +30,6 @@ const AUTO_APPROVED_TOOLS = new Set([
   'browser_get_interactive_elements',
   'browser_get_page_links',
   'browser_list_tabs',
-  'browser_search_history',
-  'browser_search_bookmarks',
   'browser_take_screenshot',
   'browser_wait',
 

@@ -494,7 +494,10 @@ function hardenIncognitoPartition(partitionName: string): boolean {
     }
     // Apply ad blocker if enabled
     if (isPrivacyShieldEnabled && getBlocker()) {
-      applyAdBlockerToSession(partSess, true);
+      applyAdBlockerToSession(partSess, true, (sess) => {
+        sessionsWithPrivacyHeaders.delete(sess);
+        applyPrivacyHeadersToSession(sess);
+      });
     }
     hardenedIncognitoPartitions.add(partitionName);
     console.log(`[Security] Hardened incognito partition: ${partitionName}`);
@@ -512,6 +515,10 @@ function initAdBlocker() {
     userDataPath: app.getPath('userData'),
     isPrivacyShieldEnabled: () => isPrivacyShieldEnabled,
     getAllSessions: getAllActiveSessions,
+    onAfterSessionStateChange: (sess: Electron.Session) => {
+      sessionsWithPrivacyHeaders.delete(sess);
+      applyPrivacyHeadersToSession(sess);
+    },
     onAdBlockedFlush: (pendingAdBlocks: Map<number, number>) => {
       if (!mainWindow || mainWindow.isDestroyed()) {
         pendingAdBlocks.clear();
@@ -1746,6 +1753,13 @@ app.whenReady().then(async () => {
           const requestsVideo = mediaTypes.includes('video');
           const requestsAudio = mediaTypes.includes('audio');
           if (requestsAudio && !requestsVideo) {
+            // Check if app-level microphone permission was already remembered and decided
+            const appPerm = decisions.get('app')?.get('media:audio') ||
+                            decisions.get(url)?.get('media:audio');
+            if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
+              return callback(appPerm.allow);
+            }
+
             if (process.platform === 'darwin') {
               try {
                 const status = systemPreferences.getMediaAccessStatus('microphone');
@@ -1760,9 +1774,6 @@ app.whenReady().then(async () => {
                 return callback(false);
               }
             }
-            // Check if app-level microphone permission was already remembered and allowed
-            const appPerm = decisions.get('app')?.get('media:audio') ||
-                            decisions.get(url)?.get('media:audio');
             if (appPerm && (Date.now() - appPerm.ts < PERMISSION_TTL_MS)) {
               return callback(appPerm.allow);
             }
@@ -1960,7 +1971,7 @@ app.whenReady().then(async () => {
         return { status: 'denied', canAsk: false, platform: 'darwin' };
       }
     }
-    const appPerm = rememberedPermissions.get('app')?.get('media');
+    const appPerm = rememberedPermissions.get('app')?.get('media:audio') || rememberedPermissions.get('app')?.get('media');
     if (appPerm && appPerm.allow) {
       return { status: 'granted', canAsk: false, platform: process.platform };
     }
@@ -1986,7 +1997,7 @@ app.whenReady().then(async () => {
         return { granted: false, status: 'denied', platform: 'darwin' };
       }
     }
-    const appPerm = rememberedPermissions.get('app')?.get('media');
+    const appPerm = rememberedPermissions.get('app')?.get('media:audio') || rememberedPermissions.get('app')?.get('media');
     if (appPerm) {
       return { granted: appPerm.allow, status: appPerm.allow ? 'granted' : 'denied', platform: process.platform };
     }
@@ -2239,6 +2250,20 @@ app.whenReady().then(async () => {
       return { success: false, error: 'Update package does not exist on disk' };
     }
 
+    if (latestReleaseDownloadInfo?.expectedSha256) {
+      try {
+        const fileBuffer = fs.readFileSync(resolvedFilePath);
+        const actualSha = crypto.createHash('sha256').update(fileBuffer).digest('hex').toLowerCase();
+        if (actualSha !== latestReleaseDownloadInfo.expectedSha256.toLowerCase()) {
+          console.error(`[Security] Update checksum mismatch! Expected ${latestReleaseDownloadInfo.expectedSha256}, got ${actualSha}`);
+          return { success: false, error: 'Update package checksum verification failed' };
+        }
+      } catch (hashErr) {
+        console.error('[Security] Failed to verify update checksum:', hashErr);
+        return { success: false, error: 'Failed to verify update integrity' };
+      }
+    }
+
     console.log('[Updater] Starting self-update and relaunch with package:', resolvedFilePath);
     updateInstallInProgress = true;
     markQuitting();
@@ -2297,14 +2322,12 @@ hdiutil attach "\${FILE_PATH}" -mountpoint "\${MOUNT_POINT}" -nobrowse -quiet -n
 SOURCE_APP=$(find "\${MOUNT_POINT}" -maxdepth 2 -name "*.app" | head -n 1)
 if [ -z "$SOURCE_APP" ]; then
   cleanup_mount
-  open "\${FILE_PATH}"
   exit 1
 fi
 
 # Bundle integrity & signature verification
 if [ ! -f "$SOURCE_APP/Contents/Info.plist" ] || [ ! -d "$SOURCE_APP/Contents/MacOS" ]; then
   cleanup_mount
-  open "\${FILE_PATH}"
   exit 1
 fi
 
@@ -2312,13 +2335,11 @@ fi
 rm -rf "\${STAGING_APP}" 2>/dev/null
 if ! ditto "$SOURCE_APP" "\${STAGING_APP}" 2>/dev/null; then
   cleanup_mount
-  open "\${FILE_PATH}"
   exit 1
 fi
 
 if [ ! -f "\${STAGING_APP}/Contents/Info.plist" ] || [ ! -d "\${STAGING_APP}/Contents/MacOS" ]; then
   cleanup_mount
-  open "\${FILE_PATH}"
   exit 1
 fi
 
@@ -2603,15 +2624,11 @@ fi
       }
     }
 
-    // Fallback: show item, open with default handler and exit
+    // Fallback: show item in folder without arbitrary unverified execution
     try {
       shell.showItemInFolder(resolvedFilePath);
     } catch (_) {}
-    const openRes = await shell.openPath(resolvedFilePath);
-    setTimeout(() => {
-      try { app.quit(); } catch (_) { app.exit(0); }
-    }, 1200);
-    return { success: !openRes, error: openRes || undefined };
+    return { success: false, error: 'Automatic installation not supported for this package type; opened containing folder.' };
   }
 
   type UpdateCheckResult = { success: boolean; version?: string; isAvailable?: boolean; error?: string };
@@ -3099,17 +3116,13 @@ fi
           console.warn(`[Security] Blocked open-external with embedded credentials for host: ${parsed.host}`);
           return false;
         }
-        // Security: Block dangerous file extensions that could execute on the host OS,
-        // unless it is an official release package from the verified Nova repository.
+        // Security: Block dangerous file extensions that could execute on the host OS.
         const pathname = parsed.pathname.toLowerCase();
-        const isOfficialNovaRelease = (parsed.hostname === 'github.com' || parsed.hostname === 'www.github.com' || parsed.hostname === 'objects.githubusercontent.com') &&
-          (pathname.startsWith('/unitybtw/nova-browser/releases') || pathname.includes('/unitybtw/nova-browser/releases/'));
-
-        const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
+        const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso|scr|pif|com|cpl|msc|msp|hta|jar|jse|vbe|wsf|wsh|reg|lnk|url|chm|appimage|run|mpkg|workflow|action|scpt|terminal|desktop|application|appref-ms)($|\?|#)/i;
         const queryHasDangerousExt = Array.from(parsed.searchParams.values()).some(val => DANGEROUS_EXT_REGEX.test(val.toLowerCase())) ||
           Array.from(parsed.searchParams.keys()).some(key => DANGEROUS_EXT_REGEX.test(key.toLowerCase()));
 
-        if (!isOfficialNovaRelease && (DANGEROUS_EXT_REGEX.test(pathname) || queryHasDangerousExt)) {
+        if (DANGEROUS_EXT_REGEX.test(pathname) || queryHasDangerousExt) {
           console.warn(`[Security] Blocked open-external for dangerous file extension: ${parsed.href}`);
           return false;
         }
@@ -3360,7 +3373,12 @@ app.on('web-contents-created', (_event, contents) => {
         return;
       }
       if (part.startsWith('incognito-')) {
-        hardenIncognitoPartition(part);
+        const hardened = hardenIncognitoPartition(part);
+        if (hardened === false) {
+          console.warn(`[Security] Failed to harden incognito partition: ${part}`);
+          event.preventDefault();
+          return;
+        }
       }
     }
 
@@ -3431,7 +3449,8 @@ app.on('web-contents-created', (_event, contents) => {
       const parsed = new URL(url);
       const isHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
       const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
-      if (isHttp || isExtension) {
+      const isInstalledExtension = isExtension && (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(session.defaultSession.getExtension(parsed.hostname)));
+      if (isHttp || isInstalledExtension) {
         sendToMainWindow('new-tab', url);
       }
     } catch {}
@@ -3706,7 +3725,10 @@ app.on('window-all-closed', () => {
 ipcMain.handle('set-privacy-shield', (event, enabled: boolean) => {
   if (!isTrustedSender(event)) return false;
   isPrivacyShieldEnabled = Boolean(enabled);
-  applyAdBlockerToAllSessions(isPrivacyShieldEnabled, getAllActiveSessions());
+  applyAdBlockerToAllSessions(isPrivacyShieldEnabled, getAllActiveSessions(), (sess) => {
+    sessionsWithPrivacyHeaders.delete(sess);
+    applyPrivacyHeadersToSession(sess);
+  });
   return isPrivacyShieldEnabled;
 });
 
@@ -4014,12 +4036,20 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
         const isHttps = parsedUrl.protocol === 'https:';
         const agentOptions = {
           lookup: (_hostname: string, _opts: any, cb: any) => {
-            cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+            const callback = typeof _opts === 'function' ? _opts : cb;
+            const opts = typeof _opts === 'object' ? _opts : {};
+            const family = pinnedIp.includes(':') ? 6 : 4;
+            if (opts && opts.all) {
+              callback(null, [{ address: pinnedIp, family }]);
+            } else {
+              callback(null, pinnedIp, family);
+            }
           }
         };
         const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
         const resp = await fetch(currentUrl, {
           agent,
+          redirect: 'manual',
           signal: AbortSignal.timeout(8000),
           headers: {
             'User-Agent': getStandardUserAgent()
@@ -4983,20 +5013,23 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
   try {
     if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) {
-      return { error: 'Invalid key format' };
+      console.warn('[Security] store-set rejected: Invalid key format');
+      return false;
     }
     const RESTRICTED_STORE_KEYS = ['passwords', 'secrets', 'auth'];
     if (RESTRICTED_STORE_KEYS.includes(key.toLowerCase())) {
-      return { error: 'Access denied: restricted storage key' };
+      console.warn('[Security] store-set rejected: restricted storage key');
+      return false;
     }
     if (typeof value !== 'string') {
-      return { error: 'Invalid value format: must be string' };
+      console.warn('[Security] store-set rejected: value must be string');
+      return false;
     }
     // VULN-23: Enforce max value size of 10MB
     const MAX_STORE_VALUE_SIZE = 10 * 1024 * 1024; // 10MB
     if (Buffer.byteLength(value, 'utf-8') > MAX_STORE_VALUE_SIZE) {
       console.error('Store set error: Value exceeds maximum size of 10MB');
-      return { error: 'Value exceeds maximum allowed size of 10MB' };
+      return false;
     }
     const keyPath = path.join(app.getPath('userData'), `store_${key}.json`);
     // Atomic replace. `writeFile` truncates in place, and the renderer has two
@@ -5105,8 +5138,9 @@ async function validatePreviewUrl(rawUrl: string): Promise<ValidatedPreviewTarge
     return { error: 'Invalid URL format' };
   }
 
-  const hostname = parsedUrl.hostname.toLowerCase();
-  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local')) {
+  const rawHost = parsedUrl.hostname.toLowerCase();
+  const hostname = rawHost.replace(/^\[|\]$/g, '');
+  if (hostname === 'localhost' || hostname.endsWith('.localhost') || hostname.endsWith('.local') || hostname.endsWith('.internal') || hostname.endsWith('.lan') || !hostname.includes('.')) {
     return { error: 'Requests to local hostnames are blocked.' };
   }
 
@@ -5228,7 +5262,14 @@ ipcMain.handle('fetch-page-html', async (event, url: string) => {
       const isHttps = parsedUrl.protocol === 'https:';
       const agentOptions = {
         lookup: (_hostname: string, _opts: any, cb: any) => {
-          cb(null, pinnedIp, pinnedIp.includes(':') ? 6 : 4);
+          const callback = typeof _opts === 'function' ? _opts : cb;
+          const opts = typeof _opts === 'object' ? _opts : {};
+          const family = pinnedIp.includes(':') ? 6 : 4;
+          if (opts && opts.all) {
+            callback(null, [{ address: pinnedIp, family }]);
+          } else {
+            callback(null, pinnedIp, family);
+          }
         }
       };
       const agent = isHttps ? new https.Agent(agentOptions) : new http.Agent(agentOptions);
@@ -5447,7 +5488,7 @@ initSuggestions(isTrustedSender);
 // Open dialog to select a folder for unpacked extension
 ipcMain.handle('select-extension-folder', async (event) => {
   if (!isTrustedSender(event)) return { canceled: true };
-  const win = BrowserWindow.getAllWindows()[0];
+  const win = mainWindow || BrowserWindow.getAllWindows()[0];
   if (!win) return { canceled: true };
   const { canceled, filePaths } = await dialog.showOpenDialog(win, {
     title: 'Select Extension Folder',
@@ -5555,6 +5596,11 @@ async function loadPersistentExtensions(): Promise<void> {
       }
       const existing = session.defaultSession.getExtension(id);
       const extInfo = existing || await session.defaultSession.loadExtension(realPath, { allowFileAccess: false });
+      if (extInfo?.id && extInfo.id !== id) {
+        console.warn(`[Extensions] Extension ID mismatch on restore: expected ${id}, got ${extInfo.id}`);
+        try { await session.defaultSession.removeExtension(extInfo.id); } catch (_) {}
+        return;
+      }
       loadedExtensions.push(extInfo);
       console.log(`[Extensions] Restored ${extInfo.name || id}`);
     } catch (err) {
@@ -5617,7 +5663,7 @@ function getLocalizedManifestString(extPath: string, text: string, fallback: str
 // Load an unpacked extension from a folder path
 ipcMain.handle('install-extension', async (event, folderPath: string) => {
   if (!isTrustedSender(event)) return { error: 'Unauthorized' };
-  const win = BrowserWindow.getAllWindows()[0];
+  const win = mainWindow || BrowserWindow.getAllWindows()[0];
   if (!win) return { error: 'No window available' };
 
   if (!folderPath || typeof folderPath !== 'string' || !folderPath.trim()) {
@@ -5685,8 +5731,8 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   }
 
   try {
-    const targetSession = win.webContents?.session || session.defaultSession;
-    const extInfo = await targetSession.loadExtension(realFolder);
+    const targetSession = session.defaultSession;
+    const extInfo = await targetSession.loadExtension(realFolder, { allowFileAccess: false });
 
     const disabledIds = getDisabledExtensionIds();
     if (disabledIds.includes(extInfo.id)) {
@@ -5888,37 +5934,19 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   if (typeof url !== 'string' || blockedProtocols.some(proto => url.trim().toLowerCase().startsWith(proto))) {
     return { error: 'Blocked: dangerous URL protocol.' };
   }
-  const extensionsDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
-  if (url.startsWith('file://')) {
-    try {
-      const filePath = path.resolve(fileURLToPath(url));
-      // path.resolve collapses `..` but not symlinks, and the check is done on
-      // the string while Chromium re-resolves the real path. A link planted in
-      // <userData>/extensions would pass this and render an arbitrary local file
-      // in a chrome-less, always-on-top window. The sibling handlers here use
-      // realpathSync on both sides; this one was the odd case out.
-      const realExtensionsDir = fs.realpathSync(extensionsDir);
-      const realFilePath = fs.realpathSync(filePath);
-      if (!realFilePath.startsWith(realExtensionsDir + path.sep)) {
-        return { error: 'Blocked: file:// URL must be within extensions directory.' };
-      }
-    } catch {
-      return { error: 'Invalid file URL.' };
+  if (!url.startsWith('chrome-extension://')) {
+    return { error: 'Blocked: extension popup URL must be chrome-extension://' };
+  }
+  try {
+    const parsedExtensionUrl = new URL(url);
+    const extensionId = parsedExtensionUrl.hostname;
+    const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
+      Boolean(session.defaultSession.getExtension(extensionId));
+    if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled) {
+      return { error: 'Blocked: extension is not installed.' };
     }
-  } else if (url.startsWith('chrome-extension://')) {
-    try {
-      const parsedExtensionUrl = new URL(url);
-      const extensionId = parsedExtensionUrl.hostname;
-      const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
-        Boolean(session.defaultSession.getExtension(extensionId));
-      if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled) {
-        return { error: 'Blocked: extension is not installed.' };
-      }
-    } catch {
-      return { error: 'Invalid extension URL.' };
-    }
-  } else {
-    return { error: 'Blocked: only chrome-extension:// and local extension file:// URLs are allowed.' };
+  } catch {
+    return { error: 'Invalid extension URL.' };
   }
 
   // Toggle behavior: if clicking the same extension popup while open, close it
@@ -6036,8 +6064,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
     } catch {}
 
     const ext: any = (extId ? session.defaultSession.getExtension(extId) : null) ||
-      loadedExtensions.find(e => e.id === extId) ||
-      (url.startsWith('file://') ? loadedExtensions.find(e => url.includes(e.id)) : null);
+      loadedExtensions.find(e => e.id === extId);
 
     let manifest: any = ext?.manifest;
     if (!manifest && ext?.path) {

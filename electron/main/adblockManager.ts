@@ -124,14 +124,20 @@ export function updateAdblockWhitelist(whitelist: string[]): void {
   currentWhitelistFilters = newFilters;
 }
 
-export function applyAdBlockerToSession(sess: Electron.Session, enable: boolean): void {
+export function applyAdBlockerToSession(
+  sess: Electron.Session,
+  enable: boolean,
+  onAfterChange?: (sess: Electron.Session) => void
+): void {
   if (!blocker) return;
   try {
     const isCurrentlyEnabled = blocker.isBlockingEnabled(sess);
     if (enable && !isCurrentlyEnabled) {
       blocker.enableBlockingInSession(sess);
+      onAfterChange?.(sess);
     } else if (!enable && isCurrentlyEnabled) {
       blocker.disableBlockingInSession(sess);
+      onAfterChange?.(sess);
     }
   } catch (e) {
     console.warn(`[AdBlocker] Failed to ${enable ? 'enable' : 'disable'} blocking in session:`, e);
@@ -140,11 +146,12 @@ export function applyAdBlockerToSession(sess: Electron.Session, enable: boolean)
 
 export function applyAdBlockerToAllSessions(
   enable: boolean,
-  sessions: Electron.Session[]
+  sessions: Electron.Session[],
+  onAfterChange?: (sess: Electron.Session) => void
 ): void {
   if (!blocker) return;
   for (const sess of sessions) {
-    applyAdBlockerToSession(sess, enable);
+    applyAdBlockerToSession(sess, enable, onAfterChange);
   }
 }
 
@@ -153,6 +160,7 @@ export interface InitAdBlockerOptions {
   isPrivacyShieldEnabled: () => boolean;
   getAllSessions: () => Electron.Session[];
   onAdBlockedFlush?: (pendingMap: Map<number, number>) => void;
+  onAfterSessionStateChange?: (sess: Electron.Session) => void;
 }
 
 export async function initAdBlocker(options: InitAdBlockerOptions): Promise<ElectronBlocker | null> {
@@ -197,7 +205,7 @@ export async function initAdBlocker(options: InitAdBlockerOptions): Promise<Elec
     blocker = engine;
 
     if (options.isPrivacyShieldEnabled()) {
-      applyAdBlockerToAllSessions(true, options.getAllSessions());
+      applyAdBlockerToAllSessions(true, options.getAllSessions(), options.onAfterSessionStateChange);
     }
 
     const pendingAdBlocks = new Map<number, number>();

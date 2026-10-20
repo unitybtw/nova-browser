@@ -6,7 +6,7 @@ import crypto from 'crypto';
 // Mirrors the open-external check in main.ts. Duplicated rather than imported
 // because main.ts is the composition root and importing it back would be
 // circular. Keep the two lists in step.
-const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso)($|\?|#)/i;
+const DANGEROUS_EXT_REGEX = /\.(exe|msi|bat|cmd|sh|app|bin|vbs|ps1|command|dmg|deb|pkg|rpm|iso|scr|pif|com|cpl|msc|msp|hta|jar|jse|vbe|wsf|wsh|reg|lnk|url|chm|appimage|run|mpkg|workflow|action|scpt|terminal|desktop|application|appref-ms)($|\?|#)/i;
 
 /**
  * Document types the OS opens by EXECUTING script rather than displaying it.
@@ -160,7 +160,13 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
         ? Array.from(knownDownloadPaths).some(p => p.toLowerCase() === normPath)
         : knownDownloadPaths.has(realPath);
       if (!isUnderDownloads && !isKnown) return null;
-      return fs.existsSync(realPath) ? realPath : null;
+      if (!fs.existsSync(realPath)) return null;
+      try {
+        if (!fs.statSync(realPath).isFile()) return null;
+      } catch {
+        return null;
+      }
+      return realPath;
     } catch {
       return null;
     }
@@ -256,12 +262,17 @@ export function isSafeDownloadUrl(urlStr: string): boolean {
       }
     }
     if (parsed.protocol === 'data:') {
-      const mime = parsed.pathname.split(';')[0].split(',')[0].toLowerCase().trim();
+      let rawMime = parsed.pathname.split(';')[0].split(',')[0].trim().toLowerCase();
+      try {
+        rawMime = decodeURIComponent(rawMime);
+      } catch {}
+      const mime = rawMime || 'text/plain';
       const dangerousMimes = [
         'javascript', 'ecmascript', 'html', 'htm', 'xml', 'svg', 'msdownload', 'executable', 'octet-stream',
         'x-sh', 'x-bat', 'x-cmd', 'x-csh', 'x-powershell', 'x-msdos-program', 'x-apple-diskimage',
         'x-ms-shortcut', 'hta', 'jar', 'appimage', 'application/x-pie-executable', 'application/x-sharedlib',
-        'application/vnd.microsoft.portable-executable'
+        'application/vnd.microsoft.portable-executable', 'application/x-msi', 'application/x-dosexec',
+        'application/x-mach-binary', 'text/vbscript'
       ];
       if (dangerousMimes.some(d => mime.includes(d))) {
         return false;
@@ -281,7 +292,7 @@ export function isSafeDownloadUrl(urlStr: string): boolean {
 export function sanitizeDownloadFilename(rawFilename: string): string {
   const normalized = (rawFilename || '').replace(/\\/g, '/');
   let name = path.basename(normalized).replace(/^\.+/, '').trim();
-  name = name.replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, '_').trim();
+  name = name.replace(/[\x00-\x1f\x7f<>:"/\\|?*\u202A-\u202E\u2066-\u2069\u200E\u200F\u061C\uFEFF]/g, '_').trim();
   name = name.replace(/[.\s]+$/, '');
   const ext = path.extname(name);
   const base = path.basename(name, ext);
@@ -289,6 +300,11 @@ export function sanitizeDownloadFilename(rawFilename: string): string {
   const DOS_RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
   if (DOS_RESERVED.test(stem) || DOS_RESERVED.test(base)) {
     name = `download_${name}`;
+  }
+  if (name.length > 255) {
+    const extLength = ext.length;
+    const maxBaseLength = Math.max(1, 255 - extLength);
+    name = `${base.slice(0, maxBaseLength)}${ext}`;
   }
   return name || 'download';
 }
@@ -346,7 +362,11 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     const requesterId = webContents?.id;
     const wantsSaveAsDialog = typeof requesterId === 'number' && nextDownloadAsSaveAsIds.delete(requesterId);
     if (wantsSaveAsDialog) {
-      // Do not set save path so Electron shows the Save Dialog automatically
+      const defaultDir = app.getPath('downloads');
+      const safeName = sanitizeDownloadFilename(filename);
+      try {
+        item.setSaveDialogOptions({ defaultPath: path.join(defaultDir, safeName) });
+      } catch (_) {}
       item.once('done', (_event, state) => {
         if (state === 'completed') recordCompletedPath();
       });

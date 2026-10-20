@@ -727,18 +727,18 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       return { error: 'Installation cancelled by user.' };
     }
 
-    // Atomic promotion: remove existing extractPath if present, and rename staging to extractPath
-    if (fs.existsSync(extractPath)) {
-      try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
-    }
-    fs.renameSync(stagingPath, extractPath);
-
-    // If extension is already loaded in defaultSession, unload it first to prevent duplicate loading crash
+    // If extension is already loaded in defaultSession, unload it first to prevent Windows file-locking (EBUSY/EPERM) and duplicate loading crashes
     try {
       if (session.defaultSession.getExtension(extensionId)) {
         await session.defaultSession.removeExtension(extensionId);
       }
     } catch (_) {}
+
+    // Atomic promotion: remove existing extractPath if present, and rename staging to extractPath
+    if (fs.existsSync(extractPath)) {
+      try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
+    }
+    fs.renameSync(stagingPath, extractPath);
 
     // Clear disabled state if extension was previously disabled
     const disabledIds = deps.getDisabledExtensionIds();

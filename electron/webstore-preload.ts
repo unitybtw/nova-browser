@@ -137,8 +137,11 @@ if ((window as any).__novaPreloadInjected) {
   };
 
   window.addEventListener('message', (event) => {
+    if (window !== window.top) return;
     const host = window.location.hostname.toLowerCase();
+    const pathname = window.location.pathname.toLowerCase();
     if (!isWebStoreHost(host)) return;
+    if (host === 'chrome.google.com' && !pathname.startsWith('/webstore')) return;
     if (event.source !== window ||
         !isWebStoreOrigin(event.origin) ||
         !event.data || event.data.type !== 'NOVA_INSTALL_EXTENSION') return;

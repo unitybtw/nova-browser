@@ -698,7 +698,11 @@ export function mergeSyncedCollections(
       ? mergeSyncedCollection(local.folders, remote.folders, syncedCollectionMergeOptions('folders', now))
       : purgeExpiredTombstones(local.folders, now),
     workspaces: prefs.syncWorkspaces && remote?.workspaces
-      ? mergeSyncedCollection(local.workspaces, remote.workspaces, syncedCollectionMergeOptions('workspaces', now))
+      ? mergeSyncedCollection(
+          local.workspaces,
+          remote.workspaces.filter(w => isTombstonedRow(w) || (typeof w?.id === 'string' && typeof w?.name === 'string')),
+          syncedCollectionMergeOptions('workspaces', now)
+        )
       : purgeExpiredTombstones(local.workspaces, now),
     history: local.history
       ? (prefs.syncHistory && remote?.history

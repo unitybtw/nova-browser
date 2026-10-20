@@ -645,7 +645,7 @@ export class BrowserMCPServer {
         const dialogPromise = dialog.showMessageBox(this.mainWindow!, {
           type: 'question',
           buttons: ['Allow', 'Deny'],
-          defaultId: 0,
+          defaultId: 1,
           cancelId: 1,
           title: 'Nova Browser - MCP Authorization',
           message: 'An external client is attempting to connect to Nova Browser via Model Context Protocol (MCP).',
@@ -814,6 +814,10 @@ export class BrowserMCPServer {
         return res.status(401).send('Unauthorized: Invalid or missing token');
       }
 
+      if (this.clients.size >= 10) {
+        return res.status(429).send('Too Many Requests: Maximum connected clients reached');
+      }
+
       const clientId = `client_${randomUUID().replace(/-/g, '')}`;
 
       res.setHeader('Content-Type', 'text/event-stream');
@@ -933,7 +937,9 @@ export class BrowserMCPServer {
 
         if (body.method === 'tools/call') {
           const toolName = body.params?.name;
-          const args = body.params?.arguments || {};
+          const args = (body.params?.arguments && typeof body.params.arguments === 'object' && !Array.isArray(body.params.arguments))
+            ? body.params.arguments
+            : {};
 
           try {
             const result = await this.executeTool(toolName, args);
@@ -992,11 +998,12 @@ export class BrowserMCPServer {
         return res.status(400).json({ error: 'Invalid request body' });
       }
 
-      const { tool, args = {} } = body;
+      const { tool, args } = body;
       if (!tool) return res.status(400).json({ error: 'Missing tool name' });
+      const safeArgs = (args && typeof args === 'object' && !Array.isArray(args)) ? args : {};
 
       try {
-        const result = await this.executeTool(tool, args);
+        const result = await this.executeTool(tool, safeArgs);
         res.json({ success: true, result });
       } catch (err: any) {
         const homeDir = process.env.HOME || process.env.USERPROFILE || '';
