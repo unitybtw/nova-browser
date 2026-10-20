@@ -1,202 +1,203 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
+import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { APPLE_FONT, MacCursor } from '../components/RealNovaWindow';
 
 export const Scene1Intro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const logoScale = spring({
+  const headerEnter = spring({
     frame,
     fps,
-    config: { damping: 12, stiffness: 110, mass: 0.8 },
+    config: { damping: 22, stiffness: 95 },
   });
 
-  const floatY = Math.sin(frame * 0.05) * 8;
-  const ringRotate = (frame * 1.2) % 360;
-  const ringRotateReverse = 360 - ((frame * 0.9) % 360);
+  const browserRise = spring({
+    frame: Math.max(0, frame - 12),
+    fps,
+    config: { damping: 20, stiffness: 82, mass: 1.05 },
+  });
 
-  const titleOpacity = interpolate(frame, [15, 38], [0, 1], {
+  // Top-anchored macro camera dolly so the browser never overlaps the headline
+  const cameraZoom = interpolate(frame, [0, 55, 168], [1, 1.01, 1.12], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
 
-  const titleY = interpolate(frame, [15, 38], [40, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
+  const searchFocused = frame >= 72;
+  const focusGlow = spring({
+    frame: Math.max(0, frame - 72),
+    fps,
+    config: { damping: 16, stiffness: 130 },
   });
-
-  const subtitleOpacity = interpolate(frame, [35, 58], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const badgeOpacity = interpolate(frame, [50, 70], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const glowPulse = interpolate(Math.sin(frame * 0.08), [-1, 1], [0.65, 1]);
 
   return (
-    <div
+    <AbsoluteFill
       style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
+        backgroundColor: '#f5f5f7',
+        fontFamily: APPLE_FONT,
+        overflow: 'hidden',
         alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        zIndex: 10,
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Top Futuristic Tag Pill */}
       <div
         style={{
-          opacity: badgeOpacity,
-          transform: 'translateY(-15px)',
-          padding: '10px 28px',
-          borderRadius: '9999px',
-          background: 'rgba(6, 182, 212, 0.12)',
-          border: '1px solid rgba(6, 182, 212, 0.5)',
-          backdropFilter: 'blur(20px)',
-          color: '#38bdf8',
-          fontSize: 19,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          marginBottom: 36,
-          boxShadow: '0 0 35px rgba(6, 182, 212, 0.3)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 50% 0%, #ffffff 0%, #f5f5f7 68%, #ebedf0 100%)',
         }}
-      >
-        <span
-          style={{
-            width: 8,
-            height: 8,
-            borderRadius: '50%',
-            backgroundColor: '#22d3ee',
-            boxShadow: '0 0 12px #22d3ee',
-          }}
-        />
-        Next-Generation Web Browser
-      </div>
+      />
 
-      {/* Hero 3D Logo Container with Holographic Energy Rings & Glass Plate */}
+      {/* Editorial Header */}
       <div
         style={{
           position: 'relative',
-          width: 250,
-          height: 250,
+          marginTop: 54,
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
-          justifyContent: 'center',
-          marginBottom: 34,
-          transform: `scale(${logoScale}) translateY(${floatY}px)`,
+          textAlign: 'center',
+          opacity: headerEnter,
+          transform: `translateY(${(1 - headerEnter) * 18}px)`,
+          zIndex: 10,
         }}
       >
-        {/* Outer Rotating Cyan Energy Ring */}
         <div
           style={{
-            position: 'absolute',
-            inset: -18,
-            borderRadius: '50%',
-            border: '2px dashed rgba(6, 182, 212, 0.65)',
-            transform: `rotate(${ringRotate}deg)`,
-            boxShadow: '0 0 45px rgba(6, 182, 212, 0.3)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '5px 15px',
+            borderRadius: 999,
+            background: '#ffffff',
+            border: '1px solid rgba(15, 23, 42, 0.08)',
+            boxShadow: '0 4px 14px rgba(15, 23, 42, 0.04)',
+            marginBottom: 14,
           }}
-        />
+        >
+          <Img src={staticFile('website-tour/nova-icon.svg')} style={{ width: 18, height: 18 }} />
+          <span style={{ fontSize: 13, fontWeight: 650, letterSpacing: '-0.01em', color: '#1d1d1f' }}>
+            Nova Browser 1.5
+          </span>
+          <span style={{ color: '#cbd5e1' }}>|</span>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: '#2563eb' }}>Built for Focus</span>
+        </div>
 
-        {/* Inner Counter-Rotating Violet Energy Ring */}
-        <div
+        <h1
           style={{
-            position: 'absolute',
-            inset: -4,
-            borderRadius: '50%',
-            border: '1.5px solid rgba(168, 85, 247, 0.5)',
-            borderTopColor: 'transparent',
-            borderBottomColor: 'transparent',
-            transform: `rotate(${ringRotateReverse}deg)`,
+            fontSize: 64,
+            fontWeight: 650,
+            letterSpacing: '-0.042em',
+            lineHeight: 1.05,
+            color: '#1d1d1f',
+            margin: 0,
           }}
-        />
-
-        {/* Frosted Glass Emblem Plate */}
-        <div
+        >
+          A browser that feels like <span style={{ color: '#2563eb' }}>yours.</span>
+        </h1>
+        <p
           style={{
-            position: 'absolute',
-            inset: 12,
-            borderRadius: 48,
-            background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.03) 100%)',
-            backdropFilter: 'blur(30px)',
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.4)',
+            fontSize: 21,
+            fontWeight: 450,
+            color: '#6e6e73',
+            marginTop: 10,
+            letterSpacing: '-0.015em',
           }}
-        />
-
-        {/* Center Glowing Neon Halo */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 20,
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(6, 182, 212, 0.7) 0%, rgba(59, 130, 246, 0.3) 50%, transparent 80%)',
-            filter: 'blur(35px)',
-            opacity: glowPulse,
-          }}
-        />
-
-        {/* Real Official Nova Logo Image */}
-        <Img
-          src={staticFile('logo.svg')}
-          alt="Nova Logo"
-          style={{
-            width: 160,
-            height: 160,
-            objectFit: 'contain',
-            filter: 'drop-shadow(0 15px 30px rgba(6, 182, 212, 0.7))',
-            zIndex: 2,
-          }}
-        />
+        >
+          Clean start page. Native speed. Local intelligence right where you work.
+        </p>
       </div>
 
-      {/* Main Brand Title */}
-      <h1
+      {/* Real Nova Browser Window Container (Top-Anchored Transform Origin) */}
+      <div
         style={{
-          opacity: titleOpacity,
-          transform: `translateY(${titleY}px)`,
-          fontSize: 94,
-          fontWeight: 900,
-          letterSpacing: '-0.03em',
-          margin: 0,
-          background: 'linear-gradient(135deg, #ffffff 0%, #a5f3fc 45%, #38bdf8 80%, #818cf8 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '0 10px 40px rgba(6, 182, 212, 0.4)',
+          position: 'absolute',
+          top: 244,
+          width: 1360,
+          height: 850,
+          borderRadius: 22,
+          background: '#ffffff',
+          border: '1px solid rgba(15, 23, 42, 0.11)',
+          boxShadow: '0 40px 110px rgba(15, 23, 42, 0.14), 0 12px 32px rgba(15, 23, 42, 0.06)',
+          overflow: 'hidden',
+          opacity: browserRise,
+          transform: `translateY(${(1 - browserRise) * 55}px) scale(${(0.96 + 0.04 * browserRise) * cameraZoom})`,
+          transformOrigin: '50% 0%',
         }}
       >
-        NOVA BROWSER
-      </h1>
+        <Img
+          src={staticFile('website-tour/newtab-clean-light.jpg')}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'top center',
+            display: 'block',
+          }}
+        />
 
-      {/* Subtitle & Value Proposition */}
-      <p
-        style={{
-          opacity: subtitleOpacity,
-          fontSize: 32,
-          fontWeight: 500,
-          color: '#94a3b8',
-          maxWidth: 960,
-          margin: '22px 0 0 0',
-          lineHeight: 1.4,
-          letterSpacing: '-0.01em',
-        }}
-      >
-        Engineered for <span style={{ color: '#38bdf8', fontWeight: 700 }}>Pure Speed</span>,{' '}
-        <span style={{ color: '#c084fc', fontWeight: 700 }}>Local WebGPU AI</span> &{' '}
-        <span style={{ color: '#34d399', fontWeight: 700 }}>Zero-Telemetry Privacy</span>
-      </p>
-    </div>
+        {/* Exact-aligned Focus Ring over New Tab Search Input (x:362, y:471, w:636, h:54) */}
+        {searchFocused && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 362,
+              top: 471,
+              width: 636,
+              height: 54,
+              borderRadius: 14,
+              border: '2px solid rgba(37, 99, 235, 0.7)',
+              boxShadow: `0 0 0 ${4 * focusGlow}px rgba(37, 99, 235, 0.15), 0 10px 24px rgba(37, 99, 235, 0.08)`,
+              background: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 18px',
+              gap: 12,
+              opacity: focusGlow,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <span style={{ color: '#1d1d1f', fontSize: 15.5, fontWeight: 500 }}>
+              {'react.dev/reference/react'.slice(
+                0,
+                Math.floor(interpolate(frame, [78, 138], [0, 25], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }))
+              )}
+            </span>
+            <span
+              style={{
+                width: 2,
+                height: 19,
+                background: '#2563eb',
+                opacity: frame % 14 < 7 ? 1 : 0,
+              }}
+            />
+            <span
+              style={{
+                marginLeft: 'auto',
+                padding: '4px 10px',
+                borderRadius: 8,
+                background: '#eff6ff',
+                color: '#2563eb',
+                fontSize: 11.5,
+                fontWeight: 650,
+              }}
+            >
+              Shield Active
+            </span>
+          </div>
+        )}
+
+        <MacCursor
+          keyframes={[
+            { frame: 25, x: 960, y: 620 },
+            { frame: 72, x: 540, y: 498, click: true },
+            { frame: 130, x: 680, y: 498 },
+          ]}
+        />
+      </div>
+    </AbsoluteFill>
   );
 };

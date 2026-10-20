@@ -90,7 +90,7 @@ const AddressBar: React.FC<{ value: string; secure?: boolean }> = ({ value, secu
   >
     <span style={{ color: secure ? GREEN : '#fbbf24', fontSize: 13 }}>{secure ? '◉' : '◈'}</span>
     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{value}</span>
-    <span style={{ marginLeft: 'auto', color: '#64748b' }}>⌘ L</span>
+    <span style={{ marginLeft: 'auto', color: '#64748b' }}>Cmd + L</span>
   </div>
 );
 
@@ -113,7 +113,10 @@ const NewTabContent: React.FC<{ vertical: boolean }> = ({ vertical }) => (
     <div style={{ position: 'relative', color: '#f8fafc', fontFamily: FONT, fontSize: vertical ? 58 : 72, fontWeight: 300, letterSpacing: '0.04em' }}>10:42</div>
     <div style={{ position: 'relative', marginTop: 10, color: '#94a3b8', fontFamily: MONO, fontSize: 12 }}>WEDNESDAY / AUGUST 27</div>
     <div style={{ position: 'relative', marginTop: 36, width: 'min(560px, 85%)', height: 48, display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px', borderRadius: 13, background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.16)', color: '#64748b', fontFamily: MONO, fontSize: 12 }}>
-      <span style={{ color: CYAN }}>⌕</span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={CYAN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
       <span>Search web or ask @ai...</span>
       <span style={{ marginLeft: 'auto', color: '#475569' }}>↵</span>
     </div>

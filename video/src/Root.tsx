@@ -11,15 +11,14 @@ export const RemotionRoot: React.FC = () => {
     <>
       <Composition id="NovaUpdateGuide" component={NovaUpdateGuide} durationInFrames={540} fps={30} width={1920} height={1080} />
       <Composition id="NovaWebsiteTour" component={NovaWebsiteTour} durationInFrames={1080} fps={30} width={1920} height={1080} />
-      {/* 16:9 Landscape Promo Trailer (1920x1080, 60fps, 23s = 1380 frames) */}
+      {/* 16:9 Apple-Style Product Launch Film (1920x1080, 30fps, 36s = 1080 frames, English Ava Voiceover) */}
       <Composition
         id="NovaPromo"
         component={NovaPromo}
-        durationInFrames={1380}
-        fps={60}
+        durationInFrames={1080}
+        fps={30}
         width={1920}
         height={1080}
-        defaultProps={{}}
       />
 
       {/* 9:16 Vertical Video for Shorts / Reels (1080x1920, 60fps, 14.5s = 870 frames) */}

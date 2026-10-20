@@ -1,214 +1,298 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
+import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { APPLE_FONT, APPLE_MONO, AppleCaptionHeader, MacCursor } from '../components/RealNovaWindow';
 
 export const Scene2Speed: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const cardScale = spring({
-    frame,
+  const panToCenter = spring({
+    frame: Math.max(0, frame - 66),
     fps,
-    config: { damping: 14, stiffness: 110 },
+    config: { damping: 20, stiffness: 75, mass: 1.0 },
   });
 
-  const opsCount = Math.floor(
-    interpolate(frame, [10, 80], [0, 1248050], {
+  // Top-anchored macro zoom so the browser window never overlaps the headline
+  const cameraScale = interpolate(panToCenter, [0, 1], [1.26, 1.08]);
+  const cameraOriginX = interpolate(panToCenter, [0, 1], [12, 50]);
+
+  const tabClicked = frame >= 38;
+  const tabHighlight = spring({
+    frame: Math.max(0, frame - 38),
+    fps,
+    config: { damping: 16, stiffness: 140 },
+  });
+
+  const spotlightOpen = frame >= 75;
+  const spotlightSpring = spring({
+    frame: Math.max(0, frame - 75),
+    fps,
+    config: { damping: 17, stiffness: 130 },
+  });
+
+  const commandExecuted = frame >= 152;
+  const execPulse = spring({
+    frame: Math.max(0, frame - 152),
+    fps,
+    config: { damping: 14, stiffness: 160 },
+  });
+
+  const commandQuery = 'open split view: react 19 docs';
+  const typedCount = Math.floor(
+    interpolate(frame, [82, 144], [0, commandQuery.length], {
       extrapolateLeft: 'clamp',
       extrapolateRight: 'clamp',
     })
   );
 
-  const speedProgress = interpolate(frame, [15, 80], [0, 100], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const latencyProgress = interpolate(frame, [20, 75], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
   return (
-    <div
+    <AbsoluteFill
       style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
+        backgroundColor: '#f5f5f7',
+        fontFamily: APPLE_FONT,
+        overflow: 'hidden',
         alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-        padding: '0 80px',
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Category Pill with Nova Icon */}
       <div
         style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '8px 24px',
-          borderRadius: 9999,
-          background: 'rgba(234, 179, 8, 0.12)',
-          border: '1px solid rgba(234, 179, 8, 0.45)',
-          color: '#facc15',
-          fontSize: 17,
-          fontWeight: 700,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          marginBottom: 16,
-          boxShadow: '0 0 30px rgba(234, 179, 8, 0.25)',
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 30% 10%, #ffffff 0%, #f3f5f8 65%, #e8ecf2 100%)',
         }}
-      >
-        <Img src={staticFile('logo.svg')} style={{ width: 22, height: 22 }} />
-        <span>Performance Telemetry</span>
+      />
+
+      <div style={{ position: 'relative', marginTop: 48, zIndex: 20 }}>
+        <AppleCaptionHeader
+          eyebrow="Workspaces & Command Bar"
+          headline="Every project in its own clean space."
+          subline="Vertical tabs, isolated sessions, and instant keyboard navigation."
+        />
       </div>
 
-      <h2
-        style={{
-          fontSize: 66,
-          fontWeight: 900,
-          color: '#ffffff',
-          margin: '0 0 36px 0',
-          letterSpacing: '-0.02em',
-          textAlign: 'center',
-          background: 'linear-gradient(135deg, #ffffff 0%, #fef08a 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}
-      >
-        Efficient V8 State Architecture
-      </h2>
-
-      {/* Main Benchmark Grid Card */}
+      {/* Real Nova Browser Window (Top-Anchored Transform Origin) */}
       <div
         style={{
-          transform: `scale(${cardScale})`,
-          width: 1240,
-          background: 'rgba(15, 23, 42, 0.85)',
-          backdropFilter: 'blur(35px)',
-          border: '1px solid rgba(255, 255, 255, 0.14)',
-          borderRadius: 32,
-          padding: '44px 54px',
-          display: 'grid',
-          gridTemplateColumns: '1.1fr 0.9fr',
-          gap: 40,
-          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.7), 0 0 60px rgba(6, 182, 212, 0.15)',
+          position: 'absolute',
+          top: 236,
+          width: 1360,
+          height: 850,
+          borderRadius: 22,
+          background: '#ffffff',
+          border: '1px solid rgba(15, 23, 42, 0.12)',
+          boxShadow: '0 40px 110px rgba(15, 23, 42, 0.15), 0 12px 32px rgba(15, 23, 42, 0.06)',
+          overflow: 'hidden',
+          transform: `scale(${cameraScale})`,
+          transformOrigin: `${cameraOriginX}% 0%`,
         }}
       >
-        {/* Metric 1: Throughput */}
-        <div
+        <Img
+          src={staticFile('website-tour/workspaces-clean-light.jpg')}
           style={{
-            background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-            borderRadius: 24,
-            padding: '32px 36px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'top left',
+            display: 'block',
           }}
-        >
-          <div>
-            <div style={{ color: '#94a3b8', fontSize: 16, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Tab Allocation & Virtualization
-            </div>
-            <div
+        />
+
+        {/* Exact-aligned Active Pill over 'React 19 Docs' in Vertical Sidebar */}
+        {tabClicked && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: 247,
+              width: 212,
+              height: 28,
+              borderRadius: 8,
+              background: '#eff6ff',
+              border: '1.5px solid rgba(37, 99, 235, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 12px',
+              gap: 9,
+              opacity: tabHighlight,
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.08)',
+            }}
+          >
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#2563eb' }} />
+            <span style={{ fontSize: 12, fontWeight: 650, color: '#1e3a8a' }}>React 19 Docs</span>
+            <span
               style={{
-                fontSize: 64,
-                fontWeight: 900,
-                color: '#38bdf8',
-                margin: '12px 0 6px 0',
-                fontVariantNumeric: 'tabular-nums',
-                textShadow: '0 0 35px rgba(56, 189, 248, 0.5)',
+                marginLeft: 'auto',
+                fontSize: 9.5,
+                fontWeight: 700,
+                color: '#2563eb',
+                background: '#ffffff',
+                padding: '1px 6px',
+                borderRadius: 5,
               }}
             >
-              {opsCount.toLocaleString()}
-              <span style={{ fontSize: 24, fontWeight: 600, color: '#94a3b8', marginLeft: 10 }}>ops/sec</span>
-            </div>
-            <div style={{ color: '#64748b', fontSize: 15 }}>
-              In-memory React/V8 state dispatch & virtualized tab allocation
-            </div>
+              Active
+            </span>
           </div>
+        )}
 
-          {/* Animated Gauge Bar */}
-          <div style={{ marginTop: 24 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#94a3b8', fontSize: 14, marginBottom: 8, fontWeight: 600 }}>
-              <span>Nova Speed Index</span>
-              <span style={{ color: '#38bdf8' }}>{Math.round(speedProgress)}% Max Pipeline</span>
-            </div>
-            <div style={{ width: '100%', height: 12, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 999, overflow: 'hidden' }}>
+        {/* Crisp Cmd+K Instant Command Palette Overlay */}
+        {spotlightOpen && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: `rgba(15, 23, 42, ${0.1 * spotlightSpring})`,
+              display: 'flex',
+              alignItems: 'flex-start',
+              justifyContent: 'center',
+              paddingTop: 145,
+            }}
+          >
+            <div
+              style={{
+                width: 680,
+                borderRadius: 20,
+                background: 'rgba(255, 255, 255, 0.98)',
+                border: '1px solid rgba(15, 23, 42, 0.14)',
+                boxShadow: '0 32px 90px rgba(15, 23, 42, 0.22)',
+                overflow: 'hidden',
+                opacity: spotlightSpring,
+                transform: `scale(${0.94 + 0.06 * spotlightSpring}) translateY(${(1 - spotlightSpring) * 18}px)`,
+              }}
+            >
               <div
                 style={{
-                  width: `${speedProgress}%`,
-                  height: '100%',
-                  background: 'linear-gradient(90deg, #06b6d4 0%, #38bdf8 50%, #818cf8 100%)',
-                  boxShadow: '0 0 20px #38bdf8',
-                  borderRadius: 999,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 2: Hibernation Latency & Resource Management */}
-        <div
-          style={{
-            background: 'linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-            borderRadius: 24,
-            padding: '32px 36px',
-            border: '1px solid rgba(255, 255, 255, 0.08)',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-          }}
-        >
-          <div>
-            <div style={{ color: '#94a3b8', fontSize: 16, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
-              Tab Hibernation Latency
-            </div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, margin: '12px 0 6px 0' }}>
-              <span
-                style={{
-                  fontSize: 64,
-                  fontWeight: 900,
-                  color: '#4ade80',
-                  textShadow: '0 0 35px rgba(74, 222, 128, 0.5)',
+                  padding: '18px 22px',
+                  borderBottom: '1px solid rgba(15, 23, 42, 0.08)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 14,
                 }}
               >
-                0.02 ms
-              </span>
-              <span style={{ fontSize: 20, color: '#94a3b8', fontWeight: 600 }}>Nova Memory Manager</span>
-            </div>
-            <div style={{ color: '#64748b', fontSize: 15, margin: '6px 0' }}>
-              Instant state suspension to unmount idle webviews
+                <Img src={staticFile('website-tour/nova-icon.svg')} style={{ width: 22, height: 22 }} />
+                <div style={{ fontSize: 17, fontWeight: 550, color: '#1d1d1f', flex: 1 }}>
+                  <span>{commandQuery.slice(0, typedCount)}</span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: 2,
+                      height: 19,
+                      marginLeft: 2,
+                      verticalAlign: 'middle',
+                      background: '#2563eb',
+                      opacity: frame % 12 < 6 ? 1 : 0,
+                    }}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontFamily: APPLE_MONO,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: '#64748b',
+                    padding: '4px 9px',
+                    borderRadius: 7,
+                    background: '#f1f5f9',
+                    border: '1px solid #e2e8f0',
+                  }}
+                >
+                  Cmd + K
+                </span>
+              </div>
+
+              <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {[
+                  {
+                    title: 'Open in Split View: React 19 Docs + Nova GitHub',
+                    tag: 'Split View',
+                    shortcut: 'Return',
+                    active: true,
+                  },
+                  {
+                    title: 'Move Tab to Workspace: Frontend Stack',
+                    tag: 'Workspace',
+                    shortcut: 'Cmd + M',
+                    active: false,
+                  },
+                  {
+                    title: 'Ask Nova Local AI to Summarize Tab',
+                    tag: 'Nova AI',
+                    shortcut: 'Cmd + J',
+                    active: false,
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      background: item.active
+                        ? commandExecuted
+                          ? '#dbeafe'
+                          : '#eff6ff'
+                        : 'transparent',
+                      border: item.active ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid transparent',
+                      transform: item.active && commandExecuted ? `scale(${1 - 0.015 * execPulse})` : 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: item.active ? '#2563eb' : '#94a3b8',
+                        }}
+                      />
+                      <span style={{ fontSize: 14.5, fontWeight: item.active ? 650 : 500, color: '#1e293b' }}>
+                        {item.title}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: 600,
+                          color: item.active ? '#2563eb' : '#64748b',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          background: item.active ? '#ffffff' : '#f8fafc',
+                        }}
+                      >
+                        {item.tag}
+                      </span>
+                      <span
+                        style={{
+                          fontFamily: APPLE_MONO,
+                          fontSize: 11,
+                          color: '#64748b',
+                          padding: '3px 8px',
+                          borderRadius: 6,
+                          background: '#f1f5f9',
+                        }}
+                      >
+                        {item.shortcut}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
+        )}
 
-          {/* Comparison Progress Bars */}
-          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#4ade80', fontWeight: 600, marginBottom: 4 }}>
-                <span>Nova Active Webviews: Max 6 LRU Pool</span>
-                <span>Optimized Memory</span>
-              </div>
-              <div style={{ width: '100%', height: 8, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 999 }}>
-                <div style={{ width: `${96 * latencyProgress}%`, height: '100%', background: '#4ade80', borderRadius: 999, boxShadow: '0 0 12px #4ade80' }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>
-                <span>Standard Chromium: Unconstrained Webview Allocations</span>
-                <span>High Memory Footprint</span>
-              </div>
-              <div style={{ width: '100%', height: 8, background: 'rgba(255, 255, 255, 0.08)', borderRadius: 999 }}>
-                <div style={{ width: `${85 * latencyProgress}%`, height: '100%', background: '#64748b', borderRadius: 999 }} />
-              </div>
-            </div>
-          </div>
-        </div>
+        <MacCursor
+          keyframes={[
+            { frame: 5, x: 240, y: 340 },
+            { frame: 38, x: 105, y: 284, click: true },
+            { frame: 75, x: 520, y: 185, click: true },
+            { frame: 152, x: 590, y: 246, click: true },
+          ]}
+        />
       </div>
-    </div>
+    </AbsoluteFill>
   );
 };

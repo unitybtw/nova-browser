@@ -1,194 +1,222 @@
 import React from 'react';
-import { interpolate, spring, useCurrentFrame, useVideoConfig, staticFile, Img } from 'remotion';
+import { AbsoluteFill, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig } from 'remotion';
+import { APPLE_FONT, APPLE_MONO, AppleCaptionHeader, MacCursor } from '../components/RealNovaWindow';
 
 export const Scene3AI: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const chatScale = spring({
-    frame,
+  const zoomToSidebar = spring({
+    frame: Math.max(0, frame - 24),
     fps,
-    config: { damping: 14, stiffness: 110 },
+    config: { damping: 20, stiffness: 75, mass: 1.05 },
   });
 
-  const message1Opacity = interpolate(frame, [15, 30], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  // Top-anchored transformOrigin so scaling never overlaps the headline above
+  const cameraScale = interpolate(zoomToSidebar, [0, 1], [1.0, 1.24]);
+  const cameraOriginX = interpolate(zoomToSidebar, [0, 1], [50, 86]);
 
-  const message2Opacity = interpolate(frame, [38, 52], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-
-  const typedChars = Math.floor(
-    interpolate(frame, [55, 125], [0, 145], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    })
+  const promptText = 'Summarize this page locally with WebGPU';
+  const typedPrompt = promptText.slice(
+    0,
+    Math.floor(interpolate(frame, [34, 59], [0, promptText.length], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }))
   );
 
-  const fullAiResponse = "Nova AI runs locally on your GPU via WebGPU. All your queries stay 100% on your device, with zero cloud latency and no API keys required.";
-  const aiText = fullAiResponse.slice(0, typedChars);
+  const sent = frame >= 62;
+  const responseSpring = spring({
+    frame: Math.max(0, frame - 66),
+    fps,
+    config: { damping: 18, stiffness: 110 },
+  });
+
+  const aiSummary =
+    'Executed on-device via WebGPU (Llama 3.2 3B):\n• Zero browsing context leaves your Mac.\n• Virtualized tab pool keeps memory low.\n• End-to-end encrypted vault sync.';
+  const streamedSummary = aiSummary.slice(
+    0,
+    Math.floor(interpolate(frame, [70, 165], [0, aiSummary.length], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' }))
+  );
 
   return (
-    <div
+    <AbsoluteFill
       style={{
-        position: 'absolute',
-        inset: 0,
-        display: 'flex',
-        flexDirection: 'column',
+        backgroundColor: '#0a0a0c',
+        fontFamily: APPLE_FONT,
+        overflow: 'hidden',
         alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-        padding: '0 80px',
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       }}
     >
-      {/* Category Pill with Nova Icon */}
       <div
         style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 12,
-          padding: '8px 24px',
-          borderRadius: 9999,
-          background: 'rgba(168, 85, 247, 0.15)',
-          border: '1px solid rgba(168, 85, 247, 0.45)',
-          color: '#c084fc',
-          fontSize: 17,
-          fontWeight: 700,
-          letterSpacing: '0.14em',
-          textTransform: 'uppercase',
-          marginBottom: 16,
-          boxShadow: '0 0 30px rgba(168, 85, 247, 0.3)',
+          position: 'absolute',
+          inset: 0,
+          background: 'radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.14) 0%, rgba(10, 10, 12, 0.96) 62%, #0a0a0c 100%)',
         }}
-      >
-        <Img src={staticFile('logo.svg')} style={{ width: 22, height: 22 }} />
-        <span>Local AI Intelligence</span>
+      />
+
+      <div style={{ position: 'relative', marginTop: 48, zIndex: 20 }}>
+        <AppleCaptionHeader
+          dark
+          eyebrow="Local Intelligence · WebGPU"
+          headline="Help right where you are. Private by design."
+          subline="Supported models run locally on your hardware with zero cloud latency."
+        />
       </div>
 
-      <h2
-        style={{
-          fontSize: 66,
-          fontWeight: 900,
-          color: '#ffffff',
-          margin: '0 0 36px 0',
-          letterSpacing: '-0.02em',
-          textAlign: 'center',
-          background: 'linear-gradient(135deg, #ffffff 0%, #e9d5ff 100%)',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-        }}
-      >
-        On-Device WebGPU AI Copilot
-      </h2>
-
-      {/* SidePanel Chat Mockup Card */}
+      {/* Real Nova Browser Window (Top-Anchored Transform Origin so header is never overlapped) */}
       <div
         style={{
-          transform: `scale(${chatScale})`,
-          width: 960,
-          background: 'rgba(15, 23, 42, 0.88)',
-          backdropFilter: 'blur(35px)',
-          border: '1px solid rgba(168, 85, 247, 0.35)',
-          borderRadius: 30,
-          padding: '36px 42px',
-          boxShadow: '0 30px 90px rgba(0, 0, 0, 0.7), 0 0 60px rgba(168, 85, 247, 0.25)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 22,
+          position: 'absolute',
+          top: 236,
+          width: 1360,
+          height: 850,
+          borderRadius: 22,
+          background: '#ffffff',
+          border: '1px solid rgba(255, 255, 255, 0.16)',
+          boxShadow: '0 45px 120px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.08)',
+          overflow: 'hidden',
+          transform: `scale(${cameraScale})`,
+          transformOrigin: `${cameraOriginX}% 0%`,
         }}
       >
-        {/* Chat Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255, 255, 255, 0.1)', paddingBottom: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+        <Img
+          src={staticFile('website-tour/assistant-clean-light.jpg')}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'top center',
+            display: 'block',
+          }}
+        />
+
+        {sent && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 978,
+              top: 142,
+              width: 364,
+              height: 590,
+              background: '#ffffff',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              padding: '16px 14px',
+              opacity: responseSpring,
+            }}
+          >
             <div
               style={{
-                width: 44,
-                height: 44,
-                borderRadius: 14,
-                background: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 100%)',
+                alignSelf: 'flex-end',
+                maxWidth: '88%',
+                padding: '11px 15px',
+                borderRadius: '16px 16px 4px 16px',
+                background: '#2563eb',
+                color: '#ffffff',
+                fontSize: 13,
+                fontWeight: 550,
+                lineHeight: 1.45,
+                boxShadow: '0 6px 18px rgba(37, 99, 235, 0.18)',
+              }}
+            >
+              {promptText}
+            </div>
+
+            <div
+              style={{
+                alignSelf: 'flex-start',
+                width: '100%',
+                padding: '15px 16px',
+                borderRadius: '16px 16px 16px 4px',
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                color: '#1e293b',
+                fontSize: 13,
+                lineHeight: 1.65,
+                whiteSpace: 'pre-line',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: '#2563eb' }}>Nova Assistant</span>
+                <span
+                  style={{
+                    fontFamily: APPLE_MONO,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    color: '#15803d',
+                    background: '#dcfce7',
+                    padding: '2px 7px',
+                    borderRadius: 999,
+                  }}
+                >
+                  On-Device WebGPU
+                </span>
+              </div>
+              <span>{streamedSummary}</span>
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 2,
+                  height: 14,
+                  marginLeft: 3,
+                  verticalAlign: 'middle',
+                  background: '#2563eb',
+                  opacity: frame % 12 < 6 ? 1 : 0,
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {frame >= 30 && (
+          <div
+            style={{
+              position: 'absolute',
+              left: 978,
+              top: 786,
+              width: 364,
+              height: 48,
+              borderRadius: 999,
+              background: '#ffffff',
+              border: '1.5px solid rgba(37, 99, 235, 0.5)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '0 16px',
+              justifyContent: 'space-between',
+              boxShadow: '0 6px 20px rgba(37, 99, 235, 0.1)',
+            }}
+          >
+            <span style={{ fontSize: 12.5, color: sent ? '#94a3b8' : '#0f172a', fontWeight: 500 }}>
+              {sent ? 'Ask Nova Assistant anything...' : typedPrompt}
+            </span>
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: '#0f172a',
+                color: '#ffffff',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 0 20px rgba(168, 85, 247, 0.5)',
+                fontSize: 12,
+                fontWeight: 700,
               }}
             >
-              <Img src={staticFile('logo.svg')} style={{ width: 30, height: 30 }} />
-            </div>
-            <div>
-              <div style={{ color: '#ffffff', fontWeight: 800, fontSize: 20 }}>Nova AI Copilot</div>
-              <div style={{ color: '#a855f7', fontSize: 14, fontWeight: 600 }}>Llama 3.2 · WebGPU Hardware Accelerated</div>
-            </div>
+              ↑
+            </span>
           </div>
-          <div
-            style={{
-              padding: '6px 16px',
-              borderRadius: 9999,
-              background: 'rgba(34, 197, 94, 0.15)',
-              border: '1px solid rgba(34, 197, 94, 0.4)',
-              color: '#4ade80',
-              fontSize: 13,
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-            }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#4ade80', boxShadow: '0 0 8px #4ade80' }} />
-            100% Offline & Private
-          </div>
-        </div>
+        )}
 
-        {/* Message 1: User Query */}
-        <div
-          style={{
-            opacity: message1Opacity,
-            alignSelf: 'flex-end',
-            background: 'linear-gradient(135deg, #0284c7 0%, #2563eb 100%)',
-            color: '#ffffff',
-            padding: '16px 24px',
-            borderRadius: '20px 20px 4px 20px',
-            fontSize: 18,
-            fontWeight: 500,
-            maxWidth: '80%',
-            boxShadow: '0 8px 25px rgba(37, 99, 235, 0.35)',
-          }}
-        >
-          Can you summarize this tab without sending my data to any cloud servers?
-        </div>
-
-        {/* Message 2: Nova AI Streaming Response */}
-        <div
-          style={{
-            opacity: message2Opacity,
-            alignSelf: 'flex-start',
-            background: 'rgba(255, 255, 255, 0.05)',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-            color: '#e2e8f0',
-            padding: '18px 26px',
-            borderRadius: '20px 20px 20px 4px',
-            fontSize: 18,
-            lineHeight: 1.55,
-            maxWidth: '85%',
-          }}
-        >
-          <span>{aiText}</span>
-          <span
-            style={{
-              display: 'inline-block',
-              width: 3,
-              height: 20,
-              marginLeft: 4,
-              verticalAlign: 'middle',
-              backgroundColor: '#c084fc',
-              boxShadow: '0 0 10px #c084fc',
-              opacity: (frame % 16 < 8) ? 1 : 0,
-            }}
-          />
-        </div>
+        <MacCursor
+          keyframes={[
+            { frame: 5, x: 920, y: 180 },
+            { frame: 27, x: 1148, y: 64, click: true },
+            { frame: 36, x: 1120, y: 810 },
+            { frame: 62, x: 1324, y: 810, click: true },
+          ]}
+        />
       </div>
-    </div>
+    </AbsoluteFill>
   );
 };
