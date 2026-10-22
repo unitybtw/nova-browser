@@ -1048,6 +1048,7 @@ export function mergeSyncedSettings<T extends object>(
   const pushed = (snapshot ?? {}) as Record<string, unknown>;
   const incoming = (synced ?? {}) as Record<string, unknown>;
   for (const key of Object.keys(incoming)) {
+    if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
     if (merged[key] === pushed[key]) merged[key] = incoming[key];
   }
   return merged as T;

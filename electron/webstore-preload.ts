@@ -48,7 +48,10 @@ const jsString = (value: string): string =>
   JSON.stringify(value).replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
 
 const currentHost = window.location.hostname.toLowerCase();
-const isChromeWebStore = isWebStoreHost(currentHost);
+const isChromeWebStore = window === window.top && (
+  currentHost === 'chromewebstore.google.com' ||
+  (currentHost === 'chrome.google.com' && /^\/webstore(\/|$)/i.test(window.location.pathname))
+);
 
 if ((window as any).__novaPreloadInjected) {
   // Already injected
@@ -321,7 +324,9 @@ if ((window as any).__novaPreloadInjected) {
   // 3. Inject the UI Banner
   const injectNovaBanner = () => {
     const host = window.location.hostname.toLowerCase();
-    const isStoreOrigin = isWebStoreHost(host) && window.location.protocol === 'https:';
+    const isStoreOrigin = window === window.top &&
+      window.location.protocol === 'https:' &&
+      (host === 'chromewebstore.google.com' || (host === 'chrome.google.com' && /^\/webstore(\/|$)/i.test(window.location.pathname)));
     if (!isStoreOrigin) {
       const existingBanner = document.getElementById('nova-extension-banner');
       if (existingBanner) {

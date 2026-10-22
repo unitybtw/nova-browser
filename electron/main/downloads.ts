@@ -26,6 +26,9 @@ const SCRIPT_CAPABLE_EXT_REGEX = /\.(html?|xhtml|mhtml|xml|svg|svgz|hta|js|mjs|j
  * allowlist is still refused.
  */
 export function requiresOpenConfirmation(filePath: string): boolean {
+  const cleanPath = filePath.split(/[?#]/)[0];
+  const baseName = path.basename(cleanPath);
+  if (!baseName.includes('.')) return true;
   return DANGEROUS_EXT_REGEX.test(filePath) || SCRIPT_CAPABLE_EXT_REGEX.test(filePath);
 }
 

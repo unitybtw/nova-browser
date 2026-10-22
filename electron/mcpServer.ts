@@ -375,6 +375,8 @@ export class BrowserMCPServer {
         if (!isNaN(parsed) && parsed > 0 && parsed < 65536) {
           this.requestedPort = parsed;
         }
+      } else {
+        this.loadPersistedPort();
       }
     } catch {
       this.token = process.env.MCP_TOKEN || randomUUID();
@@ -754,7 +756,10 @@ export class BrowserMCPServer {
       if (origin) {
         try {
           const url = new URL(origin);
-          if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.protocol === 'nova:') {
+          if (
+            (url.protocol === 'http:' || url.protocol === 'https:' || url.protocol === 'nova:') &&
+            (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.protocol === 'nova:')
+          ) {
             res.header('Access-Control-Allow-Origin', origin);
           }
         } catch (_) {

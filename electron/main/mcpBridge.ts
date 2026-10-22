@@ -19,6 +19,7 @@ interface PendingMcpAction {
   onClosed?: () => void;
 }
 
+const MAX_PENDING_MCP_ACTIONS = 25;
 const pendingMcpActions = new Map<string, PendingMcpAction>();
 
 /** Revoke pending approvals on timeout, server shutdown, or policy changes. */
@@ -76,6 +77,10 @@ export function requestRendererMcpAction(win: BrowserWindow | null, toolName: st
   return new Promise((resolve, reject) => {
     if (!win || win.isDestroyed()) {
       reject(new Error('Nova Browser window is not available'));
+      return;
+    }
+    if (pendingMcpActions.size >= MAX_PENDING_MCP_ACTIONS) {
+      reject(new Error('Too many pending MCP actions in queue'));
       return;
     }
     const id = Date.now().toString(36) + '_' + randomBytes(8).toString('hex');

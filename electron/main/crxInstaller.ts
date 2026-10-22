@@ -455,6 +455,21 @@ function assertExtractionContained(dir: string): void {
   }
 }
 
+/**
+ * Computes Chromium's extension ID from a base64-encoded DER public key.
+ * (SHA-256 of DER public key, first 128 bits converted to hex and mapped to 'a'-'p')
+ */
+export function computeExtensionIdFromPublicKey(keyBase64: string): string | null {
+  try {
+    const der = Buffer.from(keyBase64, 'base64');
+    if (der.length === 0) return null;
+    const hash = crypto.createHash('sha256').update(der).digest('hex').slice(0, 32);
+    return hash.split('').map(c => String.fromCharCode(parseInt(c, 16) + 'a'.charCodeAt(0))).join('');
+  } catch {
+    return null;
+  }
+}
+
 export async function installFromWebstore(deps: CrxInstallerDeps, event: Electron.IpcMainInvokeEvent, urlOrId: string) {
   const { isTrustedSender, getMainWindow } = deps;
 
@@ -657,8 +672,17 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
             console.warn(`[Security] Sideload warning: extension ${extensionId} update_url host is ${parsedUpdate.hostname} (expected clients2.google.com).`);
           }
         }
+
+        const manifestKey = (rawManifest as any)?.key;
+        if (typeof manifestKey === 'string' && manifestKey.trim()) {
+          const computedId = computeExtensionIdFromPublicKey(manifestKey.trim());
+          if (computedId && computedId !== extensionId) {
+            throw new Error(`The extension's manifest key resolves to ${computedId}, which does not match store ID ${extensionId}.`);
+          }
+        }
       } catch (manifestErr: any) {
-        if (manifestErr?.message === 'Extension manifest update_url must use HTTPS.' ||
+        if (manifestErr?.message?.startsWith("The extension's manifest key") ||
+            manifestErr?.message === 'Extension manifest update_url must use HTTPS.' ||
             manifestErr?.message === 'Extension manifest contains an invalid update_url.') {
           throw manifestErr;
         }

@@ -5699,8 +5699,10 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   }
 
   let manifest: any;
+  let rawManifestBefore: string;
   try {
-    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    rawManifestBefore = fs.readFileSync(manifestPath, 'utf8');
+    manifest = JSON.parse(rawManifestBefore);
   } catch {
     return { error: 'Extension manifest.json is invalid.' };
   }
@@ -5728,6 +5730,16 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
   });
   if (response !== 1) {
     return { error: 'Extension installation cancelled by user.' };
+  }
+
+  // Security: TOCTOU defense - re-verify manifest has not been modified during permission review
+  try {
+    const rawManifestAfter = fs.readFileSync(manifestPath, 'utf8');
+    if (rawManifestBefore !== rawManifestAfter) {
+      return { error: 'Extension manifest was modified during permission review.' };
+    }
+  } catch {
+    return { error: 'Extension manifest became inaccessible during permission review.' };
   }
 
   try {
