@@ -155,7 +155,7 @@
   .open-source { background: #eff1ec; margin-top: var(--section-gap); overflow: hidden; }
   .source-inner { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; padding-block: 92px; }
   .source-symbol { display: flex; justify-content: center; align-items: center; font-size: 225px; font-weight: 200; letter-spacing: -.1em; gap: 50px; color: #aebca8; }
-  .source-symbol img { filter: brightness(.5) sepia(.1); width: 125px; height: 125px; margin-left: 15px; }
+  .source-symbol img { width: 125px; height: 125px; flex-shrink: 0; }
   .source-copy h2 { font-size: 42px; }
   .source-copy p { color: var(--muted); font-size: 13px; line-height: 1.9; margin-top: 23px; max-width: 410px; }
   .source-copy .button { margin-top: 28px; min-height: 47px; font-size: 11px; padding: 12px 18px; }
@@ -199,7 +199,8 @@
   .footer-top a { display: flex; align-items: center; gap: 6px; font-size: 10px; }
   .footer-top a:hover { color: var(--blue); }
   .footer-wordmark { display: flex; align-items: center; justify-content: space-between; gap: 45px; font-size: clamp(150px, 26.7vw, 370px); line-height: 1.3; font-weight: 600; letter-spacing: -.085em; color: #d8dfd3; padding-right: 25px; margin-top: -20px; user-select: none; }
-  .footer-wordmark span { font-size: .61em; line-height: 1; font-weight: 400; letter-spacing: 0; }
+  .footer-name { display: inline-flex; align-items: baseline; line-height: inherit; }
+  .footer-mark { width: clamp(80px, 14vw, 180px); height: auto; flex-shrink: 0; }
   .footer-bottom { border-top: 1px solid var(--line); padding: 24px 0 30px; display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 9px; color: var(--muted); }
   .footer-bottom a { display: flex; align-items: center; gap: 13px; }
   .footer-bottom a svg { transform: rotate(-90deg); }
@@ -351,6 +352,7 @@
     .footer-top a { font-size: 9px; gap: 5px; }
     .footer-top a svg { width: 12px; }
     .footer-wordmark { font-size: min(24vw, 92px); gap: 15px; margin-top: 13px; padding-right: 6px; }
+    .footer-mark { width: clamp(56px, 16vw, 92px); }
     .footer-bottom { padding: 18px 0 25px; font-size: 8px; gap: 15px; }
     .footer-bottom > span:nth-child(2) { display: none; }
     .video-dialog { width: calc(100% - 24px); }

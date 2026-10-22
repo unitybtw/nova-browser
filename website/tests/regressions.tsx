@@ -9,7 +9,10 @@ async function run() {
   const w = dom.window
   Object.assign(globalThis, { window: w, document: w.document, localStorage: w.localStorage, Node: w.Node, IS_REACT_ACT_ENVIRONMENT: true })
   const mediaListeners = new Set<Function>()
-  w.matchMedia = ((query: string) => ({ matches: false, media: query, addEventListener: (_: string, fn: Function) => { if (query.includes('min-width')) mediaListeners.add(fn) }, removeEventListener: (_: string, fn: Function) => mediaListeners.delete(fn) })) as any
+  let reducedMotion = false
+  let lastScroll: ScrollToOptions | undefined
+  w.scrollTo = ((options: ScrollToOptions) => { lastScroll = options }) as any
+  w.matchMedia = ((query: string) => ({ matches: query.includes('prefers-reduced-motion') && reducedMotion, media: query, addEventListener: (_: string, fn: Function) => { if (query.includes('min-width')) mediaListeners.add(fn) }, removeEventListener: (_: string, fn: Function) => mediaListeners.delete(fn) })) as any
   w.requestAnimationFrame = (() => 1) as any
   w.cancelAnimationFrame = () => {}
   Object.defineProperty(w.HTMLDialogElement.prototype, 'showModal', { value() { this.open = true } })
@@ -25,6 +28,16 @@ async function run() {
     for (const el of document.querySelectorAll('[aria-controls]')) assert.ok(document.getElementById(el.getAttribute('aria-controls')!), `Missing panel: ${el.getAttribute('aria-controls')}`)
   }
   references()
+  assert.ok(document.querySelector('.footer-wordmark img[src="/images/nova-mark.svg"]'), 'Footer must render the Nova star mark alongside the name')
+  const toTop = document.querySelector('.footer-bottom a') as HTMLAnchorElement
+  toTop.focus()
+  reducedMotion = true
+  await click(toTop)
+  assert.ok(document.activeElement === document.querySelector('main'), 'Back to top must return keyboard focus to the main content')
+  assert.equal(lastScroll?.behavior, 'auto', 'Reduced-motion preference must disable scripted smooth scrolling')
+  reducedMotion = false
+  await click(document.querySelector('.brand'))
+  assert.equal(lastScroll?.behavior, 'smooth', 'Normal-motion navigation keeps smooth scrolling')
   const tour = document.getElementById('tour-tab-0')!
   await act(async () => tour.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'End', bubbles: true })))
   assert.equal(document.activeElement?.id, 'tour-tab-2')

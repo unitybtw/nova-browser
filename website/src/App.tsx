@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react'
 import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUpRight, Code2, Command, Download, Github, Globe2, Layers3, LockKeyhole, Menu, Monitor, Play, Plus, Puzzle, ShieldCheck, Sparkles, Terminal, X } from 'lucide-react'
 import { copy } from './content'
 import { useSiteMotion } from './useSiteMotion'
@@ -78,6 +78,13 @@ export default function App() {
     releaseScrollLock()
     watchButton.current?.focus()
   }
+  function goToTop(event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault()
+    setMenuOpen(false)
+    document.getElementById('main')?.focus({ preventScroll: true })
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' })
+  }
   function moveTab(event: KeyboardEvent<HTMLButtonElement>, group: 'tour' | 'platform', current: number) {
     const count = group === 'tour' ? 3 : platforms.length
     let next = current
@@ -95,7 +102,7 @@ export default function App() {
     <a className="skip-link" href="#main">{t.skip}</a>
     <header ref={header} className="site-header">
       <div className="nav-wrap container">
-        <a href="#main" onClick={(e) => { e.preventDefault(); setMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }} className="brand" aria-label="Nova home"><img src="/images/nova-icon.svg" width="34" height="34" alt="" /><span>nova<span className="brand-period">.</span></span></a>
+        <a href="#main" onClick={goToTop} className="brand" aria-label="Nova home"><img src="/images/nova-icon.svg" width="34" height="34" alt="" /><span>nova<span className="brand-period">.</span></span></a>
         <nav className={`main-nav ${menuOpen ? 'is-open' : ''}`} id="main-navigation" aria-label={lang === 'en' ? 'Main navigation' : 'Ana menü'}>
           {['experience', 'features', 'open-source'].map((id, i) => <a href={`#${id}`} key={id} onClick={() => setMenuOpen(false)}>{t.nav[i]}</a>)}
           <a href="#download" className="mobile-menu-cta" onClick={() => setMenuOpen(false)}><span>{t.get}</span><ArrowDown size={14} aria-hidden="true" /></a>
@@ -158,7 +165,7 @@ export default function App() {
       <section className="download-section container" id="download" aria-labelledby="download-title"><div className="download-heading"><img src="/images/nova-icon.svg" width="64" height="64" alt="" /><h2 id="download-title">{t.downloadTitle[0]}<br /><span>{t.downloadTitle[1]}</span></h2><p>{t.downloadText}</p></div><div className="download-picker"><div className="download-picker-header"><span>{t.installer}</span><span className="version-label"><span className="status-dot" />v1.5.1</span></div><div className="platform-tabs" role="tablist" aria-label={t.installer}>{platforms.map(({ name, icon: Icon }, i) => <button key={name} id={`platform-tab-${i}`} role="tab" aria-selected={platform === i} aria-controls="platform-panel" tabIndex={platform === i ? 0 : -1} onClick={() => setPlatform(i)} onKeyDown={e => moveTab(e, 'platform', i)}><Icon size={20} aria-hidden="true" />{name}</button>)}</div><div id="platform-panel" role="tabpanel" aria-labelledby={`platform-tab-${platform}`} className="platform-files"><span className="platform-file-list" key={platform}>{platforms[platform].choices.map(choice => <a key={choice.file} className="download-file" href={`${RELEASE}${choice.file}`} aria-label={`${t.download}: ${choice.name} (${choice.type})`}><span><strong>{choice.name}</strong><small>{choice.type}</small></span><Download size={18} aria-hidden="true" /></a>)}</span></div><a className="all-releases" href={`${REPO}/releases/latest`} target="_blank" rel="noopener noreferrer">{t.allReleases}<ArrowUpRight size={14} /></a><p className="desktop-note">{t.desktopNote}</p></div></section>
     </main>
 
-    <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true">nova<span className="brand-period">.</span></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Nova Browser</span><span>{t.footerBottom}</span><a href="#main" onClick={(e) => { e.preventDefault(); typeof window.scrollTo === 'function' && window.scrollTo({ top: 0, behavior: 'smooth' }); }} aria-label={t.backToTop}>{t.backToTop}<ArrowRight size={15} aria-hidden="true" /></a></div></footer>
+    <footer className="footer container"><div className="footer-top"><p>{t.footerLine}</p><nav aria-label="Footer">{[REPO, `${REPO}/releases`, `${REPO}/issues`].map((url, i) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">{t.footerLinks[i]}<ArrowUpRight size={14} /></a>)}</nav></div><div className="footer-wordmark" aria-hidden="true"><span className="footer-name">nova<span className="brand-period">.</span></span><img className="footer-mark" src="/images/nova-mark.svg" alt="" width="180" height="180" /></div><div className="footer-bottom"><span>© {new Date().getFullYear()} Nova Browser</span><span>{t.footerBottom}</span><a href="#main" onClick={goToTop} aria-label={t.backToTop}>{t.backToTop}<ArrowRight size={15} aria-hidden="true" /></a></div></footer>
 
     <dialog ref={dialog} className="video-dialog" aria-labelledby="video-title" aria-describedby="video-description" onCancel={closeVideo} onClose={onVideoClosed} onClick={e => { if (e.target === e.currentTarget) closeVideo() }}><div className="video-dialog-inner"><div className="video-heading"><h2 id="video-title">{t.videoTitle}</h2><button className="icon-button" onClick={closeVideo} aria-label={t.close} autoFocus><X size={21} /></button></div><video ref={video} key={lang} src="/images/nova-tour.mp4" poster="/images/nova-tour.poster.jpg" controls playsInline preload="none" onError={() => setVideoError(true)}><track kind="captions" src="/images/nova-tour.en.vtt" srcLang="en" label="English" default={lang === 'en'} /><track kind="captions" src="/images/nova-tour.tr.vtt" srcLang="tr" label="Türkçe" default={lang === 'tr'} /></video>{videoError && <div className="video-error" role="alert"><p>{t.videoError}</p><button className="button button-small button-dark" onClick={() => { setVideoError(false); video.current?.load() }}>{t.retryVideo}</button></div>}<p id="video-description">{t.videoDescription}</p></div></dialog>
   </>
