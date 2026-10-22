@@ -199,8 +199,8 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
       // immediately before handing the path to the OS.
       const revalidated = resolveContainedDownloadPath(confirmedPath);
       if (!revalidated) return false;
-      await shell.openPath(revalidated);
-      return true;
+      const error = await shell.openPath(revalidated);
+      return error === '';
     } catch (err) {
       console.error('Error opening download:', err);
     }
@@ -292,6 +292,26 @@ export function isSafeDownloadUrl(urlStr: string): boolean {
  * trailing spaces/dots, and preventing collisions with Windows DOS device names
  * (including compound extensions such as CON.tar.gz).
  */
+function truncateUtf8(value: string, budget: number): string {
+  let shortened = '';
+  let used = 0;
+  for (const character of value) {
+    const bytes = Buffer.byteLength(character, 'utf8');
+    if (used + bytes > budget) break;
+    shortened += character;
+    used += bytes;
+  }
+  return shortened;
+}
+
+function downloadFilenameWithSuffix(filename: string, suffix: string): string {
+  const ext = path.extname(filename);
+  const preservedExt = Buffer.byteLength(ext, 'utf8') <= 32 ? ext : '';
+  const stem = preservedExt ? path.basename(filename, preservedExt) : filename;
+  const budget = 255 - Buffer.byteLength(suffix + preservedExt, 'utf8');
+  return truncateUtf8(stem, budget).replace(/[.\s]+$/, '') + suffix + preservedExt;
+}
+
 export function sanitizeDownloadFilename(rawFilename: string): string {
   const normalized = (rawFilename || '').replace(/\\/g, '/');
   let name = path.basename(normalized).replace(/^\.+/, '').trim();
@@ -304,10 +324,12 @@ export function sanitizeDownloadFilename(rawFilename: string): string {
   if (DOS_RESERVED.test(stem) || DOS_RESERVED.test(base)) {
     name = `download_${name}`;
   }
-  if (name.length > 255) {
-    const extLength = ext.length;
-    const maxBaseLength = Math.max(1, 255 - extLength);
-    name = `${base.slice(0, maxBaseLength)}${ext}`;
+  if (Buffer.byteLength(name, 'utf8') > 255) {
+    // POSIX filesystems bound a component in bytes, not JS code units. Iterate
+    // code points so truncation never splits an emoji/surrogate pair. Preserve
+    // ordinary extensions (especially executable ones used by the open gate),
+    // but do not let an oversized extension defeat the component limit.
+    name = downloadFilenameWithSuffix(name, '').replace(/[.\s]+$/, '');
   }
   return name || 'download';
 }
@@ -378,38 +400,32 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       // Security: item.getFilename() is server-controlled (Content-Disposition) —
       // strip directory components, separators, illegal characters, and Windows device names.
       const safeName = sanitizeDownloadFilename(filename);
-      let targetPath = path.join(defaultDir, safeName);
-      // Auto-increment filename if already exists to avoid silent overwrite and TOCTOU races
+      let targetPath: string | undefined;
+      // Reserve each candidate atomically. Never pass an existing/unreserved
+      // path to Electron after a filesystem error or exhausted collision loop.
       try {
-        const ext = path.extname(safeName);
-        const base = path.basename(safeName, ext);
-        let candidatePath = targetPath;
-        let counter = 1;
-        while (true) {
+        fs.mkdirSync(defaultDir, { recursive: true });
+        for (let counter = 0; counter < 1010; counter++) {
+          const candidateName = counter === 0 ? safeName : downloadFilenameWithSuffix(
+            safeName, counter <= 1000 ? ` (${counter})` : `_${crypto.randomUUID().slice(0, 8)}`
+          );
+          const candidatePath = path.join(defaultDir, candidateName);
           try {
-            // Atomic creation test via O_CREAT | O_EXCL
             const fd = fs.openSync(candidatePath, 'wx');
             fs.closeSync(fd);
             targetPath = candidatePath;
             break;
           } catch (err: any) {
-            if (err && err.code === 'EEXIST') {
-              candidatePath = path.join(defaultDir, `${base} (${counter})${ext}`);
-              counter++;
-              if (counter > 1000) {
-                targetPath = path.join(defaultDir, `${base}_${crypto.randomUUID().slice(0, 8)}${ext}`);
-                break;
-              }
-            } else {
-              break;
-            }
+            if (err?.code !== 'EEXIST') throw err;
           }
         }
-      } catch {}
-      // Security: final containment check — the resolved save path must stay
-      // inside the downloads directory. Fall back to a fixed name otherwise.
-      if (!path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
-        targetPath = path.join(defaultDir, 'download');
+      } catch {
+        console.warn('[Downloads] Unable to reserve a unique destination.');
+      }
+      if (!targetPath || !path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
+        item.cancel();
+        activeDownloads.delete(downloadId);
+        return;
       }
       item.setSavePath(targetPath);
       item.once('done', (_event, state) => {

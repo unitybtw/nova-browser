@@ -15,11 +15,13 @@ Nova Browser operates on a rolling release cadence. Security patches and hardeni
 
 Nova Browser employs defense-in-depth principles across all application boundaries:
 
-1. **Multi-Process Sandboxing**: Chromium renderers operate in isolated sandbox environments with Node.js integration disabled and context isolation strictly enforced (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`).
+1. **Multi-Process Sandboxing**: Renderer preferences disable Node.js integration and enable context isolation and sandboxing (`contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`). On Linux, the current startup code disables the Chromium sandbox when running as root or when unprivileged user namespaces are disabled, and displays a warning. Those configurations do not provide the same isolation as a sandboxed launch.
 2. **Webview Preload Scoping**: Specialized preloads (`webstore-preload.cjs`) are restricted exclusively to authorized Chrome Web Store origins (`chromewebstore.google.com` and `chrome.google.com`). All general webviews receive standard, restricted sandboxed preloads.
 3. **IPC Origin Validation**: All IPC channels evaluate the sender's frame origin and webContents identifier using `isTrustedSender`. Subframe iframes and foreign webContents cannot invoke privileged host APIs.
-4. **Credential Isolation**: Master keys and authentication tokens are encrypted using platform keystores (macOS Keychain, Windows DPAPI, Linux Secret Service via Electron `safeStorage`). Plaintext tokens and password hashes are never persisted in unencrypted `localStorage`.
-5. **Local MCP Server Security**: The internal Model Context Protocol (MCP) server binds strictly to the IPv4 loopback interface (`127.0.0.1`), enforces dynamic per-session bearer token authorization, and validates all incoming `Host` headers against DNS rebinding attacks.
+4. **Credential Isolation**: Desktop secure storage uses Electron `safeStorage` when available. Otherwise it uses AES-256-GCM with a local file-backed secret and machine-derived key material. This fallback protects ciphertext integrity but does not provide OS-keystore isolation from an attacker who can read the user's files. Supabase sessions use this secure-store bridge on desktop; web mode disables persistent sessions.
+5. **Local MCP Server Security**: The optional Model Context Protocol (MCP) server binds to IPv4 loopback (`127.0.0.1`), validates `Host` headers and requires bearer authorization. Its encrypted token persists across restarts unless explicitly rotated; `MCP_TOKEN` can override it. Tool policy, user approval and request expiry are separate controls.
+
+Agent URL and DNS checks are preflight checks; they do not establish connection-time DNS pinning or complete private-network isolation across redirects. Treat that transport boundary as an area requiring further validation.
 
 ## Scope & Out of Scope
 
@@ -37,8 +39,7 @@ Please do not report security vulnerabilities via public GitHub issues or public
 
 ### Reporting Channels
 
-1. **GitHub Security Advisories (Preferred)**: Submit a private report via [GitHub Security Advisories](https://github.com/unitybtw/nova-browser/security/advisories/new).
-2. **Encrypted Email**: Send your report to `security@nova-browser.org` encrypted with our PGP public key.
+Submit a private report via [GitHub Security Advisories](https://github.com/unitybtw/nova-browser/security/advisories/new). Do not send sensitive reports to an email address or encrypt them to a fingerprint unless a working contact and its public key have been independently verified.
 
 ### Information to Provide
 
@@ -48,25 +49,9 @@ To expedite triage and validation, please include:
 - Target platform (macOS Apple Silicon/Intel, Windows x64, Linux) and Nova Browser version.
 - Any relevant logs, stack traces, or screenshots.
 
-### PGP Public Key Fingerprint
+## Response and Disclosure
 
-```text
-Key ID: 0x4F8A9B1C2D3E4F5A
-Fingerprint: 8A2C 4F91 D3B6 E872 90C4  1B5E 4F8A 9B1C 2D3E 4F5A
-UID: Nova Browser Security Team <security@nova-browser.org>
-```
-
-## Response Time SLA
-
-We commit to the following response timeline for valid security reports:
-
-- **Initial Acknowledgment**: Within 24 hours of report receipt.
-- **Triage & Severity Assessment**: Within 48 hours with assigned severity classification (CVSS v3.1).
-- **Patch Development & Release**:
-  - **Critical (CVSS 9.0 - 10.0)**: Targeted patch release within 72 hours.
-  - **High (CVSS 7.0 - 8.9)**: Targeted patch release within 7 days.
-  - **Medium / Low (CVSS < 7.0)**: Addressed in the subsequent scheduled release cycle (within 14 to 30 days).
-- **Public Disclosure**: Coordinated disclosure within 90 days of reporting, or upon public release of the patch.
+Maintainers prioritize reports by demonstrated impact and reachability. Acknowledgment, investigation and release timing depend on maintainer availability; no fixed response SLA is guaranteed. Coordinate public disclosure through the private advisory so users can receive a fix first.
 
 ## Safe Harbor
 

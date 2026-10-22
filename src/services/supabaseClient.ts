@@ -119,14 +119,29 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
   const config = getSupabaseConfig();
   const configKey = `${config.url}_${config.anonKey}`;
 
-  if (cachedClient && currentConfigKey === configKey) {
+  if (currentConfigKey !== configKey) {
+    currentConfigKey = configKey;
+    cachedClient = null;
+    clientPromise = null;
+  }
+
+  if (cachedClient) {
     return Promise.resolve(cachedClient);
   }
 
   if (!clientPromise) {
-    clientPromise = (async () => {
+    // The first await yields before this closure reads pending.
+    let pending!: Promise<SupabaseClient>;
+    pending = (async () => {
       try {
         const { createClient } = await import('@supabase/supabase-js');
+        const latest = getSupabaseConfig();
+        // A config switch can happen while the SDK loads. The promise identity
+        // also distinguishes A -> B -> A and prevents stale cleanup from
+        // clearing a newer initialization for the same endpoint.
+        if (clientPromise !== pending || `${latest.url}_${latest.anonKey}` !== configKey) {
+          throw new Error('Supabase configuration changed during initialization; retry with the current configuration.');
+        }
         const isElectron = hasElectronSecureStore();
         const client = createClient(config.url, config.anonKey, {
           auth: {
@@ -145,7 +160,6 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
           }
         });
         cachedClient = client;
-        currentConfigKey = configKey;
         return client;
       } catch (err) {
         console.error('[Supabase] Failed to initialize Supabase client:', err);
@@ -153,8 +167,11 @@ export const getSupabaseClient = (): Promise<SupabaseClient> => {
         throw err;
       }
     })();
+    clientPromise = pending;
     // Allow a later call to retry after a failed construction.
-    clientPromise.catch(() => { clientPromise = null; });
+    pending.catch(() => {
+      if (clientPromise === pending) clientPromise = null;
+    });
   }
   return clientPromise;
 };

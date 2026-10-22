@@ -5954,7 +5954,8 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
     const extensionId = parsedExtensionUrl.hostname;
     const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
       Boolean(session.defaultSession.getExtension(extensionId));
-    if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled ||
+        parsedExtensionUrl.username || parsedExtensionUrl.password || parsedExtensionUrl.port) {
       return { error: 'Blocked: extension is not installed.' };
     }
   } catch {
@@ -6020,16 +6021,26 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   activeExtensionPopupWin = popupWin;
   activeExtensionPopupUrl = url;
 
-  // Security: Restrict extension popup navigation to its own chrome-extension origin
-  let popupOrigin = '';
+  // URL.origin can be "null" for custom schemes, so bind the actual extension
+  // host rather than comparing opaque origins shared by unrelated extensions.
+  let popupExtensionId = '';
   try {
-    popupOrigin = new URL(url).origin;
+    popupExtensionId = new URL(url).hostname;
   } catch {}
+  const isPopupExtensionUrl = (candidate: string): boolean => {
+    try {
+      const parsed = new URL(candidate);
+      return Boolean(popupExtensionId) && parsed.protocol === 'chrome-extension:' &&
+        parsed.hostname === popupExtensionId && !parsed.username && !parsed.password && !parsed.port;
+    } catch {
+      return false;
+    }
+  };
 
   popupWin.webContents.on('will-navigate', (event, destUrl) => {
     try {
       const destParsed = new URL(destUrl);
-      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+      if (isPopupExtensionUrl(destUrl)) {
         return;
       }
       event.preventDefault();
@@ -6043,8 +6054,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
 
   popupWin.webContents.on('will-redirect', (event, destUrl) => {
     try {
-      const destParsed = new URL(destUrl);
-      if (popupOrigin && destParsed.origin === popupOrigin && destParsed.protocol === 'chrome-extension:') {
+      if (isPopupExtensionUrl(destUrl)) {
         return;
       }
       event.preventDefault();
@@ -6067,6 +6077,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   // Inject active tab bridge into the extension popup
   const injectActiveTabBridge = () => {
     if (!activeTabInfo || !popupWin || popupWin.isDestroyed()) return;
+    if (!isPopupExtensionUrl(popupWin.webContents.getURL())) return;
 
     let extId = '';
     try {

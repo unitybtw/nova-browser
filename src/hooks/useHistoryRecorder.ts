@@ -20,10 +20,8 @@ function cleanUrlForHistory(url: string): { cleanUrl: string; canonicalKey: stri
     for (const p of trackingParams) {
       parsed.searchParams.delete(p);
     }
-    let pathname = parsed.pathname;
-    if (pathname.length > 1 && pathname.endsWith('/')) {
-      parsed.pathname = pathname.slice(0, -1);
-    }
+    // /docs and /docs/ can be different resources. Preserve the visited path
+    // both in the reopening URL and the deduplication key.
     const cleanUrl = parsed.href;
     // Canonical key ignores the in-page hash and the host casing for deduplication
     // so anchor jumps do not spam history. Only scheme + host are
@@ -35,8 +33,7 @@ function cleanUrlForHistory(url: string): { cleanUrl: string; canonicalKey: stri
     const hostKey = `${parsed.protocol}//${parsed.host.toLowerCase()}`;
     return { cleanUrl, canonicalKey: `${hostKey}${parsed.pathname}${parsed.search}` };
   } catch {
-    const clean = url.length > 1 && url.endsWith('/') ? url.slice(0, -1) : url;
-    return { cleanUrl: clean, canonicalKey: clean.split('#')[0] };
+    return { cleanUrl: url, canonicalKey: url.split('#')[0] };
   }
 }
 
@@ -125,9 +122,7 @@ export function useHistoryRecorder(options: UseHistoryRecorderOptions = {}) {
               favicon: updated.favicon || existing.favicon,
               timestamp: now
             };
-            const next = [...hPrev];
-            next[recentIdx] = updatedItem;
-            return next;
+            return [updatedItem, ...hPrev.slice(0, recentIdx), ...hPrev.slice(recentIdx + 1)];
           }
 
           return [{

@@ -90,3 +90,7 @@ import './codex_security_findings_remediation.test';
 import './performance_optimization_audit.test';
 
 import './tab_download_lifecycle_regressions.test';
+import './supabase_client_lifecycle.test';
+import './extension_popup_identity.test';
+import './download_runtime_regressions.test';
+import './history_recorder_regressions.test';
