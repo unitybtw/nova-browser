@@ -47,6 +47,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   onSelectWorkspace,
   isIncognito
 }) => {
+  const [draftWorkspace, setDraftWorkspace] = useState<Workspace | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editColor, setEditColor] = useState('slate');
@@ -56,15 +57,22 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
   useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
 
-  // Prevent background scrolling
+  // A closed manager must not release a scroll lock owned by another dialog.
   useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = 'unset';
+    if (!isOpen) {
+      setEditingId(null);
+      setDraftWorkspace(null);
+      return;
     }
-    return () => { document.body.style.overflow = 'unset'; };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
   }, [isOpen]);
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setDraftWorkspace(null);
+  };
 
   const handleAddWorkspace = () => {
     const newWorkspace: Workspace = {
@@ -73,7 +81,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
       color: 'blue',
       icon: 'Folder'
     };
-    onUpdateWorkspaces([...workspaces, newWorkspace]);
+    setDraftWorkspace(newWorkspace);
     setEditingId(newWorkspace.id);
     setEditName(newWorkspace.name);
     setEditColor(newWorkspace.color);
@@ -91,11 +99,15 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
 
   const handleSaveEdit = (id: string) => {
     if (!editName.trim()) return;
-    const newWorkspaces = workspaces.map(w => 
-      w.id === id ? { ...w, name: editName.trim(), color: editColor, icon: editIcon } : w
-    );
-    onUpdateWorkspaces(newWorkspaces);
-    setEditingId(null);
+    const name = editName.trim().slice(0, 100);
+    if (draftWorkspace?.id === id) {
+      onUpdateWorkspaces([...workspaces, { ...draftWorkspace, name, color: editColor, icon: editIcon }]);
+    } else {
+      onUpdateWorkspaces(workspaces.map(w =>
+        w.id === id ? { ...w, name, color: editColor, icon: editIcon } : w
+      ));
+    }
+    cancelEdit();
   };
 
   return (
@@ -132,7 +144,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
-              {workspaces.map(workspace => {
+              {(draftWorkspace ? [...workspaces, draftWorkspace] : workspaces).map(workspace => {
                 const isEditing = editingId === workspace.id;
                 
                 if (isEditing) {
@@ -194,7 +206,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
 
                       <div className="flex justify-end gap-2">
                         <button 
-                          onClick={() => setEditingId(null)}
+                          onClick={cancelEdit}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500'}`}
                         >
                           Cancel
@@ -230,6 +242,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                       <button 
                         aria-label={`Edit ${workspace.name} workspace`}
                         onClick={() => {
+                          setDraftWorkspace(null);
                           setEditingId(workspace.id);
                           setEditName(workspace.name);
                           setEditColor(workspace.color);

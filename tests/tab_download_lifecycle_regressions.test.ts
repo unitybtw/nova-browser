@@ -128,4 +128,28 @@ check('clearing download history preserves active and paused download controls',
     assert.equal(state![0].id, 'paused');
   } finally { cleanups.forEach(cleanup => cleanup?.()); }
 });
+check('one malformed download cannot discard valid history during restart', () => {
+  let state: DownloadItem[] = [];
+  const rows = [
+    { id: 'done', filename: 'notes.pdf', url: 'https://example.com/notes', state: 'completed', receivedBytes: 30, totalBytes: 30, savePath: '/tmp/notes.pdf' },
+    null,
+    { id: 'paused', filename: 'video.mp4', url: 'https://example.com/video', state: 'progressing', receivedBytes: 10, totalBytes: 100, isPaused: true },
+    { id: 'invalid' },
+    { id: 'counts', filename: 'counts.pdf', url: 'https://example.com/counts', state: 'completed', receivedBytes: -10, totalBytes: 'broken' },
+  ];
+  const hook = loadHook('src/hooks/useDownloads.ts', {
+    useState: (init: any) => { state = init(); return [state, () => {}]; },
+    useRef: (value: any) => ({ current: value }), useCallback: (fn: any) => fn, useEffect: () => {},
+  }, { '../utils/safeStorage': { safeParseArrayWithBackup: () => rows } }, {
+    localStorage: { getItem: () => JSON.stringify(rows) },
+  }).useDownloads;
+  hook();
+  assert.equal(state.length, 3, 'valid downloads survive a corrupt row');
+  assert.equal(state[0].id, 'done');
+  assert.equal(state[0].savePath, '/tmp/notes.pdf');
+  assert.equal(state[1].state, 'interrupted', 'restart cannot resume stale Electron handles');
+  assert.equal(state[1].isPaused, false);
+  assert.equal(state[2].receivedBytes, 0);
+  assert.equal(state[2].totalBytes, 0);
+});
 assert.equal(failures.length, 0, `Lifecycle regressions: ${failures.join(', ')}`);

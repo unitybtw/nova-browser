@@ -31,10 +31,16 @@ export function useDownloads() {
       // Rehydrated downloads cannot be resumed/cancelled because electron's in-memory
       // activeDownloads map is empty upon browser restart. Ensure terminal/interrupted
       // state and clear isPaused to avoid dead UI controls.
-      return parsed.map(d => ({
+      return parsed.filter((d): d is DownloadItem => Boolean(
+        d && typeof d === 'object' && typeof d.id === 'string' && d.id &&
+        typeof d.filename === 'string' && typeof d.url === 'string' &&
+        ['progressing', 'completed', 'cancelled', 'interrupted'].includes(d.state)
+      )).map(d => ({
         ...d,
         state: d.state === 'progressing' ? 'interrupted' : d.state,
-        isPaused: false
+        isPaused: false,
+        receivedBytes: Number.isFinite(d.receivedBytes) && d.receivedBytes >= 0 ? d.receivedBytes : 0,
+        totalBytes: Number.isFinite(d.totalBytes) && d.totalBytes >= 0 ? d.totalBytes : 0
       }));
     } catch {
       return [];

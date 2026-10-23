@@ -85,6 +85,52 @@ async function main() {
     assert.equal(renamed.length, 1, 'Escape cancels without saving');
 
     console.log('[PASS] Sidebar UI: pinned/folder visibility, create, workspace switching, selection, close and keyboard isolation');
+    // Exercise the real workspace editor with controlled parent state.
+    const { WorkspaceManager } = await import('../src/components/WorkspaceManager');
+    let writes = 0;
+    let currentSpaces = [{ id: 'default', name: 'Personal', color: 'slate' }];
+    const renderManager = async (isOpen: boolean) => {
+      await React.act(async () => root.render(React.createElement(WorkspaceManager, {
+        isOpen, onClose: () => {}, workspaces: currentSpaces, activeWorkspaceId: 'default', onSelectWorkspace: () => {},
+        onUpdateWorkspaces: next => { writes++; currentSpaces = next; }
+      })));
+    };
+    await renderManager(true);
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Create New Workspace'))!);
+    assert.equal(writes, 0, 'creating a draft must not persist a workspace before Save');
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Cancel')!);
+    assert.equal(writes, 0, 'Cancel discards the draft');
+    assert.equal(container.querySelector('input[aria-label="Workspace name"]'), null);
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Create New Workspace'))!);
+    await click(container.querySelector('[aria-label="Edit Personal workspace"]'));
+    assert.equal(container.querySelector('[aria-label="Edit New Workspace workspace"]'), null, 'switching to an existing edit discards the draft');
+    assert.equal(container.querySelector<HTMLInputElement>('input[aria-label="Workspace name"]')?.value, 'Personal');
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Cancel')!);
+    assert.equal(writes, 0);
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Create New Workspace'))!);
+    const workspaceInput = container.querySelector<HTMLInputElement>('input[aria-label="Workspace name"]')!;
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value')!.set!.call(workspaceInput, '  Design  ');
+      workspaceInput.dispatchEvent(new w.Event('input', { bubbles: true }));
+    });
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Save')!);
+    assert.equal(writes, 1);
+    assert.equal(currentSpaces[1].name, 'Design');
+    await renderManager(true);
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Create New Workspace'))!);
+    await renderManager(false);
+    await renderManager(true);
+    assert.equal(container.querySelector('input[aria-label="Workspace name"]'), null, 'closing the manager discards unsaved edits');
+    assert.equal(writes, 1);
+    await renderManager(false);
+    assert.equal(w.document.body.style.overflow, '', 'closing restores the previous scroll style');
+    w.document.body.style.overflow = 'clip';
+    const closedRoot = root;
+    await React.act(async () => closedRoot.render(React.createElement(WorkspaceManager, {
+      key: 'closed-probe', isOpen: false, onClose: () => {}, workspaces: currentSpaces, activeWorkspaceId: 'default', onSelectWorkspace: () => {}, onUpdateWorkspaces: () => {}
+    })));
+    assert.equal(w.document.body.style.overflow, 'clip', 'a closed manager must not overwrite another modal scroll lock');
+    console.log('[PASS] Workspace drafts: Cancel, Save, close/reopen, and closed-dialog scroll isolation');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();
