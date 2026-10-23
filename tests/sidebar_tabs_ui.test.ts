@@ -12,11 +12,11 @@ async function main() {
     Object.defineProperty(globalThis, key, { configurable: true, value: key === 'window' ? w : (w as any)[key] });
   }
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true, requestAnimationFrame: w.requestAnimationFrame.bind(w), cancelAnimationFrame: w.cancelAnimationFrame.bind(w), getComputedStyle: w.getComputedStyle.bind(w) });
-  // Browser-style microtask ports avoid retaining Node's scheduler handles.
+  // Browser-style task ports yield to timers without retaining Node scheduler handles.
   class TestPort {
     peer: TestPort | null = null;
     onmessage: ((event: { data: unknown }) => void) | null = null;
-    postMessage(data: unknown) { const target = this.peer; queueMicrotask(() => target?.onmessage?.({ data })); }
+    postMessage(data: unknown) { const target = this.peer; setImmediate(() => target?.onmessage?.({ data })); }
     close() { this.peer = null; this.onmessage = null; }
     start() {}
   }
@@ -27,6 +27,9 @@ async function main() {
   w.scrollTo = () => {};
   const React = await import('react');
   const { createRoot } = await import('react-dom/client');
+  // This suite checks interaction outcomes, not animation timing in jsdom.
+  const { MotionGlobalConfig } = await import('framer-motion');
+  MotionGlobalConfig.skipAnimations = true;
   const { SidebarTabs } = await import('../src/components/SidebarTabs');
   const base = (id: string, extra: Partial<Tab> = {}): Tab => ({ id, title: id, url: `https://${id}.test`, workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false, ...extra });
   const selected: string[] = [], closed: string[] = [], spaces: string[] = [];
@@ -152,6 +155,56 @@ async function main() {
     await React.act(async () => deleteTask.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     assert.ok(JSON.parse(w.localStorage.getItem('nova_todos')!)[0].completed, 'keyboard activation of Delete must not toggle the parent task');
     console.log('[PASS] Empty favorites, malformed task recovery, batched toggles, and task delete keyboard isolation');
+    const { HistoryPage } = await import('../src/components/HistoryPage');
+    const now = Date.now();
+    await React.act(async () => root.render(React.createElement(HistoryPage, {
+      history: [
+        { id: 'old', title: 'Older article', url: 'https://example.com/older', timestamp: now - 1000, visitCount: 1 },
+        { id: 'recent', title: 'Recent article', url: 'https://example.com/recent', timestamp: now, visitCount: 1 }
+      ], onNavigate: () => {}, onClearHistory: () => {}, onRemoveHistoryItem: () => {}
+    })));
+    const historyTitles = Array.from(container.querySelectorAll('p[title]')).map(element => element.textContent);
+    assert.ok(historyTitles.indexOf('Recent article') < historyTitles.indexOf('Older article'), 'history presents the newest visit first even after unordered imports');
+    const historySearch = container.querySelector('input')!;
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value')!.set!.call(historySearch, '  recent  ');
+      historySearch.dispatchEvent(new w.Event('input', { bubbles: true }));
+    });
+    assert.ok(container.textContent?.includes('Recent article'), 'surrounding search whitespace is ignored');
+    assert.ok(!container.textContent?.includes('Older article'));
+    console.log('[PASS] History ordering and trimmed search');
+
+    const { DownloadToast } = await import('../src/components/DownloadToast');
+    let resolveOpen!: (result: boolean | 'cancelled') => void;
+    let calls = 0;
+    (w as any).electronAPI = {
+      openDownload: () => { calls++; return new Promise(resolve => { resolveOpen = resolve; }); },
+      showDownloadInFolder: async () => true,
+      showConfirmDialog: async () => true
+    };
+    const completedDownload = { id: 'download', filename: 'report.pdf', url: 'https://example.com/report', receivedBytes: 10, totalBytes: 10, state: 'completed' as const, savePath: '/tmp/report.pdf' };
+    await React.act(async () => root.render(React.createElement(DownloadToast, { activeDownload: completedDownload })));
+    const openButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Open File'))!;
+    await click(openButton);
+    assert.equal(openButton.disabled, true, 'pending action disables duplicate clicks');
+    assert.equal(calls, 1);
+    await React.act(async () => { resolveOpen(false); await new Promise(resolve => setImmediate(resolve)); });
+    assert.ok(Array.from(container.querySelectorAll('button')).some(button => button.textContent?.includes('Open File')), 'failed open preserves the toast for retry');
+    const retryButton = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Open File'))!;
+    await click(retryButton);
+    await React.act(async () => { resolveOpen('cancelled'); await new Promise(resolve => setImmediate(resolve)); });
+    assert.equal(retryButton.disabled, false, 'cancelling allows retry');
+    await click(retryButton);
+    await React.act(async () => { resolveOpen(true); await new Promise(resolve => setImmediate(resolve)); });
+    await React.act(async () => { await new Promise(resolve => setImmediate(resolve)); });
+    assert.equal(container.querySelector('[role="status"]'), null, 'success dismisses the toast');
+    await React.act(async () => root.render(React.createElement(DownloadToast, { activeDownload: { ...completedDownload, id: 'older-pending' } })));
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Open File'))!);
+    const latestDownload = { ...completedDownload, id: 'latest', filename: 'latest.pdf' };
+    await React.act(async () => root.render(React.createElement(DownloadToast, { activeDownload: latestDownload })));
+    await React.act(async () => { resolveOpen(true); await new Promise(resolve => setImmediate(resolve)); });
+    assert.ok(container.querySelector('[title="latest.pdf"]'), 'an older OS action must not dismiss a newer download');
+    console.log('[PASS] Download pending action, failure retry, cancellation, successful dismissal, and stale result isolation');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();

@@ -50,6 +50,10 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
   // gerçekten "türetilemeyen" UI durumunu tutar: kullanıcı tarafından kapatılan
   // indirme id'si (Dismiss butonu + 5sn otomatik gizleme).
   const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const [pendingDownloadId, setPendingDownloadId] = useState<string | null>(null);
+  const actionInFlightRef = useRef(false);
+  const activeDownloadIdRef = useRef(activeDownload?.id);
+  activeDownloadIdRef.current = activeDownload?.id;
   const lastProgressRef = useRef<{ bytes: number; time: number }>({ bytes: 0, time: Date.now() });
 
   useEffect(() => {
@@ -70,17 +74,34 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
     }
 
     // Auto-hide completed/cancelled toasts after 5 seconds
-    if (activeDownload.state === 'completed' || activeDownload.state === 'cancelled' || activeDownload.state === 'interrupted') {
+    if (pendingDownloadId !== activeDownload.id && (activeDownload.state === 'completed' || activeDownload.state === 'cancelled' || activeDownload.state === 'interrupted')) {
       const timer = setTimeout(() => {
         setDismissedId(current => (current === activeDownload.id ? current : activeDownload.id));
       }, 5000);
       return () => clearTimeout(timer);
     }
-  }, [activeDownload]);
+  }, [activeDownload, pendingDownloadId]);
 
   const activeToast = activeDownload && activeDownload.id !== dismissedId ? activeDownload : null;
   const dismissToast = () => {
     if (activeToast) setDismissedId(activeToast.id);
+  };
+
+  const handleFileAction = async (action: 'open' | 'reveal') => {
+    if (!activeToast || actionInFlightRef.current) return;
+    const target = activeToast;
+    actionInFlightRef.current = true;
+    setPendingDownloadId(target.id);
+    try {
+      const succeeded = await performDownloadAction(target.savePath, action);
+      // A newer download may have replaced this toast while the OS dialog was open.
+      if (succeeded && activeDownloadIdRef.current === target.id) setDismissedId(target.id);
+    } catch {
+      // Keep the notification available even if displaying the failure dialog fails.
+    } finally {
+      actionInFlightRef.current = false;
+      setPendingDownloadId(null);
+    }
   };
 
   const progress = activeToast?.totalBytes
@@ -170,21 +191,19 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
               {isCompleted && activeToast.savePath && (
                 <>
                   <button
-                    onClick={() => {
-                      void performDownloadAction(activeToast.savePath!, 'reveal');
-                      dismissToast();
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    disabled={pendingDownloadId !== null}
+                    aria-busy={pendingDownloadId === activeToast.id}
+                    onClick={() => { void handleFileAction('reveal'); }}
+                    className="disabled:opacity-60 disabled:cursor-wait flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     <FolderIcon className="w-3 h-3" />
                     Show in Folder
                   </button>
                   <button
-                    onClick={() => {
-                      void performDownloadAction(activeToast.savePath!, 'open');
-                      dismissToast();
-                    }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                    disabled={pendingDownloadId !== null}
+                    aria-busy={pendingDownloadId === activeToast.id}
+                    onClick={() => { void handleFileAction('open'); }}
+                    className="disabled:opacity-60 disabled:cursor-wait flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
                   >
                     <FileCheck className="w-3 h-3" />
                     Open File
@@ -202,14 +221,14 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                         (window as any).electronAPI?.pauseDownload?.(activeToast.id);
                       }
                     }}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    className="disabled:opacity-60 disabled:cursor-wait flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
                   >
                     {activeToast.isPaused ? <Play className="w-3 h-3 fill-current" /> : <Pause className="w-3 h-3 fill-current" />}
                     <span>{activeToast.isPaused ? 'Resume' : 'Pause'}</span>
                   </button>
                   <button
                     onClick={() => (window as any).electronAPI?.cancelDownload?.(activeToast.id)}
-                    className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:bg-red-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                    className="disabled:opacity-60 disabled:cursor-wait flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:bg-red-500/10 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>

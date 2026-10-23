@@ -122,12 +122,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({
   const [visibleCount, setVisibleCount] = useState(100);
 
   const filteredHistory = useMemo(() => {
-    if (!searchTerm.trim()) return history;
-    const query = searchTerm.toLowerCase();
-    return history.filter(item => 
+    const query = searchTerm.trim().toLowerCase();
+    return history.filter(item => !query ||
       item.title?.toLowerCase().includes(query) ||
       item.url?.toLowerCase().includes(query)
-    );
+    ).sort((a, b) => b.timestamp - a.timestamp);
   }, [history, searchTerm]);
 
   const groupedHistory = useMemo(() => {
