@@ -522,3 +522,74 @@ button:active:not(:disabled) {
 @media (prefers-reduced-motion: reduce) {
   .nova-newtab-clean .nova-shortcut::after { transition: none; }
 }
+
+/* Vertical tabs: Arc's spatial hierarchy, with Dia's restrained density.
+   Solid surfaces keep the sidebar stable over video and scrolling webviews. */
+.nova-vertical-sidebar {
+  --sidebar-ink: #383936;
+  --sidebar-muted: #65685f;
+  --sidebar-hover: #e6e7e1;
+  --sidebar-selected: #fff;
+  --sidebar-surface: #eeefe9;
+  --sidebar-border: #d9dbd3;
+  color: var(--sidebar-ink);
+  font-size: 13px;
+}
+.dark .nova-vertical-sidebar {
+  --sidebar-ink: #e3e4df;
+  --sidebar-muted: #95968e;
+  --sidebar-hover: #32342f;
+  --sidebar-selected: #3c3e38;
+  --sidebar-surface: #262823;
+  --sidebar-border: #3b3d36;
+}
+.nova-vertical-sidebar > :first-child { height: 46px; padding: 4px 10px 0; }
+.nova-vertical-sidebar button { -webkit-app-region: no-drag; }
+.nova-vertical-sidebar button:focus-visible,
+.nova-vertical-sidebar [role='tab']:focus-visible,
+.nova-vertical-sidebar [role='button']:focus-visible {
+  outline: 2px solid #74876a;
+  outline-offset: 2px;
+  opacity: 1;
+}
+.nova-vertical-sidebar [role='tab']:focus-within button,
+.nova-vertical-sidebar [role='button']:focus-within button,
+.nova-sidebar-favorites > div:focus-within > button { opacity: 1; }
+.nova-vertical-sidebar form > div.relative { height: 36px; border-radius: 9px; box-shadow: none; }
+.nova-sidebar-favorites { padding: 3px 0 8px; }
+.nova-sidebar-favorites > div > button:first-child {
+  height: 42px; border-radius: 11px; background: var(--sidebar-hover);
+  border: 1px solid transparent; box-shadow: none; color: var(--sidebar-ink);
+}
+.nova-sidebar-favorites > div > button:first-child:hover { background: var(--sidebar-selected); border-color: var(--sidebar-border); }
+.nova-space-indicator { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.nova-vertical-sidebar [data-sidebar-workspace] { padding-bottom: 5px; }
+.nova-sidebar-create-row { display: flex; gap: 4px; padding: 0 12px 12px; }
+.nova-sidebar-new-tab { display: flex; align-items: center; gap: 10px; flex: 1; padding: 9px 10px; border-radius: 8px; color: var(--sidebar-muted); text-align: left; cursor: pointer; }
+.nova-sidebar-new-tab:hover, .nova-sidebar-private:hover { background: var(--sidebar-hover); color: var(--sidebar-ink); }
+.nova-sidebar-new-tab span { flex: 1; }
+.nova-sidebar-new-tab kbd { font-family: inherit; font-size: 10px; opacity: 1; }
+.nova-sidebar-private { padding: 7px; border-radius: 8px; color: var(--sidebar-muted); cursor: pointer; }
+.nova-sidebar-section-label { display: flex; align-items: center; gap: 6px; padding: 12px 10px 7px; font-size: 10px; font-weight: 500; letter-spacing: .035em; color: var(--sidebar-muted); }
+.nova-sidebar-section-label > span { margin-left: auto; font-size: 10px; font-variant-numeric: tabular-nums; }
+.nova-sidebar-pinned { display: flex; flex-direction: column; gap: 3px; padding-bottom: 12px; border-bottom: 1px solid var(--sidebar-border); }
+.nova-sidebar-pinned .nova-sidebar-section-label { padding-top: 0; }
+.nova-sidebar-tab {
+  min-height: 36px; height: 36px; border-radius: 8px; border: 1px solid transparent;
+  color: var(--sidebar-ink); font-weight: 400; box-shadow: none;
+}
+.nova-sidebar-tab:hover { background-color: var(--sidebar-hover); color: var(--sidebar-ink); }
+.nova-sidebar-tab[aria-selected='true'] { background-color: var(--sidebar-selected); border-color: var(--sidebar-border); color: var(--sidebar-ink); font-weight: 500; box-shadow: 0 1px 2px #00000006; }
+.nova-sidebar-tab-list > [role='button'] { font-weight: 500; }
+.nova-sidebar-spaces { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 10px; }
+.nova-sidebar-space-buttons { display: flex; gap: 5px; overflow-x: auto; padding: 3px; scrollbar-width: thin; }
+.nova-sidebar-space-buttons button { position: relative; display: grid; place-items: center; width: 29px; height: 29px; flex-shrink: 0; border-radius: 8px; color: var(--sidebar-muted); cursor: pointer; }
+.nova-sidebar-space-buttons button:hover { background: var(--sidebar-hover); color: var(--sidebar-ink); }
+.nova-sidebar-space-buttons button[aria-pressed='true'] { background: var(--sidebar-selected); color: var(--sidebar-ink); box-shadow: 0 0 0 1px var(--sidebar-border); }
+.nova-sidebar-space-buttons button span { font-size: 11px; font-weight: 600; }
+.nova-sidebar-space-buttons button::after { content: ''; position: absolute; bottom: 3px; width: 3px; height: 3px; border-radius: 50%; background: var(--space-color); }
+.nova-sidebar-manage-spaces { padding: 6px; border-radius: 6px; color: var(--sidebar-muted); cursor: pointer; }
+.nova-sidebar-manage-spaces:hover { background: var(--sidebar-hover); }
+@media (prefers-reduced-motion: reduce) {
+  .nova-vertical-sidebar *, .nova-vertical-sidebar *::before, .nova-vertical-sidebar *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+}

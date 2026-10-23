@@ -12,7 +12,8 @@ export function reorderTabsWithinGroup(tabs: Tab[], draggedId: string, targetId:
 
   if (
     getTabWorkspaceId(dragged) !== getTabWorkspaceId(target) ||
-    dragged.folderId !== target.folderId
+    (!dragged.isPinned && dragged.folderId !== target.folderId) ||
+    Boolean(dragged.isPinned) !== Boolean(target.isPinned)
   ) {
     return tabs;
   }
@@ -20,7 +21,8 @@ export function reorderTabsWithinGroup(tabs: Tab[], draggedId: string, targetId:
   const groupIds = tabs
     .filter(tab =>
       getTabWorkspaceId(tab) === getTabWorkspaceId(target) &&
-      tab.folderId === target.folderId
+      (target.isPinned || tab.folderId === target.folderId) &&
+      Boolean(tab.isPinned) === Boolean(target.isPinned)
     )
     .map(tab => tab.id);
   const draggedIndex = groupIds.indexOf(draggedId);
@@ -39,7 +41,8 @@ export function reorderTabsWithinGroup(tabs: Tab[], draggedId: string, targetId:
   const groupPositions = tabs.reduce<number[]>((positions, tab, index) => {
     if (
       getTabWorkspaceId(tab) === getTabWorkspaceId(target) &&
-      tab.folderId === target.folderId
+      (target.isPinned || tab.folderId === target.folderId) &&
+      Boolean(tab.isPinned) === Boolean(target.isPinned)
     ) {
       positions.push(index);
     }
@@ -76,4 +79,20 @@ export function canMoveTabToFolder(tab: Tab, folderId: string | undefined, folde
   if (!folderId) return true;
   const folder = folders.find(candidate => candidate.id === folderId);
   return Boolean(folder && folder.workspaceId === getTabWorkspaceId(tab));
+}
+
+/** Collapse only mutual split partners in this rendered section. Never hide a
+ * tab because its partner lives in another folder or the pinned section. */
+export function getSidebarTabRows(tabs: Tab[]): { tab: Tab; splitTab?: Tab }[] {
+  const byId = new Map(tabs.map(tab => [tab.id, tab]));
+  const seen = new Set<string>();
+  return tabs.flatMap(tab => {
+    if (seen.has(tab.id)) return [];
+    seen.add(tab.id);
+    const partner = tab.splitWith ? byId.get(tab.splitWith) : undefined;
+    const splitTab = partner && partner.id !== tab.id &&
+      partner.splitWith === tab.id && !seen.has(partner.id) ? partner : undefined;
+    if (splitTab) seen.add(splitTab.id);
+    return [{ tab, splitTab }];
+  });
 }

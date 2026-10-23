@@ -39,6 +39,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
+import { getSidebarTabRows } from '../utils/verticalTabs';
 import { formatSearchUrl } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
@@ -102,13 +103,13 @@ function renderFavoriteIcon(fav: FavoriteApp) {
       );
     case 'github':
       return (
-        <svg className="w-4 h-4 fill-slate-200" viewBox="0 0 24 24">
+        <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
           <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/>
         </svg>
       );
     case 'x':
       return (
-        <svg className="w-3.5 h-3.5 fill-slate-200" viewBox="0 0 24 24">
+        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
         </svg>
       );
@@ -280,6 +281,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
         }
       }}
       role="tab"
+      data-tab-id={tab.id}
       tabIndex={0}
       aria-selected={isActive}
       aria-label={tab.title || tab.url || 'Untitled tab'}
@@ -290,8 +292,8 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       }}
       onMouseEnter={(e) => onMouseEnter(tab, e)}
       onMouseLeave={onMouseLeave}
-      style={isActive ? { backgroundColor: 'var(--nova-active-tab-bg)', borderColor: 'var(--nova-border-subtle)' } : undefined}
-      className={`relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
+      style={isActive ? { backgroundColor: 'var(--sidebar-selected)', borderColor: 'var(--sidebar-border)' } : undefined}
+      className={`nova-sidebar-tab relative flex items-center h-8.5 px-2.5 rounded-xl cursor-pointer transition-colors duration-150 group/tab select-none overflow-hidden ${
         isNested ? 'ml-3.5 w-[calc(100%-14px)]' : 'w-full'
       } ${
         isDragOver
@@ -875,13 +877,26 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   const isCurrentNewTab = !activeTab?.url || activeTab.url === 'nova://newtab' || activeTab.url === 'about:blank' || activeTab.url === 'https://newtab';
 
+  const renderTabRows = (group: Tab[], isNested = false) => getSidebarTabRows(group).map(({ tab, splitTab }) => (
+    <SidebarTabItem
+      key={tab.id} tab={tab} splitTab={splitTab} activeTabId={activeTabId}
+      isActive={tab.id === activeTabId || splitTab?.id === activeTabId}
+      isDragOver={dragOverTabId === tab.id} isNested={isNested} tabsLength={tabs.length}
+      onSelectTab={onSelectTab} onCloseTab={onCloseTab} onCloseSplit={onCloseSplit}
+      onToggleMuteTab={onToggleMuteTab} onTabDragStart={onTabDragStart} onTabDragEnd={onTabDragEnd}
+      onReorderTabs={onReorderTabs} onOpenContextMenu={handleOpenContextMenu}
+      onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} setDragOverTabId={setDragOverTabId}
+    />
+  ));
+  const pinnedTabs = tabs.filter(tab => tab.isPinned);
+
   return (
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
       <div
-        style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
+        style={{ backgroundColor: 'var(--sidebar-surface)', borderColor: 'var(--sidebar-border)' }}
+        className="nova-vertical-sidebar flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none text-slate-700 dark:text-slate-200 z-50 bg-slate-100 dark:bg-slate-900 border-r border-slate-200/80 dark:border-white/[0.06] font-sans"
       >
 
         {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
@@ -984,6 +999,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 // ⌘L / focus-url shortcut sites resolve to *this* input in the
                 // vertical-tabs layout too. See OmniboxBar.tsx.
                 data-omnibox-input="true"
+                aria-label="Address and search bar"
                 value={searchValue}
                 onChange={(e) => {
                   setSearchValue(e.target.value);
@@ -1063,7 +1079,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-11 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-11 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -1087,12 +1103,12 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 3. CUSTOMIZABLE TOP FAVORITES GRID (Arc 2-column or 4-column glass tiles) */}
+        {/* 3. FAVORITES: compact, persistent shortcuts */}
         <div
           className="px-3 pb-2.5 no-drag"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
         >
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="nova-sidebar-favorites grid grid-cols-4 gap-1.5">
             {favorites.slice(0, 4).map((fav) => (
               <div key={fav.id} className="relative group/fav">
                 <button
@@ -1108,6 +1124,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 {/* Delete Shortcut */}
                 <button
                   onClick={(e) => handleRemoveFavorite(fav.id, e)}
+                  aria-label={`Remove ${fav.name} favorite`}
                   className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
                 >
                   <X className="w-2 h-2" />
@@ -1138,7 +1155,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               className="px-3 pb-2.5 no-drag"
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
-              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#1e1930] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
+              <form onSubmit={handleAddFavorite} className="p-2 rounded-xl bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5">
                 <input
                   type="text"
                   placeholder="Name (e.g. Reddit)"
@@ -1174,17 +1191,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           )}
         </AnimatePresence>
 
-        {/* 4. ACTIVE SPACE / PROFILE HEADER (Zero Emoji, Clean Lucide Orbit) */}
+        {/* 4. ACTIVE WORKSPACE */}
         <div
           className="px-3 pb-2 no-drag relative"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           ref={dropdownRef}
+          data-sidebar-workspace
         >
           <button
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
+            aria-label="Switch workspace"
+            aria-expanded={isWorkspaceDropdownOpen}
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-slate-200/60 dark:hover:bg-white/6 transition-colors text-left group cursor-pointer"
           >
-            <Orbit className="w-3.5 h-3.5 text-purple-500 dark:text-purple-400 shrink-0" />
+            <span className="nova-space-indicator" style={{ backgroundColor: WORKSPACE_COLORS[activeWorkspace?.color] || WORKSPACE_COLORS.slate }} />
             <span className="text-[13px] font-semibold text-slate-800 dark:text-slate-200 truncate flex-1 tracking-tight">
               {activeWorkspace?.name || 'Personal'}
             </span>
@@ -1201,7 +1221,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
+                className="absolute top-9 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
                   {workspaces.map(w => (
@@ -1241,42 +1261,33 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
         </div>
 
-        {/* 5. TABS SECTION HEADER */}
-        <div
-          className="px-3.5 pt-1 pb-1 flex items-center justify-between text-[11px] font-semibold tracking-wider text-slate-400/80 dark:text-slate-500 uppercase no-drag select-none"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <div className="flex items-center gap-1.5">
-            <span>Tabs</span>
-            {isIncognito && (
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold tracking-wider uppercase bg-cyan-500/15 text-cyan-400 border border-cyan-500/30">
-                Private
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1">
-            {onNewIncognitoTab && (
-              <button
-                onClick={onNewIncognitoTab}
-                className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-                title={isMac ? "New Private Tab (⇧⌘N)" : "New Private Tab (Ctrl+Shift+N)"}
-              >
-                <ShieldOff className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button
-              onClick={() => onNewTab()}
-              className="p-1 rounded-md hover:bg-slate-200/80 dark:hover:bg-white/10 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors cursor-pointer"
-              title={isMac ? "New Tab (⌘T)" : "New Tab (Ctrl+T)"}
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
+        <div className="nova-sidebar-create-row">
+          <button onClick={() => onNewTab()} className="nova-sidebar-new-tab">
+            <Plus size={16} /><span>New tab</span><kbd>{isMac ? '⌘T' : 'Ctrl T'}</kbd>
+          </button>
+          {onNewIncognitoTab && <button onClick={onNewIncognitoTab} title="New private tab" className="nova-sidebar-private"><VenetianMask size={15} /></button>}
         </div>
+        {isIncognito && <div className="nova-sidebar-section-label">Private browsing</div>}
 
-        {/* 6. TAB & FOLDER LIST (Only renders visited/open web pages, NO duplicate '+ New Tab'!) */}
+        {/* 6. PINNED TABS, FOLDERS, AND OPEN TABS */}
         <div
-          className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 no-scrollbar flex flex-col gap-0.5 no-drag"
+          className="nova-sidebar-tab-list flex-1 overflow-y-auto overflow-x-hidden px-3 py-1 no-scrollbar flex flex-col gap-0.5 no-drag"
+          role="tablist" aria-label="Workspace tabs" aria-orientation="vertical"
+          onKeyDown={(event) => {
+            const target = event.target as HTMLElement;
+            if (target.closest('button, input, a') || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+            const row = target.closest<HTMLElement>('[role="tab"]');
+            if (!row) return;
+            const rows = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]'));
+            const index = rows.indexOf(row);
+            const next = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1
+              : (index + (event.key === 'ArrowDown' ? 1 : -1) + rows.length) % rows.length;
+            const nextRow = rows[next];
+            if (!nextRow?.dataset.tabId) return;
+            event.preventDefault();
+            nextRow.focus();
+            onSelectTab(nextRow.dataset.tabId);
+          }}
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
@@ -1286,9 +1297,16 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           }}
         >
           <AnimatePresence>
+            {pinnedTabs.length > 0 && (
+              <div key="pinned" className="nova-sidebar-pinned">
+                <div className="nova-sidebar-section-label"><Pin size={11} />Pinned</div>
+                {renderTabRows(pinnedTabs)}
+              </div>
+            )}
+            <div key="open-label" className="nova-sidebar-section-label">Open tabs<span>{tabs.filter(tab => !tab.isPinned).length}</span></div>
             {/* Folders */}
             {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
-              const folderTabs = tabs.filter(t => t.folderId === folder.id);
+              const folderTabs = tabs.filter(t => !t.isPinned && t.folderId === folder.id);
               return (
                 <motion.div
                   initial={{ opacity: 0 }}
@@ -1335,6 +1353,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                     <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
                     <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
                     <button
+                      aria-label={`Delete ${folder.name} folder`}
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
                       onKeyDown={(e) => { e.stopPropagation(); }}
                       className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
@@ -1352,47 +1371,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         className="relative"
                       >
                         <div className="flex flex-col gap-0.5 pb-1">
-                          {(() => {
-                            const renderedSplitIds = new Set<string>();
-                            return folderTabs.filter(tab => {
-                              if (tab.splitWith) {
-                                const other = tabs.find(t => t.id === tab.splitWith);
-                                if (!other || other.folderId !== folder.id) return true;
-                                if (renderedSplitIds.has(tab.id)) return false;
-                                renderedSplitIds.add(other.id);
-                                return true;
-                              }
-                              return true;
-                            }).map(tab => {
-                              const splitTab = tab.splitWith
-                                ? tabs.find(t => t.id === tab.splitWith && t.folderId === folder.id)
-                                : null;
-                              const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
-                              return (
-                                <SidebarTabItem
-                                  key={tab.id}
-                                  tab={tab}
-                                  splitTab={splitTab}
-                                  activeTabId={activeTabId}
-                                  isActive={isActive}
-                                  isDragOver={dragOverTabId === tab.id}
-                                  isNested={true}
-                                  tabsLength={tabs.length}
-                                  onSelectTab={onSelectTab}
-                                  onCloseTab={onCloseTab}
-                                  onCloseSplit={onCloseSplit}
-                                  onToggleMuteTab={onToggleMuteTab}
-                                  onTabDragStart={onTabDragStart}
-                                  onTabDragEnd={onTabDragEnd}
-                                  onReorderTabs={onReorderTabs}
-                                  onOpenContextMenu={handleOpenContextMenu}
-                                  onMouseEnter={handleMouseEnter}
-                                  onMouseLeave={handleMouseLeave}
-                                  setDragOverTabId={setDragOverTabId}
-                                />
-                              );
-                            });
-                          })()}
+                          {renderTabRows(folderTabs, true)}
                         </div>
                       </motion.div>
                     )}
@@ -1401,49 +1380,22 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               );
             })}
 
-            {/* Root Tabs */}
-            {(() => {
-              const renderedSplitIds = new Set<string>();
-              return tabs.filter(t => !t.folderId).filter(tab => {
-                if (tab.splitWith) {
-                  const other = tabs.find(t => t.id === tab.splitWith);
-                  if (!other || other.folderId) return true;
-                  if (renderedSplitIds.has(tab.id)) return false;
-                  renderedSplitIds.add(other.id);
-                  return true;
-                }
-                return true;
-              }).map(tab => {
-                const splitTab = tab.splitWith
-                  ? tabs.find(t => t.id === tab.splitWith && !t.folderId)
-                  : null;
-                const isActive = tab.id === activeTabId || (splitTab ? splitTab.id === activeTabId : false);
-                return (
-                  <SidebarTabItem
-                    key={tab.id}
-                    tab={tab}
-                    splitTab={splitTab}
-                    activeTabId={activeTabId}
-                    isActive={isActive}
-                    isDragOver={dragOverTabId === tab.id}
-                    isNested={false}
-                    tabsLength={tabs.length}
-                    onSelectTab={onSelectTab}
-                    onCloseTab={onCloseTab}
-                    onCloseSplit={onCloseSplit}
-                    onToggleMuteTab={onToggleMuteTab}
-                    onTabDragStart={onTabDragStart}
-                    onTabDragEnd={onTabDragEnd}
-                    onReorderTabs={onReorderTabs}
-                    onOpenContextMenu={handleOpenContextMenu}
-                    onMouseEnter={handleMouseEnter}
-                    onMouseLeave={handleMouseLeave}
-                    setDragOverTabId={setDragOverTabId}
-                  />
-                );
-              });
-            })()}
+            {renderTabRows(tabs.filter(tab => !tab.isPinned && !tab.folderId))}
           </AnimatePresence>
+        </div>
+
+        <div className="nova-sidebar-spaces" aria-label="Workspaces">
+          <div className="nova-sidebar-space-buttons">
+            {workspaces.map(workspace => (
+              <button key={workspace.id} onClick={() => onSelectWorkspace(workspace.id)}
+                title={workspace.name} aria-label={`Switch to ${workspace.name}`}
+                aria-pressed={workspace.id === activeWorkspaceId}
+                style={{ '--space-color': WORKSPACE_COLORS[workspace.color] || WORKSPACE_COLORS.slate } as React.CSSProperties}>
+                <span>{workspace.name.charAt(0).toUpperCase()}</span>
+              </button>
+            ))}
+          </div>
+          <button className="nova-sidebar-manage-spaces" title="Manage spaces" onClick={() => window.dispatchEvent(new CustomEvent('open-workspace-manager'))}><Plus size={14} /></button>
         </div>
 
         {/* 7. BOTTOM DOCK FOOTER */}
@@ -1468,7 +1420,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 transition={{ duration: 0.15 }}
-                className="absolute bottom-12 left-3 bg-white dark:bg-[#1e1930]/95 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+                className="absolute bottom-12 left-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
                 {onToggleAIAssistant && (
                   <button

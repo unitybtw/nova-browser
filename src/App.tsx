@@ -178,9 +178,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
       if (demoParams.feature === 'vertical_tabs') {
         return [
+          { id: '5', url: 'nova://newtab', title: 'New Tab', workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '6', url: 'https://github.com/unitybtw/nova-browser', title: 'Nova Browser', workspaceId: 'default', isPinned: true, isLoading: false, canGoBack: false, canGoForward: false },
           { id: '1', url: 'https://react.dev', title: 'React 19 Docs', workspaceId: 'default', folderId: 'f1', isLoading: false, canGoBack: false, canGoForward: false },
           { id: '2', url: 'https://tailwindcss.com', title: 'Tailwind CSS v4', workspaceId: 'default', folderId: 'f1', isLoading: false, canGoBack: false, canGoForward: false },
-          { id: '3', url: 'https://spotify.com', title: 'Spotify Web (Playing)', isMuted: false, workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false },
+          { id: '3', url: 'https://spotify.com', title: 'Spotify', isMuted: false, workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false },
           { id: '4', url: 'https://arxiv.org', title: 'ArXiv AI Papers', workspaceId: 'default', folderId: 'f2', isLoading: false, canGoBack: false, canGoForward: false }
         ];
       }
