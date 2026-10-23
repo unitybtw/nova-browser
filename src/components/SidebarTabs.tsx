@@ -94,6 +94,22 @@ const DEFAULT_FAVORITE_APPS: FavoriteApp[] = [
   { id: 'fav_ai', name: 'ChatGPT', url: 'https://chatgpt.com', iconType: 'chatgpt', iconBg: '#10a37f' },
 ];
 
+/** Preserve an intentionally empty list and recover usable rows independently. */
+export function parseFavoriteApps(raw: string): FavoriteApp[] | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return null;
+  const seen = new Set<string>();
+  return parsed.flatMap((entry): FavoriteApp[] => {
+    if (!entry || typeof entry !== 'object' || typeof entry.id !== 'string' || !entry.id ||
+      typeof entry.name !== 'string' || !entry.name.trim() || typeof entry.url !== 'string' ||
+      !isSafeNavigationUrl(entry.url) || seen.has(entry.id)) return [];
+    seen.add(entry.id);
+    const iconType = ['youtube', 'github', 'x', 'chatgpt', 'google', 'custom'].includes(entry.iconType)
+      ? entry.iconType as FavoriteApp['iconType'] : 'custom';
+    return [{ id: entry.id, name: entry.name, url: entry.url, iconType }];
+  });
+}
+
 function renderFavoriteIcon(fav: FavoriteApp) {
   switch (fav.iconType) {
     case 'youtube':
@@ -585,10 +601,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     try {
       const saved = localStorage.getItem('nova_top_favorites');
       if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.filter(f => f && typeof f.url === 'string' && isSafeNavigationUrl(f.url));
-        }
+        const parsed = parseFavoriteApps(saved);
+        if (parsed !== null) return parsed;
       }
     } catch (_) {}
     return DEFAULT_FAVORITE_APPS;

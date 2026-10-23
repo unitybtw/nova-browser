@@ -131,6 +131,27 @@ async function main() {
     })));
     assert.equal(w.document.body.style.overflow, 'clip', 'a closed manager must not overwrite another modal scroll lock');
     console.log('[PASS] Workspace drafts: Cancel, Save, close/reopen, and closed-dialog scroll isolation');
+    w.localStorage.setItem('nova_top_favorites', '[]');
+    await React.act(async () => root.render(React.createElement(SidebarTabs, {
+      tabs: [base('blank')], activeTabId: 'blank', workspaces: currentSpaces, activeWorkspaceId: 'default',
+      onSelectTab: () => {}, onCloseTab: () => {}, onNewTab: () => {}, onToggleMuteTab: () => {}, onSelectWorkspace: () => {}
+    })));
+    assert.equal(container.querySelector('.nova-sidebar-favorites [title^="YouTube"]'), null, 'empty saved favorites do not resurrect defaults');
+    const { NewTabPage } = await import('../src/components/NewTabPage');
+    w.localStorage.setItem('nova_todos', JSON.stringify([null, { id: 'first', text: 'First task', completed: false }, { id: 'second', text: 'Second task', completed: false }]));
+    await React.act(async () => root.render(React.createElement(NewTabPage, { onNavigate: () => {}, isActive: false, energySaverMode: true })));
+    const tasks = container.querySelectorAll<HTMLElement>('[role="checkbox"]');
+    assert.equal(tasks.length, 2, 'malformed tasks cannot crash the new tab page');
+    await React.act(async () => {
+      tasks[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+      tasks[1].dispatchEvent(new w.MouseEvent('click', { bubbles: true }));
+    });
+    const savedTasks = JSON.parse(w.localStorage.getItem('nova_todos')!);
+    assert.ok(savedTasks.every((task: any) => task.completed), 'batched task changes preserve both updates');
+    const deleteTask = tasks[0].querySelector('button')!;
+    await React.act(async () => deleteTask.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    assert.ok(JSON.parse(w.localStorage.getItem('nova_todos')!)[0].completed, 'keyboard activation of Delete must not toggle the parent task');
+    console.log('[PASS] Empty favorites, malformed task recovery, batched toggles, and task delete keyboard isolation');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();

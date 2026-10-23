@@ -96,3 +96,5 @@ import './download_runtime_regressions.test';
 import './history_recorder_regressions.test';
 
 import './download_actions.test';
+
+import './newtab_collection_recovery.test';

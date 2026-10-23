@@ -19,6 +19,20 @@ interface Todo {
   completed: boolean;
 }
 
+/** Recover individual tasks without trusting stored row shapes or booleans. */
+export function parseTodos(raw: string): Todo[] | null {
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed)) return null;
+  const seen = new Set<string>();
+  return parsed.flatMap((entry): Todo[] => {
+    if (!entry || typeof entry !== 'object' || typeof entry.text !== 'string' || !entry.text.trim()) return [];
+    const id = typeof entry.id === 'string' && entry.id ? entry.id : generateId('todo');
+    if (seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, text: entry.text, completed: entry.completed === true }];
+  });
+}
+
 interface NewTabPageProps {
   onNavigate: (url: string) => void;
   onNewTab?: (url?: string) => void;
@@ -360,10 +374,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
 
   const [todos, setTodos] = useSharedLocalStorageState<Todo[]>(
     'nova_todos',
-    useCallback((raw: string): Todo[] | null => {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? (parsed as Todo[]) : null;
-    }, []),
+    parseTodos,
     () => [],
     !isIncognito && !isDemo
   );
@@ -452,20 +463,21 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   const handleAddTodo = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
-    setTodos([...todos, { id: generateId('todo'), text: newTodo.trim(), completed: false }]);
+    const todo = { id: generateId('todo'), text: newTodo.trim(), completed: false };
+    setTodos(current => [...current, todo]);
     setNewTodo('');
   };
 
   const toggleTodo = (id: string) => {
-    setTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+    setTodos(current => current.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
   };
 
   const deleteTodo = (id: string) => {
-    setTodos(todos.filter(t => t.id !== id));
+    setTodos(current => current.filter(t => t.id !== id));
   };
 
   const clearCompletedTodos = () => {
-    setTodos(todos.filter(t => !t.completed));
+    setTodos(current => current.filter(t => !t.completed));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1271,6 +1283,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 aria-checked={todo.completed}
                 tabIndex={0}
                 onKeyDown={(e) => {
+                  if ((e.target as Element).closest('button')) return;
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
                     toggleTodo(todo.id);

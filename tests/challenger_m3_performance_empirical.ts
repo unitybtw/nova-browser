@@ -29,6 +29,10 @@ function recordTest(category: string, test: string, passed: boolean, details: st
 }
 
 async function runMilestone3ChallengerSuite() {
+  // runAll statically imports many synchronous suites. Start the timed checks
+  // after those imports finish; otherwise their CPU work can exhaust the
+  // debounce deadline before Node has run even the first timer callback.
+  await new Promise<void>(resolve => setImmediate(resolve));
   // =========================================================================
   // 1. KEYSTROKE ISOLATION & HORIZONTAL TAB RENDERING IMMUNITY
   // =========================================================================
