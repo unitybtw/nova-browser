@@ -31,6 +31,7 @@ async function main() {
   const base = (id: string, extra: Partial<Tab> = {}): Tab => ({ id, title: id, url: `https://${id}.test`, workspaceId: 'default', isLoading: false, canGoBack: false, canGoForward: false, ...extra });
   const selected: string[] = [], closed: string[] = [], spaces: string[] = [];
   let created = 0, toggled = 0;
+  const renamed: string[][] = [];
   const container = w.document.getElementById('root')!;
   const root = createRoot(container);
   try {
@@ -38,7 +39,7 @@ async function main() {
       tabs: [base('pinned', { isPinned: true, folderId: 'folder' }), base('nested', { folderId: 'folder' }), base('root')],
       folders: [{ id: 'folder', name: 'Projects', isExpanded: true, workspaceId: 'default' }],
       activeTabId: 'nested', workspaces: [{ id: 'default', name: 'Personal', color: 'slate' }, { id: 'work', name: 'Work', color: 'blue' }], activeWorkspaceId: 'default',
-      onSelectTab: id => selected.push(id), onCloseTab: id => closed.push(id), onNewTab: () => created++, onToggleMuteTab: () => {}, onSelectWorkspace: id => spaces.push(id), onToggleFolder: () => toggled++
+      onSelectTab: id => selected.push(id), onCloseTab: id => closed.push(id), onNewTab: () => created++, onToggleMuteTab: () => {}, onSelectWorkspace: id => spaces.push(id), onToggleFolder: () => toggled++, onRenameFolder: (id, name) => renamed.push([id, name])
     })));
     const click = async (element: Element | null) => {
       assert.ok(element, 'expected control exists');
@@ -69,6 +70,20 @@ async function main() {
     await React.act(async () => folder.dispatchEvent(new w.KeyboardEvent('keydown', { key: ' ', bubbles: true })));
     assert.equal(toggled, 1);
     assert.ok(container.querySelector('[aria-label="Remove GitHub favorite"]'));
+    await click(container.querySelector('[aria-label="Rename Projects folder"]'));
+    const nameInput = container.querySelector<HTMLInputElement>('input[aria-label="Folder name"]')!;
+    assert.ok(nameInput, 'folder name editor is reachable');
+    await React.act(async () => {
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, 'value')!.set!.call(nameInput, '  Research  ');
+      nameInput.dispatchEvent(new w.Event('input', { bubbles: true }));
+    });
+    await React.act(async () => nameInput.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+    assert.deepEqual(renamed, [['folder', 'Research']], 'Enter saves without toggling the folder');
+    assert.equal(toggled, 1);
+    await click(container.querySelector('[aria-label="Rename Projects folder"]'));
+    await React.act(async () => container.querySelector('input[aria-label="Folder name"]')!.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+    assert.equal(renamed.length, 1, 'Escape cancels without saving');
+
     console.log('[PASS] Sidebar UI: pinned/folder visibility, create, workspace switching, selection, close and keyboard isolation');
   } finally {
     await React.act(async () => root.unmount());

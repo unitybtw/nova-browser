@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Folder as FolderIcon,
   FolderPlus,
+  Pencil,
   Check,
   Settings,
   Clock,
@@ -553,6 +554,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [dragOverTabId, setDragOverTabId] = useState<string | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const [folderName, setFolderName] = useState('');
 
   const [tabContextMenu, setTabContextMenu] = useState<TabContextMenuState>({
     isOpen: false,
@@ -1351,7 +1354,35 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                       {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     </div>
                     <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
-                    <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>
+                    {editingFolderId === folder.id ? (
+                      <input autoFocus aria-label="Folder name" title="Enter to save, Escape to cancel" maxLength={100}
+                        className="min-w-0 flex-1 rounded px-1 py-0.5 text-xs bg-white dark:bg-slate-800 outline-none ring-1 ring-slate-400"
+                        value={folderName} onChange={event => setFolderName(event.target.value)}
+                        onFocus={event => event.target.select()}
+                        onBlur={() => setEditingFolderId(null)}
+                        onKeyDown={event => {
+                          event.stopPropagation();
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            if (!folderName.trim()) return;
+                            onRenameFolder?.(folder.id, folderName.trim());
+                            setEditingFolderId(null);
+                            event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
+                          } else if (event.key === 'Escape') {
+                            event.preventDefault();
+                            setEditingFolderId(null);
+                            event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
+                          }
+                        }} />
+                    ) : <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>}
+                    {onRenameFolder && editingFolderId !== folder.id && (
+                      <button aria-label={`Rename ${folder.name} folder`} title="Rename folder"
+                        onClick={event => { event.stopPropagation(); setFolderName(folder.name); setEditingFolderId(folder.id); }}
+                        onKeyDown={event => event.stopPropagation()}
+                        className="p-1 rounded-md opacity-0 group-hover/folder:opacity-100 focus:opacity-100 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                    )}
                     <button
                       aria-label={`Delete ${folder.name} folder`}
                       onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}

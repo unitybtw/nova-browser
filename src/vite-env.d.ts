@@ -123,7 +123,7 @@ export interface ElectronAPI {
   pauseDownload: (id: string) => Promise<boolean>;
   resumeDownload: (id: string) => Promise<boolean>;
   cancelDownload: (id: string) => Promise<boolean>;
-  openDownload: (pathStr: string) => Promise<boolean>;
+  openDownload: (pathStr: string) => Promise<boolean | 'cancelled'>;
   showDownloadInFolder: (pathStr: string) => Promise<boolean>;
   // Auto updater & version
   getAppVersion: () => Promise<string>;

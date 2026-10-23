@@ -11,6 +11,7 @@ async function run() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nova-download-runtime-'));
   const handlers = new Map<string, Function>();
   let openResult = '';
+  let dialogResponse = 1;
   let reservationError = false;
   const exports: any = {};
   const imports: Record<string, unknown> = { fs: { ...fs, openSync: (...args: any[]) => {
@@ -20,7 +21,7 @@ async function run() {
     electron: {
       app: { getPath: () => dir },
       ipcMain: { handle: (name: string, fn: Function) => handlers.set(name, fn) },
-      shell: { openPath: async () => openResult }, dialog: { showMessageBox: async () => ({ response: 1 }) }
+      shell: { openPath: async () => openResult }, dialog: { showMessageBox: async () => ({ response: dialogResponse }) }
     }
   };
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('electron/main/downloads.ts', 'utf8'), {
@@ -34,6 +35,12 @@ async function run() {
     assert.equal(await handlers.get('open-download')!({}, file), false, 'native open failure must not be reported as success');
     openResult = '';
     assert.equal(await handlers.get('open-download')!({}, file), true, 'empty native result means success');
+
+    const executable = path.join(dir, 'installer.exe');
+    fs.writeFileSync(executable, 'test');
+    dialogResponse = 0;
+    assert.equal(await handlers.get('open-download')!({}, executable), 'cancelled', 'user cancellation must be distinguishable from a failed open');
+    dialogResponse = 1;
 
     for (const original of ['ş'.repeat(200) + '.pdf', '😀'.repeat(100) + '.exe', 'x.' + 'a'.repeat(300), 'a'.repeat(300) + '.html']) {
       const safe = exports.sanitizeDownloadFilename(original);

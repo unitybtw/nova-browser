@@ -94,3 +94,5 @@ import './supabase_client_lifecycle.test';
 import './extension_popup_identity.test';
 import './download_runtime_regressions.test';
 import './history_recorder_regressions.test';
+
+import './download_actions.test';

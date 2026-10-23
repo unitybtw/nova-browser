@@ -1,3 +1,4 @@
+import { performDownloadAction } from '../utils/downloadActions';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Folder as FolderIcon } from 'lucide-react';
@@ -92,7 +93,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                       key={item.id} 
                       onClick={() => {
                         if (isCompleted && item.savePath) {
-                          (window as any).electronAPI?.openDownload?.(item.savePath);
+                          void performDownloadAction(item.savePath, 'open');
                         }
                       }}
                       className={`group flex items-start gap-3 p-2.5 hover:bg-slate-100/70 dark:hover:bg-white/[0.04] rounded-xl transition-colors ${isCompleted ? 'cursor-pointer' : ''}`}
@@ -132,7 +133,7 @@ export const DownloadsPopover: React.FC<DownloadsPopoverProps> = ({
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!);
+                              void performDownloadAction(item.savePath!, 'reveal');
                             }}
                             className="p-1.5 text-slate-400 hover:text-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-500/10 rounded-lg transition-colors"
                             title="Show in Folder"

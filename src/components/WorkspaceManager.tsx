@@ -126,7 +126,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                 </div>
                 <h2 className="text-base font-semibold">Manage Workspaces</h2>
               </div>
-              <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+              <button aria-label="Close workspaces" onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -146,6 +146,8 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                           isIncognito ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700 dark:text-white'
                         } border`}
                         placeholder="Workspace Name"
+                        aria-label="Workspace name"
+                        maxLength={100}
                         autoFocus
                         onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(workspace.id)}
                       />
@@ -153,6 +155,8 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                         {COLORS.map(c => (
                           <button
                             key={c.id}
+                            aria-label={`${c.id} workspace color`}
+                            aria-pressed={editColor === c.id}
                             type="button"
                             onClick={() => setEditColor(c.id)}
                             className={`w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 shrink-0 ${editColor === c.id ? 'ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-900 ring-current' : ''}`}
@@ -170,6 +174,8 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                           return (
                             <button
                               key={iconObj.id}
+                              aria-label={`${iconObj.id} workspace icon`}
+                              aria-pressed={isSelected}
                               type="button"
                               onClick={() => setEditIcon(iconObj.id)}
                               className={`p-1.5 rounded-lg border transition-all shrink-0 ${
@@ -222,6 +228,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                     </div>
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity">
                       <button 
+                        aria-label={`Edit ${workspace.name} workspace`}
                         onClick={() => {
                           setEditingId(workspace.id);
                           setEditName(workspace.name);
@@ -234,6 +241,7 @@ export const WorkspaceManager: React.FC<WorkspaceManagerProps> = ({
                       </button>
                       {workspaces.length > 1 && (
                         <button 
+                          aria-label={`Delete ${workspace.name} workspace`}
                           onClick={() => handleDelete(workspace.id)}
                           className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 transition-colors"
                         >

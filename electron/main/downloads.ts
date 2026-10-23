@@ -192,7 +192,7 @@ export function initDownloads(send: SendToMainWindow, trustedSenderCheck: Truste
           message: `This file (${path.basename(confirmedPath)}) could harm your computer. Do you want to open it?`,
           detail: confirmedPath,
         });
-        if (response !== 1) return false;
+        if (response !== 1) return 'cancelled';
       }
       // The dialog can stay open for an unbounded time, so a symlink planted
       // while it is up would be followed by the next resolve. Re-validate

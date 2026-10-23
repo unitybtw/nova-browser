@@ -1,3 +1,4 @@
+import { performDownloadAction } from '../utils/downloadActions';
 import React, { useState, useMemo } from 'react';
 import { Download, CheckCircle2, AlertCircle, FileText, Pause, Play, XCircle, Trash2, Search, FolderOpen } from 'lucide-react';
 import { useTranslation, t as translateFn, type SupportedLanguage } from '../services/i18n';
@@ -127,13 +128,13 @@ const DownloadRowItem: React.FC<DownloadRowItemProps> = React.memo(({
         {item.state === 'completed' && item.savePath && (
           <div className="flex items-center gap-3">
             <button
-              onClick={() => (window as any).electronAPI?.showDownloadInFolder?.(item.savePath!)}
+              onClick={() => void performDownloadAction(item.savePath!, 'reveal')}
               className="text-xs font-semibold text-slate-600 hover:text-cyan-500 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center gap-1"
             >
               <FolderOpen className="w-3.5 h-3.5" /> {t('downloads.openFolder')}
             </button>
             <button
-              onClick={() => (window as any).electronAPI?.openDownload?.(item.savePath!)}
+              onClick={() => void performDownloadAction(item.savePath!, 'open')}
               className="text-xs font-semibold text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 transition-colors"
             >
               {t('downloads.openFile')}

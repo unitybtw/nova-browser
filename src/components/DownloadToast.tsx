@@ -1,3 +1,4 @@
+import { performDownloadAction } from '../utils/downloadActions';
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DownloadItem } from '../types/browser';
@@ -170,7 +171,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                 <>
                   <button
                     onClick={() => {
-                      (window as any).electronAPI?.showDownloadInFolder?.(activeToast.savePath!);
+                      void performDownloadAction(activeToast.savePath!, 'reveal');
                       dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-cyan-600 dark:text-slate-300 dark:hover:text-cyan-400 hover:bg-slate-100 dark:hover:bg-white/5 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
@@ -180,7 +181,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                   </button>
                   <button
                     onClick={() => {
-                      (window as any).electronAPI?.openDownload?.(activeToast.savePath!);
+                      void performDownloadAction(activeToast.savePath!, 'open');
                       dismissToast();
                     }}
                     className="flex items-center gap-1 text-[11px] font-semibold text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/10 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
