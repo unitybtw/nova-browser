@@ -263,6 +263,65 @@ async function main() {
     await React.act(async () => { resolveCopy(); await new Promise(resolve => setImmediate(resolve)); });
     assert.ok(!container.textContent?.includes('Copied!'), 'copying the old visible image cannot mark a newer full-page image copied');
     console.log('[PASS] Screenshot preview reopen isolation, full-page failure feedback and retry');
+    const { ExtensionsSection } = await import('../src/components/settings/ExtensionsSection');
+    const extensionAlerts: string[] = [];
+    let extensionRows = [{ id: 'addon', name: 'Example addon', enabled: true }];
+    let resolveToggle!: (value: { success: boolean }) => void;
+    let toggleCalls = 0;
+    (w as any).electronAPI = {
+      listExtensions: async () => extensionRows,
+      onExtensionChanged: () => () => {},
+      toggleExtension: () => { toggleCalls++; return new Promise(resolve => { resolveToggle = resolve; }); },
+      showConfirmDialog: async (options: any) => { if (options.cancelLabel === '') extensionAlerts.push(options.message); return true; },
+    };
+    await React.act(async () => { root.render(React.createElement(ExtensionsSection)); await new Promise(resolve => setImmediate(resolve)); });
+    const addonSwitch = () => container.querySelector('[role="switch"]') as HTMLButtonElement;
+    await click(addonSwitch());
+    assert.equal(addonSwitch().disabled, true);
+    await click(addonSwitch());
+    assert.equal(toggleCalls, 1, 'the visible pending switch cannot submit duplicate native updates');
+    await React.act(async () => { extensionRows = [{ ...extensionRows[0], enabled: false }]; resolveToggle({ success: true }); await new Promise(resolve => setImmediate(resolve)); });
+    assert.equal(addonSwitch().getAttribute('aria-checked'), 'false');
+    assert.equal(addonSwitch().disabled, false);
+    await click(container.querySelector('[title="Remove Example addon"]'));
+    assert.ok(container.textContent?.includes('Example addon'), 'missing native removal cannot erase the settings row');
+    assert.equal(extensionAlerts.length, 1);
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('Load Unpacked'))!);
+    assert.equal(extensionAlerts.length, 2, 'unsupported unpacked install needs visible feedback');
+    console.log('[PASS] Extension settings pending controls, native success and unavailable-action feedback');
+    const { ExtensionsModal } = await import('../src/components/ExtensionsModal');
+    await React.act(async () => root.render(React.createElement(ExtensionsModal, { isOpen: true, onClose() {}, extensions: [] })));
+    await click(container.querySelector('[title="Load unpacked extension folder"]'));
+    assert.equal(extensionAlerts.length, 3, 'the extension modal must share the same unavailable-install feedback');
+    let installedFolders = 0;
+    (w as any).electronAPI.selectExtensionFolder = async () => ({ canceled: false, folderPath: '/tmp/example-addon' });
+    (w as any).electronAPI.installExtension = async () => { installedFolders++; return {}; };
+    await click(container.querySelector('[title="Load unpacked extension folder"]'));
+    assert.equal(extensionAlerts.length, 4, 'unconfirmed installation must be reported');
+    (w as any).electronAPI.installExtension = async () => { installedFolders++; return { success: true }; };
+    await click(container.querySelector('[title="Load unpacked extension folder"]'));
+    assert.equal(installedFolders, 2);
+    assert.equal(extensionAlerts.length, 4, 'confirmed installation must retain the success path');
+    (w as any).electronAPI.selectExtensionFolder = async () => ({ canceled: true });
+    await click(container.querySelector('[title="Load unpacked extension folder"]'));
+    assert.equal(installedFolders, 2, 'cancelled folder selection cannot invoke installation');
+    const { BrowserView } = await import('../src/components/BrowserView');
+    const { defaultSettings } = await import('../src/types/browser');
+    const { useWebviewNavigation } = await import('../src/hooks/useWebviewNavigation');
+    (w as any).electronAPI = undefined;
+    function PreviewNavigation() {
+      const controls = useWebviewNavigation({ activeTabId: 'preview' });
+      return React.createElement(React.Fragment, null,
+        React.createElement('button', { onClick: controls.handleReload }, 'Reload preview'),
+        React.createElement(BrowserView, { tab: base('preview'), isActive: true, isIncognito: false, settings: defaultSettings, onUpdateTab() {}, onCloseTab() {} }));
+    }
+    await React.act(async () => root.render(React.createElement(PreviewNavigation)));
+    const previewFrame = container.querySelector('iframe[data-tab-id="preview"]') as HTMLIFrameElement;
+    assert.ok(previewFrame);
+    const previewSource = previewFrame.src;
+    await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Reload preview')!);
+    assert.equal(previewFrame.src, previewSource, 'reload cannot leave the rendered preview on about:blank');
+    console.log('[PASS] Shared navigation reloads the actual preview iframe without a blank detour');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();

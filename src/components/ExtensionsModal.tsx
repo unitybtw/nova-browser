@@ -5,6 +5,7 @@ import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { showAlert } from '../utils/confirmDialog';
 import { useDialogA11y } from '../hooks/useDialogA11y';
+import { installUnpackedExtension } from '../services/extensionActions';
 
 interface ExtensionPermission {
   name: string;
@@ -19,6 +20,7 @@ interface ExtensionsModalProps {
   activeTab?: Tab | null;
   onToggleExtension?: (id: string) => void;
   onRemoveExtension?: (id: string) => void;
+  pendingExtensionIds?: ReadonlySet<string>;
   onManageExtensions?: () => void;
   onOpenUrl?: (url: string) => void;
   // Permission review dialog
@@ -170,6 +172,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   activeTab,
   onToggleExtension,
   onRemoveExtension,
+  pendingExtensionIds,
   onManageExtensions,
   onOpenUrl,
   pendingPermissionReview,
@@ -218,15 +221,7 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
 
   const handleLoadUnpacked = async () => {
     try {
-      if ((window as any).electronAPI?.selectExtensionFolder && (window as any).electronAPI?.installExtension) {
-        const result = await (window as any).electronAPI.selectExtensionFolder();
-        if (!result.canceled && result.folderPath) {
-          const installRes = await (window as any).electronAPI.installExtension(result.folderPath);
-          if (installRes.error) {
-            void showAlert({ title: 'Extensions', message: 'Extension load error: ' + installRes.error });
-          }
-        }
-      }
+      await installUnpackedExtension();
     } catch (err: any) {
       console.error('Failed to load unpacked extension:', err);
       void showAlert({ title: 'Extensions', message: err?.message || 'Failed to load extension.' });
@@ -326,6 +321,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                         )}
                         <button 
                           onClick={() => onToggleExtension?.(ext.id)}
+                          disabled={pendingExtensionIds?.has(ext.id)}
+                          aria-busy={pendingExtensionIds?.has(ext.id)}
                           className={`p-1.5 rounded-lg transition-colors cursor-pointer ${ext.enabled !== false ? 'text-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-500/20' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
                           title={ext.enabled !== false ? 'Disable' : 'Enable'}
                         >
@@ -333,6 +330,8 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
                         </button>
                         <button 
                           onClick={() => onRemoveExtension?.(ext.id)}
+                          disabled={pendingExtensionIds?.has(ext.id)}
+                          aria-busy={pendingExtensionIds?.has(ext.id)}
                           className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-500/20 transition-colors cursor-pointer"
                           title="Remove"
                         >

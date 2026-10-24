@@ -1,83 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Settings, Upload, ExternalLink, Puzzle, Play, Trash2 } from 'lucide-react';
-import { showConfirm, showAlert } from '../../utils/confirmDialog';
+import { showAlert } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
+import { useExtensions } from '../../hooks/useExtensions';
+import { installUnpackedExtension } from '../../services/extensionActions';
 
 export const ExtensionsSection: React.FC = () => {
-  const [extensions, setExtensions] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchExtensions = async () => {
-      if (getElectronAPI()?.listExtensions) {
-        setExtensions(await getElectronAPI()?.listExtensions() || []);
-      }
-    };
-    fetchExtensions();
-
-    let cleanupExt: (() => void) | void;
-    if (getElectronAPI()?.onExtensionChanged) {
-      cleanupExt = getElectronAPI()?.onExtensionChanged(async () => {
-        if (getElectronAPI()?.listExtensions) {
-          const list = await getElectronAPI()?.listExtensions();
-          setExtensions(list || []);
-        }
-      });
-    }
-    return () => {
-      if (typeof cleanupExt === 'function') cleanupExt();
-    };
-  }, []);
-
-  const handleToggleExtension = async (extId: string, currentEnabled: boolean) => {
-    try {
-      const nextState = !currentEnabled;
-      const api = getElectronAPI();
-      if (!api?.toggleExtension) throw new Error('Extension controls are unavailable in this window.');
-      const result = await api.toggleExtension(extId, nextState);
-      if (result?.error) throw new Error(result.error);
-      setExtensions(prev => prev.map(e => e.id === extId ? { ...e, enabled: nextState } : e));
-    } catch (e) {
-      console.error('Failed to toggle extension:', e);
-      void showAlert({ title: 'Extensions', message: e instanceof Error ? e.message : 'The extension could not be updated.' });
-    }
-  };
-
-  const handleRemoveExtension = async (ext: any) => {
-    const confirmed = await showConfirm({
-      title: 'Remove Extension',
-      message: `Are you sure you want to remove "${ext.name}"?`,
-      confirmLabel: 'Remove',
-      cancelLabel: 'Cancel'
-    });
-    if (confirmed) {
-      try {
-        const res = await getElectronAPI()?.removeExtension?.(ext.id);
-        if (res?.error) {
-          console.error('Failed to remove extension:', res.error);
-          void showAlert({ title: 'Extensions', message: res.error });
-          return;
-        }
-        setExtensions(prev => prev.filter(e => e.id !== ext.id));
-      } catch (e) {
-        console.error('Failed to remove extension:', e);
-      }
-    }
-  };
+  const { extensions, pendingExtensionIds, refreshExtensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
 
   const handleLoadUnpacked = async () => {
     try {
-      if (getElectronAPI()?.selectExtensionFolder && getElectronAPI()?.installExtension) {
-        const result = await getElectronAPI()?.selectExtensionFolder();
-        if (result && !result.canceled && result.folderPath) {
-          const installRes = await getElectronAPI()?.installExtension(result.folderPath);
-          if (installRes?.error) {
-            void showAlert({ title: 'Extensions', message: 'Failed to load extension: ' + installRes.error });
-          } else {
-            const list = await getElectronAPI()?.listExtensions();
-            setExtensions(list || []);
-          }
-        }
-      }
+      if (await installUnpackedExtension()) await refreshExtensions();
     } catch (e: any) {
       console.error(e);
       void showAlert({ title: 'Extensions', message: e?.message || 'Failed to load extension.' });
@@ -147,7 +80,7 @@ export const ExtensionsSection: React.FC = () => {
         ) : (
           <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 shadow-xs overflow-hidden">
             <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
-              {extensions.map((ext: any) => (
+              {extensions.map(ext => (
                 <div key={ext.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-xl flex items-center justify-center overflow-hidden shrink-0 border border-slate-200/50 dark:border-white/5">
@@ -188,7 +121,9 @@ export const ExtensionsSection: React.FC = () => {
                       role="switch"
                       aria-checked={ext.enabled !== false}
                       aria-label={ext.enabled !== false ? `Disable ${ext.name}` : `Enable ${ext.name}`}
-                      onClick={() => handleToggleExtension(ext.id, ext.enabled !== false)}
+                      disabled={pendingExtensionIds.has(ext.id)}
+                      aria-busy={pendingExtensionIds.has(ext.id)}
+                      onClick={() => handleToggleExtension(ext.id)}
                       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${ext.enabled !== false ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'}`}
                       title={ext.enabled !== false ? 'Disable Extension' : 'Enable Extension'}
                     >
@@ -198,6 +133,7 @@ export const ExtensionsSection: React.FC = () => {
                     {ext.popupUrl && (
                       <button
                         onClick={(e) => {
+                          if (!ext.popupUrl) return;
                           const rect = e.currentTarget.getBoundingClientRect();
                           const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
                           const url = `chrome-extension://${ext.id}/${cleanPopup}`;
@@ -215,6 +151,7 @@ export const ExtensionsSection: React.FC = () => {
                     {ext.optionsUrl && (
                       <button
                         onClick={() => {
+                          if (!ext.optionsUrl) return;
                           const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
                           // Routed through the main process, which checks that the
                           // extension is installed and confines the path. window.open
@@ -231,7 +168,9 @@ export const ExtensionsSection: React.FC = () => {
                       </button>
                     )}
                     <button
-                      onClick={() => handleRemoveExtension(ext)}
+                      disabled={pendingExtensionIds.has(ext.id)}
+                      aria-busy={pendingExtensionIds.has(ext.id)}
+                      onClick={() => handleRemoveExtension(ext.id)}
                       className="px-3 py-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 dark:text-red-400 border border-red-500/20 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
                       title={`Remove ${ext.name}`}
                     >

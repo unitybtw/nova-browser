@@ -387,7 +387,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const [isVpnPopoverOpen, setIsVpnPopoverOpen] = useState(false);
   const [splitRatio, setSplitRatio] = useState(50);
   // Extension listesi & operations: useExtensions'a taşındı.
-  const { extensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
+  const { extensions, pendingExtensionIds, handleToggleExtension, handleRemoveExtension } = useExtensions();
   const [findMatches, setFindMatches] = useState<{ index: number; count: number }>({ index: 0, count: 0 });
   const [isDragOverMain, setIsDragOverMain] = useState(false);
   const [splitDragSide, setSplitDragSide] = useState<'left' | 'right'>('right');
@@ -2047,6 +2047,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             activeTab={activeTab}
             onToggleExtension={handleToggleExtension}
             onRemoveExtension={handleRemoveExtension}
+            pendingExtensionIds={pendingExtensionIds}
             onManageExtensions={handleManageExtensions}
             onOpenUrl={handleNewTab}
           />

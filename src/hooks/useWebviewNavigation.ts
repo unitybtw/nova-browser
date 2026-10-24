@@ -6,49 +6,36 @@ export interface UseWebviewNavigationOptions {
 }
 
 export function useWebviewNavigation({ activeTabId }: UseWebviewNavigationOptions) {
-  const handleGoBack = useCallback(() => {
+  const navigateHistory = useCallback((direction: 'back' | 'forward') => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.canGoBack && webview.canGoBack()) {
-      webview.goBack();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe && iframe.contentWindow) {
-        try {
-          iframe.contentWindow.history.back();
-        } catch (err) {
-          logger.debug('App:Navigation', 'iframe history.back blocked or failed', err);
-        }
+    try {
+      if (webview) {
+        const canGo = direction === 'back' ? 'canGoBack' : 'canGoForward';
+        const go = direction === 'back' ? 'goBack' : 'goForward';
+        if (typeof webview[canGo] === 'function' && webview[canGo]()) webview[go]();
+        return;
       }
+      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
+      iframe?.contentWindow?.history[direction]();
+    } catch (err) {
+      logger.debug('App:Navigation', `History ${direction} blocked or failed`, err);
     }
   }, [activeTabId]);
 
-  const handleGoForward = useCallback(() => {
-    const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.canGoForward && webview.canGoForward()) {
-      webview.goForward();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe && iframe.contentWindow) {
-        try {
-          iframe.contentWindow.history.forward();
-        } catch (err) {
-          logger.debug('App:Navigation', 'iframe history.forward blocked or failed', err);
-        }
-      }
-    }
-  }, [activeTabId]);
+  const handleGoBack = useCallback(() => navigateHistory('back'), [navigateHistory]);
+  const handleGoForward = useCallback(() => navigateHistory('forward'), [navigateHistory]);
 
   const handleReload = useCallback(() => {
     const webview = document.querySelector(`webview[data-tab-id="${activeTabId}"]`) as any;
-    if (webview && webview.reload) {
-      webview.reload();
-    } else {
-      const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
-      if (iframe) {
-        const currentSrc = iframe.src;
-        iframe.src = 'about:blank';
-        setTimeout(() => { if (iframe) iframe.src = currentSrc; }, 50);
+    try {
+      if (webview && typeof webview.reload === 'function') {
+        webview.reload();
+      } else {
+        const iframe = document.querySelector(`iframe[data-tab-id="${activeTabId}"]`) as HTMLIFrameElement;
+        if (iframe) iframe.src = iframe.src;
       }
+    } catch (err) {
+      logger.debug('App:Navigation', 'Reload blocked or failed', err);
     }
   }, [activeTabId]);
 
