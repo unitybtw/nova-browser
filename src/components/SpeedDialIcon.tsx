@@ -160,10 +160,10 @@ export const SpeedDialIcon: React.FC<SpeedDialIconProps> = React.memo(({ name, u
     );
   }
 
-  // Fallback: Elegant Monogram / Globe Icon
+  // Fallback: Clean Monogram / Globe Icon
   const initialChar = (name || cleanDomain || 'W').charAt(0).toUpperCase();
   return (
-    <div className="w-full h-full flex items-center justify-center rounded-md bg-gradient-to-br from-cyan-500/20 to-blue-600/20 text-cyan-600 dark:text-cyan-300 font-bold text-sm">
+    <div className="w-full h-full flex items-center justify-center rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-semibold text-sm">
       {initialChar.match(/[A-Z0-9]/) ? (
         <span>{initialChar}</span>
       ) : (

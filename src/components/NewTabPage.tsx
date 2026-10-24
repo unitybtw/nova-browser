@@ -684,7 +684,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           className="w-full max-w-2xl flex flex-col items-center gap-10 z-10"
         >
           <motion.div variants={shouldAnimate ? itemVariants : undefined} className="flex flex-col items-center text-center">
-            <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-2xl shadow-black/50">
+            <div className="w-32 h-32 bg-slate-900 rounded-full flex items-center justify-center mb-8 border border-slate-800 shadow-sm">
               <VenetianMask className="w-16 h-16 text-slate-300" strokeWidth={1.5} />
             </div>
             <h1 className="text-4xl md:text-5xl font-light tracking-tight text-white mb-4">{t('newtab.incognitoTitle')}</h1>
@@ -703,7 +703,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('newtab.incognitoPlaceholder')}
-                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-2xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-xl backdrop-blur-xl"
+                className="w-full block pl-14 pr-12 py-4.5 bg-slate-900/50 border border-slate-800 rounded-xl text-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-700 focus:bg-slate-900 focus:border-slate-700 transition-colors duration-200 shadow-sm"
               />
               <button
                 type="submit"
@@ -720,7 +720,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={onExitIncognito}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-cyan-500/10 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 transition-colors duration-200 text-sm font-medium shadow-xs cursor-pointer"
               >
                 <Compass className="w-4 h-4 text-cyan-400" />
                 <span>{language === 'tr' ? 'Normal Sekmeye Geç' : 'Switch to Normal Tab'}</span>
@@ -756,15 +756,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
           />
           <div className="absolute inset-0 bg-black/25"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/45"></div>
-          {/* Subtle central backlight behind clock & search widget for enhanced contrast on vibrant wallpapers */}
-          <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[360px] bg-black/25 blur-3xl rounded-full pointer-events-none" />
 
-          {/* Daily 4K Wallpaper Credit & Shuffle Button */}
+          {/* Daily Wallpaper Credit & Shuffle Button */}
           {unsplashPhoto && (
-            <div className="nova-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/25 hover:bg-black/45 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.35)] transition-all duration-300 pointer-events-auto group select-none ring-1 ring-inset ring-white/[0.05]">
-              <span className="px-1.5 py-0.5 text-[9px] font-semibold tracking-wider uppercase font-mono bg-white/[0.08] group-hover:bg-white/[0.14] text-white/75 group-hover:text-white/95 rounded border border-white/10 transition-colors">
-                4K UHD
-              </span>
+            <div className="nova-newtab-glass absolute bottom-4 left-6 z-20 flex items-center gap-2.5 bg-black/35 hover:bg-black/50 px-3 py-1.5 rounded-full border border-white/10 hover:border-white/20 shadow-sm transition-colors duration-200 pointer-events-auto group select-none">
               <span className="text-[11px] font-medium text-white/85 group-hover:text-white max-w-[200px] truncate tracking-tight transition-colors">
                 {formattedWallpaperTitle}
               </span>
@@ -775,10 +770,10 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               <button
                 type="button"
                 onClick={shuffleWallpaper}
-                className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-90 transition-all duration-200 flex items-center justify-center focus:outline-none group/btn"
+                className="ml-0.5 p-1 -mr-0.5 rounded-full text-white/40 hover:text-white hover:bg-white/15 active:scale-95 transition-colors duration-200 flex items-center justify-center focus:outline-none group/btn"
                 title={t('newtab.shuffleWallpaper')}
               >
-                <Shuffle className="w-3 h-3 group-hover/btn:rotate-180 transition-transform duration-500 ease-out" />
+                <Shuffle className="w-3 h-3" />
               </button>
             </div>
           )}
@@ -803,10 +798,8 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
               style={{ backgroundImage: `url('${safeBgCssUrl}')` }}
             />
           )}
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]"></div>
+          <div className="absolute inset-0 bg-black/40"></div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-black/50"></div>
-          {/* Subtle central backlight behind clock & search widget */}
-          <div className="absolute top-[28%] left-1/2 -translate-x-1/2 -translate-y-1/2 w-[720px] h-[360px] bg-black/25 blur-3xl rounded-full pointer-events-none" />
         </div>
       )}
 
@@ -1116,7 +1109,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
                 transition={{ duration: 0.15, ease: 'easeOut' }}
-                className="absolute top-full left-0 right-0 mt-2 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 rounded-xl shadow-lg overflow-hidden z-50 py-1.5 divide-y divide-slate-100 dark:divide-white/5"
               >
                 {suggestions.map((s, idx) => (
                   <button
@@ -1379,7 +1372,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcut-modal-title"
-            className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
+            className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100 dark:border-white/10">
@@ -1421,9 +1414,6 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   {previewDomain || 'https://...'}
                 </div>
               </div>
-              <span className="text-[10px] font-medium tracking-wide uppercase px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-white/10 text-slate-600 dark:text-slate-300">
-                {language === 'tr' ? 'Önizleme' : 'Preview'}
-              </span>
             </div>
 
             {/* Form Inputs */}
