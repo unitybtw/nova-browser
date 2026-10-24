@@ -1,9 +1,8 @@
 import React from 'react';
 import { Settings, Upload, ExternalLink, Puzzle, Play, Trash2 } from 'lucide-react';
 import { showAlert } from '../../utils/confirmDialog';
-import { getElectronAPI } from '../../utils/electronBridge';
 import { useExtensions } from '../../hooks/useExtensions';
-import { installUnpackedExtension } from '../../services/extensionActions';
+import { installUnpackedExtension, launchExtensionPopup } from '../../services/extensionActions';
 
 export const ExtensionsSection: React.FC = () => {
   const { extensions, pendingExtensionIds, refreshExtensions, handleToggleExtension, handleRemoveExtension } = useExtensions();
@@ -137,9 +136,7 @@ export const ExtensionsSection: React.FC = () => {
                           const rect = e.currentTarget.getBoundingClientRect();
                           const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
                           const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                          if (getElectronAPI()?.openExtensionPopup) {
-                            getElectronAPI()?.openExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
-                          }
+                          void launchExtensionPopup(url, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
                         }}
                         className="px-2.5 py-1.5 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 text-xs font-medium transition-colors flex items-center gap-1 cursor-pointer"
                         title="Open Extension Popup"
@@ -156,7 +153,7 @@ export const ExtensionsSection: React.FC = () => {
                           // Routed through the main process, which checks that the
                           // extension is installed and confines the path. window.open
                           // would create an unmanaged BrowserWindow instead.
-                          (window as any).electronAPI?.openExtensionPopup?.(
+                          void launchExtensionPopup(
                             `chrome-extension://${ext.id}/${cleanOptions}`
                           );
                         }}

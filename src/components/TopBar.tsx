@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { launchExtensionPopup } from '../services/extensionActions';
 import { createPortal } from 'react-dom';
 import { DownloadsPopover } from './DownloadsPopover';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
@@ -1057,6 +1058,13 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
     };
   }, []);
   const activeTab = React.useMemo(() => tabs.find(t => t.id === activeTabId), [tabs, activeTabId]);
+  const handleOpenToolbarExtension = useCallback((ext: Extension, rect: DOMRect) => {
+    const page = ext.popupUrl || ext.optionsUrl;
+    if (!page) { onOpenExtensions(); return; }
+    void launchExtensionPopup(`chrome-extension://${ext.id}/${page.replace(/^\.?\//, '')}`,
+      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      activeTab ? { id: activeTab.id, url: activeTab.url, title: activeTab.title, favIconUrl: activeTab.favicon, webContentsId: activeTab.webContentsId, isIncognito: Boolean(isIncognito || activeTab.isIncognito) } : undefined);
+  }, [activeTab, isIncognito, onOpenExtensions]);
   const isBookmarked = React.useMemo(() => bookmarks.some(b => b.url === activeTab?.url), [bookmarks, activeTab?.url]);
 
   useEffect(() => {
@@ -1446,34 +1454,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               key={ext.id}
               className={`p-1 rounded-lg transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
               title={ext.name}
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                if (ext.popupUrl) {
-                  const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
-                  const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                  if (getElectronAPI()?.openExtensionPopup) {
-                    getElectronAPI()?.openExtensionPopup(
-                      url,
-                      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-                      {
-                        id: activeTab?.id,
-                        url: activeTab?.url,
-                        title: activeTab?.title,
-                        favIconUrl: activeTab?.favicon,
-                        webContentsId: activeTab?.webContentsId,
-                        isIncognito: Boolean(isIncognito || activeTab?.isIncognito)
-                      }
-                    );
-                  } else {
-                    onNewTab(url);
-                  }
-                } else if (ext.optionsUrl) {
-                  const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
-                  onNewTab(`chrome-extension://${ext.id}/${cleanOptions}`);
-                } else {
-                  onOpenExtensions();
-                }
-              }}
+              onClick={e => handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())}
             >
               {ext.iconData ? (
                 <img src={ext.iconData} alt={ext.name} className="w-4 h-4 rounded-xs object-contain" />
@@ -1551,32 +1532,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           {extensions && extensions.filter(ext => ext.enabled !== false && (ext.popupUrl || ext.optionsUrl)).slice(0, 5).map(ext => (
             <button
               key={ext.id}
-              onClick={(e) => {
-                if (ext.popupUrl) {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
-                  const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-                  if (getElectronAPI()?.openExtensionPopup) {
-                    getElectronAPI()?.openExtensionPopup(
-                      url,
-                      { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-                      activeTab ? {
-                        id: activeTab.id,
-                        url: activeTab.url,
-                        title: activeTab.title,
-                        favIconUrl: activeTab.favicon,
-                        webContentsId: activeTab.webContentsId,
-                        isIncognito: Boolean(isIncognito || activeTab.isIncognito)
-                      } : undefined
-                    );
-                  } else {
-                    onNavigate(url);
-                  }
-                } else if (ext.optionsUrl) {
-                  const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
-                  onNavigate(`chrome-extension://${ext.id}/${cleanOptions}`);
-                }
-              }}
+              onClick={e => handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())}
               className={`p-1.5 rounded-lg transition-colors flex items-center justify-center relative cursor-pointer ${
                 isIncognito
                   ? 'hover:bg-slate-700 text-slate-300'

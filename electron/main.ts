@@ -18,10 +18,10 @@ console.log('Main process starting...');
 const MAX_CRASH_LOG_BYTES = 1024 * 1024; // 1 MB cap to prevent disk exhaustion
 // Registered once at module scope on purpose: createWindow runs again on every
 // macOS activate, so an app-level listener added there would accumulate.
-// NOTE: render-process-gone fires on `app`, not on webContents.
+// App-level observation covers every renderer; only the host is reloaded here.
 app.on('render-process-gone', (_event, contents, details) => {
-  // render-process-gone fires on `app`, and it fires for an ORDINARY window
-  // teardown too, not just a crash. The update path destroys every window and
+  // Renderer termination can accompany an ordinary window teardown too, not
+  // just a crash. The update path destroys every window and
   // then quits, so a `clean-exit` arrives moments before the process is meant to
   // die; reloading there resurrected a window while the updater script was
   // replacing the bundle underneath it, which is how a finished update could
@@ -5945,6 +5945,18 @@ ipcMain.handle('list-extensions', async (event) => {
 });
 
 const incognitoAllowedExtensions = new Set<string>();
+const extensionPopupContexts = new Map<number, { extensionId: string; tabData: Record<string, unknown> }>();
+
+ipcMain.on('extension-popup-context', event => {
+  const context = extensionPopupContexts.get(event.sender.id);
+  if (!context || event.sender.isDestroyed() || event.sender !== activeExtensionPopupWin?.webContents ||
+      !event.senderFrame || event.senderFrame !== event.sender.mainFrame) { event.returnValue = null; return; }
+  try {
+    const url = new URL(event.senderFrame.url);
+    if (url.protocol !== 'chrome-extension:' || url.hostname !== context.extensionId || url.username || url.password || url.port) { event.returnValue = null; return; }
+    event.returnValue = context;
+  } catch { event.returnValue = null; }
+});
 
 export function isExtensionAllowedInIncognito(extensionId: string, manifest: any): boolean {
   if (!extensionId) return false;
@@ -5966,12 +5978,12 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   try {
     const parsedExtensionUrl = new URL(url);
     const extensionId = parsedExtensionUrl.hostname;
-    const isInstalled = loadedExtensions.some(extension => extension.id === extensionId) ||
-      Boolean(session.defaultSession.getExtension(extensionId));
-    if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !isInstalled ||
+    const extension = (session.defaultSession.extensions || session.defaultSession).getExtension(extensionId);
+    if (!/^[a-zA-Z0-9_-]+$/.test(extensionId) || !extension ||
         parsedExtensionUrl.username || parsedExtensionUrl.password || parsedExtensionUrl.port) {
-      return { error: 'Blocked: extension is not installed.' };
+      return { error: 'This extension is disabled or could not be loaded. Enable it from Extensions and try again.' };
     }
+    if (activeTabInfo?.isIncognito && !isExtensionAllowedInIncognito(extensionId, extension.manifest)) return { error: 'This extension is not enabled for private tabs.' };
   } catch {
     return { error: 'Invalid extension URL.' };
   }
@@ -5979,12 +5991,17 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   // Toggle behavior: if clicking the same extension popup while open, close it
   if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
     const isSameUrl = activeExtensionPopupUrl === url;
+    const source = extensionPopupContexts.get(activeExtensionPopupWin.webContents.id)?.tabData;
+    const sameSource = source ? source.id === activeTabInfo?.webContentsId &&
+      Boolean(source.incognito) === Boolean(activeTabInfo?.isIncognito) &&
+      (source.url === undefined || source.url === activeTabInfo?.url) : !activeTabInfo;
+    if (isSameUrl && sameSource && activeExtensionPopupWin.webContents.isLoading()) return { success: true };
     try {
       activeExtensionPopupWin.close();
     } catch (_) {}
     activeExtensionPopupWin = null;
     activeExtensionPopupUrl = null;
-    if (isSameUrl) {
+    if (isSameUrl && sameSource) {
       return { success: true, toggled: true };
     }
   }
@@ -6028,12 +6045,14 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,
+      preload: path.join(__dirname, 'extension-popup-preload.cjs'),
       session: session.defaultSession
     }
   });
 
   activeExtensionPopupWin = popupWin;
   activeExtensionPopupUrl = url;
+  const popupContentsId = popupWin.webContents.id;
 
   // URL.origin can be "null" for custom schemes, so bind the actual extension
   // host rather than comparing opaque origins shared by unrelated extensions.
@@ -6088,10 +6107,9 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
     return { action: 'deny' };
   });
 
-  // Inject active tab bridge into the extension popup
-  const injectActiveTabBridge = () => {
+  // Prepare context before loadURL so startup scripts can query their source tab.
+  const prepareActiveTabContext = () => {
     if (!activeTabInfo || !popupWin || popupWin.isDestroyed()) return;
-    if (!isPopupExtensionUrl(popupWin.webContents.getURL())) return;
 
     let extId = '';
     try {
@@ -6100,7 +6118,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       }
     } catch {}
 
-    const ext: any = (extId ? session.defaultSession.getExtension(extId) : null) ||
+    const ext: any = (extId ? (session.defaultSession.extensions || session.defaultSession).getExtension(extId) : null) ||
       loadedExtensions.find(e => e.id === extId);
 
     let manifest: any = ext?.manifest;
@@ -6115,11 +6133,9 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
 
     const effectiveId = extId || ext?.id || '';
     const perms: string[] = Array.isArray(manifest?.permissions) ? manifest.permissions : [];
-    const optPerms: string[] = Array.isArray(manifest?.optional_permissions) ? manifest.optional_permissions : [];
     const hostPerms: string[] = Array.isArray(manifest?.host_permissions) ? manifest.host_permissions : [];
-    const allPerms = [...perms, ...optPerms];
 
-    const hasTabsPermission = allPerms.includes('tabs') || allPerms.includes('activeTab');
+    const hasTabsPermission = perms.includes('tabs') || perms.includes('activeTab');
     const activeUrl = typeof activeTabInfo.url === 'string' ? activeTabInfo.url : '';
     const hasHostPermission = matchesExtensionHostPermission([...hostPerms, ...perms], activeUrl);
     const hasTabAccess = hasTabsPermission || hasHostPermission;
@@ -6148,44 +6164,23 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
       tabData.favIconUrl = typeof activeTabInfo.favIconUrl === 'string' ? activeTabInfo.favIconUrl : '';
     }
 
-    const bridgeCode = `
-      (function() {
-        try {
-          window.chrome = window.chrome || {};
-          window.chrome.tabs = window.chrome.tabs || {};
-          const realTab = ${JSON.stringify(tabData)};
-          const origQuery = window.chrome.tabs.query;
-          window.chrome.tabs.query = function(q, cb) {
-            if (typeof cb === 'function') {
-              if (!q || q.active || q.currentWindow || q.lastFocusedWindow) {
-                cb([realTab]);
-              } else if (origQuery) {
-                origQuery.call(window.chrome.tabs, q, function(res) {
-                  cb(res && res.length > 0 ? res : [realTab]);
-                });
-              } else {
-                cb([realTab]);
-              }
-            } else {
-              return Promise.resolve([realTab]);
-            }
-          };
-          window.chrome.tabs.get = function(id, cb) {
-            if (typeof cb === 'function') cb(realTab);
-            else return Promise.resolve(realTab);
-          };
-          window.chrome.tabs.getCurrent = function(cb) {
-            if (typeof cb === 'function') cb(realTab);
-            else return Promise.resolve(realTab);
-          };
-        } catch(e) {}
-      })();
-    `;
-
-    if (!popupWin.isDestroyed() && !popupWin.webContents.isDestroyed()) {
-      popupWin.webContents.executeJavaScript(bridgeCode).catch(() => {});
-    }
+    extensionPopupContexts.set(popupWin.webContents.id, { extensionId: popupExtensionId, tabData });
   };
+  prepareActiveTabContext();
+  let popupLoaded = false;
+  let closedDuringLoad = false;
+  popupWin.on('close', () => { if (!popupLoaded) closedDuringLoad = true; });
+  popupWin.webContents.on('render-process-gone', (_event, details) => {
+    if (details.reason === 'clean-exit' || popupWin.isDestroyed()) return;
+    popupWin.destroy();
+    if (popupLoaded && !win.isDestroyed()) {
+      void dialog.showMessageBox(win, {
+        type: 'error', title: 'Extension stopped', buttons: ['Close'],
+        message: 'The extension window stopped unexpectedly.',
+        detail: 'Try opening the extension again. If it keeps failing, disable it from Extensions.'
+      }).catch(error => console.error('[Extensions] Could not show popup failure:', error));
+    }
+  });
 
   // Graceful show & blur handling: only allow blur-close after popup is stably shown
   let canCloseOnBlur = false;
@@ -6200,7 +6195,6 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   };
 
   popupWin.webContents.on('dom-ready', async () => {
-    injectActiveTabBridge();
     showPopup();
 
     // Auto-fit popup dimensions to content
@@ -6234,6 +6228,7 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   });
 
   popupWin.on('closed', () => {
+    extensionPopupContexts.delete(popupContentsId);
     if (activeExtensionPopupWin === popupWin) {
       activeExtensionPopupWin = null;
       activeExtensionPopupUrl = null;
@@ -6254,12 +6249,14 @@ ipcMain.handle('open-extension-popup', async (event, url: unknown, bounds?: { x?
   try {
     if (!popupWin.isDestroyed()) {
       await popupWin.loadURL(url);
+      popupLoaded = true;
       showPopup();
       return { success: true };
     }
     return { error: 'Popup window was destroyed before load' };
   } catch (err: any) {
-    if (!popupWin.isDestroyed()) popupWin.close();
+    if (closedDuringLoad) return { success: true, toggled: true };
+    if (!popupWin.isDestroyed()) popupWin.destroy();
     return { error: 'Failed to load extension popup: ' + err.message };
   }
 });

@@ -5,7 +5,7 @@ import { Extension, Tab } from '../types/browser';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { showAlert } from '../utils/confirmDialog';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { installUnpackedExtension } from '../services/extensionActions';
+import { installUnpackedExtension, launchExtensionPopup } from '../services/extensionActions';
 
 interface ExtensionPermission {
   name: string;
@@ -182,41 +182,14 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
   useDialogA11y({ isOpen, onClose, containerRef });
   useModalFocusTrap(isOpen, onClose, containerRef);
 
-  const handleLaunchExtension = (ext: Extension, e?: React.MouseEvent) => {
-    if (ext.popupUrl) {
-      const cleanPopup = ext.popupUrl.replace(/^\.?\//, '');
-      const url = `chrome-extension://${ext.id}/${cleanPopup}`;
-      if ((window as any).electronAPI?.openExtensionPopup) {
-        let bounds: any = undefined;
-        if (e) {
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-          bounds = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-        }
-        (window as any).electronAPI.openExtensionPopup(
-          url, 
-          bounds,
-          activeTab ? {
-            id: activeTab.id,
-            url: activeTab.url,
-            title: activeTab.title,
-            favIconUrl: activeTab.favicon,
-            webContentsId: activeTab.webContentsId,
-            isIncognito: Boolean(activeTab.isIncognito)
-          } : undefined
-        );
-        onClose();
-      } else if (onOpenUrl) {
-        onOpenUrl(url);
-        onClose();
-      }
-    } else if (ext.optionsUrl) {
-      const cleanOptions = ext.optionsUrl.replace(/^\.?\//, '');
-      const url = `chrome-extension://${ext.id}/${cleanOptions}`;
-      if (onOpenUrl) {
-        onOpenUrl(url);
-        onClose();
-      }
-    }
+  const handleLaunchExtension = async (ext: Extension, e?: React.MouseEvent) => {
+    const page = ext.popupUrl || ext.optionsUrl;
+    if (!page || ext.enabled === false) return;
+    const url = `chrome-extension://${ext.id}/${page.replace(/^\.?\//, '')}`;
+    const rect = e?.currentTarget.getBoundingClientRect();
+    const opened = await launchExtensionPopup(url, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : undefined,
+      activeTab ? { id: activeTab.id, url: activeTab.url, title: activeTab.title, favIconUrl: activeTab.favicon, webContentsId: activeTab.webContentsId, isIncognito: Boolean(activeTab.isIncognito) } : undefined);
+    if (opened) onClose();
   };
 
   const handleLoadUnpacked = async () => {

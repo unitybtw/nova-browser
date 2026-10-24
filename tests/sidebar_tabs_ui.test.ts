@@ -305,6 +305,16 @@ async function main() {
     (w as any).electronAPI.selectExtensionFolder = async () => ({ canceled: true });
     await click(container.querySelector('[title="Load unpacked extension folder"]'));
     assert.equal(installedFolders, 2, 'cancelled folder selection cannot invoke installation');
+    let modalClosed = 0;
+    (w as any).electronAPI.openExtensionPopup = async () => ({ error: 'Unsupported extension API' });
+    const launchProps = { isOpen: true, onClose() { modalClosed++; }, extensions: [{ id: 'addon', name: 'Example addon', enabled: true, popupUrl: 'popup.html' }] };
+    await React.act(async () => root.render(React.createElement(ExtensionsModal, launchProps)));
+    await click(container.querySelector('[title="Open Popup"]'));
+    assert.equal(modalClosed, 0, 'an unsuccessful popup launch must keep extension management open');
+    assert.ok(extensionAlerts.some(message => message.includes('Unsupported extension API')), 'popup launch errors must be visible');
+    (w as any).electronAPI.openExtensionPopup = async () => ({ success: true });
+    await click(container.querySelector('[title="Open Popup"]'));
+    assert.equal(modalClosed, 1);
     const { BrowserView } = await import('../src/components/BrowserView');
     const { defaultSettings } = await import('../src/types/browser');
     const { useWebviewNavigation } = await import('../src/hooks/useWebviewNavigation');
