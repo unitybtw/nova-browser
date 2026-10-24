@@ -202,7 +202,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
           className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]"
         >
           <div
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
             onClick={onClose}
           />
 
@@ -212,17 +212,17 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: -10 }}
             transition={{ type: 'spring', stiffness: 500, damping: 32 }}
-            className={`relative w-full max-w-2xl backdrop-blur-2xl rounded-2xl shadow-2xl border overflow-hidden outline-none transition-colors duration-300 ${
+            className={`relative w-full max-w-2xl rounded-xl shadow-xl border overflow-hidden outline-none transition-colors duration-200 ${
               isAIMode
-                ? 'bg-purple-950/95 border-purple-500/30 shadow-[0_0_40px_rgba(168,85,247,0.25)]'
-                : 'bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-white/10'
+                ? 'bg-slate-900 border-cyan-500/40'
+                : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-white/10'
             }`}
             tabIndex={-1}
           >
             <form onSubmit={handleSubmit} className={`flex items-center gap-3 px-5 py-4 border-b transition-colors ${
-              isAIMode ? 'border-purple-800/40 bg-purple-900/20' : 'border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30'
+              isAIMode ? 'border-cyan-500/20 bg-cyan-950/20' : 'border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-slate-800/30'
             }`}>
-              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-purple-400' : 'text-slate-400 dark:text-slate-500'}`} />
+              <Search className={`w-5 h-5 transition-colors ${isAIMode ? 'text-cyan-400' : 'text-slate-400 dark:text-slate-500'}`} />
               <input
                 ref={inputRef}
                 type="text"
@@ -247,9 +247,9 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
                   }
                 }}
                 placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
-                className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-all duration-300 ${
+                className={`flex-1 bg-transparent border-none outline-none text-base font-sans transition-colors duration-200 ${
                   isAIMode
-                    ? 'text-purple-100 placeholder-purple-400/80'
+                    ? 'text-cyan-100 placeholder-cyan-400/70'
                     : 'text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500'
                 }`}
                 autoFocus

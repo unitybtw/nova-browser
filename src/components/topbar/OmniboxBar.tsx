@@ -307,7 +307,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   }, [searchValue, searchEngine, onNavigate, isAIMode, selectedIndex, suggestions, matchedBookmarks]);
 
   return (
-    <div className="flex-1 flex w-full mx-1 duration-200 ease-out" style={{ transform: isFocused ? 'scale(1.005)' : 'scale(1)' }}>
+    <div className="flex-1 flex w-full mx-1">
       <div className="w-full relative">
         <form
           onSubmit={handleSearchSubmit}
@@ -393,7 +393,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               }`}
               title="Site Permissions (Click to toggle)"
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
               <span className="text-[11px] font-semibold whitespace-nowrap">Permissions</span>
             </div>
           )}
@@ -455,7 +455,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               isIncognito
                 ? 'bg-slate-900/80 hover:bg-slate-900 focus:bg-slate-900 text-slate-200 placeholder-slate-500'
                 : 'bg-slate-100/90 hover:bg-slate-200/60 focus:bg-white text-slate-800 placeholder-slate-400 dark:bg-slate-900/70 dark:hover:bg-slate-900 dark:focus:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500'
-            } ${isAIMode ? 'border-cyan-400/50 ring-4 ring-cyan-500/20 bg-cyan-950/30 text-cyan-100 shadow-[0_0_20px_rgba(6,182,212,0.3)]' : ''} ${
+            } ${isAIMode ? 'border-cyan-500 ring-2 ring-cyan-500/15 bg-cyan-950/20 text-cyan-100' : ''} ${
               (useVerticalTabs && !isFocused && !isAIMode) ? '!text-transparent !placeholder-transparent' : ''
             }`}
           />
@@ -566,7 +566,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -8, scale: 0.98 }}
                 transition={{ duration: 0.18, ease: 'easeOut' }}
-                className={`absolute left-0 right-0 top-full mt-2 rounded-2xl shadow-2xl py-2 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white/95 backdrop-blur-xl border border-slate-200/80 divide-slate-100 dark:bg-slate-900/95 dark:border-white/10 dark:divide-white/5'}`}
+                className={`absolute left-0 right-0 top-full mt-2 rounded-xl shadow-xl py-1.5 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-900 dark:border-white/10 dark:divide-white/5'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >
 

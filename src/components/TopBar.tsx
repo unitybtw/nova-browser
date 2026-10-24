@@ -32,7 +32,6 @@ import {
   ZoomOut,
   Settings,
   Camera,
-  Sparkles,
   Puzzle,
   ShieldCheck,
   Cpu,
@@ -1491,7 +1490,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
             >
               <Download className={`w-4 h-4 ${(activeDownloadsCount || 0) > 0 ? 'text-cyan-500' : ''}`} />
               {(activeDownloadsCount || 0) > 0 && (
-                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs animate-pulse">
+                <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center shadow-xs">
                   {activeDownloadsCount}
                 </span>
               )}
@@ -1525,7 +1524,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               {ext.iconData ? (
                 <img src={ext.iconData} alt={ext.name} className="w-4 h-4 object-contain rounded-xs" />
               ) : (
-                <div className="w-4 h-4 rounded-xs bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] font-bold uppercase">
+                <div className="w-4 h-4 rounded-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 flex items-center justify-center text-[10px] font-semibold uppercase">
                   {ext.name ? ext.name.charAt(0) : 'E'}
                 </div>
               )}
@@ -1536,7 +1535,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           <button
             onClick={onOpenExtensions}
             className={`p-1.5 rounded-lg transition-colors ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
-            title="Extensions (Beta)"
+            title="Extensions"
           >
             <Puzzle className="w-4 h-4" />
           </button>
@@ -1555,7 +1554,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               title={syncStatus.isLoggedIn ? `Nova Account (${syncStatus.user?.displayName || syncStatus.user?.email})` : 'Sign In to Nova Sync'}
             >
               {syncStatus.isLoggedIn && syncStatus.user ? (
-                <div className="w-5 h-5 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-[10px] flex items-center justify-center shadow-xs uppercase">
+                <div className="w-5 h-5 rounded-full bg-cyan-600 text-white font-semibold text-[10px] flex items-center justify-center shadow-xs uppercase">
                   {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
                 </div>
               ) : (
@@ -1590,27 +1589,27 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -4, scale: 0.96 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-1.5 w-72 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
+                    className="absolute right-0 top-full mt-1.5 w-72 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 z-50 flex flex-col p-1.5 divide-y divide-slate-100 dark:divide-white/5"
                   >
                     {/* Nova Account Header inside menu */}
                     {onOpenAccount && (
                       <div className="p-1">
                         <button
                           onClick={() => { onOpenAccount(); setIsMoreMenuOpen(false); }}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/15 hover:to-blue-500/15 text-slate-800 dark:text-slate-100 rounded-xl transition-colors text-left"
+                          className="w-full flex items-center justify-between px-3 py-2 bg-slate-100/80 dark:bg-slate-800/70 hover:bg-slate-200/70 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-lg transition-colors text-left"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
                             {syncStatus.isLoggedIn && syncStatus.user ? (
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 uppercase">
+                              <div className="w-6 h-6 rounded-full bg-cyan-600 text-white font-semibold text-xs flex items-center justify-center shrink-0 uppercase">
                                 {syncStatus.user.displayName ? syncStatus.user.displayName.charAt(0) : 'U'}
                               </div>
                             ) : (
-                              <div className="p-1 rounded-lg bg-cyan-500/20 text-cyan-600 dark:text-cyan-400">
+                              <div className="p-1 rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
                                 <Cloud className="w-4 h-4" />
                               </div>
                             )}
                             <div className="min-w-0">
-                              <span className="text-xs font-bold block truncate">
+                              <span className="text-xs font-semibold block truncate">
                                 {syncStatus.isLoggedIn ? (syncStatus.syncCode || 'Nova Sync') : 'Nova Sync'}
                               </span>
                               <span className="text-[10px] text-slate-400 truncate block">
@@ -1621,7 +1620,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                           {syncStatus.isLoggedIn ? (
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                           ) : (
-                            <span className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full shrink-0">Sync</span>
+                            <span className="text-[10px] font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md shrink-0">Sync</span>
                           )}
                         </button>
                       </div>
@@ -1666,8 +1665,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                           <span>MCP AI Tools Server</span>
                         </div>
                         {mcpRunning ? (
-                          <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          <span className="text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                             ONLINE
                           </span>
                         ) : (
