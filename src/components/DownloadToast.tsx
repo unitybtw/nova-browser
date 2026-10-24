@@ -124,7 +124,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
           animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
           exit={{ opacity: 0, y: 50, scale: 0.9 }}
           transition={{ type: 'spring', damping: 26, stiffness: 420 }}
-          className="fixed bottom-6 right-6 z-[9999] bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 p-3.5 w-90 flex items-start gap-3 group"
+          className="fixed bottom-6 right-6 z-[9999] bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 p-3.5 w-90 flex items-start gap-3 group"
         >
           <div className="w-10 h-10 shrink-0 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-white/10 flex items-center justify-center mt-0.5 shadow-xs">
             {isCompleted ? (
@@ -164,7 +164,7 @@ export const DownloadToast: React.FC<DownloadToastProps> = React.memo(({ activeD
                 <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-200 ${
-                      activeToast.isPaused ? 'bg-amber-500' : 'bg-gradient-to-r from-cyan-500 to-blue-500 shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+                      activeToast.isPaused ? 'bg-amber-500' : 'bg-cyan-500'
                     }`}
                     style={{ width: `${Math.max(4, progress)}%` }}
                   />

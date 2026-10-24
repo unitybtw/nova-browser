@@ -60,7 +60,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
           transition={{ duration: 0.14, ease: 'easeOut' }}
-          className="absolute top-full right-0 mt-2.5 w-80 rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 select-none overflow-hidden z-[99999]"
+          className="absolute top-full right-0 mt-2.5 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/15 shadow-xl select-none overflow-hidden z-[99999]"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200/80 dark:border-white/10 bg-slate-50/80 dark:bg-white/5">
@@ -162,10 +162,10 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
                 onClick={async () => {
                   await onTranslate(selectedTargetLang, currentSourceLang);
                 }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-white text-xs font-semibold shadow-md shadow-cyan-500/20 transition-all cursor-pointer ${
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer ${
                   isLoading
                     ? 'bg-cyan-600/70'
-                    : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-[0.98]'
+                    : 'bg-cyan-600 hover:bg-cyan-500'
                 }`}
               >
                 {isLoading ? (

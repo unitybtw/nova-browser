@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Type, Sun, Moon, ArrowLeft, ShieldAlert, Play, Pause, Square,
-  Trash2, Clock, BookOpen, Volume2, Globe, Sparkles, SkipBack, SkipForward,
+  Trash2, Clock, BookOpen, Volume2, Globe, SkipBack, SkipForward,
   Check, ChevronDown
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
@@ -1046,7 +1046,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                       {/* Native / System Voice Picker */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-cyan-400" /> Voice
+                          <Volume2 className="w-3 h-3 text-cyan-400" /> Voice
                         </span>
                         <select
                           value={selectedVoiceName}
@@ -1118,7 +1118,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                     {wordCount.toLocaleString()} words
                   </span>
                   <span className="flex items-center gap-1 text-cyan-400 font-medium">
-                    <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
                     {isMac ? (effectiveLanguage.startsWith('tr') ? 'macOS Yelda Natural Voice' : 'macOS Samantha Natural Voice') : 'Natural Human Voice'}
                   </span>
                 </div>

@@ -1337,8 +1337,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
                 opacity: { duration: 0.15, delay: 0.05 }
               }
             }}
-            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%', boxShadow: '0 0 10px rgba(59, 130, 246, 0.8)' }}
-            className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-500 z-50 shadow-md"
+            style={{ willChange: 'transform, opacity', transformOrigin: '0% 50%' }}
+            className="absolute top-0 left-0 right-0 h-[2px] bg-cyan-500 z-50"
           />
         )}
       </AnimatePresence>
@@ -1418,7 +1418,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
               </div>
 
               {/* Web Demo Notice Banner */}
-              <div className="bg-gradient-to-r from-blue-950/40 to-indigo-950/30 border border-blue-500/30 rounded-lg p-3.5 text-xs leading-relaxed text-blue-200/90">
+              <div className="bg-blue-950/30 border border-blue-500/30 rounded-lg p-3.5 text-xs leading-relaxed text-blue-200/90">
                 <span className="font-semibold text-blue-400">Interactive Marketing Demo: </span>
                 Third-party platforms like GitHub enforce <code className="bg-black/40 px-1 py-0.5 rounded text-indigo-300 font-mono text-[11px]">X-Frame-Options: DENY</code> in web browsers. In the desktop Nova app, all websites render natively with Chromium with no iframe restrictions.
               </div>

@@ -14,8 +14,7 @@ import {
   X, 
   Check, 
   Info,
-  Layers,
-  Sparkles
+  Layers
 } from 'lucide-react';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
 
@@ -117,7 +116,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.96 }}
           transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="absolute top-11 left-2 z-[99999] w-80 bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-4 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default"
+          className="absolute top-11 left-2 z-[99999] w-80 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 rounded-xl shadow-xl p-4 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default"
         >
         {/* Header */}
         <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100 dark:border-white/10">
@@ -129,7 +128,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
               'bg-amber-500/10 text-amber-500'
             }`}>
               {isDangerous ? <ShieldAlert className="w-4 h-4" /> :
-               isInternal ? <Sparkles className="w-4 h-4" /> :
+               isInternal ? <ShieldCheck className="w-4 h-4" /> :
                isSecure ? <Lock className="w-4 h-4" /> :
                <Unlock className="w-4 h-4" />}
             </div>

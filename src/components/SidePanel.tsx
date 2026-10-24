@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Sparkles,
   X,
   Copy,
   Check,
@@ -168,7 +167,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
           <span>You</span>
         ) : (
           <div className="flex items-center gap-1.5 text-cyan-600 dark:text-cyan-400 font-semibold">
-            <Sparkles className="w-3 h-3" />
+            <NovaAssistantIcon size={12} active />
             <span>Nova Assistant</span>
           </div>
         )}
@@ -926,7 +925,7 @@ export const SidePanel = React.memo(({
         {isLoading && (
           <div className="flex flex-col gap-1.5 w-full items-start">
             <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
-              <Sparkles className="w-3 h-3 animate-pulse" />
+              <NovaAssistantIcon size={12} active />
               <span>Nova Assistant</span>
               {streamStartTime && (
                 <span className="text-[10px] font-mono text-slate-400">
@@ -965,7 +964,7 @@ export const SidePanel = React.memo(({
       </div>
 
       {/* 3. MODERN SPRING PHYSICS PROMPT INPUT */}
-      <footer className="p-3 pt-1.5 bg-gradient-to-t from-slate-100/95 via-slate-100/80 to-transparent dark:from-slate-950/95 dark:via-slate-950/80 dark:to-transparent backdrop-blur-md flex justify-center">
+      <footer className="p-3 pt-1.5 bg-slate-100 dark:bg-slate-950 border-t border-slate-200/70 dark:border-white/[0.06] flex justify-center">
         <PromptInput
           fullWidth
           className="w-full"

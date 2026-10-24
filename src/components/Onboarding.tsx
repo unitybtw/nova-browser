@@ -188,9 +188,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.6 }}
         onClick={goNext}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-2xl text-base transition-all  no-drag cursor-pointer"
+        className="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold px-10 py-3.5 rounded-xl text-base transition-colors no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         Let&apos;s Get Started
@@ -199,7 +197,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
 
     // Step 1 — Import Data
     <motion.div key="import" className="flex flex-col items-center justify-center h-full text-center px-8 relative">
-      <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 shadow-2xl text-cyan-400">
+      <div className="w-20 h-20 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center mb-6 shadow-sm text-cyan-400">
         <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
         </svg>
@@ -290,10 +288,10 @@ export function Onboarding({ onComplete }: OnboardingProps) {
           <button
             key={engine.id}
             onClick={() => setSearchEngine(engine.id)}
-            className={`flex items-center gap-4 p-3.5 rounded-2xl border text-left transition-all backdrop-blur-xl no-drag cursor-pointer ${
+            className={`flex items-center gap-4 p-3.5 rounded-xl border text-left transition-colors no-drag cursor-pointer ${
               searchEngine === engine.id
-                ? 'border-cyan-500 bg-cyan-500/15  scale-[1.02]'
-                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10 hover:shadow-md'
+                ? 'border-cyan-500 bg-cyan-500/15'
+                : 'border-white/10 bg-white/5 hover:border-white/30 hover:bg-white/10'
             }`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
@@ -366,9 +364,9 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="w-24 h-24 rounded-3xl bg-cyan-500/15 flex items-center justify-center mb-6  text-slate-950"
+        className="w-20 h-20 rounded-2xl bg-cyan-500/15 border border-cyan-500/20 flex items-center justify-center mb-6 text-cyan-400"
       >
-        <svg className="w-12 h-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+        <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
         </svg>
       </motion.div>
@@ -405,9 +403,7 @@ export function Onboarding({ onComplete }: OnboardingProps) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.7 }}
         onClick={handleFinish}
-        whileHover={{ scale: 1.05, boxShadow: "0px 0px 25px rgba(6, 182, 212, 0.4)" }}
-        whileTap={{ scale: 0.95 }}
-        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-2xl font-bold text-base transition-all  no-drag cursor-pointer"
+        className="flex items-center gap-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 px-10 py-3.5 rounded-xl font-bold text-base transition-colors no-drag cursor-pointer"
         style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
       >
         <span>Start Browsing</span>

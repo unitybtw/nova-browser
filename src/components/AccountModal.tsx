@@ -13,7 +13,6 @@ import {
   Clock,
   Settings,
   FolderTree,
-  Sparkles,
   Link2,
   Copy,
   Laptop,
@@ -183,7 +182,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md select-none"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs select-none"
           onClick={onClose}
         >
           <motion.div
@@ -194,20 +193,20 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ type: 'spring', stiffness: 500, damping: 30 }}
-            className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
+            className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
           >
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50/80 dark:bg-slate-800/40 backdrop-blur-md">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50/80 dark:bg-slate-800/40">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-sm shadow-cyan-500/20">
+                <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <Cloud className="w-5 h-5" />
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                     Nova Sync
                     {syncStatus.isLoggedIn && (
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                        ● Active
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Active
                       </span>
                     )}
                   </h2>
@@ -246,13 +245,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <div className="space-y-5">
                   {/* Sync Code Card - hidden until the pairing join flow exists */}
                   {NovaSyncService.PAIRING_AVAILABLE && (
-                  <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500/5 to-blue-500/5 border border-cyan-500/20 space-y-2.5">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-white/10 space-y-2.5">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                         <Link2 className="w-4 h-4 text-cyan-500" />
                         Your Device Sync Code
                       </span>
-                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
                         Encrypted Sync
                       </span>
                     </div>
@@ -386,14 +385,14 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   </form>
 
                   {/* Option 2: Generate Code on this device */}
-                  <div className="p-5 rounded-2xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-3.5">
+                  <div className="p-5 rounded-xl bg-slate-50/80 dark:bg-white/[0.02] border border-slate-200/80 dark:border-white/5 space-y-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                        <Sparkles className="w-4 h-4" />
+                        <Key className="w-4 h-4" />
                       </div>
                       <div>
                         <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">This is my primary device</h3>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Generate a 1-click sync code to pair other laptops or desktops:</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Generate a pairing code to link other laptops or desktops:</p>
                       </div>
                     </div>
 
@@ -422,7 +421,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         disabled={isLoading}
                         className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
+                        <Key className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
                         <span>Generate Sync Code</span>
                       </button>
                     )}
