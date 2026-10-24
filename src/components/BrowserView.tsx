@@ -295,6 +295,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     return isSafeNavigationUrl(u) ? u : 'about:blank';
   };
   const lastLoadedUrl = useRef<string>(tab?.url || '');
+  const initialWebviewSrcRef = useRef<string>('');
   const isWebviewReady = useRef<boolean>(false);
   if (tab?.isSuspended) {
     lastLoadedUrl.current = '';
@@ -430,6 +431,14 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     () => !(isNewTab || isSettingsTab || isHistoryTab || isDownloadsTab || isChangelogTab),
     [isNewTab, isSettingsTab, isHistoryTab, isDownloadsTab, isChangelogTab]
   );
+
+  if (!rendersWebview || tab?.isSuspended) {
+    initialWebviewSrcRef.current = '';
+    lastLoadedUrl.current = '';
+  } else if (!initialWebviewSrcRef.current) {
+    initialWebviewSrcRef.current = getSafeUrl(tab?.url);
+    lastLoadedUrl.current = tab?.url || '';
+  }
 
   const latestTabRef = useRef(tab);
   // Latest-settings ref: the main webview effect intentionally does NOT depend
@@ -1354,7 +1363,7 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             ref={webviewRef}
             data-tab-id={tab.id}
             partition={isIncognito && tab?.id ? `incognito-${tab.id}` : undefined}
-            src={getSafeUrl(tab.url)}
+            src={initialWebviewSrcRef.current || getSafeUrl(tab.url)}
             className="w-full h-full flex-1 border-none bg-white absolute inset-0"
             webpreferences="contextIsolation=yes, nodeIntegration=no, webSecurity=yes, sandbox=yes"
           />

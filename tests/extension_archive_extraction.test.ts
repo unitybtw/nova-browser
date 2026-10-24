@@ -14,7 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import JSZip from 'jszip';
-import { loadSafeCrxZip, extractSafeCrxZip } from '../electron/main/crxInstaller';
+import { loadSafeCrxZip, extractSafeCrxZip, extractCrxPublicKey, computeExtensionIdFromPublicKey } from '../electron/main/crxInstaller';
 
 console.log('\n--- Extension Archive Extraction (real loadSafeCrxZip) ---');
 
@@ -383,6 +383,36 @@ async function main() {
     assert.deepEqual(fs.readdirSync(target), [], `CRX3 ${label} must write nothing`);
   }
   console.log(`[PASS] [CRX3-Header] all ${malformedCrx3.length} malformed CRX3 headers refused, nothing written`);
+
+  // --- CRX2 / CRX3 Public Key Extraction & Store ID Verification -----------
+  {
+    const fakeKey = Buffer.alloc(64, 0x5a);
+    const fakeKeyB64 = fakeKey.toString('base64');
+    const expectedExtId = computeExtensionIdFromPublicKey(fakeKeyB64)!;
+    assert.ok(/^[a-p]{32}$/.test(expectedExtId), 'computed extension ID must be 32 chars in a-p');
+
+    // CRX2 public key extraction
+    const crx2Header = Buffer.alloc(16);
+    crx2Header.write('Cr24', 0, 'ascii');
+    crx2Header.writeUInt32LE(2, 4);
+    crx2Header.writeUInt32LE(fakeKey.length, 8);
+    crx2Header.writeUInt32LE(16, 12);
+    const crx2WithKey = Buffer.concat([crx2Header, fakeKey, Buffer.alloc(16, 0x22), containerZip]);
+    assert.equal(extractCrxPublicKey(crx2WithKey, expectedExtId), fakeKeyB64);
+    assert.equal(extractCrxPublicKey(crx2WithKey, 'a'.repeat(32)), null);
+
+    // CRX3 protobuf AsymmetricKeyProof (field 2, wire type 2 -> tag 0x12; inner field 1, wire type 2 -> tag 0x0a)
+    const innerProof = Buffer.concat([Buffer.from([0x0a, fakeKey.length]), fakeKey]);
+    const crx3ProtoHeader = Buffer.concat([Buffer.from([0x12, innerProof.length]), innerProof]);
+    const crx3Fixed = Buffer.alloc(12);
+    crx3Fixed.write('Cr24', 0, 'ascii');
+    crx3Fixed.writeUInt32LE(3, 4);
+    crx3Fixed.writeUInt32LE(crx3ProtoHeader.length, 8);
+    const crx3WithKey = Buffer.concat([crx3Fixed, crx3ProtoHeader, containerZip]);
+    assert.equal(extractCrxPublicKey(crx3WithKey, expectedExtId), fakeKeyB64);
+    assert.equal(extractCrxPublicKey(crx3WithKey, 'b'.repeat(32)), null);
+    console.log('[PASS] [CRX-PublicKey] CRX2 and CRX3 public key extraction and store ID verification passed');
+  }
 
   fs.rmSync(tmpRoot, { recursive: true, force: true });
   console.log('--- Extension Archive Extraction: all checks passed ---\n');

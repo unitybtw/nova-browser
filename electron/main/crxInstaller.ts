@@ -470,6 +470,108 @@ export function computeExtensionIdFromPublicKey(keyBase64: string): string | nul
   }
 }
 
+function readProtobufVarint(buf: Buffer, offset: number): { value: number; nextOffset: number } | null {
+  let val = 0;
+  let shift = 0;
+  while (offset < buf.length) {
+    const b = buf[offset++];
+    val |= (b & 0x7f) << shift;
+    if ((b & 0x80) === 0) return { value: val >>> 0, nextOffset: offset };
+    shift += 7;
+    if (shift > 28) return null;
+  }
+  return null;
+}
+
+/**
+ * Extracts the base64-encoded DER public key from a CRX2 or CRX3 binary header
+ * whose derived Chromium extension ID matches `expectedExtId`.
+ *
+ * Chrome Web Store CRX packages frequently omit `"key"` from the inner
+ * `manifest.json` because the public key is carried in the CRX container
+ * header (`AsymmetricKeyProof.public_key`). Chromium's native unpacker writes
+ * that key into the extracted `manifest.json` so unpacked extension loading
+ * derives the canonical store ID instead of a path-based ID.
+ */
+export function extractCrxPublicKey(buffer: Buffer, expectedExtId?: string): string | null {
+  try {
+    if (buffer.length < MIN_CRX_HEADER_BYTES) return null;
+    if (!(buffer[0] === 0x43 && buffer[1] === 0x72 && buffer[2] === 0x32 && buffer[3] === 0x34)) return null;
+    const version = buffer.readUInt32LE(4);
+    if (version === 2) {
+      const pubKeyLen = buffer.readUInt32LE(8);
+      if (pubKeyLen <= 0 || pubKeyLen > MAX_CRX2_KEY_BYTES || CRX2_HEADER_BYTES + pubKeyLen > buffer.length) {
+        return null;
+      }
+      const b64 = buffer.subarray(CRX2_HEADER_BYTES, CRX2_HEADER_BYTES + pubKeyLen).toString('base64');
+      if (!expectedExtId || computeExtensionIdFromPublicKey(b64) === expectedExtId) {
+        return b64;
+      }
+      return null;
+    }
+    if (version === 3) {
+      const headerSize = buffer.readUInt32LE(8);
+      if (headerSize <= 0 || headerSize > MAX_CRX3_HEADER_BYTES || CRX3_HEADER_BYTES + headerSize > buffer.length) {
+        return null;
+      }
+      const header = buffer.subarray(CRX3_HEADER_BYTES, CRX3_HEADER_BYTES + headerSize);
+      let offset = 0;
+      while (offset < header.length) {
+        const tagVar = readProtobufVarint(header, offset);
+        if (!tagVar) break;
+        offset = tagVar.nextOffset;
+        const wireType = tagVar.value & 0x07;
+        const fieldNo = tagVar.value >>> 3;
+        if (wireType === 2) {
+          const lenVar = readProtobufVarint(header, offset);
+          if (!lenVar || lenVar.value < 0 || lenVar.nextOffset + lenVar.value > header.length) break;
+          const payload = header.subarray(lenVar.nextOffset, lenVar.nextOffset + lenVar.value);
+          offset = lenVar.nextOffset + lenVar.value;
+          // CrxFileHeader: field 2 = sha256_with_rsa, field 3 = sha256_with_ecdsa (AsymmetricKeyProof)
+          if (fieldNo === 2 || fieldNo === 3) {
+            let subOff = 0;
+            while (subOff < payload.length) {
+              const subTag = readProtobufVarint(payload, subOff);
+              if (!subTag) break;
+              subOff = subTag.nextOffset;
+              const subWire = subTag.value & 0x07;
+              const subField = subTag.value >>> 3;
+              if (subWire === 2) {
+                const subLen = readProtobufVarint(payload, subOff);
+                if (!subLen || subLen.value < 0 || subLen.nextOffset + subLen.value > payload.length) break;
+                const subBytes = payload.subarray(subLen.nextOffset, subLen.nextOffset + subLen.value);
+                subOff = subLen.nextOffset + subLen.value;
+                // AsymmetricKeyProof: field 1 = public_key
+                if (subField === 1 && subBytes.length > 0) {
+                  const b64 = subBytes.toString('base64');
+                  if (!expectedExtId || computeExtensionIdFromPublicKey(b64) === expectedExtId) {
+                    return b64;
+                  }
+                }
+              } else if (subWire === 0) {
+                const v = readProtobufVarint(payload, subOff);
+                if (!v) break;
+                subOff = v.nextOffset;
+              } else {
+                break;
+              }
+            }
+          }
+        } else if (wireType === 0) {
+          const v = readProtobufVarint(header, offset);
+          if (!v) break;
+          offset = v.nextOffset;
+        } else {
+          break;
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function installFromWebstore(deps: CrxInstallerDeps, event: Electron.IpcMainInvokeEvent, urlOrId: string) {
   const { isTrustedSender, getMainWindow } = deps;
 
@@ -679,6 +781,12 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
           if (computedId && computedId !== extensionId) {
             throw new Error(`The extension's manifest key resolves to ${computedId}, which does not match store ID ${extensionId}.`);
           }
+        } else {
+          const headerKey = extractCrxPublicKey(buffer, extensionId);
+          if (headerKey && rawManifest && typeof rawManifest === 'object') {
+            (rawManifest as any).key = headerKey;
+            fs.writeFileSync(manifestPath, JSON.stringify(rawManifest, null, 2), 'utf8');
+          }
         }
       } catch (manifestErr: any) {
         if (manifestErr?.message?.startsWith("The extension's manifest key") ||
@@ -753,8 +861,9 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     // If extension is already loaded in defaultSession, unload it first to prevent Windows file-locking (EBUSY/EPERM) and duplicate loading crashes
     try {
-      if (session.defaultSession.getExtension(extensionId)) {
-        await session.defaultSession.removeExtension(extensionId);
+      const extApi = (session.defaultSession as any).extensions || session.defaultSession;
+      if (extApi.getExtension(extensionId)) {
+        await extApi.removeExtension(extensionId);
       }
     } catch (_) {}
 
@@ -772,7 +881,8 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
 
     let extInfo;
     try {
-      extInfo = await session.defaultSession.loadExtension(extractPath, { allowFileAccess: false });
+      const extApi = (session.defaultSession as any).extensions || session.defaultSession;
+      extInfo = await extApi.loadExtension(extractPath, { allowFileAccess: false });
 
       // Bind the requested id to the extension Chromium actually loaded.
       // Chromium derives an unpacked extension's runtime id from its public key
@@ -786,7 +896,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       // This is the same fail-closed assertion toggle-extension already makes.
       if (extInfo?.id && extInfo.id !== extensionId) {
         const actualId = extInfo.id;
-        try { await session.defaultSession.removeExtension(actualId); } catch (_) {}
+        try { await extApi.removeExtension(actualId); } catch (_) {}
         try { fs.rmSync(extractPath, { recursive: true, force: true }); } catch (_) {}
         if (crxFilePath && fs.existsSync(crxFilePath)) {
           try { fs.unlinkSync(crxFilePath); } catch (_) {}

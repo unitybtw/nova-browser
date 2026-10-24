@@ -153,6 +153,16 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      ignored: [
+        '**/graphify-out/**',
+        '**/dist/**',
+        '**/dist-electron/**',
+        '**/dist-test/**',
+        '**/video/**',
+        '**/website/**'
+      ]
+    },
     headers: {
       'Cross-Origin-Opener-Policy': 'same-origin',
       'Cross-Origin-Embedder-Policy': 'credentialless'

@@ -3409,7 +3409,7 @@ app.on('web-contents-created', (_event, contents) => {
         const isAllowedExtension = parsed.protocol === 'chrome-extension:' &&
           /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) &&
           (loadedExtensions.some(ext => ext.id === parsed.hostname) ||
-            Boolean(session.defaultSession.getExtension(parsed.hostname)));
+            Boolean(((session.defaultSession as any).extensions || session.defaultSession).getExtension(parsed.hostname)));
 
         if ((!allowedProtocols.includes(parsed.protocol) && !isAllowedAboutBlank && !isAllowedExtension) ||
             parsed.username || parsed.password) {
@@ -3460,7 +3460,7 @@ app.on('web-contents-created', (_event, contents) => {
       const parsed = new URL(url);
       const isHttp = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !parsed.username && !parsed.password;
       const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
-      const isInstalledExtension = isExtension && (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(session.defaultSession.getExtension(parsed.hostname)));
+      const isInstalledExtension = isExtension && (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(((session.defaultSession as any).extensions || session.defaultSession).getExtension(parsed.hostname)));
       if (isHttp || isInstalledExtension) {
         openTabFromWebContents(url, contents);
       }
@@ -3770,123 +3770,154 @@ ipcMain.handle('set-app-language', async (event, lang: unknown) => {
 });
 
 // Daily 4K Ultra HD Wallpaper Engine (Bing 4K UHD Archive + 4K Desktop Masterpieces)
+const WALLPAPER_CACHE_TTL_MS = 15 * 60 * 1000;
+let cachedWallpaperPhotos: { timestamp: number; photos: any[] } | null = null;
+let inFlightWallpaperFetch: Promise<any[]> | null = null;
+
 ipcMain.handle('fetch-wallpaper-photos', async (event) => {
   if (!isTrustedSender(event)) return [];
-  const results: any[] = [];
-  const seenIds = new Set<string>();
+  if (cachedWallpaperPhotos && Date.now() - cachedWallpaperPhotos.timestamp < WALLPAPER_CACHE_TTL_MS && cachedWallpaperPhotos.photos.length > 0) {
+    return cachedWallpaperPhotos.photos;
+  }
+  if (inFlightWallpaperFetch) {
+    return inFlightWallpaperFetch;
+  }
 
-  const isSafeHttpUrl = (u: any): boolean => {
-    if (typeof u !== 'string' || !u.trim() || /["'\r\n\\]/.test(u)) return false;
-    try {
-      const p = new URL(u);
-      return p.protocol === 'https:';
-    } catch {
-      return false;
+  const runFetch = (async () => {
+    const results: any[] = [];
+    const seenIds = new Set<string>();
+
+    const isSafeHttpUrl = (u: any): boolean => {
+      if (typeof u !== 'string' || !u.trim() || /["'\r\n\\]/.test(u)) return false;
+      try {
+        const p = new URL(u);
+        return p.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    };
+
+    const addPhoto = (photo: any) => {
+      if (!photo || !photo.id || !isSafeHttpUrl(photo.imageUrl) || seenIds.has(photo.id)) return;
+      seenIds.add(photo.id);
+      results.push(photo);
+    };
+
+    // Run all providers concurrently to eliminate sequential network latency
+    await Promise.allSettled([
+      // Bing Batch 1 (Today + recent days)
+      (async () => {
+        try {
+          const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
+            signal: AbortSignal.timeout(8000)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.images && Array.isArray(data.images)) {
+              for (const img of data.images) {
+                const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+                addPhoto({
+                  id: `bing-${img.hsh || img.startdate}`,
+                  title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                  author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                  authorUrl: 'https://bing.com',
+                  imageUrl: uhdUrl,
+                  thumbnailUrl: `https://www.bing.com${img.url}`,
+                  source: 'Bing 4K UHD Daily',
+                  resolution: '3840x2160',
+                  date: img.startdate
+                });
+              }
+            }
+          }
+        } catch (e: any) {
+          if (e?.name !== 'AbortError' && e?.name !== 'TimeoutError') {
+            console.warn('Bing batch 0 fetch error:', e?.message || e);
+          }
+        }
+      })(),
+
+      // Bing Batch 2 (Previous week)
+      (async () => {
+        try {
+          const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=7&n=8&mkt=en-US', {
+            signal: AbortSignal.timeout(8000)
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.images && Array.isArray(data.images)) {
+              for (const img of data.images) {
+                const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
+                addPhoto({
+                  id: `bing-${img.hsh || img.startdate}`,
+                  title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
+                  author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
+                  authorUrl: 'https://bing.com',
+                  imageUrl: uhdUrl,
+                  thumbnailUrl: `https://www.bing.com${img.url}`,
+                  source: 'Bing 4K UHD Daily',
+                  resolution: '3840x2160',
+                  date: img.startdate
+                });
+              }
+            }
+          }
+        } catch (e: any) {
+          if (e?.name !== 'AbortError' && e?.name !== 'TimeoutError') {
+            console.warn('Bing batch 7 fetch error:', e?.message || e);
+          }
+        }
+      })(),
+
+      // Wallhaven Curated 4K Widescreen
+      (async () => {
+        try {
+          const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
+          const res = await fetch(whUrl, {
+            headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
+            signal: AbortSignal.timeout(6000)
+          });
+          if (res.ok) {
+            const whData = await res.json();
+            if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
+              for (const item of whData.data.slice(0, 15)) {
+                if (!isSafeHttpUrl(item.path)) continue;
+                const categoryLabel = item.category ? (item.category.charAt(0).toUpperCase() + item.category.slice(1)) : 'Curated';
+                addPhoto({
+                  id: `wh-${item.id}`,
+                  title: `${categoryLabel} Artwork`,
+                  author: 'Wallhaven',
+                  authorUrl: isSafeHttpUrl(item.url) ? item.url : 'https://wallhaven.cc',
+                  imageUrl: item.path,
+                  thumbnailUrl: isSafeHttpUrl(item.thumbs?.large) ? item.thumbs.large : (isSafeHttpUrl(item.thumbs?.small) ? item.thumbs.small : item.path),
+                  source: '4K Ultra HD',
+                  resolution: item.resolution || '3840x2160'
+                });
+              }
+            }
+          }
+        } catch (err: any) {
+          if (err?.name !== 'AbortError' && err?.name !== 'TimeoutError') {
+            console.warn('Wallhaven toplist fetch error:', err?.message || err);
+          }
+        }
+      })()
+    ]);
+
+    if (results.length > 0) {
+      cachedWallpaperPhotos = { timestamp: Date.now(), photos: results };
+    }
+    return results;
+  })();
+
+  inFlightWallpaperFetch = runFetch;
+  const clearInFlight = () => {
+    if (inFlightWallpaperFetch === runFetch) {
+      inFlightWallpaperFetch = null;
     }
   };
-
-  const addPhoto = (photo: any) => {
-    if (!photo || !photo.id || !isSafeHttpUrl(photo.imageUrl) || seenIds.has(photo.id)) return;
-    seenIds.add(photo.id);
-    results.push(photo);
-  };
-
-  // Run all providers concurrently to eliminate sequential network latency
-  await Promise.allSettled([
-    // Bing Batch 1 (Today + recent days)
-    (async () => {
-      try {
-        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US', {
-          signal: AbortSignal.timeout(8000)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.images && Array.isArray(data.images)) {
-            for (const img of data.images) {
-              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-              addPhoto({
-                id: `bing-${img.hsh || img.startdate}`,
-                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
-                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
-                authorUrl: 'https://bing.com',
-                imageUrl: uhdUrl,
-                thumbnailUrl: `https://www.bing.com${img.url}`,
-                source: 'Bing 4K UHD Daily',
-                resolution: '3840x2160',
-                date: img.startdate
-              });
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Bing batch 0 fetch error:', e);
-      }
-    })(),
-
-    // Bing Batch 2 (Previous week)
-    (async () => {
-      try {
-        const res = await fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=7&n=8&mkt=en-US', {
-          signal: AbortSignal.timeout(8000)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.images && Array.isArray(data.images)) {
-            for (const img of data.images) {
-              const uhdUrl = img.urlbase ? `https://www.bing.com${img.urlbase}_UHD.jpg` : `https://www.bing.com${img.url}`;
-              addPhoto({
-                id: `bing-${img.hsh || img.startdate}`,
-                title: String(img.title || 'Bing Daily 4K Wallpaper').slice(0, 150),
-                author: String(img.copyright || 'Microsoft Bing Daily').slice(0, 100),
-                authorUrl: 'https://bing.com',
-                imageUrl: uhdUrl,
-                thumbnailUrl: `https://www.bing.com${img.url}`,
-                source: 'Bing 4K UHD Daily',
-                resolution: '3840x2160',
-                date: img.startdate
-              });
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Bing batch 7 fetch error:', e);
-      }
-    })(),
-
-    // Wallhaven Curated 4K Widescreen
-    (async () => {
-      try {
-        const whUrl = 'https://wallhaven.cc/api/v1/search?sorting=toplist&topRange=1M&ratios=16x9,16x10,21x9&atleast=3840x2160&purity=100';
-        const res = await fetch(whUrl, {
-          headers: { 'User-Agent': getStandardUserAgent(), 'Accept': 'application/json' },
-          signal: AbortSignal.timeout(8000)
-        });
-        if (res.ok) {
-          const whData = await res.json();
-          if (whData.data && Array.isArray(whData.data) && whData.data.length > 0) {
-            for (const item of whData.data.slice(0, 15)) {
-              if (!isSafeHttpUrl(item.path)) continue;
-              const categoryLabel = item.category ? (item.category.charAt(0).toUpperCase() + item.category.slice(1)) : 'Curated';
-              addPhoto({
-                id: `wh-${item.id}`,
-                title: `${categoryLabel} Artwork`,
-                author: 'Wallhaven',
-                authorUrl: isSafeHttpUrl(item.url) ? item.url : 'https://wallhaven.cc',
-                imageUrl: item.path,
-                thumbnailUrl: isSafeHttpUrl(item.thumbs?.large) ? item.thumbs.large : (isSafeHttpUrl(item.thumbs?.small) ? item.thumbs.small : item.path),
-                source: '4K Ultra HD',
-                resolution: item.resolution || '3840x2160'
-              });
-            }
-          }
-        }
-      } catch (err) {
-        console.warn('Wallhaven toplist fetch error:', err);
-      }
-    })()
-  ]);
-
-  return results;
+  runFetch.then(clearInFlight, clearInFlight);
+  return runFetch;
 });
 
 // Legacy alias for compatibility
@@ -5608,11 +5639,12 @@ async function loadPersistentExtensions(): Promise<void> {
         rememberDisabled(id, realPath, manifest);
         return;
       }
-      const existing = session.defaultSession.getExtension(id);
-      const extInfo = existing || await session.defaultSession.loadExtension(realPath, { allowFileAccess: false });
+      const extApi = (session.defaultSession as any).extensions || session.defaultSession;
+      const existing = extApi.getExtension(id);
+      const extInfo = existing || await extApi.loadExtension(realPath, { allowFileAccess: false });
       if (extInfo?.id && extInfo.id !== id) {
         console.warn(`[Extensions] Extension ID mismatch on restore: expected ${id}, got ${extInfo.id}`);
-        try { await session.defaultSession.removeExtension(extInfo.id); } catch (_) {}
+        try { await extApi.removeExtension(extInfo.id); } catch (_) {}
         return;
       }
       loadedExtensions.push(extInfo);
@@ -5758,7 +5790,8 @@ ipcMain.handle('install-extension', async (event, folderPath: string) => {
 
   try {
     const targetSession = session.defaultSession;
-    const extInfo = await targetSession.loadExtension(realFolder, { allowFileAccess: false });
+    const extApi = (targetSession as any).extensions || targetSession;
+    const extInfo = await extApi.loadExtension(realFolder, { allowFileAccess: false });
 
     const disabledIds = getDisabledExtensionIds();
     if (disabledIds.includes(extInfo.id)) {
@@ -5808,15 +5841,16 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
     : (unpackedPath && fs.existsSync(unpackedPath) ? unpackedPath : extPath);
 
   try {
+    const extApi = (session.defaultSession as any).extensions || session.defaultSession;
     if (enabled) {
       if (!fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
         return { error: 'Extension files are missing. Remove and install the extension again.' };
       }
-      const existing = session.defaultSession.getExtension(extensionId);
-      const extInfo = existing || await session.defaultSession.loadExtension(targetExtPath, { allowFileAccess: false });
+      const existing = extApi.getExtension(extensionId);
+      const extInfo = existing || await extApi.loadExtension(targetExtPath, { allowFileAccess: false });
       if (extInfo.id !== extensionId) {
         if (!existing) {
-          try { session.defaultSession.removeExtension(extInfo.id); } catch (_) {}
+          try { extApi.removeExtension(extInfo.id); } catch (_) {}
         }
         return { error: 'Extension identity changed. Remove and install the extension again.' };
       }
@@ -5827,12 +5861,12 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
       setDisabledExtensionIds(getDisabledExtensionIds().filter(id => id !== extensionId));
       loadedExtensions = [...loadedExtensions.filter(e => e.id !== extensionId), extInfo];
     } else {
-      const extensionInfo = foundExt || session.defaultSession.getExtension(extensionId);
+      const extensionInfo = foundExt || extApi.getExtension(extensionId);
       if (!extensionInfo && !fs.existsSync(path.join(targetExtPath, 'manifest.json'))) {
         return { error: 'Extension files are missing. Remove and install the extension again.' };
       }
-      if (session.defaultSession.getExtension(extensionId)) {
-        await session.defaultSession.removeExtension(extensionId);
+      if (extApi.getExtension(extensionId)) {
+        await extApi.removeExtension(extensionId);
       }
       // Same reason as the enable branch: this branch awaits removeExtension(),
       // so the list must be re-read after the await, not before it.
@@ -6448,13 +6482,15 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
 
     // 2. Remove from Electron runtime sessions (both default and window sessions)
     try {
-      await session.defaultSession.removeExtension(extensionId);
+      const extApi = (session.defaultSession as any).extensions || session.defaultSession;
+      await extApi.removeExtension(extensionId);
     } catch (_) {}
 
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.isDestroyed() && win.webContents?.session && win.webContents.session !== session.defaultSession) {
         try {
-          await win.webContents.session.removeExtension(extensionId);
+          const winExtApi = (win.webContents.session as any).extensions || win.webContents.session;
+          await winExtApi.removeExtension(extensionId);
         } catch (_) {}
       }
     }
