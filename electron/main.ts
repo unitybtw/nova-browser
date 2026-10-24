@@ -520,6 +520,35 @@ function hardenIncognitoPartition(partitionName: string): boolean {
 // Initialize AdBlocker in a dedicated function called after app.whenReady()
 // to prevent race conditions and invalid path resolution from top-level app.getPath('userData').
 function initAdBlocker() {
+  try {
+    const userSettingsPath = path.join(app.getPath('userData'), 'store_user_settings.json');
+    if (fs.existsSync(userSettingsPath)) {
+      const raw = fs.readFileSync(userSettingsPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      const settings = typeof parsed === 'string' ? JSON.parse(parsed) : parsed;
+      if (settings && typeof settings === 'object') {
+        if (typeof settings.privacyShield === 'boolean') {
+          isPrivacyShieldEnabled = settings.privacyShield;
+        }
+        if (typeof settings.doNotTrack === 'boolean') {
+          isDoNotTrackEnabled = settings.doNotTrack;
+        }
+      }
+    }
+  } catch (_) {}
+
+  try {
+    const whitelistPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
+    let wl: string[] = [];
+    if (fs.existsSync(whitelistPath)) {
+      const parsed = JSON.parse(fs.readFileSync(whitelistPath, 'utf-8'));
+      if (Array.isArray(parsed)) wl = parsed;
+    }
+    updateAdblockWhitelist(wl);
+  } catch (_) {
+    updateAdblockWhitelist([]);
+  }
+
   initAdBlockerEngine({
     userDataPath: app.getPath('userData'),
     isPrivacyShieldEnabled: () => isPrivacyShieldEnabled,
@@ -536,18 +565,6 @@ function initAdBlocker() {
       const batch = Object.fromEntries(pendingAdBlocks);
       mainWindow.webContents.send('ad-blocked-batch', batch);
       pendingAdBlocks.clear();
-    }
-  }).then(() => {
-    try {
-      const settingsPath = path.join(app.getPath('userData'), 'store_adblocker_whitelist.json');
-      let wl: string[] = [];
-      if (fs.existsSync(settingsPath)) {
-        const parsed = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-        if (Array.isArray(parsed)) wl = parsed;
-      }
-      updateAdblockWhitelist(wl);
-    } catch(e) {
-      updateAdblockWhitelist([]);
     }
   }).catch((e: unknown) => console.error('Failed to initialize adblocker:', e));
 }
@@ -689,13 +706,16 @@ function createWindow() {
 
   // Apply AdBlocker to sessions (default and incognito)
   const blocker = getBlocker();
+  const clearPrivacyHeaderFlag = (sess: Electron.Session) => {
+    sessionsWithPrivacyHeaders.delete(sess);
+  };
   if (isPrivacyShieldEnabled && blocker) {
-    applyAdBlockerToSession(session.defaultSession, true);
-    applyAdBlockerToSession(session.fromPartition('incognito'), true);
+    applyAdBlockerToSession(session.defaultSession, true, clearPrivacyHeaderFlag);
+    applyAdBlockerToSession(session.fromPartition('incognito'), true, clearPrivacyHeaderFlag);
     try { if (!blocker.isBlockingEnabled(session.fromPartition('incognito'))) blocker.enableBlockingInSession(session.fromPartition('incognito')); } catch(e) {}
   } else if (blocker) {
-    applyAdBlockerToSession(session.defaultSession, false);
-    applyAdBlockerToSession(session.fromPartition('incognito'), false);
+    applyAdBlockerToSession(session.defaultSession, false, clearPrivacyHeaderFlag);
+    applyAdBlockerToSession(session.fromPartition('incognito'), false, clearPrivacyHeaderFlag);
   }
 
   currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
