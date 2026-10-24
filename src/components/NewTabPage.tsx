@@ -113,9 +113,12 @@ export const Clock: React.FC<ClockProps> = React.memo(({
   return (
     <motion.div
       variants={variants}
-      className={`nova-clock flex flex-col items-center justify-center text-center mb-2 select-none relative ${hasWallpaper ? "nova-wallpaper-surface rounded-2xl px-10 py-6" : ""}`}
+      className="nova-clock flex flex-col items-center justify-center text-center mb-2 select-none"
     >
-      <p className={`mb-3 text-sm ${useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500'}`}>
+      <p
+        className={`mb-3 text-sm ${useDarkCanvasStyle ? 'text-white/75' : 'text-slate-500'}`}
+        style={hasWallpaper ? { textShadow: '0 1px 6px rgba(0, 0, 0, 0.4)' } : undefined}
+      >
         {dateStr}
       </p>
 

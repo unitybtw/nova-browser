@@ -442,7 +442,6 @@ button:active:not(:disabled) {
    does not mutate the element that captures the backdrop. */
 .nova-wallpaper-surface,
 .nova-newtab-glass,
-.nova-newtab-clean .nova-clock,
 .nova-newtab-clean .nova-shortcut {
   isolation: isolate;
 }
@@ -454,7 +453,6 @@ button:active:not(:disabled) {
 }
 .nova-wallpaper-surface::before,
 .nova-newtab-glass::before,
-.nova-newtab-clean .nova-clock::before,
 .nova-newtab-clean .nova-shortcut::before {
   content: "";
   position: absolute;
@@ -500,17 +498,12 @@ button:active:not(:disabled) {
   --nova-clean-tint: rgb(255 255 255 / 0.06);
   --nova-clean-border: rgb(255 255 255 / 0.14);
 }
-.nova-newtab-clean .nova-clock,
 .nova-newtab-clean .nova-shortcut,
 .nova-newtab-clean .nova-newtab-glass {
   position: relative;
   --nova-glass-tint: var(--nova-clean-tint);
   background-color: transparent;
   border: 1px solid var(--nova-clean-border);
-}
-.nova-newtab-clean .nova-clock {
-  padding: 24px 40px;
-  border-radius: 16px;
 }
 .nova-newtab-clean .nova-newtab-glass input {
   background-color: transparent;
