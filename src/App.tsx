@@ -848,6 +848,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Screenshot capture operations (extracted to useScreenshots)
   const {
     screenshotDataUrl,
+    screenshotPageTitle,
     handleTakeScreenshot,
     handleCaptureFullPage,
   } = useScreenshots({
@@ -2071,7 +2072,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             isOpen={isScreenshotOpen}
             onClose={handleCloseScreenshot}
             imageDataUrl={screenshotDataUrl}
-            pageTitle={activeTab?.title || ''}
+            pageTitle={screenshotPageTitle}
             onCaptureFullPage={handleCaptureFullPage}
           />
         )}

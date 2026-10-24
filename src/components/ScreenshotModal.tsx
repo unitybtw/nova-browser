@@ -19,27 +19,36 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
   onCaptureFullPage
 }) => {
   const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [isCapturingFull, setIsCapturingFull] = useState(false);
   const [currentImage, setCurrentImage] = useState<string | null>(initialImageDataUrl);
   const [captureMode, setCaptureMode] = useState<'visible' | 'full'>('visible');
   const containerRef = useRef<HTMLDivElement>(null);
   const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const previewVersionRef = useRef(0);
+  const clipboardVersionRef = useRef(0);
 
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      previewVersionRef.current++;
+      clipboardVersionRef.current++;
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     };
   }, []);
 
   useEffect(() => {
+    previewVersionRef.current++;
+    clipboardVersionRef.current++;
+    setIsCapturingFull(false);
+    setCopied(false);
+    setActionError(null);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
     if (isOpen) {
       setCurrentImage(initialImageDataUrl);
       setCaptureMode('visible');
-      setCopyError(null);
     }
   }, [isOpen, initialImageDataUrl]);
 
@@ -57,7 +66,8 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
 
   const handleCopy = async () => {
     if (!currentImage) return;
-    setCopyError(null);
+    const version = clipboardVersionRef.current;
+    setActionError(null);
     try {
       const base64Data = currentImage.split(',')[1];
       const byteCharacters = atob(base64Data);
@@ -75,36 +85,47 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
       await navigator.clipboard.write([
         new ClipboardItem({ [blob.type]: blob })
       ]);
-      if (!isMountedRef.current) return;
+      if (!isMountedRef.current || version !== clipboardVersionRef.current) return;
       setCopied(true);
       if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
       copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error('Failed to copy screenshot to clipboard:', err);
-      if (isMountedRef.current) {
-        setCopyError('Clipboard unavailable — use "Save PNG" instead.');
+      if (isMountedRef.current && version === clipboardVersionRef.current) {
+        setActionError('Clipboard unavailable — use "Save PNG" instead.');
       }
     }
   };
 
   const handleToggleMode = async (mode: 'visible' | 'full') => {
     if (mode === captureMode || isCapturingFull) return;
+    clipboardVersionRef.current++;
+    setCopied(false);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
 
     if (mode === 'full' && onCaptureFullPage) {
+      const version = previewVersionRef.current;
       setIsCapturingFull(true);
+      setActionError(null);
       // Every control below is gated on isCapturingFull, so a rejected capture
       // that skipped the reset left the whole dialog disabled until it was
       // closed and reopened. The finally is what guarantees the flag clears.
       try {
         const fullPageDataUrl = await onCaptureFullPage();
-        if (fullPageDataUrl && isMountedRef.current) {
+        if (!isMountedRef.current || version !== previewVersionRef.current) return;
+        if (fullPageDataUrl) {
           setCurrentImage(fullPageDataUrl);
           setCaptureMode('full');
+        } else {
+          setActionError('Full-page capture failed. Please try again.');
         }
       } catch (err) {
         console.error('Full page capture failed:', err);
+        if (isMountedRef.current && version === previewVersionRef.current) {
+          setActionError('Full-page capture failed. Please try again.');
+        }
       } finally {
-        if (isMountedRef.current) setIsCapturingFull(false);
+        if (isMountedRef.current && version === previewVersionRef.current) setIsCapturingFull(false);
       }
     } else if (mode === 'visible') {
       setCurrentImage(initialImageDataUrl);
@@ -189,10 +210,10 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = React.memo(({
 
             {/* Image Preview Container */}
             <div className="flex-1 overflow-y-auto bg-slate-100/50 dark:bg-slate-950/50 p-6 flex flex-col items-center min-h-[300px]">
-              {copyError && (
+              {actionError && (
                 <p role="alert" className="w-full max-w-2xl mb-3 text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1.5">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  {copyError}
+                  {actionError}
                 </p>
               )}
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-4 bg-white/80 dark:bg-slate-800/80 px-3 py-1.5 rounded-full shadow-xs border border-slate-200/60 dark:border-white/10 truncate max-w-full">
