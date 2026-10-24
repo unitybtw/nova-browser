@@ -148,7 +148,8 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
         const serializedTabs = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serializedTabs);
         getElectronAPI()?.storeSet?.('session_tabs', serializedTabs);
-        if (activeTabIdRef.current) {
+        const activeTabObj = tabsRef.current.find(t => t.id === activeTabIdRef.current);
+        if (activeTabIdRef.current && !activeTabObj?.isIncognito) {
           localStorage.setItem('active_tab_session', activeTabIdRef.current);
           getElectronAPI()?.storeSet?.('active_tab_session', activeTabIdRef.current);
         }
@@ -259,13 +260,16 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
 
   useEffect(() => {
     if (isDemo || !isHydrated) return;
+    const activeTabObj = tabsRef.current.find(t => t.id === activeTabId);
+    if (activeTabObj?.isIncognito) return;
     const timer = setTimeout(() => {
       try {
         localStorage.setItem('active_tab_session', activeTabId);
+        getElectronAPI()?.storeSet?.('active_tab_session', activeTabId);
       } catch (err) {
         logger.warn('App:Session', 'Failed to persist active_tab_session to storage', err);
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [activeTabId, isDemo, isHydrated]);
+  }, [activeTabId, isDemo, isHydrated, tabsRef]);
 }

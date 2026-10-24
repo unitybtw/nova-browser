@@ -92,7 +92,13 @@ export function useBrowserAgentBridge({
       if (!guest || documentVersions.has(guest)) return;
       const state = { version: 0 };
       documentVersions.set(guest, state);
-      const changed = (event: any) => { if (event?.isMainFrame !== false) state.version++; };
+      const changed = (event: any) => {
+        if (event?.isMainFrame !== false) state.version++;
+        if (event?.type === 'destroyed') {
+          guestListeners.get(guest)?.();
+          guestListeners.delete(guest);
+        }
+      };
       for (const name of ['did-start-navigation', 'did-navigate-in-page', 'render-process-gone', 'destroyed']) {
         guest.addEventListener?.(name, changed);
       }
@@ -478,7 +484,8 @@ export function useBrowserAgentBridge({
 
         case 'browser_zoom':
           if (activeWebview && activeWebview.setZoomLevel) {
-            const zoomLevel = Number(safeArgs.level) || 0;
+            const rawLevel = Number(safeArgs.level);
+            const zoomLevel = Math.min(5, Math.max(-5, Number.isFinite(rawLevel) ? rawLevel : 0));
             await activeWebview.setZoomLevel(zoomLevel);
             return `Zoom level set to ${zoomLevel}`;
           }

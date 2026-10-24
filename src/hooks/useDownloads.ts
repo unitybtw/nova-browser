@@ -59,12 +59,13 @@ export function useDownloads() {
   });
 
   const lastProgressPersistRef = useRef<number>(0);
+  const pendingUpdatesRef = useRef<Record<string, DownloadItem>>({});
 
   // Listen for download progress events from main process with cleanups
   useEffect(() => {
     if (!window.electronAPI?.onDownloadUpdate) return;
 
-    let pendingUpdates: Record<string, DownloadItem> = {};
+    pendingUpdatesRef.current = {};
     let throttleTimer: any = null;
 
     const flushUpdates = () => {
@@ -76,8 +77,8 @@ export function useDownloads() {
       // (StrictMode-safe): mutating it inside the updater would empty the
       // bag on the first double-invoke pass and silently drop updates on
       // the second.
-      const captured = pendingUpdates;
-      pendingUpdates = {};
+      const captured = pendingUpdatesRef.current;
+      pendingUpdatesRef.current = {};
       setDownloads(prev => {
         const updated = [...prev];
         let hasChanges = false;
@@ -116,7 +117,7 @@ export function useDownloads() {
     };
 
     const removeDownloadListener = window.electronAPI.onDownloadUpdate((_event: any, data: DownloadItem) => {
-      pendingUpdates[data.id] = data;
+      pendingUpdatesRef.current[data.id] = data;
 
       // Immediate update for new downloads or completion/cancellation/interruption
       if (data.receivedBytes === 0 || data.state === 'completed' || data.state === 'cancelled' || data.state === 'interrupted') {
@@ -129,8 +130,8 @@ export function useDownloads() {
     });
 
     const removePrivateCleanupListener = window.electronAPI.onPrivateDownloadsCleared?.((_event, sessionId) => {
-      for (const [id, item] of Object.entries(pendingUpdates)) {
-        if (item.privateSessionId === sessionId) delete pendingUpdates[id];
+      for (const [id, item] of Object.entries(pendingUpdatesRef.current)) {
+        if (item.privateSessionId === sessionId) delete pendingUpdatesRef.current[id];
       }
       setDownloads(current => current.filter(item => item.privateSessionId !== sessionId));
     });
@@ -141,17 +142,28 @@ export function useDownloads() {
         clearTimeout(throttleTimer);
         throttleTimer = null;
       }
+      pendingUpdatesRef.current = {};
       if (typeof removeDownloadListener === 'function') removeDownloadListener();
     };
   }, []);
 
   const handleClearDownloads = useCallback((privateSessionId?: string) => {
+    const shouldKeep = (item: DownloadItem) =>
+      item.state === 'progressing' ||
+      (privateSessionId
+        ? (privateSessionId === '*' ? !item.isPrivate : item.privateSessionId !== privateSessionId)
+        : Boolean(item.isPrivate || item.privateSessionId));
+
+    for (const [id, item] of Object.entries(pendingUpdatesRef.current)) {
+      if (!shouldKeep(item)) {
+        delete pendingUpdatesRef.current[id];
+      }
+    }
+
     // Clearing history must leave running/paused transfers reachable so the
     // user can still resume or cancel them until Electron reports completion.
     setDownloads(prev => {
-      const active = prev.filter(item => item.state === 'progressing' || (privateSessionId
-        ? (privateSessionId === '*' ? !item.isPrivate : item.privateSessionId !== privateSessionId)
-        : Boolean(item.isPrivate || item.privateSessionId)));
+      const active = prev.filter(shouldKeep);
       persistDownloadsToStorage(active);
       return active;
     });

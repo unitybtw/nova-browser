@@ -169,4 +169,18 @@ check('StrictMode effect replay retains one pending write', () => {
   } finally { h.r.dispose(); }
 });
 
+check('incognito active tab does not overwrite persisted active_tab_session', () => {
+  const h = persistenceHarness();
+  try {
+    h.render([tab('a'), tab('incog', { isIncognito: true })]);
+    h.r.advance(500);
+    assert.equal(h.stored.get('active_tab_session'), 'a');
+    h.options.activeTabId = 'incog';
+    h.options.activeTabIdRef.current = 'incog';
+    h.render([tab('a'), tab('incog', { isIncognito: true })]);
+    h.r.advance(500);
+    assert.equal(h.stored.get('active_tab_session'), 'a', 'incognito tab ID must never overwrite active_tab_session');
+  } finally { h.r.dispose(); }
+});
+
 assert.equal(failures.length, 0, `Resource regressions: ${failures.join(', ')}`);

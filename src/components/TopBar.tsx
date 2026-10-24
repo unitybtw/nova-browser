@@ -1448,24 +1448,6 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
 
           <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />
 
-          {/* Active Pinned Extensions */}
-          {extensions.filter(ext => ext.enabled !== false).slice(0, 4).map(ext => (
-            <button
-              key={ext.id}
-              className={`p-1 rounded-lg transition-colors flex items-center justify-center font-bold text-[11px] w-[28px] h-[28px] shrink-0 ${isIncognito ? 'hover:bg-slate-700' : 'hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-              title={ext.name}
-              onClick={e => handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())}
-            >
-              {ext.iconData ? (
-                <img src={ext.iconData} alt={ext.name} className="w-4 h-4 rounded-xs object-contain" />
-              ) : (
-                <div className="w-4 h-4 rounded-xs bg-purple-500/20 text-purple-400 flex items-center justify-center text-[10px] uppercase font-bold">
-                  {ext.name ? ext.name.charAt(0) : <Puzzle className="w-3.5 h-3.5" />}
-                </div>
-              )}
-            </button>
-          ))}
-
           {/* Ad Blocker Shield */}
           <div className="relative">
             <button
@@ -1529,7 +1511,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           </div>
 
           {/* Active Extension Toolbar Buttons */}
-          {extensions && extensions.filter(ext => ext.enabled !== false && (ext.popupUrl || ext.optionsUrl)).slice(0, 5).map(ext => (
+          {extensions && extensions.filter(ext => ext.enabled !== false).slice(0, 5).map(ext => (
             <button
               key={ext.id}
               onClick={e => handleOpenToolbarExtension(ext, e.currentTarget.getBoundingClientRect())}

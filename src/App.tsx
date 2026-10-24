@@ -955,20 +955,37 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       if (currentActive?.splitWith) return;
 
       const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
-      const candidate = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
+      const candidate = workspaceTabs.find(
+        t => t.id !== activeTabId && !t.splitWith && Boolean(t.isIncognito) === Boolean(currentActive?.isIncognito)
+      );
       if (!candidate) return;
       targetTabId = candidate.id;
       partnerTabId = activeTabId;
     }
 
+    const partnerTabSnapshot = tabs.find(t => t.id === partnerTabId);
+    const targetTabSnapshot = tabs.find(t => t.id === targetTabId);
+    if (
+      !partnerTabSnapshot ||
+      !targetTabSnapshot ||
+      Boolean(partnerTabSnapshot.isIncognito) !== Boolean(targetTabSnapshot.isIncognito)
+    ) {
+      return;
+    }
+
     setTabs(prev => {
       const activeT = prev.find(t => t.id === partnerTabId);
       const droppedT = prev.find(t => t.id === targetTabId);
-      if (!activeT || !droppedT) return prev;
+      if (!activeT || !droppedT || Boolean(activeT.isIncognito) !== Boolean(droppedT.isIncognito)) return prev;
 
+      const now = Date.now();
       let updated = prev.map(t => {
-        if (t.id === partnerTabId) return { ...t, splitWith: targetTabId };
-        if (t.id === targetTabId) return { ...t, splitWith: partnerTabId };
+        if (t.id === partnerTabId) {
+          return { ...t, splitWith: targetTabId, ...(t.isSuspended ? { isSuspended: false, lastAccessed: now } : {}) };
+        }
+        if (t.id === targetTabId) {
+          return { ...t, splitWith: partnerTabId, ...(t.isSuspended ? { isSuspended: false, lastAccessed: now } : {}) };
+        }
         if (t.splitWith === partnerTabId || t.splitWith === targetTabId) return { ...t, splitWith: undefined };
         return t;
       });

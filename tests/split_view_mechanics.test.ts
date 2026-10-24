@@ -115,3 +115,63 @@ assert.strictEqual(clampSplitRatio(10), 20, 'Ratio below 20% must clamp to 20%')
 assert.strictEqual(clampSplitRatio(95), 80, 'Ratio above 80% must clamp to 80%');
 
 console.log('[PASS] [Split View] Split ratio boundary clamping verified (20% - 80%)');
+
+// 5. Real useSplitView Hook: Incognito Boundary & Suspended Tab Wake Verification
+import fs from 'node:fs';
+import vm from 'node:vm';
+import ts from 'typescript';
+
+{
+  let currentTabs: Tab[] = [
+    { ...makeTab('normal-1'), isIncognito: false },
+    { ...makeTab('incog-1'), isIncognito: true },
+    { ...makeTab('normal-suspended'), isIncognito: false, isSuspended: true }
+  ];
+  const activeSplitRef = { current: null as string | null };
+  const exports: any = {};
+  vm.runInNewContext(
+    ts.transpileModule(fs.readFileSync('src/hooks/useSplitView.ts', 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
+    }).outputText,
+    {
+      exports,
+      Date,
+      Boolean,
+      require: (name: string) => {
+        if (name === 'react') {
+          return {
+            useMemo: (fn: () => any) => fn(),
+            useCallback: (fn: any) => fn
+          };
+        }
+        if (name === '../utils/idGenerator') {
+          return { generateId: () => 'generated-split-tab' };
+        }
+        throw new Error(`Unexpected module ${name}`);
+      }
+    }
+  );
+
+  // Toggling split view from normal-1 must skip incog-1 and pair with normal-suspended, waking it up
+  const hook = exports.useSplitView({
+    activeTab: currentTabs[0],
+    activeTabId: 'normal-1',
+    tabs: currentTabs,
+    activeWorkspaceId: 'default',
+    setTabs: (updater: (prev: Tab[]) => Tab[]) => {
+      currentTabs = updater(currentTabs);
+    },
+    activeSplitTabIdRef: activeSplitRef
+  });
+
+  hook.handleToggleSplitView();
+  const normal1 = currentTabs.find(t => t.id === 'normal-1')!;
+  const incog1 = currentTabs.find(t => t.id === 'incog-1')!;
+  const wokenNormal = currentTabs.find(t => t.id === 'normal-suspended')!;
+
+  assert.strictEqual(normal1.splitWith, 'normal-suspended', 'Normal tab must pair with normal tab, skipping incognito tab');
+  assert.strictEqual(incog1.splitWith, undefined, 'Incognito tab must not be paired with normal tab');
+  assert.strictEqual(wokenNormal.splitWith, 'normal-1', 'Partner tab must point back to active tab');
+  assert.strictEqual(wokenNormal.isSuspended, false, 'Suspended partner tab must be woken up when entering Split View');
+  console.log('[PASS] [Split View] Incognito isolation and suspended partner wake verified on useSplitView hook');
+}

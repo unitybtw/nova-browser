@@ -25,7 +25,8 @@ export function useSplitView({
   const splitTabId = useMemo(() => {
     if (!activeTab || !activeTab.splitWith) return null;
     const partner = tabs.find(t => t.id === activeTab.splitWith);
-    return partner ? partner.id : null;
+    if (!partner || Boolean(partner.isIncognito) !== Boolean(activeTab.isIncognito)) return null;
+    return partner.id;
   }, [activeTab, tabs]);
 
   activeSplitTabIdRef.current = splitTabId;
@@ -53,11 +54,18 @@ export function useSplitView({
       handleCloseSplitView();
     } else {
       const workspaceTabs = tabs.filter(t => t.workspaceId === activeWorkspaceId || (!t.workspaceId && activeWorkspaceId === 'default'));
-      const otherTab = workspaceTabs.find(t => t.id !== activeTabId && !t.splitWith);
+      const otherTab = workspaceTabs.find(
+        t => t.id !== activeTabId && !t.splitWith && Boolean(t.isIncognito) === Boolean(activeTab?.isIncognito)
+      );
       if (otherTab) {
+        const now = Date.now();
         setTabs(prev => prev.map(t => {
-          if (t.id === activeTabId) return { ...t, splitWith: otherTab.id };
-          if (t.id === otherTab.id) return { ...t, splitWith: activeTabId };
+          if (t.id === activeTabId) {
+            return { ...t, splitWith: otherTab.id, ...(t.isSuspended ? { isSuspended: false, lastAccessed: now } : {}) };
+          }
+          if (t.id === otherTab.id) {
+            return { ...t, splitWith: activeTabId, ...(t.isSuspended ? { isSuspended: false, lastAccessed: now } : {}) };
+          }
           return t;
         }));
       } else {
