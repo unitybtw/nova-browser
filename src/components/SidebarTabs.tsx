@@ -49,6 +49,16 @@ import { tabThumbnailCache } from '../services/thumbnailCache';
 import { TabHoverPreview } from './TabHoverPreview';
 import { generateId } from '../utils/idGenerator';
 import { getLocale, getLanguage } from '../services/i18n';
+import { AdBlockerPopover } from './AdBlockerPopover';
+import { getElectronAPI } from '../utils/electronBridge';
+import {
+  normalizeAdblockDomain,
+  isDomainWhitelisted,
+  toggleDomainInWhitelist,
+  sanitizeAdblockWhitelist,
+  ADBLOCK_WHITELIST_UPDATED_EVENT,
+  notifyAdblockWhitelistUpdated,
+} from '../utils/adblockUtils';
 
 const WORKSPACE_COLORS: Record<string, string> = {
   slate: '#64748b',
@@ -180,6 +190,7 @@ export interface SidebarTabsProps {
   isLoading?: boolean;
   searchEngine?: UserSettings['searchEngine'];
   privacyShield?: boolean;
+  onTogglePrivacyShield?: () => void;
   onOpenDownloads?: () => void;
   onOpenHistory?: () => void;
   onOpenSettings?: () => void;
@@ -544,6 +555,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   isLoading = false,
   searchEngine = 'google',
   privacyShield = true,
+  onTogglePrivacyShield,
   onOpenDownloads,
   onOpenHistory,
   onOpenSettings,
@@ -583,8 +595,58 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
 
   const [isWorkspaceDropdownOpen, setIsWorkspaceDropdownOpen] = useState(false);
   const [isLibraryDropdownOpen, setIsLibraryDropdownOpen] = useState(false);
+  const [isAdBlockerOpen, setIsAdBlockerOpen] = useState(false);
+  const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
+  const adBlockerBtnRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const libraryRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchWhitelist = async () => {
+      try {
+        const api = getElectronAPI();
+        if (api?.storeGet) {
+          const val = await api.storeGet('adblocker_whitelist');
+          if (val) {
+            const parsed = JSON.parse(val);
+            setAdblockWhitelist(sanitizeAdblockWhitelist(parsed));
+          }
+        }
+      } catch (_) {}
+    };
+    fetchWhitelist();
+
+    const handleWhitelistEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ whitelist?: string[] }>)?.detail;
+      if (detail && Array.isArray(detail.whitelist)) {
+        setAdblockWhitelist(sanitizeAdblockWhitelist(detail.whitelist));
+      } else {
+        fetchWhitelist();
+      }
+    };
+    window.addEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    return () => {
+      window.removeEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    };
+  }, []);
+
+  const currentHostname = normalizeAdblockDomain(activeTab?.url);
+  const isWhitelisted = isDomainWhitelisted(currentHostname, adblockWhitelist);
+  const isShieldActiveOnPage = Boolean(privacyShield) && !isWhitelisted;
+
+  const handleToggleWhitelist = async () => {
+    if (!currentHostname) return;
+    const { nextWhitelist } = toggleDomainInWhitelist(currentHostname, adblockWhitelist);
+    setAdblockWhitelist(nextWhitelist);
+    notifyAdblockWhitelistUpdated(nextWhitelist);
+    try {
+      const api = getElectronAPI();
+      if (api?.storeSet) {
+        await api.storeSet('adblocker_whitelist', JSON.stringify(nextWhitelist));
+      }
+    } catch (_) {}
+    onReload?.();
+  };
 
   // Omnibox state
   const [searchValue, setSearchValue] = useState('');
@@ -1065,15 +1127,31 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               />
 
               <div className="flex items-center gap-1.5 shrink-0 ml-1">
-                {privacyShield ? (
-                  <span title="Privacy Shield Active" className="text-emerald-500 dark:text-emerald-400/90">
+                <button
+                  ref={adBlockerBtnRef}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAdBlockerOpen(prev => !prev);
+                  }}
+                  title={!privacyShield ? 'Privacy Shield Disabled' : isWhitelisted ? 'Ad Shield Paused on this site' : 'Privacy & Ad Shield'}
+                  className={`flex items-center gap-1 px-1 py-0.5 rounded-md transition-colors cursor-pointer ${
+                    isShieldActiveOnPage
+                      ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
+                      : 'text-slate-400 dark:text-slate-500 hover:bg-slate-200/60 dark:hover:bg-white/10'
+                  }`}
+                >
+                  {isShieldActiveOnPage ? (
                     <ShieldCheck className="w-3.5 h-3.5" />
-                  </span>
-                ) : (
-                  <span title="Privacy Shield Disabled" className="text-slate-400 dark:text-slate-500">
-                    <Shield className="w-3.5 h-3.5" />
-                  </span>
-                )}
+                  ) : (
+                    <ShieldOff className="w-3.5 h-3.5" />
+                  )}
+                  {isShieldActiveOnPage && (activeTab?.blockedAdsCount || 0) > 0 && (
+                    <span className="text-[10px] font-bold font-mono leading-none">
+                      {activeTab?.blockedAdsCount}
+                    </span>
+                  )}
+                </button>
                 {onOpenExtensions && (
                   <button
                     type="button"
@@ -1087,6 +1165,20 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               </div>
             </div>
           </form>
+
+          {isAdBlockerOpen && (
+            <AdBlockerPopover
+              variant="sidebar"
+              blockedCount={activeTab?.blockedAdsCount || 0}
+              isWhitelisted={isWhitelisted}
+              onToggleWhitelist={handleToggleWhitelist}
+              onClose={() => setIsAdBlockerOpen(false)}
+              hostname={currentHostname}
+              buttonRef={adBlockerBtnRef}
+              privacyShieldEnabled={privacyShield}
+              onTogglePrivacyShield={onTogglePrivacyShield}
+            />
+          )}
 
           {/* Suggestions Dropdown */}
           <AnimatePresence>
@@ -1637,7 +1729,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       a.isMuted !== b.isMuted ||
       a.isSuspended !== b.isSuspended ||
       a.splitWith !== b.splitWith ||
-      a.folderId !== b.folderId
+      a.folderId !== b.folderId ||
+      (a.id === nextProps.activeTabId && a.blockedAdsCount !== b.blockedAdsCount)
     ) {
       return false;
     }

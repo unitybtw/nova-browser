@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, ExternalLink, Trash2, Cpu } from 'lucide-react';
+import { ShieldCheck, ExternalLink, Trash2, Cpu, Plus, X, Globe } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { aiAgent } from '../../services/aiAgent';
 import { ToggleSwitch } from './ToggleSwitch';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
+import {
+  normalizeAdblockDomain,
+  sanitizeAdblockWhitelist,
+  ADBLOCK_WHITELIST_UPDATED_EVENT,
+  notifyAdblockWhitelistUpdated,
+} from '../../utils/adblockUtils';
 
 export interface PrivacySectionProps {
   settings: UserSettings;
@@ -23,7 +29,68 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
   const [resetPermsSuccess, setResetPermsSuccess] = useState(false);
   const [aiCacheStatus, setAiCacheStatus] = useState<string>('');
   const [isClearingCache, setIsClearingCache] = useState<boolean>(false);
+  const [whitelistedDomains, setWhitelistedDomains] = useState<string[]>([]);
+  const [newWhitelistDomain, setNewWhitelistDomain] = useState<string>('');
+  const [whitelistError, setWhitelistError] = useState<string>('');
   const { setSafeTimeout } = useSafeTimeout();
+
+  useEffect(() => {
+    const fetchWhitelist = async () => {
+      try {
+        const api = getElectronAPI();
+        if (api?.storeGet) {
+          const raw = await api.storeGet('adblocker_whitelist');
+          if (raw) {
+            setWhitelistedDomains(sanitizeAdblockWhitelist(JSON.parse(raw)));
+          }
+        }
+      } catch (_) {}
+    };
+    fetchWhitelist();
+
+    const handleWhitelistEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ whitelist?: string[] }>)?.detail;
+      if (detail && Array.isArray(detail.whitelist)) {
+        setWhitelistedDomains(sanitizeAdblockWhitelist(detail.whitelist));
+      } else {
+        fetchWhitelist();
+      }
+    };
+    window.addEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    return () => {
+      window.removeEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    };
+  }, []);
+
+  const persistWhitelist = async (nextList: string[]) => {
+    const sanitized = sanitizeAdblockWhitelist(nextList);
+    setWhitelistedDomains(sanitized);
+    notifyAdblockWhitelistUpdated(sanitized);
+    try {
+      const api = getElectronAPI();
+      if (api?.storeSet) {
+        await api.storeSet('adblocker_whitelist', JSON.stringify(sanitized));
+      }
+    } catch (_) {}
+  };
+
+  const handleAddWhitelistDomain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalized = normalizeAdblockDomain(newWhitelistDomain);
+    if (!normalized) {
+      setWhitelistError('Enter a valid domain (e.g. example.com)');
+      return;
+    }
+    setWhitelistError('');
+    setNewWhitelistDomain('');
+    if (!whitelistedDomains.includes(normalized)) {
+      await persistWhitelist([...whitelistedDomains, normalized]);
+    }
+  };
+
+  const handleRemoveWhitelistDomain = async (domain: string) => {
+    await persistWhitelist(whitelistedDomains.filter(d => d !== domain));
+  };
 
   useEffect(() => {
     if (getElectronAPI()?.getRememberedPermissionsCount) {
@@ -104,6 +171,76 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
                 {settings.privacyShield ? 'Shield is Active' : 'Enable Shield'}
               </button>
             </div>
+          </div>
+
+          <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-900/30 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Allowed Sites (Whitelist)</h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Websites listed here bypass Ad & Tracker Blocking across all tabs.
+                </p>
+              </div>
+              {whitelistedDomains.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => persistWhitelist([])}
+                  className="text-xs font-medium text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 transition-colors cursor-pointer"
+                >
+                  Clear All ({whitelistedDomains.length})
+                </button>
+              )}
+            </div>
+
+            <form onSubmit={handleAddWhitelistDomain} className="flex items-center gap-2 max-w-md">
+              <input
+                type="text"
+                value={newWhitelistDomain}
+                onChange={(e) => {
+                  setNewWhitelistDomain(e.target.value);
+                  if (whitelistError) setWhitelistError('');
+                }}
+                placeholder="example.com"
+                className="flex-1 px-3 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
+              />
+              <button
+                type="submit"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-semibold transition-colors cursor-pointer shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Site</span>
+              </button>
+            </form>
+
+            {whitelistError && (
+              <p className="text-xs text-red-500 font-medium">{whitelistError}</p>
+            )}
+
+            {whitelistedDomains.length > 0 ? (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {whitelistedDomains.map((domain) => (
+                  <span
+                    key={domain}
+                    className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-mono text-slate-700 dark:text-slate-200"
+                  >
+                    <Globe className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>{domain}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveWhitelistDomain(domain)}
+                      aria-label={`Remove ${domain} from whitelist`}
+                      className="p-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-slate-400 dark:text-slate-500">
+                No websites are currently whitelisted.
+              </p>
+            )}
           </div>
         </div>
       </section>

@@ -56,6 +56,14 @@ import { Tab, Bookmark, Workspace, PermissionRequest, Extension, UserSettings, D
 import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../utils/searchEngine';
 import { getLanguage, getLocale } from '../services/i18n';
 import { AdBlockerPopover } from './AdBlockerPopover';
+import {
+  normalizeAdblockDomain,
+  isDomainWhitelisted,
+  toggleDomainInWhitelist,
+  sanitizeAdblockWhitelist,
+  ADBLOCK_WHITELIST_UPDATED_EVENT,
+  notifyAdblockWhitelistUpdated,
+} from '../utils/adblockUtils';
 import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 import { logger } from '../utils/logger';
 import { syncService, SyncStatus } from '../services/syncService';
@@ -162,6 +170,8 @@ interface TopBarProps {
   permissionRequests?: PermissionRequest[];
   onRespondPermission?: (requestId: string, allow: boolean, remember: boolean) => void;
   onDismissPermission?: (requestId: string) => void;
+  privacyShield?: boolean;
+  onTogglePrivacyShield?: () => void;
 }
 
 const MemoizedTabItem = React.memo(
@@ -759,7 +769,9 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   onCloseSplit,
   permissionRequests,
   onRespondPermission,
-  onDismissPermission
+  onDismissPermission,
+  privacyShield = true,
+  onTogglePrivacyShield
 }) => {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getStatus());
 
@@ -1018,7 +1030,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
           const val = await getElectronAPI()?.storeGet('adblocker_whitelist');
           if (val) {
             const parsed = JSON.parse(val);
-            setAdblockWhitelist(Array.isArray(parsed) ? parsed : []);
+            setAdblockWhitelist(sanitizeAdblockWhitelist(parsed));
           }
         }
       } catch (e) {
@@ -1026,6 +1038,19 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
       }
     };
     fetchWhitelist();
+
+    const handleWhitelistEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ whitelist?: string[] }>)?.detail;
+      if (detail && Array.isArray(detail.whitelist)) {
+        setAdblockWhitelist(sanitizeAdblockWhitelist(detail.whitelist));
+      } else {
+        fetchWhitelist();
+      }
+    };
+    window.addEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    return () => {
+      window.removeEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+    };
   }, []);
 
   // Fetch MCP status on mount and listen for client changes
@@ -1101,27 +1126,18 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   const activeWorkspace = workspaces?.find(w => w.id === activeWorkspaceId) || workspaces?.[0];
 
   const currentUrl = activeTab?.url || '';
-  let currentHostname = '';
-  try {
-    if (currentUrl && !currentUrl.startsWith('nova://')) {
-      const urlToParse = currentUrl.includes('://') ? currentUrl : `http://${currentUrl}`;
-      currentHostname = new URL(urlToParse).hostname;
-    }
-  } catch (err) {
-    logger.debug('TopBar:hostname', 'Failed to parse hostname from activeTab URL', err);
-  }
-  const isWhitelisted = Array.isArray(adblockWhitelist) && Boolean(currentHostname) && adblockWhitelist.includes(currentHostname);
+  const currentHostname = normalizeAdblockDomain(currentUrl);
+  const isWhitelisted = isDomainWhitelisted(currentHostname, adblockWhitelist);
+  const isShieldActiveOnPage = Boolean(privacyShield) && !isWhitelisted;
 
   const handleToggleWhitelist = async () => {
     if (!currentHostname) return;
-    const currentList = Array.isArray(adblockWhitelist) ? adblockWhitelist : [];
-    const newWhitelist = isWhitelisted
-      ? currentList.filter(h => h !== currentHostname)
-      : [...currentList, currentHostname];
+    const { nextWhitelist } = toggleDomainInWhitelist(currentHostname, adblockWhitelist);
 
-    setAdblockWhitelist(newWhitelist);
+    setAdblockWhitelist(nextWhitelist);
+    notifyAdblockWhitelistUpdated(nextWhitelist);
     if (getElectronAPI()?.storeSet) {
-      await getElectronAPI()?.storeSet('adblocker_whitelist', JSON.stringify(newWhitelist));
+      await getElectronAPI()?.storeSet('adblocker_whitelist', JSON.stringify(nextWhitelist));
     }
     onReload();
   };
@@ -1453,10 +1469,14 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
               ref={adBlockerBtnRef}
               onClick={() => setIsAdBlockerOpen(!isAdBlockerOpen)}
               className={`p-1.5 rounded-lg transition-colors relative ${isIncognito ? 'hover:bg-slate-700 text-slate-300' : 'hover:bg-slate-100 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-white'}`}
-              title="Privacy & Ad Shield"
+              title={!privacyShield ? 'Privacy Shield Disabled' : isWhitelisted ? 'Ad Shield Paused on this site' : 'Privacy & Ad Shield'}
             >
-              {isWhitelisted ? <ShieldOff className="w-4 h-4 text-slate-400" /> : <Shield className="w-4 h-4 text-cyan-400" />}
-              {(!isWhitelisted && (activeTab?.blockedAdsCount || 0) > 0) && (
+              {!isShieldActiveOnPage ? (
+                <ShieldOff className="w-4 h-4 text-slate-400" />
+              ) : (
+                <Shield className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
+              )}
+              {(isShieldActiveOnPage && (activeTab?.blockedAdsCount || 0) > 0) && (
                 <span className="absolute -top-1 -right-1 bg-cyan-500 text-slate-950 text-[9px] font-bold px-1 min-w-[14px] h-[14px] rounded-full flex items-center justify-center">
                   {activeTab?.blockedAdsCount ?? 0}
                 </span>
@@ -1470,6 +1490,8 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
                 onClose={() => setIsAdBlockerOpen(false)}
                 hostname={currentHostname}
                 buttonRef={adBlockerBtnRef}
+                privacyShieldEnabled={privacyShield}
+                onTogglePrivacyShield={onTogglePrivacyShield}
               />
             )}
           </div>
@@ -1859,6 +1881,7 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
   if (prevProps.tabAnimation !== nextProps.tabAnimation) return false;
   if (prevProps.isIncognito !== nextProps.isIncognito) return false;
   if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
   if (prevProps.isVpnEnabled !== nextProps.isVpnEnabled) return false;
   if (prevProps.splitTabId !== nextProps.splitTabId) return false;
   // Drives the AI pill's active state and sparkle; toggling the assistant only

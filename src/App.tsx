@@ -929,6 +929,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setIsSidePanelOpen(prev => !prev);
   }, []);
 
+  const handleTogglePrivacyShield = useCallback(() => {
+    handleUpdateSettings({ privacyShield: !settingsRef.current.privacyShield });
+  }, [handleUpdateSettings, settingsRef]);
+
   const handleTabDragStart = useCallback(() => setIsDraggingTab(true), []);
   const handleTabDragEnd = useCallback(() => {
     setIsDraggingTab(false);
@@ -1464,6 +1468,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               isLoading={activeTab?.isLoading}
               searchEngine={settings.searchEngine}
               privacyShield={settings.privacyShield}
+              onTogglePrivacyShield={handleTogglePrivacyShield}
               onOpenDownloads={handleOpenDownloads}
               onOpenHistory={handleOpenHistory}
               onOpenSettings={handleOpenSettings}
@@ -1560,6 +1565,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   isLoading={activeTab?.isLoading}
                   searchEngine={settings.searchEngine}
                   privacyShield={settings.privacyShield}
+                  onTogglePrivacyShield={handleTogglePrivacyShield}
                   onOpenDownloads={handleOpenDownloads}
                   onOpenHistory={handleOpenHistory}
                   onOpenSettings={handleOpenSettings}
@@ -1620,6 +1626,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 tabAnimation={settings.tabAnimation}
                 isIncognito={activeTab?.isIncognito}
                 searchEngine={settings.searchEngine}
+                privacyShield={settings.privacyShield}
+                onTogglePrivacyShield={handleTogglePrivacyShield}
                 onToggleBookmark={handleToggleBookmarkActive}
                 onOpenHistory={handleOpenHistory}
                 onOpenDownloads={handleOpenDownloads}

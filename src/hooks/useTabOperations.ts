@@ -645,13 +645,13 @@ export function useTabOperations({
           }
         } catch (_) {}
       }
-      setTabs(p => p.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage } : t));
+      setTabs(p => p.map(t => t.id === targetId ? { ...t, isLoading: !isInternalPage, blockedAdsCount: 0 } : t));
       return;
     }
 
     setTabs(p => p.map(t => t.id === targetId ? {
       ...t,
-      ...(isInternalPage ? { ...EMPTY_DOCUMENT_STATE, favicon: undefined, canGoBack: false, canGoForward: false } : {}),
+      ...(isInternalPage ? { ...EMPTY_DOCUMENT_STATE, favicon: undefined, canGoBack: false, canGoForward: false } : { blockedAdsCount: 0 }),
       url,
       isLoading: !isInternalPage,
       ...(newTitle ? { title: newTitle } : {})

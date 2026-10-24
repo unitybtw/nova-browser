@@ -17,6 +17,11 @@ import {
   Layers
 } from 'lucide-react';
 import { getUrlSecurityInfo } from '../utils/securityUtils';
+import {
+  isDomainWhitelisted,
+  sanitizeAdblockWhitelist,
+  ADBLOCK_WHITELIST_UPDATED_EVENT,
+} from '../utils/adblockUtils';
 
 interface SiteInfoPopoverProps {
   isOpen: boolean;
@@ -79,6 +84,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   const isSecure = sec.level === 'secure' || (!isDangerous && !isHttp && !isInternal && !isFile && protocol === 'https:');
 
   const [sitePerms, setSitePerms] = useState<Record<string, { allow: boolean; ts: number }>>({});
+  const [adblockWhitelist, setAdblockWhitelist] = useState<string[]>([]);
 
   useEffect(() => {
     setSitePerms({});
@@ -94,10 +100,31 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
         if (!isCancelled) setSitePerms({});
       });
     }
+    if (api?.storeGet) {
+      api.storeGet('adblocker_whitelist').then((val: string | null) => {
+        if (!isCancelled && val) {
+          try {
+            setAdblockWhitelist(sanitizeAdblockWhitelist(JSON.parse(val)));
+          } catch (_) {}
+        }
+      }).catch(() => {});
+    }
+
+    const handleWhitelistEvent = (e: Event) => {
+      const detail = (e as CustomEvent<{ whitelist?: string[] }>)?.detail;
+      if (!isCancelled && detail && Array.isArray(detail.whitelist)) {
+        setAdblockWhitelist(sanitizeAdblockWhitelist(detail.whitelist));
+      }
+    };
+    window.addEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
+
     return () => {
       isCancelled = true;
+      window.removeEventListener(ADBLOCK_WHITELIST_UPDATED_EVENT, handleWhitelistEvent);
     };
   }, [isOpen, isInternal, origin, domain]);
+
+  const isSiteWhitelisted = !isInternal && isDomainWhitelisted(url, adblockWhitelist);
 
   const getPermStatus = (key: string) => {
     const p = sitePerms[key];
@@ -179,15 +206,21 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
             </span>
           </div>
 
-          {blockedAdsCount > 0 && (
+          {(isSiteWhitelisted || blockedAdsCount > 0) && (
             <div className="flex items-center justify-between text-[11px]">
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5 text-cyan-500" />
+                <ShieldAlert className={`w-3.5 h-3.5 ${isSiteWhitelisted ? 'text-slate-400' : 'text-cyan-500'}`} />
                 Trackers & Ads Blocked
               </span>
-              <span className="font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md">
-                {blockedAdsCount} blocked
-              </span>
+              {isSiteWhitelisted ? (
+                <span className="font-semibold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md">
+                  Paused on this site
+                </span>
+              ) : (
+                <span className="font-bold text-cyan-600 dark:text-cyan-400 bg-cyan-500/10 px-1.5 py-0.5 rounded-md">
+                  {blockedAdsCount} blocked
+                </span>
+              )}
             </div>
           )}
         </div>

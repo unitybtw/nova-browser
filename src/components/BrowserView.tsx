@@ -509,6 +509,10 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (tab?.id) {
         const isMain = e?.isMainFrame !== false;
         if (isMain) {
+          // Ignore in-place SPA navigations (pushState/replaceState/hash changes):
+          // they are handled by `did-navigate-in-page` and must not wipe
+          // blockedAdsCount, isPlayingAudio, or isTranslated on the current document.
+          if (e?.isInPlace) return;
           const targetUrl = e?.url || (typeof webview.getURL === 'function' ? webview.getURL() : '');
           const currentBlockedAds = latestTabRef.current?.blockedAdsCount || 0;
           const updates: Partial<Tab> = {
