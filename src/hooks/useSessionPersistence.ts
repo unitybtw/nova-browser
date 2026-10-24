@@ -35,8 +35,7 @@ const PERSISTED_TAB_FIELDS = [
 
 /**
  * Builds a cheap structural fingerprint of the tab list.
- * Two invocations producing the same string guarantee the persisted JSON is
- * identical, so the write can be skipped entirely.
+ * Transient document updates do not require a new durable session write.
  */
 function buildTabSignature(tabs: Tab[]): string {
   let signature = '';
@@ -216,29 +215,42 @@ export function useSessionPersistence(options: UseSessionPersistenceOptions): vo
   const lastPersistedTabsSignature = useRef<string | null>(null);
   const scheduledTabsSignature = useRef<string | null>(null);
   const pendingTabsWrite = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);
+    pendingTabsWrite.current = null;
+    scheduledTabsSignature.current = null;
+  }, []);
+
   useEffect(() => {
-    if (isDemo || !isHydrated) return;
+    if (isDemo || !isHydrated) {
+      if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);
+      pendingTabsWrite.current = null;
+      scheduledTabsSignature.current = null;
+      return;
+    }
     const sessionTabs = tabs
       .filter(t => !t.isIncognito);
     const signature = buildTabSignature(sessionTabs);
 
-    // Already written, or already covered by a pending write. This is the hot
-    // path for the 300ms ad-block churn and must stay allocation-free.
+    // Transient metadata updates must not postpone an already scheduled write.
     if (signature === scheduledTabsSignature.current) return;
+    // Cancel before comparing with the last write: A → B → A must not leave
+    // B's timer alive merely because A is already on disk.
+    if (pendingTabsWrite.current !== null) clearTimeout(pendingTabsWrite.current);
+    pendingTabsWrite.current = null;
     scheduledTabsSignature.current = null;
     if (signature === lastPersistedTabsSignature.current) return;
 
     // Durable state changed: drop the superseded write and debounce a new one.
-    if (pendingTabsWrite.current) clearTimeout(pendingTabsWrite.current);
     scheduledTabsSignature.current = signature;
     pendingTabsWrite.current = setTimeout(() => {
       pendingTabsWrite.current = null;
       scheduledTabsSignature.current = null;
-      lastPersistedTabsSignature.current = signature;
       try {
         const serialized = JSON.stringify(sessionTabs);
         localStorage.setItem('nova_session_tabs', serialized);
         getElectronAPI()?.storeSet?.('session_tabs', serialized);
+        lastPersistedTabsSignature.current = signature;
       } catch (err) {
         logger.warn('App:Session', 'Failed to persist session_tabs to storage', err);
       }

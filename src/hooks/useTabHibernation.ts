@@ -1,4 +1,4 @@
-import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, type Dispatch, type SetStateAction } from 'react';
 import type { Tab, UserSettings } from '../types/browser';
 import { computeLiveAndSuspendedTabs } from '../utils/tabManager';
 
@@ -17,24 +17,7 @@ export interface UseTabHibernationOptions {
 
 const MAX_LIVE_WEBVIEWS = 6;
 
-/**
- * Tab hibernation motoru: App.tsx'ten birebir taşıma (pure code motion).
- *
- * - Effect 1 (Idle Timer): 30sn'de bir, aktif/split/pinned/sesli/loading
- *   olmayan ve `hibernationTimeoutMinutes` süresince dokunulmamış sekmeleri
- *   `isSuspended: true` yapar. `clearInterval` cleanup aynen korunur.
- * - Effect 2 (Webview LRU Pool + staggered wake): hibernation açıkken canlı
- *   webview sayısını LRU-6 ile cap'ler (`computeLiveAndSuspendedTabs`);
- *   kapalıyken askıdaki sekmeleri 300ms'de en fazla 2'şerli uyandırır
- *   (Chromium renderer patlamasını önler). `staggeredWakeRef` cleanup'ları
- *   aynen korunur. LRU güncellemesi de Effect 1 gibi `changed ? updated : prev`
- *   guard'ı kullanır: `isSuspended` alanı fiilen değişmiyorsa `tabs`
- *   referansı korunur, böylece dep array'i ikinci bir geçiş tetiklemez.
- *
- * Timer davranışı birebir aynıdır: 30sn idle kontrol, LRU-6, staggered wake.
- * Manuel kontroller (handleSelectTab/handleSuspendTab/handlePurgeMemory)
- * App.tsx'te kalır; bu hook sadece 2 effect'i sahiplenir.
- */
+/** Owns idle suspension, the live webview pool and gradual wake-up. */
 export function useTabHibernation({
   tabs,
   tabsRef,
@@ -99,44 +82,26 @@ export function useTabHibernation({
     return () => clearInterval(interval);
   }, [settings.tabHibernationEnabled, settings.hibernationTimeoutMinutes, settings.energySaverMode, isDemo]);
 
-  // Webview LRU Pool: cap concurrent live tabs to max 6 (or 3 in energy saver mode) to prevent Chromium process explosion only when hibernation is enabled
-  // Staggered wake-up ref: tracks the interval used to gradually restore suspended tabs
-  // when hibernation is disabled, preventing simultaneous Chromium renderer process spawning.
-  const staggeredWakeRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Unrelated tab metadata changes must not restart the 300ms wake interval.
+  const hasSuspendedTabs = tabs.some(tab => tab.isSuspended);
   useEffect(() => {
-    const isHibernationEnabled = settings.tabHibernationEnabled ?? true;
-    if (!isHibernationEnabled) {
-      // Staggered wake-up: wake at most 2 tabs every 300ms to avoid a Chromium process explosion.
-      // Clear any previous interval before starting a new one.
-      if (staggeredWakeRef.current !== null) {
-        clearInterval(staggeredWakeRef.current);
-        staggeredWakeRef.current = null;
+    if ((settings.tabHibernationEnabled ?? true) || !hasSuspendedTabs) return;
+    const interval = setInterval(() => {
+      if (!tabsRef.current.some(tab => tab.isSuspended)) {
+        clearInterval(interval);
+        return;
       }
-      staggeredWakeRef.current = setInterval(() => {
-        let shouldClear = false;
-        setTabs(prev => {
-          const suspendedTabs = prev.filter(t => t.isSuspended);
-          if (suspendedTabs.length === 0) {
-            shouldClear = true;
-            return prev;
-          }
-          // Wake next 2 suspended tabs in this tick
-          const idsToWake = new Set(suspendedTabs.slice(0, 2).map(t => t.id));
-          return prev.map(t => idsToWake.has(t.id) ? { ...t, isSuspended: false } : t);
-        });
-        if (shouldClear && staggeredWakeRef.current !== null) {
-          clearInterval(staggeredWakeRef.current);
-          staggeredWakeRef.current = null;
-        }
-      }, 300);
-      return () => {
-        if (staggeredWakeRef.current !== null) {
-          clearInterval(staggeredWakeRef.current);
-          staggeredWakeRef.current = null;
-        }
-      };
-    }
+      setTabs(prev => {
+        const ids = new Set(prev.filter(tab => tab.isSuspended).slice(0, 2).map(tab => tab.id));
+        return ids.size ? prev.map(tab => ids.has(tab.id) ? { ...tab, isSuspended: false } : tab) : prev;
+      });
+    }, 300);
+    return () => clearInterval(interval);
+  }, [hasSuspendedTabs, settings.tabHibernationEnabled, tabsRef, setTabs]);
 
+  // Cap live webviews while hibernation is enabled.
+  useEffect(() => {
+    if (!(settings.tabHibernationEnabled ?? true)) return;
     const liveLimit = settings.energySaverMode ? 3 : MAX_LIVE_WEBVIEWS;
     const { tabsToSuspend } = computeLiveAndSuspendedTabs(tabs, activeTabId, splitTabId, liveLimit);
     if (tabsToSuspend.size > 0) {
