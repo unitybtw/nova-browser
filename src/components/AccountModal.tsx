@@ -253,7 +253,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                         Your Device Sync Code
                       </span>
                       <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                        E2EE Active
+                        Encrypted Sync
                       </span>
                     </div>
 
@@ -316,7 +316,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     <div className="space-y-1.5">
                       {[
                         { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark },
-                        { key: 'syncPasswords', label: 'Saved Passwords (E2EE)', icon: Key },
+                        { key: 'syncPasswords', label: 'Saved Passwords (Encrypted)', icon: Key },
                         { key: 'syncHistory', label: 'Browsing History', icon: Clock },
                         { key: 'syncSettings', label: 'Settings & Themes', icon: Settings },
                         { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree },
@@ -432,7 +432,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   <div className="p-3.5 rounded-2xl bg-cyan-500/5 border border-cyan-500/15 flex items-start gap-2.5">
                     <ShieldCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
                     <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
-                      <strong className="font-semibold text-cyan-600 dark:text-cyan-400">Zero-Knowledge Security:</strong> No email or password needed. All passwords and bookmarks are encrypted client-side using 256-bit AES-GCM.
+                      <strong className="font-semibold text-cyan-600 dark:text-cyan-400">Encrypted sync:</strong> Cloud sign-in uses email and password. Sync data is encrypted before upload; the authentication provider remains part of the trust boundary.
                     </p>
                   </div>
                 </div>

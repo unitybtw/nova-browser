@@ -1,6 +1,6 @@
 # Contributing to Nova Browser
 
-Thank you for your interest in contributing to Nova Browser. Nova is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite, featuring a native Model Context Protocol (MCP) server, on-device WebGPU neural execution, and zero-knowledge encrypted multi-device sync.
+Thank you for your interest in contributing to Nova Browser. Nova is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite, featuring a native Model Context Protocol (MCP) server, on-device WebGPU neural execution, and client-side encrypted multi-device sync.
 
 This document outlines the workflow, development environment setup, architecture principles, and contribution guidelines.
 
@@ -85,7 +85,7 @@ Nova Browser is structured into distinct subsystems:
 - `src/`: React 18 renderer process (UI and state management):
   - `src/App.tsx`: Primary application layout, tab orchestration, split view coordination.
   - `src/components/`: Modular UI components (Omnibar, TabBar, Settings, DevTools, AI Chat).
-  - `src/services/`: Client-side services including zero-knowledge E2EE sync, search engines, and AI agents.
+  - `src/services/`: Client-side services including client-side encrypted sync, search engines, and AI agents.
 - `website/`: Standalone React/Vite/Tailwind landing page and documentation showcase.
 - `tests/`: Automated test suite covering security boundaries, IPC validation, extension extraction, and regressions.
 

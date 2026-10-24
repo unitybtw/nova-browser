@@ -1,13 +1,15 @@
 /**
  * Nova Browser Cloud Sync & Account Service
  *
- * Supabase-backed E2EE sync vault: data is stored as a version-2 envelope
- * (AES-GCM-256, PBKDF2-SHA256 600k iterations — see syncCrypto.ts). The E2EE
- * secret is a dedicated sync key derived from the account password (min 12
+ * Supabase-backed client-side encrypted sync vault: data uses a version-2 envelope
+ * (AES-GCM-256, PBKDF2-SHA256 600k iterations — see syncCrypto.ts). The sync
+ * secret is a dedicated key derived from the account password (min 12
  * chars) via PBKDF2-SHA256 @ 600k with a per-account random salt; the
  * raw password is never persisted or used as the long-lived key. The derived
  * key is kept in memory and persisted only in the OS-keychain-backed secure
  * store, scoped per user id.
+ * The same password is sent to Supabase Auth over HTTPS, so the authentication
+ * provider remains trusted; this is not a zero-knowledge design.
  *
  * Local (zero-config) account passwords are stored as salted PBKDF2-SHA256
  * hashes (600k iterations) and compared in constant time.

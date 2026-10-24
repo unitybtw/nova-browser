@@ -93,7 +93,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Nova Sync Active</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
-                      <ShieldCheck className="w-3 h-3" /> E2EE Protected
+                      <ShieldCheck className="w-3 h-3" /> Encrypted Sync
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
@@ -248,7 +248,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
               <div className="divide-y divide-slate-100 dark:divide-slate-700/50">
                 {[
                   { key: 'syncBookmarks', label: 'Bookmarks & Folders', icon: Bookmark, desc: 'Your saved bookmarks and toolbar folders' },
-                  { key: 'syncPasswords', label: 'Saved Passwords (E2EE)', icon: Key, desc: 'Zero-knowledge client-side encrypted with AES-256' },
+                  { key: 'syncPasswords', label: 'Saved Passwords (Encrypted)', icon: Key, desc: 'Encrypted before upload with AES-256; the authentication provider remains trusted' },
                   { key: 'syncHistory', label: 'Browsing History', icon: Cloud, desc: 'Your visited page history across devices' },
                   { key: 'syncSettings', label: 'Settings & Appearance', icon: Settings, desc: 'Themes, search engine, shortcuts' },
                   { key: 'syncWorkspaces', label: 'Workspaces', icon: FolderTree, desc: 'Custom tab workspaces and icons' },

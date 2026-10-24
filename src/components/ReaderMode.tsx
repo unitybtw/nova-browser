@@ -11,6 +11,7 @@ import { detectLanguage, getBestVoice, getMacDefaultVoice, splitIntoSentences, N
 import { safeBase64 as safeBase64Util } from '../utils/securityUtils';
 import { generateId } from '../utils/idGenerator';
 import { getLocale } from '../services/i18n';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
 
 const safeBase64 = (str: string): string => {
   return safeBase64Util(str);
@@ -120,14 +121,42 @@ export function loadArticleHighlights(options: HighlightLoadOptions): () => void
   };
 }
 
+export function sanitizeReaderContent(content: string, isPrivate = false): string {
+  return DOMPurify.sanitize(content, {
+      USE_PROFILES: { html: true },
+      ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
+      ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
+      FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button', ...(isPrivate ? ['img', 'picture', 'source', 'audio', 'video'] : [])],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+    });
+}
+
+export function handleReaderLink(event: React.MouseEvent<HTMLElement>, onNavigate?: (url: string) => void): void {
+  if (event.button !== 0 && event.button !== 1) return;
+  const link = (event.target as Element).closest?.('a[href]');
+  if (!link) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const url = link.getAttribute('href') || '';
+  if (/^https?:\/\//i.test(url) && isSafeNavigationUrl(url)) onNavigate?.(url);
+}
+
+export function persistArticleHighlights(url: string, highlights: HighlightData[], isPrivate: boolean,
+  write: (key: string, value: string) => unknown): void {
+  if (url && !isPrivate) write(highlightsStorageKey(url), JSON.stringify(highlights));
+}
+
 interface ReaderModeProps {
   url: string;
   tabId: string;
   isActive: boolean;
   onClose: () => void;
+  isIncognito?: boolean;
+  onNavigate?: (url: string) => void;
 }
 
-export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, isActive, onClose }) => {
+export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, isActive, onClose, isIncognito = false, onNavigate }) => {
   const [content, setContent] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -138,15 +167,8 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
   const sanitizedContent = useMemo(() => {
     if (!content) return '';
-    return DOMPurify.sanitize(content, {
-      USE_PROFILES: { html: true },
-      ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
-      ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
-      FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-    });
-  }, [content]);
+    return sanitizeReaderContent(content, isIncognito);
+  }, [content, isIncognito]);
 
   // Theme & Appearance with persistence
   const [theme, setTheme] = useState<'light' | 'dark' | 'sepia'>(() => {
@@ -323,6 +345,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
   // Load highlights from storage when content is ready
   useEffect(() => {
     if (!content) return;
+    if (isIncognito) { setHighlights([]); return; }
 
     return loadArticleHighlights({
       url,
@@ -376,7 +399,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
         });
       },
     });
-  }, [content, url]);
+  }, [content, url, isIncognito]);
 
   // Handle selection for highlighting
   useEffect(() => {
@@ -470,10 +493,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
     }
 
     setHighlights(updated);
-    if (url) {
-      const storageKey = 'reader_highlights_' + safeBase64(url);
-      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
-    }
+    persistArticleHighlights(url, updated, isIncognito, (key, value) => (window as any).electronAPI?.storeSet(key, value));
 
     setPopoverState({ visible: false, top: 0, left: 0, text: '' });
     window.getSelection()?.removeAllRanges();
@@ -495,10 +515,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
       }
     }
 
-    if (url) {
-      const storageKey = 'reader_highlights_' + safeBase64(url);
-      (window as any).electronAPI?.storeSet(storageKey, JSON.stringify(updated));
-    }
+    persistArticleHighlights(url, updated, isIncognito, (key, value) => (window as any).electronAPI?.storeSet(key, value));
 
     setViewingNote({ visible: false, note: '', top: 0, left: 0 });
   };
@@ -801,14 +818,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           setReadingTime(Math.max(1, Math.ceil(words / 200)));
 
           // Sanitize and strip hardcoded inline colors/backgrounds for true dark mode and security
-          const rawCleanHtml = DOMPurify.sanitize(article.content, {
-            USE_PROFILES: { html: true },
-            ADD_ATTR: ['target', 'rel', 'src', 'srcset', 'alt', 'title', 'href'],
-            ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
-            FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button'],
-            FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
-            ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
-          });
+          const rawCleanHtml = sanitizeReaderContent(article.content, isIncognito);
           // Harden links against tabnabbing: force rel + blank target.
           const linkHost = document.createElement('div');
           linkHost.innerHTML = rawCleanHtml;
@@ -830,7 +840,7 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
     extractContent();
     return () => { cancelled = true; };
-  }, [isActive, tabId, url]);
+  }, [isActive, tabId, url, isIncognito]);
 
   const bgColors = {
     light: 'bg-[#fafafa] text-slate-900',
@@ -1113,8 +1123,14 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
                   </span>
                 </div>
 
+                {isIncognito && <p className="mb-4 text-xs opacity-70">Private reading: highlights stay in memory. Images are hidden to keep your normal session separate.</p>}
                 <div
                   ref={contentRef}
+                  onClick={event => handleReaderLink(event, onNavigate)}
+                  onAuxClick={event => handleReaderLink(event, onNavigate)}
+                  onContextMenu={event => {
+                    if (isIncognito && (event.target as Element).closest?.('a')) event.preventDefault();
+                  }}
                   className={`reader-content prose prose-lg max-w-none prose-a:text-cyan-400 hover:prose-a:text-cyan-300 prose-img:rounded-xl prose-img:shadow-md prose-headings:font-bold ${theme === 'dark' ? 'prose-invert' : ''}`}
                   dangerouslySetInnerHTML={{
                     __html: sanitizedContent

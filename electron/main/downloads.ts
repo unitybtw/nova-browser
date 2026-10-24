@@ -46,6 +46,24 @@ type SendToMainWindow = (channel: string, payload?: unknown) => void;
 type TrustedSenderCheck = (event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => boolean;
 
 const activeDownloads = new Map<string, Electron.DownloadItem>();
+const privateDownloadSessions = new Map<string, { closed: boolean; ids: Set<string> }>();
+
+/** Drop metadata and stop transfers before an ephemeral session is discarded. */
+export function disposePrivateDownloads(sessionId: string): void {
+  const state = privateDownloadSessions.get(sessionId);
+  if (state) {
+    state.closed = true;
+    privateDownloadSessions.delete(sessionId);
+    for (const id of state.ids) {
+      const item = activeDownloads.get(id);
+      activeDownloads.delete(id);
+      try { item?.cancel(); } catch { /* already finished */ }
+    }
+    state.ids.clear();
+  }
+  sendToMainWindow('private-downloads-cleared', sessionId);
+}
+
 const MAX_KNOWN_DOWNLOAD_PATHS = 500;
 const knownDownloadPaths = new Set<string>();
 
@@ -335,14 +353,24 @@ export function sanitizeDownloadFilename(rawFilename: string): string {
 }
 
 // Downloads Manager: Handle file downloads via Electron IPC
-export function registerDownloadsManager(targetSession: Electron.Session) {
+export function registerDownloadsManager(targetSession: Electron.Session, privateSessionId?: string) {
   if (downloadsRegistered.has(targetSession)) return;
   downloadsRegistered.add(targetSession);
+  // The registration owns this lifetime token. Deleting the lookup entry on
+  // disposal must never reopen a listener still attached to an old Session.
+  const privateState = privateSessionId ? { closed: false, ids: new Set<string>() } : undefined;
+  if (privateSessionId && privateState) privateDownloadSessions.set(privateSessionId, privateState);
   targetSession.on('will-download', (event, item, webContents) => {
+    if (privateState?.closed) { item.cancel(); return; }
+    const emitUpdate = (payload: Record<string, unknown>) => {
+      if (privateState?.closed) return;
+      sendToMainWindow('download-update', { ...payload, isPrivate: Boolean(privateSessionId), privateSessionId });
+    };
     const downloadId = `dl_${crypto.randomUUID()}`;
     const filename = item.getFilename();
     const totalBytes = item.getTotalBytes();
     activeDownloads.set(downloadId, item);
+    privateState?.ids.add(downloadId);
 
     // Security: Enforce allowed download schemes across the entire redirect chain (http, https, blob, data).
     // Disallow file:, javascript:, and internal browser schemes (including blob:file:/// evasions).
@@ -360,6 +388,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       );
       item.cancel();
       activeDownloads.delete(downloadId);
+      privateState?.ids.delete(downloadId);
       return;
     }
 
@@ -367,11 +396,13 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     if (filename.toLowerCase().endsWith('.crx')) {
       item.cancel();
       activeDownloads.delete(downloadId);
+      privateState?.ids.delete(downloadId);
       return;
     }
 
     const recordCompletedPath = () => {
       activeDownloads.delete(downloadId);
+      privateState?.ids.delete(downloadId);
       const finalPath = item.getSavePath();
       if (finalPath) {
         try {
@@ -425,6 +456,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       if (!targetPath || !path.resolve(targetPath).startsWith(path.resolve(defaultDir) + path.sep)) {
         item.cancel();
         activeDownloads.delete(downloadId);
+        privateState?.ids.delete(downloadId);
         return;
       }
       item.setSavePath(targetPath);
@@ -433,7 +465,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
       });
     }
 
-    sendToMainWindow('download-update', {
+    emitUpdate({
       id: downloadId,
       filename: path.basename(item.getSavePath() || filename),
       url: redactUrlForLog(item.getURL()),
@@ -447,7 +479,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
     let lastProgressBroadcastTime = 0;
     item.on('updated', (event, state) => {
       if (state === 'interrupted') {
-        sendToMainWindow('download-update', {
+        emitUpdate({
           id: downloadId,
           filename: path.basename(item.getSavePath() || filename),
           url: redactUrlForLog(item.getURL()),
@@ -462,7 +494,7 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
         // Throttle frequent byte updates to at most once every 250ms, unless pause status changed
         if (item.isPaused() || now - lastProgressBroadcastTime >= 250) {
           lastProgressBroadcastTime = now;
-          sendToMainWindow('download-update', {
+          emitUpdate({
             id: downloadId,
             filename: path.basename(item.getSavePath() || filename),
             url: redactUrlForLog(item.getURL()),
@@ -478,7 +510,8 @@ export function registerDownloadsManager(targetSession: Electron.Session) {
 
     item.once('done', (event, state) => {
       activeDownloads.delete(downloadId);
-      sendToMainWindow('download-update', {
+      privateState?.ids.delete(downloadId);
+      emitUpdate({
         id: downloadId,
         filename: path.basename(item.getSavePath() || filename),
         url: redactUrlForLog(item.getURL()),

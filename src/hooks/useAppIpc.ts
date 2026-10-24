@@ -1,10 +1,19 @@
 import { useEffect, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
-import type { Tab, UserSettings } from '../types/browser';
+import type { Tab, UserSettings, TabOpenRequest } from '../types/browser';
 import { getElectronAPI } from '../utils/electronBridge';
 import { showAlert } from '../utils/confirmDialog';
+import { isSafeNavigationUrl } from '../utils/safeNavigation';
+
+export function resolveNewTabRequest(request: string | TabOpenRequest, tabs: Tab[]) {
+  if (typeof request === 'string') return isSafeNavigationUrl(request) ? { url: request, sourceTabId: undefined, isIncognito: undefined } : null;
+  if (!request || typeof request.url !== 'string' || !isSafeNavigationUrl(request.url) ||
+    !Number.isInteger(request.sourceWebContentsId) || typeof request.isIncognito !== 'boolean') return null;
+  const source = tabs.find(tab => tab.webContentsId === request.sourceWebContentsId);
+  return { url: request.url, sourceTabId: source?.id, isIncognito: request.isIncognito };
+}
 
 export type AppEventHandlers = {
-  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean }) => void;
+  handleNewTab: (url?: string | any, sourceTabId?: string, opts?: { reuseBlank?: boolean; isIncognito?: boolean }) => void;
   handleNewIncognitoTab: (url?: string) => void;
   handleCloseTab: (id: string, e?: React.MouseEvent) => void;
   handleReopenClosedTab: () => void;
@@ -26,6 +35,7 @@ export type AppEventHandlers = {
 export interface UseAppIpcOptions {
   handlersRef: MutableRefObject<AppEventHandlers>;
   activeTabIdRef: MutableRefObject<string>;
+  tabsRef?: MutableRefObject<Tab[]>;
   setIsSpotlightOpen: Dispatch<SetStateAction<boolean>>;
   setIsFindInPageOpen: Dispatch<SetStateAction<boolean>>;
   setHelpInitialTab: Dispatch<SetStateAction<'help' | 'shortcuts' | 'ai' | 'privacy' | 'about'>>;
@@ -49,6 +59,7 @@ export interface UseAppIpcOptions {
 export function useAppIpc({
   handlersRef,
   activeTabIdRef,
+  tabsRef,
   setIsSpotlightOpen,
   setIsFindInPageOpen,
   setHelpInitialTab,
@@ -191,8 +202,9 @@ export function useAppIpc({
     let cleanupQuickAI: any = null;
 
     if (window.electronAPI?.onNewTab) {
-      cleanupNewTab = window.electronAPI.onNewTab((_event: any, url: string) => {
-        handlersRef.current.handleNewTab(url, undefined, { reuseBlank: false });
+      cleanupNewTab = window.electronAPI.onNewTab((_event, request) => {
+        const target = resolveNewTabRequest(request, tabsRef?.current || []);
+        if (target) handlersRef.current.handleNewTab(target.url, target.sourceTabId, { reuseBlank: false, isIncognito: target.isIncognito });
       });
     }
 

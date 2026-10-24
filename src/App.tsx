@@ -7,7 +7,7 @@ import { BrowserView } from './components/BrowserView';
 // src/hooks. The item types moved with them and are re-exported here so the
 // existing `from '../App'` import paths (DownloadToast, DownloadsPopover,
 // HistoryPage, BrowserView, syncService) keep resolving unchanged.
-import { useDownloads } from './hooks/useDownloads';
+import { getVisibleDownloads, useDownloads } from './hooks/useDownloads';
 import { useHistoryRecorder } from './hooks/useHistoryRecorder';
 import { usePermissionRequests } from './hooks/usePermissionRequests';
 import { useTabHibernation } from './hooks/useTabHibernation';
@@ -498,7 +498,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Downloads state + onDownloadUpdate IPC listener with ~100ms progress batching
   // + clear handler (extracted to useDownloads)
-  const { downloads, handleClearDownloads } = useDownloads();
+  const { downloads: allDownloads, handleClearDownloads } = useDownloads();
 
   // History state + debounced (~2s) localStorage persistence + navigation
   // recorder that handleUpdateTab calls OUTSIDE the tabs updater
@@ -615,6 +615,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
+  const downloads = useMemo(() => getVisibleDownloads(allDownloads, activeTab?.isIncognito ? '*' : undefined), [allDownloads, activeTab?.id, activeTab?.isIncognito]);
+  const handleClearVisibleDownloads = useCallback(() => handleClearDownloads(activeTab?.isIncognito ? '*' : undefined), [handleClearDownloads, activeTab?.id, activeTab?.isIncognito]);
   const {
     splitTabId,
     handleCloseSplitView,
@@ -703,6 +705,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   useAppIpc({
     handlersRef,
     activeTabIdRef,
+    tabsRef,
     setIsSpotlightOpen,
     setIsFindInPageOpen,
     setHelpInitialTab,
@@ -816,11 +819,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleOpenDownloads = useCallback(() => {
     closeAllModals();
-    const existing = tabsRef.current.find(t => t.url === 'nova://downloads');
+    const source = tabsRef.current.find(tab => tab.id === activeTabIdRef.current);
+    const existing = tabsRef.current.find(t => t.url === 'nova://downloads' && Boolean(t.isIncognito) === Boolean(source?.isIncognito));
     if (existing) {
       activateTab(existing.id);
     } else {
-      handleNewTab('nova://downloads');
+      handleNewTab('nova://downloads', source?.id, { reuseBlank: false });
     }
   }, [handleNewTab, closeAllModals, activateTab]);
   const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
@@ -1000,6 +1004,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setReaderTabId(activeTabId);
     setIsReaderModeOpen(true);
   }, [isReaderModeOpen, readerTabId, activeTabId]);
+  const handleReaderNavigate = useCallback((url: string) => {
+    if (!readerTabId || !tabsRef.current.some(tab => tab.id === readerTabId)) return;
+    handleNewTab(url, readerTabId, { reuseBlank: false });
+  }, [readerTabId, handleNewTab]);
   const handleCloseSidePanel = useCallback(() => setIsSidePanelOpen(false), []);
   const handleOpenSpotlight = useCallback(() => setIsSpotlightOpen(true), []);
 
@@ -1585,7 +1593,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 bookmarks={bookmarks}
                 activeDownloadsCount={activeDownloadsCount}
                 downloads={downloads}
-                onClearDownloads={handleClearDownloads}
+                onClearDownloads={handleClearVisibleDownloads}
                 showBookmarksBar={settings.showBookmarksBar}
                 useVerticalTabs={useVerticalTabs}
                 onToggleReaderMode={handleToggleReaderMode}
@@ -1920,10 +1928,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                     isIncognito={tab.isIncognito || false}
                     onExitIncognito={handleExitIncognitoTab}
                     history={typeof tab?.url === 'string' && (tab.url.includes('nova://history') || tab.url === 'about:history') ? history : EMPTY_ARRAY}
-                    downloads={typeof tab?.url === 'string' && (tab.url.includes('nova://downloads') || tab.url === 'about:downloads') ? downloads : EMPTY_ARRAY}
+                    downloads={typeof tab?.url === 'string' && (tab.url.includes('nova://downloads') || tab.url === 'about:downloads') ? getVisibleDownloads(allDownloads, tab?.isIncognito ? '*' : undefined) : EMPTY_ARRAY}
                     onClearHistory={handleClearHistory}
                     onRemoveHistoryItem={handleRemoveHistoryItem}
-                    onClearDownloads={handleClearDownloads}
+                    onClearDownloads={() => handleClearDownloads(tab?.isIncognito ? '*' : undefined)}
                     onPurgeMemory={handlePurgeMemory}
                     onPerformSync={handlePerformSync}
                     isDemo={demoParams.isDemo}
@@ -2092,6 +2100,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       <React.Suspense fallback={null}>
         {isReaderModeOpen && readerTabId && (
           <ReaderMode
+            key={`${readerTabId}-${Boolean(readerTab?.isIncognito)}`}
+            isIncognito={Boolean(readerTab?.isIncognito)}
+            onNavigate={handleReaderNavigate}
             url={readerTab?.url || ''}
             tabId={readerTabId}
             isActive={activeTabId === readerTabId}

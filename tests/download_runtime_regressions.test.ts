@@ -13,6 +13,7 @@ async function run() {
   let openResult = '';
   let dialogResponse = 1;
   let reservationError = false;
+  const broadcasts: Array<[string, any]> = [];
   const exports: any = {};
   const imports: Record<string, unknown> = { fs: { ...fs, openSync: (...args: any[]) => {
     if (reservationError) throw Object.assign(new Error('Cannot reserve download'), { code: 'EACCES' });
@@ -28,7 +29,7 @@ async function run() {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
   }).outputText, { exports, console, Buffer, URL, process, require: (name: string) => ({ default: imports[name], ...imports[name] as object }) });
   try {
-    exports.initDownloads(() => {}, () => true);
+    exports.initDownloads((channel: string, payload: any) => broadcasts.push([channel, payload]), () => true);
     const file = path.join(dir, 'notes.txt');
     fs.writeFileSync(file, 'test');
     openResult = 'No application is associated with this file';
@@ -83,6 +84,40 @@ async function run() {
     downloadSession.emit('will-download', {}, refused, { id: 43 });
     assert.equal(cancelled, true, 'reservation failure must cancel instead of using an unreserved path');
     assert.equal(unsafeSavePath, '', 'a failed reservation must never fall back to the existing filename');
+    reservationError = false;
+    const privateSession = new EventEmitter();
+    exports.registerDownloadsManager(privateSession, 'incognito-test');
+    const privateItem: any = new EventEmitter();
+    let privatePath = '', wasCancelled = false;
+    Object.assign(privateItem, {
+      getFilename: () => 'private.pdf', getURL: () => 'https://example.com/private.pdf?secret=1',
+      getTotalBytes: () => 100, getReceivedBytes: () => 50, isPaused: () => false,
+      getSavePath: () => privatePath, setSavePath: (value: string) => { privatePath = value; },
+      cancel: () => { wasCancelled = true; privateItem.emit('done', {}, 'cancelled'); }
+    });
+    privateSession.emit('will-download', {}, privateItem, { id: 99 });
+    privateItem.emit('updated', {}, 'interrupted');
+    const privateEvents = broadcasts.filter(([channel, payload]) => channel === 'download-update' && payload.filename === 'private.pdf');
+    assert.ok(privateEvents.length >= 2);
+    assert.ok(privateEvents.every(([, payload]) => payload.isPrivate === true && payload.privateSessionId === 'incognito-test'), 'all private download events carry main-owned classification');
+    exports.disposePrivateDownloads('incognito-test');
+    assert.equal(wasCancelled, true, 'closing a private session cancels its running transfers');
+    const afterClose = broadcasts.filter(([channel]) => channel === 'download-update').length;
+    privateItem.emit('updated', {}, 'interrupted');
+    privateItem.emit('done', {}, 'completed');
+    assert.equal(broadcasts.filter(([channel]) => channel === 'download-update').length, afterClose, 'late terminal events cannot restore private metadata');
+    assert.ok(broadcasts.some(([channel, payload]) => channel === 'private-downloads-cleared' && payload === 'incognito-test'));
+    let lateCancelled = false;
+    const lateItem = { cancel: () => { lateCancelled = true; } };
+    privateSession.emit('will-download', {}, lateItem, { id: 99 });
+    assert.equal(lateCancelled, true, 'a disposed session must reject new delayed download events');
+    const unusedPrivateSession = new EventEmitter();
+    exports.registerDownloadsManager(unusedPrivateSession, 'incognito-unused');
+    exports.disposePrivateDownloads('incognito-unused');
+    lateCancelled = false;
+    unusedPrivateSession.emit('will-download', {}, lateItem, { id: 100 });
+    assert.equal(lateCancelled, true, 'disposal before the first download also closes the event boundary');
+
     console.log('[PASS] Native download open outcomes and UTF-8/long-extension filename limits.');
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }

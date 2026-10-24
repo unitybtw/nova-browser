@@ -142,7 +142,7 @@ import {
 } from './main/adblockManager.js';
 import { BrowserMCPServer } from './mcpServer.js';
 import { initMcpBridge } from './main/mcpBridge.js';
-import { initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
+import { disposePrivateDownloads, initDownloads, markNextDownloadAsSaveAs, registerDownloadsManager, registerKnownDownloadPath, isSafeDownloadUrl, sanitizeDownloadFilename } from './main/downloads.js';
 import { initSuggestions } from './main/suggestions.js';
 import { installFromWebstore, parseExtensionPermissions, formatPermissionsForDisplay } from './main/crxInstaller.js';
 import { autoUpdater } from 'electron-updater';
@@ -478,6 +478,15 @@ async function applyProxyToAllSessions(rules: string): Promise<void> {
   return proxyMutex;
 }
 
+function openTabFromWebContents(url: string, source: Electron.WebContents): void {
+  if (source.isDestroyed()) return;
+  sendToMainWindow('new-tab', {
+    url,
+    sourceWebContentsId: source.id,
+    isIncognito: source.session !== session.defaultSession
+  });
+}
+
 function hardenIncognitoPartition(partitionName: string): boolean {
   if (hardenedIncognitoPartitions.has(partitionName)) return true;
   try {
@@ -487,7 +496,7 @@ function hardenIncognitoPartition(partitionName: string): boolean {
     // Apply privacy headers (DNT, GPC, user-agent)
     applyPrivacyHeadersToSession(partSess);
     // Register download handler for this partition
-    registerDownloadsManager(partSess);
+    registerDownloadsManager(partSess, partitionName);
     // Apply active proxy if VPN is enabled
     if (activeChromiumProxyRules && activeChromiumProxyRules !== 'direct://') {
       applyProxyToSession(partSess, activeChromiumProxyRules);
@@ -642,11 +651,13 @@ function createWindow() {
   // effects never run, so anything the renderer owned must be reclaimed here.
   mainWindow.on('closed', () => {
     mainWindow = null;
+    disposePrivateDownloads('incognito');
     // Incognito tabs are never persisted, so their partition names can never be
     // reused. Without this sweep every close/reopen cycle orphans a live
     // Electron.Session (own cache dir + permission/webRequest handlers), and
     // each later privacy/VPN/language/purge call walks all of them.
     for (const partName of Array.from(hardenedIncognitoPartitions)) {
+      disposePrivateDownloads(partName);
       hardenedIncognitoPartitions.delete(partName);
       try {
         session.fromPartition(partName, { cache: false }).clearStorageData();
@@ -823,7 +834,7 @@ function createWindow() {
 
   // Downloads Manager: Handle file downloads via Electron IPC
   registerDownloadsManager(session.defaultSession);
-  registerDownloadsManager(session.fromPartition('incognito'));
+  registerDownloadsManager(session.fromPartition('incognito'), 'incognito');
 
   const devUrl = 'http://localhost:5173';
   const distHtmlPath = path.join(__dirname, '../dist/index.html');
@@ -3451,7 +3462,7 @@ app.on('web-contents-created', (_event, contents) => {
       const isExtension = parsed.protocol === 'chrome-extension:' && /^[a-zA-Z0-9_-]+$/.test(parsed.hostname) && !parsed.username && !parsed.password;
       const isInstalledExtension = isExtension && (loadedExtensions.some(ext => ext.id === parsed.hostname) || Boolean(session.defaultSession.getExtension(parsed.hostname)));
       if (isHttp || isInstalledExtension) {
-        sendToMainWindow('new-tab', url);
+        openTabFromWebContents(url, contents);
       }
     } catch {}
     return { action: 'deny' };
@@ -4194,7 +4205,7 @@ app.on('web-contents-created', (_event, wc) => {
         if (isAllowedLinkScheme) {
           menu.append(new MenuItem({
             label: labels.openLinkNewTab,
-            click: () => sendToMainWindow('new-tab', params.linkURL)
+            click: () => openTabFromWebContents(params.linkURL, wc)
           }));
           menu.append(new MenuItem({
             label: labels.openLinkNewIncognitoTab,
@@ -4228,7 +4239,7 @@ app.on('web-contents-created', (_event, wc) => {
           if (isHttpImage) {
             menu.append(new MenuItem({
               label: labels.openImageNewTab,
-              click: () => sendToMainWindow('new-tab', params.srcURL)
+              click: () => openTabFromWebContents(params.srcURL, wc)
             }));
           }
           menu.append(new MenuItem({
@@ -4260,7 +4271,7 @@ app.on('web-contents-created', (_event, wc) => {
         if (isHttpImage) {
           menu.append(new MenuItem({
             label: labels.searchImageLens,
-            click: () => sendToMainWindow('new-tab', `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`)
+            click: () => openTabFromWebContents(`https://lens.google.com/uploadbyurl?url=${encodeURIComponent(params.srcURL)}`, wc)
           }));
         }
         menu.append(new MenuItem({ type: 'separator' }));
@@ -4359,7 +4370,7 @@ app.on('web-contents-created', (_event, wc) => {
         menu.append(new MenuItem({ role: 'copy', label: labels.copy, accelerator: 'CmdOrCtrl+C' }));
         menu.append(new MenuItem({
           label: labels.searchFor(shortQuery),
-          click: () => sendToMainWindow('new-tab', `https://www.google.com/search?q=${encodeURIComponent(queryText)}`)
+          click: () => openTabFromWebContents(`https://www.google.com/search?q=${encodeURIComponent(queryText)}`, wc)
         }));
         menu.append(new MenuItem({
           label: labels.aiExplain,
@@ -4631,6 +4642,7 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
   try {
     if (tabId && typeof tabId === 'string' && /^[a-zA-Z0-9_-]+$/.test(tabId)) {
       const partitionName = `incognito-${tabId}`;
+      disposePrivateDownloads(partitionName);
       hardenedIncognitoPartitions.delete(partitionName);
       const sess = session.fromPartition(partitionName, { cache: false });
       await sess.clearStorageData();
@@ -4640,6 +4652,7 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       const partitions = Array.from(hardenedIncognitoPartitions);
       hardenedIncognitoPartitions.clear();
       for (const partName of partitions) {
+        disposePrivateDownloads(partName);
         try {
           const sess = session.fromPartition(partName, { cache: false });
           await sess.clearStorageData();
@@ -4648,6 +4661,7 @@ ipcMain.handle('clear-incognito-session', async (event, tabId?: string) => {
       }
 
       // Clear the legacy shared 'incognito' partition.
+      disposePrivateDownloads('incognito');
       const legacySess = session.fromPartition('incognito', { cache: false });
       await legacySess.clearStorageData();
       await legacySess.clearCache();

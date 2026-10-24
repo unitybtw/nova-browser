@@ -141,8 +141,8 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
     version: '1.4.9',
     date: 'September 2026',
-    title: 'Private Tab Navigation, E2EE Vault Conflict Resolution & Local Whisper AI',
-    lede: 'Seamless switching between private and normal tabs, deterministic E2EE synchronization with race condition resilience, on-device Whisper voice transcription, and strict boundary defense across every subsystem.',
+    title: 'Private Tab Navigation, Encrypted Vault Conflict Resolution & Local Whisper AI',
+    lede: 'Switching between private and normal tabs, client-side encrypted synchronization with race condition resilience, on-device Whisper voice transcription, and browser boundary improvements.',
     hero: {
       src: './screenshots/newtab.png',
       alt: 'Nova Browser v1.4.9 release interface.',
@@ -150,7 +150,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     },
     highlights: [
       'Private tabs lifecycle hardened: effortless switching to normal tabs with automatic session cleanup and UI badge indicators.',
-      'E2EE Sync Vault upgraded with LWW timestamp verification, conflict resolution retries, and tombstone propagation.',
+      'Encrypted Sync Vault upgraded with LWW timestamp verification, conflict resolution retries, and tombstone propagation.',
       'On-device Whisper voice transcription powered by local WebAssembly transformers for zero-latency private speech recognition.',
       'Agent navigation guard and CRX archive safety preventing SSRF, zip-slip, and extension decompression bombs.',
       'Full modal and popover dialog accessibility (A11y) with bulletproof focus trapping and keyboard navigation.',
@@ -168,12 +168,12 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       },
       {
         eyebrow: 'Cloud Sync',
-        title: 'Deterministic E2EE vault sync',
+        title: 'Deterministic encrypted vault sync',
         body: 'Sync conflicts now resolve deterministically using field-level LWW clocks and automatic race retries, preventing silent overwrites and data loss.',
         points: [
           'Field-level write timestamping guarantees latest edit wins across devices.',
           'Tombstone tracking purges deleted items cleanly without re-surfacing.',
-          'Zero-knowledge AES-256-GCM envelope v2 verification.',
+          'Client-side AES-256-GCM envelope v2 verification.',
         ],
       },
       {
@@ -552,30 +552,30 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     version: '1.4.3',
     date: 'August 2026',
     title: 'Chrome Web Store Extensions & Encrypted Sync',
-    lede: 'Install extensions from the Chrome Web Store directly, and pair a second device with a single code — no account, no email, no password, no server that can read your bookmarks.',
+    lede: 'Install extensions from the Chrome Web Store directly and synchronize devices through your cloud account with client-side encrypted data.',
     highlights: [
       'Direct Manifest V3 extension installation from the Chrome Web Store.',
-      'End-to-end encrypted sync for bookmarks, history, and settings using AES-256-GCM.',
+      'Client-side encrypted sync for bookmarks, history, and settings using AES-256-GCM; authentication-provider trust still applies.',
       'Popup flooding protection with sliding-window rate limiters.',
     ],
     sections: [
       {
         eyebrow: 'Nova Sync',
-        title: 'Pair a device with one code',
-        body: 'The primary device generates a one-click sync code; the other device types it in and the browser profile is there. No email, no password, no account to recover. Bookmarks and passwords are encrypted client-side before they leave the machine, with a 12-word recovery seed as the only way back in.',
+        title: 'Encrypted sync between devices',
+        body: 'Sign in with your cloud account on each device. Bookmarks and passwords are encrypted locally before upload. Your account password also reaches Supabase Auth over HTTPS and derives the sync key, so the authentication provider remains trusted. Accountless code pairing and recovery seeds are not supported by the current implementation.',
         media: {
           src: './screenshots/sync.png',
-          alt: 'Nova Sync dialog offering a sync code field, a generate sync code button, and a note that passwords and bookmarks are encrypted client-side with 256-bit AES-GCM.',
+          alt: 'Earlier Nova Sync interface showing a device code and encryption information.',
           caption:
-            'Nova Sync: one code connects the second device, with client-side 256-bit AES-GCM encryption.',
+            'Earlier sync interface. Current sync requires a cloud account and uses client-side AES-256-GCM encryption.',
         },
         points: [
-          'End-to-end encrypted sync engine with a 12-word recovery seed.',
-          'No email or password required — the code is the whole handshake.',
+          'Client-side encrypted sync using your cloud account. Authentication and encryption currently share password-derived key material.',
+          'Sign in on each device with the same cloud account.',
         ],
         stats: [
           { value: '256-bit', label: 'AES-GCM, client-side' },
-          { value: '12', label: 'word recovery seed' },
+          { value: '600k', label: 'PBKDF2 iterations' },
         ],
       },
       {
@@ -596,7 +596,7 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       },
       {
         category: 'security',
-        text: 'End-to-end encrypted sync engine with 12-word recovery seed.',
+        text: 'Client-side encrypted sync engine; the account authentication provider remains trusted.',
       },
       {
         category: 'security',

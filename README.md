@@ -5,7 +5,7 @@
   # Nova Browser
 
   **Open-Source Desktop Browser for Developers & Coding Agents**  
-  *Built with Electron, React, TypeScript & Vite — Featuring Native MCP Server, On-Device WebGPU & Whisper STT, and Zero-Knowledge E2EE Sync*
+  *Built with Electron, React, TypeScript & Vite — Featuring Native MCP Server, On-Device WebGPU & Whisper STT, and client-side encrypted Sync*
 
   <br/>
 
@@ -15,7 +15,7 @@
   [![React](https://img.shields.io/badge/React-18.x-61DAFB?style=for-the-badge&logo=react)](https://react.dev/)
   [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
   [![Vite](https://img.shields.io/badge/Vite-6.x-646CFF?style=for-the-badge&logo=vite)](https://vitejs.dev/)
-  [![E2EE Security](https://img.shields.io/badge/E2EE-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
+  [![Client-side Encryption](https://img.shields.io/badge/Encryption-AES--256--GCM-059669?style=for-the-badge&logo=shield)](https://github.com/unitybtw/nova-browser)
   [![CI](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/unitybtw/nova-browser/actions/workflows/ci.yml)
   [![CodeQL](https://github.com/unitybtw/nova-browser/actions/workflows/codeql.yml/badge.svg)](https://github.com/unitybtw/nova-browser/actions/workflows/codeql.yml)
   [![Security Alerts](https://img.shields.io/badge/CodeQL%20Alerts-0%20Open-10B981?style=for-the-badge)](https://github.com/unitybtw/nova-browser/security/code-scanning)
@@ -48,7 +48,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 
 - **Native Model Context Protocol (MCP) Server (Port 3020)**: Built-in local HTTP/SSE MCP server exposing 26 browser automation and inspection tools directly to coding agents (Claude Code, Cursor, Windsurf, Antigravity) with zero configuration.
 - **On-Device Whisper Voice & Neural Execution**: Run multilingual speech-to-text locally via Transformers.js (`whisper-tiny`, ~41 MB) and on-device LLMs via WebGPU (Llama 3.2, Phi 3.5 Vision, Qwen 2.5). Exactly 0 KB of voice audio or model prompt data is transmitted to cloud servers.
-- **Zero-Telemetry Network-Level Privacy Shield**: Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM zero-knowledge cloud sync.
+- **Zero-Telemetry Network-Level Privacy Shield**: Employs `@cliqz/adblocker` (EasyList, EasyPrivacy, Peter Lowe, uBlock filters) to terminate ads and tracking beacons at the Chromium network layer before DOM parsing, paired with client-side AES-256-GCM encrypted cloud sync.
 - **Tab Hibernation & Memory Eviction**: Dormant background tabs automatically suspend active rendering execution via an LRU pool (capping live webviews to 6) while preserving complete navigation state, preventing Chromium process explosion regardless of tab count.
 - **Hardened Security Architecture**: Audited against CodeQL static analysis with 0 open security alerts, TOCTOU-safe file descriptor operations, strict context isolation, and SSRF/DNS rebinding defense.
 
@@ -56,7 +56,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 
 ## Overview
 
-**Nova Browser** is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite. Designed for developers, researchers, and privacy-conscious users, Nova pairs standard Chromium rendering with a native **Model Context Protocol (MCP) server**, **on-device WebGPU neural execution**, **local Whisper speech recognition**, **zero-knowledge encrypted multi-device sync**, **Chrome Web Store extension support**, and a **dual-view split screen**.
+**Nova Browser** is an open-source, sovereign desktop web browser built with Electron, React, TypeScript, and Vite. Designed for developers, researchers, and privacy-conscious users, Nova pairs standard Chromium rendering with a native **Model Context Protocol (MCP) server**, **on-device WebGPU neural execution**, **local Whisper speech recognition**, **client-side encrypted multi-device sync**, **Chrome Web Store extension support**, and a **dual-view split screen**.
 
 ---
 
@@ -74,7 +74,7 @@ Rather than bloated cloud telemetry or generic hype, Nova focuses on concrete de
 | **Model Context Protocol (MCP)** | **Native 26-Tool Server (Port 3020)** | Not available | Not available | Not available |
 | **Ad & Tracker Protection** | **Built-in Session Engine (EasyList)** | Not built-in (Extensions needed) | Brave Shields | Content Blockers |
 | **Background Tab Strategy** | **Background Activity Suspension** | Memory Saver (Tab Discard) | Sleeping Tabs | OS Memory Management |
-| **Multi-Device Cloud Sync** | **Zero-Knowledge E2EE (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
+| **Multi-Device Cloud Sync** | **Client-side Encrypted (AES-256)** | Google Account required | Sync Chain | iCloud Keychain |
 | **Split View Browsing** | **Native Dual Synchronized Canvas** | Not built-in | Not built-in | macOS Split View |
 | **Telemetry & Analytics** | **Zero Telemetry (0 KB)** | Extensive telemetry | Opt-out required | Telemetry enabled |
 | **Security Auditing** | **CodeQL Static Analysis (0 Alerts)** | Chromium Security & Bug Bounty | Internal Security & Bug Bounty | Apple Security Engineering |
@@ -140,9 +140,9 @@ Current English interface in Clean Minimalist mode with the light theme.
 
 ## Key Features
 
-### Nova Cloud Sync (Zero-Knowledge E2EE)
-- **End-to-End Encryption (AES-256-GCM)**: Saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted locally with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
-- **Encrypted Multi-Device Sync**: Sign in with your Nova Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Encryption keys stay on your local device; the cloud server only ever receives encrypted ciphertext.
+### Nova Cloud Sync (Client-side Encrypted)
+- **Client-side Encryption (AES-256-GCM)**: Saved passwords, bookmarks, browsing history, settings, and workspace arrangements are encrypted locally with PBKDF2 (600,000 iterations) and 256-bit AES-GCM before transmission.
+- **Encrypted Multi-Device Sync**: Sign in with your Nova Cloud account to synchronize bookmarks, passwords, and preferences across your computers in real-time over Supabase Realtime WebSockets. Vault contents are encrypted before upload. Supabase Auth also receives your sign-in password over HTTPS, and this password is used for key derivation; the authentication provider remains trusted.
 - **Code-Based Pairing (Roadmap)**: Accountless 1-click device pairing via temporary sync codes is in active development for a future release.
 
 ### On-Device Whisper Voice & Speech Recognition
@@ -163,7 +163,7 @@ Current English interface in Clean Minimalist mode with the light theme.
 - **Zip-Slip & Path Traversal Neutralization**: All CRX archive extractions are validated in-memory before decompression to prevent directory traversal attacks.
 
 ### Native `nova://` Internal Pages
-- **`nova://settings`**: Complete browser preferences, theme toggles, search engine picker, shortcuts, zero-knowledge password vault, and sync controls.
+- **`nova://settings`**: Complete browser preferences, theme toggles, search engine picker, shortcuts, client-side encrypted password vault, and sync controls.
 - **`nova://history`**: Grouped timeline search, date filtering, and quick item deletion.
 - **`nova://downloads`**: Live progress indicators, pause/resume, folder shortcuts, and file launching.
 - **`nova://newtab`**: Start page with quick dials, customizable animated background, and tasks widget.
@@ -306,7 +306,7 @@ Nova Browser features an entirely local-first neural execution architecture:
 | **Bundler & Build Tool** | [Vite 6](https://vitejs.dev/) + [esbuild](https://esbuild.github.io/) | Sub-second HMR and optimized production bundles |
 | **Styling & Motion** | [TailwindCSS 3](https://tailwindcss.com/) + [Framer Motion](https://www.framer.com/motion/) | Utility styling and GPU-accelerated micro-interactions |
 | **Icons** | [Lucide React](https://lucide.dev/) | Clean consistent icon set |
-| **Cloud Sync & Vault** | [Supabase Realtime](https://supabase.com/) | E2EE ciphertext sync over WebSockets |
+| **Cloud Sync & Vault** | [Supabase Realtime](https://supabase.com/) | Encrypted ciphertext sync over WebSockets |
 | **Cryptography** | Web Crypto API + Node.js `crypto` | PBKDF2-SHA256 (600k iterations) + AES-256-GCM |
 | **AdBlock & Filtering** | [`@cliqz/adblocker-electron`](https://github.com/cliqz-oss/adblocker) | EasyList, EasyPrivacy, Peter Lowe network filtering |
 | **AI Protocol** | [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) | JSON-RPC over HTTP/SSE server |
@@ -321,7 +321,7 @@ Nova Browser runs fully offline out of the box with zero required configuration.
 
 | Variable | Required | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `VITE_SUPABASE_URL` | Optional | `""` | Supabase project URL for zero-knowledge cloud sync |
+| `VITE_SUPABASE_URL` | Optional | `""` | Supabase project URL for client-side encrypted cloud sync |
 | `VITE_SUPABASE_ANON_KEY` | Optional | `""` | Supabase anonymous public API key |
 | `MCP_PORT` | Optional | `3020` | Local port for the Model Context Protocol HTTP/SSE server |
 | `MCP_TOKEN` | Optional | Auto-generated | Bearer token for authenticating external MCP clients |
@@ -432,7 +432,7 @@ flowchart TB
     subgraph Neural["On-Device AI & Sync Vault"]
         whisperEngine["Local Whisper STT<br/>ONNX whisper-tiny / 0 KB to Cloud"]
         webgpuEngine["WebGPU Neural Runtime<br/>Llama 3.2 / Phi 3.5 / Qwen 2.5"]
-        syncVault["Zero-Knowledge E2EE Vault<br/>AES-256-GCM / Supabase Realtime"]
+        syncVault["client-side encrypted Vault<br/>AES-256-GCM / Supabase Realtime"]
     end
 
     agentClient <-->|"JSON-RPC / SSE"| mcp
@@ -483,7 +483,7 @@ flowchart TB
 | **Preload Bridge** | Context bridge barrier (`contextIsolation: true`) | Selective unidirectional API exposure via `window.electronAPI`, guest webview isolation | `electron/preload.ts`, `electron/guest-preload.ts` |
 | **Renderer Process** | Sandboxed Chromium UI (`nodeIntegration: false`) | React 18 UI shell, 27 modular state hooks, tab virtualization, dual split-screen geometry | `src/App.tsx`, `src/hooks/*`, `src/components/*` |
 | **AI Web Worker** | Isolated worker thread | Off-thread WebGPU neural inference (Llama 3.2, Phi 3.5, Qwen 2.5), local Whisper ONNX speech recognition | `src/workers/aiWorker.ts`, `src/services/localSpeechRecognition.ts` |
-| **Encrypted Vault** | Zero-knowledge client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
+| **Encrypted Vault** | client-side encryption | PBKDF2 (600k) + AES-256-GCM encrypted cloud sync over Supabase Realtime WebSockets | `src/services/syncService.ts`, `src/services/syncCrypto.ts` |
 | **External Agents** | Authenticated JSON-RPC over port 3020 | Autonomous agent navigation, DOM interaction, and inspection via 26 built-in tools | Claude Desktop, Cursor, Windsurf, Antigravity |
 
 ### Architectural Subsystem Breakdown
@@ -512,7 +512,7 @@ flowchart TB
    - **Autonomous ReAct Agent & Visual Cursor**: Multi-step reasoning loop with live DOM tree inspection and an animated virtual glowing cursor overlay (`AICursorOverlay.tsx`) for real-time visual execution tracking.
    - **Memory Vault (`aiMemory.ts`)**: Categorized persistent memory (`[PREFERENCE]`, `[FACT]`, `[INSTRUCTION]`) with LRU eviction and quota-safe storage management.
 
-5. **Client-Side Zero-Knowledge E2EE Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
+5. **Client-Side client-side encrypted Sync Engine (`src/services/syncService.ts`, `src/services/syncCrypto.ts`)**:
    - **Client-Side Cryptography**: Passwords, bookmarks, history, and workspace configurations are encrypted locally using PBKDF2 (600,000 iterations) with cryptographic salt and 256-bit AES-GCM before transmission.
    - **Realtime Encrypted Sync**: Synchronizes client-encrypted vaults across devices over Supabase Realtime WebSockets without centralized plaintext storage. Remote property injection protections ensure settings deserialization cannot tamper with Object prototypes.
 
@@ -557,7 +557,7 @@ flowchart TB
 - [x] On-Device Whisper Voice Navigation & Speech Recognition
 - [x] Modern UI with Vertical Tabs & Workspaces
 - [x] Native MCP Autonomous AI Agent Protocol (26 Built-in Tools) & Virtual Glowing Cursor
-- [x] Zero-Knowledge Encrypted Cloud Sync (AES-256-GCM via Nova Cloud)
+- [x] client-side encrypted Cloud Sync (AES-256-GCM via Nova Cloud)
 - [x] Direct Chrome Web Store 1-Click Extension Installation
 - [x] Built-in Privacy Shield (AdBlock & Tracker Protection)
 - [x] Dual-View Split Screen with Drag-to-Resize Divider
@@ -572,10 +572,10 @@ flowchart TB
 
 ## Security & Privacy Commitment
 
-- **Zero-Knowledge Architecture**: Encryption keys never leave your device. All passwords and confidential sync data are encrypted client-side with 256-bit AES-GCM and PBKDF2 (600,000 iterations).
+- **Client-side Encryption Architecture**: Confidential sync data is encrypted client-side with 256-bit AES-GCM and PBKDF2 (600,000 iterations). The current key is derived from the account password, which is also sent over HTTPS to Supabase Auth. This design does not provide zero-knowledge protection against the authentication provider. Normal history, AI memory and exported backups are not covered by whole-profile encryption.
 - **Strict Context Isolation & Sandboxing**: Renderer code has no direct access to Node.js APIs or disk. Every IPC event enforces `isTrustedSender` frame verification.
 - **Atomic File Descriptors**: File operations on crash logs, bookmarks, and caching avoid path-based TOCTOU checks, utilizing atomic descriptor calls.
-- **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Transparent disclosure: direct network connections occur only when explicitly using specific features, such as opt-in Supabase sync, downloading local model weights from HuggingFace, fetching wallpapers from Unsplash/Bing, or page translation via Google Translate).
+- **Zero Telemetry & Tracking**: We do not collect, store, or monetize your browsing history. No analytics, error telemetry, or tracking beacons are bundled. (Network disclosure: update checks contact GitHub automatically. Search suggestions can send typing to search providers before Enter; custom shortcut icons use Google/DuckDuckGo services. Opt-in sync uses Supabase, model downloads use HuggingFace, wallpapers may use Unsplash/Bing, and translation sends page text to Google. These feature requests are separate from analytics.)
 
 ### Binary Verification
 
@@ -637,3 +637,9 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 <div align="center">
   <sub>Designed & Developed by the Nova Browser Team</sub>
 </div>
+
+### Privacy boundaries
+
+Private tabs keep downloads and Reader Mode notes in memory. Closing their private session cancels its running downloads and clears their activity metadata; files already downloaded remain on disk. Previously saved download records without session classification cannot safely be identified as private; use Clear history on the Downloads page to remove old records if needed. Private Reader Mode hides embedded images and handles links through its source tab so normal-profile cookies are not reused.
+
+Cloud sync remains client-side encrypted, but the authentication provider is trusted with the password used for key derivation. A separate never-uploaded encryption secret requires an explicit vault migration and recovery design; this update does not silently change existing keys or risk locking users out.

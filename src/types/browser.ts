@@ -76,7 +76,16 @@ export interface SavedPassword {
   createdAt?: number;
 }
 
+export interface TabOpenRequest {
+  url: string;
+  sourceWebContentsId: number;
+  isIncognito: boolean;
+}
+
 export interface DownloadItem {
+  /** Assigned by the main process, never by downloaded content. */
+  isPrivate?: boolean;
+  privateSessionId?: string;
   id: string;
   url: string;
   filename: string;

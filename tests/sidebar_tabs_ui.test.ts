@@ -205,6 +205,30 @@ async function main() {
     await React.act(async () => { resolveOpen(true); await new Promise(resolve => setImmediate(resolve)); });
     assert.ok(container.querySelector('[title="latest.pdf"]'), 'an older OS action must not dismiss a newer download');
     console.log('[PASS] Download pending action, failure retry, cancellation, successful dismissal, and stale result isolation');
+    const { handleReaderLink, persistArticleHighlights, sanitizeReaderContent } = await import('../src/components/ReaderMode');
+    const readerHost = w.document.createElement('div');
+    readerHost.innerHTML = '<a href="https://example.com/private"><span>Read more</span></a>';
+    const readerNavigations: string[] = [];
+    for (const button of [0, 1]) {
+      let prevented = false;
+      handleReaderLink({ button, target: readerHost.querySelector('span'), preventDefault: () => { prevented = true; }, stopPropagation: () => {} } as any, url => readerNavigations.push(url));
+      assert.ok(prevented, 'reader activation cannot fall through to a context-free popup');
+    }
+    assert.equal(readerNavigations.length, 2);
+    readerHost.querySelector('a')!.setAttribute('href', 'javascript:alert(1)');
+    handleReaderLink({ button: 0, target: readerHost.querySelector('span'), preventDefault() {}, stopPropagation() {} } as any, url => readerNavigations.push(url));
+    assert.equal(readerNavigations.length, 2, 'dangerous reader destinations are rejected');
+    let highlightWrites = 0;
+    persistArticleHighlights('https://example.com/private', [], true, () => { highlightWrites++; });
+    assert.equal(highlightWrites, 0);
+    persistArticleHighlights('https://example.com/normal', [], false, () => { highlightWrites++; });
+    assert.equal(highlightWrites, 1);
+    const article = '<p>Article text</p><img src="https://example.com/tracker"><picture><source srcset="https://example.com/other"></picture><script>alert(1)</script>';
+    const privateArticle = sanitizeReaderContent(article, true);
+    assert.ok(privateArticle.includes('Article text'));
+    assert.ok(!privateArticle.includes('<img') && !privateArticle.includes('<source') && !privateArticle.includes('<script'), 'private reader cannot fetch images using the normal host session');
+    assert.ok(sanitizeReaderContent(article, false).includes('<img'), 'ordinary reader images remain available');
+    console.log('[PASS] Reader navigation gestures, unsafe schemes, private highlights and private image isolation');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { TabOpenRequest } from '../src/types/browser';
 
 contextBridge.exposeInMainWorld('electronAPI', {
   // Theme
@@ -136,8 +137,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('shortcut', handler);
     return () => ipcRenderer.removeListener('shortcut', handler);
   },
-  onNewTab: (callback: (event: any, url: string) => void) => {
-    const handler = (_event: any, url: string) => callback(null, url);
+  onNewTab: (callback: (event: any, url: string | TabOpenRequest) => void) => {
+    const handler = (_event: any, url: string | TabOpenRequest) => callback(null, url);
     ipcRenderer.on('new-tab', handler);
     return () => ipcRenderer.removeListener('new-tab', handler);
   },
@@ -150,6 +151,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const handler = (_event: any, text: string) => callback(null, text);
     ipcRenderer.on('quick-ai-action', handler);
     return () => ipcRenderer.removeListener('quick-ai-action', handler);
+  },
+  onPrivateDownloadsCleared: (callback: (event: null, sessionId: string) => void) => {
+    const handler = (_event: unknown, sessionId: string) => callback(null, sessionId);
+    ipcRenderer.on('private-downloads-cleared', handler);
+    return () => ipcRenderer.removeListener('private-downloads-cleared', handler);
   },
   onDownloadUpdate: (callback: (event: any, data: any) => void) => {
     const handler = (_event: any, data: any) => callback(null, data);

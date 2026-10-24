@@ -5,14 +5,25 @@ export type { DownloadItem };
 
 const STORAGE_KEY = 'nova_downloads_history';
 
+export function getPersistableDownloads(items: DownloadItem[]): DownloadItem[] {
+  return items.filter(item => !item.isPrivate && !item.privateSessionId);
+}
+
+export function getVisibleDownloads(items: DownloadItem[], privateSessionId?: string): DownloadItem[] {
+  return privateSessionId
+    ? items.filter(item => item.isPrivate === true && (privateSessionId === '*' || item.privateSessionId === privateSessionId))
+    : getPersistableDownloads(items);
+}
+
 function persistDownloadsToStorage(items: DownloadItem[]): void {
+  const publicItems = getPersistableDownloads(items);
   try {
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 150)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(publicItems.slice(0, 150)));
     }
   } catch (err) {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, 50)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(publicItems.slice(0, 50)));
     } catch (_) {}
   }
 }
@@ -32,7 +43,7 @@ export function useDownloads() {
       // activeDownloads map is empty upon browser restart. Ensure terminal/interrupted
       // state and clear isPaused to avoid dead UI controls.
       return parsed.filter((d): d is DownloadItem => Boolean(
-        d && typeof d === 'object' && typeof d.id === 'string' && d.id &&
+        d && !d.isPrivate && !d.privateSessionId && typeof d === 'object' && typeof d.id === 'string' && d.id &&
         typeof d.filename === 'string' && typeof d.url === 'string' &&
         ['progressing', 'completed', 'cancelled', 'interrupted'].includes(d.state)
       )).map(d => ({
@@ -117,7 +128,15 @@ export function useDownloads() {
       }
     });
 
+    const removePrivateCleanupListener = window.electronAPI.onPrivateDownloadsCleared?.((_event, sessionId) => {
+      for (const [id, item] of Object.entries(pendingUpdates)) {
+        if (item.privateSessionId === sessionId) delete pendingUpdates[id];
+      }
+      setDownloads(current => current.filter(item => item.privateSessionId !== sessionId));
+    });
+
     return () => {
+      removePrivateCleanupListener?.();
       if (throttleTimer) {
         clearTimeout(throttleTimer);
         throttleTimer = null;
@@ -126,11 +145,13 @@ export function useDownloads() {
     };
   }, []);
 
-  const handleClearDownloads = useCallback(() => {
+  const handleClearDownloads = useCallback((privateSessionId?: string) => {
     // Clearing history must leave running/paused transfers reachable so the
     // user can still resume or cancel them until Electron reports completion.
     setDownloads(prev => {
-      const active = prev.filter(item => item.state === 'progressing');
+      const active = prev.filter(item => item.state === 'progressing' || (privateSessionId
+        ? (privateSessionId === '*' ? !item.isPrivate : item.privateSessionId !== privateSessionId)
+        : Boolean(item.isPrivate || item.privateSessionId)));
       persistDownloadsToStorage(active);
       return active;
     });

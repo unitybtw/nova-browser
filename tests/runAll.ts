@@ -98,3 +98,5 @@ import './history_recorder_regressions.test';
 import './download_actions.test';
 
 import './newtab_collection_recovery.test';
+
+import './privacy_boundary_fixes.test';

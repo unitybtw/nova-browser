@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-import type { DownloadItem, PermissionRequest } from './types/browser';
+import type { DownloadItem, PermissionRequest, TabOpenRequest } from './types/browser';
 import type { NativeVoiceInfo } from './services/tts';
 
 /** Wallpaper photo object returned by the main-process wallpaper providers. */
@@ -205,9 +205,10 @@ export interface ElectronAPI {
   setVpn: (config: { enabled: boolean; proxyUrl?: string }) => Promise<boolean | { error: string }>;
   // Shortcuts, navigation & download events
   onShortcut: (callback: (event: null, command: string) => void) => () => void;
-  onNewTab: (callback: (event: null, url: string) => void) => () => void;
+  onNewTab: (callback: (event: null, url: string | TabOpenRequest) => void) => () => void;
   onNewIncognitoTab: (callback: (event: null, url?: string) => void) => () => void;
   onQuickAIAction: (callback: (event: null, text: string) => void) => () => void;
+  onPrivateDownloadsCleared: (callback: (event: null, sessionId: string) => void) => () => void;
   onDownloadUpdate: (callback: (event: null, data: DownloadItem) => void) => () => void;
   // Extension management
   installExtension: (folderPath: string) => Promise<{

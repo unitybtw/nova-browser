@@ -152,4 +152,37 @@ check('one malformed download cannot discard valid history during restart', () =
   assert.equal(state[2].receivedBytes, 0);
   assert.equal(state[2].totalBytes, 0);
 });
+check('private downloads remain memory-only and private cleanup removes queued metadata', () => {
+  let state: DownloadItem[] = [];
+  let listener: any, clearPrivate: any;
+  const effects: Array<() => any> = [];
+  const stored = new Map<string, string>();
+  const hook = loadHook('src/hooks/useDownloads.ts', {
+    useState: (init: any) => { state = init(); return [state, (next: any) => { state = typeof next === 'function' ? next(state) : next; }]; },
+    useRef: (value: any) => ({ current: value }), useCallback: (fn: any) => fn, useEffect: (effect: any) => effects.push(effect),
+  }, { '../utils/safeStorage': { safeParseArrayWithBackup: () => [] } }, {
+    localStorage: { getItem: (key: string) => stored.get(key) ?? null, setItem: (key: string, value: string) => stored.set(key, value) },
+    window: { electronAPI: { onDownloadUpdate: (fn: any) => { listener = fn; }, onPrivateDownloadsCleared: (fn: any) => { clearPrivate = fn; } } }
+  }).useDownloads;
+  const api = hook(); const cleanups = effects.map(fn => fn());
+  const normal: DownloadItem = { id: 'public', filename: 'public.pdf', url: 'https://example.com/public', state: 'completed', receivedBytes: 0, totalBytes: 10 };
+  const privateItem = { ...normal, id: 'private', filename: 'sensitive.pdf', isPrivate: true, privateSessionId: 'incognito-a' };
+  try {
+    listener(null, normal); listener(null, privateItem);
+    assert.equal(state.length, 2, 'private transfer state remains controllable in memory');
+    assert.equal(JSON.parse(stored.get('nova_downloads_history')!).length, 1);
+    assert.ok(!stored.get('nova_downloads_history')!.includes('sensitive'));
+    api.handleClearDownloads();
+    assert.equal(state.length, 1, 'normal clear does not clear another private view');
+    assert.equal(state[0].id, 'private');
+    listener(null, normal);
+    api.handleClearDownloads('*');
+    assert.equal(state.length, 1, 'private clear preserves normal history');
+    assert.equal(state[0].id, 'public');
+    listener(null, privateItem);
+    clearPrivate(null, 'incognito-a');
+    assert.equal(state.length, 1);
+    assert.equal(state[0].id, 'public', 'session disposal preserves normal downloads');
+  } finally { cleanups.forEach(fn => fn?.()); }
+});
 assert.equal(failures.length, 0, `Lifecycle regressions: ${failures.join(', ')}`);
