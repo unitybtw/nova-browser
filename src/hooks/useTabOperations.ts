@@ -19,6 +19,23 @@ const EMPTY_DOCUMENT_STATE: Partial<Tab> = {
   thumbnail: undefined,
 };
 
+const INTERNAL_PAGE_TITLES: Record<string, string> = {
+  blank: 'New Tab',
+  newtab: 'New Tab',
+  settings: 'Settings',
+  history: 'History',
+  downloads: 'Downloads',
+  changelog: "What's New",
+  'whats-new': "What's New",
+};
+
+function internalPageTitle(url: string): string | undefined {
+  if (url === 'https://newtab') return 'New Tab';
+  const page = url.startsWith('nova://') ? url.slice(7).split('#')[0]
+    : url.startsWith('about:') ? url.slice(6) : '';
+  return INTERNAL_PAGE_TITLES[page];
+}
+
 export interface UseTabOperationsOptions {
   tabsRef: MutableRefObject<Tab[]>;
   activeTabId: string;
@@ -247,14 +264,23 @@ export function useTabOperations({
 
   const handleReorderFullList = useCallback((reorderedWorkspaceTabs: Tab[]) => {
     setTabs(prevTabs => {
-      const activeWs = activeWorkspaceId || 'default';
-      const workspaceIds = new Set(reorderedWorkspaceTabs.map(t => t.id));
-      const nonWorkspaceTabs = prevTabs.filter(t => !workspaceIds.has(t.id) && (t.workspaceId || 'default') !== activeWs);
-      // Guarantee any tab from the current workspace that was omitted is preserved
-      const missingWorkspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs && !workspaceIds.has(t.id));
-      return [...reorderedWorkspaceTabs, ...missingWorkspaceTabs, ...nonWorkspaceTabs];
+      const activeWs = activeWorkspaceIdRef.current || 'default';
+      const currentWorkspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
+      const remaining = new Map(currentWorkspaceTabs.map(tab => [tab.id, tab]));
+      const ordered: Tab[] = [];
+      // Drag snapshots supply order only. Keep live records and ignore closed,
+      // repeated or foreign tabs so a delayed event cannot overwrite new state.
+      for (const candidate of reorderedWorkspaceTabs) {
+        const current = remaining.get(candidate.id);
+        if (!current) continue;
+        ordered.push(current);
+        remaining.delete(candidate.id);
+      }
+      ordered.push(...remaining.values());
+      let index = 0;
+      return prevTabs.map(tab => (tab.workspaceId || 'default') === activeWs ? ordered[index++] : tab);
     });
-  }, [activeWorkspaceId, setTabs]);
+  }, [activeWorkspaceIdRef, setTabs]);
 
   const handleDuplicateTab = useCallback((tabId: string) => {
     // Compute from tabsRef OUTSIDE the updater (StrictMode-safe)
@@ -451,11 +477,7 @@ export function useTabOperations({
       return;
     }
 
-    let initialTitle = 'New Tab';
-    if (finalUrl.startsWith('nova://settings')) initialTitle = 'Settings';
-    else if (finalUrl.startsWith('nova://history')) initialTitle = 'History';
-    else if (finalUrl.startsWith('nova://downloads')) initialTitle = 'Downloads';
-    else if (finalUrl.startsWith('nova://changelog') || finalUrl.startsWith('nova://whats-new')) initialTitle = "What's New";
+    const initialTitle = internalPageTitle(finalUrl) || 'New Tab';
 
     // If target/current tab is an unnavigated empty "New Tab" and url is specific (e.g. settings, history),
     // navigate current tab instead of spawning a redundant new tab
@@ -467,7 +489,7 @@ export function useTabOperations({
       !currentTarget.canGoBack;
 
     if (isCurrentBlank && finalUrl !== 'nova://newtab' && (opts?.reuseBlank ?? true)) {
-      const isInternalPage = finalUrl.startsWith('nova://') || finalUrl === 'about:blank';
+      const isInternalPage = Boolean(internalPageTitle(finalUrl));
       setTabs(prev => prev.map(tab => tab.id === currentTarget.id ? {
         ...tab,
         url: finalUrl,
@@ -604,15 +626,8 @@ export function useTabOperations({
 
     tabThumbnailCache.remove(targetId);
 
-    let newTitle: string | undefined = undefined;
-    const isNewTabUrl = url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
-    if (isNewTabUrl) newTitle = 'New Tab';
-    else if (url.startsWith('nova://settings')) newTitle = 'Settings';
-    else if (url.startsWith('nova://history')) newTitle = 'History';
-    else if (url.startsWith('nova://downloads')) newTitle = 'Downloads';
-    else if (url.startsWith('nova://changelog') || url.startsWith('nova://whats-new')) newTitle = "What's New";
-
-    const isInternalPage = !!newTitle;
+    const newTitle = internalPageTitle(url);
+    const isInternalPage = Boolean(newTitle);
 
     if (targetId !== currentActiveId) {
       // Safe to run before the navigation setTabs below: both are functional
@@ -636,6 +651,7 @@ export function useTabOperations({
 
     setTabs(p => p.map(t => t.id === targetId ? {
       ...t,
+      ...(isInternalPage ? { ...EMPTY_DOCUMENT_STATE, favicon: undefined, canGoBack: false, canGoForward: false } : {}),
       url,
       isLoading: !isInternalPage,
       ...(newTitle ? { title: newTitle } : {})

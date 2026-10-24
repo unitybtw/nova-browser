@@ -97,6 +97,42 @@ check('leaving private mode clears the cached private document preview', () => {
   assert.ok(h.removed.includes('private'));
 });
 
+check('internal navigation drops old document state and keeps tab preferences', () => {
+  for (const [url, title] of [['nova://newtab', 'New Tab'], ['nova://settings#mcp', 'Settings'], ['about:downloads', 'Downloads'], ['about:history', 'History'], ['about:changelog', "What's New"]]) {
+    const h = tabHarness([tab('live', { isPlayingAudio: true, isTranslated: true, translatedLang: 'de', blockedAdsCount: 8, webContentsId: 999, thumbnail: 'old-preview', favicon: 'old-icon', isMuted: true, zoomFactor: 1.25, isPinned: true })]);
+    h.api.handleNavigate(url);
+    const next = h.getTabs()[0];
+    assert.equal(next.title, title, url);
+    assert.equal(next.isLoading, false, url);
+    assert.equal(next.canGoBack, false, url);
+    assert.equal(Boolean(next.isPlayingAudio), false, url);
+    assert.equal(Boolean(next.isTranslated), false, url);
+    assert.equal(next.translatedLang, undefined, url);
+    assert.equal(next.webContentsId, undefined, url);
+    assert.equal(next.thumbnail, undefined, url);
+    assert.equal(next.favicon, undefined, url);
+    assert.equal(next.blockedAdsCount ?? 0, 0, url);
+    assert.equal(next.isMuted, true);
+    assert.equal(next.isPinned, true);
+    assert.equal(next.zoomFactor, 1.25);
+  }
+});
+
+check('a delayed drag only changes live tab order, never tab contents or membership', () => {
+  const oldA = tab('a');
+  const b = tab('b');
+  const foreign = tab('foreign', { workspaceId: 'work' });
+  const h = tabHarness([oldA, foreign, b]);
+  h.api.handleUpdateTab('a', { title: 'New document', url: 'https://example.com/new' });
+  h.api.handleReorderFullList([b, oldA, tab('closed'), oldA, foreign]);
+  assert.deepEqual(Array.from(h.getTabs(), t => t.id), ['b', 'foreign', 'a']);
+  assert.equal(h.getTabs()[2].title, 'New document', 'drag snapshots cannot restore an old document');
+  assert.equal(h.getTabs()[2].url, 'https://example.com/new');
+  assert.equal(h.getTabs()[1], foreign, 'another workspace retains its slot and object');
+  h.api.handleReorderFullList([oldA]);
+  assert.deepEqual(Array.from(h.getTabs(), t => t.id), ['a', 'foreign', 'b'], 'tabs omitted by a stale drag remain present');
+});
+
 check('clearing download history preserves active and paused download controls', () => {
   let state: DownloadItem[];
   let listener: any;

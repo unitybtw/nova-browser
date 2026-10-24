@@ -19,19 +19,6 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
     setTabs(prev => prev.map(t => t.id === tabId ? { ...t, zoomFactor: factor } : t));
   }, [setTabs]);
 
-  // The tab record is the only place the current factor lives when there is no
-  // webview (internal pages: nova://, about:). Reading it through an
-  // identity-preserving updater runs the reducer during the dispatch and hands
-  // back the very same array, so React bails out and nothing re-renders.
-  const readCommittedFactor = useCallback((tabId: string): number => {
-    let factor: number | undefined;
-    setTabs(prev => {
-      factor = prev.find(t => t.id === tabId)?.zoomFactor;
-      return prev;
-    });
-    return typeof factor === 'number' && factor > 0 ? factor : 1;
-  }, [setTabs]);
-
   /** Applies one step along the zoom ladder and records it on the tab. */
   const stepZoom = useCallback((direction: 1 | -1) => {
     if (!activeTabId) return;
@@ -64,10 +51,11 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
       commitFactor(tabId, nextFactor);
     };
 
-    // Internal pages have no webview in the DOM: nothing to read, so step from
-    // the recorded factor and let the next real page inherit it.
+    // Read and step inside one pure update: React can defer or batch dispatches.
     if (!webview || typeof webview.getZoomFactor !== 'function') {
-      applyFactor(readCommittedFactor(tabId));
+      setTabs(prev => prev.map(tab => tab.id === tabId
+        ? { ...tab, zoomFactor: nextFrom(tab.zoomFactor ?? 1) }
+        : tab));
       return;
     }
 
@@ -84,7 +72,7 @@ export function useZoom({ activeTabId, setTabs }: UseZoomOptions) {
     Promise.resolve(pending as number)
       .then((current: number) => applyFactor(current))
       .catch((e) => console.error("Zoom factor read error:", e));
-  }, [activeTabId, commitFactor, readCommittedFactor]);
+  }, [activeTabId, commitFactor, setTabs]);
 
   const handleZoomIn = useCallback(() => stepZoom(1), [stepZoom]);
 

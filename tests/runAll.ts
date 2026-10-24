@@ -60,6 +60,7 @@ import './newtab_wallpaper_contrast.test';
 import './split_view_drag_persistence.test';
 import './data_backup_sanitization.test';
 import './zoom_factors.test';
+import './zoom_runtime_regressions.test';
 import './tab_operations_deep.test';
 import './split_view_mechanics.test';
 import './safe_storage_resilience.test';
