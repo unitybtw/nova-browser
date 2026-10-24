@@ -21,16 +21,11 @@ export const ExtensionsSection: React.FC = () => {
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 text-slate-800 dark:text-slate-100">
-            <div className="p-2 bg-accent/20 dark:bg-accent/20 text-accent-hover dark:text-accent rounded-xl shadow-inner">
+            <div className="p-2 bg-accent/15 text-accent-hover dark:text-accent rounded-xl">
               <Puzzle className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
-                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
-                  Beta
-                </span>
-              </div>
+              <h2 className="text-xl font-bold tracking-tight">Extensions</h2>
               <p className="text-sm text-slate-500 dark:text-slate-400">Manage and configure your browser extensions.</p>
             </div>
           </div>
@@ -69,7 +64,7 @@ export const ExtensionsSection: React.FC = () => {
             <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={() => window.open('https://chromewebstore.google.com/', '_blank')}
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-xs font-semibold hover:opacity-95 shadow-md transition-all flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
               >
                 <ExternalLink className="w-4 h-4" />
                 Explore Chrome Web Store
@@ -86,7 +81,7 @@ export const ExtensionsSection: React.FC = () => {
                       {ext.iconData ? (
                         <img src={ext.iconData} alt={ext.name} className="w-7 h-7 object-contain" />
                       ) : (
-                        <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center text-sm font-bold uppercase">
+                        <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-sm font-semibold uppercase">
                           {ext.name ? ext.name.charAt(0) : <Puzzle className="w-5 h-5" />}
                         </div>
                       )}

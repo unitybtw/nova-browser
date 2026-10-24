@@ -210,7 +210,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
             onClick={onExportData}
             className="flex-1 bg-white dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 hover:border-blue-500 dark:hover:border-blue-500 transition-colors flex flex-col items-center justify-center gap-3 group"
           >
-            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/20 rounded-full flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/15 rounded-xl flex items-center justify-center text-blue-500">
               <Download className="w-6 h-6" />
             </div>
             <div className="text-center">
@@ -220,7 +220,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
           </button>
 
           <label className="flex-1 bg-white dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-200 dark:border-slate-700/50 hover:border-emerald-500 dark:hover:border-emerald-500 transition-colors flex flex-col items-center justify-center gap-3 group cursor-pointer">
-            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/20 rounded-full flex items-center justify-center text-emerald-500 group-hover:scale-110 transition-transform">
+            <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/15 rounded-xl flex items-center justify-center text-emerald-500">
               <Upload className="w-6 h-6" />
             </div>
             <div className="text-center">

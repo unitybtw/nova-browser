@@ -95,9 +95,9 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
 
               <button
                 onClick={() => onUpdateSettings({ privacyShield: !settings.privacyShield })}
-                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   settings.privacyShield
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-xs'
                     : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600'
                 }`}
               >
@@ -144,9 +144,6 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
             <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
               <span>SHA-256 Checksum Verification</span>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                REPRODUCIBLE CI
-              </span>
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
               Every release publishes a <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">SHA256SUMS.txt</code> file. Run <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">sha256sum -c SHA256SUMS.txt</code> to verify your download before installing.

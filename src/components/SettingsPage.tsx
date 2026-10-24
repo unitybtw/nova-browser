@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Search, ShieldCheck, Monitor, Bot, Paintbrush, LayoutPanelLeft, Cpu, Key, RefreshCw, ShieldAlert, Keyboard, Puzzle, X, Sparkles, Cloud, User, Mail, FolderTree, Link2, Laptop, QrCode, ChevronDown, ChevronUp, Bookmark, Power, Plus } from 'lucide-react';
+import { Settings, ShieldCheck, Bot, Paintbrush, Cpu, Key, Keyboard, Puzzle, Cloud } from 'lucide-react';
 import { UserSettings } from '../types/browser';
 
 import { GeneralSection } from './settings/GeneralSection';
@@ -56,7 +55,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'passwords', label: 'Passwords', icon: Key },
-    { id: 'extensions', label: 'Extensions', icon: Puzzle, badge: 'Beta' },
+    { id: 'extensions', label: 'Extensions', icon: Puzzle },
     { id: 'advanced', label: 'Advanced', icon: Bot },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
@@ -71,7 +70,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Sidebar */}
       <div 
         style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 backdrop-blur-xl flex flex-col"
+        className="w-64 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col"
       >
         <div className="p-6 pb-2">
           <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
@@ -87,7 +86,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
                   isActive 
                     ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400' 
                     : 'text-slate-600 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:bg-slate-800/50'
@@ -97,11 +96,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <Icon className="w-4 h-4" />
                   <span>{tab.label}</span>
                 </div>
-                {'badge' in tab && tab.badge && (
-                  <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 rounded-md">
-                    {tab.badge}
-                  </span>
-                )}
               </button>
             );
           })}

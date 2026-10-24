@@ -203,7 +203,7 @@ export const McpSection: React.FC<McpSectionProps> = ({
       <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-6 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className={`w-3 h-3 rounded-full ${mcpStatus?.running ? 'bg-green-500 animate-pulse' : 'bg-slate-400'}`} />
+            <div className={`w-2.5 h-2.5 rounded-full ${mcpStatus?.running ? 'bg-green-500' : 'bg-slate-400'}`} />
             <span className="font-semibold text-slate-800 dark:text-slate-100">
               {mcpStatus?.running ? 'Running' : 'Stopped'}
             </span>

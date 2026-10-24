@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Cloud, Check, ShieldAlert, ShieldCheck, RefreshCw, Link2, Laptop, Bookmark, Key, Settings, FolderTree, Sparkles } from 'lucide-react';
+import { Cloud, Check, ShieldAlert, ShieldCheck, RefreshCw, Link2, Laptop, Bookmark, Key, Settings, FolderTree } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { syncService, NovaSyncService, SyncStatus, SyncPreferences } from '../../services/syncService';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils/safeStorage';
@@ -53,7 +53,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
       <section className="space-y-6">
         <div className="border-b border-slate-200 dark:border-slate-800/80 pb-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-sm shadow-cyan-500/20">
+            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
               <Cloud className="w-5 h-5" />
             </div>
             <div>
@@ -68,13 +68,13 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
         </div>
 
         {syncMsg && (
-          <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
             <Check className="w-4 h-4 shrink-0" />
             <span>{syncMsg}</span>
           </div>
         )}
         {syncErr && (
-          <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
+          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
             <ShieldAlert className="w-4 h-4 shrink-0" />
             <span>{syncErr}</span>
           </div>
@@ -84,15 +84,15 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
           /* ACTIVE SYNC CHAIN VIEW */
           <div className="space-y-6">
             {/* Active Sync Code Banner */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-white font-bold text-xl flex items-center justify-center shadow-md shadow-cyan-500/20">
-                  <Link2 className="w-7 h-7" />
+                <div className="w-12 h-12 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-semibold text-lg flex items-center justify-center">
+                  <Link2 className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Nova Sync Active</h3>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 flex items-center gap-1">
                       <ShieldCheck className="w-3 h-3" /> Encrypted Sync
                     </span>
                   </div>
@@ -100,7 +100,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                     Code: <span className="font-mono text-cyan-600 dark:text-cyan-400 font-semibold">{syncStatus.syncCode || 'Active Device'}</span>
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
-                    Status: <span className="text-emerald-500 font-medium">● Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                    Status: <span className="text-emerald-500 font-medium">Connected</span> · Last synced: {syncStatus.lastSyncedAt ? new Date(syncStatus.lastSyncedAt).toLocaleTimeString(getLocale(settings.language), { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
                   </p>
                 </div>
               </div>
@@ -187,10 +187,10 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
 
             {/* Pair Another Device Card - hidden until the pairing join flow exists */}
             {NovaSyncService.PAIRING_AVAILABLE && (
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-sm">
+            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-3 shadow-xs">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                     <Laptop className="w-5 h-5" />
                   </div>
                   <div>
@@ -240,7 +240,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
             )}
 
             {/* Synced Categories List */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-sm">
+            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 space-y-4 shadow-xs">
               <h4 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
                 Synchronized Data Categories
               </h4>
@@ -293,9 +293,9 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
           /* PAIRING SETUP (NO EMAIL / NO PASSWORD) */
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Option 1: Enter Code */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-sm">
+            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-xs">
               <div className="space-y-3">
-                <div className="p-3 w-fit rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                <div className="p-3 w-fit rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
                   <Laptop className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
@@ -336,16 +336,16 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
             </div>
 
             {/* Option 2: Generate Code on This Computer */}
-            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-sm">
+            <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-6 flex flex-col justify-between space-y-6 shadow-xs">
               <div className="space-y-3">
-                <div className="p-3 w-fit rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
-                  <Sparkles className="w-6 h-6" />
+                <div className="p-3 w-fit rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+                  <Key className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
                   Start New Encrypted Sync
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                  Generate a secure 1-click pairing code on this computer to link your other laptops or desktops.
+                  Generate a secure pairing code on this computer to link your other laptops or desktops.
                 </p>
               </div>
 
@@ -383,7 +383,7 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
                   }}
                   className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                 >
-                  <Sparkles className="w-4 h-4 text-cyan-400 dark:text-cyan-600" />
+                  <Key className="w-4 h-4 text-cyan-400 dark:text-cyan-600" />
                   <span>{copiedSyncCode ? 'Sync Code Copied!' : 'Generate Sync Code'}</span>
                 </button>
               </div>
@@ -392,8 +392,8 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
         ) : (
           /* Pairing is not built yet: offering a code that can never be redeemed
              is worse than saying so, so this states the one route that works. */
-          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-3xl border border-slate-200 dark:border-slate-700/60 p-8 flex flex-col items-center text-center gap-3 shadow-sm">
-            <div className="p-3 rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
+          <div className="premium-card bg-white dark:bg-slate-800/60 rounded-2xl border border-slate-200 dark:border-slate-700/60 p-8 flex flex-col items-center text-center gap-3 shadow-xs">
+            <div className="p-3 rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-cyan-400">
               <Laptop className="w-6 h-6" />
             </div>
             <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">

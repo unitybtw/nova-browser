@@ -27,13 +27,10 @@ const DailyWallpaperSection = () => {
         <div>
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              Daily 4K Wallpaper (Ultra HD)
+              Daily 4K Wallpaper
             </h3>
-            <span className="px-2 py-0.5 text-[10px] font-bold bg-blue-500/10 text-blue-500 rounded-full border border-blue-500/20">
-              3840 × 2160 UHD
-            </span>
             {isUserOverride && (
-              <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
+              <span className="px-2 py-0.5 text-[10px] font-medium bg-amber-500/10 text-amber-500 rounded-md border border-amber-500/20">
                 Custom Choice
               </span>
             )}
@@ -68,20 +65,20 @@ const DailyWallpaperSection = () => {
 
       {currentPhoto && (
         <div className="animate-in fade-in slide-in-from-bottom-2">
-          <div className="w-full aspect-video max-h-[340px] rounded-xl overflow-hidden bg-slate-900 border border-slate-700 relative group shadow-lg">
+          <div className="w-full aspect-video max-h-[340px] rounded-xl overflow-hidden bg-slate-900 border border-slate-700 relative group shadow-sm">
             <img 
               src={currentPhoto.imageUrl} 
               alt={currentPhoto.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent flex items-end p-4">
               <div className="text-white flex items-center justify-between w-full">
                 <div className="max-w-[70%]">
                   <p className="text-sm font-bold truncate">{currentPhoto.title}</p>
-                  <p className="text-xs text-white/70 truncate">{currentPhoto.author} • {currentPhoto.source} {currentPhoto.resolution ? `(${currentPhoto.resolution})` : ''}</p>
+                  <p className="text-xs text-white/70 truncate">{currentPhoto.author} · {currentPhoto.source} {currentPhoto.resolution ? `(${currentPhoto.resolution})` : ''}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs px-3 py-1 rounded-full bg-emerald-500/25 border border-emerald-400/40 text-emerald-300 font-medium flex items-center gap-1.5 backdrop-blur-md shadow-sm">
+                  <span className="text-xs px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 font-medium flex items-center gap-1.5">
                     <Check className="w-3.5 h-3.5" /> Active on New Tab
                   </span>
                 </div>
@@ -112,10 +109,10 @@ const DailyWallpaperSection = () => {
                   key={p.id}
                   type="button"
                   onClick={() => selectPhoto(p.id)}
-                  className={`group relative aspect-video rounded-lg overflow-hidden border text-left transition-all ${
+                  className={`group relative aspect-video rounded-lg overflow-hidden border text-left transition-colors ${
                     isActive 
-                      ? 'ring-2 ring-blue-500 border-blue-500 shadow-md scale-[0.98]' 
-                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:scale-[1.02] opacity-80 hover:opacity-100'
+                      ? 'ring-2 ring-blue-500 border-blue-500 shadow-xs' 
+                      : 'border-slate-200 dark:border-slate-700 hover:border-blue-400 opacity-85 hover:opacity-100'
                   }`}
                   title={`${p.title} - ${p.author}`}
                 >
@@ -251,12 +248,7 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
               <section>
                 <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
-                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 rounded-full">
-                        Beta
-                      </span>
-                    </div>
+                    <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Browser Color (Full UI Theme)</h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Customize the entire browser chrome, frame, navigation bar, and tab surfaces</p>
                   </div>
                 </div>
