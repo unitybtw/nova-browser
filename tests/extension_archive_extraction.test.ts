@@ -162,6 +162,24 @@ async function main() {
     console.log('[PASS] [CRX-Extract] unicode and spaced entry names survive');
   }
 
+  // Archive UNIX mode bits must not create links that could redirect the
+  // installer's subsequent manifest read/rewrite outside its staging tree.
+  {
+    const target = makeTarget('archive-link');
+    const outside = path.join(tmpRoot, 'outside-manifest.json');
+    fs.writeFileSync(outside, 'untouched');
+    const zip = new JSZip();
+    zip.file('manifest.json', outside, { unixPermissions: 0o120777 });
+    const buffer = await zip.generateAsync({ type: 'nodebuffer', platform: 'UNIX' });
+    await extractSafeCrxZip(buffer, target);
+    const manifestPath = path.join(target, 'manifest.json');
+    assert.equal(fs.lstatSync(manifestPath).isSymbolicLink(), false);
+    assert.equal(fs.lstatSync(manifestPath).isFile(), true);
+    fs.writeFileSync(manifestPath, MANIFEST);
+    assert.equal(fs.readFileSync(outside, 'utf8'), 'untouched');
+    console.log('[PASS] [CRX-Extract] archive symlink attributes cannot redirect manifest writes');
+  }
+
   // --- zip-slip defences must stay in force ---------------------------------
   {
     const payloads = [

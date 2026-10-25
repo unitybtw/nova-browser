@@ -117,6 +117,38 @@ assert.equal(isUrlInUserWhitelist('https://unlisted.org/article', new Set(mainSa
 // 5. Domain toggle lifecycle (www. equivalence and subdomain removal)
 assert.equal(normalizeAdblockDomain('https://www.nytimes.com/section/tech'), 'nytimes.com');
 assert.equal(normalizeAdblockDomain('nova://newtab'), '');
+// Exercise the production enforcement boundary: only HTTP(S) URLs and plain
+// hostnames may contribute domains to the adblock exception list.
+for (const input of [
+  'javascript:alert(1)', 'javascript://example.com', 'JaVaScRiPt://example.com',
+  'java\tscript://example.com', 'java\nscript://example.com', 'java\rscript://example.com',
+  'vbscript://example.com', 'VBScript:msgbox(1)',
+  'data:text/html,<script>alert(1)</script>', 'data://example.com',
+  'blob:https://example.com/id', 'file://example.com/path', 'ftp://example.com',
+  'chrome://example.com', 'chrome-extension://example.com', 'about:blank',
+  'nova://example.com', 'custom://example.com',
+  'javascript%3A%2F%2Fexample.com', '//example.com/path',
+  'https://example.com@evil.test', 'https://user:password@example.com',
+  'example.com/path', 'example.com?x=1', 'example.com#fragment',
+  'example.com:443', 'newtab', 'https://newtab',
+]) {
+  assert.equal(normalizeAdblockDomain(input), '', `unsafe whitelist input: ${JSON.stringify(input)}`);
+  assert.equal(toggleDomainInWhitelist(input, []).isWhitelisted, false);
+}
+for (const [input, expected] of [
+  ['  www.Example.COM.  ', 'example.com'],
+  ['https://www.Example.com.:8443/path?q=1#section', 'example.com'],
+  ['http://sub.example.com/path', 'sub.example.com'],
+  ['localhost', 'localhost'], ['http://localhost:5176/', 'localhost'],
+] as const) {
+  assert.equal(normalizeAdblockDomain(input), expected);
+}
+for (const input of [
+  'https://example.com.evil.test/', 'https://evil-example.com/',
+  'https://evil.test/example.com', 'https://evil.test/?redirect=example.com',
+]) {
+  assert.equal(isDomainWhitelisted(input, ['example.com']), false, `domain confusion: ${input}`);
+}
 const step1 = toggleDomainInWhitelist('https://www.nytimes.com/2026/news', []);
 assert.equal(step1.isWhitelisted, true);
 assert.deepEqual(step1.nextWhitelist, ['nytimes.com']);
@@ -128,10 +160,11 @@ assert.equal(step2.isWhitelisted, false);
 assert.deepEqual(step2.nextWhitelist, []);
 
 // 6. CAPTCHA whitelist rules must not blanket-whitelist YouTube domains
-assert.equal(CAPTCHA_WHITELIST_RULES.includes('youtube.com'), false, 'youtube.com must not be in CAPTCHA_WHITELIST_RULES');
-assert.equal(CAPTCHA_WHITELIST_RULES.includes('www.youtube.com'), false, 'www.youtube.com must not be in CAPTCHA_WHITELIST_RULES');
-assert.equal(CAPTCHA_WHITELIST_RULES.includes('googlevideo.com'), false, 'googlevideo.com must not be in CAPTCHA_WHITELIST_RULES');
-assert.equal(CAPTCHA_WHITELIST_RULES.includes('recaptcha.net'), true, 'recaptcha.net must remain protected in CAPTCHA_WHITELIST_RULES');
-assert.equal(CAPTCHA_WHITELIST_RULES.includes('challenges.cloudflare.com'), true, 'Cloudflare Turnstile must remain protected in CAPTCHA_WHITELIST_RULES');
+const captchaRuleSet = new Set(CAPTCHA_WHITELIST_RULES);
+assert.equal(captchaRuleSet.has('youtube.com'), false, 'youtube.com must not be in CAPTCHA_WHITELIST_RULES');
+assert.equal(captchaRuleSet.has('www.youtube.com'), false, 'www.youtube.com must not be in CAPTCHA_WHITELIST_RULES');
+assert.equal(captchaRuleSet.has('googlevideo.com'), false, 'googlevideo.com must not be in CAPTCHA_WHITELIST_RULES');
+assert.equal(captchaRuleSet.has('recaptcha.net'), true, 'recaptcha.net must remain protected in CAPTCHA_WHITELIST_RULES');
+assert.equal(captchaRuleSet.has('challenges.cloudflare.com'), true, 'Cloudflare Turnstile must remain protected in CAPTCHA_WHITELIST_RULES');
 
 console.log('[PASS] [AdBlock Engine] Tracker matching, whitelist overrides, and rule compilation verified.');

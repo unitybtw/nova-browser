@@ -29,7 +29,7 @@ const WHITELIST_HOST_RE =
 
 /**
  * Normalizes a URL or hostname into a canonical adblock whitelist domain.
- * - Rejects internal browser schemes (`nova://`, `about:`, `chrome://`, `file://`, `javascript:`, `data:`).
+ * - Accepts only HTTP(S) URLs or plain hostnames.
  * - Strips leading `www.` and trailing `.` so `www.example.com` and `example.com` match consistently.
  * - Returns `''` if the input does not resolve to a valid hostname.
  */
@@ -38,23 +38,9 @@ export function normalizeAdblockDomain(input: string | null | undefined): string
   const trimmed = input.trim();
   if (!trimmed) return '';
 
-  const lower = trimmed.toLowerCase();
-  if (
-    lower.startsWith('nova://') ||
-    lower.startsWith('about:') ||
-    lower.startsWith('chrome://') ||
-    lower.startsWith('chrome-extension://') ||
-    lower.startsWith('file://') ||
-    lower.startsWith('javascript:') ||
-    lower.startsWith('data:') ||
-    lower.startsWith('blob:') ||
-    lower === 'newtab' ||
-    lower === 'https://newtab'
-  ) {
-    return '';
-  }
-
-  let candidate = lower;
+  // Enforce the parsed protocol allowlist below rather than maintaining a
+  // second, necessarily incomplete list of schemes to reject.
+  let candidate = trimmed.toLowerCase();
   if (candidate.includes('://')) {
     try {
       const parsed = new URL(candidate);
