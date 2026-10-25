@@ -5570,44 +5570,59 @@ let activeExtensionPopupUrl: string | null = null;
 const disabledExtensionsFile = path.join(app.getPath('userData'), 'disabled_extensions.json');
 const unpackedExtensionsFile = path.join(app.getPath('userData'), 'unpacked_extensions.json');
 
-function getDisabledExtensionIds(): string[] {
+function getDisabledExtensionIds(strict = false): string[] {
   try {
-    if (fs.existsSync(disabledExtensionsFile)) {
-      const parsed = JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
-      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id)) : [];
+    const parsed = JSON.parse(fs.readFileSync(disabledExtensionsFile, 'utf8'));
+    if (!Array.isArray(parsed)) {
+      if (strict) throw new Error('Invalid disabled extension registry.');
+      return [];
     }
-  } catch (_) {}
-  return [];
+    const ids = parsed.filter((id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id));
+    if (strict && ids.length !== parsed.length) throw new Error('Invalid disabled extension registry.');
+    return ids;
+  } catch (err) {
+    if (strict && (err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
+    return [];
+  }
 }
 
-function setDisabledExtensionIds(ids: string[]): void {
+function setDisabledExtensionIds(ids: string[]): boolean {
   try {
     const safeIds = Array.from(new Set(ids.filter(id => typeof id === 'string' && /^[a-p]{32}$/.test(id))));
     fs.writeFileSync(disabledExtensionsFile, JSON.stringify(safeIds), { encoding: 'utf8', mode: 0o600 });
-  } catch (_) {}
+    return true;
+  } catch (_) { return false; }
 }
 
-function getUnpackedExtensionPaths(): Record<string, string> {
+function getUnpackedExtensionPaths(strict = false): Record<string, string> {
   try {
-    if (!fs.existsSync(unpackedExtensionsFile)) return {};
     const parsed = JSON.parse(fs.readFileSync(unpackedExtensionsFile, 'utf8'));
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
-    return Object.fromEntries(Object.entries(parsed).filter(([id, folderPath]) =>
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      if (strict) throw new Error('Invalid unpacked extension registry.');
+      return {};
+    }
+    const entries = Object.entries(parsed);
+    const safeEntries = entries.filter(([id, folderPath]) =>
       /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
-    )) as Record<string, string>;
-  } catch (_) {
+    );
+    if (strict && safeEntries.length !== entries.length) throw new Error('Invalid unpacked extension registry.');
+    return Object.fromEntries(safeEntries) as Record<string, string>;
+  } catch (err) {
+    if (strict && (err as NodeJS.ErrnoException)?.code !== 'ENOENT') throw err;
     return {};
   }
 }
 
-function setUnpackedExtensionPaths(paths: Record<string, string>): void {
+function setUnpackedExtensionPaths(paths: Record<string, string>): boolean {
   try {
     const safeEntries = Object.entries(paths).filter(([id, folderPath]) =>
       /^[a-p]{32}$/.test(id) && typeof folderPath === 'string' && folderPath.length <= 4096
     );
     fs.writeFileSync(unpackedExtensionsFile, JSON.stringify(Object.fromEntries(safeEntries)), { encoding: 'utf8', mode: 0o600 });
+    return true;
   } catch (err) {
     console.error('[Extensions] Could not persist unpacked extension list:', err);
+    return false;
   }
 }
 
@@ -5909,12 +5924,14 @@ ipcMain.handle('toggle-extension', async (event, extensionId: string, enabled: b
 ipcMain.handle('list-extensions', async (event) => {
   if (!isTrustedSender(event)) return [];
   const disabledIds = getDisabledExtensionIds();
+  let runningIds: Set<string> | null = null;
 
   // Sync with session extensions
   try {
     const sessionExts = (session.defaultSession.extensions?.getAllExtensions
       ? session.defaultSession.extensions.getAllExtensions()
       : (session.defaultSession as any).getAllExtensions());
+    runningIds = new Set(sessionExts.map((extension: any) => extension.id));
     for (const se of sessionExts) {
       if (!loadedExtensions.some(e => e.id === se.id)) {
         loadedExtensions.push(se);
@@ -5986,7 +6003,7 @@ ipcMain.handle('list-extensions', async (event) => {
     return {
       name: localizedName || e.name || e.id,
       id: e.id,
-      enabled: !disabledIds.includes(e.id),
+      enabled: runningIds ? runningIds.has(e.id) : !disabledIds.includes(e.id),
       path: e.path,
       version: e.version,
       description: localizedDesc || e.description || '',
@@ -6492,84 +6509,71 @@ ipcMain.handle('remove-extension', async (event, extensionId: string) => {
   try {
     const foundExt = loadedExtensions.find((e) => e.id === extensionId);
 
-    // 1. Close any active popup windows for this extension
-    if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed()) {
-      try {
-        activeExtensionPopupWin.close();
-        activeExtensionPopupWin = null;
-      } catch (_) {}
-    }
-
-    // 2. Remove from Electron runtime sessions (both default and window sessions)
-    try {
-      const extApi = (session.defaultSession as any).extensions || session.defaultSession;
-      await extApi.removeExtension(extensionId);
-    } catch (_) {}
-
+    // Stop every runtime copy before deleting its files or registration. A
+    // failed unload must leave the installation available for another attempt.
+    const sessions = new Set([session.defaultSession]);
     for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed() && win.webContents?.session && win.webContents.session !== session.defaultSession) {
-        try {
-          const winExtApi = (win.webContents.session as any).extensions || win.webContents.session;
-          await winExtApi.removeExtension(extensionId);
-        } catch (_) {}
+      if (!win.isDestroyed() && win.webContents?.session) sessions.add(win.webContents.session);
+    }
+    for (const targetSession of sessions) {
+      const extApi = (targetSession as any).extensions || targetSession;
+      if (extApi.getExtension(extensionId)) {
+        await extApi.removeExtension(extensionId);
+        if (extApi.getExtension(extensionId)) throw new Error('The extension is still running. Try removing it again.');
       }
     }
 
-    // 3. Remove from in-memory state
-    loadedExtensions = loadedExtensions.filter((e) => e.id !== extensionId);
+    // Read current registration after the last await, before destructive work.
+    // Read errors must not be treated as empty state or a successful uninstall.
+    const unpackedPaths = getUnpackedExtensionPaths(true);
+    const disabledIds = getDisabledExtensionIds(true);
 
-    // 4. Remove from disabled extensions list so it doesn't linger
-    const disabledIds = getDisabledExtensionIds();
-    if (disabledIds.includes(extensionId)) {
-      setDisabledExtensionIds(disabledIds.filter((id) => id !== extensionId));
+    if (activeExtensionPopupWin && !activeExtensionPopupWin.isDestroyed() && activeExtensionPopupUrl &&
+        new URL(activeExtensionPopupUrl).hostname === extensionId) {
+      // Extension beforeunload handlers cannot keep a removed popup alive.
+      activeExtensionPopupWin.destroy();
+      activeExtensionPopupWin = null;
+      activeExtensionPopupUrl = null;
     }
 
-    const unpackedPaths = getUnpackedExtensionPaths();
+    // Only application-owned installations may be deleted. Developer-selected
+    // unpacked sources outside this root are unregistered, never deleted.
+    const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
+    const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
+    const ownedPaths = new Set([extDir]);
+    if (foundExt?.path) ownedPaths.add(path.resolve(foundExt.path));
+    for (const ownedPath of ownedPaths) {
+      if (ownedPath.startsWith(extensionsBaseDir + path.sep)) {
+        fs.rmSync(ownedPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+      }
+    }
+
+    const tempCrx = path.join(app.getPath('userData'), 'temp_extensions', `${extensionId}.crx`);
+    fs.rmSync(tempCrx, { force: true });
+
     if (unpackedPaths[extensionId]) {
       delete unpackedPaths[extensionId];
-      setUnpackedExtensionPaths(unpackedPaths);
+      if (!setUnpackedExtensionPaths(unpackedPaths)) throw new Error('Could not save the extension removal. Try again.');
     }
 
-    // 5. Permanently remove extension directory from disk
-    const extensionsBaseDir = path.resolve(path.join(app.getPath('userData'), 'extensions'));
-
-    // Path 1: Direct ID folder
-    const extDir = path.resolve(path.join(extensionsBaseDir, extensionId));
-    if (extDir.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(extDir)) {
-      try {
-        fs.rmSync(extDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-      } catch (rmErr) {
-        console.error(`[Extensions] Error removing directory ${extDir}:`, rmErr);
-      }
+    if (disabledIds.includes(extensionId) && !setDisabledExtensionIds(disabledIds.filter(id => id !== extensionId))) {
+      throw new Error('Could not save the extension removal. Try again.');
     }
 
-    // Path 2: Loaded extension recorded path (if different)
-    if (foundExt?.path) {
-      const recordedPath = path.resolve(foundExt.path);
-      if (recordedPath.startsWith(extensionsBaseDir + path.sep) && fs.existsSync(recordedPath)) {
-        try {
-          fs.rmSync(recordedPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
-        } catch (_) {}
-      }
-    }
-
-    // Path 3: Clean up any lingering downloaded .crx files in temp_extensions
-    const tempCrx = path.join(app.getPath('userData'), 'temp_extensions', `${extensionId}.crx`);
-    if (fs.existsSync(tempCrx)) {
-      try { fs.rmSync(tempCrx, { force: true }); } catch (_) {}
-    }
-
-    // 6. Notify all browser windows of the change
-    for (const win of BrowserWindow.getAllWindows()) {
-      if (!win.isDestroyed()) {
-        win.webContents.send('extension-changed');
-      }
-    }
-
+    loadedExtensions = loadedExtensions.filter(e => e.id !== extensionId);
+    incognitoAllowedExtensions.delete(extensionId);
     return { success: true };
   } catch (err: any) {
     console.error('Failed to remove extension:', err);
     return { error: err?.message || 'Failed to remove extension' };
+  } finally {
+    // Even a partial failure may have stopped the runtime. Refresh every UI
+    // without allowing a closed renderer to turn a committed removal into an error.
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) {
+        try { win.webContents.send('extension-changed'); } catch (_) {}
+      }
+    }
   }
 });
 

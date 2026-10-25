@@ -89,6 +89,20 @@ async function run() {
       assert.equal(h.render().extensions.length, 0);
     } finally { h.dispose(); }
   });
+  await check('failed removal refreshes partially changed native state', async () => {
+    const h = harness();
+    try {
+      h.render(); await settle();
+      h.api.removeExtension = async () => {
+        h.api.listExtensions = async () => [{ ...extension, enabled: false }];
+        return { error: 'Extension stopped, but its files could not be removed.' };
+      };
+      await h.render().handleRemoveExtension('a'); await settle();
+      assert.equal(h.render().extensions.length, 1);
+      assert.equal(h.render().extensions[0].enabled, false);
+      assert.equal(h.alerts.length, 1);
+    } finally { h.dispose(); }
+  });
   await check('repeated toggle clicks issue one native mutation and expose pending state', async () => {
     const h = harness();
     try {

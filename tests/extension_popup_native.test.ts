@@ -44,13 +44,19 @@ app.whenReady().then(async () => {
     await root.webContents.executeJavaScript(`const guest = document.createElement('webview'); guest.src = ${JSON.stringify(expectedUrl)}; guest.style.cssText = 'width:100%;height:100%'; document.body.appendChild(guest);`);
     const guest = await guestReady;
     const tree = ts.createSourceFile('main.ts', fs.readFileSync('electron/main.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-    let callback = '', contextCallback = '';
+    let callback = '', contextCallback = '', removalCallback = '';
+    const persistenceHelpers: string[] = [];
     function find(node: ts.Node) {
+      if (ts.isFunctionDeclaration(node) && node.name &&
+          ['getDisabledExtensionIds', 'setDisabledExtensionIds', 'getUnpackedExtensionPaths', 'setUnpackedExtensionPaths'].includes(node.name.text)) persistenceHelpers.push(node.getText(tree));
       if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'open-extension-popup') callback = node.arguments[1].getText(tree);
       if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'extension-popup-context') contextCallback = node.arguments[1].getText(tree);
+      if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'remove-extension') removalCallback = node.arguments[1].getText(tree);
       ts.forEachChild(node, find);
     }
-    find(tree); assert.ok(callback);
+    find(tree); assert.ok(callback); assert.ok(removalCallback);
+    const unpackedExtensionsFile = path.join(app.getPath('userData'), 'unpacked_extensions.json');
+    fs.writeFileSync(unpackedExtensionsFile, JSON.stringify({ [ext.id]: fixture }));
     class PopupWindow extends BrowserWindow { constructor(options: any) {
       super(options); popups.push(this);
       this.webContents.on('console-message', details => console.log('[Fixture popup console]', details.message));
@@ -61,10 +67,13 @@ app.whenReady().then(async () => {
       __dirname: path.resolve('dist-electron'), isTrustedSender: () => true, loadedExtensions: [ext],
       activeExtensionPopupWin: null, activeExtensionPopupUrl: null, sendToMainWindow() {},
       extensionPopupContexts: new Map(),
+      app, unpackedExtensionsFile, disabledExtensionsFile: path.join(app.getPath('userData'), 'disabled_extensions.json'),
+      incognitoAllowedExtensions: new Set([ext.id]),
       dialog: { showMessageBox: async () => ({ response: 0 }) },
       matchesExtensionHostPermission, isExtensionAllowedInIncognito: () => false, setTimeout, clearTimeout,
     };
-    const callbacks = `exports.handler = ${callback};${contextCallback ? `exports.contextHandler = ${contextCallback};` : ''}`;
+    const callbacks = `${persistenceHelpers.join('\n')}\nexports.handler = ${callback};${contextCallback ? `exports.contextHandler = ${contextCallback};` : ''}
+      exports.remove = ${removalCallback}; exports.rows = () => loadedExtensions;`;
     const compiled = ts.transpileModule(callbacks, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
     // Electron native wrappers must be constructed in Node's own realm.
     new Function(...Object.keys(context), compiled + '\nreturn exports;')(...Object.values(context));
@@ -100,6 +109,16 @@ app.whenReady().then(async () => {
     const reopened = await context.exports.handler({}, `chrome-extension://${ext.id}/popup.html`, null, { url: expectedUrl, title: 'Fixture document', webContentsId: guest.id });
     assert.equal(reopened.success, true, 'a closed crashed popup can be opened again');
     console.log('[PASS] Native extension crash cleanup, host survival and reopen');
+    const removal = await context.exports.remove({}, ext.id);
+    assert.equal(removal.success, true, JSON.stringify(removal));
+    assert.equal(session.defaultSession.extensions.getExtension(ext.id), null);
+    assert.equal(popups.at(-1)!.isDestroyed(), true);
+    assert.equal(context.extensionPopupContexts.size, 0);
+    assert.equal(context.incognitoAllowedExtensions.has(ext.id), false);
+    assert.equal(context.exports.rows().length, 0);
+    assert.deepEqual(JSON.parse(fs.readFileSync(unpackedExtensionsFile, 'utf8')), {});
+    assert.equal(fs.existsSync(path.join(fixture, 'manifest.json')), true, 'uninstall must preserve external developer source');
+    console.log('[PASS] Native extension removal unloads runtime, closes its popup and preserves unpacked source');
     exitCode = 0;
   } catch (error) { console.error(error); }
   finally { BrowserWindow.getAllWindows().forEach(window => window.destroy()); server.close(); app.exit(exitCode); }

@@ -88,7 +88,10 @@ export function useExtensions() {
       void refreshExtensions();
     } catch (e) {
       console.error('Failed to remove extension:', e);
-      if (mountedRef.current) void showAlert({ title: 'Extensions', message: e instanceof Error ? e.message : 'The extension could not be removed.' });
+      if (mountedRef.current) {
+        void refreshExtensions();
+        void showAlert({ title: 'Extensions', message: e instanceof Error ? e.message : 'The extension could not be removed.' });
+      }
     } finally {
       endAction(id);
     }

@@ -64,6 +64,7 @@ import './zoom_runtime_regressions.test';
 import './resource_lifecycle_regressions.test';
 import './screenshot_capture_regressions.test';
 import './extension_actions_regressions.test';
+import './extension_removal_runtime.test';
 import './navigation_controls_regressions.test';
 import './tab_operations_deep.test';
 import './split_view_mechanics.test';
