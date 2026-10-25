@@ -34,9 +34,10 @@ app.whenReady().then(async () => {
 
     // Obtain the actual thumbnail through its production main-process handler.
     const tree = ts.createSourceFile('main.ts', fs.readFileSync('electron/main.ts', 'utf8'), ts.ScriptTarget.Latest, true);
-    let thumbnailHandler = '';
+    let thumbnailHandler = '', fullPageHandler = '';
     function find(node: ts.Node) {
       if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'capture-tab-thumbnail') thumbnailHandler = node.arguments[1].getText(tree);
+      if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'capture-full-page') fullPageHandler = node.arguments[1].getText(tree);
       ts.forEachChild(node, find);
     }
     find(tree); assert.ok(thumbnailHandler);
@@ -77,6 +78,26 @@ app.whenReady().then(async () => {
     assert.deepEqual(pngSize(result.image), originalSize, 'saved screenshot must preserve the full native viewport resolution');
     assert.equal(result.thumbnailCalls, 0);
     console.log('[PASS] Native screenshot hook retains viewport PNG dimensions:', originalSize, 'thumbnail:', thumbnailSize);
+
+    // Verify lifecycle restoration, including a page with smooth-scroll CSS.
+    // This does not certify off-screen raster coverage: embedded Electron
+    // surfaces can repeat content beyond their visible host bounds.
+    const longPage = '<!doctype html><html style="scroll-behavior:smooth"><body style="margin:0"><header style="height:600px;background:#dde8f0">Page header</header><main style="height:1200px;background:#fff">Long document</main><footer style="height:100px;background:rgb(12,180,90)">Footer</footer></body></html>';
+    await guest.loadURL('data:text/html,' + encodeURIComponent(longPage));
+    await guest.executeJavaScript('window.scrollTo({left:0,top:250,behavior:"instant"}); new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    const before = await guest.executeJavaScript('({width:innerWidth,height:innerHeight,scroll:scrollY,hero:document.querySelector("header").offsetHeight,content:document.documentElement.scrollHeight})');
+    assert.ok(fullPageHandler);
+    const fullCode = ts.transpileModule(`return ${fullPageHandler};`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText;
+    const fullCapture = new Function('isTrustedSender', 'webContents', 'fullPageCaptureJobs', fullCode)(() => true, webContents, new Map());
+    const fullImage = await fullCapture({}, guest.id);
+    assert.ok(fullImage, 'full-page capture must produce a PNG');
+    await guest.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+    const after = await guest.executeJavaScript('({width:innerWidth,height:innerHeight,scroll:scrollY,hero:document.querySelector("header").offsetHeight,content:document.documentElement.scrollHeight})');
+    assert.deepEqual(after, before, 'capture must preserve viewport, scroll position and document layout');
+    const fullSize = pngSize(fullImage);
+    assert.ok(fullSize.height > originalSize.height);
+    assert.equal(guest.debugger.isAttached(), false);
+    console.log('[PASS] Native full-page capture restores viewport and immediate scroll position:', fullSize);
     exitCode = 0;
   } catch (error) { console.error(error); }
   finally { root.destroy(); app.exit(exitCode); }

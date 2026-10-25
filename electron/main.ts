@@ -3983,80 +3983,112 @@ ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => 
 });
 
 // Capture full page screenshot using CDP
+const fullPageCaptureJobs = new Map<number, Promise<string | null>>();
 ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
   if (!isTrustedSender(event)) return null;
   if (typeof webContentsId !== 'number' || !Number.isInteger(webContentsId)) return null;
   try {
     const wc = webContents.fromId(webContentsId);
     if (!wc || wc.isDestroyed() || wc.getType() !== 'webview') return null;
+    const pending = fullPageCaptureJobs.get(webContentsId);
+    if (pending) return await pending;
+    // A screenshot must not overwrite emulation owned by another debugger.
+    if (wc.debugger.isAttached()) return null;
 
-    let attached = false;
-    try {
-      if (!wc.debugger.isAttached()) {
-        wc.debugger.attach('1.3');
-        attached = true;
-      }
-    } catch (err) {
-      console.error('Debugger attach failed: ', err);
-      return null;
-    }
-
-    let dataUrl = null;
-    let metricsOverridden = false;
-    try {
-      const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
-      const MAX_SCREENSHOT_WIDTH = 8192;
-      const MAX_SCREENSHOT_HEIGHT = 16384;
-      const rawWidth = Math.ceil((metrics as any).cssContentSize?.width || (metrics as any).contentSize?.width || 1920);
-      const rawHeight = Math.ceil((metrics as any).cssContentSize?.height || (metrics as any).contentSize?.height || 1080);
-      const width = Math.min(Math.max(Number.isFinite(rawWidth) ? rawWidth : 1920, 320), MAX_SCREENSHOT_WIDTH);
-      const height = Math.min(Math.max(Number.isFinite(rawHeight) ? rawHeight : 1080, 200), MAX_SCREENSHOT_HEIGHT);
-
-      // Force the viewport to expand to the full height of the page to ensure off-screen content is rendered
-      await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
-        mobile: false,
-        width,
-        height,
-        deviceScaleFactor: 1,
-        screenOrientation: { angle: 0, type: 'portraitPrimary' }
-      });
-      metricsOverridden = true;
-
-      // Wait a moment for the page to layout and paint the newly exposed areas
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const response = await wc.debugger.sendCommand('Page.captureScreenshot', {
-        format: 'png',
-        captureBeyondViewport: true,
-        fromSurface: true,
-        clip: {
-          x: 0,
-          y: 0,
-          width,
-          height,
-          scale: 1
+    // Concurrent requests for one guest must share the debugger lifetime:
+    // detaching one capture must not interrupt another capture's commands.
+    const job = (async () => {
+      let attached = false;
+      let metricsOverridden = false;
+      let invalidated = false;
+      let scrollSnapshot: { objectId: string; x: number; y: number } | null = null;
+      const invalidate = () => { invalidated = true; };
+      const onDebuggerDetached = () => { attached = false; invalidate(); };
+      const onNavigation = (details: { isMainFrame?: boolean }, _url?: string, _inPlace?: boolean, isMainFrame?: boolean) => {
+        if ((details.isMainFrame ?? isMainFrame) !== false) invalidate();
+      };
+      wc.on('did-start-navigation', onNavigation);
+      wc.once('destroyed', invalidate);
+      wc.debugger.on('detach', onDebuggerDetached);
+      try {
+        if (!wc.debugger.isAttached()) {
+          wc.debugger.attach('1.3');
+          attached = true;
         }
-      });
+        const metrics = await wc.debugger.sendCommand('Page.getLayoutMetrics');
+        if (invalidated || wc.isDestroyed()) return null;
+        const content = metrics.cssContentSize ?? metrics.contentSize;
+        const rawWidth = Math.ceil(content?.width);
+        const rawHeight = Math.ceil(content?.height);
+        if (!Number.isFinite(rawWidth) || !Number.isFinite(rawHeight) || rawWidth <= 0 || rawHeight <= 0) return null;
+        const width = Math.min(rawWidth, 8192);
+        const height = Math.min(rawHeight, 16384);
+        const viewport = metrics.cssLayoutViewport ?? metrics.layoutViewport;
+        if (Number.isFinite(viewport?.pageX) && Number.isFinite(viewport?.pageY)) {
+          // Bind restoration to this Window's execution context. Navigation
+          // destroys the remote handle, so a new document cannot be scrolled.
+          const windowObject = await wc.debugger.sendCommand('Runtime.evaluate', { expression: 'window', returnByValue: false });
+          if (invalidated || wc.isDestroyed()) return null;
+          const objectId = windowObject?.result?.objectId;
+          if (typeof objectId !== 'string') return null;
+          scrollSnapshot = { objectId, x: viewport.pageX, y: viewport.pageY };
+          await wc.debugger.sendCommand('Runtime.callFunctionOn', {
+            objectId, functionDeclaration: "function() { this.scrollTo({left:0, top:0, behavior:'instant'}); }", returnByValue: true,
+          });
+          if (invalidated || wc.isDestroyed()) return null;
+        }
 
-      if (response && (response as any).data) {
-        dataUrl = `data:image/png;base64,${(response as any).data}`;
+        // Webview surfaces need an expanded viewport to render off-screen
+        // content reliably. Keep this override confined to our debugger job.
+        metricsOverridden = true;
+        await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
+          mobile: false, width, height, deviceScaleFactor: 1,
+          screenOrientation: { angle: 0, type: 'portraitPrimary' },
+        });
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (invalidated || wc.isDestroyed()) return null;
+        const response = await wc.debugger.sendCommand('Page.captureScreenshot', {
+          format: 'png', captureBeyondViewport: true, fromSurface: true,
+          clip: { x: 0, y: 0, width, height, scale: 1 },
+        });
+        return !invalidated && !wc.isDestroyed() && typeof response?.data === 'string' && response.data
+          ? `data:image/png;base64,${response.data}` : null;
+      } catch (err) {
+        console.error('Screenshot CDP command failed:', err);
+        return null;
+      } finally {
+        if (metricsOverridden && attached && !wc.isDestroyed() && wc.debugger.isAttached()) {
+          try { await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride'); } catch (_) {}
+        }
+        if (scrollSnapshot && attached && !wc.isDestroyed() && wc.debugger.isAttached()) {
+          if (!invalidated) {
+            try {
+              await wc.debugger.sendCommand('Runtime.callFunctionOn', {
+                objectId: scrollSnapshot.objectId,
+                functionDeclaration: "function(x, y) { this.scrollTo({left:x, top:y, behavior:'instant'}); }",
+                arguments: [{ value: scrollSnapshot.x }, { value: scrollSnapshot.y }],
+                returnByValue: true,
+              });
+            } catch (_) {}
+          }
+          if (attached && !wc.isDestroyed() && wc.debugger.isAttached()) {
+            try { await wc.debugger.sendCommand('Runtime.releaseObject', { objectId: scrollSnapshot.objectId }); } catch (_) {}
+          }
+        }
+        if (attached && !wc.isDestroyed() && wc.debugger.isAttached()) {
+          try { wc.debugger.detach(); } catch (_) {}
+        }
+        wc.removeListener('did-start-navigation', onNavigation);
+        wc.removeListener('destroyed', invalidate);
+        wc.debugger.removeListener('detach', onDebuggerDetached);
       }
-    } catch (err) {
-      console.error('Screenshot CDP command failed:', err);
+    })();
+    fullPageCaptureJobs.set(webContentsId, job);
+    try {
+      return await job;
     } finally {
-      if (metricsOverridden && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
-        try {
-          await wc.debugger.sendCommand('Emulation.clearDeviceMetricsOverride');
-        } catch (_) {}
-      }
-      if (attached && wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
-        try {
-          wc.debugger.detach();
-        } catch (_) {}
-      }
+      if (fullPageCaptureJobs.get(webContentsId) === job) fullPageCaptureJobs.delete(webContentsId);
     }
-
-    return dataUrl;
   } catch (err) {
     console.error('Failed to capture full page:', err);
     return null;

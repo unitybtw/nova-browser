@@ -14,6 +14,7 @@ import path from 'path';
 import { EventEmitter } from 'events';
 import { isValidUrlOrDomain, formatSearchUrl } from '../src/utils/searchEngine';
 import { isSafeNavigationUrl } from '../src/utils/safeNavigation';
+import { verifyFullPageCaptureRegressions } from './full_page_capture_runtime.test';
 
 interface RegressionTestResult {
   category: string;
@@ -268,102 +269,14 @@ async function runSecurityRegressionAuditSuite() {
     `DNT=${simulatedHeaders.reqHeaders['DNT']}, Sec-GPC=${simulatedHeaders.reqHeaders['Sec-GPC']}, X-Content-Type-Options=${simulatedHeaders.resHeaders['X-Content-Type-Options']?.[0]}`
   );
 
-  // R1.3: capture-full-page CDP metrics reset in finally block
-  const captureFullPageStart = mainTsContent.indexOf("ipcMain.handle('capture-full-page'");
-  const captureFullPageCode = captureFullPageStart !== -1 ? mainTsContent.substring(captureFullPageStart, captureFullPageStart + 3000) : '';
-
-  const hasFinallyBlock = captureFullPageCode.includes('finally {') &&
-    captureFullPageCode.includes('Emulation.clearDeviceMetricsOverride') &&
-    captureFullPageCode.includes('debugger.detach');
-
+  // R1.3: Exercise the registered production handler instead of a copy of its
+  // old viewport-override algorithm or source-string cleanup checks.
+  await verifyFullPageCaptureRegressions();
   record(
     'R1-CDP-Cleanup',
-    'capture-full-page executes Emulation.clearDeviceMetricsOverride and detach in finally block',
-    hasFinallyBlock,
-    hasFinallyBlock ? 'CDP metrics reset and detach verified in finally block' : 'Missing finally block cleanup'
-  );
-
-  // Empirical CDP execution simulation testing finally block resilience under error
-  let metricsCleared = false;
-  let debuggerDetached = false;
-  let cdpErrorCaught = false;
-
-  async function simulateCaptureFullPage(shouldFail: boolean) {
-    let attached = false;
-    let metricsOverridden = false;
-    const mockDebugger = {
-      isAttached: () => attached,
-      attach: () => { attached = true; },
-      detach: () => { attached = false; debuggerDetached = true; },
-      sendCommand: async (cmd: string) => {
-        if (cmd === 'Page.getLayoutMetrics') {
-          if (shouldFail) throw new Error('Simulated CDP Page.getLayoutMetrics failure');
-          return { cssContentSize: { width: 1280, height: 2400 } };
-        }
-        if (cmd === 'Emulation.setDeviceMetricsOverride') {
-          metricsOverridden = true;
-          return {};
-        }
-        if (cmd === 'Page.captureScreenshot') {
-          if (shouldFail) throw new Error('Simulated CDP captureScreenshot failure');
-          return { data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==' };
-        }
-        if (cmd === 'Emulation.clearDeviceMetricsOverride') {
-          metricsCleared = true;
-          metricsOverridden = false;
-          return {};
-        }
-        return {};
-      }
-    };
-
-    try {
-      mockDebugger.attach();
-      try {
-        await mockDebugger.sendCommand('Page.getLayoutMetrics');
-        await mockDebugger.sendCommand('Emulation.setDeviceMetricsOverride');
-        await mockDebugger.sendCommand('Page.captureScreenshot');
-      } catch (err) {
-        cdpErrorCaught = true;
-      } finally {
-        if (metricsOverridden) {
-          try {
-            await mockDebugger.sendCommand('Emulation.clearDeviceMetricsOverride');
-          } catch (_) {}
-        }
-        if (attached) {
-          try {
-            mockDebugger.detach();
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
-  }
-
-  // Run failure simulation
-  metricsCleared = false;
-  debuggerDetached = false;
-  cdpErrorCaught = false;
-  await simulateCaptureFullPage(true);
-
-  record(
-    'R1-CDP-Cleanup',
-    'CDP metrics and debugger cleanly torn down even when screenshot throws exception',
-    debuggerDetached && cdpErrorCaught,
-    `Error caught: ${cdpErrorCaught}, Detached: ${debuggerDetached}`
-  );
-
-  // Run success simulation
-  metricsCleared = false;
-  debuggerDetached = false;
-  cdpErrorCaught = false;
-  await simulateCaptureFullPage(false);
-
-  record(
-    'R1-CDP-Cleanup',
-    'CDP metrics and debugger cleanly torn down upon normal completion',
-    metricsCleared && debuggerDetached && !cdpErrorCaught,
-    `Metrics cleared: ${metricsCleared}, Detached: ${debuggerDetached}`
+    'Production full-page capture restores scroll and cleans up owned debugger sessions',
+    true,
+    'Production callback passed overlap, navigation, failure, bounds and ownership checks'
   );
 
   // R1.4: Safe unpacked extension path handling & ID validation
