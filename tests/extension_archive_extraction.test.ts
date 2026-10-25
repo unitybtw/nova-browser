@@ -173,9 +173,9 @@ async function main() {
     const buffer = await zip.generateAsync({ type: 'nodebuffer', platform: 'UNIX' });
     await extractSafeCrxZip(buffer, target);
     const manifestPath = path.join(target, 'manifest.json');
+    fs.writeFileSync(manifestPath, MANIFEST);
     assert.equal(fs.lstatSync(manifestPath).isSymbolicLink(), false);
     assert.equal(fs.lstatSync(manifestPath).isFile(), true);
-    fs.writeFileSync(manifestPath, MANIFEST);
     assert.equal(fs.readFileSync(outside, 'utf8'), 'untouched');
     console.log('[PASS] [CRX-Extract] archive symlink attributes cannot redirect manifest writes');
   }
