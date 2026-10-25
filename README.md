@@ -549,6 +549,8 @@ flowchart TB
 | `F12` / `Cmd + Opt + I` | `F12` / `Ctrl + Shift + I` | Open Developer Tools |
 | `F1` / `Cmd + /` | `F1` / `Ctrl + /` | Open Help & Shortcuts Guide |
 
+Full-page screenshots currently have rendering limitations in embedded webviews: off-screen sections can repeat or be omitted, and viewport-relative layouts can reflow during capture. Viewport screenshots preserve native resolution. Check full-page output before relying on it.
+
 ---
 
 ## Completed Milestones & Roadmap

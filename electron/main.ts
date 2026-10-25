@@ -4038,8 +4038,8 @@ ipcMain.handle('capture-full-page', async (event, webContentsId: number) => {
           if (invalidated || wc.isDestroyed()) return null;
         }
 
-        // Webview surfaces need an expanded viewport to render off-screen
-        // content reliably. Keep this override confined to our debugger job.
+        // Retain the existing viewport-expansion path. Embedded surfaces can
+        // still repeat off-screen content; this job only manages capture state.
         metricsOverridden = true;
         await wc.debugger.sendCommand('Emulation.setDeviceMetricsOverride', {
           mobile: false, width, height, deviceScaleFactor: 1,
