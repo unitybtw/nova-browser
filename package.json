@@ -139,6 +139,7 @@
     "test": "npm run test:e2e && npm run test:sidebar",
     "test:sidebar": "esbuild tests/sidebar_tabs_ui.test.ts --bundle --platform=node --external:jsdom --define:import.meta.env=\"{}\" --outfile=dist-test/sidebar_tabs_ui.cjs && node dist-test/sidebar_tabs_ui.cjs",
     "test:extensions:native": "npm run build:electron && esbuild tests/extension_popup_native.test.ts --bundle --platform=node --external:electron --outfile=dist-test/extension_popup_native.cjs && electron dist-test/extension_popup_native.cjs",
+    "test:screenshots:native": "npm run build:electron && esbuild tests/screenshot_native.test.ts --bundle --platform=node --external:electron --outfile=dist-test/screenshot_native.cjs && electron dist-test/screenshot_native.cjs",
     "benchmark": "esbuild tests/benchmark_suite.ts --bundle --platform=node --outfile=dist-test/benchmark_suite.cjs && node dist-test/benchmark_suite.cjs",
     "benchmark:speedometer": "esbuild scripts/speedometer_runner.ts --bundle --platform=node --outfile=dist-test/speedometer_runner.cjs --external:electron && electron dist-test/speedometer_runner.cjs",
     "pack:win": "npm run build && electron-builder --win",

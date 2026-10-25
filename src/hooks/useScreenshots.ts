@@ -73,11 +73,11 @@ export function useScreenshots({
       try {
         let dataUrl: string | null = null;
         const wcId = typeof webview.getWebContentsId === 'function' ? webview.getWebContentsId() : undefined;
-        if (wcId !== undefined && getElectronAPI()?.captureTabThumbnail) {
-          dataUrl = await getElectronAPI()?.captureTabThumbnail(wcId) ?? null;
-        } else if (typeof webview.capturePage === 'function') {
+        // Saved screenshots need the original viewport pixels. The thumbnail
+        // IPC deliberately resizes to 320x200 and is only for tab previews.
+        if (typeof webview.capturePage === 'function') {
           const image = await webview.capturePage();
-          dataUrl = image.toDataURL();
+          if (!image.isEmpty()) dataUrl = image.toDataURL();
         }
 
         if (!isCurrentCapture(requestId, webview, activeTabId, url)) return;

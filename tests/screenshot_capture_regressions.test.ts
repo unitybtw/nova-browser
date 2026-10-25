@@ -17,7 +17,12 @@ async function run() {
   const guests = new Map<string, any>();
   let capture = deferred<string>();
   let fullRequests = 0;
-  const api = { captureTabThumbnail: () => capture.promise, captureFullPage: () => { fullRequests++; return capture.promise; } };
+  let thumbnailRequests = 0;
+  const api = { captureTabThumbnail: () => { thumbnailRequests++; return capture.promise; }, captureFullPage: () => { fullRequests++; return capture.promise; } };
+  const capturePage = async () => {
+    const data = await capture.promise;
+    return { isEmpty: () => !data, toDataURL: () => data };
+  };
   const exports: any = {};
   vm.runInNewContext(ts.transpileModule(fs.readFileSync('src/hooks/useScreenshots.ts', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 }
@@ -46,7 +51,7 @@ async function run() {
       };
     },
   });
-  const guest = Object.assign(new EventTarget(), { getWebContentsId: () => 7, isConnected: true });
+  const guest = Object.assign(new EventTarget(), { getWebContentsId: () => 7, isConnected: true, capturePage });
   guests.set('webview[data-tab-id="a"]', guest);
   let options = { activeTabId: 'a', tabs: [{ id: 'a', url: 'https://example.com/a', title: 'Original page' }], setIsScreenshotOpen: (value: boolean) => opened.push(value) };
   const render = () => {
@@ -61,6 +66,7 @@ async function run() {
   hook = render();
   options = { ...options, activeTabId: 'a' }; hook = render();
   capture.resolve('data:image/png;base64,old'); await first;
+  assert.equal(thumbnailRequests, 0, 'saving a screenshot must not use the reduced tab thumbnail');
   assert.equal(opened.length, 0, 'switching tabs must discard a pending screenshot');
   assert.equal(render().screenshotDataUrl, null);
 
@@ -100,7 +106,7 @@ async function run() {
   options = { ...options, activeTabId: 'a' }; hook = render();
 
   capture = deferred(); hook = render(); const replaced = hook.handleTakeScreenshot();
-  const replacementGuest = Object.assign(new EventTarget(), { getWebContentsId: () => 8, isConnected: true });
+  const replacementGuest = Object.assign(new EventTarget(), { getWebContentsId: () => 8, isConnected: true, capturePage });
   guests.set('webview[data-tab-id="a"]', replacementGuest);
   capture.resolve('data:image/png;base64,replaced-guest'); await replaced;
   assert.equal(opened.length, 1, 'replacing the webview invalidates its in-flight capture');
@@ -108,6 +114,12 @@ async function run() {
   capture = deferred(); hook = render(); const failed = hook.handleTakeScreenshot();
   capture.reject(new Error('capture failed')); await failed;
   assert.equal(alerts.length, 1, 'a current capture failure needs visible feedback');
+
+  capture = deferred(); hook = render(); const empty = hook.handleTakeScreenshot();
+  capture.resolve(''); await empty;
+  assert.equal(opened.length, 1, 'an empty native image must not open a blank screenshot preview');
+  assert.equal(alerts.length, 2, 'an empty native image needs visible failure feedback');
+  assert.equal(thumbnailRequests, 0, 'failed captures must never fall back to a reduced thumbnail');
 
   capture = deferred(); const unmounted = hook.handleTakeScreenshot();
   assert.equal(getEventListeners(replacementGuest, 'did-start-navigation').length, 1);
