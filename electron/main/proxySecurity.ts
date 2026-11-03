@@ -60,6 +60,56 @@ export function getMachineSalt(saltContext = 'nova-secure-salt', mockUserInfoErr
     .digest();
 }
 
+export const MAX_SCRYPT_CACHE_ENTRIES = 50;
+
+// Process-level LRU memo cache for computationally heavy scrypt key derivations.
+// Keys are composite hex strings: `${secret.hex}:${machineSalt.hex}`.
+const scryptKeyCache = new Map<string, Buffer>();
+
+/**
+ * Returns a memoized 32-byte key derived from secret and machineSalt using scrypt.
+ * Eliminates 50-100ms synchronous event loop freezes on subsequent calls.
+ * Enforces strict LRU bounding capped at MAX_SCRYPT_CACHE_ENTRIES (50) to prevent memory growth.
+ */
+export function getMemoizedScryptKey(secret: Buffer, machineSalt: Buffer): Buffer {
+  const cacheKey = `${secret.toString('hex')}:${machineSalt.toString('hex')}`;
+  let keyBuf = scryptKeyCache.get(cacheKey);
+  if (keyBuf) {
+    // Refresh LRU order on cache hit (re-insert moves key to the end)
+    scryptKeyCache.delete(cacheKey);
+    scryptKeyCache.set(cacheKey, keyBuf);
+    return keyBuf;
+  }
+
+  // Derive 32-byte key synchronously
+  keyBuf = crypto.scryptSync(secret, machineSalt, 32);
+
+  // Evict least recently used entry if capacity is reached
+  if (scryptKeyCache.size >= MAX_SCRYPT_CACHE_ENTRIES) {
+    const oldestKey = scryptKeyCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      scryptKeyCache.delete(oldestKey);
+    }
+  }
+
+  scryptKeyCache.set(cacheKey, keyBuf);
+  return keyBuf;
+}
+
+/**
+ * Exposed for unit tests to reset cached keys across isolated test cases.
+ */
+export function _clearScryptKeyCacheForTesting(): void {
+  scryptKeyCache.clear();
+}
+
+/**
+ * Exposed for unit tests to inspect current cache size and verify LRU bounding.
+ */
+export function _getScryptCacheSizeForTesting(): number {
+  return scryptKeyCache.size;
+}
+
 /**
  * Encrypts sensitive configuration using safeStorage (DPAPI on Windows, Keychain on macOS)
  * or falls back to an authenticated AES-256-GCM cipher bound to the machine salt.
@@ -95,7 +145,7 @@ export function encryptDataWithFallback(plainText: string, userDataPath: string,
   }
 
   const machineSalt = getMachineSalt('nova-secure-salt');
-  const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
+  const keyBuf = getMemoizedScryptKey(secret, machineSalt);
   const iv = crypto.randomBytes(12);
   const cipher = crypto.createCipheriv('aes-256-gcm', keyBuf, iv);
   const enc = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
@@ -123,7 +173,7 @@ export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeS
         const secret = fs.readFileSync(secretPath);
         if (secret.length !== 32) return null;
         const machineSalt = getMachineSalt('nova-secure-salt');
-        const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
+        const keyBuf = getMemoizedScryptKey(secret, machineSalt);
         const iv = raw.subarray(4, 16);
         const tag = raw.subarray(16, 32);
         const enc = raw.subarray(32);
@@ -135,4 +185,25 @@ export function decryptDataWithFallback(raw: Buffer, userDataPath: string, safeS
   }
 
   return null;
+}
+
+/**
+ * Computes the SHA-256 checksum of a file on disk via streaming to avoid large heap allocations.
+ * Streams data directly into crypto.Hash and resolves with 64-character lowercase hex digest.
+ */
+export function computeFileSha256Stream(filePath: string): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', (err) => {
+      stream.destroy();
+      reject(err);
+    });
+    hash.on('error', (err) => {
+      stream.destroy();
+      reject(err);
+    });
+    hash.on('finish', () => resolve(hash.digest('hex').toLowerCase()));
+    stream.pipe(hash);
+  });
 }

@@ -10,7 +10,7 @@ import { once } from 'events';
 import fs from 'fs';
 import createDOMPurify from 'dompurify';
 import { checkPhishingDomain, matchesExtensionHostPermission } from '../src/utils/securityUtils.js';
-import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback } from './main/proxySecurity';
+import { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt, encryptDataWithFallback, decryptDataWithFallback, getMemoizedScryptKey, computeFileSha256Stream } from './main/proxySecurity';
 export { isValidSecureProxy, normalizeProxyForChromium, getMachineSalt };
 
 console.log('Main process starting...');
@@ -720,6 +720,112 @@ function createWindow() {
 
   currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());
 
+  interface ChainedSessionWebRequest extends Electron.Session {
+    __hasChainedHeadersReceived?: boolean;
+    __externalHeadersReceivedListener?: ((details: Electron.OnHeadersReceivedListenerDetails, callback: (res: Electron.HeadersReceivedResponse) => void) => void) | null;
+  }
+
+  function applyInternalPrivacyHeaders(
+    details: Electron.OnHeadersReceivedListenerDetails,
+    baseHeaders?: Record<string, string[] | string>
+  ): Record<string, string[]> | null {
+    let isDevLocalhost = false;
+    let isAppFile = false;
+    try {
+      const parsed = new URL(details.url);
+      if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
+        isDevLocalhost = true;
+      }
+      if (parsed.protocol === 'file:') {
+        isAppFile = true;
+      }
+    } catch {}
+
+    // Never modify response headers for external sites (YouTube, Google, streaming, etc.)
+    if (!isDevLocalhost && !isAppFile) {
+      if (!baseHeaders) return null;
+      const normalized: Record<string, string[]> = {};
+      for (const [k, v] of Object.entries(baseHeaders)) {
+        if (v) normalized[k] = Array.isArray(v) ? v : [v];
+      }
+      return normalized;
+    }
+
+    const responseHeaders: Record<string, string[]> = {};
+    if (baseHeaders) {
+      for (const [key, value] of Object.entries(baseHeaders)) {
+        if (value) {
+          responseHeaders[key] = Array.isArray(value) ? value : [value];
+        }
+      }
+    }
+
+    if (isDevLocalhost) {
+      responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
+      responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
+    }
+
+    // VULN-16: Add Content Security Policy for the app's own pages
+    if (isAppFile || isDevLocalhost) {
+      const isDev = isDevLocalhost || !app.isPackaged;
+      responseHeaders['Content-Security-Policy'] = [
+        isDev
+          ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
+          : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
+      ];
+      responseHeaders['X-Content-Type-Options'] = ['nosniff'];
+    }
+
+    return responseHeaders;
+  }
+
+  function ensureChainedHeadersReceivedInterceptor(targetSession: Electron.Session): void {
+    const chainedSess = targetSession as ChainedSessionWebRequest;
+    if (chainedSess.__hasChainedHeadersReceived) return;
+    chainedSess.__hasChainedHeadersReceived = true;
+
+    const originalOnHeadersReceived = targetSession.webRequest.onHeadersReceived.bind(targetSession.webRequest);
+
+    // Wrap webRequest.onHeadersReceived so external modules (like adblockManager) register cooperatively
+    targetSession.webRequest.onHeadersReceived = ((...args: any[]) => {
+      let listener: any = null;
+      if (args.length === 1) listener = args[0];
+      else if (args.length >= 2) listener = args[1];
+
+      chainedSess.__externalHeadersReceivedListener = typeof listener === 'function' ? listener : null;
+    }) as any;
+
+    originalOnHeadersReceived({ urls: ['<all_urls>'] }, (details, callback) => {
+      const externalListener = chainedSess.__externalHeadersReceivedListener;
+      if (externalListener) {
+        try {
+          externalListener(details, (externalRes: Electron.HeadersReceivedResponse) => {
+            try {
+              if (externalRes?.cancel) {
+                callback(externalRes);
+                return;
+              }
+              const inputHeaders = externalRes?.responseHeaders || details.responseHeaders;
+              const finalHeaders = applyInternalPrivacyHeaders(details, inputHeaders);
+              callback({
+                ...externalRes,
+                ...(finalHeaders ? { responseHeaders: finalHeaders } : {})
+              });
+            } catch (_) {
+              callback(externalRes || {});
+            }
+          });
+        } catch (_) {
+          const fallback = applyInternalPrivacyHeaders(details, details.responseHeaders);
+          callback(fallback ? { responseHeaders: fallback } : {});
+        }
+      } else {
+        const finalHeaders = applyInternalPrivacyHeaders(details, details.responseHeaders);
+        callback(finalHeaders ? { responseHeaders: finalHeaders } : {});
+      }
+    });
+  }
+
   // Privacy Shield: Reusable helper to attach privacy and security headers to a session
   applyPrivacyHeadersToSession = function(targetSession: Electron.Session) {
     if (sessionsWithPrivacyHeaders.has(targetSession)) return;
@@ -766,86 +872,7 @@ function createWindow() {
     });
 
     // Handle headers for WebGPU / WASM SharedArrayBuffer + CSP for internal app pages only
-    targetSession.webRequest.onHeadersReceived((details, callback) => {
-      let isDevLocalhost = false;
-      let isAppFile = false;
-      try {
-        const parsed = new URL(details.url);
-        // Security: dev-server COOP/COEP headers and dev CSP only apply in
-        // unpackaged dev builds; a packaged app must never trust localhost:5173.
-        if (!app.isPackaged && parsed.origin === 'http://localhost:5173') {
-          isDevLocalhost = true;
-        }
-        if (parsed.protocol === 'file:') {
-          isAppFile = true;
-        }
-      } catch {}
-
-      // Never modify response headers for external sites (YouTube, Google, streaming, etc.)
-      if (!isDevLocalhost && !isAppFile) {
-        callback({});
-        return;
-      }
-
-      const responseHeaders: Record<string, string[]> = {};
-      if (details.responseHeaders) {
-        for (const [key, value] of Object.entries(details.responseHeaders)) {
-          if (value) {
-            responseHeaders[key] = Array.isArray(value) ? value : [value];
-          }
-        }
-      }
-
-      if (isDevLocalhost) {
-        responseHeaders['Cross-Origin-Opener-Policy'] = ['same-origin'];
-        responseHeaders['Cross-Origin-Embedder-Policy'] = ['credentialless'];
-      }
-
-      // VULN-16: Add Content Security Policy for the app's own pages
-      if (isAppFile || isDevLocalhost) {
-        const isDev = isDevLocalhost || !app.isPackaged;
-
-        // VULN-16 / CSP parity: this PROD header and the <meta> policy that
-        // vite.config.ts bakes into dist/index.html (HARDENED_PROD_CSP) are
-        // INTENTIONALLY BYTE-IDENTICAL. A page's enforced CSP is the
-        // intersection of every policy delivered to it, so a value present in
-        // only one copy contributes nothing — and it has never been verified
-        // which copy actually binds for a file:// load. Identical copies make
-        // the question moot. Editing one without the other silently changes the
-        // intersection.
-        //
-        // PROD directives that are easy to "tidy" back into an asymmetric state:
-        //  - style-src keeps 'unsafe-inline' ON PURPOSE. src/ has 136
-        //    `style={{...}}` attributes — 46 of them `-webkit-app-region: drag |
-        //    no-drag` on the frameless title bar, so dropping it makes the title
-        //    bar undraggable and its buttons drag regions — plus a runtime
-        //    <style> element in ReaderMode. That is a functional break, not
-        //    cosmetics, so it belongs in BOTH prod copies.
-        //  - No frame-src: it falls back to default-src 'self', i.e. the
-        //    stricter header-bound behaviour we already ship. The
-        //    `https://*.supabase.co` frame-src that lived only in the prod meta
-        //    never took effect and must not come back — a framed Supabase origin
-        //    sits inside this privileged UI.
-        //  - font-src carries no bare `https:`; under intersection it was
-        //    already the narrower value below.
-        //  - script-src carries no `blob:`: the one Worker (services/aiAgent) is
-        //    covered by worker-src, and every createObjectURL use is an <img> or
-        //    a download (img-src).
-        //  - form-action is inherited from the prod meta so both copies express
-        //    it; every <form> in src/ is JS-submitted (onSubmit +
-        //    preventDefault, no action/method attribute), so nothing regresses.
-        //  - frame-ancestors is ignored by browsers in a <meta> policy; it is
-        //    kept here only so the two prod copies stay byte-identical.
-        responseHeaders['Content-Security-Policy'] = [
-          isDev
-            ? `default-src 'self' http://localhost:*; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: http://localhost:*; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https: http:; connect-src 'self' http://localhost:* ws://localhost:* https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';`
-            : `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://huggingface.co https://*.huggingface.co https://hf.co https://*.hf.co https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'`
-        ];
-        responseHeaders['X-Content-Type-Options'] = ['nosniff'];
-      }
-
-      callback({ responseHeaders });
-    });
+    ensureChainedHeadersReceivedInterceptor(targetSession);
   }
 
   // Apply privacy and security headers across both standard and incognito sessions
@@ -1363,18 +1390,18 @@ app.on('second-instance', (_event, commandLine) => {
   }
 });
 
-function cleanStaleUpdateArtifacts(): void {
+async function cleanStaleUpdateArtifacts(): Promise<void> {
   try {
     // 1. Clean stale in-flight downloads or old installers in userData/updates
     const updatesDir = path.join(app.getPath('userData'), 'updates');
-    if (fs.existsSync(updatesDir)) {
-      const files = fs.readdirSync(updatesDir);
+    try {
+      const files = await fs.promises.readdir(updatesDir);
       for (const f of files) {
         const fullPath = path.join(updatesDir, f);
         try {
           // Immediately purge aborted or incomplete download chunks
           if (f.includes('.download_') || f.endsWith('.download')) {
-            fs.unlinkSync(fullPath);
+            await fs.promises.unlink(fullPath).catch(() => {});
             continue;
           }
           // In Linux, never delete the currently running AppImage
@@ -1382,97 +1409,91 @@ function cleanStaleUpdateArtifacts(): void {
             continue;
           }
           // Remove old installers older than 24 hours
-          const stat = fs.statSync(fullPath);
+          const stat = await fs.promises.stat(fullPath);
           const ageHours = (Date.now() - stat.mtimeMs) / (1000 * 60 * 60);
           if (ageHours > 24) {
-            fs.unlinkSync(fullPath);
+            await fs.promises.unlink(fullPath).catch(() => {});
           }
         } catch (_) {}
       }
-    }
+    } catch (_) {}
 
     // 2. Clean temporary CRX files in userData/temp_extensions
     const tempExtDir = path.join(app.getPath('userData'), 'temp_extensions');
-    if (fs.existsSync(tempExtDir)) {
-      const crxFiles = fs.readdirSync(tempExtDir);
+    try {
+      const crxFiles = await fs.promises.readdir(tempExtDir);
       for (const f of crxFiles) {
         try {
-          fs.unlinkSync(path.join(tempExtDir, f));
+          await fs.promises.unlink(path.join(tempExtDir, f)).catch(() => {});
         } catch (_) {}
       }
-    }
+    } catch (_) {}
 
     // 3. Clean abandoned update staging directories in OS temp directory
     const osTemp = app.getPath('temp');
-    if (fs.existsSync(osTemp)) {
-      const tempEntries = fs.readdirSync(osTemp);
+    try {
+      const tempEntries = await fs.promises.readdir(osTemp);
       for (const entry of tempEntries) {
         if (entry.startsWith('nova_update_')) {
           const entryPath = path.join(osTemp, entry);
           try {
-            const stat = fs.statSync(entryPath);
+            const stat = await fs.promises.stat(entryPath);
             // If older than 30 minutes, it is an abandoned update directory
             if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
-              fs.rmSync(entryPath, { recursive: true, force: true });
+              await fs.promises.rm(entryPath, { recursive: true, force: true }).catch(() => {});
             }
           } catch (_) {}
         }
       }
-    }
+    } catch (_) {}
 
     // 4. Clean any orphaned updater staging or backup artifacts in app parent directory (e.g. /Applications)
     if (process.platform === 'darwin') {
       try {
         const exePath = app.getPath('exe');
-        const appBundlePath = path.dirname(path.dirname(path.dirname(exePath)));
-        const searchDirs = new Set<string>();
-        searchDirs.add('/Applications');
-        if (appBundlePath.endsWith('.app')) {
-          searchDirs.add(path.dirname(appBundlePath));
-        }
+        const appMatch = exePath.match(/^(.*?\.app)\/Contents\/MacOS\//);
+        const appBundlePath = appMatch ? appMatch[1] : null;
 
-        const lsregisterPath = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
-        let foundOrphans = false;
+        // Target only the running app bundle's parent directory if packaged as an .app
+        if (appBundlePath) {
+          const appParentDir = path.dirname(appBundlePath);
+          const bundleBasename = path.basename(appBundlePath);
+          const lsregisterPath = '/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister';
+          let foundOrphans = false;
 
-        for (const dir of searchDirs) {
-          if (!fs.existsSync(dir)) continue;
-          let entries: string[] = [];
           try {
-            entries = fs.readdirSync(dir);
-          } catch (_) {
-            continue;
-          }
-
-          for (const entry of entries) {
-            if (
-              entry.startsWith('.nova_staging_') ||
-              entry.startsWith('.nova_backup_') ||
-              entry.startsWith('Nova Browser.app.staging_') ||
-              entry.startsWith('Nova Browser.app.backup_')
-            ) {
-              const orphanPath = path.resolve(dir, entry);
-              if (!orphanPath.startsWith(dir + path.sep)) continue;
-              try {
-                if (fs.existsSync(lsregisterPath)) {
+            const entries = await fs.promises.readdir(appParentDir);
+            for (const entry of entries) {
+              if (
+                entry.startsWith('.nova_staging_') ||
+                entry.startsWith('.nova_backup_') ||
+                entry.startsWith(`${bundleBasename}.staging_`) ||
+                entry.startsWith(`${bundleBasename}.backup_`) ||
+                entry.startsWith('Nova Browser.app.staging_') ||
+                entry.startsWith('Nova Browser.app.backup_')
+              ) {
+                const orphanPath = path.resolve(appParentDir, entry);
+                if (!orphanPath.startsWith(appParentDir + path.sep)) continue;
+                try {
                   try {
-                    // No timeout: a wedged lsregister blocks the main thread forever.
-                    child_process.execFileSync(lsregisterPath, ['-u', orphanPath], { stdio: 'ignore', timeout: 15000 });
+                    await fs.promises.access(lsregisterPath);
+                    await new Promise<void>((resolve) => {
+                      child_process.execFile(lsregisterPath, ['-u', orphanPath], { timeout: 15000 }, () => resolve());
+                    });
                   } catch (_) {}
-                }
-                fs.rmSync(orphanPath, { recursive: true, force: true });
-                foundOrphans = true;
-                console.log(`[Cleanup] Removed orphaned update artifact: ${orphanPath}`);
+                  await fs.promises.rm(orphanPath, { recursive: true, force: true });
+                  foundOrphans = true;
+                  console.log(`[Cleanup] Removed orphaned update artifact: ${orphanPath}`);
+                } catch (_) {}
+              }
+            }
+
+            if (foundOrphans) {
+              try {
+                await fs.promises.access(lsregisterPath);
+                child_process.execFile(lsregisterPath, ['-gc'], { encoding: 'utf8', timeout: 15000 }, () => {});
               } catch (_) {}
             }
-          }
-        }
-
-        if (foundOrphans && fs.existsSync(lsregisterPath)) {
-          try {
-            // -gc rebuilds the entire system LaunchServices database and is routinely
-  // multi-second. Synchronous, it freezes every window, and it runs on a 5s
-  // timer - exactly when the user starts interacting. Bounded and non-blocking.
-  child_process.execFile(lsregisterPath, ['-gc'], { encoding: 'utf8', timeout: 15000 }, () => {});
           } catch (_) {}
         }
       } catch (_) {}
@@ -1484,52 +1505,52 @@ function cleanStaleUpdateArtifacts(): void {
         const appImagePath = process.env.APPIMAGE;
         if (appImagePath && fs.existsSync(appImagePath)) {
           const backupFile = `${appImagePath}.old`;
-          if (fs.existsSync(backupFile)) {
-            const stat = fs.statSync(backupFile);
+          try {
+            const stat = await fs.promises.stat(backupFile);
             if ((Date.now() - stat.mtimeMs) > 10 * 60 * 1000) {
-              fs.unlinkSync(backupFile);
+              await fs.promises.unlink(backupFile).catch(() => {});
             }
-          }
+          } catch (_) {}
         }
       } catch (_) {}
     } else if (process.platform === 'win32') {
       try {
         const osTemp = app.getPath('temp');
-        if (fs.existsSync(osTemp)) {
-          const entries = fs.readdirSync(osTemp);
+        try {
+          const entries = await fs.promises.readdir(osTemp);
           for (const entry of entries) {
             if (entry.startsWith('update_') && entry.endsWith('.bat')) {
               const p = path.join(osTemp, entry);
               try {
-                const stat = fs.statSync(p);
+                const stat = await fs.promises.stat(p);
                 if ((Date.now() - stat.mtimeMs) > 30 * 60 * 1000) {
-                  fs.unlinkSync(p);
+                  await fs.promises.unlink(p).catch(() => {});
                 }
               } catch (_) {}
             }
           }
-        }
+        } catch (_) {}
       } catch (_) {}
     }
 
     // 6. Clean orphaned store and secure-store temporary write files in userData
     try {
       const userDataDir = app.getPath('userData');
-      if (fs.existsSync(userDataDir)) {
-        const uEntries = fs.readdirSync(userDataDir);
+      try {
+        const uEntries = await fs.promises.readdir(userDataDir);
         for (const entry of uEntries) {
           if ((entry.startsWith('store_') || entry.startsWith('secure_')) && entry.endsWith('.tmp')) {
             const tmpFile = path.join(userDataDir, entry);
             try {
-              const stat = fs.statSync(tmpFile);
+              const stat = await fs.promises.stat(tmpFile);
               // If older than 15 minutes, it is an abandoned crash leftover
               if ((Date.now() - stat.mtimeMs) > 15 * 60 * 1000) {
-                fs.unlinkSync(tmpFile);
+                await fs.promises.unlink(tmpFile).catch(() => {});
               }
             } catch (_) {}
           }
         }
-      }
+      } catch (_) {}
     } catch (_) {}
   } catch (e) {
     console.warn('[Cleanup] Non-fatal error cleaning stale update artifacts:', e);
@@ -1546,7 +1567,9 @@ app.whenReady().then(async () => {
 
   // Background idle garbage collection for updater artifacts after 5s
   setTimeout(() => {
-    cleanStaleUpdateArtifacts();
+    cleanStaleUpdateArtifacts().catch((err) => {
+      console.warn('[Cleanup] Non-fatal background cleanup error:', err);
+    });
   }, 5000);
 
   // Y-1: Restore persistent VPN proxy on startup if previously configured
@@ -2283,8 +2306,7 @@ app.whenReady().then(async () => {
 
     if (latestReleaseDownloadInfo?.expectedSha256) {
       try {
-        const fileBuffer = fs.readFileSync(resolvedFilePath);
-        const actualSha = crypto.createHash('sha256').update(fileBuffer).digest('hex').toLowerCase();
+        const actualSha = await computeFileSha256Stream(resolvedFilePath);
         if (actualSha !== latestReleaseDownloadInfo.expectedSha256.toLowerCase()) {
           console.error(`[Security] Update checksum mismatch! Expected ${latestReleaseDownloadInfo.expectedSha256}, got ${actualSha}`);
           return { success: false, error: 'Update package checksum verification failed' };
@@ -3489,6 +3511,7 @@ app.on('web-contents-created', (_event, contents) => {
   });
 
   if (contents.getType() === 'webview') {
+    setupWebViewContextMenu(contents);
     if (!app.isPackaged) {
       contents.on('console-message', (details) => {
         const isError = details.level === 'error';
@@ -3976,7 +3999,9 @@ ipcMain.handle('capture-tab-thumbnail', async (event, webContentsId: number) => 
 
     const image = await wc.capturePage();
     if (image.isEmpty()) return null;
-    return image.resize({ width: 320, height: 200 }).toDataURL();
+    const resized = image.resize({ width: 320, height: 200 });
+    const jpegBuffer = resized.toJPEG(75);
+    return `data:image/jpeg;base64,${jpegBuffer.toString('base64')}`;
   } catch (err) {
     return null;
   }
@@ -4192,9 +4217,8 @@ export async function openPageSourceViewer(currentUrl: string, wc?: any): Promis
   return sourceWin;
 }
 
-// Auto-capture thumbnails and Native Chrome-Parity Context Menu for WebViews
-app.on('web-contents-created', (_event, wc) => {
-  wc.removeAllListeners('context-menu');
+// Native Chrome-Parity Context Menu for WebViews
+function setupWebViewContextMenu(wc: Electron.WebContents): void {
   wc.on('context-menu', (e, params) => {
     // Only show for webviews
     if (wc.getType() === 'webview') {
@@ -4594,7 +4618,7 @@ app.on('web-contents-created', (_event, wc) => {
       menu.popup({ window: mainWindow || undefined });
     }
   });
-});
+}
 
 // Download Controls (handlers live in main/downloads.ts)
 initDownloads(sendToMainWindow, isTrustedSender);
@@ -4831,26 +4855,110 @@ ipcMain.on('save-password', (event, data: { hostname: string; username: string; 
 });
 
 // Generic Secure Storage API (for future password manager, etc.)
-// Mutex: serialize concurrent secure-store operations to prevent read-modify-write races
-// when multiple tabs call save-password / secure-store-set simultaneously.
-let secureStoreMutexChain: Promise<unknown> = Promise.resolve();
-function withSecureStoreMutex<T>(fn: () => Promise<T>): Promise<T> {
-  const next = secureStoreMutexChain.then(fn, fn) as Promise<T>;
-  // Swallow any rejection on the chain tail so the mutex never stalls permanently.
-  secureStoreMutexChain = next.catch(() => undefined);
-  return next;
+/**
+ * Generic Secure Storage Keyed Reader-Writer Lock
+ * - Allows concurrent reads on the same key without head-of-line blocking.
+ * - Serializes writes exclusively per key to prevent write-write and read-write races.
+ * - Isolates different storage keys completely so unrelated operations never block each other.
+ * - Writer-preference scheduling ensures pending writes are not starved by a stream of readers.
+ * - Self-cleaning: keys are deleted from the Map immediately when queues become empty.
+ */
+class SecureStoreKeyedRWLock {
+  private locks = new Map<string, {
+    activeReaders: number;
+    isWriting: boolean;
+    waitingWriters: Array<() => void>;
+    waitingReaders: Array<() => void>;
+  }>();
+
+  private getEntry(key: string) {
+    let entry = this.locks.get(key);
+    if (!entry) {
+      entry = {
+        activeReaders: 0,
+        isWriting: false,
+        waitingWriters: [],
+        waitingReaders: [],
+      };
+      this.locks.set(key, entry);
+    }
+    return entry;
+  }
+
+  private tryCleanup(key: string, entry: { activeReaders: number; isWriting: boolean; waitingWriters: any[]; waitingReaders: any[] }) {
+    if (entry.activeReaders === 0 && !entry.isWriting && entry.waitingWriters.length === 0 && entry.waitingReaders.length === 0) {
+      this.locks.delete(key);
+    }
+  }
+
+  async read<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const entry = this.getEntry(key);
+
+    // If a write is in progress or a write is queued (writer-preference to prevent starvation), wait
+    if (entry.isWriting || entry.waitingWriters.length > 0) {
+      await new Promise<void>((resolve) => entry.waitingReaders.push(resolve));
+    } else {
+      entry.activeReaders++;
+    }
+
+    try {
+      return await fn();
+    } finally {
+      entry.activeReaders--;
+      if (entry.activeReaders === 0 && entry.waitingWriters.length > 0) {
+        entry.isWriting = true;
+        const nextWriter = entry.waitingWriters.shift()!;
+        nextWriter();
+      }
+      this.tryCleanup(key, entry);
+    }
+  }
+
+  async write<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const entry = this.getEntry(key);
+
+    if (entry.isWriting || entry.activeReaders > 0) {
+      await new Promise<void>((resolve) => entry.waitingWriters.push(resolve));
+    } else {
+      entry.isWriting = true;
+    }
+
+    try {
+      return await fn();
+    } finally {
+      entry.isWriting = false;
+      if (entry.waitingWriters.length > 0) {
+        entry.isWriting = true;
+        const nextWriter = entry.waitingWriters.shift()!;
+        nextWriter();
+      } else if (entry.waitingReaders.length > 0) {
+        // Wake all waiting readers concurrently
+        const readersToWake = entry.waitingReaders.splice(0, entry.waitingReaders.length);
+        entry.activeReaders += readersToWake.length;
+        for (const wakeReader of readersToWake) {
+          wakeReader();
+        }
+      }
+      this.tryCleanup(key, entry);
+    }
+  }
 }
+
+const secureStoreLock = new SecureStoreKeyedRWLock();
+
 ipcMain.handle('secure-store-set', async (event, key: string, value: string) => {
   if (!isTrustedSender(event)) return false;
-  return withSecureStoreMutex(async () => {
-    try {
-      if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
-      if (typeof value !== 'string') throw new Error('Invalid value format');
-      // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
-      const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
-      if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
-        throw new Error('Value exceeds maximum allowed size of 5MB');
-      }
+  try {
+    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) throw new Error('Invalid key format');
+    if (typeof value !== 'string') throw new Error('Invalid value format');
+    // VULN-23 parity: enforce max value size of 5MB (store-set enforces 10MB)
+    const MAX_SECURE_STORE_VALUE_SIZE = 5_000_000; // 5MB
+    if (Buffer.byteLength(value, 'utf-8') > MAX_SECURE_STORE_VALUE_SIZE) {
+      throw new Error('Value exceeds maximum allowed size of 5MB');
+    }
+
+    return await secureStoreLock.write(key, async () => {
+      try {
       const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
       if (safeStorage.isEncryptionAvailable()) {
         const encrypted = safeStorage.encryptString(value);
@@ -4894,7 +5002,7 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
           }
           // K-3: Bind salt to machine identity so copying userData to another machine/account fails
           const machineSalt = getMachineSalt('nova-secure-salt');
-          return crypto.scryptSync(secret, machineSalt, 32);
+          return getMemoizedScryptKey(secret, machineSalt);
         };
         const keyBuf = getFallbackKey();
         const iv = crypto.randomBytes(12);
@@ -4922,67 +5030,71 @@ ipcMain.handle('secure-store-set', async (event, key: string, value: string) => 
       return false;
     }
   });
+} catch (err) {
+  console.error('Secure store set error:', err);
+  return false;
+}
 });
 
 ipcMain.handle('secure-store-get', async (event, key: string) => {
   if (!isTrustedSender(event)) return null;
-  // Read under the same mutex the writer uses: otherwise a read can land inside
-  // the writer's truncate window, fail to decrypt the partial buffer, and
-  // report "no credential stored" for a secret that exists.
-  return withSecureStoreMutex(async () => {
-  try {
-    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
-    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+  if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return null;
+
+  return secureStoreLock.read(key, async () => {
     try {
-      const raw = await fs.promises.readFile(keyPath);
-      if (safeStorage.isEncryptionAvailable()) {
-        try {
-          return safeStorage.decryptString(raw);
-        } catch (_) {}
+      const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+      try {
+        const raw = await fs.promises.readFile(keyPath);
+        if (safeStorage.isEncryptionAvailable()) {
+          try {
+            return safeStorage.decryptString(raw);
+          } catch (_) {}
+        }
+        // Check for fallback AES-256-GCM format
+        if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
+          try {
+            const secretPath = path.join(app.getPath('userData'), '.machine_secret');
+            if (fs.existsSync(secretPath)) {
+              const secret = fs.readFileSync(secretPath);
+              if (secret.length !== 32) return null;
+              const machineSalt = getMachineSalt('nova-secure-salt');
+              const keyBuf = getMemoizedScryptKey(secret, machineSalt);
+              const iv = raw.subarray(4, 16);
+              const tag = raw.subarray(16, 32);
+              const enc = raw.subarray(32);
+              const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
+              decipher.setAuthTag(tag);
+              return decipher.update(enc) + decipher.final('utf8');
+            }
+          } catch (_) {}
+        }
+        // K-4: Fail closed: do NOT read unauthenticated plaintext
+        return null;
+      } catch {
+        return null;
       }
-      // Check for fallback AES-256-GCM format
-      if (raw.length >= 32 && raw.subarray(0, 4).toString('utf8') === 'NENC') {
-        try {
-          const secretPath = path.join(app.getPath('userData'), '.machine_secret');
-          if (fs.existsSync(secretPath)) {
-            const secret = fs.readFileSync(secretPath);
-            const machineSalt = getMachineSalt('nova-secure-salt');
-            const keyBuf = crypto.scryptSync(secret, machineSalt, 32);
-            const iv = raw.subarray(4, 16);
-            const tag = raw.subarray(16, 32);
-            const enc = raw.subarray(32);
-            const decipher = crypto.createDecipheriv('aes-256-gcm', keyBuf, iv);
-            decipher.setAuthTag(tag);
-            return decipher.update(enc) + decipher.final('utf8');
-          }
-        } catch (_) {}
-      }
-      // K-4: Fail closed: do NOT read unauthenticated plaintext
-      return null;
-    } catch {
+    } catch (err) {
+      console.error('Secure store get error:', err);
       return null;
     }
-  } catch (err) {
-    console.error('Secure store get error:', err);
-  }
-  return null;
   });
 });
 
 ipcMain.handle('secure-store-delete', async (event, key: string) => {
   if (!isTrustedSender(event)) return false;
-  return withSecureStoreMutex(async () => {
-  try {
-    if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
-    const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+  if (!key || typeof key !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(key)) return false;
+
+  return secureStoreLock.write(key, async () => {
     try {
-      await fs.promises.unlink(keyPath);
-    } catch (_) {}
-    return true;
-  } catch (err) {
-    console.error('Secure store delete error:', err);
-    return false;
-  }
+      const keyPath = path.join(app.getPath('userData'), `secure_${key}`);
+      try {
+        await fs.promises.unlink(keyPath);
+      } catch (_) {}
+      return true;
+    } catch (err) {
+      console.error('Secure store delete error:', err);
+      return false;
+    }
   });
 });
 

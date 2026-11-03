@@ -1,6 +1,6 @@
 import type { Express, Request } from 'express';
 import { BrowserWindow, safeStorage, dialog, powerMonitor, app as electronApp } from 'electron';
-import { randomUUID, createHash, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { randomUUID, createHash, timingSafeEqual, createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import os from 'os';
 import fs from 'fs';
 import path from 'path';
@@ -8,6 +8,7 @@ import path from 'path';
 // sender-gated IPC round-trip instead of executing JS in the main window.
 // Imported from main/mcpBridge (not main.ts) to avoid a circular import.
 import { requestRendererMcpAction, cancelPendingMcpActions } from './main/mcpBridge.js';
+import { getMemoizedScryptKey } from './main/proxySecurity.js';
 
 // Security: Screen-lock tracking prevents MCP execution while user is away
 let isScreenLocked = false;
@@ -433,7 +434,7 @@ export class BrowserMCPServer {
     const machineSalt = createHash('sha256')
       .update(`${os.hostname()}:${username}:${os.homedir()}:nova-mcp-salt`)
       .digest();
-    return scryptSync(secret, machineSalt, 32);
+    return getMemoizedScryptKey(secret, machineSalt);
   }
 
   private loadOrGenerateToken(): string {

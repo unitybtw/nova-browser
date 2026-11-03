@@ -225,6 +225,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     setSuggestions(cached ? cached.slice(0, 6) : []);
 
     abortControllerRef.current?.abort();
+    getElectronAPI()?.cancelSuggestions?.(suggestionRequestIdRef.current);
     const abortController = new AbortController();
     abortControllerRef.current = abortController;
     const currentReqId = ++suggestionRequestIdRef.current;
@@ -232,7 +233,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     const fetchSuggestions = async () => {
       try {
         if (typeof window !== 'undefined' && getElectronAPI()?.getSuggestions) {
-          const results = await getElectronAPI()?.getSuggestions(trimmed, searchEngine, clientLocale);
+          const results = await getElectronAPI()?.getSuggestions(trimmed, searchEngine, clientLocale, currentReqId);
           if (!abortController.signal.aborted && suggestionRequestIdRef.current === currentReqId) {
             if (Array.isArray(results)) {
               setClientCachedSuggestions(cacheKey, results, clientLocale);
@@ -264,6 +265,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     return () => {
       clearTimeout(timer);
       abortController.abort();
+      getElectronAPI()?.cancelSuggestions?.(currentReqId);
     };
   }, [searchValue, isAIMode, searchEngine, clientLanguage]);
 

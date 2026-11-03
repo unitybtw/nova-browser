@@ -90,7 +90,8 @@ async function run() {
     electron: { app: { isPackaged: false }, powerMonitor: { on: (name: string, fn: Function) => lockEvents.set(name, fn) },
       dialog: { showMessageBox: () => new Promise(resolve => { resolveDialog = resolve; }) } },
     crypto, os, fs, path,
-    './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} }
+    './main/mcpBridge.js': { requestRendererMcpAction: async () => { forwarded++; return 'ok'; }, cancelPendingMcpActions: () => {} },
+    './main/proxySecurity.js': { getMemoizedScryptKey: (secret: Buffer, salt: Buffer) => crypto.scryptSync(secret, salt, 32) }
   });
   for (const change of ['stop', 'rotateToken', 'lock'] as const) {
     const server: any = Object.assign(Object.create(serverModule.BrowserMCPServer.prototype), {

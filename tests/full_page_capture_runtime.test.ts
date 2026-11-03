@@ -168,3 +168,9 @@ export async function verifyFullPageCaptureRegressions() {
   });
   assert.equal(failures, 0, `${failures} full-page capture regressions`);
 }
+
+// Top-level runner activation (Feature 19)
+verifyFullPageCaptureRegressions().catch((err) => {
+  console.error('Full page capture regression error:', err);
+  process.exit(1);
+});

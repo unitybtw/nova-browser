@@ -45,17 +45,20 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
     const current = tabThumbnailCache.get(tab.id) || tab.thumbnail;
     setCachedThumbnail(current);
 
-    // If thumbnail is missing and webContentsId is available, attempt capture
+    // If thumbnail is missing and webContentsId is available, attempt capture with 300ms hover dwell debounce
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     if (!current && tab.webContentsId && typeof (window as any).electronAPI?.captureTabThumbnail === 'function') {
       const targetWcId = tab.webContentsId;
-      (window as any).electronAPI.captureTabThumbnail(targetWcId)
-        .then((thumb: string | null) => {
-          if (!isCancelled && thumb && currentTabId) {
-            tabThumbnailCache.set(currentTabId, thumb);
-            setCachedThumbnail(thumb);
-          }
-        })
-        .catch(() => {});
+      debounceTimer = setTimeout(() => {
+        (window as any).electronAPI.captureTabThumbnail(targetWcId)
+          .then((thumb: string | null) => {
+            if (!isCancelled && thumb && currentTabId) {
+              tabThumbnailCache.set(currentTabId, thumb);
+              setCachedThumbnail(thumb);
+            }
+          })
+          .catch(() => {});
+      }, 300);
     }
 
     const unsubscribe = tabThumbnailCache.subscribe(() => {
@@ -67,6 +70,7 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
 
     return () => {
       isCancelled = true;
+      if (debounceTimer) clearTimeout(debounceTimer);
       unsubscribe();
     };
   }, [tab?.id, tab?.thumbnail, tab?.webContentsId]);

@@ -19,6 +19,7 @@ import './e2e/tier5_adversarial_stress.test';
 import './challenger2_empirical_verification';
 import './challenger_iter2_stress';
 import './challenger_m1_security_empirical';
+import './challenger_m1_2_empirical';
 import './m1_adversarial_security.test';
 import './m2_adversarial_empirical.test';
 import './m3_performance_memoization.test';
@@ -94,6 +95,7 @@ import './mcp_bridge_config_regressions.test';
 import './agent_document_boundary.test';
 import './codex_security_findings_remediation.test';
 import './performance_optimization_audit.test';
+import './full_page_capture_runtime.test';
 
 import './tab_download_lifecycle_regressions.test';
 import './supabase_client_lifecycle.test';

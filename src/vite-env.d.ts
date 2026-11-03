@@ -104,7 +104,8 @@ export interface ElectronAPI {
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
   setPrivacyShield: (enabled: boolean) => Promise<boolean>;
   setDoNotTrack: (enabled: boolean) => Promise<void>;
-  getSuggestions: (query: string, engine?: string, locale?: string) => Promise<string[]>;
+  getSuggestions: (query: string, engine?: string, locale?: string, sequenceId?: number) => Promise<string[]>;
+  cancelSuggestions?: (sequenceId?: number) => void;
   fetchWallpaperPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
   fetchUnsplashPhotos: (query: string) => Promise<ElectronWallpaperPhoto[]>;
   fetchPageHtml: (url: string) => Promise<{ success: boolean; html?: string; error?: string }>;

@@ -83,16 +83,45 @@ function resolveLocaleDetails(clientLocale?: string) {
   return { lang, country, ddgRegion, acceptLanguage };
 }
 
+interface ActiveSuggestionJob {
+  sequenceId: number;
+  queryAbortController: AbortController;
+  staggerTimers: ReturnType<typeof setTimeout>[];
+  allSettledResolve: () => void;
+}
+
+const activeJobsBySender = new Map<number, ActiveSuggestionJob>();
+
+function cancelSenderJob(senderId: number, sequenceId?: number): void {
+  const job = activeJobsBySender.get(senderId);
+  if (!job) return;
+  if (sequenceId === undefined || job.sequenceId <= sequenceId) {
+    job.queryAbortController.abort();
+    job.staggerTimers.forEach(clearTimeout);
+    job.allSettledResolve();
+    activeJobsBySender.delete(senderId);
+  }
+}
+
 /**
- * Registers the 'get-suggestions' IPC handler. Called once by main.ts
+ * Registers the 'get-suggestions' and 'cancel-suggestions' IPC handlers. Called once by main.ts
  * (the composition root) with its trusted-sender validator.
  */
 export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
-  ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, clientLocale?: string) => {
+  ipcMain.on('cancel-suggestions', (event, sequenceId?: number) => {
+    if (!isTrustedSender(event)) return;
+    cancelSenderJob(event.sender.id, sequenceId);
+  });
+
+  ipcMain.handle('get-suggestions', async (event, query: string, engine?: string, clientLocale?: string, sequenceId?: number) => {
     if (!isTrustedSender(event)) return [];
     if (!query || typeof query !== 'string') return [];
     const cleanQ = query.trim().slice(0, 512);
     if (!cleanQ) return [];
+
+    const senderId = event.sender.id;
+    // Disarm any previously in-flight query job for this sender
+    cancelSenderJob(senderId);
 
     const allowedEngines = new Set(['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'yahoo']);
     const cleanEngine = typeof engine === 'string' && allowedEngines.has(engine) ? engine : 'default';
@@ -106,6 +135,9 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       return cachedList;
     }
 
+    const queryAbortController = new AbortController();
+    const querySignal = queryAbortController.signal;
+
     const chromeVer = process.versions.chrome || '134.0.0.0';
     const userAgent = process.platform === 'win32'
       ? `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
@@ -113,169 +145,149 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       ? `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`
       : `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVer} Safari/537.36`;
 
-    const fetchGoogle = async (): Promise<string[]> => {
+    const PROVIDER_TIMEOUT_MS = 3_000;
+    const createProviderFetch = (fetchImpl: (signal: AbortSignal) => Promise<string[]>) => {
+      return async (): Promise<string[]> => {
+        if (querySignal.aborted) return [];
+        const controller = new AbortController();
+        const onQueryAbort = () => controller.abort();
+        querySignal.addEventListener('abort', onQueryAbort, { once: true });
+        const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
+        try {
+          return await fetchImpl(controller.signal);
+        } catch (_) {
+          return [];
+        } finally {
+          clearTimeout(timeout);
+          querySignal.removeEventListener('abort', onQueryAbort);
+        }
+      };
+    };
+
+    const fetchGoogle = createProviderFetch(async (signal) => {
       if (Date.now() < googleRateLimitUntil) {
         return [];
       }
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        const chromeMajor = chromeVer.split('.')[0] || '134';
-        const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
-        const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${encodeURIComponent(lang)}&gl=${encodeURIComponent(country)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage,
-            'sec-ch-ua': `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`,
-            'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': platformName,
-            'Sec-Fetch-Dest': 'empty',
-            'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-site'
-          }
-        });
-        if (res.status === 429 || res.status === 403) {
-          googleRateLimitUntil = Date.now() + 60_000;
-          return [];
+      const chromeMajor = chromeVer.split('.')[0] || '134';
+      const platformName = process.platform === 'win32' ? '"Windows"' : process.platform === 'linux' ? '"Linux"' : '"macOS"';
+      const url = `https://suggestqueries.google.com/complete/search?client=chrome&q=${encodeURIComponent(cleanQ)}&hl=${encodeURIComponent(lang)}&gl=${encodeURIComponent(country)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage,
+          'sec-ch-ua': `"Not/A)Brand";v="8", "Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}"`,
+          'sec-ch-ua-mobile': '?0',
+          'sec-ch-ua-platform': platformName,
+          'Sec-Fetch-Dest': 'empty',
+          'Sec-Fetch-Mode': 'cors',
+          'Sec-Fetch-Site': 'same-site'
         }
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+      });
+      if (res.status === 429 || res.status === 403) {
+        googleRateLimitUntil = Date.now() + 60_000;
+        return [];
+      }
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
       }
       return [];
-    };
+    });
 
-    const fetchDuckDuckGo = async (): Promise<string[]> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+    const fetchDuckDuckGo = createProviderFetch(async (signal) => {
+      const url = `https://duckduckgo.com/ac/?q=${encodeURIComponent(cleanQ)}&type=list&kl=${encodeURIComponent(ddgRegion)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
       return [];
-    };
+    });
 
-    const fetchBing = async (): Promise<string[]> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        const market = `${lang}-${country.toUpperCase()}`;
-        const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${encodeURIComponent(lang)}&setmkt=${encodeURIComponent(market)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+    const fetchBing = createProviderFetch(async (signal) => {
+      const market = `${lang}-${country.toUpperCase()}`;
+      const url = `https://api.bing.com/osjson.aspx?query=${encodeURIComponent(cleanQ)}&setlang=${encodeURIComponent(lang)}&setmkt=${encodeURIComponent(market)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
       return [];
-    };
+    });
 
-    const fetchBrave = async (): Promise<string[]> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        // Brave expects a bare ISO country code (e.g. "TR", "DE"); without it
-        // the API falls back to the request IP's region, which yields results
-        // in the wrong language for users abroad.
-        const braveCountry = braveCountryFor(lang, country);
-        const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false&country=${encodeURIComponent(braveCountry)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+    const fetchBrave = createProviderFetch(async (signal) => {
+      const braveCountry = braveCountryFor(lang, country);
+      const url = `https://search.brave.com/api/suggest?q=${encodeURIComponent(cleanQ)}&rich=false&country=${encodeURIComponent(braveCountry)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
       return [];
-    };
+    });
 
-    const fetchEcosia = async (): Promise<string[]> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list&locale=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+    const fetchEcosia = createProviderFetch(async (signal) => {
+      const url = `https://ac.ecosia.org/autocomplete?q=${encodeURIComponent(cleanQ)}&type=list&locale=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
       return [];
-    };
+    });
 
-    const fetchYahoo = async (): Promise<string[]> => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
-      try {
-        const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
-        const res = await fetch(url, {
-          signal: controller.signal,
-          headers: {
-            'User-Agent': userAgent,
-            'Accept-Language': acceptLanguage
-          }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-            return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
-          }
+    const fetchYahoo = createProviderFetch(async (signal) => {
+      const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
+      const res = await fetch(url, {
+        signal,
+        headers: {
+          'User-Agent': userAgent,
+          'Accept-Language': acceptLanguage
         }
-      } catch (_) {} finally {
-        clearTimeout(timeout);
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
+          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+        }
       }
       return [];
-    };
+    });
 
     let providers = [fetchGoogle, fetchDuckDuckGo, fetchBing];
     if (cleanEngine === 'duckduckgo') {
@@ -290,32 +302,15 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       providers = [fetchYahoo, fetchGoogle, fetchBing];
     }
 
-    // Performance + Privacy: Fast staggered fallback to keep latency ultra-low.
-    // Provider 0 is started immediately; subsequent fallback providers are probed
-    // with 150ms stagger intervals only if previous providers have not yet returned.
-    // As soon as any provider yields valid non-empty suggestions, remaining pending
-    // stagger timers are cancelled to minimize redundant network requests.
     const FALLBACK_STAGGER_MS = 150;
-
-/**
- * Deadline for one provider request, covering the BODY as well as the headers.
- *
- * Every provider used to call clearTimeout immediately after `await fetch(...)`,
- * which disarmed the AbortController the moment the response headers arrived and
- * left `res.json()` with no deadline at all. A server that sends headers and then
- * an endless chunked body parks the promise forever and buffers into main-process
- * memory; the fan-out only settles once all three do, so one such host wedges
- * suggestions entirely. The deadline is therefore only cleared in `finally`.
- */
-const PROVIDER_TIMEOUT_MS = 3_000;
     const resultsByPriority = new Map<number, string[]>();
     let anyNonEmpty = false;
     let activeRuns = 0;
     let scheduledStarts = providers.length - 1;
     const staggerTimers: ReturnType<typeof setTimeout>[] = [];
 
-    let allSettledResolve: () => void;
-    let settled = false; // late provider resolutions after settle are ignored
+    let allSettledResolve!: () => void;
+    let settled = false;
     const allSettled = new Promise<void>((resolve) => {
       allSettledResolve = () => {
         if (settled) return;
@@ -323,9 +318,15 @@ const PROVIDER_TIMEOUT_MS = 3_000;
         resolve();
       };
     });
+
+    querySignal.addEventListener('abort', () => {
+      staggerTimers.forEach(clearTimeout);
+      allSettledResolve();
+    }, { once: true });
+
     const maybeAllSettled = () => {
       if (activeRuns > 0) return;
-      if (anyNonEmpty || scheduledStarts === 0) {
+      if (anyNonEmpty || scheduledStarts === 0 || querySignal.aborted) {
         staggerTimers.forEach(clearTimeout);
         scheduledStarts = 0;
         allSettledResolve();
@@ -333,6 +334,7 @@ const PROVIDER_TIMEOUT_MS = 3_000;
     };
 
     const runProvider = (idx: number) => {
+      if (querySignal.aborted) return;
       activeRuns++;
       providers[idx]()
         .then((list) => {
@@ -346,20 +348,36 @@ const PROVIDER_TIMEOUT_MS = 3_000;
         });
     };
 
+    activeJobsBySender.set(senderId, {
+      sequenceId: sequenceId ?? 0,
+      queryAbortController,
+      staggerTimers,
+      allSettledResolve,
+    });
+
     runProvider(0);
     for (let i = 1; i < providers.length; i++) {
       staggerTimers.push(
         setTimeout(() => {
           scheduledStarts--;
-          // Privacy: skip lower-priority engines entirely once we have an answer.
-          if (!anyNonEmpty) runProvider(i);
+          if (!anyNonEmpty && !querySignal.aborted) runProvider(i);
           else maybeAllSettled();
         }, FALLBACK_STAGGER_MS * i)
       );
     }
 
-    await allSettled;
-    staggerTimers.forEach(clearTimeout);
+    try {
+      await allSettled;
+    } finally {
+      staggerTimers.forEach(clearTimeout);
+      if (activeJobsBySender.get(senderId)?.queryAbortController === queryAbortController) {
+        activeJobsBySender.delete(senderId);
+      }
+    }
+
+    if (querySignal.aborted) {
+      return [];
+    }
 
     for (let i = 0; i < providers.length; i++) {
       const list = resultsByPriority.get(i);

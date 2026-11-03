@@ -423,26 +423,27 @@ export async function extractSafeCrxZip(buffer: Buffer, stagingPath: string): Pr
       continue;
     }
     if (file.dir) {
-      fs.mkdirSync(destFile, { recursive: true });
+      await fs.promises.mkdir(destFile, { recursive: true });
     } else {
       const remainingArchiveBytes = MAX_TOTAL_UNCOMPRESSED_BYTES - totalUncompressedBytes;
       const entryLimit = Math.min(MAX_SINGLE_FILE_UNCOMPRESSED_BYTES, remainingArchiveBytes);
       const content = await readZipEntryWithLimit(file, entryLimit, filename);
       totalUncompressedBytes += content.length;
-      fs.mkdirSync(path.dirname(destFile), { recursive: true });
-      fs.writeFileSync(destFile, content);
+      await fs.promises.mkdir(path.dirname(destFile), { recursive: true });
+      await fs.promises.writeFile(destFile, content);
     }
   }
 }
 
 // Defense in depth: after extraction, nothing on disk may resolve outside the
 // target dir, and the CRX/zip format cannot legitimately produce symlinks.
-function assertExtractionContained(dir: string): void {
+export async function assertExtractionContained(dir: string): Promise<void> {
   const resolvedDir = path.resolve(dir);
   const stack: string[] = [resolvedDir];
   while (stack.length > 0) {
     const currentDir = stack.pop()!;
-    for (const entry of fs.readdirSync(currentDir, { withFileTypes: true })) {
+    const entries = await fs.promises.readdir(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
       const entryPath = path.join(currentDir, entry.name);
       if (!path.resolve(entryPath).startsWith(resolvedDir + path.sep)) {
         throw new Error(`Extension extraction escaped the target directory: ${entry.name}`);
@@ -747,7 +748,7 @@ export async function installFromWebstore(deps: CrxInstallerDeps, event: Electro
       await extractSafeCrxZip(buffer, stagingPath);
 
       // Security: post-extraction containment + symlink sweep
-      assertExtractionContained(stagingPath);
+      await assertExtractionContained(stagingPath);
 
       // Verify manifest.json exists
       const manifestPath = path.join(stagingPath, 'manifest.json');
