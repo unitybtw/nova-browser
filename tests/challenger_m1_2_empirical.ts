@@ -74,6 +74,7 @@ async function runAllChallengerTests() {
   let totalFetchesCompleted = 0;
   let totalFetchesAborted = 0;
 
+  let simulatedLatencyMs = 250;
   const mockFetch = async (url: string, opts: any) => {
     totalFetchesInitiated++;
     const signal: AbortSignal = opts?.signal;
@@ -92,7 +93,7 @@ async function runAllChallengerTests() {
           status: 200,
           json: async () => [url, ['suggest 1', 'suggest 2', 'suggest 3']]
         });
-      }, 50); // 50ms realistic network latency
+      }, simulatedLatencyMs); // realistic network latency
 
       if (signal) {
         signal.addEventListener('abort', () => {
@@ -149,7 +150,7 @@ async function runAllChallengerTests() {
     activeFetchSignals = [];
 
     const mockEvent = { sender: { id: 101, trusted: true } };
-    const textQuery = 'nova browser is responsive';
+    const textQuery = 'nova browser is responsiv';
     const promises: Promise<string[]>[] = [];
 
     for (let i = 1; i <= textQuery.length; i++) {
@@ -161,8 +162,8 @@ async function runAllChallengerTests() {
       }
       // Issue new suggestion request
       promises.push(getSuggestionsHandler(mockEvent, sub, 'google', 'en-US', seqId));
-      // Simulate 10ms typing interval between keys
-      await new Promise(r => setTimeout(r, 10));
+      // Simulate typing interval between keys (5ms for rapid burst)
+      await new Promise(r => setTimeout(r, 5));
     }
 
     const results = await Promise.all(promises);
@@ -177,7 +178,7 @@ async function runAllChallengerTests() {
 
     recordTest('IPC Suggestions', 'Keystroke Burst Cancellation',
       allEarlierEmpty && finalHasResults && fetchAbortedCount > 0,
-      `25-stroke burst: 24 earlier queries cancelled (${fetchAbortedCount} fetches aborted), final query succeeded with ${finalResult.length} suggestions`
+      `${textQuery.length}-stroke burst: ${earlierResults.length} earlier queries cancelled (${fetchAbortedCount} fetches aborted), final query succeeded with ${finalResult.length} suggestions`
     );
   }
 
@@ -739,7 +740,7 @@ async function runAllChallengerTests() {
       const lines = content.split('\n');
       for (let i = 0; i < lines.length; i++) {
         if (regex.test(lines[i])) {
-          listenerMatches.push({ file: path.relative('.', f), line: i + 1, text: lines[i].trim() });
+          listenerMatches.push({ file: path.relative('.', f).replace(/\\/g, '/'), line: i + 1, text: lines[i].trim() });
         }
       }
     }
