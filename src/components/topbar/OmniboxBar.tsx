@@ -261,7 +261,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
     };
 
     const timer = setTimeout(fetchSuggestions, 120);
-    setSelectedIndex(-1);
+    setSelectedIndex(prev => prev === -1 ? prev : -1);
     return () => {
       clearTimeout(timer);
       abortController.abort();

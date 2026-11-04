@@ -786,6 +786,11 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
+        if (cancelled) return;
+        // Cooperative micro-yield after DOM parsing
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+        if (cancelled) return;
+
         const clonedDoc = doc.cloneNode(true) as Document;
 
         try {
@@ -804,8 +809,16 @@ export const ReaderMode: React.FC<ReaderModeProps> = React.memo(({ url, tabId, i
           }
         });
 
+        // Cooperative micro-yield before Readability
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
+        if (cancelled) return;
+
         const reader = new Readability(clonedDoc);
         const article = reader.parse();
+        if (cancelled) return;
+
+        // Cooperative micro-yield after Readability before sanitization
+        await new Promise<void>(resolve => setTimeout(resolve, 0));
         if (cancelled) return;
 
         if (article && article.content) {

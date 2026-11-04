@@ -310,13 +310,7 @@ h1, h2, h3, h4, h5, h6, .font-serif {
   animation: float-up 0.2s ease-out forwards;
 }
 
-/* Premium Interactive Globals */
-button {
-  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
+/* Premium Interactive Globals - global transition removed to eliminate window resize & split-resizer layout thrashing */
 button:active:not(:disabled) {
   transform: scale(0.96);
 }

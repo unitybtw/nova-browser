@@ -9,13 +9,7 @@
  */
 
 import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import esbuild from 'esbuild';
-import vm from 'vm';
-import { getMemoizedScryptKey, _clearScryptKeyCacheForTesting } from '../electron/main/proxySecurity';
-
-const rootDir = process.cwd();
+import { getMemoizedScryptKey, _clearScryptKeyCacheForTesting, SecureStoreKeyedRWLock } from '../electron/main/proxySecurity';
 
 interface TestResult {
   section: string;
@@ -36,63 +30,12 @@ function recordResult(section: string, name: string, passed: boolean, details: s
   }
 }
 
-// ---------------------------------------------------------------------------
-// Helper: Extract real SecureStoreKeyedRWLock class from electron/main.ts
-// ---------------------------------------------------------------------------
-function loadShippedSecureStoreKeyedRWLock(): any {
-  const mainTsPath = path.join(rootDir, 'electron/main.ts');
-  const mainContent = fs.readFileSync(mainTsPath, 'utf8');
-
-  // Extract class SecureStoreKeyedRWLock declaration
-  const startIdx = mainContent.indexOf('class SecureStoreKeyedRWLock');
-  if (startIdx === -1) {
-    throw new Error('Could not find "class SecureStoreKeyedRWLock" in electron/main.ts');
-  }
-
-  // Find the closing brace of the class
-  let depth = 0;
-  let inClass = false;
-  let endIdx = -1;
-  for (let i = startIdx; i < mainContent.length; i++) {
-    if (mainContent[i] === '{') {
-      depth++;
-      inClass = true;
-    } else if (mainContent[i] === '}') {
-      depth--;
-      if (inClass && depth === 0) {
-        endIdx = i + 1;
-        break;
-      }
-    }
-  }
-
-  if (endIdx === -1) {
-    throw new Error('Failed to parse closing brace of SecureStoreKeyedRWLock in electron/main.ts');
-  }
-
-  const classTsCode = mainContent.substring(startIdx, endIdx);
-
-  // Transpile TypeScript class to JavaScript using esbuild
-  const transpiled = esbuild.transformSync(classTsCode, {
-    loader: 'ts',
-    target: 'node18',
-  });
-
-  const sandbox: any = {};
-  vm.createContext(sandbox);
-  vm.runInContext(`${transpiled.code}\nglobalThis.LockClass = SecureStoreKeyedRWLock;`, sandbox);
-
-  return sandbox.LockClass;
-}
-
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function runEmpiricalStressSuite() {
   console.log('================================================================');
   console.log('CHALLENGER M1-1: CONCURRENCY & CRYPTO EMPIRICAL STRESS SUITE');
   console.log('================================================================\n');
-
-  const SecureStoreKeyedRWLock = loadShippedSecureStoreKeyedRWLock();
 
   // =========================================================================
   // 1. Concurrent Reads on Identical Key

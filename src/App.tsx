@@ -312,8 +312,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Tab listesi uzlaştırması: aynı `tabs` değişiminde üç ayrı effect üç ayrı
   // O(n) tarama yapıyordu. Üçü de aynı anda aynı girdilere bağlı olduğu için
-  // tek effect'te birleştirildi; gövde sırası birebir korunur:
-  //   1) workspace görünürlüğü  2) folder ataması onarımı  3) genel uzlaştırma
+  // Geçersiz folderId'leri sadece folders listesi değiştiğinde temizle.
+  // repairTabFolderAssignments değişiklik olmadığında aynı referansı döndürür.
+  useEffect(() => {
+    setTabs(prevTabs => repairTabFolderAssignments(prevTabs, folders));
+  }, [folders, setTabs]);
+
+  // Sekme ve aktif sekme uzlaştırması:
+  //   1) workspace görünürlüğü  2) genel uzlaştırma
   useEffect(() => {
     const visibleWorkspaceTabs = tabs.filter(tab =>
       (tab.workspaceId || 'default') === activeWorkspaceId
@@ -339,10 +345,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
     }
 
-    // Geçersiz folderId'leri temizle. repairTabFolderAssignments değişiklik
-    // olmadığında aynı referansı döndürdüğü için gereksiz re-render üretmez.
-    setTabs(prevTabs => repairTabFolderAssignments(prevTabs, folders));
-
     // En az bir sekme var olsun ve activeTabId geçerli olsun
     if (tabs.length === 0) {
       const fallbackId = generateId('tab');
@@ -363,7 +365,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setTabs(prev => prev.map(t => t.id === fallbackTarget.id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
       }
     }
-  }, [tabs, activeTabId, activeWorkspaceId, folders]);
+  }, [tabs, activeTabId, activeWorkspaceId]);
 
   // AI Assistant State (isSidePanelOpen lives in usePanels above)
   const [pendingAIActions, setPendingAIActions] = useState<Array<{ id: number; text: string }>>([]);

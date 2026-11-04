@@ -1083,7 +1083,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 onChange={(e) => {
                   setSearchValue(e.target.value);
                   setShowSuggestions(true);
-                  setSelectedIndex(-1);
+                  setSelectedIndex(prev => prev === -1 ? prev : -1);
                 }}
                 onFocus={() => {
                   setIsOmniboxFocused(true);

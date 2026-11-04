@@ -78,8 +78,14 @@ export function useTabOperations({
   // the wake lands on the surviving list.
   const activateTab = useCallback((id: string) => {
     setActiveTabId(id);
-    setTabs(prev => prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
-  }, [setActiveTabId, setTabs]);
+    setTabs(prev => {
+      const cur = prev.find(t => t.id === id);
+      if (cur && !cur.isSuspended && id === activeTabIdRef.current) {
+        return prev;
+      }
+      return prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t);
+    });
+  }, [setActiveTabId, setTabs, activeTabIdRef]);
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {

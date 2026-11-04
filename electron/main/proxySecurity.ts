@@ -207,3 +207,92 @@ export function computeFileSha256Stream(filePath: string): Promise<string> {
     stream.pipe(hash);
   });
 }
+
+/**
+ * Fine-grained per-key Reader-Writer Lock for secure store operations:
+ * - Allows concurrent reads on the same key without head-of-line blocking.
+ * - Serializes writes exclusively per key to prevent write-write and read-write races.
+ * - Isolates different storage keys completely so unrelated operations never block each other.
+ * - Writer-preference scheduling ensures pending writes are not starved by a stream of readers.
+ * - Self-cleaning: keys are deleted from the Map immediately when queues become empty.
+ */
+export class SecureStoreKeyedRWLock {
+  private locks = new Map<string, {
+    activeReaders: number;
+    isWriting: boolean;
+    waitingWriters: Array<() => void>;
+    waitingReaders: Array<() => void>;
+  }>();
+
+  private getEntry(key: string) {
+    let entry = this.locks.get(key);
+    if (!entry) {
+      entry = {
+        activeReaders: 0,
+        isWriting: false,
+        waitingWriters: [],
+        waitingReaders: [],
+      };
+      this.locks.set(key, entry);
+    }
+    return entry;
+  }
+
+  private tryCleanup(key: string, entry: { activeReaders: number; isWriting: boolean; waitingWriters: any[]; waitingReaders: any[] }) {
+    if (entry.activeReaders === 0 && !entry.isWriting && entry.waitingWriters.length === 0 && entry.waitingReaders.length === 0) {
+      this.locks.delete(key);
+    }
+  }
+
+  async read<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const entry = this.getEntry(key);
+
+    // If a write is in progress or a write is queued (writer-preference to prevent starvation), wait
+    if (entry.isWriting || entry.waitingWriters.length > 0) {
+      await new Promise<void>((resolve) => entry.waitingReaders.push(resolve));
+    } else {
+      entry.activeReaders++;
+    }
+
+    try {
+      return await fn();
+    } finally {
+      entry.activeReaders--;
+      if (entry.activeReaders === 0 && entry.waitingWriters.length > 0) {
+        entry.isWriting = true;
+        const nextWriter = entry.waitingWriters.shift()!;
+        nextWriter();
+      }
+      this.tryCleanup(key, entry);
+    }
+  }
+
+  async write<T>(key: string, fn: () => Promise<T>): Promise<T> {
+    const entry = this.getEntry(key);
+
+    if (entry.isWriting || entry.activeReaders > 0) {
+      await new Promise<void>((resolve) => entry.waitingWriters.push(resolve));
+    } else {
+      entry.isWriting = true;
+    }
+
+    try {
+      return await fn();
+    } finally {
+      entry.isWriting = false;
+      if (entry.waitingWriters.length > 0) {
+        entry.isWriting = true;
+        const nextWriter = entry.waitingWriters.shift()!;
+        nextWriter();
+      } else if (entry.waitingReaders.length > 0) {
+        // Wake all waiting readers concurrently
+        const readersToWake = entry.waitingReaders.splice(0, entry.waitingReaders.length);
+        entry.activeReaders += readersToWake.length;
+        for (const wakeReader of readersToWake) {
+          wakeReader();
+        }
+      }
+      this.tryCleanup(key, entry);
+    }
+  }
+}

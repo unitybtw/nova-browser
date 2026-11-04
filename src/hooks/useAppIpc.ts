@@ -71,14 +71,25 @@ export function useAppIpc({
   queueAIAction,
   setTabs,
 }: UseAppIpcOptions): void {
-  // Listen to batch ad-block count updates
+  // Listen to batch ad-block count updates with 300ms throttling to prevent React render storms
   useEffect(() => {
     if (typeof window !== 'undefined' && getElectronAPI()?.onAdBlockedBatch) {
-      const removeListener = getElectronAPI()?.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
+      let pendingBatch: Record<number, number> = {};
+      let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const flushPendingBatch = () => {
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+          throttleTimer = null;
+        }
+        const currentBatch = pendingBatch;
+        pendingBatch = {};
+        if (Object.keys(currentBatch).length === 0) return;
+
         setTabs(prev => {
           let changed = false;
           const updated = prev.map(t => {
-            const count = t.webContentsId !== undefined ? batch[t.webContentsId] : undefined;
+            const count = t.webContentsId !== undefined ? currentBatch[t.webContentsId] : undefined;
             if (count) {
               changed = true;
               return { ...t, blockedAdsCount: (t.blockedAdsCount || 0) + count };
@@ -87,8 +98,24 @@ export function useAppIpc({
           });
           return changed ? updated : prev;
         });
+      };
+
+      const removeListener = getElectronAPI()?.onAdBlockedBatch((_event: any, batch: Record<number, number>) => {
+        if (!batch) return;
+        for (const [wcIdStr, count] of Object.entries(batch)) {
+          const wcId = Number(wcIdStr);
+          pendingBatch[wcId] = (pendingBatch[wcId] || 0) + (count || 0);
+        }
+        if (!throttleTimer) {
+          throttleTimer = setTimeout(flushPendingBatch, 300);
+        }
       });
-      return () => removeListener?.();
+      return () => {
+        removeListener?.();
+        if (throttleTimer) {
+          clearTimeout(throttleTimer);
+        }
+      };
     }
   }, [setTabs]);
 

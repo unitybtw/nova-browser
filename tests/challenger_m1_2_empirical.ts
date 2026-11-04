@@ -9,9 +9,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { EventEmitter } from 'node:events';
+import { createRequire } from 'node:module';
 import ts from 'typescript';
 
-const dynamicRequire = eval('require');
+const dynamicRequire = createRequire(typeof __filename !== 'undefined' ? __filename : `${process.cwd()}/package.json`);
 const sharp = dynamicRequire('sharp');
 
 interface TestResult {
