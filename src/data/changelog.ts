@@ -42,10 +42,61 @@ export interface ReleaseVersion {
 
 export const CHANGELOG_DATA: ReleaseVersion[] = [
   {
+    version: '1.5.2',
+    date: 'November 2026',
+    title: 'Startup Performance Optimization, Memory Hardening & Render Fluidity',
+    badge: 'Latest Release',
+    lede: 'Zero-latency instant startup with asynchronous extension loading, pre-bundled core dependencies, cooperative reader micro-yielding, 300ms throttled adblock badge batching, fine-grained secure store RWLock concurrency, and layout thrashing elimination.',
+    hero: {
+      src: './screenshots/newtab.png',
+      alt: 'Nova Browser v1.5.2 interface.',
+      caption: 'Nova v1.5.2: Streamlined startup sequence, sub-millisecond crypto operations, and zero-jank frame pacing.',
+    },
+    highlights: [
+      'Eliminated startup latency by moving persistent extension restoration to asynchronous background loading.',
+      'Pre-bundled core dependencies in Vite optimizeDeps, preventing runtime re-optimization freezes and reload cascades.',
+      'Fine-grained per-key Reader-Writer Lock (SecureStoreKeyedRWLock) preventing head-of-line blocking and write-write races.',
+      '300ms throttled adblock badge updates and cooperative micro-yield in reader mode preventing main-thread lockups.',
+      'Eliminated initial layout reflows and global CSS button transitions for rock-solid 120fps window operations.',
+      'Fast-path tab reconciliation reducing redundant React re-renders across all workspaces.',
+    ],
+    sections: [
+      {
+        eyebrow: 'Performance',
+        title: 'Instant startup & Zero-jank frame pacing',
+        body: 'Removed synchronous disk I/O bottlenecks from the main process startup path and optimized the React reconciliation pipeline.',
+        points: [
+          'Background extension initialization lets the browser window paint immediately without waiting for disk scans.',
+          'Eliminated global CSS button transitions that caused layout thrashing during window resize and split view divider dragging.',
+          'Pre-bundled critical UI dependencies to eliminate development and startup reload loops.',
+        ],
+      },
+      {
+        eyebrow: 'Concurrency & Stability',
+        title: 'Hardened cryptographic concurrency & Throttled IPC',
+        body: 'Implemented fine-grained reader-writer locking on encrypted storage and batched high-frequency renderer updates.',
+        points: [
+          'Keyed reader-writer locks with writer-preference scheduling guarantee atomic writes without blocking concurrent readers on distinct keys.',
+          'Batched ad-block counter updates prevent React render storms on tracker-dense pages.',
+          'Cooperative micro-yielding in reader mode keeps the UI responsive even on massive HTML documents.',
+        ],
+      },
+    ],
+    changes: [
+      { category: 'performance', text: 'Decoupled persistent extension loading from window initialization for immediate launch.' },
+      { category: 'performance', text: 'Pre-bundled core libraries in Vite optimizeDeps preventing startup reloads.' },
+      { category: 'performance', text: 'Removed global button transition styles to eliminate layout thrashing.' },
+      { category: 'performance', text: 'Added fast-path tab reconciliation avoiding redundant state updates.' },
+      { category: 'improvement', text: 'Throttled ad-block counter IPC updates with a 300ms batch buffer.' },
+      { category: 'improvement', text: 'Introduced cooperative micro-yields into Reader Mode parsing for large articles.' },
+      { category: 'fix', text: 'Replaced test dynamic require patterns with standardized createRequire for cleaner bundling.' },
+      { category: 'security', text: 'Modularized and exported SecureStoreKeyedRWLock with comprehensive stress validation.' },
+    ],
+  },
+  {
     version: '1.5.1',
     date: 'October 2026',
     title: 'CodeQL Security Remediation, On-Device Whisper STT & 25 Native MCP Tools',
-    badge: 'Latest Release',
     lede: 'Comprehensive remediation of all 28 CodeQL static security alerts, offline Whisper speech recognition runtime, expanded 25-tool Model Context Protocol (MCP) server, and hardened tab virtualization.',
     hero: {
       src: './screenshots/newtab.png',
