@@ -259,7 +259,6 @@ app.commandLine.appendSwitch('num-raster-threads', '4');
 // Platform-tailored high-performance graphics optimizations
 if (process.platform === 'darwin') {
   // Apple Silicon & macOS Metal API for ultra-smooth 120Hz ProMotion compositing
-  app.commandLine.appendSwitch('use-metal');
   app.commandLine.appendSwitch('enable-features', [
     'CanvasOopRasterization',
     'SmoothScrolling',
@@ -1560,10 +1559,12 @@ async function cleanStaleUpdateArtifacts(): Promise<void> {
 app.whenReady().then(async () => {
   console.log('App is ready, creating window...');
   loadExtensionDiagnostics();
-  await loadPersistentExtensions();
   createWindow();
   setupApplicationMenu();
   initAdBlocker();
+  loadPersistentExtensions().catch((err) => {
+    console.warn('[Extensions] Failed to restore extensions on startup:', err);
+  });
 
   // Background idle garbage collection for updater artifacts after 5s
   setTimeout(() => {

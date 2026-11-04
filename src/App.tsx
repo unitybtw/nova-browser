@@ -321,6 +321,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // Sekme ve aktif sekme uzlaştırması:
   //   1) workspace görünürlüğü  2) genel uzlaştırma
   useEffect(() => {
+    // Fast path: Eğer activeTabId geçerli ve mevcut çalışma alanındaysa, gereksiz filtreleme ve state tetiklemelerini atla
+    const currentActive = tabs.find(t => t.id === activeTabId);
+    const currentActiveWs = currentActive?.workspaceId || 'default';
+    if (currentActive && currentActiveWs === activeWorkspaceId) {
+      return;
+    }
+
     const visibleWorkspaceTabs = tabs.filter(tab =>
       (tab.workspaceId || 'default') === activeWorkspaceId
     );
@@ -337,12 +344,15 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       };
       setTabs(prev => [...prev, initialWorkspaceTab]);
       setActiveTabId(newTabId);
-    } else if (visibleWorkspaceTabs.length > 0 && !visibleWorkspaceTabs.some(tab => tab.id === activeTabId)) {
+      return;
+    }
+    if (visibleWorkspaceTabs.length > 0) {
       const fallbackTarget = visibleWorkspaceTabs[0];
       setActiveTabId(fallbackTarget.id);
       if (fallbackTarget.isSuspended) {
         setTabs(prev => prev.map(t => t.id === fallbackTarget.id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
       }
+      return;
     }
 
     // En az bir sekme var olsun ve activeTabId geçerli olsun
@@ -365,7 +375,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         setTabs(prev => prev.map(t => t.id === fallbackTarget.id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t));
       }
     }
-  }, [tabs, activeTabId, activeWorkspaceId]);
+  }, [tabs, activeTabId, activeWorkspaceId, demoParams.isDemo]);
 
   // AI Assistant State (isSidePanelOpen lives in usePanels above)
   const [pendingAIActions, setPendingAIActions] = useState<Array<{ id: number; text: string }>>([]);
@@ -1425,7 +1435,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       <AnimatePresence initial={false}>
         {useVerticalTabs && !isSidebarCollapsed && (
           <motion.div
-            initial={{ width: 0, opacity: 0 }}
+            initial={false}
             animate={{ width: 250, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
@@ -1604,7 +1614,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         <AnimatePresence initial={false}>
           {!useVerticalTabs && (
             <motion.div
-              initial={{ height: 0, opacity: 0 }}
+              initial={false}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
