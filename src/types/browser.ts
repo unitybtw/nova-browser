@@ -129,6 +129,10 @@ export interface UserSettings {
   hibernationTimeoutMinutes?: number;
   shortcuts?: Record<string, ShortcutConfig>;
   aiLinkPreviewEnabled?: boolean;
+  aiProvider?: 'webgpu' | 'custom';
+  aiCustomEndpoint?: string;
+  aiCustomModel?: string;
+  aiCustomApiKey?: string;
   energySaverMode?: boolean;
   preloadDnsEnabled?: boolean;
   smoothScrollingEnabled?: boolean;
@@ -169,6 +173,10 @@ export const defaultSettings: UserSettings = {
   preloadDnsEnabled: true,
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
+  aiProvider: 'webgpu',
+  aiCustomEndpoint: 'http://localhost:4000/v1',
+  aiCustomModel: '',
+  aiCustomApiKey: '',
   defaultTranslationLanguage: 'en',
   language: detectSystemLanguage(),
   shortcuts: {

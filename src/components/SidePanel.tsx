@@ -327,6 +327,10 @@ export const SidePanel = React.memo(({
   const [expandedReasoning, setExpandedReasoning] = useState<Record<number, boolean>>({});
   const { setSafeTimeout } = useSafeTimeout();
 
+  const isCustomBackend = aiAgent.getBackend() === 'custom';
+  const customConfig = aiAgent.getCustomConfig();
+  const customModelBadge = customConfig.model ? `LiteLLM: ${customConfig.model}` : 'LiteLLM';
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
   const requestIdRef = useRef<number>(0);
@@ -793,7 +797,7 @@ export const SidePanel = React.memo(({
                     </div>
                   ) : (
                     <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 text-slate-400 dark:text-slate-500">
-                      {currentModel.name.split('(')[0].trim()}
+                      {isCustomBackend ? customModelBadge : currentModel.name.split('(')[0].trim()}
                     </span>
                   )}
                 </div>
@@ -973,9 +977,10 @@ export const SidePanel = React.memo(({
               ? (isTr ? 'Bu sayfa veya web hakkında bir soru sorun...' : 'Ask about this page or instruct Nova...')
               : (isTr ? 'Nova Asistan’a bir şey sorun...' : 'Ask Nova Assistant anything...')
           }
-          models={AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
-          selectedModel={currentModel.name.split('(')[0].trim()}
+          models={isCustomBackend ? [customModelBadge] : AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
+          selectedModel={isCustomBackend ? customModelBadge : currentModel.name.split('(')[0].trim()}
           onModelChange={(modelName) => {
+            if (isCustomBackend) return;
             // Prefer stable IDs so a future display-name change can't silently break matching.
             const key = modelName.toLowerCase();
             const found = AVAILABLE_AI_MODELS.find((m) => m.id.toLowerCase() === key)

@@ -1,4 +1,5 @@
 import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam, ChatCompletionContentPart } from "@mlc-ai/web-llm";
+import { OpenAICompatibleEngine } from "./openAiCompatibleClient";
 import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
@@ -729,6 +730,53 @@ class AIAgent {
     return this.modelId;
   }
 
+  public getBackend(): 'webgpu' | 'custom' {
+    if (typeof localStorage === 'undefined') return 'webgpu';
+    return (localStorage.getItem('nova_ai_backend') as 'webgpu' | 'custom') || 'webgpu';
+  }
+
+  public getCustomConfig(): { endpoint: string; model: string; apiKey: string } {
+    if (typeof localStorage === 'undefined') {
+      return { endpoint: 'http://localhost:4000/v1', model: '', apiKey: '' };
+    }
+    return {
+      endpoint: localStorage.getItem('nova_ai_custom_endpoint') || 'http://localhost:4000/v1',
+      model: localStorage.getItem('nova_ai_custom_model') || '',
+      apiKey: localStorage.getItem('nova_ai_custom_api_key') || ''
+    };
+  }
+
+  public async configureBackend(
+    backend: 'webgpu' | 'custom',
+    endpoint?: string,
+    model?: string,
+    apiKey?: string
+  ): Promise<void> {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('nova_ai_backend', backend);
+      if (endpoint !== undefined) localStorage.setItem('nova_ai_custom_endpoint', endpoint);
+      if (model !== undefined) localStorage.setItem('nova_ai_custom_model', model);
+      if (apiKey !== undefined) localStorage.setItem('nova_ai_custom_api_key', apiKey);
+    }
+    await this.unload();
+    await this.init();
+  }
+
+  public getModelDisplayName(): string {
+    if (this.getBackend() === 'custom') {
+      const { model, endpoint } = this.getCustomConfig();
+      if (model) return `Custom: ${model}`;
+      try {
+        const u = new URL(endpoint);
+        return `Custom (${u.hostname}:${u.port || (u.protocol === 'https:' ? '443' : '80')})`;
+      } catch {
+        return 'Custom Endpoint (LiteLLM)';
+      }
+    }
+    const found = AVAILABLE_AI_MODELS.find(m => m.id === this.modelId);
+    return found ? found.name : this.modelId;
+  }
+
   public getAllTabs(): { id: string; title: string; url: string }[] {
     return this.actionContext?.onGetAllTabs() || [];
   }
@@ -754,6 +802,11 @@ class AIAgent {
 
   /** Whether the currently loaded model accepts image content parts. */
   public currentModelSupportsVision(): boolean {
+    if (this.getBackend() === 'custom') {
+      const { model } = this.getCustomConfig();
+      const m = model.toLowerCase();
+      return !model || m.includes('vision') || m.includes('4o') || m.includes('pixtral') || m.includes('vl') || m.includes('gemini') || m.includes('claude') || m.includes('llava');
+    }
     return !!AVAILABLE_AI_MODELS.find(m => m.id === this.modelId)?.vision;
   }
 
@@ -839,6 +892,7 @@ class AIAgent {
    * and memory bandwidth back to Chromium compositor, eliminating scroll jank.
    */
   public async parkModel(): Promise<void> {
+    if (this.getBackend() === 'custom') return;
     if (!this.engine && !this.worker) return;
     logger.debug('AIAgent:parkModel', 'Parking resident model to reclaim VRAM for GPU compositor');
     if (this.idleParkTimer) {
@@ -1365,8 +1419,43 @@ CRITICAL RULES:
   private async _doInit(onProgress?: InitProgressHandler) {
     this.isInitializing = true;
     try {
+      const backend = this.getBackend();
+      if (backend === 'custom') {
+        const { endpoint, model, apiKey } = this.getCustomConfig();
+        const msg = model ? `Connecting to custom backend (${model})...` : 'Connecting to custom endpoint (LiteLLM / Ollama)...';
+        if (onProgress) onProgress(50, msg);
+        this.emitStatus('loading_model', msg);
+
+        // Terminate any previous lingering worker before spinning up a new one
+        if (this.worker) {
+          try {
+            this.worker.terminate();
+          } catch (err) {
+            logger.warn('AIAgent:initEngine', 'Failed to terminate prior worker', err);
+          }
+          this.worker = null;
+        }
+        if (this.engine) {
+          try {
+            await this.engine.unload?.();
+          } catch (err) {
+            logger.warn('AIAgent:initEngine', 'Failed to unload prior engine', err);
+          }
+          this.engine = null;
+        }
+
+        this.engine = new OpenAICompatibleEngine(endpoint, model, apiKey) as any;
+        this.ctxWindowSize = 8192;
+        this.toolCallSchemaString = null;
+        this.constrainedUnsupported = false;
+        if (onProgress) onProgress(100, 'Connected to custom endpoint');
+        this.emitStatus('idle');
+        this.resetIdleParkTimer();
+        return;
+      }
+
       if (typeof navigator !== 'undefined' && !(navigator as any).gpu) {
-        throw new Error("WebGPU is not supported or hardware acceleration is disabled. Please enable Hardware Acceleration in your system/browser settings.");
+        throw new Error("WebGPU is not supported or hardware acceleration is disabled. Please enable Hardware Acceleration in your system/browser settings, or switch to a Custom Backend (LiteLLM / Ollama) in Advanced Settings.");
       }
 
       const initProgressCallback: InitProgressCallback = (initProgress) => {
