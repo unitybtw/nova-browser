@@ -246,10 +246,16 @@ async function runLiteLLMTests() {
     storage.set('nova_ai_custom_model', 'llama-3.2-11b-vision-instruct');
     assert.equal(aiAgent.currentModelSupportsVision(), true); // vision keyword
 
+    // Verify in-memory API key configuration and security (zero cleartext storage in localStorage)
+    await aiAgent.configureBackend('custom', 'http://127.0.0.1:4000/v1', 'gpt-4o', 'sk-test-secret-key-123', 'custom');
+    assert.equal(aiAgent.getCustomConfig().apiKey, 'sk-test-secret-key-123');
+    assert.equal(storage.has('nova_ai_custom_api_key'), false, 'apiKey must not be stored in localStorage');
+
     console.log('[PASS] AIAgent methods support custom backend configuration, personality, presets, vision detection and display naming');
   }
 
   console.log('ALL LITELLM / OPENAI-COMPATIBLE BACKEND TESTS PASSED CLEANLY.');
+  process.exit(0);
 }
 
 runLiteLLMTests().catch(err => {
