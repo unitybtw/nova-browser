@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Download,
   Upload,
@@ -16,7 +16,13 @@ import {
   Code,
   ExternalLink,
   Key,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  EyeOff,
+  ShieldCheck,
+  Activity,
+  Search,
+  CheckCheck
 } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { ToggleSwitch } from './ToggleSwitch';
@@ -46,7 +52,10 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
   const [isPurgingMemory, setIsPurgingMemory] = useState(false);
   const [purgedFeedback, setPurgedFeedback] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
-  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; models?: string[] } | null>(null);
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number; models?: string[] } | null>(null);
+  const [providerTab, setProviderTab] = useState<'all' | 'local' | 'cloud' | 'custom'>('all');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
   const { setSafeTimeout } = useSafeTimeout();
 
   const currentPresetId = (settings.aiProvider === 'webgpu')
@@ -149,6 +158,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
         setTestResult({
           ok: true,
           message: `Connected successfully (${res.latencyMs}ms). ${countText}.`,
+          latencyMs: res.latencyMs,
           models: res.models
         });
       } else {
@@ -167,59 +177,213 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
     }
   };
 
+  const filteredPresets = useMemo(() => {
+    if (providerTab === 'all') return AI_PROVIDER_PRESETS;
+    return AI_PROVIDER_PRESETS.filter((p) => p.category === providerTab);
+  }, [providerTab]);
+
+  const showWebGPU = providerTab === 'all' || providerTab === 'local';
+
+  const filteredDiscoveredModels = useMemo(() => {
+    if (!testResult?.models) return [];
+    if (!modelSearchQuery.trim()) return testResult.models;
+    const q = modelSearchQuery.toLowerCase();
+    return testResult.models.filter((m) => m.toLowerCase().includes(q));
+  }, [testResult?.models, modelSearchQuery]);
+
+  const temperatureDescription = useMemo(() => {
+    const temp = settings.aiTemperature ?? 0.2;
+    if (temp <= 0.2) {
+      return 'Precise & Deterministic: Recommended for programming, code refactoring, SQL queries, and exact facts.';
+    }
+    if (temp <= 0.7) {
+      return 'Balanced: Optimal for everyday browsing, deep web research, and reasoning.';
+    }
+    return 'Creative & Exploratory: High diversity, ideal for brainstorming and imaginative drafting.';
+  }, [settings.aiTemperature]);
+
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section>
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">AI Features</h2>
-        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8">
-          {/* AI Backend Provider Selection */}
-          <div className="p-5 space-y-5">
-            <div>
-              <div className="text-sm font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                <Server className="w-4 h-4 text-blue-500" />
-                AI Assistant Backend Provider
-              </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Select where your AI Assistant runs. Run models locally with zero data leakage or connect to ultra-fast inference APIs.
+
+        {/* Card 1: AI Assistant Infrastructure & Provider Selection */}
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/90 dark:border-slate-700/50 shadow-xs divide-y divide-slate-100 dark:divide-slate-700/50 mb-6 overflow-hidden">
+          {/* Header Title */}
+          <div className="p-5 pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                  <Server className="w-4 h-4 text-blue-500" />
+                  AI Assistant Infrastructure & Providers
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Connect Nova AI to private on-device WebGPU models, local daemons (Ollama, LM Studio), or high-throughput cloud endpoints.
+                </div>
               </div>
             </div>
 
-            {/* Provider Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
-              {/* WebGPU Tile */}
-              <button
-                type="button"
-                onClick={() => handleSelectPreset('webgpu')}
-                className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[76px] ${
-                  (settings.aiProvider ?? 'webgpu') === 'webgpu'
-                    ? 'border-blue-500/80 bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs'
-                    : 'border-slate-200 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300'
-                }`}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <Cpu className="w-4 h-4 text-emerald-500 shrink-0" />
-                  {(settings.aiProvider ?? 'webgpu') === 'webgpu' && (
-                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            {/* Hero Active Status Banner */}
+            <div className="mt-4 p-4 rounded-xl bg-gradient-to-r from-slate-50 to-blue-50/40 dark:from-slate-900/80 dark:to-blue-950/20 border border-slate-200/90 dark:border-slate-700/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start md:items-center gap-3.5">
+                <div className="w-11 h-11 rounded-xl bg-blue-500/10 dark:bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+                  {settings.aiProvider === 'webgpu' ? (
+                    <Cpu className="w-5 h-5 text-emerald-500" />
+                  ) : selectedPresetDef.id === 'openrouter' ? (
+                    <Globe className="w-5 h-5 text-indigo-500" />
+                  ) : selectedPresetDef.id === 'groq' ? (
+                    <Zap className="w-5 h-5 text-amber-500" />
+                  ) : selectedPresetDef.id === 'deepseek' ? (
+                    <Code className="w-5 h-5 text-blue-500" />
+                  ) : selectedPresetDef.id === 'openai' ? (
+                    <Sparkles className="w-5 h-5 text-purple-500" />
+                  ) : (
+                    <Server className="w-5 h-5 text-blue-500" />
                   )}
                 </div>
-                <div>
-                  <div className="text-xs font-semibold leading-tight mt-1.5">WebGPU</div>
-                  <div className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
-                    On-Device Private
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-semibold text-slate-900 dark:text-white">
+                      {settings.aiProvider === 'webgpu' ? 'On-Device WebGPU' : selectedPresetDef.name}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-medium bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      {settings.aiProvider === 'webgpu'
+                        ? '100% Private & Ready'
+                        : testResult?.latencyMs
+                        ? `${testResult.latencyMs}ms Connected`
+                        : 'Active Backend'}
+                    </span>
+                    <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                      {settings.aiProvider === 'webgpu' ? 'Offline GPU' : selectedPresetDef.category}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-mono">
+                    <span className="text-slate-400 dark:text-slate-500 font-sans">Active Model:</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {settings.aiProvider === 'webgpu'
+                        ? aiAgent.getModelDisplayName()
+                        : (settings.aiCustomModel || selectedPresetDef.defaultModel || 'Server Default')}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                    {settings.aiProvider === 'webgpu'
+                      ? 'Local memory buffer with zero data leaving this device.'
+                      : `Endpoint: ${settings.aiCustomEndpoint || selectedPresetDef.defaultEndpoint}`}
                   </div>
                 </div>
-              </button>
+              </div>
 
-              {/* Dynamic Presets from AI_PROVIDER_PRESETS */}
-              {AI_PROVIDER_PRESETS.map((preset) => {
+              {/* Action Button */}
+              {settings.aiProvider === 'custom' && (
+                <button
+                  type="button"
+                  disabled={testingConnection}
+                  onClick={handleTestConnection}
+                  className="self-start md:self-auto px-3.5 py-2 rounded-xl bg-white dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-slate-700/80 text-blue-600 dark:text-blue-400 border border-slate-200 dark:border-slate-700 text-xs font-semibold shadow-2xs transition-all flex items-center gap-2 cursor-pointer shrink-0 disabled:opacity-50"
+                >
+                  {testingConnection ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Testing Ping...
+                    </>
+                  ) : (
+                    <>
+                      <Activity className="w-3.5 h-3.5 text-blue-500" />
+                      Test Connection
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+
+            {/* Segmented Filter Pills */}
+            <div className="flex items-center gap-1.5 mt-5 pb-1 flex-wrap">
+              {[
+                { id: 'all', label: 'All Providers', count: 10 },
+                { id: 'local', label: 'Local & On-Device', count: 5 },
+                { id: 'cloud', label: 'Cloud Services', count: 4 },
+                { id: 'custom', label: 'Custom Endpoint', count: 1 }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setProviderTab(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                    providerTab === tab.id
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                    providerTab === tab.id
+                      ? 'bg-blue-500/40 text-white'
+                      : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                  }`}>
+                    {tab.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            {/* Provider Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 mt-3">
+              {/* WebGPU Tile */}
+              {showWebGPU && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectPreset('webgpu')}
+                  className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[96px] ${
+                    (settings.aiProvider ?? 'webgpu') === 'webgpu'
+                      ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs'
+                      : 'border-slate-200 dark:border-slate-700/70 bg-white dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                      <Cpu className="w-4 h-4" />
+                    </div>
+                    <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300">
+                      On-Device
+                    </span>
+                  </div>
+                  <div className="mt-2.5">
+                    <div className="text-xs font-semibold leading-snug">WebGPU</div>
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal mt-0.5">
+                      Zero data leakage, fully offline private execution.
+                    </div>
+                  </div>
+                </button>
+              )}
+
+              {/* Filtered Dynamic Presets */}
+              {filteredPresets.map((preset) => {
                 const isSelected = settings.aiProvider === 'custom' && currentPresetId === preset.id;
                 let IconComponent = Server;
-                if (preset.id === 'openrouter') IconComponent = Globe;
-                else if (preset.id === 'groq') IconComponent = Zap;
-                else if (preset.id === 'openai') IconComponent = Sparkles;
-                else if (preset.id === 'deepseek') IconComponent = Code;
-                else if (preset.id === 'custom') IconComponent = Sliders;
-                else if (preset.id === 'lmstudio') IconComponent = Cpu;
+                let iconColor = 'text-blue-500 bg-blue-500/10';
+                if (preset.id === 'openrouter') {
+                  IconComponent = Globe;
+                  iconColor = 'text-indigo-500 bg-indigo-500/10';
+                } else if (preset.id === 'groq') {
+                  IconComponent = Zap;
+                  iconColor = 'text-amber-500 bg-amber-500/10';
+                } else if (preset.id === 'openai') {
+                  IconComponent = Sparkles;
+                  iconColor = 'text-purple-500 bg-purple-500/10';
+                } else if (preset.id === 'deepseek') {
+                  IconComponent = Code;
+                  iconColor = 'text-sky-500 bg-sky-500/10';
+                } else if (preset.id === 'custom') {
+                  IconComponent = Sliders;
+                  iconColor = 'text-slate-500 bg-slate-500/10';
+                } else if (preset.id === 'lmstudio') {
+                  IconComponent = Cpu;
+                  iconColor = 'text-emerald-500 bg-emerald-500/10';
+                }
 
                 const categoryBadge = preset.category === 'local' ? 'Local' : preset.category === 'cloud' ? 'Cloud' : 'Custom';
 
@@ -228,199 +392,126 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
                     key={preset.id}
                     type="button"
                     onClick={() => handleSelectPreset(preset.id)}
-                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[76px] ${
+                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between min-h-[96px] ${
                       isSelected
-                        ? 'border-blue-500/80 bg-blue-50/70 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'border-slate-200 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300'
+                        ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs'
+                        : 'border-slate-200 dark:border-slate-700/70 bg-white dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300'
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <IconComponent className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className={`text-[9.5px] uppercase font-mono px-1 py-0.2 rounded ${
+                      <div className={`p-2 rounded-lg ${iconColor}`}>
+                        <IconComponent className="w-4 h-4" />
+                      </div>
+                      <span className={`text-[10px] font-mono font-medium px-2 py-0.5 rounded-full ${
                         preset.category === 'local'
-                          ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+                          ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
                           : preset.category === 'cloud'
-                          ? 'bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400'
+                          ? 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
                           : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                       }`}>
                         {categoryBadge}
                       </span>
                     </div>
-                    <div>
-                      <div className="text-xs font-semibold leading-tight mt-1.5 truncate">
+                    <div className="mt-2.5">
+                      <div className="text-xs font-semibold leading-snug">
                         {preset.name}
                       </div>
-                      <div className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5 truncate">
-                        {preset.category === 'local' ? 'Local daemon' : preset.category === 'cloud' ? 'API service' : 'Proxy URL'}
+                      <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-normal mt-0.5 line-clamp-2">
+                        {preset.description}
                       </div>
                     </div>
                   </button>
                 );
               })}
             </div>
+          </div>
 
-            {/* Custom / Preset Configuration Details */}
-            {settings.aiProvider === 'custom' && (
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-700/80 space-y-4 animate-in fade-in duration-300">
-                {/* Active Preset Banner */}
-                <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200/70 dark:border-slate-800">
-                  <div>
-                    <span className="text-xs font-semibold text-slate-800 dark:text-slate-100">
-                      {selectedPresetDef.name} Configuration
-                    </span>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {selectedPresetDef.description}
-                    </p>
-                  </div>
-                  {selectedPresetDef.docsUrl && (
-                    <a
-                      href={selectedPresetDef.docsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
-                    >
-                      Documentation
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
-                </div>
-
-                {/* Endpoint URL Input */}
+          {/* Active Preset Configuration Details Panel */}
+          {settings.aiProvider === 'custom' && (
+            <div className="p-5 bg-slate-50/60 dark:bg-slate-900/60 space-y-4">
+              {/* Header */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      OpenAI-Compatible Base URL
-                    </label>
-                    {settings.aiCustomEndpoint !== selectedPresetDef.defaultEndpoint && (
-                      <button
-                        type="button"
-                        onClick={() => handleCustomConfigChange('aiCustomEndpoint', selectedPresetDef.defaultEndpoint)}
-                        className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <RotateCcw className="w-3 h-3" />
-                        Reset to default ({selectedPresetDef.defaultEndpoint})
-                      </button>
-                    )}
+                  <div className="text-xs font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                    <Sliders className="w-3.5 h-3.5 text-blue-500" />
+                    {selectedPresetDef.name} Parameters
                   </div>
-                  <input
-                    type="text"
-                    value={settings.aiCustomEndpoint ?? selectedPresetDef.defaultEndpoint}
-                    onChange={(e) => handleCustomConfigChange('aiCustomEndpoint', e.target.value)}
-                    placeholder={selectedPresetDef.defaultEndpoint}
-                    className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                  />
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                    Route requests to any OpenAI-compatible server. Suffix <code className="font-mono text-[10px] bg-slate-200/60 dark:bg-slate-700 px-1 py-0.5 rounded">/v1</code> is automatically normalized.
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {selectedPresetDef.description}
                   </p>
                 </div>
+                {selectedPresetDef.docsUrl && (
+                  <a
+                    href={selectedPresetDef.docsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium"
+                  >
+                    Documentation
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
 
-                {/* Model Name & API Key */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
-                      Model Identifier
-                    </label>
-                    <input
-                      type="text"
-                      value={settings.aiCustomModel ?? ''}
-                      onChange={(e) => handleCustomConfigChange('aiCustomModel', e.target.value)}
-                      placeholder={selectedPresetDef.defaultModel || 'e.g. llama3.3, claude-3-5-sonnet, gpt-4o'}
-                      className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs px-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                    />
-
-                    {/* Popular Models Chips */}
-                    {selectedPresetDef.popularModels && selectedPresetDef.popularModels.length > 0 && (
-                      <div className="mt-2">
-                        <div className="text-[10.5px] font-medium text-slate-400 dark:text-slate-500 mb-1">
-                          Popular models:
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {selectedPresetDef.popularModels.map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => handleCustomConfigChange('aiCustomModel', m)}
-                              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
-                                settings.aiCustomModel === m
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
-                              }`}
-                            >
-                              {m}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
-                      API Key {selectedPresetDef.requiresApiKey ? '(Required)' : '(Optional)'}
-                    </label>
-                    <div className="relative">
-                      <input
-                        type="password"
-                        value={settings.aiCustomApiKey ?? ''}
-                        onChange={(e) => handleCustomConfigChange('aiCustomApiKey', e.target.value)}
-                        placeholder={selectedPresetDef.apiKeyPlaceholder || 'Bearer token (if required)'}
-                        className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs pl-8 pr-3.5 py-2 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                      />
-                      <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
-                    </div>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
-                      {selectedPresetDef.requiresApiKey
-                        ? 'Bearer token sent securely with each inference request.'
-                        : 'Local servers (Ollama, LM Studio) typically require no key.'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Connection Test & Discovered Models */}
-                <div className="pt-2 flex flex-col gap-2">
-                  <div className="flex items-center gap-3">
+              {/* Endpoint URL Input */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    OpenAI-Compatible Base URL
+                  </label>
+                  {settings.aiCustomEndpoint && settings.aiCustomEndpoint !== selectedPresetDef.defaultEndpoint && (
                     <button
                       type="button"
-                      disabled={testingConnection}
-                      onClick={handleTestConnection}
-                      className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                      onClick={() => handleCustomConfigChange('aiCustomEndpoint', selectedPresetDef.defaultEndpoint)}
+                      className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 cursor-pointer font-medium"
                     >
-                      {testingConnection ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Testing Endpoint...
-                        </>
-                      ) : (
-                        <>
-                          <Zap className="w-3.5 h-3.5" />
-                          Test Connection
-                        </>
-                      )}
+                      <RotateCcw className="w-3 h-3" />
+                      Reset to default ({selectedPresetDef.defaultEndpoint})
                     </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={settings.aiCustomEndpoint ?? selectedPresetDef.defaultEndpoint}
+                  onChange={(e) => handleCustomConfigChange('aiCustomEndpoint', e.target.value)}
+                  placeholder={selectedPresetDef.defaultEndpoint}
+                  className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                  Route requests to any standard OpenAI proxy or server. Suffix <code className="font-mono text-[10px] bg-slate-200/60 dark:bg-slate-700 px-1 py-0.5 rounded">/v1</code> is automatically normalized.
+                </p>
+              </div>
 
-                    {testResult && (
-                      <div className={`text-xs flex items-center gap-1.5 ${testResult.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
-                        {testResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                        <span>{testResult.message}</span>
-                      </div>
-                    )}
-                  </div>
+              {/* Model Identifier & API Key */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
+                    Model Identifier
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.aiCustomModel ?? ''}
+                    onChange={(e) => handleCustomConfigChange('aiCustomModel', e.target.value)}
+                    placeholder={selectedPresetDef.defaultModel || 'e.g. llama3.3, claude-3-5-sonnet, gpt-4o'}
+                    className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
+                  />
 
-                  {testResult?.models && testResult.models.length > 0 && (
-                    <div className="p-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                      <div className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5">
-                        Click a discovered model to select it:
+                  {/* Popular Models */}
+                  {selectedPresetDef.popularModels && selectedPresetDef.popularModels.length > 0 && (
+                    <div className="mt-2.5">
+                      <div className="text-[10.5px] font-medium text-slate-400 dark:text-slate-500 mb-1.5">
+                        Quick select popular models:
                       </div>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
-                        {testResult.models.slice(0, 30).map((m) => (
+                      <div className="flex flex-wrap gap-1.5">
+                        {selectedPresetDef.popularModels.map((m) => (
                           <button
                             key={m}
                             type="button"
                             onClick={() => handleCustomConfigChange('aiCustomModel', m)}
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                            className={`text-[10px] font-mono px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
                               settings.aiCustomModel === m
-                                ? 'bg-blue-500 text-white border-blue-600'
-                                : 'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold'
+                                : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
                             }`}
                           >
                             {m}
@@ -430,86 +521,292 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
                     </div>
                   )}
                 </div>
-              </div>
-            )}
 
-            {/* Model Temperature & System Personality Section */}
-            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60 grid grid-cols-1 md:grid-cols-2 gap-5">
-              {/* Temperature Slider */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                      <Sliders className="w-3.5 h-3.5 text-blue-500" />
-                      Inference Temperature
-                    </label>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                      Controls answer randomness and creativity.
-                    </p>
-                  </div>
-                  <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-blue-600 dark:text-blue-400 font-semibold border border-slate-200 dark:border-slate-700">
-                    {(settings.aiTemperature ?? 0.2).toFixed(2)}
-                  </span>
-                </div>
-
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={settings.aiTemperature ?? 0.2}
-                  onChange={(e) => handleTemperatureChange(parseFloat(e.target.value))}
-                  className="w-full accent-blue-600 cursor-pointer"
-                />
-
-                <div className="flex items-center justify-between text-[10px] text-slate-400">
-                  <span>Precise (0.0)</span>
-                  <span>Balanced (0.5)</span>
-                  <span>Creative (1.0)</span>
-                </div>
-              </div>
-
-              {/* System Personality */}
-              <div className="space-y-2">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-blue-500" />
-                    Assistant Personality & Tone
-                  </label>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                    Adjusts prompt instructions and style.
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      API Key {selectedPresetDef.requiresApiKey ? '(Required)' : '(Optional)'}
+                    </label>
+                    <span className="text-[11px] text-slate-400">
+                      {selectedPresetDef.requiresApiKey ? 'Bearer authorization' : 'Not needed for local'}
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showApiKey ? 'text' : 'password'}
+                      value={settings.aiCustomApiKey ?? ''}
+                      onChange={(e) => handleCustomConfigChange('aiCustomApiKey', e.target.value)}
+                      placeholder={selectedPresetDef.apiKeyPlaceholder || 'Bearer token (if required)'}
+                      className="w-full bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 text-xs pl-8 pr-10 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-mono"
+                    />
+                    <Key className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-3" />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey((prev) => !prev)}
+                      className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 absolute right-2.5 top-2.5 transition-colors cursor-pointer"
+                      title={showApiKey ? 'Hide API Key' : 'Show API Key'}
+                    >
+                      {showApiKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-500 shrink-0" />
+                    Stored encrypted on this device. Sent directly over TLS to your server.
                   </p>
                 </div>
-
-                <div className="grid grid-cols-2 gap-1.5">
-                  {[
-                    { id: 'balanced', label: 'Balanced', desc: 'Thoughtful & helpful' },
-                    { id: 'code', label: 'Code & Dev', desc: 'Clean diffs, no filler' },
-                    { id: 'concise', label: 'Concise', desc: 'Direct bullet points' },
-                    { id: 'creative', label: 'Creative', desc: 'Exploratory & witty' }
-                  ].map((p) => {
-                    const isSelected = (settings.aiSystemPersonality ?? 'balanced') === p.id;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => handlePersonalityChange(p.id as any)}
-                        className={`p-2 rounded-lg border text-left transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/20'
-                            : 'border-slate-200 dark:border-slate-700/60 bg-white/60 dark:bg-slate-800/40 text-slate-700 dark:text-slate-300 hover:border-slate-300'
-                        }`}
-                      >
-                        <div className="text-xs font-semibold leading-tight">{p.label}</div>
-                        <div className="text-[10px] text-slate-400 leading-tight mt-0.5 truncate">{p.desc}</div>
-                      </button>
-                    );
-                  })}
-                </div>
               </div>
+
+              {/* Connection Test & Discovered Models */}
+              <div className="pt-2 flex flex-col gap-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    disabled={testingConnection}
+                    onClick={handleTestConnection}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {testingConnection ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Testing Endpoint...
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-3.5 h-3.5" />
+                        Test Connection
+                      </>
+                    )}
+                  </button>
+
+                  {testResult && (
+                    <div className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
+                      testResult.ok
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                    }`}>
+                      {testResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                      <span className="font-medium">{testResult.message}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Discovered Models Cloud */}
+                {testResult?.models && testResult.models.length > 0 && (
+                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2 mt-1">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                        <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                        Discovered Server Models ({testResult.models.length})
+                      </div>
+                      {testResult.models.length > 8 && (
+                        <div className="relative w-48">
+                          <input
+                            type="text"
+                            value={modelSearchQuery}
+                            onChange={(e) => setModelSearchQuery(e.target.value)}
+                            placeholder="Filter models..."
+                            className="w-full bg-slate-50 dark:bg-slate-900 text-xs pl-7 pr-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                          />
+                          <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                      Click any discovered model to immediately set it as active:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
+                      {filteredDiscoveredModels.map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => handleCustomConfigChange('aiCustomModel', m)}
+                          className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                            settings.aiCustomModel === m
+                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold'
+                              : 'bg-slate-50 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300'
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Card 2: Model Behavior, Creativity & Intelligence Style (Independent Card) */}
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/90 dark:border-slate-700/50 shadow-xs divide-y divide-slate-100 dark:divide-slate-700/50 mb-8 overflow-hidden">
+          <div className="p-5 pb-4">
+            <div className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-blue-500" />
+              Model Behavior & Intelligence Style
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              Fine-tune inference randomness, creativity thresholds, and conversational persona for your browsing sessions.
             </div>
           </div>
 
+          <div className="p-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Temperature */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Activity className="w-3.5 h-3.5 text-blue-500" />
+                    Inference Temperature
+                  </label>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                    Controls output predictability and exploratory creativity.
+                  </p>
+                </div>
+                <span className="font-mono text-xs px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 font-bold border border-blue-200 dark:border-blue-900">
+                  {(settings.aiTemperature ?? 0.2).toFixed(2)}
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={settings.aiTemperature ?? 0.2}
+                onChange={(e) => handleTemperatureChange(parseFloat(e.target.value))}
+                className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none"
+              />
+
+              {/* Quick Presets */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleTemperatureChange(0.1)}
+                  className={`flex-1 py-1 px-2 rounded-lg text-[10.5px] font-medium border text-center transition-colors cursor-pointer ${
+                    (settings.aiTemperature ?? 0.2) <= 0.2
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 text-blue-600 dark:text-blue-300 font-semibold'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Precise (0.10)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTemperatureChange(0.5)}
+                  className={`flex-1 py-1 px-2 rounded-lg text-[10.5px] font-medium border text-center transition-colors cursor-pointer ${
+                    (settings.aiTemperature ?? 0.2) > 0.2 && (settings.aiTemperature ?? 0.2) <= 0.7
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 text-blue-600 dark:text-blue-300 font-semibold'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Balanced (0.50)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTemperatureChange(0.85)}
+                  className={`flex-1 py-1 px-2 rounded-lg text-[10.5px] font-medium border text-center transition-colors cursor-pointer ${
+                    (settings.aiTemperature ?? 0.2) > 0.7
+                      ? 'bg-blue-50 dark:bg-blue-950/40 border-blue-400 text-blue-600 dark:text-blue-300 font-semibold'
+                      : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Creative (0.85)
+                </button>
+              </div>
+
+              {/* Dynamic Context Helper Note */}
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70 text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                {temperatureDescription}
+              </div>
+            </div>
+
+            {/* Right Column: Assistant Persona */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  Assistant Persona & Tone
+                </label>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  Defines the system instructions, depth, and communicative demeanor.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {[
+                  {
+                    id: 'balanced',
+                    label: 'Balanced',
+                    role: 'General Assistant',
+                    desc: 'Clear reasoning, helpful explanations, and balanced tone.',
+                    Icon: Sparkles,
+                    color: 'text-blue-500'
+                  },
+                  {
+                    id: 'code',
+                    label: 'Code & Dev',
+                    role: 'Staff Engineer',
+                    desc: 'Clean unified diffs, terminal snippets, zero filler words.',
+                    Icon: Code,
+                    color: 'text-indigo-500'
+                  },
+                  {
+                    id: 'concise',
+                    label: 'Concise',
+                    role: 'Minimalist',
+                    desc: 'Direct bullet points, ultra-fast token conservation.',
+                    Icon: Zap,
+                    color: 'text-amber-500'
+                  },
+                  {
+                    id: 'creative',
+                    label: 'Creative',
+                    role: 'Brainstormer',
+                    desc: 'Vivid prose, expansive insights, and witty analogies.',
+                    Icon: Globe,
+                    color: 'text-purple-500'
+                  }
+                ].map((p) => {
+                  const isSelected = (settings.aiSystemPersonality ?? 'balanced') === p.id;
+                  const Icon = p.Icon;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => handlePersonalityChange(p.id as any)}
+                      className={`p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                        isSelected
+                          ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 ring-2 ring-blue-500/20 shadow-xs'
+                          : 'border-slate-200 dark:border-slate-700/70 bg-white dark:bg-slate-800/40 hover:border-slate-300 dark:hover:border-slate-600 text-slate-700 dark:text-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-2">
+                          <Icon className={`w-3.5 h-3.5 ${p.color}`} />
+                          <span className="text-xs font-semibold">{p.label}</span>
+                        </div>
+                        {isSelected && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                        )}
+                      </div>
+                      <div className="mt-1.5">
+                        <div className="text-[10px] font-mono font-medium text-slate-400 uppercase tracking-wide">
+                          {p.role}
+                        </div>
+                        <div className="text-[10.5px] text-slate-500 dark:text-slate-400 leading-tight mt-0.5">
+                          {p.desc}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Additional AI & Privacy Controls */}
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200/90 dark:border-slate-700/50 divide-y divide-slate-100 dark:divide-slate-700/50 mb-8 overflow-hidden">
           <div className="p-5 flex items-center justify-between">
             <div>
               <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">AI Link Preview (Hover Summaries)</div>
