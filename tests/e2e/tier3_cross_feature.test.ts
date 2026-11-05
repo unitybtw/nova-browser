@@ -48,7 +48,8 @@ export async function runTier3CrossFeatureTests() {
 
     interceptRequest(url: string, tabId: string): { blocked: boolean } {
       const normalized = normalizeAdblockDomain(url);
-      const isTracker = normalized.includes('tracker.com') || normalized.includes('doubleclick.net');
+      const trackerDomains = ['tracker.com', 'doubleclick.net'];
+      const isTracker = trackerDomains.some((d) => normalized === d || normalized.endsWith('.' + d));
       if (isTracker) {
         this.badgeBatches.set(tabId, (this.badgeBatches.get(tabId) || 0) + 1);
         return { blocked: true };

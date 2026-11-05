@@ -154,8 +154,16 @@ export async function runTier4RealWorldTests() {
     </html>
   `;
 
-  // Sanitized extraction
-  const cleanBody = rawArticle.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+  // Sanitized extraction (token-based extractor)
+  const articleTokens = rawArticle.split(/(<[^>]*>)/g);
+  let cleanBody = '';
+  let inScriptBlock = false;
+  for (const token of articleTokens) {
+    const lower = token.toLowerCase().trim();
+    if (lower.startsWith('<script')) inScriptBlock = true;
+    else if (lower.startsWith('</script')) inScriptBlock = false;
+    else if (!inScriptBlock) cleanBody += token;
+  }
   assert.equal(cleanBody.includes('<script>'), false);
   assert.ok(cleanBody.includes('Quantum Gravity in 2026'));
   recordWorkloadPass(3, 'Research & Reading Session', 'Step 1: Extracts and sanitizes article content removing scripts');
@@ -207,7 +215,9 @@ export async function runTier4RealWorldTests() {
   function evaluateRequest(url: string): { blocked: boolean } {
     if (isDomainWhitelisted(url, userWhitelist)) return { blocked: false };
     const norm = normalizeAdblockDomain(url);
-    if (norm.includes('doubleclick.net') || norm.includes('google-analytics.com') || norm.includes('adservice.google.com')) {
+    const blockedHosts = ['doubleclick.net', 'google-analytics.com', 'adservice.google.com'];
+    const isBlocked = blockedHosts.some((h) => norm === h || norm.endsWith('.' + h));
+    if (isBlocked) {
       blockedCount++;
       return { blocked: true };
     }

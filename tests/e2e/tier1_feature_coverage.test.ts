@@ -352,7 +352,8 @@ export async function runTier1FeatureCoverageTests() {
     shouldBlockRequest(url: string, whitelist: string[]): boolean {
       const normalized = normalizeAdblockDomain(url);
       if (isDomainWhitelisted(url, whitelist)) return false;
-      return normalized.includes('doubleclick.net') || normalized.includes('adservice.google.com');
+      const blockedHosts = ['doubleclick.net', 'adservice.google.com'];
+      return blockedHosts.some((h) => normalized === h || normalized.endsWith('.' + h));
     }
   }
 
@@ -668,11 +669,23 @@ export async function runTier1FeatureCoverageTests() {
   // FEATURE 12: Non-Blocking Reader Mode
   // --------------------------------------------------------------------------
   function extractReaderContentSync(html: string): { title: string; content: string; author?: string } {
-    // Sanitized extraction mock
+    // Sanitized extraction mock using tokenization
     const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : 'Untitled Article';
-    // Remove script tags
-    const sanitized = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
+    let title = 'Untitled Article';
+    if (titleMatch) {
+      const parts = titleMatch[1].split(/<[^>]*>/g);
+      title = parts.join('').trim() || 'Untitled Article';
+    }
+    // Remove script tags via tokenization
+    const tokens = html.split(/(<[^>]*>)/g);
+    let sanitized = '';
+    let inScript = false;
+    for (const t of tokens) {
+      const lower = t.toLowerCase().trim();
+      if (lower.startsWith('<script')) inScript = true;
+      else if (lower.startsWith('</script')) inScript = false;
+      else if (!inScript) sanitized += t;
+    }
     return { title, content: sanitized };
   }
 

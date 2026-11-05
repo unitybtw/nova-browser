@@ -569,7 +569,9 @@ async function runAllChallengerTests() {
 
     // Simulate adblocker registering
     sess.webRequest.onHeadersReceived({ urls: ['<all_urls>'] }, (details: any, cb: any) => {
-      if (details.url.includes('tracker.doubleclick.net')) {
+      let hostname = '';
+      try { hostname = new URL(details.url).hostname; } catch {}
+      if (hostname === 'tracker.doubleclick.net' || hostname.endsWith('.tracker.doubleclick.net')) {
         cb({ cancel: true });
       } else {
         cb({ responseHeaders: details.responseHeaders });

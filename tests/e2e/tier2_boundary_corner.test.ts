@@ -722,9 +722,15 @@ export async function runTier2BoundaryTests() {
 
   // 12.4 XSS in <noscript> and SVG stripped
   const maliciousReaderHtml = '<p>Normal</p><noscript><img src=x onerror=alert(1)></noscript><svg><script>alert("svg")</script></svg>';
-  const cleanReaderHtml = maliciousReaderHtml
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<noscript\b[^<]*(?:(?!<\/noscript>)<[^<]*)*<\/noscript>/gi, '');
+  const readerTokens = maliciousReaderHtml.split(/(<[^>]*>)/g);
+  let cleanReaderHtml = '';
+  let inDisallowedBlock = false;
+  for (const t of readerTokens) {
+    const lower = t.toLowerCase().trim();
+    if (lower.startsWith('<script') || lower.startsWith('<noscript')) inDisallowedBlock = true;
+    else if (lower.startsWith('</script') || lower.startsWith('</noscript')) inDisallowedBlock = false;
+    else if (!inDisallowedBlock) cleanReaderHtml += t;
+  }
   assert.equal(cleanReaderHtml.includes('<noscript>'), false);
   assert.equal(cleanReaderHtml.includes('<script>'), false);
   recordPass(12, 'Non-Blocking Reader Mode', 'XSS vectors in noscript and SVG tags stripped from reader content');

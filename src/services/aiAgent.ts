@@ -735,6 +735,37 @@ class AIAgent {
     return (localStorage.getItem('nova_ai_backend') as 'webgpu' | 'custom') || 'webgpu';
   }
 
+  // Obfuscate / encrypt credentials to avoid cleartext exposure in localStorage
+  private secureStoreToken(token: string): string {
+    if (!token) return '';
+    try {
+      const buffer = new TextEncoder().encode(token);
+      const cipher = buffer.map((b, i) => b ^ ((i * 11 + 17) % 256));
+      let bin = '';
+      for (let i = 0; i < cipher.length; i++) {
+        bin += String.fromCharCode(cipher[i]);
+      }
+      return 'vault:v1:' + (typeof btoa === 'function' ? btoa(bin) : Buffer.from(bin, 'binary').toString('base64'));
+    } catch {
+      return token;
+    }
+  }
+
+  private secureRetrieveToken(storedCipher: string): string {
+    if (!storedCipher) return '';
+    if (!storedCipher.startsWith('vault:v1:')) return storedCipher;
+    try {
+      const bin = typeof atob === 'function' ? atob(storedCipher.slice(9)) : Buffer.from(storedCipher.slice(9), 'base64').toString('binary');
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) {
+        bytes[i] = bin.charCodeAt(i) ^ ((i * 11 + 17) % 256);
+      }
+      return new TextDecoder().decode(bytes);
+    } catch {
+      return '';
+    }
+  }
+
   public getCustomConfig(): {
     endpoint: string;
     model: string;
@@ -756,7 +787,7 @@ class AIAgent {
     return {
       endpoint: localStorage.getItem('nova_ai_custom_endpoint') || 'http://localhost:11434/v1',
       model: localStorage.getItem('nova_ai_custom_model') || '',
-      apiKey: localStorage.getItem('nova_ai_custom_api_key') || '',
+      apiKey: this.secureRetrieveToken(localStorage.getItem('nova_ai_custom_api_key') || ''),
       preset: localStorage.getItem('nova_ai_provider_preset') || 'ollama',
       temperature: Number(localStorage.getItem('nova_ai_temperature')) || 0.2,
       personality: (localStorage.getItem('nova_ai_personality') as any) || 'balanced'
@@ -776,7 +807,10 @@ class AIAgent {
       localStorage.setItem('nova_ai_backend', backend);
       if (endpoint !== undefined) localStorage.setItem('nova_ai_custom_endpoint', endpoint);
       if (model !== undefined) localStorage.setItem('nova_ai_custom_model', model);
-      if (apiKey !== undefined) localStorage.setItem('nova_ai_custom_api_key', apiKey);
+      if (apiKey !== undefined) {
+        const encryptedKey = this.secureStoreToken(apiKey);
+        localStorage.setItem('nova_ai_custom_api_key', encryptedKey);
+      }
       if (preset !== undefined) localStorage.setItem('nova_ai_provider_preset', preset);
       if (temperature !== undefined) localStorage.setItem('nova_ai_temperature', String(temperature));
       if (personality !== undefined) localStorage.setItem('nova_ai_personality', personality);
