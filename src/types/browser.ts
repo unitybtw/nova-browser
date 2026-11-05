@@ -130,9 +130,12 @@ export interface UserSettings {
   shortcuts?: Record<string, ShortcutConfig>;
   aiLinkPreviewEnabled?: boolean;
   aiProvider?: 'webgpu' | 'custom';
+  aiProviderPreset?: 'ollama' | 'litellm' | 'lmstudio' | 'vllm' | 'openrouter' | 'groq' | 'openai' | 'deepseek' | 'custom';
   aiCustomEndpoint?: string;
   aiCustomModel?: string;
   aiCustomApiKey?: string;
+  aiTemperature?: number;
+  aiSystemPersonality?: 'balanced' | 'creative' | 'code' | 'concise';
   energySaverMode?: boolean;
   preloadDnsEnabled?: boolean;
   smoothScrollingEnabled?: boolean;
@@ -174,9 +177,12 @@ export const defaultSettings: UserSettings = {
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
   aiProvider: 'webgpu',
-  aiCustomEndpoint: 'http://localhost:4000/v1',
+  aiProviderPreset: 'ollama',
+  aiCustomEndpoint: 'http://localhost:11434/v1',
   aiCustomModel: '',
   aiCustomApiKey: '',
+  aiTemperature: 0.2,
+  aiSystemPersonality: 'balanced',
   defaultTranslationLanguage: 'en',
   language: detectSystemLanguage(),
   shortcuts: {

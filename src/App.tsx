@@ -2054,6 +2054,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             pendingActions={pendingAIActions}
             onPendingActionConsumed={consumeAIAction}
             isDemo={demoParams.isDemo && demoParams.feature === 'ai'}
+            onOpenSettings={handleOpenSettings}
           />
         </React.Suspense>
       </main>

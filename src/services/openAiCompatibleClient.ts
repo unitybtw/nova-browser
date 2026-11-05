@@ -1,7 +1,7 @@
 /**
- * OpenAI-Compatible & LiteLLM API Client
- * Supports LiteLLM, Ollama, LM Studio, vLLM, LocalAI, and remote OpenAI endpoints
- * for Nova Browser's AI Assistant Sidebar.
+ * OpenAI-Compatible & Multi-Provider AI Client
+ * Enterprise-grade connector for LiteLLM, Ollama, LM Studio, vLLM, OpenRouter, Groq,
+ * DeepSeek, and OpenAI endpoints for Nova Browser's AI Assistant.
  */
 
 export interface OpenAIModelSummary {
@@ -14,6 +14,143 @@ export interface ConnectionTestResult {
   models?: string[];
   latencyMs?: number;
   error?: string;
+  providerName?: string;
+}
+
+export interface AIProviderPreset {
+  id: string;
+  name: string;
+  category: 'local' | 'cloud' | 'custom';
+  defaultEndpoint: string;
+  defaultModel: string;
+  popularModels: string[];
+  requiresApiKey: boolean;
+  apiKeyPlaceholder?: string;
+  description: string;
+  docsUrl?: string;
+}
+
+export const AI_PROVIDER_PRESETS: AIProviderPreset[] = [
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    category: 'local',
+    defaultEndpoint: 'http://localhost:11434/v1',
+    defaultModel: 'llama3.3',
+    popularModels: ['llama3.3', 'deepseek-r1', 'qwen2.5-coder', 'mistral', 'llama3.2', 'phi4', 'gemma2'],
+    requiresApiKey: false,
+    description: 'Local private models running via Ollama daemon',
+    docsUrl: 'https://ollama.com'
+  },
+  {
+    id: 'litellm',
+    name: 'LiteLLM Proxy',
+    category: 'local',
+    defaultEndpoint: 'http://localhost:4000/v1',
+    defaultModel: '',
+    popularModels: ['default', 'gpt-4o', 'claude-3-5-sonnet', 'gemini-1.5-pro'],
+    requiresApiKey: false,
+    description: 'Unified gateway proxy for 100+ local & team LLMs',
+    docsUrl: 'https://docs.litellm.ai'
+  },
+  {
+    id: 'lmstudio',
+    name: 'LM Studio',
+    category: 'local',
+    defaultEndpoint: 'http://localhost:1234/v1',
+    defaultModel: '',
+    popularModels: ['local-model'],
+    requiresApiKey: false,
+    description: 'Run GGUF models locally with LM Studio server',
+    docsUrl: 'https://lmstudio.ai'
+  },
+  {
+    id: 'vllm',
+    name: 'vLLM',
+    category: 'local',
+    defaultEndpoint: 'http://localhost:8000/v1',
+    defaultModel: '',
+    popularModels: [],
+    requiresApiKey: false,
+    description: 'High-throughput local vLLM server',
+    docsUrl: 'https://docs.vllm.ai'
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    category: 'cloud',
+    defaultEndpoint: 'https://openrouter.ai/api/v1',
+    defaultModel: 'anthropic/claude-3.5-sonnet',
+    popularModels: [
+      'anthropic/claude-3.5-sonnet',
+      'deepseek/deepseek-r1',
+      'openai/gpt-4o',
+      'openai/gpt-4o-mini',
+      'meta-llama/llama-3.3-70b-instruct',
+      'google/gemini-2.0-flash-exp:free',
+      'qwen/qwen-2.5-coder-32b-instruct'
+    ],
+    requiresApiKey: true,
+    apiKeyPlaceholder: 'sk-or-v1-...',
+    description: 'Access Claude, DeepSeek, GPT-4o, and 200+ models with one key',
+    docsUrl: 'https://openrouter.ai'
+  },
+  {
+    id: 'groq',
+    name: 'Groq Cloud',
+    category: 'cloud',
+    defaultEndpoint: 'https://api.groq.com/openai/v1',
+    defaultModel: 'llama-3.3-70b-versatile',
+    popularModels: [
+      'llama-3.3-70b-versatile',
+      'deepseek-r1-distill-llama-70b',
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768'
+    ],
+    requiresApiKey: true,
+    apiKeyPlaceholder: 'gsk_...',
+    description: 'Ultra-fast LPU inference (500+ tokens/sec)',
+    docsUrl: 'https://console.groq.com'
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI Official',
+    category: 'cloud',
+    defaultEndpoint: 'https://api.openai.com/v1',
+    defaultModel: 'gpt-4o',
+    popularModels: ['gpt-4o', 'gpt-4o-mini', 'o3-mini', 'o1', 'gpt-4-turbo'],
+    requiresApiKey: true,
+    apiKeyPlaceholder: 'sk-proj-...',
+    description: 'Direct connection to OpenAI API platform',
+    docsUrl: 'https://platform.openai.com'
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek Official',
+    category: 'cloud',
+    defaultEndpoint: 'https://api.deepseek.com/v1',
+    defaultModel: 'deepseek-chat',
+    popularModels: ['deepseek-chat', 'deepseek-reasoner'],
+    requiresApiKey: true,
+    apiKeyPlaceholder: 'sk-...',
+    description: 'Official API for DeepSeek V3 and R1 reasoning models',
+    docsUrl: 'https://platform.deepseek.com'
+  },
+  {
+    id: 'custom',
+    name: 'Custom Endpoint',
+    category: 'custom',
+    defaultEndpoint: 'http://localhost:4000/v1',
+    defaultModel: '',
+    popularModels: [],
+    requiresApiKey: false,
+    description: 'Any OpenAI-compatible HTTP server URL and credentials'
+  }
+];
+
+export function getProviderPreset(id: string): AIProviderPreset {
+  const found = AI_PROVIDER_PRESETS.find(p => p.id === id);
+  return found || AI_PROVIDER_PRESETS[AI_PROVIDER_PRESETS.length - 1];
 }
 
 /**
@@ -76,7 +213,6 @@ export async function testOpenAIConnection(
       };
     }
   } catch (err: any) {
-    // If /models failed due to network unreachable, fail early
     if (err.name === 'AbortError') {
       return { ok: false, error: 'Connection timed out after 7 seconds' };
     }
@@ -126,21 +262,26 @@ export async function testOpenAIConnection(
 
 /**
  * Drop-in OpenAI-compatible engine implementing the chat.completions.create
- * interface expected by AIAgent.
+ * interface expected by AIAgent, with Server-Sent Events (SSE) streaming support.
  */
 export class OpenAICompatibleEngine {
   public chat = {
     completions: {
-      create: async (params: {
-        messages: any[];
-        temperature?: number;
-        max_tokens?: number;
-        stream?: boolean;
-        response_format?: any;
-        signal?: AbortSignal;
-        [key: string]: any;
-      }): Promise<any> => {
-        return this._createCompletion(params);
+      create: async (
+        params: {
+          messages: any[];
+          temperature?: number;
+          max_tokens?: number;
+          stream?: boolean;
+          response_format?: any;
+          signal?: AbortSignal;
+          onChunk?: (chunk: string) => void;
+          [key: string]: any;
+        },
+        onChunk?: (chunk: string) => void
+      ): Promise<any> => {
+        const mergedParams = onChunk ? { ...params, onChunk } : params;
+        return this._createCompletion(mergedParams);
       }
     }
   };
@@ -169,13 +310,93 @@ export class OpenAICompatibleEngine {
   private async _createCompletion(params: any): Promise<any> {
     const url = `${this.normalizedEndpoint}/chat/completions`;
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
+      'Content-Type': 'application/json'
     };
 
     if (this.apiKey && this.apiKey.trim()) {
       headers['Authorization'] = `Bearer ${this.apiKey.trim()}`;
     }
+
+    const wantsStream = typeof params.onChunk === 'function' || params.stream === true;
+
+    // Handle Streaming Path
+    if (wantsStream && typeof params.onChunk === 'function') {
+      try {
+        const streamHeaders = {
+          ...headers,
+          'Accept': 'text/event-stream'
+        };
+        const streamPayload: Record<string, any> = {
+          model: this.modelName?.trim() || 'default',
+          messages: params.messages,
+          temperature: params.temperature ?? 0.2,
+          stream: true
+        };
+        if (typeof params.max_tokens === 'number') {
+          streamPayload.max_tokens = params.max_tokens;
+        }
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: streamHeaders,
+          body: JSON.stringify(streamPayload),
+          signal: params.signal
+        });
+
+        if (res.ok && res.body && typeof (res.body as any).getReader === 'function') {
+          const reader = (res.body as ReadableStream<Uint8Array>).getReader();
+          const decoder = new TextDecoder('utf-8');
+          let fullText = '';
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || trimmed.startsWith(':')) continue;
+              if (trimmed === 'data: [DONE]') continue;
+              if (trimmed.startsWith('data: ')) {
+                try {
+                  const parsed = JSON.parse(trimmed.slice(6));
+                  const delta = parsed.choices?.[0]?.delta?.content || '';
+                  if (delta) {
+                    fullText += delta;
+                    params.onChunk(delta);
+                  }
+                } catch {}
+              }
+            }
+          }
+
+          if (fullText.trim().length > 0) {
+            return {
+              choices: [
+                {
+                  message: {
+                    content: fullText,
+                    role: 'assistant'
+                  },
+                  finish_reason: 'stop'
+                }
+              ]
+            };
+          }
+        }
+      } catch (streamErr) {
+        // Fall back to standard non-streaming fetch if streaming fails or is unhandled
+      }
+    }
+
+    // Standard Non-Streaming Path
+    const nonStreamHeaders = {
+      ...headers,
+      'Accept': 'application/json'
+    };
 
     const payload: Record<string, any> = {
       model: this.modelName?.trim() || 'default',
@@ -195,7 +416,7 @@ export class OpenAICompatibleEngine {
     const executeFetch = async (bodyPayload: any) => {
       const res = await fetch(url, {
         method: 'POST',
-        headers,
+        headers: nonStreamHeaders,
         body: JSON.stringify(bodyPayload),
         signal: params.signal
       });

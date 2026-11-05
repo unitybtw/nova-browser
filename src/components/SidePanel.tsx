@@ -14,6 +14,10 @@ import {
   Layers,
   Search,
   Zap,
+  Server,
+  Settings,
+  Cpu,
+  Globe
 } from 'lucide-react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -23,6 +27,10 @@ import {
   AVAILABLE_AI_MODELS,
   detectDirectIntent,
 } from '../services/aiAgent';
+import {
+  AI_PROVIDER_PRESETS,
+  getProviderPreset
+} from '../services/openAiCompatibleClient';
 import { tts } from '../services/tts';
 import { getLocale } from '../services/i18n';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
@@ -81,6 +89,7 @@ interface SidePanelProps {
   isDemo?: boolean;
   pendingActions?: Array<{ id: number; text: string }>;
   onPendingActionConsumed?: (id: number) => void;
+  onOpenSettings?: () => void;
 }
 
 /**
@@ -293,6 +302,7 @@ export const SidePanel = React.memo(({
   isDemo = false,
   pendingActions = [],
   onPendingActionConsumed,
+  onOpenSettings,
 }: SidePanelProps) => {
   const isTr = getLocale() === 'tr-TR';
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
@@ -325,11 +335,13 @@ export const SidePanel = React.memo(({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [expandedReasoning, setExpandedReasoning] = useState<Record<number, boolean>>({});
+  const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
+  const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const { setSafeTimeout } = useSafeTimeout();
 
   const isCustomBackend = aiAgent.getBackend() === 'custom';
   const customConfig = aiAgent.getCustomConfig();
-  const customModelBadge = customConfig.model ? `LiteLLM: ${customConfig.model}` : 'LiteLLM';
+  const displayModelBadge = aiAgent.getModelDisplayName();
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef<ChatMessage[]>(messages);
@@ -742,6 +754,46 @@ export const SidePanel = React.memo(({
     }
   }, [selectedModelId, isReady]);
 
+  // Close model menu when clicking outside
+  useEffect(() => {
+    if (!isModelMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setIsModelMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isModelMenuOpen]);
+
+  const handleQuickSwitchPreset = useCallback(async (presetId: string) => {
+    if (presetId === 'webgpu') {
+      await aiAgent.configureBackend('webgpu');
+      setIsModelMenuOpen(false);
+      await handleInit();
+      return;
+    }
+    const preset = getProviderPreset(presetId);
+    await aiAgent.configureBackend(
+      'custom',
+      preset.defaultEndpoint,
+      preset.defaultModel || '',
+      undefined,
+      presetId
+    );
+    setIsModelMenuOpen(false);
+  }, [handleInit]);
+
+  const handleQuickSwitchModel = useCallback(async (modelName: string) => {
+    if (aiAgent.getBackend() === 'webgpu') {
+      await handleSelectModel(modelName);
+    } else {
+      const cfg = aiAgent.getCustomConfig();
+      await aiAgent.configureBackend('custom', cfg.endpoint, modelName, cfg.apiKey, cfg.preset);
+    }
+    setIsModelMenuOpen(false);
+  }, [handleSelectModel]);
+
   // Escape key handler to close side panel
   useEffect(() => {
     if (!isOpen) return;
@@ -782,7 +834,7 @@ export const SidePanel = React.memo(({
             className="w-[420px] min-w-[420px] max-w-[420px] h-full flex flex-col"
           >
             {/* 1. TOP CONTROLS (Seamless, unified without separate background tone or brand clutter) */}
-            <div className="flex flex-col px-3.5 pt-3 pb-1 shrink-0">
+            <div className="flex flex-col px-3.5 pt-3 pb-1 shrink-0 relative">
               <div className="flex items-center justify-between min-h-[30px]">
                 {/* Left: Brand title & model indicator */}
                 <div className="flex items-center gap-2">
@@ -796,36 +848,171 @@ export const SidePanel = React.memo(({
                       <span>{downloadProgress > 0 ? `${downloadProgress}%` : ''}</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 text-slate-400 dark:text-slate-500">
-                      {isCustomBackend ? customModelBadge : currentModel.name.split('(')[0].trim()}
-                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsModelMenuOpen((prev) => !prev)}
+                      className="flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/5 border border-slate-200/60 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      title={isTr ? 'Model ve Sağlayıcı Değiştir' : 'Switch Model or Provider'}
+                    >
+                      <span className="truncate max-w-[140px]">{displayModelBadge}</span>
+                      <ChevronDown className={`w-3 h-3 transition-transform ${isModelMenuOpen ? 'rotate-180' : ''}`} />
+                    </button>
                   )}
                 </div>
 
-          {/* Right Action Buttons */}
-          <div className="flex items-center gap-1 ml-auto">
-            {messages.length > 0 && !isLoading && (
-              <button
-                type="button"
-                onClick={handleResetChat}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
-                title={isTr ? 'Sohbeti Temizle' : 'Reset Chat'}
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            )}
+                {/* Right Action Buttons */}
+                <div className="flex items-center gap-1 ml-auto">
+                  {messages.length > 0 && !isLoading && (
+                    <button
+                      type="button"
+                      onClick={handleResetChat}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      title={isTr ? 'Sohbeti Temizle' : 'Reset Chat'}
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
-              title={isTr ? 'Kapat' : 'Close'}
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-200/50 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                    title={isTr ? 'Kapat' : 'Close'}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Quick Model & Provider Switcher Popover */}
+              <AnimatePresence>
+                {isModelMenuOpen && (
+                  <motion.div
+                    ref={modelMenuRef}
+                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute top-full left-3.5 right-3.5 mt-1 z-30 bg-white/95 dark:bg-slate-900/98 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-3 select-none"
+                  >
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {isTr ? 'Sağlayıcı & Model Değiştir' : 'Switch Provider & Model'}
+                      </span>
+                      {onOpenSettings && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsModelMenuOpen(false);
+                            onOpenSettings();
+                          }}
+                          className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
+                        >
+                          <Settings className="w-3 h-3" />
+                          {isTr ? 'Tüm Ayarlar' : 'All Settings'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Provider Quick Grid */}
+                    <div className="space-y-1">
+                      <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                        {isTr ? 'Sağlayıcılar' : 'Providers'}
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleQuickSwitchPreset('webgpu')}
+                          className={`px-2 py-1.5 rounded-lg text-left text-xs transition-colors flex items-center gap-2 cursor-pointer ${
+                            aiAgent.getBackend() === 'webgpu'
+                              ? 'bg-blue-600 text-white font-medium'
+                              : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                          }`}
+                        >
+                          <Cpu className="w-3.5 h-3.5 shrink-0" />
+                          <div className="truncate">
+                            <div className="font-medium">WebGPU</div>
+                            <div className="text-[9.5px] opacity-75">{isTr ? 'Cihaz İçi' : 'On-Device'}</div>
+                          </div>
+                        </button>
+
+                        {AI_PROVIDER_PRESETS.filter((p) => ['ollama', 'litellm', 'openrouter', 'groq', 'openai', 'deepseek'].includes(p.id)).map((p) => {
+                          const isSelected = aiAgent.getBackend() === 'custom' && aiAgent.getCustomConfig().preset === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => handleQuickSwitchPreset(p.id)}
+                              className={`px-2 py-1.5 rounded-lg text-left text-xs transition-colors flex items-center gap-2 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white font-medium'
+                                  : 'bg-slate-100 dark:bg-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              <Server className="w-3.5 h-3.5 shrink-0" />
+                              <div className="truncate">
+                                <div className="font-medium">{p.name}</div>
+                                <div className="text-[9.5px] opacity-75">{p.category === 'local' ? 'Local' : 'Cloud'}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Model Quick Switcher */}
+                    {aiAgent.getBackend() === 'webgpu' ? (
+                      <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                          {isTr ? 'WebGPU Modelleri' : 'WebGPU Models'}
+                        </div>
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                          {AVAILABLE_AI_MODELS.map((m) => (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => handleQuickSwitchModel(m.id)}
+                              className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                                selectedModelId === m.id
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                              }`}
+                            >
+                              {m.name.split('(')[0].trim()}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                          {isTr ? 'Popüler Modeller' : 'Popular Models'}
+                        </div>
+                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                          {getProviderPreset(aiAgent.getCustomConfig().preset).popularModels.map((m) => {
+                            const currentModelName = aiAgent.getCustomConfig().model;
+                            return (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => handleQuickSwitchModel(m)}
+                                className={`text-[10px] font-mono px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                                  currentModelName === m
+                                    ? 'bg-blue-600 text-white border-blue-600'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
 
       {/* 2. CHAT MESSAGES BODY */}
       <div
@@ -977,8 +1164,8 @@ export const SidePanel = React.memo(({
               ? (isTr ? 'Bu sayfa veya web hakkında bir soru sorun...' : 'Ask about this page or instruct Nova...')
               : (isTr ? 'Nova Asistan’a bir şey sorun...' : 'Ask Nova Assistant anything...')
           }
-          models={isCustomBackend ? [customModelBadge] : AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
-          selectedModel={isCustomBackend ? customModelBadge : currentModel.name.split('(')[0].trim()}
+          models={isCustomBackend ? [displayModelBadge] : AVAILABLE_AI_MODELS.map((m) => m.name.split('(')[0].trim())}
+          selectedModel={isCustomBackend ? displayModelBadge : currentModel.name.split('(')[0].trim()}
           onModelChange={(modelName) => {
             if (isCustomBackend) return;
             // Prefer stable IDs so a future display-name change can't silently break matching.

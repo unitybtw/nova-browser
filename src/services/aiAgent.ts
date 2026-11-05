@@ -1,5 +1,5 @@
 import type { MLCEngine, InitProgressCallback, ChatCompletionMessageParam, ChatCompletionContentPart } from "@mlc-ai/web-llm";
-import { OpenAICompatibleEngine } from "./openAiCompatibleClient";
+import { OpenAICompatibleEngine, getProviderPreset } from "./openAiCompatibleClient";
 import { aiMemory } from "./aiMemory";
 import { tts } from "./tts";
 import { orchestrator } from "./agentOrchestrator";
@@ -735,14 +735,31 @@ class AIAgent {
     return (localStorage.getItem('nova_ai_backend') as 'webgpu' | 'custom') || 'webgpu';
   }
 
-  public getCustomConfig(): { endpoint: string; model: string; apiKey: string } {
+  public getCustomConfig(): {
+    endpoint: string;
+    model: string;
+    apiKey: string;
+    preset: string;
+    temperature: number;
+    personality: 'balanced' | 'creative' | 'code' | 'concise';
+  } {
     if (typeof localStorage === 'undefined') {
-      return { endpoint: 'http://localhost:4000/v1', model: '', apiKey: '' };
+      return {
+        endpoint: 'http://localhost:11434/v1',
+        model: '',
+        apiKey: '',
+        preset: 'ollama',
+        temperature: 0.2,
+        personality: 'balanced'
+      };
     }
     return {
-      endpoint: localStorage.getItem('nova_ai_custom_endpoint') || 'http://localhost:4000/v1',
+      endpoint: localStorage.getItem('nova_ai_custom_endpoint') || 'http://localhost:11434/v1',
       model: localStorage.getItem('nova_ai_custom_model') || '',
-      apiKey: localStorage.getItem('nova_ai_custom_api_key') || ''
+      apiKey: localStorage.getItem('nova_ai_custom_api_key') || '',
+      preset: localStorage.getItem('nova_ai_provider_preset') || 'ollama',
+      temperature: Number(localStorage.getItem('nova_ai_temperature')) || 0.2,
+      personality: (localStorage.getItem('nova_ai_personality') as any) || 'balanced'
     };
   }
 
@@ -750,13 +767,19 @@ class AIAgent {
     backend: 'webgpu' | 'custom',
     endpoint?: string,
     model?: string,
-    apiKey?: string
+    apiKey?: string,
+    preset?: string,
+    temperature?: number,
+    personality?: 'balanced' | 'creative' | 'code' | 'concise'
   ): Promise<void> {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('nova_ai_backend', backend);
       if (endpoint !== undefined) localStorage.setItem('nova_ai_custom_endpoint', endpoint);
       if (model !== undefined) localStorage.setItem('nova_ai_custom_model', model);
       if (apiKey !== undefined) localStorage.setItem('nova_ai_custom_api_key', apiKey);
+      if (preset !== undefined) localStorage.setItem('nova_ai_provider_preset', preset);
+      if (temperature !== undefined) localStorage.setItem('nova_ai_temperature', String(temperature));
+      if (personality !== undefined) localStorage.setItem('nova_ai_personality', personality);
     }
     await this.unload();
     await this.init();
@@ -764,13 +787,15 @@ class AIAgent {
 
   public getModelDisplayName(): string {
     if (this.getBackend() === 'custom') {
-      const { model, endpoint } = this.getCustomConfig();
-      if (model) return `Custom: ${model}`;
+      const { model, endpoint, preset } = this.getCustomConfig();
+      const presetDef = getProviderPreset(preset);
+      const providerName = presetDef ? presetDef.name : 'Custom';
+      if (model) return `${providerName}: ${model}`;
       try {
         const u = new URL(endpoint);
-        return `Custom (${u.hostname}:${u.port || (u.protocol === 'https:' ? '443' : '80')})`;
+        return `${providerName} (${u.hostname}:${u.port || (u.protocol === 'https:' ? '443' : '80')})`;
       } catch {
-        return 'Custom Endpoint (LiteLLM)';
+        return `${providerName} (Default)`;
       }
     }
     const found = AVAILABLE_AI_MODELS.find(m => m.id === this.modelId);
@@ -1381,7 +1406,18 @@ class AIAgent {
           })
     ).join('\n');
 
+    const { personality } = this.getCustomConfig();
+    let personalityPrompt = '';
+    if (personality === 'creative') {
+      personalityPrompt = '\nSTYLE: Be expressive, creative, witty, and rich in descriptive insights.';
+    } else if (personality === 'code') {
+      personalityPrompt = '\nSTYLE: Act as a Senior Software Engineer. Deliver clean, production-ready code with concise explanations. Avoid filler words.';
+    } else if (personality === 'concise') {
+      personalityPrompt = '\nSTYLE: Be extremely direct and concise. State facts and actions directly with minimal pleasantries.';
+    }
+
     return `You are Nova Browser's AI assistant. You control a real browser and answer questions.
+${personalityPrompt}
 
 TOOLS:
 ${toolLines}
@@ -3543,7 +3579,8 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
    */
   private async generateAgentTurn(
     windowedMessages: ChatCompletionMessageParam[],
-    generation?: number
+    generation?: number,
+    onChunk?: (chunk: string) => void
   ): Promise<{ text: string; constrained: boolean }> {
     const isActive = () => generation === undefined
       ? !this.isInterrupted
@@ -3585,17 +3622,34 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
       return { text: 'Islem durduruldu.', constrained: false };
     }
     await this.yieldToCompositor();
-    const reply = await this.engine!.chat.completions.create({
-      messages: windowedMessages,
-      temperature: 0.1,
-      max_tokens: AGENT_MAX_TOKENS,
-      stream: false
-    });
+    const customCfg = this.getCustomConfig();
+    const isStreaming = typeof onChunk === 'function';
+    let replyText = '';
+
+    if (this.getBackend() === 'custom' && isStreaming) {
+      const customReply = await (this.engine as any).chat.completions.create({
+        messages: windowedMessages,
+        temperature: customCfg.temperature,
+        max_tokens: AGENT_MAX_TOKENS,
+        stream: true,
+        onChunk
+      });
+      replyText = customReply?.choices?.[0]?.message?.content || '';
+    } else {
+      const standardReply = await (this.engine!.chat.completions.create as any)({
+        messages: windowedMessages,
+        temperature: this.getBackend() === 'custom' ? customCfg.temperature : 0.1,
+        max_tokens: AGENT_MAX_TOKENS,
+        stream: false
+      });
+      replyText = standardReply?.choices?.[0]?.message?.content || '';
+    }
+
     await this.yieldToCompositor();
     if (!isActive()) {
       return { text: 'Islem durduruldu.', constrained: false };
     }
-    return { text: reply.choices[0]?.message?.content || '', constrained: false };
+    return { text: replyText, constrained: false };
   }
 
   public async chat(
@@ -3928,7 +3982,7 @@ Output a JSON array of objects with { "selector": "...", "value": "..." } for fi
 
         let turn: { text: string; constrained: boolean };
         try {
-          turn = await this.generateAgentTurn(windowedMessages, generation);
+          turn = await this.generateAgentTurn(windowedMessages, generation, onChunk);
         } catch (e: any) {
           finalAnswer = 'An error occurred. Please try again.';
           this.emitStatus('error', e?.message || String(e));

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {
   normalizeOpenAIEndpoint,
   testOpenAIConnection,
-  OpenAICompatibleEngine
+  OpenAICompatibleEngine,
+  AI_PROVIDER_PRESETS,
+  getProviderPreset
 } from '../src/services/openAiCompatibleClient';
 import { aiAgent } from '../src/services/aiAgent';
 
@@ -140,10 +142,66 @@ async function runLiteLLMTests() {
     assert.equal(replyFormatRetry.choices[0].message.content, '{"status":"ok"}');
     console.log('[PASS] OpenAICompatibleEngine automatically retries without response_format if model rejects it');
 
+    // Subtest 3.3: SSE Streaming token stream
+    const chunks: string[] = [];
+    const streamPayload = [
+      'data: {"choices":[{"delta":{"content":"Nova"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":" AI"}}]}\n\n',
+      'data: {"choices":[{"delta":{"content":" stream"}}]}\n\n',
+      'data: [DONE]\n\n'
+    ].join('');
+
+    globalThis.fetch = async () => {
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        start(controller) {
+          controller.enqueue(encoder.encode(streamPayload));
+          controller.close();
+        }
+      });
+      return new Response(readable, {
+        status: 200,
+        headers: { 'Content-Type': 'text/event-stream' }
+      });
+    };
+
+    const streamResult = await engine.chat.completions.create(
+      {
+        messages: [{ role: 'user', content: 'stream test' }],
+        stream: true
+      },
+      (token) => {
+        chunks.push(token);
+      }
+    );
+
+    assert.deepEqual(chunks, ['Nova', ' AI', ' stream']);
+    assert.equal(streamResult.choices[0].message.content, 'Nova AI stream');
+    console.log('[PASS] OpenAICompatibleEngine parses SSE text/event-stream chunks via ReadableStream');
+
     globalThis.fetch = originalFetch;
   }
 
-  // Test 4: AIAgent Backend Configuration & Model Display
+  // Test 4: Provider Presets and Defaults
+  {
+    assert.ok(AI_PROVIDER_PRESETS.length >= 8);
+    const ollama = getProviderPreset('ollama');
+    assert.equal(ollama.name, 'Ollama');
+    assert.equal(ollama.category, 'local');
+    assert.equal(ollama.defaultEndpoint, 'http://localhost:11434/v1');
+    assert.equal(ollama.requiresApiKey, false);
+
+    const openRouter = getProviderPreset('openrouter');
+    assert.equal(openRouter.name, 'OpenRouter');
+    assert.equal(openRouter.category, 'cloud');
+    assert.equal(openRouter.requiresApiKey, true);
+
+    const fallback = getProviderPreset('non-existent-provider');
+    assert.equal(fallback.id, 'custom');
+    console.log('[PASS] AI_PROVIDER_PRESETS and getProviderPreset behave accurately with fallbacks');
+  }
+
+  // Test 5: AIAgent Backend Configuration & Model Display
   {
     // Mock localStorage
     const storage = new Map<string, string>();
@@ -157,23 +215,38 @@ async function runLiteLLMTests() {
 
     // Configure custom backend
     storage.set('nova_ai_backend', 'custom');
-    storage.set('nova_ai_custom_endpoint', 'http://192.168.1.100:4000/v1');
+    storage.set('nova_ai_provider_preset', 'ollama');
+    storage.set('nova_ai_custom_endpoint', 'http://192.168.1.100:11434/v1');
     storage.set('nova_ai_custom_model', 'qwen2.5-coder:32b');
+    storage.set('nova_ai_temperature', '0.2');
+    storage.set('nova_ai_personality', 'code');
 
     assert.equal(aiAgent.getBackend(), 'custom');
     const customCfg = aiAgent.getCustomConfig();
-    assert.equal(customCfg.endpoint, 'http://192.168.1.100:4000/v1');
+    assert.equal(customCfg.endpoint, 'http://192.168.1.100:11434/v1');
     assert.equal(customCfg.model, 'qwen2.5-coder:32b');
-    assert.equal(aiAgent.getModelDisplayName(), 'Custom: qwen2.5-coder:32b');
+    assert.equal(customCfg.temperature, 0.2);
+    assert.equal(customCfg.personality, 'code');
+    assert.equal(aiAgent.getModelDisplayName(), 'Ollama: qwen2.5-coder:32b');
+
+    // Switch to OpenRouter preset
+    storage.set('nova_ai_provider_preset', 'openrouter');
+    storage.set('nova_ai_custom_model', 'anthropic/claude-3.5-sonnet');
+    assert.equal(aiAgent.getModelDisplayName(), 'OpenRouter: anthropic/claude-3.5-sonnet');
+
+    // Custom fallback
+    storage.set('nova_ai_provider_preset', 'custom');
+    assert.equal(aiAgent.getModelDisplayName(), 'Custom Endpoint: anthropic/claude-3.5-sonnet');
 
     // Vision support heuristic for custom models
+    storage.set('nova_ai_custom_model', 'qwen2.5-coder:32b');
     assert.equal(aiAgent.currentModelSupportsVision(), false); // coder model
     storage.set('nova_ai_custom_model', 'gpt-4o-mini');
     assert.equal(aiAgent.currentModelSupportsVision(), true); // 4o is vision
     storage.set('nova_ai_custom_model', 'llama-3.2-11b-vision-instruct');
     assert.equal(aiAgent.currentModelSupportsVision(), true); // vision keyword
 
-    console.log('[PASS] AIAgent methods support custom backend configuration, vision detection and display naming');
+    console.log('[PASS] AIAgent methods support custom backend configuration, personality, presets, vision detection and display naming');
   }
 
   console.log('ALL LITELLM / OPENAI-COMPATIBLE BACKEND TESTS PASSED CLEANLY.');
