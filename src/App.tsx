@@ -679,6 +679,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     pushClosedTabs,
     recordVisit,
     setIsExtensionsOpen,
+    settingsRef,
   });
 
   const handleNewTabRef = useRef(handleNewTab);

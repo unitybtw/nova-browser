@@ -4,6 +4,7 @@ import { UserSettings } from '../../types/browser';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from './UpdateWidget';
+import { ToggleSwitch } from './ToggleSwitch';
 
 export interface GeneralSectionProps {
   settings: UserSettings;
@@ -135,6 +136,27 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
               </button>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Media & Browsing Experience</h2>
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-5 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Automatic Picture-in-Picture (Auto-PiP)</span>
+              <span className="px-2 py-0.5 text-[10px] font-medium bg-blue-500/10 text-blue-600 dark:text-blue-400 rounded-md border border-blue-500/20">Video</span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-md">
+              Automatically pops out playing videos into a floating Picture-in-Picture window when switching away from a tab, and restores them when returning.
+            </p>
+          </div>
+          <ToggleSwitch
+            ariaLabel="Toggle automatic picture-in-picture"
+            checked={settings.autoPictureInPicture ?? true}
+            onToggle={() => onUpdateSettings({ autoPictureInPicture: !(settings.autoPictureInPicture ?? true) })}
+            activeColorClass="bg-blue-600"
+          />
         </div>
       </section>
 

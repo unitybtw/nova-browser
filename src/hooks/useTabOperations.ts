@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction, type MutableRefObject } from 'react';
-import type { Tab } from '../types/browser';
+import type { Tab, UserSettings } from '../types/browser';
 import { generateId } from '../utils/idGenerator';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { reorderTabsWithinGroup } from '../utils/verticalTabs';
@@ -49,6 +49,7 @@ export interface UseTabOperationsOptions {
   pushClosedTabs: (tabs: Tab[]) => void;
   recordVisit: (tab: Tab, updates: Partial<Tab>) => void;
   setIsExtensionsOpen: (open: boolean) => void;
+  settingsRef?: MutableRefObject<UserSettings>;
 }
 
 export function useTabOperations({
@@ -64,7 +65,59 @@ export function useTabOperations({
   pushClosedTabs,
   recordVisit,
   setIsExtensionsOpen,
+  settingsRef,
 }: UseTabOperationsOptions) {
+  // Trigger Auto-PiP on previous tab if a video is playing, and exit PiP when returning
+  const handleAutoPipTransition = useCallback((prevTabId: string, newTabId: string) => {
+    if (!prevTabId || prevTabId === newTabId) return;
+    const isAutoPipEnabled = settingsRef?.current?.autoPictureInPicture ?? true;
+    if (!isAutoPipEnabled) return;
+
+    // 1. Pop out playing video in prevTabId if not already in PiP
+    const prevWebview = document.querySelector(`webview[data-tab-id="${prevTabId}"]`) as any;
+    if (prevWebview && typeof prevWebview.executeJavaScript === 'function') {
+      prevWebview.executeJavaScript(`
+        (() => {
+          try {
+            function findPlayingVideo() {
+              let vids = Array.from(document.querySelectorAll('video'));
+              const allEls = document.querySelectorAll('*');
+              for (let i = 0; i < allEls.length; i++) {
+                const sr = allEls[i].shadowRoot;
+                if (sr) {
+                  const shadowVids = sr.querySelectorAll('video');
+                  if (shadowVids.length) vids.push(...Array.from(shadowVids));
+                }
+              }
+              return vids.find(v => !v.paused && !v.ended && v.readyState >= 2 && v.currentTime > 0);
+            }
+            const activeVid = findPlayingVideo();
+            if (activeVid && !document.pictureInPictureElement) {
+              activeVid.requestPictureInPicture().then(() => {
+                window.__novaAutoPipActive = true;
+              }).catch(() => {});
+            }
+          } catch (_) {}
+        })();
+      `, true).catch(() => {});
+    }
+
+    // 2. Exit PiP when returning to newTabId if video is currently in PiP
+    const newWebview = document.querySelector(`webview[data-tab-id="${newTabId}"]`) as any;
+    if (newWebview && typeof newWebview.executeJavaScript === 'function') {
+      newWebview.executeJavaScript(`
+        (() => {
+          try {
+            if (document.pictureInPictureElement) {
+              document.exitPictureInPicture().catch(() => {});
+              window.__novaAutoPipActive = false;
+            }
+          } catch (_) {}
+        })();
+      `, true).catch(() => {});
+    }
+  }, [settingsRef]);
+
   // THE single activation primitive. Any path that puts a tab in front (select,
   // close/promote-neighbour, close-other-tabs, close-to-right, duplicate, new
   // tab, navigate, reopen) must route through this, because BrowserView renders
@@ -77,6 +130,10 @@ export function useTabOperations({
   // computed from a snapshot (`setTabs(toKeep)`), call activateTab AFTER it so
   // the wake lands on the surviving list.
   const activateTab = useCallback((id: string) => {
+    const prevId = activeTabIdRef.current;
+    if (prevId && prevId !== id) {
+      handleAutoPipTransition(prevId, id);
+    }
     setActiveTabId(id);
     setTabs(prev => {
       const cur = prev.find(t => t.id === id);
@@ -85,7 +142,7 @@ export function useTabOperations({
       }
       return prev.map(t => t.id === id ? { ...t, isSuspended: false, lastAccessed: Date.now() } : t);
     });
-  }, [setActiveTabId, setTabs, activeTabIdRef]);
+  }, [setActiveTabId, setTabs, activeTabIdRef, handleAutoPipTransition]);
 
   // Select/focus tab & reset hibernation timer
   const handleSelectTab = useCallback((id: string) => {
@@ -707,7 +764,15 @@ export function useTabOperations({
     if (webview && webview.executeJavaScript) {
       webview.executeJavaScript(`
         (() => {
-          const videos = Array.from(document.querySelectorAll('video'));
+          let videos = Array.from(document.querySelectorAll('video'));
+          const allEls = document.querySelectorAll('*');
+          for (let i = 0; i < allEls.length; i++) {
+            const sr = allEls[i].shadowRoot;
+            if (sr) {
+              const shadowVids = sr.querySelectorAll('video');
+              if (shadowVids.length) videos.push(...Array.from(shadowVids));
+            }
+          }
           const target = videos.find(v => !v.paused) || videos[0];
           if (!target) {
             throw new Error("No video found on page!");

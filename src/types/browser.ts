@@ -140,6 +140,7 @@ export interface UserSettings {
   preloadDnsEnabled?: boolean;
   smoothScrollingEnabled?: boolean;
   passwordManagerEnabled?: boolean;
+  autoPictureInPicture?: boolean;
   defaultTranslationLanguage?: string;
   language?: 'en' | 'tr' | 'ar' | 'de';
 }
@@ -176,6 +177,7 @@ export const defaultSettings: UserSettings = {
   preloadDnsEnabled: true,
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
+  autoPictureInPicture: true,
   aiProvider: 'webgpu',
   aiProviderPreset: 'ollama',
   aiCustomEndpoint: 'http://localhost:11434/v1',
