@@ -80,7 +80,7 @@ export const AdBlockerPopover: React.FC<AdBlockerPopoverProps> = ({
       initial={{ opacity: 0, y: -6, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.96 }}
-      transition={{ duration: 0.15, ease: 'easeOut' }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       className={`${containerPositionClass} bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200/80 dark:border-white/10 z-50 overflow-hidden select-none`}
     >
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 dark:border-white/10 bg-slate-50 dark:bg-slate-800/50">

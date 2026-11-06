@@ -160,10 +160,10 @@ export const TabContextMenu: React.FC<TabContextMenuProps> = React.memo(({
           aria-label="Tab options"
           aria-orientation="vertical"
           tabIndex={-1}
-          initial={{ opacity: 0, scale: 0.95, y: -4 }}
+          initial={{ opacity: 0, scale: 0.96, y: -4 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95 }}
-          transition={{ duration: 0.12, ease: 'easeOut' }}
+          exit={{ opacity: 0, scale: 0.96 }}
+          transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
           style={{ top: `${adjustedY}px`, left: `${adjustedX}px` }}
           className="fixed z-[99999] w-58 max-h-[calc(100vh-20px)] overflow-y-auto bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl p-1.5 flex flex-col gap-0.5 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default font-medium outline-none"
         >

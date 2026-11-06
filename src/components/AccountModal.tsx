@@ -189,10 +189,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             ref={containerRef}
             onClick={(e) => e.stopPropagation()}
             tabIndex={-1}
-            initial={{ opacity: 0, scale: 0.95, y: 15 }}
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}
             className="w-full max-w-lg bg-white dark:bg-slate-900 rounded-2xl shadow-xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
           >
             {/* Modal Header */}

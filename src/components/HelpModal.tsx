@@ -156,8 +156,8 @@ export const HelpModal: React.FC<HelpModalProps> = React.memo(({
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 12 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96, y: 12 }}
-            transition={{ type: 'spring', damping: 28, stiffness: 400 }}
+            exit={{ opacity: 0, scale: 0.96, y: 8 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 380, mass: 0.8 }}
             ref={containerRef}
             onClick={(e) => e.stopPropagation()}
             className="bg-white dark:bg-[#11141d] border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl h-[600px] flex flex-col overflow-hidden outline-none"

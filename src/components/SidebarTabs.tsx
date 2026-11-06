@@ -298,7 +298,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
       initial={false}
       animate={{ opacity: 1 }}
       exit={splitTab ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, height: 0, paddingTop: 0, paddingBottom: 0, marginTop: 0 }}
-      transition={{ duration: 0.15, ease: [0.2, 0, 0, 1] }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       key={tab.id}
       onClick={(e) => { if (isFromNestedControl(e)) return; onSelectTab(tab.id); }}
       onKeyDown={(e) => {
@@ -1187,7 +1187,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 initial={{ opacity: 0, y: -4, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -4, scale: 0.98 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute top-11 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 {suggestions.map((s, idx) => (
@@ -1329,7 +1329,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 initial={{ opacity: 0, y: -6, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -6, scale: 0.96 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute top-9 left-3 right-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1"
               >
                 <div className="max-h-48 overflow-y-auto no-scrollbar py-1">
@@ -1504,7 +1504,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                         className="relative"
                       >
                         <div className="flex flex-col gap-0.5 pb-1">
@@ -1556,7 +1556,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 initial={{ opacity: 0, y: 10, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
-                transition={{ duration: 0.15 }}
+                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute bottom-12 left-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
               >
                 {onToggleAIAssistant && (

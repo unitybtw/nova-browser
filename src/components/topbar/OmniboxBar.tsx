@@ -449,7 +449,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               blurTimerRef.current = setTimeout(() => setShowSuggestions(false), 200);
             }}
             placeholder={isAIMode ? t('nav.aiPlaceholder') : t('nav.searchPlaceholder', { engine: getSearchEngineName(searchEngine) })}
-            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-colors duration-300 shadow-2xs ${
+            className={`w-full border border-slate-200/60 dark:border-white/10 focus:border-cyan-500 dark:focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500/20 focus:shadow-[0_0_0_3px_rgba(6,182,212,0.12)] rounded-xl py-1.5 pr-24 text-[13px] outline-none transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] shadow-2xs ${
               relevantPermissionRequests.length > 0
                 ? isIncognito ? 'pl-52' : 'pl-34'
                 : isIncognito ? 'pl-28' : 'pl-11'
@@ -564,10 +564,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
         <AnimatePresence>
           {showSuggestions && searchValue.trim().length > 0 && (
             <motion.div
-                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                initial={{ opacity: 0, y: -6, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: 'easeOut' }}
+                exit={{ opacity: 0, y: -4, scale: 0.98 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                 className={`absolute left-0 right-0 top-full mt-2 rounded-xl shadow-xl py-1.5 z-50 overflow-hidden divide-y ${isIncognito ? 'bg-slate-800 border border-slate-700 divide-slate-700' : 'bg-white border border-slate-200/80 divide-slate-100 dark:bg-slate-900 dark:border-white/10 dark:divide-white/5'}`}
                 onMouseDown={(e) => e.preventDefault()}
               >

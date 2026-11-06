@@ -115,10 +115,10 @@ export const TabHoverPreview: React.FC<TabHoverPreviewProps> = React.memo(({
       {visible && (
         <motion.div
           key={`tab-preview-${tab.id}`}
-          initial={{ opacity: 0, y: position === 'bottom' ? -8 : 0, x: position === 'right' ? -8 : 0, scale: 0.95 }}
+          initial={{ opacity: 0, y: position === 'bottom' ? -8 : 0, x: position === 'right' ? -8 : 0, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
-          exit={{ opacity: 0, y: position === 'bottom' ? -4 : 0, scale: 0.95 }}
-          transition={{ duration: 0.12, ease: 'easeOut' }}
+          exit={{ opacity: 0, y: position === 'bottom' ? -4 : 0, scale: 0.96 }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           className="pointer-events-none fixed z-[999999] rounded-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl border border-slate-200/90 dark:border-white/15 shadow-2xl shadow-black/30 overflow-hidden select-none flex flex-col"
           style={{
             top,

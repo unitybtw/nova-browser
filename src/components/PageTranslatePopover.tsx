@@ -59,7 +59,7 @@ export const PageTranslatePopover: React.FC<PageTranslatePopoverProps> = ({
           initial={{ opacity: 0, y: -6, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.96 }}
-          transition={{ duration: 0.14, ease: 'easeOut' }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           className="absolute top-full right-0 mt-2.5 w-80 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-white/15 shadow-xl select-none overflow-hidden z-[99999]"
         >
           {/* Header */}

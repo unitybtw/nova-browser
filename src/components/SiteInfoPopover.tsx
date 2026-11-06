@@ -142,7 +142,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
           initial={{ opacity: 0, y: -6, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -6, scale: 0.96 }}
-          transition={{ duration: 0.15, ease: 'easeOut' }}
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
           className="absolute top-11 left-2 z-[99999] w-80 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-white/10 rounded-xl shadow-xl p-4 text-xs text-slate-700 dark:text-slate-200 select-none cursor-default"
         >
         {/* Header */}

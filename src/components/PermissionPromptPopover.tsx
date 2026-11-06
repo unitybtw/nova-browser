@@ -170,10 +170,10 @@ export const PermissionPromptPopover: React.FC<PermissionPromptPopoverProps> = (
         role="dialog"
         aria-modal="true"
         aria-label={details.title}
-        initial={{ opacity: 0, y: -8, scale: 0.95 }}
+        initial={{ opacity: 0, y: -6, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -8, scale: 0.95 }}
-        transition={{ duration: 0.18, ease: 'easeOut' }}
+        exit={{ opacity: 0, y: -6, scale: 0.96 }}
+        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
         className="absolute top-11 left-2 z-[999999] w-88 bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/80 rounded-2xl shadow-2xl p-4 text-slate-800 dark:text-slate-100 select-none cursor-default"
         style={{
           boxShadow: '0 20px 45px -10px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05)'

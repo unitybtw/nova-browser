@@ -167,7 +167,10 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
   copiedIdx,
 }: ChatMessageItemProps) {
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 6, scale: 0.99 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
       className={`flex flex-col gap-1.5 w-full ${isUser ? 'items-end' : 'items-start'} group`}
     >
       {/* Sender Tag */}
@@ -291,7 +294,7 @@ const ChatMessageItem = React.memo(function ChatMessageItem({
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 });
 
@@ -892,7 +895,7 @@ export const SidePanel = React.memo(({
                     initial={{ opacity: 0, y: -6, scale: 0.98 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
+                    transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                     className="absolute top-full left-3.5 right-3.5 mt-1 z-30 bg-white/95 dark:bg-slate-900/98 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-2xl shadow-2xl p-3.5 space-y-3 select-none"
                   >
                     <div className="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
@@ -1114,7 +1117,12 @@ export const SidePanel = React.memo(({
 
         {/* Live Streaming Message Bubble */}
         {isLoading && (
-          <div className="flex flex-col gap-1.5 w-full items-start">
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col gap-1.5 w-full items-start"
+          >
             <div className="flex items-center gap-1.5 px-1 text-[11px] text-cyan-600 dark:text-cyan-400 font-semibold">
               <NovaAssistantIcon size={12} active />
               <span>Nova Assistant</span>
@@ -1137,7 +1145,7 @@ export const SidePanel = React.memo(({
                 </div>
               )}
             </div>
-          </div>
+          </motion.div>
         )}
 
         <div ref={messagesEndRef} />

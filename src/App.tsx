@@ -1412,7 +1412,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   if (showOnboarding) {
     return (
-      <MotionConfig reducedMotion="user">
+      <MotionConfig reducedMotion="user" transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
         <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
           <Onboarding
             onComplete={handleOnboardingComplete}
@@ -1423,7 +1423,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   }
 
   return (
-    <MotionConfig reducedMotion="user">
+    <MotionConfig reducedMotion="user" transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
       <div
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${

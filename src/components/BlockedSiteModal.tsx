@@ -46,10 +46,10 @@ export const BlockedSiteModal: React.FC<BlockedSiteModalProps> = ({ alert, onClo
       >
         <motion.div
           ref={modalRef}
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
+          exit={{ opacity: 0, scale: 0.96, y: 8 }}
+          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-lg bg-zinc-900 border border-red-500/40 rounded-xl shadow-2xl overflow-hidden text-zinc-100 p-6"
         >
           {/* Header */}

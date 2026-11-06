@@ -54,10 +54,10 @@ const PermissionReviewDialog: React.FC<PermissionReviewDialogProps> = ({
   return (
     <motion.div
       onClick={(e) => e.stopPropagation()}
-      initial={{ opacity: 0, scale: 0.95, y: 15 }}
+      initial={{ opacity: 0, scale: 0.96, y: 12 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95, y: 10 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      exit={{ opacity: 0, scale: 0.96, y: 8 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}
       className="w-full max-w-lg bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
     >
       <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-amber-50/80 dark:bg-amber-900/30 backdrop-blur-md">
@@ -221,10 +221,10 @@ export const ExtensionsModal: React.FC<ExtensionsModalProps> = ({
               aria-label="Extensions"
               onClick={(e) => e.stopPropagation()}
               tabIndex={-1}
-              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}
               className="w-full max-w-md bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-slate-200/80 dark:border-white/10 overflow-hidden flex flex-col outline-none"
             >
             <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex justify-between items-center bg-slate-50/80 dark:bg-slate-800/50 backdrop-blur-md">

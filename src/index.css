@@ -307,16 +307,57 @@ h1, h2, h3, h4, h5, h6, .font-serif {
 }
 
 .animate-float {
-  animation: float-up 0.2s ease-out forwards;
+  animation: float-up 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Nova Smooth Spring & Motion Tokens */
+:root {
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-smooth: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.nova-spring-transition {
+  transition: all 0.24s var(--ease-spring);
+}
+
+.nova-smooth-hover {
+  transition: transform 0.2s var(--ease-spring), opacity 0.2s var(--ease-spring), background-color 0.15s ease-out;
+  transform: translateZ(0);
+}
+.nova-smooth-hover:hover {
+  transform: translateY(-1px) scale(1.02);
+}
+.nova-smooth-hover:active {
+  transform: translateY(0) scale(0.97);
+}
+
+/* Popover & Modal Hardware Accelerated Spring Animation */
+@keyframes nova-popover-spring {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.nova-popover-enter {
+  animation: nova-popover-spring 0.22s var(--ease-spring) forwards;
+  transform-origin: top center;
+  transform: translateZ(0);
 }
 
 /* Premium Interactive Globals - global transition removed to eliminate window resize & split-resizer layout thrashing */
 button:active:not(:disabled) {
   transform: scale(0.96);
+  transition: transform 0.1s var(--ease-spring);
 }
 
 .premium-card {
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: all 0.3s var(--ease-spring);
 }
 .premium-card:hover {
   transform: translateY(-2px);
