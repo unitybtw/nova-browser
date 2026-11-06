@@ -174,12 +174,15 @@ const DOM_SCAN_SCRIPT = `(() => {
   const items = visibleEls.map(el => {
     const aiId = currentId++;
     el.setAttribute('data-ai-id', aiId.toString());
-    let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || el.value || '';
+    const tag = el.tagName.toLowerCase();
+    const type = (el.getAttribute('type') || '').toLowerCase();
+    // Security: never capture entered passwords or sensitive credentials into AI text
+    let text = el.innerText?.trim() || el.getAttribute('aria-label') || el.title || el.placeholder || '';
+    if (tag === 'input' && type !== 'password' && type !== 'hidden') {
+      text = text || el.value || '';
+    }
     text = text.replace(/\\s+/g, ' ');
     if (text.length > 50) text = text.substring(0, 50) + '...';
-
-    const tag = el.tagName.toLowerCase();
-    const type = el.getAttribute('type');
 
     return {
       ai_id: aiId.toString(),
@@ -3094,6 +3097,13 @@ CRITICAL RULES:
             el = document.querySelector('[data-ai-id="' + (window.CSS && CSS.escape ? CSS.escape(${safeAiId}) : ${safeAiId}) + '"]');
           } catch (_) {}
           if (!el) return { error: 'Input not found for ID: ' + ${safeAiId} };
+
+          // Security: Block typing into password and sensitive payment fields
+          const inputType = ((el as any).type || '').toLowerCase();
+          const autocomplete = (el.getAttribute('autocomplete') || '').toLowerCase();
+          if (inputType === 'password' || autocomplete === 'current-password' || autocomplete === 'new-password' || autocomplete.startsWith('cc-')) {
+            return { error: 'Security restriction: AI Agent is blocked from typing into password or payment credential fields.' };
+          }
 
           el.scrollIntoView({ behavior: 'smooth', block: 'center' });
           await new Promise(r => setTimeout(r, 400));

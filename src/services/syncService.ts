@@ -702,7 +702,7 @@ export function mergeSyncedCollections(
     workspaces: prefs.syncWorkspaces && remote?.workspaces
       ? mergeSyncedCollection(
           local.workspaces,
-          remote.workspaces.filter(w => isTombstonedRow(w) || (typeof w?.id === 'string' && typeof w?.name === 'string')),
+          remote.workspaces.filter(w => isTombstonedRow(w) || (typeof w?.id === 'string' && typeof w?.name === 'string' && typeof w?.color === 'string' && w.id !== '__proto__' && w.id !== 'constructor' && w.id !== 'prototype')),
           syncedCollectionMergeOptions('workspaces', now)
         )
       : purgeExpiredTombstones(local.workspaces, now),

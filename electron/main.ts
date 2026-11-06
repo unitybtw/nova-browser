@@ -3407,6 +3407,14 @@ export function isSafeSubframeNavigation(url: string): boolean {
 app.on('web-contents-created', (_event, contents) => {
   // Security: Force secure webPreferences for any <webview> tags
   contents.on('will-attach-webview', (event, webPreferences, params) => {
+    // Only the trusted main window is authorized to attach <webview> tags.
+    // Untrusted guest webviews, popups, or external frames attempting to attach nested webviews are denied.
+    if (!mainWindow || mainWindow.isDestroyed() || contents !== mainWindow.webContents) {
+      console.warn('[Security] Prevented unauthorized WebContents from attaching a webview');
+      event.preventDefault();
+      return;
+    }
+
     // Force entirely secure environment for webviews
     webPreferences.nodeIntegration = false;
     webPreferences.nodeIntegrationInWorker = false;
