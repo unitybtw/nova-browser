@@ -999,6 +999,8 @@ function hasUpgradedUrl(url: string): boolean {
   return true;
 }
 
+let globalCheckForUpdates: (() => Promise<any>) | null = null;
+
 function setupApplicationMenu() {
   const isMac = process.platform === 'darwin';
 
@@ -1033,7 +1035,11 @@ function setupApplicationMenu() {
         {
           label: 'Check for Updates...',
           click: () => {
-            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            if (globalCheckForUpdates) {
+              globalCheckForUpdates().catch(() => {});
+            } else {
+              autoUpdater.checkForUpdates().catch(() => {});
+            }
             sendToMainWindow('shortcut', 'check-updates');
           }
         },
@@ -1319,7 +1325,11 @@ function setupApplicationMenu() {
         {
           label: 'Check for Updates...',
           click: () => {
-            autoUpdater.checkForUpdatesAndNotify().catch(() => {});
+            if (globalCheckForUpdates) {
+              globalCheckForUpdates().catch(() => {});
+            } else {
+              autoUpdater.checkForUpdates().catch(() => {});
+            }
             sendToMainWindow('shortcut', 'check-updates');
           }
         },
@@ -2282,7 +2292,7 @@ app.whenReady().then(async () => {
   autoUpdater.autoDownload = false;
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;
   let isUpdateDownloaded = false;
   let latestReleaseDownloadInfo: {
     version: string;
@@ -2714,6 +2724,7 @@ fi
     inFlight.then(release, release);
     return inFlight;
   }
+  globalCheckForUpdates = checkForUpdatesInternal;
 
   /**
    * Performs one update check. Callers should go through
@@ -2761,7 +2772,7 @@ fi
           return { success: true, version: app.getVersion(), isAvailable: false };
         }
       }
-      const result = await autoUpdater.checkForUpdatesAndNotify();
+      const result = await autoUpdater.checkForUpdates();
       if (result?.updateInfo?.version && isNewerVersion(result.updateInfo.version, app.getVersion())) {
         return { success: true, version: result.updateInfo.version, isAvailable: true };
       } else {
@@ -2893,6 +2904,156 @@ fi
     }
   });
 
+  async function downloadFileWithProgress(
+    url: string,
+    destPath: string,
+    expectedSha256?: string,
+    onProgress?: (progress: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void
+  ): Promise<{ success: boolean; error?: string; filePath?: string; hashVerified: boolean }> {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'https:') {
+      return { success: false, error: 'Insecure download URL: must use HTTPS', hashVerified: false };
+    }
+
+    const tempDest = `${destPath}.download_${Date.now()}`;
+    const fileStream = fs.createWriteStream(tempDest);
+    const hash = crypto.createHash('sha256');
+
+    return new Promise((resolve) => {
+      let lastTime = Date.now();
+      let lastBytes = 0;
+      let transferred = 0;
+      let total = 0;
+      let speed = 0;
+
+      const followRedirectAndDownload = (currentUrl: string, maxRedirects = 6) => {
+        if (maxRedirects <= 0) {
+          fileStream.close();
+          try { fs.unlinkSync(tempDest); } catch (_) {}
+          resolve({ success: false, error: 'Too many redirects', hashVerified: false });
+          return;
+        }
+
+        let parsedCur: URL;
+        try {
+          parsedCur = new URL(currentUrl);
+        } catch (_) {
+          fileStream.close();
+          try { fs.unlinkSync(tempDest); } catch (_) {}
+          resolve({ success: false, error: 'Malformed redirect URL', hashVerified: false });
+          return;
+        }
+
+        const isTrustedHost = parsedCur.hostname === 'github.com' ||
+                              parsedCur.hostname === 'www.github.com' ||
+                              parsedCur.hostname === 'objects.githubusercontent.com' ||
+                              parsedCur.hostname.endsWith('.githubusercontent.com') ||
+                              parsedCur.hostname.endsWith('.amazonaws.com');
+
+        if (!isTrustedHost || parsedCur.protocol !== 'https:') {
+          fileStream.close();
+          try { fs.unlinkSync(tempDest); } catch (_) {}
+          resolve({ success: false, error: `Untrusted download redirect host: ${parsedCur.hostname}`, hashVerified: false });
+          return;
+        }
+
+        const req = https.get(currentUrl, {
+          headers: {
+            'User-Agent': getStandardUserAgent(),
+            'Accept': 'application/octet-stream, */*'
+          }
+        }, (res) => {
+          if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            res.resume();
+            const nextUrl = new URL(res.headers.location, currentUrl).href;
+            followRedirectAndDownload(nextUrl, maxRedirects - 1);
+            return;
+          }
+
+          if (res.statusCode !== 200) {
+            fileStream.close();
+            try { fs.unlinkSync(tempDest); } catch (_) {}
+            resolve({ success: false, error: `HTTP ${res.statusCode}: ${res.statusMessage}`, hashVerified: false });
+            return;
+          }
+
+          const parsedTotal = parseInt(res.headers['content-length'] || '0', 10);
+          if (parsedTotal > 0) total = parsedTotal;
+
+          res.on('data', (chunk: Buffer) => {
+            transferred += chunk.length;
+            hash.update(chunk);
+
+            const now = Date.now();
+            const elapsed = (now - lastTime) / 1000;
+            if (elapsed >= 0.25) {
+              speed = Math.round((transferred - lastBytes) / elapsed);
+              lastTime = now;
+              lastBytes = transferred;
+              const percent = total > 0 ? Math.min(100, Math.round((transferred / total) * 100)) : 0;
+              onProgress?.({ percent, bytesPerSecond: speed, transferred, total });
+            }
+          });
+
+          res.pipe(fileStream);
+
+          res.on('error', (err) => {
+            fileStream.close();
+            try { fs.unlinkSync(tempDest); } catch (_) {}
+            resolve({ success: false, error: err.message, hashVerified: false });
+          });
+        });
+
+        req.on('error', (err) => {
+          fileStream.close();
+          try { fs.unlinkSync(tempDest); } catch (_) {}
+          resolve({ success: false, error: err.message, hashVerified: false });
+        });
+
+        req.setTimeout(45000, () => {
+          req.destroy();
+          fileStream.close();
+          try { fs.unlinkSync(tempDest); } catch (_) {}
+          resolve({ success: false, error: 'Download connection timed out', hashVerified: false });
+        });
+      };
+
+      fileStream.on('finish', () => {
+        fileStream.close(async () => {
+          const actualSha = hash.digest('hex').toLowerCase();
+          let hashVerified = false;
+
+          if (expectedSha256) {
+            if (actualSha !== expectedSha256.toLowerCase()) {
+              try { fs.unlinkSync(tempDest); } catch (_) {}
+              console.error(`[Updater] Checksum mismatch! Expected ${expectedSha256}, got ${actualSha}`);
+              resolve({ success: false, error: 'Update checksum mismatch', hashVerified: false });
+              return;
+            }
+            hashVerified = true;
+          }
+
+          try {
+            if (fs.existsSync(destPath)) {
+              try { fs.unlinkSync(destPath); } catch (_) {}
+            }
+            fs.renameSync(tempDest, destPath);
+            resolve({ success: true, filePath: destPath, hashVerified });
+          } catch (renameErr: any) {
+            resolve({ success: false, error: renameErr?.message || 'Failed to save downloaded package', hashVerified: false });
+          }
+        });
+      });
+
+      fileStream.on('error', (err) => {
+        try { fs.unlinkSync(tempDest); } catch (_) {}
+        resolve({ success: false, error: err.message, hashVerified: false });
+      });
+
+      followRedirectAndDownload(url);
+    });
+  }
+
   async function runUpdateDownload(customUrl?: string) {
     let targetUrl = (typeof customUrl === 'string' && customUrl.trim()) ? customUrl.trim() : latestReleaseDownloadInfo?.downloadUrl;
     let targetVersion = latestReleaseDownloadInfo?.version || '';
@@ -2964,22 +3125,77 @@ fi
     const downloadedReleaseNotes = latestReleaseDownloadInfo?.releaseNotes || '';
     const downloadedReleaseName = latestReleaseDownloadInfo?.releaseName || `v${targetVersion}`;
 
-    // Attempt official autoUpdater download engine first
-    try {
-      if (autoUpdater && typeof (autoUpdater as any).downloadUpdate === 'function') {
-        const dlPromise = (autoUpdater as any).downloadUpdate();
-        if (dlPromise && typeof dlPromise.then === 'function') {
-          await dlPromise;
+    // 1. Attempt official autoUpdater download engine first if on packaged Windows NSIS
+    if (app.isPackaged && process.platform === 'win32' && !process.env.PORTABLE_EXECUTABLE_DIR) {
+      try {
+        if (autoUpdater && typeof (autoUpdater as any).downloadUpdate === 'function') {
+          const dlPromise = (autoUpdater as any).downloadUpdate();
+          if (dlPromise && typeof dlPromise.then === 'function') {
+            await dlPromise;
+            return {
+              success: true,
+              version: targetVersion,
+              releaseNotes: downloadedReleaseNotes,
+              releaseName: downloadedReleaseName
+            };
+          }
+        }
+      } catch (updaterErr: any) {
+        console.warn('[Updater] electron-updater download failed, falling back to direct stream download:', updaterErr?.message || updaterErr);
+      }
+    }
+
+    // 2. Direct in-app streaming download for macOS, Linux, Windows portable, and manual packages
+    const isDirectAsset = targetUrl.endsWith('.dmg') || targetUrl.endsWith('.zip') || targetUrl.endsWith('.exe') || targetUrl.endsWith('.AppImage') || targetUrl.endsWith('.deb');
+    if (isDirectAsset || assetName) {
+      try {
+        const resolvedAssetName = assetName || path.basename(new URL(targetUrl).pathname) || `Nova-Update-${targetVersion}`;
+        const tempUpdatesDir = path.join(app.getPath('temp'), 'nova_updates');
+        fs.mkdirSync(tempUpdatesDir, { recursive: true, mode: 0o700 });
+        if (process.platform !== 'win32') {
+          try { fs.chmodSync(tempUpdatesDir, 0o700); } catch (_) {}
+        }
+        const destPath = path.join(tempUpdatesDir, resolvedAssetName);
+
+        sendToMainWindow('update-download-progress', {
+          percent: 0,
+          bytesPerSecond: 0,
+          transferred: 0,
+          total: 0
+        });
+
+        const dlResult = await downloadFileWithProgress(targetUrl, destPath, targetExpectedSha, (p) => {
+          sendToMainWindow('update-download-progress', p);
+        });
+
+        if (dlResult.success && dlResult.filePath) {
+          downloadedUpdateFilePath = dlResult.filePath;
+          isUpdateDownloaded = true;
+          sendToMainWindow('update-downloaded', {
+            version: targetVersion,
+            filePath: dlResult.filePath,
+            integrityVerified: dlResult.hashVerified,
+            releaseNotes: downloadedReleaseNotes,
+            releaseName: downloadedReleaseName
+          });
           return {
             success: true,
             version: targetVersion,
+            filePath: dlResult.filePath,
             releaseNotes: downloadedReleaseNotes,
             releaseName: downloadedReleaseName
           };
+        } else {
+          const err = dlResult.error || 'Download failed';
+          console.error('[Updater] Direct stream download failed:', err);
+          sendToMainWindow('update-error', { message: err });
+          return { success: false, error: err };
         }
+      } catch (streamErr: any) {
+        console.error('[Updater] Error during direct download:', streamErr);
+        sendToMainWindow('update-error', { message: streamErr?.message || 'Download error' });
+        return { success: false, error: streamErr?.message || 'Download error' };
       }
-    } catch (updaterErr: any) {
-      console.warn('[Updater] electron-updater download failed, falling back to browser download:', updaterErr?.message || updaterErr);
     }
 
     // Safe fallback: open official release page in browser

@@ -142,6 +142,8 @@ export interface UserSettings {
   smoothScrollingEnabled?: boolean;
   passwordManagerEnabled?: boolean;
   autoPictureInPicture?: boolean;
+  autoCheckUpdates?: boolean;
+  autoDownloadUpdates?: boolean;
   defaultTranslationLanguage?: string;
   language?: 'en' | 'tr' | 'ar' | 'de';
 }
@@ -179,6 +181,8 @@ export const defaultSettings: UserSettings = {
   smoothScrollingEnabled: true,
   passwordManagerEnabled: false,
   autoPictureInPicture: true,
+  autoCheckUpdates: true,
+  autoDownloadUpdates: false,
   aiProvider: 'webgpu',
   aiProviderPreset: 'ollama',
   aiCustomEndpoint: 'http://localhost:11434/v1',

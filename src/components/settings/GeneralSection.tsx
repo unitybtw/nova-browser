@@ -56,6 +56,34 @@ export const GeneralSection: React.FC<GeneralSectionProps> = ({
           <UpdateWidget />
         </div>
 
+        <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4 mb-4 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Automatic Update Checks</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Periodically check for new releases in the background and notify when ready.</p>
+            </div>
+            <ToggleSwitch
+              ariaLabel="Toggle automatic update checks"
+              checked={settings.autoCheckUpdates ?? true}
+              onToggle={() => onUpdateSettings({ autoCheckUpdates: !(settings.autoCheckUpdates ?? true) })}
+              activeColorClass="bg-blue-600"
+            />
+          </div>
+
+          <div className="border-t border-slate-200/60 dark:border-slate-700/60 pt-3 flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Auto-Download Updates</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">When disabled, Nova will never download update packages without your explicit approval.</p>
+            </div>
+            <ToggleSwitch
+              ariaLabel="Toggle automatic update downloads"
+              checked={settings.autoDownloadUpdates ?? false}
+              onToggle={() => onUpdateSettings({ autoDownloadUpdates: !(settings.autoDownloadUpdates ?? false) })}
+              activeColorClass="bg-blue-600"
+            />
+          </div>
+        </div>
+
         {systemVersions && (
           <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-4">
             <div className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-3 flex items-center gap-1.5">
