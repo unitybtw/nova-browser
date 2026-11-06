@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { ToggleSwitch } from './ToggleSwitch';
+import { SmoothCollapse } from './SmoothCollapse';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 import {
   testOpenAIConnection,
@@ -427,8 +428,8 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
           </div>
 
           {/* Active Preset Configuration Details Panel */}
-          {settings.aiProvider === 'custom' && (
-            <div className="p-5 bg-slate-50/60 dark:bg-slate-900/60 space-y-4">
+          <SmoothCollapse isOpen={settings.aiProvider === 'custom'}>
+            <div className="p-5 bg-slate-50/60 dark:bg-slate-900/60 space-y-4 border-t border-slate-200/60 dark:border-slate-700/60">
               {/* Header */}
               <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-200 dark:border-slate-800">
                 <div>
@@ -578,63 +579,67 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
                     )}
                   </button>
 
-                  {testResult && (
-                    <div className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
-                      testResult.ok
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                        : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
-                    }`}>
-                      {testResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
-                      <span className="font-medium">{testResult.message}</span>
-                    </div>
-                  )}
+                  <SmoothCollapse isOpen={Boolean(testResult)} className="inline-grid">
+                    {testResult && (
+                      <div className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${
+                        testResult.ok
+                          ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                          : 'bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800'
+                      }`}>
+                        {testResult.ok ? <CheckCircle2 className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                        <span className="font-medium">{testResult.message}</span>
+                      </div>
+                    )}
+                  </SmoothCollapse>
                 </div>
 
                 {/* Discovered Models Cloud */}
-                {testResult?.models && testResult.models.length > 0 && (
-                  <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2 mt-1">
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
-                        <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
-                        Discovered Server Models ({testResult.models.length})
-                      </div>
-                      {testResult.models.length > 8 && (
-                        <div className="relative w-48">
-                          <input
-                            type="text"
-                            value={modelSearchQuery}
-                            onChange={(e) => setModelSearchQuery(e.target.value)}
-                            placeholder="Filter models..."
-                            className="w-full bg-slate-50 dark:bg-slate-900 text-xs pl-7 pr-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
-                          />
-                          <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                <SmoothCollapse isOpen={Boolean(testResult?.models && testResult.models.length > 0)}>
+                  {testResult?.models && testResult.models.length > 0 && (
+                    <div className="p-3.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 space-y-2 mt-1">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1.5">
+                          <CheckCheck className="w-3.5 h-3.5 text-blue-500" />
+                          Discovered Server Models ({testResult.models.length})
                         </div>
-                      )}
+                        {testResult.models.length > 8 && (
+                          <div className="relative w-48">
+                            <input
+                              type="text"
+                              value={modelSearchQuery}
+                              onChange={(e) => setModelSearchQuery(e.target.value)}
+                              placeholder="Filter models..."
+                              className="w-full bg-slate-50 dark:bg-slate-900 text-xs pl-7 pr-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500 font-mono"
+                            />
+                            <Search className="w-3 h-3 text-slate-400 absolute left-2 top-2" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-400 dark:text-slate-500">
+                        Click any discovered model to immediately set it as active:
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
+                        {filteredDiscoveredModels.map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => handleCustomConfigChange('aiCustomModel', m)}
+                            className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                              settings.aiCustomModel === m
+                                ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold'
+                                : 'bg-slate-50 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300'
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="text-[11px] text-slate-400 dark:text-slate-500">
-                      Click any discovered model to immediately set it as active:
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pt-1">
-                      {filteredDiscoveredModels.map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => handleCustomConfigChange('aiCustomModel', m)}
-                          className={`text-[10px] font-mono px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                            settings.aiCustomModel === m
-                              ? 'bg-blue-600 text-white border-blue-600 shadow-2xs font-semibold'
-                              : 'bg-slate-50 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300'
-                          }`}
-                        >
-                          {m}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  )}
+                </SmoothCollapse>
               </div>
             </div>
-          )}
+          </SmoothCollapse>
         </div>
 
         {/* Card 2: Model Behavior, Creativity & Intelligence Style (Independent Card) */}
@@ -852,8 +857,8 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
             />
           </div>
 
-          {(settings.tabHibernationEnabled ?? true) && (
-            <div className="p-5 flex items-center justify-between">
+          <SmoothCollapse isOpen={Boolean(settings.tabHibernationEnabled ?? true)}>
+            <div className="p-5 flex items-center justify-between border-t border-slate-100 dark:border-slate-700/50">
               <div>
                 <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Hibernation Inactivity Timeout</div>
                 <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Time after which unused tabs are suspended to save RAM</div>
@@ -861,7 +866,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
               <select
                 value={settings.hibernationTimeoutMinutes ?? 10}
                 onChange={(e) => onUpdateSettings({ hibernationTimeoutMinutes: Number(e.target.value) })}
-                className="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 focus:outline-none"
+                className="bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 focus:outline-none cursor-pointer"
               >
                 <option value={5}>5 minutes</option>
                 <option value={10}>10 minutes</option>
@@ -869,7 +874,7 @@ export const AdvancedSection: React.FC<AdvancedSectionProps> = ({
                 <option value={60}>1 hour</option>
               </select>
             </div>
-          )}
+          </SmoothCollapse>
 
           {/* Energy Saver Mode */}
           <div className="p-5 flex items-center justify-between">

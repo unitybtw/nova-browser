@@ -4,6 +4,7 @@ import { UserSettings } from '../../types/browser';
 import { useLiveUnsplashPhoto } from '../../utils/unsplash';
 import { TabAnimationPreviewBox } from './TabAnimationPreviewBox';
 import { ToggleSwitch } from './ToggleSwitch';
+import { SmoothCollapse } from './SmoothCollapse';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './BackgroundPreviewCard';
 
 export interface AppearanceSectionProps {
@@ -41,17 +42,19 @@ const DailyWallpaperSection = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {isUserOverride && (
-            <button
-              type="button"
-              onClick={resetToDaily}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm"
-              title="Reset to today's official wallpaper"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reset to Today</span>
-            </button>
-          )}
+          <SmoothCollapse isOpen={Boolean(isUserOverride)} className="inline-grid">
+            {isUserOverride && (
+              <button
+                type="button"
+                onClick={resetToDaily}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors shadow-sm cursor-pointer"
+                title="Reset to today's official wallpaper"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset to Today</span>
+              </button>
+            )}
+          </SmoothCollapse>
           <button
             type="button"
             onClick={shuffleNext}

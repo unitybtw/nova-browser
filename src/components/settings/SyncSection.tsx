@@ -6,6 +6,7 @@ import { safeParseArrayWithBackup, safeParseObjectWithBackup } from '../../utils
 import { getLocale } from '../../services/i18n';
 import { copyTextToClipboard } from '../../utils/clipboard';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
+import { SmoothCollapse } from './SmoothCollapse';
 
 function safeParseArray<T>(raw: string | null, key: string = 'unknown_array'): T[] {
   return safeParseArrayWithBackup<T>(key, raw, []);
@@ -67,18 +68,22 @@ export const SyncSection: React.FC<SyncSectionProps> = ({
           </div>
         </div>
 
-        {syncMsg && (
-          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
-            <Check className="w-4 h-4 shrink-0" />
-            <span>{syncMsg}</span>
-          </div>
-        )}
-        {syncErr && (
-          <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
-            <ShieldAlert className="w-4 h-4 shrink-0" />
-            <span>{syncErr}</span>
-          </div>
-        )}
+        <SmoothCollapse isOpen={Boolean(syncMsg)}>
+          {syncMsg && (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium flex items-center gap-2.5">
+              <Check className="w-4 h-4 shrink-0" />
+              <span>{syncMsg}</span>
+            </div>
+          )}
+        </SmoothCollapse>
+        <SmoothCollapse isOpen={Boolean(syncErr)}>
+          {syncErr && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs font-medium flex items-center gap-2.5">
+              <ShieldAlert className="w-4 h-4 shrink-0" />
+              <span>{syncErr}</span>
+            </div>
+          )}
+        </SmoothCollapse>
 
         {syncStatus.isLoggedIn ? (
           /* ACTIVE SYNC CHAIN VIEW */

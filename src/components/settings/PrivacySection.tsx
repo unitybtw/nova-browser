@@ -5,6 +5,7 @@ import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
 import { aiAgent } from '../../services/aiAgent';
 import { ToggleSwitch } from './ToggleSwitch';
+import { SmoothCollapse } from './SmoothCollapse';
 import { useSafeTimeout } from '../../hooks/useSafeTimeout';
 import {
   normalizeAdblockDomain,
@@ -212,9 +213,11 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
               </button>
             </form>
 
-            {whitelistError && (
-              <p className="text-xs text-red-500 font-medium">{whitelistError}</p>
-            )}
+            <SmoothCollapse isOpen={Boolean(whitelistError)}>
+              {whitelistError && (
+                <p className="text-xs text-red-500 font-medium pt-1">{whitelistError}</p>
+              )}
+            </SmoothCollapse>
 
             {whitelistedDomains.length > 0 ? (
               <div className="flex flex-wrap gap-2 pt-1">
@@ -328,11 +331,13 @@ export const PrivacySection: React.FC<PrivacySectionProps> = ({
           <div>
             <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Purge AI Model Cache</div>
             <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Delete downloaded local WebLLM neural network weights to free up disk space</div>
-            {aiCacheStatus && (
-              <div className={`text-xs mt-2 font-medium ${aiCacheStatus.includes('successfully') ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
-                {aiCacheStatus}
-              </div>
-            )}
+            <SmoothCollapse isOpen={Boolean(aiCacheStatus)}>
+              {aiCacheStatus && (
+                <div className={`text-xs mt-2 font-medium ${aiCacheStatus.includes('successfully') ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                  {aiCacheStatus}
+                </div>
+              )}
+            </SmoothCollapse>
           </div>
           <button
             onClick={handleClearAiCache}
