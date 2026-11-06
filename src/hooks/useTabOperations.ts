@@ -73,12 +73,91 @@ export function useTabOperations({
     const isAutoPipEnabled = settingsRef?.current?.autoPictureInPicture ?? true;
     if (!isAutoPipEnabled) return;
 
-    // 1. Pop out playing video in prevTabId if not already in PiP
+    // Guard: Only consider tabs that are actively playing audio (filters out muted preview cards, silent ads, and idle tabs)
+    const prevTab = tabsRef.current.find(t => t.id === prevTabId);
+    if (!prevTab?.isPlayingAudio) {
+      return;
+    }
+
+    // 1. Pop out active content video in prevTabId if not already in PiP and not an ad or preview
     const prevWebview = document.querySelector(`webview[data-tab-id="${prevTabId}"]`) as any;
     if (prevWebview && typeof prevWebview.executeJavaScript === 'function') {
       prevWebview.executeJavaScript(`
         (() => {
           try {
+            function isEligibleVideo(v) {
+              if (!v || v.paused || v.ended || v.readyState < 2 || v.currentTime <= 0.5) {
+                return false;
+              }
+
+              // 1. Dimensions: reject hidden, tiny, tracking, or banner preview videos
+              const rect = v.getBoundingClientRect();
+              const style = window.getComputedStyle(v);
+              if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') < 0.1) {
+                return false;
+              }
+              if (rect.width < 320 || rect.height < 180) {
+                return false;
+              }
+
+              // 2. Reject short looping decorative clips
+              if (v.loop && v.duration > 0 && v.duration < 30) {
+                return false;
+              }
+
+              // 3. Reject muted videos (ads, silent feed autoplay, background video)
+              if (v.muted || v.volume === 0) {
+                return false;
+              }
+
+              // 4. YouTube specific anti-ad & feed filters:
+              const host = window.location.hostname;
+              if (host.includes('youtube.com')) {
+                // Must be on a dedicated watch, live or shorts view, never on home/feed
+                const path = window.location.pathname;
+                const isWatchPage = path.startsWith('/watch') || path.startsWith('/live') || path.startsWith('/embed') || path.startsWith('/shorts');
+                if (!isWatchPage) {
+                  return false;
+                }
+
+                // Reject if player is currently playing a pre-roll or mid-roll ad
+                const moviePlayer = document.getElementById('movie_player');
+                if (moviePlayer && (moviePlayer.classList.contains('ad-showing') || moviePlayer.classList.contains('ad-interrupting'))) {
+                  return false;
+                }
+
+                // Reject if inside YouTube ad module, ad container, or hover preview
+                if (v.closest('.ytp-ad-module, .ytp-ad-player-overlay, .video-ads, ytd-video-preview, #inline-preview-player, ytd-ad-slot-renderer, [class*="ad-container"]')) {
+                  return false;
+                }
+
+                // Must be the primary YouTube player video
+                if (!v.classList.contains('html5-main-video') && !v.closest('#movie_player')) {
+                  return false;
+                }
+              }
+
+              // 5. Generic ad container heuristics across websites
+              const adContainer = v.closest([
+                '[class*="ad-showing"]',
+                '[class*="video-ads"]',
+                '[class*="ad-player"]',
+                '[class*="advertisement" i]',
+                '[id*="advertisement" i]',
+                '[data-ad-type]',
+                '[data-ad]',
+                '.outbrain',
+                '.taboola',
+                '.teads-inread',
+                '.connatix'
+              ].join(', '));
+              if (adContainer) {
+                return false;
+              }
+
+              return true;
+            }
+
             function findPlayingVideo() {
               let vids = Array.from(document.querySelectorAll('video'));
               const allEls = document.querySelectorAll('*');
@@ -89,8 +168,9 @@ export function useTabOperations({
                   if (shadowVids.length) vids.push(...Array.from(shadowVids));
                 }
               }
-              return vids.find(v => !v.paused && !v.ended && v.readyState >= 2 && v.currentTime > 0);
+              return vids.find(isEligibleVideo);
             }
+
             const activeVid = findPlayingVideo();
             if (activeVid && !document.pictureInPictureElement) {
               activeVid.requestPictureInPicture().then(() => {
@@ -116,7 +196,7 @@ export function useTabOperations({
         })();
       `, true).catch(() => {});
     }
-  }, [settingsRef]);
+  }, [settingsRef, tabsRef]);
 
   // THE single activation primitive. Any path that puts a tab in front (select,
   // close/promote-neighbour, close-other-tabs, close-to-right, duplicate, new
@@ -773,15 +853,26 @@ export function useTabOperations({
               if (shadowVids.length) videos.push(...Array.from(shadowVids));
             }
           }
-          const target = videos.find(v => !v.paused) || videos[0];
+          if (document.pictureInPictureElement) {
+            return document.exitPictureInPicture();
+          }
+
+          function isNotAd(v) {
+            if (!v) return false;
+            if (v.closest && v.closest('.ytp-ad-module, .ytp-ad-player-overlay, .video-ads, ytd-video-preview, ytd-ad-slot-renderer, [class*="ad-"]')) return false;
+            const r = v.getBoundingClientRect();
+            if (r.width > 0 && r.width < 260) return false;
+            return true;
+          }
+
+          const target = videos.find(v => !v.paused && isNotAd(v)) ||
+                         videos.find(v => v.classList.contains('html5-main-video')) ||
+                         videos.find(isNotAd) ||
+                         videos[0];
           if (!target) {
             throw new Error("No video found on page!");
           }
-          if (document.pictureInPictureElement) {
-            return document.exitPictureInPicture();
-          } else {
-            return target.requestPictureInPicture();
-          }
+          return target.requestPictureInPicture();
         })();
       `, true).catch((e: any) => {
         void showAlert({ title: 'Picture-in-Picture', message: "Picture-in-Picture Error: " + (e.message || e) });
