@@ -69,6 +69,7 @@ export function useTabOperations({
 }: UseTabOperationsOptions) {
   // Trigger Auto-PiP on previous tab if a video is playing, and exit PiP when returning
   const handleAutoPipTransition = useCallback((prevTabId: string, newTabId: string) => {
+    if (typeof document === 'undefined') return;
     if (!prevTabId || prevTabId === newTabId) return;
     const isAutoPipEnabled = settingsRef?.current?.autoPictureInPicture ?? true;
     if (!isAutoPipEnabled) return;
@@ -840,6 +841,7 @@ export function useTabOperations({
   }, [setTabs]);
 
   const handleTogglePip = useCallback((tabId: string) => {
+    if (typeof document === 'undefined') return;
     const webview = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
     if (webview && webview.executeJavaScript) {
       webview.executeJavaScript(`
