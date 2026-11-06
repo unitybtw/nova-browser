@@ -13,7 +13,8 @@ import {
   Download,
   Globe,
   Languages,
-  VenetianMask
+  VenetianMask,
+  PictureInPicture2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab, Bookmark, UserSettings, PermissionRequest } from '../../types/browser';
@@ -35,6 +36,7 @@ export interface OmniboxBarProps {
   useVerticalTabs?: boolean;
   onNavigate: (url: string) => void;
   onToggleReaderMode?: () => void;
+  onTogglePip?: () => void;
   onToggleBookmark?: (targetTab?: Tab) => void;
   onResetZoom?: () => void;
   isBookmarked: boolean;
@@ -51,6 +53,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   useVerticalTabs,
   onNavigate,
   onToggleReaderMode,
+  onTogglePip,
   onToggleBookmark,
   onResetZoom,
   isBookmarked,
@@ -514,6 +517,23 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
               </button>
             )}
 
+            {onTogglePip && (activeTab?.isPlayingAudio || activeTab?.isInPip) && (
+              <button
+                type="button"
+                onClick={onTogglePip}
+                className={`p-1.5 rounded-lg transition-colors ${
+                  activeTab.isInPip
+                    ? 'text-blue-500 bg-blue-500/15 hover:bg-blue-500/25 ring-1 ring-blue-500/30'
+                    : isIncognito
+                      ? 'text-slate-400 hover:text-blue-400 hover:bg-slate-700'
+                      : 'text-slate-400 hover:text-blue-500 hover:bg-slate-200 dark:hover:text-blue-400 dark:hover:bg-slate-700'
+                }`}
+                title={activeTab.isInPip ? "Exit Picture in Picture" : "Picture in Picture"}
+              >
+                <PictureInPicture2 className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Page Translation Button & Popover */}
             {activeTab?.url && (activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://')) && (
               <div className="relative flex items-center">
@@ -686,16 +706,19 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
   if (prevProps.permissionRequests !== nextProps.permissionRequests) return false;
   if (prevProps.onNavigate !== nextProps.onNavigate) return false;
   if (prevProps.onToggleReaderMode !== nextProps.onToggleReaderMode) return false;
+  if (prevProps.onTogglePip !== nextProps.onTogglePip) return false;
   if (prevProps.onToggleBookmark !== nextProps.onToggleBookmark) return false;
   if (prevProps.onResetZoom !== nextProps.onResetZoom) return false;
   if (prevProps.onRespondPermission !== nextProps.onRespondPermission) return false;
   if (prevProps.onDismissPermission !== nextProps.onDismissPermission) return false;
 
-  // Omnibox only reads and renders activeTab's url, id, zoomFactor, and isTranslated
+  // Omnibox only reads and renders activeTab's url, id, zoomFactor, isTranslated, isPlayingAudio, and isInPip
   if (prevProps.activeTab?.id !== nextProps.activeTab?.id) return false;
   if (prevProps.activeTab?.url !== nextProps.activeTab?.url) return false;
   if (prevProps.activeTab?.zoomFactor !== nextProps.activeTab?.zoomFactor) return false;
   if (prevProps.activeTab?.isTranslated !== nextProps.activeTab?.isTranslated) return false;
+  if (prevProps.activeTab?.isPlayingAudio !== nextProps.activeTab?.isPlayingAudio) return false;
+  if (prevProps.activeTab?.isInPip !== nextProps.activeTab?.isInPip) return false;
 
   return true;
 });

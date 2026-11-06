@@ -176,6 +176,7 @@ export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewP
   if (prev.tab?.thumbnail !== next.tab?.thumbnail) return false;
   if (prev.tab?.zoomFactor !== next.tab?.zoomFactor) return false;
   if (prev.tab?.isPlayingAudio !== next.tab?.isPlayingAudio) return false;
+  if (prev.tab?.isInPip !== next.tab?.isInPip) return false;
   if (prev.tab?.blockedAdsCount !== next.tab?.blockedAdsCount) return false;
   if (prev.tab?.webContentsId !== next.tab?.webContentsId) return false;
   if (prev.tab?.isSuspended !== next.tab?.isSuspended) return false;
@@ -519,7 +520,8 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
             isLoading: true,
             isTranslated: false,
             translatedLang: undefined,
-            isPlayingAudio: false
+            isPlayingAudio: false,
+            isInPip: false
           };
           setCrashInfo({ crashed: false });
           if (targetUrl && targetUrl !== 'about:blank') {
@@ -783,7 +785,9 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
     };
 
     const handleIpcMessage = (e: any) => {
-      if (e.channel === 'password-form-submitted' && e.args?.[0]) {
+      if (e.channel === 'nova-pip-status-changed' && e.args?.[0] && tab?.id) {
+        onUpdateTab(tab.id, { isInPip: Boolean(e.args[0].isInPip) });
+      } else if (e.channel === 'password-form-submitted' && e.args?.[0]) {
         const { origin, hostname, username, password } = e.args[0];
         handlePasswordDetected(origin, hostname, username, password);
       } else if (e.channel === 'login-field-focused' && e.args?.[0]) {

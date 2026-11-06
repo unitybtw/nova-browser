@@ -1451,6 +1451,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               onNewTab={handleNewTab}
               onNewIncognitoTab={handleNewIncognitoTab}
               onToggleMuteTab={handleToggleMuteTab}
+              onTogglePip={handleTogglePip}
               onDuplicateTab={handleDuplicateTab}
               onTogglePinTab={handleTogglePinTab}
               onCloseOtherTabs={handleCloseOtherTabs}
@@ -1548,6 +1549,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                   onNewTab={handleNewTab}
                   onNewIncognitoTab={handleNewIncognitoTab}
                   onToggleMuteTab={handleToggleMuteTab}
+                  onTogglePip={handleTogglePip}
                   onDuplicateTab={handleDuplicateTab}
                   onTogglePinTab={handleTogglePinTab}
                   onCloseOtherTabs={handleCloseOtherTabs}
@@ -1831,7 +1833,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 className={`h-full flex flex-col transition-none ${
                   isTabVisible
                     ? 'opacity-100 z-10 pointer-events-auto visible'
-                    : 'opacity-0 z-0 pointer-events-none invisible'
+                    : tab.isInPip
+                      ? 'opacity-0 z-0 pointer-events-none visible'
+                      : 'opacity-0 z-0 pointer-events-none invisible'
                 }`}
                 onMouseDownCapture={() => {
                   if (secondarySplitTab) {

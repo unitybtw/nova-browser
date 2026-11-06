@@ -74,130 +74,120 @@ export function useTabOperations({
     const isAutoPipEnabled = settingsRef?.current?.autoPictureInPicture ?? true;
     if (!isAutoPipEnabled) return;
 
-    // Guard: Only consider tabs that are actively playing audio (filters out muted preview cards, silent ads, and idle tabs)
+    // 1. Pop out active content video in prevTabId if not an internal or blank page
     const prevTab = tabsRef.current.find(t => t.id === prevTabId);
-    if (!prevTab?.isPlayingAudio) {
-      return;
-    }
+    const isPrevInternal = prevTab && (prevTab.url.startsWith('nova://') || prevTab.url.startsWith('about:') || !prevTab.url);
 
-    // 1. Pop out active content video in prevTabId if not already in PiP and not an ad or preview
-    const prevWebview = document.querySelector(`webview[data-tab-id="${prevTabId}"]`) as any;
-    if (prevWebview && typeof prevWebview.executeJavaScript === 'function') {
-      prevWebview.executeJavaScript(`
-        (() => {
-          try {
-            function isEligibleVideo(v) {
-              if (!v || v.paused || v.ended || v.readyState < 2 || v.currentTime <= 0.5) {
-                return false;
+    if (!isPrevInternal) {
+      const prevWebview = document.querySelector(`webview[data-tab-id="${prevTabId}"]`) as any;
+      if (prevWebview && typeof prevWebview.executeJavaScript === 'function') {
+        prevWebview.executeJavaScript(`
+          (() => {
+            try {
+              function collectVideos(root) {
+                let results = Array.from(root.querySelectorAll('video'));
+                const all = root.querySelectorAll('*');
+                for (let i = 0; i < all.length; i++) {
+                  if (all[i].shadowRoot) {
+                    try {
+                      results.push(...collectVideos(all[i].shadowRoot));
+                    } catch (_) {}
+                  }
+                }
+                return results;
               }
 
-              // 1. Dimensions: reject hidden, tiny, tracking, or banner preview videos
-              const rect = v.getBoundingClientRect();
-              const style = window.getComputedStyle(v);
-              if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity || '1') < 0.1) {
-                return false;
-              }
-              if (rect.width < 320 || rect.height < 180) {
-                return false;
-              }
+              const videos = collectVideos(document);
+              if (!videos.length) return false;
 
-              // 2. Reject short looping decorative clips
-              if (v.loop && v.duration > 0 && v.duration < 30) {
-                return false;
-              }
+              function isEligibleVideo(v) {
+                if (!v || v.paused || v.ended) return false;
+                if (v.readyState < 1) return false;
+                if ((v.videoWidth || 0) < 120 || (v.videoHeight || 0) < 90) return false;
 
-              // 3. Reject muted videos (ads, silent feed autoplay, background video)
-              if (v.muted || v.volume === 0) {
-                return false;
-              }
+                const host = window.location.hostname || '';
+                const path = window.location.pathname || '';
+                const isYouTube = host.includes('youtube.com');
 
-              // 4. YouTube specific anti-ad & feed filters:
-              const host = window.location.hostname;
-              if (host.includes('youtube.com')) {
-                // Must be on a dedicated watch, live or shorts view, never on home/feed
-                const path = window.location.pathname;
-                const isWatchPage = path.startsWith('/watch') || path.startsWith('/live') || path.startsWith('/embed') || path.startsWith('/shorts');
-                if (!isWatchPage) {
+                if (isYouTube) {
+                  if (path === '/' || path.startsWith('/feed') || path.startsWith('/channel') || path.startsWith('/@')) {
+                    if (v.muted || v.closest('#inline-preview-player, ytd-video-preview, ytd-rich-grid-media, ytd-ad-slot-renderer')) {
+                      return false;
+                    }
+                  }
+                  const moviePlayer = document.getElementById('movie_player') || document.querySelector('.html5-video-player');
+                  if (moviePlayer && (moviePlayer.classList.contains('ad-showing') || moviePlayer.classList.contains('ad-interrupting'))) {
+                    return false;
+                  }
+                  if (v.closest('.ytp-ad-module, .video-ads, .ytp-ad-player-overlay, ytd-ad-slot-renderer')) {
+                    return false;
+                  }
+                }
+
+                if (v.closest && v.closest('.ad-showing, .video-ads, [class*="advertisement" i], [id*="advertisement" i], .outbrain, .taboola, .teads-inread, .connatix')) {
                   return false;
                 }
 
-                // Reject if player is currently playing a pre-roll or mid-roll ad
-                const moviePlayer = document.getElementById('movie_player');
-                if (moviePlayer && (moviePlayer.classList.contains('ad-showing') || moviePlayer.classList.contains('ad-interrupting'))) {
+                if (v.loop && v.duration > 0 && v.duration < 30 && (v.muted || v.volume === 0)) {
                   return false;
                 }
 
-                // Reject if inside YouTube ad module, ad container, or hover preview
-                if (v.closest('.ytp-ad-module, .ytp-ad-player-overlay, .video-ads, ytd-video-preview, #inline-preview-player, ytd-ad-slot-renderer, [class*="ad-container"]')) {
-                  return false;
-                }
-
-                // Must be the primary YouTube player video
-                if (!v.classList.contains('html5-main-video') && !v.closest('#movie_player')) {
-                  return false;
-                }
+                return true;
               }
 
-              // 5. Generic ad container heuristics across websites
-              const adContainer = v.closest([
-                '[class*="ad-showing"]',
-                '[class*="video-ads"]',
-                '[class*="ad-player"]',
-                '[class*="advertisement" i]',
-                '[id*="advertisement" i]',
-                '[data-ad-type]',
-                '[data-ad]',
-                '.outbrain',
-                '.taboola',
-                '.teads-inread',
-                '.connatix'
-              ].join(', '));
-              if (adContainer) {
-                return false;
-              }
+              const eligible = videos.filter(isEligibleVideo);
+              if (!eligible.length) return false;
 
-              return true;
-            }
+              const bestVideo = eligible.find(v => !v.muted && v.volume > 0 && v.classList.contains('html5-main-video')) ||
+                                eligible.find(v => !v.muted && v.volume > 0) ||
+                                eligible.find(v => v.classList.contains('html5-main-video')) ||
+                                eligible.sort((a, b) => ((b.videoWidth || 0) * (b.videoHeight || 0)) - ((a.videoWidth || 0) * (a.videoHeight || 0)))[0];
 
-            function findPlayingVideo() {
-              let vids = Array.from(document.querySelectorAll('video'));
-              const allEls = document.querySelectorAll('*');
-              for (let i = 0; i < allEls.length; i++) {
-                const sr = allEls[i].shadowRoot;
-                if (sr) {
-                  const shadowVids = sr.querySelectorAll('video');
-                  if (shadowVids.length) vids.push(...Array.from(shadowVids));
-                }
-              }
-              return vids.find(isEligibleVideo);
-            }
+              if (!bestVideo) return false;
+              if (document.pictureInPictureElement === bestVideo) return true;
 
-            const activeVid = findPlayingVideo();
-            if (activeVid && !document.pictureInPictureElement) {
-              activeVid.requestPictureInPicture().then(() => {
+              try {
+                bestVideo.removeAttribute('disablepictureinpicture');
+                bestVideo.disablePictureInPicture = false;
+              } catch (_) {}
+
+              return bestVideo.requestPictureInPicture().then(() => {
                 window.__novaAutoPipActive = true;
-              }).catch(() => {});
+                return true;
+              }).catch(() => false);
+            } catch (_) {
+              return false;
             }
-          } catch (_) {}
-        })();
-      `, true).catch(() => {});
+          })();
+        `, true).then((popped: boolean) => {
+          if (popped) {
+            setTabs(prev => prev.map(t => t.id === prevTabId ? { ...t, isInPip: true } : t));
+          }
+        }).catch(() => {});
+      }
     }
 
-    // 2. Exit PiP when returning to newTabId if video is currently in PiP
+    // 2. Exit PiP when returning to newTabId if video is currently in Auto-PiP
     const newWebview = document.querySelector(`webview[data-tab-id="${newTabId}"]`) as any;
     if (newWebview && typeof newWebview.executeJavaScript === 'function') {
       newWebview.executeJavaScript(`
         (() => {
           try {
-            if (document.pictureInPictureElement) {
+            if (document.pictureInPictureElement && window.__novaAutoPipActive) {
               document.exitPictureInPicture().catch(() => {});
               window.__novaAutoPipActive = false;
+              return true;
             }
           } catch (_) {}
+          return false;
         })();
-      `, true).catch(() => {});
+      `, true).then((restored: boolean) => {
+        if (restored) {
+          setTabs(prev => prev.map(t => t.id === newTabId ? { ...t, isInPip: false } : t));
+        }
+      }).catch(() => {});
     }
-  }, [settingsRef, tabsRef]);
+  }, [settingsRef, tabsRef, setTabs]);
 
   // THE single activation primitive. Any path that puts a tab in front (select,
   // close/promote-neighbour, close-other-tabs, close-to-right, duplicate, new
@@ -291,6 +281,18 @@ export function useTabOperations({
     const targetTab = prevTabs.find(t => t.id === id);
     if (!targetTab) return;
     tabThumbnailCache.remove(id);
+
+    // Clean up active PiP window if this tab had a video popped out
+    if (typeof document !== 'undefined') {
+      const closingWebview = document.querySelector(`webview[data-tab-id="${id}"]`) as any;
+      if (closingWebview && typeof closingWebview.executeJavaScript === 'function') {
+        closingWebview.executeJavaScript(`
+          if (document.pictureInPictureElement) {
+            document.exitPictureInPicture().catch(() => {});
+          }
+        `, true).catch(() => {});
+      }
+    }
     const activeWs = activeWorkspaceIdRef.current || 'default';
     const workspaceTabs = prevTabs.filter(t => (t.workspaceId || 'default') === activeWs);
     if (workspaceTabs.length <= 1 && workspaceTabs.some(t => t.id === id)) {
@@ -843,44 +845,70 @@ export function useTabOperations({
   const handleTogglePip = useCallback((tabId: string) => {
     if (typeof document === 'undefined') return;
     const webview = document.querySelector(`webview[data-tab-id="${tabId}"]`) as any;
-    if (webview && webview.executeJavaScript) {
+    if (webview && typeof webview.executeJavaScript === 'function') {
       webview.executeJavaScript(`
         (() => {
-          let videos = Array.from(document.querySelectorAll('video'));
-          const allEls = document.querySelectorAll('*');
-          for (let i = 0; i < allEls.length; i++) {
-            const sr = allEls[i].shadowRoot;
-            if (sr) {
-              const shadowVids = sr.querySelectorAll('video');
-              if (shadowVids.length) videos.push(...Array.from(shadowVids));
+          function collectVideos(root) {
+            let results = Array.from(root.querySelectorAll('video'));
+            const all = root.querySelectorAll('*');
+            for (let i = 0; i < all.length; i++) {
+              if (all[i].shadowRoot) {
+                try {
+                  results.push(...collectVideos(all[i].shadowRoot));
+                } catch (_) {}
+              }
             }
+            return results;
           }
+
           if (document.pictureInPictureElement) {
-            return document.exitPictureInPicture();
+            window.__novaAutoPipActive = false;
+            return document.exitPictureInPicture().then(() => 'exited');
+          }
+
+          const videos = collectVideos(document);
+          if (!videos.length) {
+            throw new Error("No video found on page!");
           }
 
           function isNotAd(v) {
             if (!v) return false;
             if (v.closest && v.closest('.ytp-ad-module, .ytp-ad-player-overlay, .video-ads, ytd-video-preview, ytd-ad-slot-renderer, [class*="ad-"]')) return false;
-            const r = v.getBoundingClientRect();
-            if (r.width > 0 && r.width < 260) return false;
             return true;
           }
 
-          const target = videos.find(v => !v.paused && isNotAd(v)) ||
+          const target = videos.find(v => !v.paused && !v.ended && isNotAd(v)) ||
                          videos.find(v => v.classList.contains('html5-main-video')) ||
                          videos.find(isNotAd) ||
                          videos[0];
+
           if (!target) {
             throw new Error("No video found on page!");
           }
-          return target.requestPictureInPicture();
+
+          try {
+            target.removeAttribute('disablepictureinpicture');
+            target.disablePictureInPicture = false;
+          } catch (_) {}
+
+          return target.requestPictureInPicture().then(() => 'entered');
         })();
-      `, true).catch((e: any) => {
-        void showAlert({ title: 'Picture-in-Picture', message: "Picture-in-Picture Error: " + (e.message || e) });
+      `, true).then((status: string) => {
+        if (status === 'entered') {
+          setTabs(prev => prev.map(t => t.id === tabId ? { ...t, isInPip: true } : t));
+        } else if (status === 'exited') {
+          setTabs(prev => prev.map(t => t.id === tabId ? { ...t, isInPip: false } : t));
+        }
+      }).catch((e: any) => {
+        const msg = String(e?.message || e || '');
+        if (msg.includes('No video found')) {
+          void showAlert({ title: 'Picture-in-Picture', message: "Bu sayfada oynatılabilir video bulunamadı." });
+        } else if (!msg.includes('user gesture')) {
+          void showAlert({ title: 'Picture-in-Picture', message: "Picture-in-Picture hatası: " + msg });
+        }
       });
     }
-  }, []);
+  }, [showAlert, setTabs]);
 
   return {
     activateTab,

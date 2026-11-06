@@ -417,6 +417,20 @@ if (protocol === 'https:' || protocol === 'http:') {
     }, true);
   };
 
+  const setupPipDetection = () => {
+    document.addEventListener('enterpictureinpicture', () => {
+      try {
+        ipcRenderer.sendToHost('nova-pip-status-changed', { isInPip: true });
+      } catch (_) {}
+    }, true);
+
+    document.addEventListener('leavepictureinpicture', () => {
+      try {
+        ipcRenderer.sendToHost('nova-pip-status-changed', { isInPip: false });
+      } catch (_) {}
+    }, true);
+  };
+
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', () => {
       if (isTopFrame) {
@@ -424,6 +438,7 @@ if (protocol === 'https:' || protocol === 'http:') {
         setupPasswordFocusDetection();
       }
       setupLinkHoverDetection();
+      setupPipDetection();
     });
   } else {
     if (isTopFrame) {
@@ -431,5 +446,6 @@ if (protocol === 'https:' || protocol === 'http:') {
       setupPasswordFocusDetection();
     }
     setupLinkHoverDetection();
+    setupPipDetection();
   }
 }

@@ -36,7 +36,8 @@ import {
   Columns2,
   HelpCircle,
   Compass,
-  Cloud
+  Cloud,
+  PictureInPicture2
 } from 'lucide-react';
 import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
@@ -203,6 +204,7 @@ export interface SidebarTabsProps {
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
+  onTogglePip?: (id: string) => void;
 }
 
 interface SidebarTabItemProps {
@@ -217,6 +219,7 @@ interface SidebarTabItemProps {
   onCloseTab: (id: string, e?: React.MouseEvent) => void;
   onCloseSplit?: (tab1Id?: string, tab2Id?: string) => void;
   onToggleMuteTab: (id: string, e: React.MouseEvent) => void;
+  onTogglePip?: (id: string) => void;
   onTabDragStart?: () => void;
   onTabDragEnd?: () => void;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
@@ -238,6 +241,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   onCloseTab,
   onCloseSplit,
   onToggleMuteTab,
+  onTogglePip,
   onTabDragStart,
   onTabDragEnd,
   onReorderTabs,
@@ -446,8 +450,22 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
           </div>
 
           <div className={`flex items-center gap-1 transition-opacity duration-150 shrink-0 ${
-            isActive || tab.isPlayingAudio || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
+            isActive || tab.isPlayingAudio || tab.isInPip || tab.isMuted || tab.isSuspended ? 'opacity-100' : 'opacity-0 group-hover/tab:opacity-100'
           }`}>
+            {onTogglePip && (tab.isPlayingAudio || tab.isInPip) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onTogglePip(tab.id); }}
+                onKeyDown={(e) => { e.stopPropagation(); }}
+                className={`p-1 rounded-md transition-colors ${
+                  tab.isInPip
+                    ? 'bg-blue-500/20 text-blue-500 dark:text-blue-400 hover:bg-blue-500/30 ring-1 ring-blue-500/30'
+                    : 'hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400 hover:text-blue-500 dark:hover:text-blue-400'
+                }`}
+                title={tab.isInPip ? "Exit Picture in Picture" : "Picture in Picture"}
+              >
+                <PictureInPicture2 className="w-3 h-3" />
+              </button>
+            )}
             {tab.isMuted ? (
               <button onClick={(e) => onToggleMuteTab(tab.id, e)} onKeyDown={(e) => { e.stopPropagation(); }} className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 text-red-500 dark:text-red-400">
                 <VolumeX className="w-3 h-3" />
@@ -502,6 +520,7 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
     prev.tab.isLoading === next.tab.isLoading &&
     prev.tab.isMuted === next.tab.isMuted &&
     prev.tab.isPlayingAudio === next.tab.isPlayingAudio &&
+    prev.tab.isInPip === next.tab.isInPip &&
     prev.tab.isSuspended === next.tab.isSuspended &&
     prev.tab.isPinned === next.tab.isPinned &&
     prev.tab.isIncognito === next.tab.isIncognito &&
@@ -512,7 +531,8 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
     prev.splitTab?.favicon === next.splitTab?.favicon &&
     prev.splitTab?.isLoading === next.splitTab?.isLoading &&
     prev.splitTab?.isMuted === next.splitTab?.isMuted &&
-    prev.splitTab?.isPlayingAudio === next.splitTab?.isPlayingAudio
+    prev.splitTab?.isPlayingAudio === next.splitTab?.isPlayingAudio &&
+    prev.splitTab?.isInPip === next.splitTab?.isInPip
   );
 });
 
@@ -525,6 +545,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   onNewTab,
   onNewIncognitoTab,
   onToggleMuteTab,
+  onTogglePip,
   onDuplicateTab,
   onTogglePinTab,
   onCloseOtherTabs,
@@ -962,7 +983,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       isActive={tab.id === activeTabId || splitTab?.id === activeTabId}
       isDragOver={dragOverTabId === tab.id} isNested={isNested} tabsLength={tabs.length}
       onSelectTab={onSelectTab} onCloseTab={onCloseTab} onCloseSplit={onCloseSplit}
-      onToggleMuteTab={onToggleMuteTab} onTabDragStart={onTabDragStart} onTabDragEnd={onTabDragEnd}
+      onToggleMuteTab={onToggleMuteTab} onTogglePip={onTogglePip} onTabDragStart={onTabDragStart} onTabDragEnd={onTabDragEnd}
       onReorderTabs={onReorderTabs} onOpenContextMenu={handleOpenContextMenu}
       onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave} setDragOverTabId={setDragOverTabId}
     />
@@ -1726,6 +1747,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       a.isPinned !== b.isPinned ||
       a.isIncognito !== b.isIncognito ||
       a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isInPip !== b.isInPip ||
       a.isMuted !== b.isMuted ||
       a.isSuspended !== b.isSuspended ||
       a.splitWith !== b.splitWith ||

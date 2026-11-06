@@ -14,6 +14,7 @@ export interface Tab {
   folderId?: string;
   zoomFactor?: number;
   isPlayingAudio?: boolean;
+  isInPip?: boolean;
   blockedAdsCount?: number;
   webContentsId?: number;
   isSuspended?: boolean;
