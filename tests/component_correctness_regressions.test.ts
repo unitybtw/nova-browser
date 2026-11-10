@@ -54,6 +54,11 @@ import {
   highlightsStorageKey,
   type HighlightData,
 } from '../src/components/ReaderMode';
+import {
+  formatKeyForPlatform,
+  SHORTCUT_GROUPS,
+  HELP_FAQS,
+} from '../src/components/HelpModal';
 
 async function main() {
   console.log('--- Component correctness regressions ---');
@@ -423,6 +428,38 @@ async function main() {
       getSuggestedSiteName('') === '');
     check('popular shortcut presets array is populated',
       Array.isArray(POPULAR_SHORTCUT_PRESETS) && POPULAR_SHORTCUT_PRESETS.length >= 6);
+  }
+
+  // --- 2d. Help & Support center regressions ---
+  console.log('--- 2d. Help & Support center regressions ---');
+  {
+    check('formatKeyForPlatform leaves Mac keys intact on Mac',
+      formatKeyForPlatform('⌘', true) === '⌘' &&
+      formatKeyForPlatform('⌥', true) === '⌥' &&
+      formatKeyForPlatform('⇧', true) === '⇧');
+    check('formatKeyForPlatform converts keys for Windows/Linux',
+      formatKeyForPlatform('⌘', false) === 'Ctrl' &&
+      formatKeyForPlatform('⌥', false) === 'Alt' &&
+      formatKeyForPlatform('⇧', false) === 'Shift' &&
+      formatKeyForPlatform('^', false) === 'Ctrl');
+    check('all shortcut groups have valid entries',
+      SHORTCUT_GROUPS.length >= 4 &&
+      SHORTCUT_GROUPS.every(g => g.title && g.shortcuts.length > 0 && g.shortcuts.every(s => s.desc && s.keys.length > 0)));
+    check('help FAQs are populated with real technical answers',
+      HELP_FAQS.length >= 5 &&
+      HELP_FAQS.some(f => f.id === 'zero-telemetry') &&
+      HELP_FAQS.some(f => f.id === 'local-ai-reqs') &&
+      HELP_FAQS.some(f => f.id === 'mcp-integration'));
+
+    const code = readCode('components/HelpModal.tsx');
+    check('HelpModal uses getElectronAPI bridge',
+      /getElectronAPI\(\)/.test(code));
+    check('HelpModal has copy diagnostics support',
+      /copyTextToClipboard/.test(code) && /handleCopyDiagnostics/.test(code));
+    check('HelpModal synchronizes initialTab on prop change',
+      /setActiveTab\(initialTab\)/.test(code));
+    check('HelpModal includes WebGPU live detection check',
+      /'gpu'\s+in\s+navigator/.test(code));
   }
 
   // =========================================================================
