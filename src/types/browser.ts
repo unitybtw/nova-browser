@@ -162,7 +162,7 @@ export const defaultSettings: UserSettings = {
   browserColor: 'default',
   customBrowserColor: '#6366f1',
   showBookmarksBar: false,
-  showTasksWidget: true,
+  showTasksWidget: false,
   useVerticalTabs: false,
   mcpServerEnabled: false,
   newTabBackground: 'default',

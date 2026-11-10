@@ -392,10 +392,6 @@ export const AISection: React.FC<AISectionProps> = ({ settings, onUpdateSettings
 
       {/* ========================== Overview card ========================= */}
       <div className="premium-card relative overflow-hidden rounded-2xl border border-slate-200/80 dark:border-slate-700/50 bg-white dark:bg-slate-800/40">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -top-24 -right-24 w-72 h-72 rounded-full bg-blue-500/10 dark:bg-blue-500/[0.07] blur-3xl"
-        />
         <div className="relative p-5 flex flex-col md:flex-row md:items-center gap-5">
           <div className="flex items-center gap-4 min-w-0 flex-1">
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${activeIcon.tint}`}>

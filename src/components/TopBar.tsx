@@ -1451,24 +1451,21 @@ export const TopBar: React.FC<TopBarProps> = React.memo(({
         {/* Extensions / Action Controls / More Menu */}
         <div className="flex items-center gap-1.5 ml-auto relative shrink-0">
           {/* Assistant toggle */}
-          <motion.button
-            whileHover={{ scale: 1 }}
-            whileTap={{ scale: 0.95 }}
+          <button
+            type="button"
             onClick={onToggleAIAssistant}
-            className={`group relative flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-300 font-semibold text-xs shrink-0 select-none cursor-pointer overflow-hidden ${
+            className={`flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors text-xs font-medium cursor-pointer ${
               isAIAssistantOpen
-                ? 'bg-accent/15 text-accent border border-accent/40'
+                ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-600 dark:text-blue-400'
                 : isIncognito
-                ? 'bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 hover:border-cyan-400/40'
-                : 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 dark:text-cyan-400 border border-cyan-500/20 hover:border-cyan-400/40 shadow-xs'
+                ? 'text-slate-400 hover:text-white hover:bg-slate-800'
+                : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
             }`}
             title={isMac ? "Nova AI Assistant (⌘I)" : "Nova AI Assistant (Ctrl+I)"}
           >
-            <NovaAssistantIcon size={15} active={isAIAssistantOpen} />
-            <span className="font-medium text-[11px]">
-              AI
-            </span>
-          </motion.button>
+            <NovaAssistantIcon size={14} active={isAIAssistantOpen} />
+            <span className="text-[11px] font-medium leading-none">AI</span>
+          </button>
 
           <div className="w-px h-4 bg-slate-200 dark:bg-white/10 mx-0.5" />
 

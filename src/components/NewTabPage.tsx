@@ -1138,24 +1138,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             )}
           </AnimatePresence>
 
-          {/* Privacy Indicator */}
-          <div className={`flex items-center justify-between px-3 mt-2 text-xs font-medium transition-colors ${
+          {/* Privacy & Engine Indicator */}
+          <div className={`flex items-center justify-between px-3 mt-2 text-[11px] font-medium transition-colors ${
             hasWallpaper || isDarkTheme
-              ? 'text-white/95 drop-shadow-[0_1px_4px_rgba(0,0,0,0.9)]'
-              : 'text-slate-600 dark:text-slate-300 drop-shadow-sm'
+              ? 'text-white/60'
+              : 'text-slate-400 dark:text-slate-500'
           }`}>
             <div className="flex items-center gap-1.5">
               {privacyShield ? (
                 <>
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 drop-shadow-sm" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500/80" />
                   <span>{t('newtab.shieldActive')}</span>
                 </>
               ) : (
                 <>
-                  <ShieldAlert className="w-3.5 h-3.5 text-amber-400 drop-shadow-sm" />
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-500/80" />
                   <span>{t('newtab.shieldDisabled')}</span>
                 </>
-              ) }
+              )}
             </div>
             <span>{t('newtab.searchEngine', { engine: getSearchEngineName(searchEngine) })}</span>
           </div>
@@ -1184,7 +1184,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     buttons were focusable but stayed at opacity 0, so the controls
                     existed and could not be seen. group-focus-within reveals the
                     group as soon as focus lands inside it. */}
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-1 bg-slate-900/80 rounded-lg p-0.5 z-10">
+                <div className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-within:opacity-100 transition-opacity flex gap-0.5 bg-slate-900/80 backdrop-blur-xs rounded-md p-0.5 border border-white/10 z-10">
                   <button
                     type="button"
                     aria-label={t('newtab.editSpeedDial', { name: dial.name })}
@@ -1194,9 +1194,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                       setUrlError('');
                       setIsEditModalOpen(true);
                     }}
-                    className="p-1.5 text-slate-300 hover:text-white rounded cursor-pointer"
+                    className="p-1 text-slate-300 hover:text-white hover:bg-white/10 rounded transition-colors cursor-pointer"
                   >
-                    <Edit2 className="w-4 h-4" />
+                    <Edit2 className="w-3 h-3" />
                   </button>
                   <button
                     type="button"
@@ -1205,9 +1205,9 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                       e.stopPropagation();
                       handleDeleteSpeedDial(dial.id);
                     }}
-                    className="p-1.5 text-red-400 hover:text-red-300 rounded cursor-pointer"
+                    className="p-1 text-red-400 hover:text-red-300 hover:bg-white/10 rounded transition-colors cursor-pointer"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-3 h-3" />
                   </button>
                 </div>
               </motion.div>

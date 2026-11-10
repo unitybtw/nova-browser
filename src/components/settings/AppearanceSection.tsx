@@ -454,8 +454,8 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                     </div>
                     <ToggleSwitch
                       ariaLabel="Toggle tasks widget"
-                      checked={settings.showTasksWidget !== false}
-                      onToggle={() => onUpdateSettings({ showTasksWidget: settings.showTasksWidget === false ? true : false })}
+                      checked={Boolean(settings.showTasksWidget)}
+                      onToggle={() => onUpdateSettings({ showTasksWidget: !settings.showTasksWidget })}
                     />
                   </div>
                 </div>
