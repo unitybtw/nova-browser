@@ -746,6 +746,13 @@ export const BrowserView: React.FC<BrowserViewProps> = React.memo(({
       if (origin && origin !== actualOrigin) return;
       if (hostname && hostname !== actualHostname) return;
 
+      // Security: Never offer to save passwords on unencrypted remote HTTP origins
+      const isSecureOrigin = actualOrigin.startsWith('https://') || actualHostname === 'localhost' || actualHostname === '127.0.0.1';
+      if (!isSecureOrigin) {
+        console.warn('[Security] Refusing to store credentials over insecure HTTP connection:', actualOrigin);
+        return;
+      }
+
       const cleanUser = String(username).substring(0, 100);
       const cleanPass = String(password).substring(0, 500);
 

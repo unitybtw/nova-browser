@@ -2944,11 +2944,16 @@ fi
           return;
         }
 
+        const isGithubS3 = parsedCur.hostname.endsWith('.amazonaws.com') &&
+                              (parsedCur.hostname.startsWith('github-production-release-asset-') ||
+                               parsedCur.hostname.startsWith('github-cloud.') ||
+                               parsedCur.hostname.startsWith('github-production-user-asset-'));
+
         const isTrustedHost = parsedCur.hostname === 'github.com' ||
                               parsedCur.hostname === 'www.github.com' ||
                               parsedCur.hostname === 'objects.githubusercontent.com' ||
                               parsedCur.hostname.endsWith('.githubusercontent.com') ||
-                              parsedCur.hostname.endsWith('.amazonaws.com');
+                              isGithubS3;
 
         if (!isTrustedHost || parsedCur.protocol !== 'https:') {
           fileStream.close();
@@ -5389,8 +5394,11 @@ ipcMain.handle('store-set', async (event, key: string, value: string) => {
     // (invalid JSON) and the losing rename rejected with ENOENT.
     const tmpPath = `${keyPath}.${process.pid}.${crypto.randomUUID()}.tmp`;
     try {
-      await fs.promises.writeFile(tmpPath, value, 'utf-8');
+      await fs.promises.writeFile(tmpPath, value, { encoding: 'utf-8', mode: 0o600 });
       await fs.promises.rename(tmpPath, keyPath);
+      if (process.platform !== 'win32') {
+        try { await fs.promises.chmod(keyPath, 0o600); } catch (_) {}
+      }
     } catch (writeErr) {
       try { await fs.promises.unlink(tmpPath); } catch (_) {}
       throw writeErr;

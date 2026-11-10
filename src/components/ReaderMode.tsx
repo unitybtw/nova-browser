@@ -128,7 +128,7 @@ export function sanitizeReaderContent(content: string, isPrivate = false): strin
       ADD_TAGS: ['figure', 'figcaption', 'picture', 'source', 'mark'],
       FORBID_TAGS: ['script', 'style', 'iframe', 'frame', 'object', 'embed', 'applet', 'svg', 'math', 'form', 'input', 'button', ...(isPrivate ? ['img', 'picture', 'source', 'audio', 'video'] : [])],
       FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style', 'color', 'bgcolor', 'background'],
-      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+      ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto|tel):|data:image\/(?:png|jpe?g|webp|gif|avif|bmp|ico);base64,[a-z0-9+/=]+$|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
     });
 }
 
