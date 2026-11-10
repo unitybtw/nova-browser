@@ -59,6 +59,7 @@ import {
   SHORTCUT_GROUPS,
   HELP_FAQS,
 } from '../src/components/HelpModal';
+import { CHANGELOG_DATA } from '../src/data/changelog';
 
 async function main() {
   console.log('--- Component correctness regressions ---');
@@ -770,6 +771,62 @@ async function main() {
       check(`TopBar no longer imports ${dead}`, !new RegExp(`^import .*\\b${dead}\\b`, 'm').test(src));
     }
     check('OmniboxBar is still re-exported from TopBar', /export \{ OmniboxBar \}/.test(src));
+  }
+
+  // =========================================================================
+  // 7. Changelog infrastructure: dynamic media galleries, asset validity & IPC
+  // =========================================================================
+  console.log('--- 7. Changelog dynamic media infrastructure ---');
+
+  {
+    check('changelog data has at least 10 releases', CHANGELOG_DATA.length >= 10);
+    check('latest release in changelog is 1.5.2', CHANGELOG_DATA[0]?.version === '1.5.2');
+
+    const publicDir = path.resolve(__dirname, '../public');
+    const checkedAssets = new Set<string>();
+
+    for (const release of CHANGELOG_DATA) {
+      check(`release ${release.version} has hero defined`, Boolean(release.hero && release.hero.src));
+      check(
+        `release ${release.version} has multi-item mediaGallery`,
+        Boolean(release.mediaGallery && release.mediaGallery.length >= 2)
+      );
+
+      const allMedia = [
+        release.hero,
+        ...(release.mediaGallery || []),
+        ...(release.sections || []).map(s => s.media),
+      ].filter(Boolean);
+
+      for (const m of allMedia) {
+        if (!m || checkedAssets.has(m.src)) continue;
+        checkedAssets.add(m.src);
+        const relPath = m.src.replace(/^\.\//, '');
+        const fullPath = path.join(publicDir, relPath);
+        check(`asset exists on disk: ${m.src}`, fs.existsSync(fullPath));
+      }
+    }
+
+    const topHeroes = CHANGELOG_DATA.slice(0, 5).map(r => r.hero?.src);
+    const uniqueHeroes = new Set(topHeroes);
+    check(
+      'top releases have distinct heroes (no single repetitive placeholder)',
+      uniqueHeroes.size >= 4,
+      `found ${uniqueHeroes.size} unique heroes`
+    );
+
+    const mediaSrc = readCode('components/changelog/ReleaseMedia.tsx');
+    check(
+      'ReleaseMedia has eliminated restrictive version === 1.5.0 check',
+      !/release\.version === '1\.5\.0'/.test(mediaSrc)
+    );
+
+    const walkthroughSrc = readCode('components/changelog/UpdateWalkthrough.tsx');
+    check(
+      'UpdateWalkthrough uses getElectronAPI instead of window.electronAPI',
+      !/window\.electronAPI\?\.checkForUpdates/.test(walkthroughSrc) &&
+      /getElectronAPI\(\)\?\.checkForUpdates/.test(walkthroughSrc)
+    );
   }
 
   console.log(`\n${passed} component correctness regression checks passed\n`);

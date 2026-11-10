@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { Check, Download, RefreshCw, ArrowRight, Monitor } from 'lucide-react';
 import { useTranslation } from '../../services/i18n';
+import { getElectronAPI } from '../../utils/electronBridge';
 import { UpdateWidget } from '../settings/UpdateWidget';
 
 export function UpdateWalkthrough() {
@@ -23,7 +24,7 @@ export function UpdateWalkthrough() {
         <p className="journal-demo-note">{t('releaseJournal.illustration')}</p>
       </div>
       <aside className="journal-update-live"><div className="journal-update-live-heading"><Monitor size={18} /><h3>{t('releaseJournal.thisDevice')}</h3></div>
-        {window.electronAPI?.checkForUpdates ? <div className="journal-device-widget"><UpdateWidget /></div> : <><p>{t('releaseJournal.desktopOnly')}</p><a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noopener noreferrer">{t('changelog.githubReleases')}<ArrowRight size={16} /></a></>}
+        {getElectronAPI()?.checkForUpdates ? <div className="journal-device-widget"><UpdateWidget /></div> : <><p>{t('releaseJournal.desktopOnly')}</p><a href="https://github.com/unitybtw/nova-browser/releases" target="_blank" rel="noopener noreferrer">{t('changelog.githubReleases')}<ArrowRight size={16} /></a></>}
       </aside>
     </div>
   </section>;

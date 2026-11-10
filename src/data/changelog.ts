@@ -3,11 +3,15 @@ export interface ChangelogItem {
   text: string;
 }
 
-/** A real product screenshot shipped in /public/screenshots. */
+/** A real product screenshot or demo video shipped in /public. */
 export interface ReleaseMedia {
   src: string;
   alt: string;
   caption?: string;
+  kind?: 'image' | 'video';
+  title?: string;
+  poster?: string;
+  captions?: string;
 }
 
 export interface ReleaseStat {
@@ -35,6 +39,7 @@ export interface ReleaseVersion {
   badge?: string;
   lede?: string;
   hero?: ReleaseMedia;
+  mediaGallery?: ReleaseMedia[];
   highlights: string[];
   changes: ChangelogItem[];
   sections?: ReleaseSection[];
@@ -48,10 +53,33 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     badge: 'Latest Release',
     lede: 'Zero-latency instant startup with asynchronous extension loading, pre-bundled core dependencies, cooperative reader micro-yielding, 300ms throttled adblock badge batching, fine-grained secure store RWLock concurrency, and layout thrashing elimination.',
     hero: {
-      src: './screenshots/newtab.png',
-      alt: 'Nova Browser v1.5.2 interface.',
+      src: './screenshots/vertical-clean-light.jpg',
+      alt: 'Nova Browser v1.5.2 interface with vertical tabs and optimized layout.',
       caption: 'Nova v1.5.2: Streamlined startup sequence, sub-millisecond crypto operations, and zero-jank frame pacing.',
     },
+    mediaGallery: [
+      {
+        src: './screenshots/vertical-clean-light.jpg',
+        kind: 'image',
+        title: 'Vertical Tabs & Instant Startup',
+        alt: 'Nova Browser v1.5.2 vertical tabs layout with instantaneous window startup',
+        caption: 'Asynchronous extension restoration and optimized React reconciliation eliminate startup bottlenecks.',
+      },
+      {
+        src: './screenshots/horizontal-newtab.png',
+        kind: 'image',
+        title: 'Pre-bundled Dependencies & Speed Dials',
+        alt: 'Horizontal tab layout with speed dials and pre-bundled dependencies',
+        caption: 'Vite optimizeDeps pre-bundling prevents runtime re-optimization freezes and reload cascades.',
+      },
+      {
+        src: './screenshots/horizontal-clean-light.jpg',
+        kind: 'image',
+        title: 'Keyed RWLock & Zero-Jank Frame Pacing',
+        alt: 'Clean browser frame with 120fps window operations',
+        caption: 'Fine-grained SecureStoreKeyedRWLock prevents head-of-line blocking and write-write races across secure storage.',
+      },
+    ],
     highlights: [
       'Eliminated startup latency by moving persistent extension restoration to asynchronous background loading.',
       'Pre-bundled core dependencies in Vite optimizeDeps, preventing runtime re-optimization freezes and reload cascades.',
@@ -99,10 +127,33 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     title: 'CodeQL Security Remediation, On-Device Whisper STT & 25 Native MCP Tools',
     lede: 'Comprehensive remediation of all 28 CodeQL static security alerts, offline Whisper speech recognition runtime, expanded 25-tool Model Context Protocol (MCP) server, and hardened tab virtualization.',
     hero: {
-      src: './screenshots/newtab.png',
-      alt: 'Nova Browser v1.5.1 interface.',
+      src: './screenshots/preview.png',
+      alt: 'Nova Browser v1.5.1 interface with AI assistant side panel.',
       caption: 'Nova v1.5.1: Zero CodeQL security alerts, private offline speech transcription, and native agent automation.',
     },
+    mediaGallery: [
+      {
+        src: './screenshots/preview.png',
+        kind: 'image',
+        title: 'AI Sidepanel & On-Device Whisper STT',
+        alt: 'Nova AI Assistant sidepanel with speech-to-text input and response streaming',
+        caption: 'Local Whisper speech-to-text integration using ONNX whisper-tiny with 0 KB audio data leaving the machine.',
+      },
+      {
+        src: './screenshots/horizontal-preview.png',
+        kind: 'image',
+        title: '25 Native MCP Agent Tools',
+        alt: 'Model Context Protocol inspection tools in Nova Browser',
+        caption: 'Native MCP server enabling Claude Desktop, Cursor, and custom autonomous agents to inspect and control web tabs.',
+      },
+      {
+        src: './screenshots/horizontal-assistant-clean-light.jpg',
+        kind: 'image',
+        title: 'CodeQL Security & Tab Virtualization',
+        alt: 'Hardened TopBar tab strip and sanitized renderer DOM',
+        caption: 'Resolved all 28 CodeQL static security alerts across TOCTOU file races, DOM sanitization, and URL anchoring.',
+      },
+    ],
     highlights: [
       'Remediated 28 CodeQL security alerts across main process and renderer (DOM XSS, file TOCTOU race conditions, regex anchors).',
       'Local on-device Whisper speech-to-text integration using ONNX whisper-tiny with 0 KB audio data leaving the machine.',
@@ -148,10 +199,42 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     title: 'Webview Stability, Anti-Bot Compatibility & Hardened Session Lifecycle',
     lede: 'Eliminated automated bot false-positives across search engines, resolved webview redirect loops affecting modern dynamic web apps like YouTube, and unified partition cleanup across multi-tab teardown.',
     hero: {
-      src: './screenshots/newtab.png',
+      src: './changelog/newtab.jpg',
       alt: 'Nova Browser v1.5.0 interface.',
       caption: 'Nova v1.5.0: Smooth navigation, authentic webview identity, and robust streaming media playback.',
     },
+    mediaGallery: [
+      {
+        src: './changelog/nova-tour.mp4',
+        kind: 'video',
+        title: 'Nova Product Film (27s)',
+        alt: 'Nova product walkthrough film showing speed, UI, and privacy',
+        poster: './changelog/nova-tour.poster.jpg',
+        captions: './changelog/nova-tour.en.vtt',
+      },
+      {
+        src: './changelog/update-guide.mp4',
+        kind: 'video',
+        title: 'Update Guide Film (18s)',
+        alt: 'Interactive update guide showing seamless downloads and restarts',
+        poster: './changelog/update-guide.poster.jpg',
+        captions: './changelog/update-guide.en.vtt',
+      },
+      {
+        src: './changelog/newtab.jpg',
+        kind: 'image',
+        title: 'Webview Stability & Anti-Bot Compatibility',
+        alt: 'Nova new tab with clean webview environment',
+        caption: 'Standardized client identity preventing CAPTCHA false-positives and YouTube blank screen loops.',
+      },
+      {
+        src: './changelog/assistant.jpg',
+        kind: 'image',
+        title: 'Hardened Session Lifecycle & Incognito Teardown',
+        alt: 'Nova assistant and isolated session partition',
+        caption: 'Batch tab closure operations strictly purge isolated incognito partitions without leaving residual cookies or memory behind.',
+      },
+    ],
     highlights: [
       'Standardized webview client identity and prototype emulation to prevent search engine CAPTCHA false-positives.',
       'Dynamic URL equivalence matching resolving infinite reload loops on complex SPA and video platforms including YouTube.',
@@ -195,10 +278,33 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     title: 'Private Tab Navigation, Encrypted Vault Conflict Resolution & Local Whisper AI',
     lede: 'Switching between private and normal tabs, client-side encrypted synchronization with race condition resilience, on-device Whisper voice transcription, and browser boundary improvements.',
     hero: {
-      src: './screenshots/newtab.png',
-      alt: 'Nova Browser v1.4.9 release interface.',
+      src: './screenshots/sync.png',
+      alt: 'Nova Browser v1.4.9 release interface with encrypted sync.',
       caption: 'Nova v1.4.9: Sovereign desktop browsing with offline AI speech recognition and bulletproof privacy controls.',
     },
+    mediaGallery: [
+      {
+        src: './screenshots/sync.png',
+        kind: 'image',
+        title: 'Deterministic Encrypted Vault Sync',
+        alt: 'Nova sync settings and end-to-end encryption vault',
+        caption: 'Sync conflicts resolve deterministically with field-level LWW clocks and automatic race retries.',
+      },
+      {
+        src: './screenshots/sync-clean-light.jpg',
+        kind: 'image',
+        title: 'Encrypted Multi-Device Pairing',
+        alt: 'Clean pairing cards and verified AES-256-GCM envelope v2 verification',
+        caption: 'Client-side AES-256-GCM envelope v2 verification and tombstone tracking purges deleted items cleanly.',
+      },
+      {
+        src: './screenshots/vertical-assistant-clean-light.jpg',
+        kind: 'image',
+        title: 'Private Whisper Voice Engine & Workspaces',
+        alt: 'Vertical tabs and private on-device voice recognition',
+        caption: 'Local WebAssembly Whisper model transcribes spoken commands entirely on your device with zero telemetry.',
+      },
+    ],
     highlights: [
       'Private tabs lifecycle hardened: effortless switching to normal tabs with automatic session cleanup and UI badge indicators.',
       'Encrypted Sync Vault upgraded with LWW timestamp verification, conflict resolution retries, and tombstone propagation.',
@@ -252,11 +358,26 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     title: 'Security Hardening, Browser Identity & 120Hz Fluid Motion',
     lede: 'Nova stopped pretending to be Chrome. Requests now carry Chromium’s own identity, every download and autofill boundary is fenced off, and the whole interface moves at 120Hz.',
     hero: {
-      src: './screenshots/newtab.png',
-      alt: 'Nova Browser new tab with a gradient background, a large clock, a search field and speed dials for Google, GitHub, YouTube, Reddit and Wikipedia.',
-      caption:
-        'The new tab: gradient, clock and greeting, search with tracking protection, and speed dials one click away.',
+      src: './screenshots/horizontal-newtab.png',
+      alt: 'Horizontal Nova Browser new tab with a clock, search bar, a row of speed dials and a Nova AI button in the toolbar.',
+      caption: 'Horizontal new tab: clock, search, speed dials and Nova AI always within reach.',
     },
+    mediaGallery: [
+      {
+        src: './screenshots/horizontal-newtab.png',
+        kind: 'image',
+        title: 'Chromium Native Client Hints & LRU Cache',
+        alt: 'Nova Browser with native client hints and instant search cache',
+        caption: 'Precomputed headers outside onBeforeSendHeaders hot path and LRU search suggestion cache.',
+      },
+      {
+        src: './screenshots/newtab.png',
+        kind: 'image',
+        title: '120Hz Fluid Motion & Tracking Shield',
+        alt: 'New tab with 120Hz Lenis momentum scrolling',
+        caption: '120Hz Lenis momentum scrolling, zero-thrash ScrollSpy, and autofill origin boundary isolation.',
+      },
+    ],
     highlights: [
       'Browser requests now keep Chromium’s native user-agent and Client Hints consistent.',
       'Comprehensive security hardening: repository update confinement, download filename/origin sanitization, and autofill isolation.',
@@ -349,6 +470,27 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     date: 'September 2026',
     title: 'Split View Overhaul, Tab Engine Ergonomics & Customization',
     lede: 'Split view stopped fighting the page. The header moved into a native 32px bar, the floating badge that covered site headers is gone, and switching tabs no longer reloads what you were reading.',
+    hero: {
+      src: './screenshots/preview.png',
+      alt: 'Nova Browser with redesigned split view header bar.',
+      caption: 'Nova v1.4.7: Native 32px split pane header bar, zero site obstruction, and warm DOM tab persistence.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/preview.png',
+        kind: 'image',
+        title: 'Native 32px Split Pane Header Bar',
+        alt: 'Nova Browser split view header bar positioned cleanly above webviews',
+        caption: 'Controls live in a clean header above webviews, eliminating intrusive floating badges.',
+      },
+      {
+        src: './screenshots/vertical-clean-light.jpg',
+        kind: 'image',
+        title: 'Persistent Views Container & Warm DOM',
+        alt: 'Vertical tabs and persistent webviews',
+        caption: 'Tab switching preserves webview DOM without reloading what you were reading.',
+      },
+    ],
     highlights: [
       'Redesigned split view with non-intrusive native header bars and zero website obstruction.',
       'Unified persistent views container eliminating tab switch and split view reload churn.',
@@ -430,6 +572,27 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     date: 'September 2026',
     title: 'Updater Bloat Prevention, Security Hardening & Integrity',
     lede: 'Installers were piling up in your profile folder forever. Now they clean up after themselves, key derivation got 30× heavier, and the benchmark page stopped publishing numbers nobody could reproduce.',
+    hero: {
+      src: './screenshots/horizontal-clean-light.jpg',
+      alt: 'Nova Browser profile cleanup and updater integrity.',
+      caption: 'Nova v1.4.6: Background artifact garbage collection and 600,000 PBKDF2 rounds key derivation.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/horizontal-clean-light.jpg',
+        kind: 'image',
+        title: 'Artifact Garbage Collection',
+        alt: 'Profile folder without disk bloat',
+        caption: 'Automatic cleanup of leftover installer packages, temporary downloads, and stale update directories.',
+      },
+      {
+        src: './screenshots/newtab.png',
+        kind: 'image',
+        title: '600k PBKDF2 Iterations & Staging Checks',
+        alt: 'Security verification and PBKDF2 key derivation',
+        caption: 'PBKDF2 key derivation upgraded to 600,000 rounds for sync and credential encryption.',
+      },
+    ],
     highlights: [
       'Automatic cleanup of leftover installer packages, temporary downloads, and stale update directories.',
       'PBKDF2 key derivation upgraded to 600,000 rounds for sync and credential encryption.',
@@ -498,6 +661,27 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     date: 'September 2026',
     title: 'Silent Auto-Update Pipeline & Privacy Shield Upgrades',
     lede: 'Updates download inside the app with real progress and speed, macOS and Windows installers clean up after themselves, and the search box stopped firing requests nobody will read the answer to.',
+    hero: {
+      src: './screenshots/horizontal-newtab.png',
+      alt: 'Nova Browser in-app update downloader with transfer metrics.',
+      caption: 'Nova v1.4.5: Real-time update progress, background scripts, and search request abort controllers.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/horizontal-newtab.png',
+        kind: 'image',
+        title: 'In-App Update Downloader',
+        alt: 'In-app update downloader with live transfer speed',
+        caption: 'In-app update downloading with real-time transfer progress and transfer speed metrics.',
+      },
+      {
+        src: './screenshots/sync-clean-light.jpg',
+        kind: 'image',
+        title: 'Search Autocomplete Abort Controller',
+        alt: 'Search debounce and immediate cancellation of obsolete requests',
+        caption: 'Instant cancellation of obsolete in-flight suggestion requests on every keystroke.',
+      },
+    ],
     highlights: [
       'In-app update downloading with real-time transfer progress and transfer speed metrics.',
       'Autonomous background updater scripts for macOS DMG/ZIP and Windows EXE installations.',
@@ -548,6 +732,27 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     date: 'September 2026',
     title: 'Model Context Protocol (MCP) & GPU Memory Optimization',
     lede: 'Nova speaks Model Context Protocol, so Claude Desktop, Cursor and your own agents can drive the browser. When the local model goes idle, the GPU gets its memory back instead of holding it forever.',
+    hero: {
+      src: './screenshots/horizontal-preview.png',
+      alt: 'Nova Browser with the Nova AI side panel open, a local Llama 3.2 3B model selected, and a tool call listing the open tabs.',
+      caption: 'Nova AI side panel with a local Llama 3.2 3B model, answering from the page in front of you.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/horizontal-preview.png',
+        kind: 'image',
+        title: 'Nova AI & Model Context Protocol',
+        alt: 'Nova AI with local LLM and MCP server',
+        caption: 'Built-in MCP server speaks to Claude Desktop, Cursor, and custom agent integrations.',
+      },
+      {
+        src: './screenshots/vertical-assistant-clean-light.jpg',
+        kind: 'image',
+        title: 'GPU VRAM Parking & Yielding',
+        alt: 'Clean GPU memory management',
+        caption: 'Dynamic VRAM deallocation and auto-parking when the local AI engine is idle.',
+      },
+    ],
     highlights: [
       'Integrated Model Context Protocol (MCP) server for local AI assistant tools and automation.',
       'Automatic GPU VRAM parking after inactivity to keep the system cool and responsive.',
@@ -604,6 +809,27 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
     date: 'August 2026',
     title: 'Chrome Web Store Extensions & Encrypted Sync',
     lede: 'Install extensions from the Chrome Web Store directly and synchronize devices through your cloud account with client-side encrypted data.',
+    hero: {
+      src: './screenshots/sync.png',
+      alt: 'Nova Sync interface showing encryption and device management.',
+      caption: 'Nova v1.4.3: Direct Chrome Web Store installs and client-side encrypted sync.',
+    },
+    mediaGallery: [
+      {
+        src: './screenshots/sync.png',
+        kind: 'image',
+        title: 'Client-Side Encrypted Sync',
+        alt: 'Nova encrypted sync interface',
+        caption: 'Client-side AES-256-GCM encryption with 600,000 PBKDF2 iterations.',
+      },
+      {
+        src: './screenshots/sync-clean-light.jpg',
+        kind: 'image',
+        title: 'Chrome Web Store Extension Engine',
+        alt: 'Clean extension management and popup shielding',
+        caption: 'Direct Manifest V3 extension installation from the Chrome Web Store with sliding-window popup rate limiting.',
+      },
+    ],
     highlights: [
       'Direct Manifest V3 extension installation from the Chrome Web Store.',
       'Client-side encrypted sync for bookmarks, history, and settings using AES-256-GCM; authentication-provider trust still applies.',
@@ -670,6 +896,22 @@ export const CHANGELOG_DATA: ReleaseVersion[] = [
       caption:
         'The vertical sidebar: spaces, quick links and workspace tabs in one column, with Nova AI beside it.',
     },
+    mediaGallery: [
+      {
+        src: './screenshots/preview.png',
+        kind: 'image',
+        title: 'Workspaces & AI Side Panel',
+        alt: 'Vertical sidebar and workspaces in Nova Browser',
+        caption: 'The vertical sidebar: spaces, quick links and workspace tabs in one column, with Nova AI beside it.',
+      },
+      {
+        src: './screenshots/vertical-clean-light.jpg',
+        kind: 'image',
+        title: 'Integrated Reader Mode & Split View',
+        alt: 'Clean reader mode and split view layout',
+        caption: 'Distraction-free reading with on-device text-to-speech and side-by-side split view.',
+      },
+    ],
     highlights: [
       'Arc-inspired vertical sidebar tabs with customizable workspaces.',
       'Side-by-side Split View for simultaneous multi-tab productivity.',

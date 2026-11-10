@@ -1,4 +1,5 @@
 import { CHANGELOG_DATA, ReleaseVersion, ChangelogItem, ReleaseMedia, ReleaseSection } from '../data/changelog';
+import { getElectronAPI } from '../utils/electronBridge';
 
 const LOCAL_STORAGE_CACHE_KEY = 'nova_dynamic_changelog_cache_v2';
 
@@ -159,7 +160,7 @@ function fetchLiveFromMain(forceRefresh = false): Promise<ChangelogResult> {
 
 async function requestLiveFromMain(forceRefresh: boolean): Promise<ChangelogResult> {
   try {
-    const api = (window as any).electronAPI;
+    const api = getElectronAPI();
     if (api?.getChangelogReleases) {
       const remoteReleases = await api.getChangelogReleases(forceRefresh);
       if (Array.isArray(remoteReleases) && remoteReleases.length > 0) {
@@ -276,6 +277,13 @@ function sanitizeRelease(value: unknown): ReleaseVersion | null {
   const hero = sanitizeMedia(value.hero);
   if (hero) release.hero = hero;
 
+  if (Array.isArray(value.mediaGallery)) {
+    const gallery = value.mediaGallery
+      .map(sanitizeMedia)
+      .filter((m): m is ReleaseMedia => Boolean(m));
+    if (gallery.length > 0) release.mediaGallery = gallery;
+  }
+
   const sections = sanitizeSections(value.sections);
   if (sections) release.sections = sections;
 
@@ -311,6 +319,10 @@ function sanitizeMedia(value: unknown): ReleaseMedia | undefined {
     alt: typeof value.alt === 'string' ? value.alt : '',
   };
   if (typeof value.caption === 'string') media.caption = value.caption;
+  if (value.kind === 'image' || value.kind === 'video') media.kind = value.kind;
+  if (typeof value.title === 'string') media.title = value.title;
+  if (typeof value.poster === 'string') media.poster = value.poster;
+  if (typeof value.captions === 'string') media.captions = value.captions;
   return media;
 }
 
