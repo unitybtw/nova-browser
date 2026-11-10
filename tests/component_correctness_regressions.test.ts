@@ -43,6 +43,8 @@ import {
   addSpeedDial,
   formatWallpaperCreditTitle,
   formatWallpaperCreditAuthor,
+  getSuggestedSiteName,
+  POPULAR_SHORTCUT_PRESETS,
   type SpeedDial,
 } from '../src/components/NewTabPage';
 import { resolveMenuFocusIndex } from '../src/components/TabContextMenu';
@@ -397,6 +399,30 @@ async function main() {
     check('an empty title stays empty rather than throwing', formatWallpaperCreditTitle('') === '');
     check('a fully-decorated title falls back to the original',
       formatWallpaperCreditTitle('4K 4K') === '4K 4K');
+  }
+
+  // --- 2c. shortcut preview and smart autofill ---
+  {
+    const code = readCode('components/NewTabPage.tsx');
+    check('shortcut preview never falls back to fake google',
+      !/editingDial\.url\s*\|\|\s*['"]https:\/\/google\.com['"]/.test(code));
+    check('shortcut save button is disabled when url is empty',
+      /disabled=\{!editingDial\.url\.trim\(\)\}/.test(code));
+    check('shortcut modal offers popular quick presets',
+      /POPULAR_SHORTCUT_PRESETS\.map/.test(code));
+    check('getSuggestedSiteName handles well-known domains',
+      getSuggestedSiteName('youtube.com') === 'YouTube' &&
+      getSuggestedSiteName('github.com') === 'GitHub' &&
+      getSuggestedSiteName('reddit.com') === 'Reddit' &&
+      getSuggestedSiteName('x.com') === 'X' &&
+      getSuggestedSiteName('twitch.tv') === 'Twitch');
+    check('getSuggestedSiteName handles arbitrary domains with capitalization',
+      getSuggestedSiteName('myservice.com') === 'Myservice' &&
+      getSuggestedSiteName('https://sub.platform.org') === 'Sub');
+    check('getSuggestedSiteName handles empty input without error',
+      getSuggestedSiteName('') === '');
+    check('popular shortcut presets array is populated',
+      Array.isArray(POPULAR_SHORTCUT_PRESETS) && POPULAR_SHORTCUT_PRESETS.length >= 6);
   }
 
   // =========================================================================

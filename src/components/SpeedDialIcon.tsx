@@ -50,6 +50,10 @@ export const SpeedDialIcon: React.FC<SpeedDialIconProps> = React.memo(({ name, u
   const cleanDomain = getCleanDomain(domain || url);
   const [loadErrorStage, setLoadErrorStage] = useState<number>(0);
 
+  if (!cleanDomain && !url) {
+    return <Globe className="w-5 h-5 text-slate-400 dark:text-slate-500" aria-hidden="true" />;
+  }
+
   // 1. Wikipedia
   if (cleanDomain.includes('wikipedia') || name.toLowerCase().includes('wikipedia')) {
     return (

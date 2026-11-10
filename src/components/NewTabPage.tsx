@@ -278,6 +278,55 @@ export function formatWallpaperCreditAuthor(author: string): string {
     .trim() || author;
 }
 
+/**
+ * Suggests a clean display name for a website given its domain or hostname.
+ */
+export function getSuggestedSiteName(domain: string): string {
+  if (!domain) return '';
+  const clean = domain.toLowerCase().replace(/^(?:https?:\/\/)?(?:www\.)?/, '').split('/')[0].split(':')[0];
+  const POPULAR_NAMES: Record<string, string> = {
+    'google.com': 'Google',
+    'youtube.com': 'YouTube',
+    'github.com': 'GitHub',
+    'reddit.com': 'Reddit',
+    'wikipedia.org': 'Wikipedia',
+    'twitter.com': 'Twitter',
+    'x.com': 'X',
+    'twitch.tv': 'Twitch',
+    'linkedin.com': 'LinkedIn',
+    'instagram.com': 'Instagram',
+    'facebook.com': 'Facebook',
+    'discord.com': 'Discord',
+    'netflix.com': 'Netflix',
+    'spotify.com': 'Spotify',
+    'amazon.com': 'Amazon',
+    'chatgpt.com': 'ChatGPT',
+    'openai.com': 'OpenAI',
+    'claude.ai': 'Claude',
+    'stackoverflow.com': 'Stack Overflow',
+  };
+  if (POPULAR_NAMES[clean]) {
+    return POPULAR_NAMES[clean];
+  }
+  const parts = clean.split('.');
+  if (parts.length >= 2) {
+    const namePart = parts[0];
+    if (namePart) {
+      return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+    }
+  }
+  return clean ? clean.charAt(0).toUpperCase() + clean.slice(1) : '';
+}
+
+export const POPULAR_SHORTCUT_PRESETS = [
+  { name: 'YouTube', url: 'https://youtube.com' },
+  { name: 'GitHub', url: 'https://github.com' },
+  { name: 'Reddit', url: 'https://reddit.com' },
+  { name: 'Wikipedia', url: 'https://wikipedia.org' },
+  { name: 'X', url: 'https://x.com' },
+  { name: 'Twitch', url: 'https://twitch.tv' },
+];
+
 // Session-level flag: only run the entrance animation once on initial application launch
 let hasAnimatedInitialLaunch = false;
 
@@ -360,20 +409,45 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   useModalFocusTrap(isEditModalOpen, handleCloseEditModal, editModalRef);
 
   const previewUrl = useMemo(() => {
-    return normalizeNavigationUrl(editingDial.url || 'https://google.com');
+    const raw = (editingDial.url || '').trim();
+    if (!raw) return '';
+    return normalizeNavigationUrl(raw);
   }, [editingDial.url]);
 
   const previewDomain = useMemo(() => {
+    if (!previewUrl) return '';
     return getCleanDomain(previewUrl) || '';
   }, [previewUrl]);
 
   const previewName = useMemo(() => {
     if (editingDial.name.trim()) return editingDial.name.trim();
     if (previewDomain) {
-      return previewDomain.charAt(0).toUpperCase() + previewDomain.slice(1);
+      return getSuggestedSiteName(previewDomain);
     }
-    return editingDial.id !== null ? 'Shortcut' : (language === 'tr' ? 'Kısayol Önizleme' : 'Shortcut Preview');
+    return editingDial.id !== null
+      ? (language === 'tr' ? 'Kısayol' : 'Shortcut')
+      : (language === 'tr' ? 'Yeni Kısayol' : 'New Shortcut');
   }, [editingDial.name, previewDomain, editingDial.id, language]);
+
+  const handleUrlChange = useCallback((newUrl: string) => {
+    if (urlError) setUrlError('');
+    const trimmed = newUrl.trim();
+    const normalized = trimmed ? normalizeNavigationUrl(trimmed) : '';
+    const newDomain = normalized ? getCleanDomain(normalized) : '';
+    const newSuggested = newDomain ? getSuggestedSiteName(newDomain) : '';
+
+    setEditingDial(prev => {
+      const prevDomain = prev.url ? getCleanDomain(normalizeNavigationUrl(prev.url.trim())) : '';
+      const prevSuggested = prevDomain ? getSuggestedSiteName(prevDomain) : '';
+      const isUntouchedOrAuto = !prev.name.trim() || prev.name.trim() === prevSuggested;
+
+      return {
+        ...prev,
+        url: newUrl,
+        name: isUntouchedOrAuto && newSuggested ? newSuggested : prev.name,
+      };
+    });
+  }, [urlError]);
 
   const [todos, setTodos] = useSharedLocalStorageState<Todo[]>(
     'nova_todos',
@@ -518,11 +592,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
   };
 
   const handleAddSpeedDial = () => {
-    if (!editingDial.url || !editingDial.url.trim()) {
+    const rawUrl = (editingDial.url || '').trim();
+    if (!rawUrl) {
       setUrlError(language === 'tr' ? 'Lütfen bir web adresi girin.' : 'Please enter a web address.');
       return;
     }
-    const url = normalizeNavigationUrl(editingDial.url);
+    const url = normalizeNavigationUrl(rawUrl);
     if (!isSafeNavigationUrl(url)) {
       setUrlError(language === 'tr' ? 'Geçerli ve güvenli bir web adresi girin.' : 'Please enter a valid, safe URL.');
       return;
@@ -534,7 +609,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
         return;
       }
       const rawName = (editingDial.name || '').trim();
-      const name = rawName || (domain.charAt(0).toUpperCase() + domain.slice(1));
+      const name = rawName || getSuggestedSiteName(domain);
       if (editingDial.id !== null) {
         const updated = updateSpeedDial(speedDials, editingDial.id, { name, url, domain });
         if (!updated) {
@@ -1372,7 +1447,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             role="dialog"
             aria-modal="true"
             aria-labelledby="shortcut-modal-title"
-            className="bg-white dark:bg-slate-900 p-6 rounded-xl shadow-xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
+            className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-200/90 dark:border-white/10 text-slate-900 dark:text-slate-100 select-auto outline-none"
           >
             {/* Header */}
             <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-slate-100 dark:border-white/10">
@@ -1402,16 +1477,24 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
             </div>
 
             {/* Live Visual Preview */}
-            <div className="flex items-center gap-3 p-2.5 rounded-xl bg-slate-100/80 dark:bg-slate-800/60 border border-slate-200/70 dark:border-white/10 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 flex items-center justify-center p-2 shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
-                <SpeedDialIcon name={previewName} url={previewUrl} domain={previewDomain} />
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-white/10 mb-4 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-white dark:bg-slate-900 flex items-center justify-center p-2 shadow-xs border border-slate-200/80 dark:border-white/10 shrink-0">
+                {previewDomain || previewUrl ? (
+                  <SpeedDialIcon name={previewName} url={previewUrl} domain={previewDomain} />
+                ) : (
+                  <Globe className="w-5 h-5 text-slate-400 dark:text-slate-500" aria-hidden="true" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
+                <div className={`text-xs font-semibold truncate ${
+                  previewDomain || editingDial.name.trim()
+                    ? 'text-slate-900 dark:text-slate-100'
+                    : 'text-slate-400 dark:text-slate-500'
+                }`}>
                   {previewName}
                 </div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono">
-                  {previewDomain || 'https://...'}
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate font-mono mt-0.5">
+                  {previewDomain || (language === 'tr' ? 'Önizleme için URL girin' : 'Enter URL to preview')}
                 </div>
               </div>
             </div>
@@ -1432,7 +1515,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder={language === 'tr' ? 'Örn. YouTube, GitHub...' : 'e.g. YouTube, GitHub...'}
-                  className="w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/90 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20 transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20 transition-all"
                 />
               </div>
               <div>
@@ -1443,16 +1526,13 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   id="shortcut-url-input"
                   type="text"
                   value={editingDial.url}
-                  onChange={(e) => {
-                    setEditingDial({ ...editingDial, url: e.target.value });
-                    if (urlError) setUrlError('');
-                  }}
+                  onChange={(e) => handleUrlChange(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleAddSpeedDial(); }}
                   placeholder={language === 'tr' ? 'Örn. https://youtube.com veya youtube.com' : 'e.g. https://youtube.com or youtube.com'}
-                  className={`w-full px-3.5 py-2.5 bg-slate-100/90 dark:bg-slate-800/90 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 dark:bg-slate-800/80 border rounded-xl text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 outline-none transition-all ${
                     urlError
                       ? 'border-rose-500 focus:ring-2 focus:ring-rose-500/20'
-                      : 'border-slate-200/90 dark:border-slate-700/80 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20'
+                      : 'border-slate-200 dark:border-slate-700/80 focus:border-cyan-500 dark:focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/20 dark:focus:ring-cyan-400/20'
                   }`}
                 />
                 {urlError && (
@@ -1461,6 +1541,33 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                   </p>
                 )}
               </div>
+
+              {editingDial.id === null && (
+                <div className="pt-0.5">
+                  <div className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                    {language === 'tr' ? 'Hızlı öneriler:' : 'Quick suggestions:'}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {POPULAR_SHORTCUT_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => {
+                          setEditingDial({
+                            id: null,
+                            name: preset.name,
+                            url: preset.url,
+                          });
+                          if (urlError) setUrlError('');
+                        }}
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                      >
+                        {preset.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer Actions */}
@@ -1493,7 +1600,12 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                 <button
                   type="button"
                   onClick={handleAddSpeedDial}
-                  className="px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer"
+                  disabled={!editingDial.url.trim()}
+                  className={`px-5 py-2 rounded-xl text-sm font-semibold transition-all shadow-xs ${
+                    !editingDial.url.trim()
+                      ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed opacity-60'
+                      : 'bg-accent hover:bg-accent-hover text-white cursor-pointer active:scale-[0.98]'
+                  }`}
                 >
                   {t('common.save')}
                 </button>
