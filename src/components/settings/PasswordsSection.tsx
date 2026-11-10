@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Key, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { showConfirm } from '../../utils/confirmDialog';
 import { getElectronAPI } from '../../utils/electronBridge';
+import { UserSettings } from '../../types/browser';
+import { ToggleSwitch } from './ToggleSwitch';
 
 function safeParseArray<T>(raw: string | null): T[] {
   if (!raw) return [];
@@ -119,9 +121,35 @@ const PasswordList = () => {
   );
 };
 
-export const PasswordsSection: React.FC = () => {
+export interface PasswordsSectionProps {
+  settings?: UserSettings;
+  onUpdateSettings?: (newSettings: Partial<UserSettings>) => void;
+}
+
+export const PasswordsSection: React.FC<PasswordsSectionProps> = ({ settings, onUpdateSettings }) => {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {settings && onUpdateSettings && (
+        <section>
+          <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Password Manager</h2>
+          </div>
+          <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 overflow-hidden">
+            <div className="p-5 flex items-center justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-slate-800 dark:text-slate-100">Offer to save passwords</div>
+                <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Save and autofill passwords on secure websites. Credentials are encrypted on this device.</div>
+              </div>
+              <ToggleSwitch
+                ariaLabel="Toggle password manager"
+                checked={settings.passwordManagerEnabled}
+                onToggle={() => onUpdateSettings({ passwordManagerEnabled: !settings.passwordManagerEnabled })}
+                activeColorClass="bg-indigo-500"
+              />
+            </div>
+          </div>
+        </section>
+      )}
       <section>
         <div className="flex items-center justify-between mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Saved Passwords</h2>

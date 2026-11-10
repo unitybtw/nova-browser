@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, ShieldCheck, Bot, Paintbrush, Cpu, Key, Keyboard, Puzzle, Cloud } from 'lucide-react';
+import { Settings, ShieldCheck, Sparkles, SlidersHorizontal, Paintbrush, Cpu, Key, Keyboard, Puzzle, Cloud } from 'lucide-react';
 import { UserSettings } from '../types/browser';
 
 import { GeneralSection } from './settings/GeneralSection';
@@ -11,6 +11,7 @@ import { SyncSection } from './settings/SyncSection';
 import { PrivacySection } from './settings/PrivacySection';
 import { PasswordsSection } from './settings/PasswordsSection';
 import { AdvancedSection } from './settings/AdvancedSection';
+import { AISection } from './settings/AISection';
 
 export interface SettingsPageProps {
   url?: string;
@@ -33,12 +34,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onPurgeMemory,
   onPerformSync
 }) => {
-  const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'ai' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
   useEffect(() => {
     if (url) {
       if (url.includes('#account') || url.includes('#sync')) setActiveTab('account');
       else if (url.includes('#appearance')) setActiveTab('appearance');
+      else if (url.includes('#ai')) setActiveTab('ai');
       else if (url.includes('#privacy')) setActiveTab('privacy');
       else if (url.includes('#passwords')) setActiveTab('passwords');
       else if (url.includes('#advanced')) setActiveTab('advanced');
@@ -53,10 +55,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     { id: 'general', label: 'General', icon: Settings },
     { id: 'account', label: 'Nova Sync', icon: Cloud },
     { id: 'appearance', label: 'Appearance', icon: Paintbrush },
+    { id: 'ai', label: 'Nova AI', icon: Sparkles },
     { id: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
     { id: 'passwords', label: 'Passwords', icon: Key },
     { id: 'extensions', label: 'Extensions', icon: Puzzle },
-    { id: 'advanced', label: 'Advanced', icon: Bot },
+    { id: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
     { id: 'mcp', label: 'MCP Server', icon: Cpu },
     { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
   ];
@@ -121,6 +124,15 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <AppearanceSection settings={settings} onUpdateSettings={onUpdateSettings} />
           )}
 
+          {/* NOVA AI */}
+          {activeTab === 'ai' && (
+            <AISection
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+              onOpenMcp={() => setActiveTab('mcp')}
+            />
+          )}
+
           {/* PRIVACY */}
           {activeTab === 'privacy' && (
             <PrivacySection settings={settings} onUpdateSettings={onUpdateSettings} />
@@ -128,7 +140,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* PASSWORDS */}
           {activeTab === 'passwords' && (
-            <PasswordsSection />
+            <PasswordsSection settings={settings} onUpdateSettings={onUpdateSettings} />
           )}
 
           {/* ADVANCED */}

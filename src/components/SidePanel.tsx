@@ -89,7 +89,7 @@ interface SidePanelProps {
   isDemo?: boolean;
   pendingActions?: Array<{ id: number; text: string }>;
   onPendingActionConsumed?: (id: number) => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (url?: string) => void;
 }
 
 /**
@@ -907,12 +907,12 @@ export const SidePanel = React.memo(({
                           type="button"
                           onClick={() => {
                             setIsModelMenuOpen(false);
-                            onOpenSettings();
+                            onOpenSettings('nova://settings#ai');
                           }}
                           className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1 font-medium cursor-pointer"
                         >
                           <Settings className="w-3 h-3" />
-                          {isTr ? 'Tüm Ayarlar' : 'All Settings'}
+                          {isTr ? 'AI Ayarları' : 'AI Settings'}
                         </button>
                       )}
                     </div>

@@ -192,6 +192,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           { id: '2', url: 'https://tailwindcss.com/docs', title: 'Tailwind CSS Docs', isLoading: false, splitWith: '1', canGoBack: false, canGoForward: false }
         ];
       }
+      if (demoParams.feature === 'settings_ai') {
+        return [
+          { id: '1', url: 'nova://settings#ai', title: 'Settings - Nova AI', isLoading: false, canGoBack: false, canGoForward: false }
+        ];
+      }
       if (demoParams.feature === 'shield') {
         return [
           { id: '1', url: 'https://techinsider.io/ai-revolution', title: 'Tech News & Privacy', blockedAdsCount: 148, isLoading: false, canGoBack: false, canGoForward: false },
@@ -840,7 +845,14 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       handleNewTab('nova://downloads', source?.id, { reuseBlank: false });
     }
   }, [handleNewTab, closeAllModals, activateTab]);
-  const handleOpenSettings = useCallback(() => handleNewTab('nova://settings'), [handleNewTab]);
+  const handleOpenSettings = useCallback((targetUrl?: string) => {
+    const url = typeof targetUrl === 'string' && targetUrl.startsWith('nova://settings')
+      ? targetUrl
+      : typeof targetUrl === 'string' && targetUrl.startsWith('#')
+      ? `nova://settings${targetUrl}`
+      : 'nova://settings';
+    handleNewTab(url);
+  }, [handleNewTab]);
   const handleOpenExtensions = useCallback(() => openModal('extensions'), [openModal]);
 
   // Stable chrome-modal openers: inline arrows passed to memoized SidebarTabs /
