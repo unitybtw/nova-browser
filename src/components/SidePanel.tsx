@@ -821,7 +821,7 @@ export const SidePanel = React.memo(({
           animate={{ width: 420, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{
-            width: { type: 'spring', damping: 32, stiffness: 360, mass: 0.8 },
+            width: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
             opacity: { duration: 0.2, ease: 'easeInOut' }
           }}
           className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.45)] overflow-hidden select-none"
@@ -831,7 +831,7 @@ export const SidePanel = React.memo(({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 28, opacity: 0 }}
             transition={{
-              x: { type: 'spring', damping: 30, stiffness: 350, mass: 0.8 },
+              x: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
               opacity: { duration: 0.18, ease: 'easeOut' }
             }}
             className="w-[420px] min-w-[420px] max-w-[420px] h-full flex flex-col"

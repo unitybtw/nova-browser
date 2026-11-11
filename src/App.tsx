@@ -97,6 +97,13 @@ const FindInPage = lazyWithRetry(() => import('./components/FindInPage').then(m 
 const DownloadToast = lazyWithRetry(() => import('./components/DownloadToast').then(m => ({ default: m.DownloadToast })));
 const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(m => ({ default: m.UpdateToast })));
 
+// Idle prefetch SidePanel chunk so opening the AI assistant is instantaneous without chunk-fetch pause
+if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+  window.requestIdleCallback(() => {
+    import('./components/SidePanel');
+  });
+}
+
 // VpnPopover requires an anchorRef prop, but no element ever attaches to it
 // (the VPN toggle lives inside TopBar's more-menu, which is unmounted while
 // closed), so the popover has always used its fallback positioning

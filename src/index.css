@@ -467,12 +467,27 @@ button:active:not(:disabled) {
   0% { opacity: 0; }
   100% { opacity: 1; }
 }
-/* Keep tasks in the document flow when the assistant narrows the new tab. */
+/* Keep tasks and newtab content stably aligned and responsive without layout snapping */
 .nova-newtab { container-type: inline-size; }
-.nova-newtab-layout { position: relative; min-height: 100%; display: grid; justify-content: center; align-content: center; justify-items: center; gap: 32px; padding-block: 40px; }
-@container (min-width: 1100px) {
-  .nova-newtab-layout { grid-template-columns: minmax(0, 672px) 288px; gap: 48px; }
-  .nova-newtab-layout:not(:has(.nova-tasks-widget)) { grid-template-columns: minmax(0, 672px); }
+.nova-newtab-layout {
+  position: relative;
+  min-height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 32px;
+  padding-top: clamp(28px, 8vh, 88px);
+  padding-bottom: 48px;
+}
+@container (min-width: 1320px) {
+  .nova-tasks-widget {
+    position: absolute;
+    right: 32px;
+    top: clamp(28px, 8vh, 88px);
+    margin: 0;
+  }
 }
 
 /* Keep backdrop capture on a permanent decorative layer. Hover/focus belongs
