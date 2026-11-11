@@ -131,12 +131,10 @@ export function formatSearchUrl(
 
   // Otherwise treat as localized search engine query
   const q = encodeURIComponent(trimmed);
-  // Chrome sends both a language and a region. Without the region the engine
-  // uses the IP-derived country, so a Turkish user abroad still gets results
-  // from the wrong market.
+  // Without restrictive cr country locks, queries yield natural, accurate search results
+  // while preserving user locale preference via hl and gl.
   const country = activeLang ? countryForLang(activeLang) : '';
   const gl = country ? `&gl=${country.toLowerCase()}` : '';
-  const cr = country ? `&cr=${country}` : '';
   switch (engine) {
     case 'duckduckgo': {
       if (!activeLang) return `https://duckduckgo.com/?q=${q}`;
@@ -159,14 +157,74 @@ export function formatSearchUrl(
         : `https://www.ecosia.org/search?q=${q}`;
     case 'yahoo':
       return activeLang
-        ? `https://search.yahoo.com/search?p=${q}&vl=lang_${activeLang}${cr}`
+        ? `https://search.yahoo.com/search?p=${q}&vl=lang_${activeLang}`
         : `https://search.yahoo.com/search?p=${q}`;
     case 'google':
     default:
       return activeLang
-        ? `https://www.google.com/search?q=${q}&hl=${activeLang}${gl}${cr}`
+        ? `https://www.google.com/search?q=${q}&hl=${activeLang}${gl}`
         : `https://www.google.com/search?q=${q}`;
   }
+}
+
+/**
+ * Resolves the user's preferred search query language.
+ * Checks user settings, browser navigator languages, and system preferences.
+ */
+export function getSearchLanguage(): string {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('user_settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.defaultTranslationLanguage && typeof parsed.defaultTranslationLanguage === 'string') {
+          return parsed.defaultTranslationLanguage.toLowerCase();
+        }
+        if (parsed.language && typeof parsed.language === 'string') {
+          return parsed.language.toLowerCase();
+        }
+      }
+    } catch (_) {}
+  }
+  if (typeof navigator !== 'undefined') {
+    const nav = (navigator.language || '').toLowerCase();
+    const navLangs = Array.isArray(navigator.languages) ? navigator.languages.map(l => l.toLowerCase()) : [];
+    if (nav.includes('tr') || navLangs.some(l => l.includes('tr'))) {
+      return 'tr';
+    }
+    if (nav.includes('de') || navLangs.some(l => l.includes('de'))) {
+      return 'de';
+    }
+  }
+  return 'tr';
+}
+
+/**
+ * Resolves the client locale for search suggestions (e.g. 'tr-TR', 'en-US').
+ */
+export function getSearchLocale(): string {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      const raw = localStorage.getItem('user_settings');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.defaultTranslationLanguage === 'tr' || parsed.language === 'tr') {
+          return 'tr-TR';
+        }
+      }
+    } catch (_) {}
+  }
+  if (typeof navigator !== 'undefined') {
+    const nav = (navigator.language || '').toLowerCase();
+    const navLangs = Array.isArray(navigator.languages) ? navigator.languages.map(l => l.toLowerCase()) : [];
+    if (nav.includes('tr') || navLangs.some(l => l.includes('tr'))) {
+      return 'tr-TR';
+    }
+    if (navigator.language && /^[a-z]{2}(-[a-z]{2})?$/i.test(navigator.language)) {
+      return navigator.language;
+    }
+  }
+  return 'tr-TR';
 }
 
 export function getSearchEngineName(engine: UserSettings['searchEngine'] = 'google'): string {

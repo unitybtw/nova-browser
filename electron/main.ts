@@ -356,8 +356,24 @@ nativeTheme.on('updated', () => {
 });
 
 
-function getAcceptLanguagesForLocale(_localeOrLang?: string): string {
-  return 'en-US,en;q=0.9';
+function getAcceptLanguagesForLocale(localeOrLang?: string): string {
+  const raw = (typeof localeOrLang === 'string' && localeOrLang.trim())
+    ? localeOrLang.trim()
+    : (app.getLocale() || 'tr-TR');
+  const normalized = raw.replace('_', '-');
+  const parts = normalized.split('-');
+  const lang = (parts[0] || 'tr').toLowerCase();
+  const country = (parts[1] || '').toUpperCase();
+
+  const sys = (app.getLocale() || '').toLowerCase();
+  const isTurkish = lang === 'tr' || country === 'TR' || sys.includes('tr');
+  if (isTurkish) {
+    return 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7';
+  }
+  if (country) {
+    return `${lang}-${country},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
+  }
+  return `${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
 }
 
 let currentAcceptLanguages = getAcceptLanguagesForLocale(app.getLocale());

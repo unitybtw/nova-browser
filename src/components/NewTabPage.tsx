@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, ArrowRight, ShieldCheck, ShieldAlert, Plus, X, Edit2, Check, CheckSquare, Square, Trash2, ListTodo, VenetianMask, Camera, Shuffle, Compass } from 'lucide-react';
-import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { formatSearchUrl, getSearchEngineName, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { useLiveUnsplashPhoto } from '../utils/unsplash';
 import { UserSettings } from '../types/browser';
@@ -493,12 +493,15 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
-    const clientLocale = getLocale(language);
+    const clientLocale = getSearchLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
     const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 6));
       setShowSuggestions(cached.length > 0);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
     }
 
     abortControllerRef.current?.abort();
@@ -588,7 +591,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
     }
     if (!target) return;
     setShowSuggestions(false);
-    onNavigate(formatSearchUrl(target, searchEngine, language));
+    onNavigate(formatSearchUrl(target, searchEngine, getSearchLanguage()));
   };
 
   const handleAddSpeedDial = () => {
@@ -1193,7 +1196,7 @@ export const NewTabPage: React.FC<NewTabPageProps> = React.memo(({
                     onMouseDown={(e) => {
                       e.preventDefault();
                       setShowSuggestions(false);
-                      onNavigate(formatSearchUrl(s, searchEngine, language));
+                      onNavigate(formatSearchUrl(s, searchEngine, getSearchLanguage()));
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between px-4 py-2.5 text-start text-sm transition-colors cursor-pointer ${

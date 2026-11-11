@@ -2,29 +2,30 @@ import assert from 'node:assert/strict';
 import { formatSearchUrl, isValidUrlOrDomain, getSearchEngineName } from '../src/utils/searchEngine';
 import { setLanguage, getLanguage } from '../src/services/i18n';
 import { detectSystemLanguage } from '../src/types/browser';
+import { isSuggestionScriptCompatible, sanitizeSuggestions } from '../electron/main/suggestions';
 
 console.log('\n--- Search Localization & CAPTCHA Resistance Suite ---');
 
-// 1. Google Search Localization
+// 1. Google Search Localization (Clean parameters without restrictive cr country locks)
 assert.equal(
   formatSearchUrl('react hooks', 'google', 'tr'),
-  'https://www.google.com/search?q=react%20hooks&hl=tr&gl=tr&cr=TR',
-  'Google search must append hl=tr, gl=tr, cr=TR when Turkish is active'
+  'https://www.google.com/search?q=react%20hooks&hl=tr&gl=tr',
+  'Google search must append hl=tr, gl=tr without restrictive cr parameter when Turkish is active'
 );
 assert.equal(
   formatSearchUrl('react hooks', 'google', 'en'),
-  'https://www.google.com/search?q=react%20hooks&hl=en&gl=us&cr=US',
-  'Google search must append hl=en, gl=us, cr=US when English is active'
+  'https://www.google.com/search?q=react%20hooks&hl=en&gl=us',
+  'Google search must append hl=en, gl=us without restrictive cr parameter when English is active'
 );
 assert.equal(
   formatSearchUrl('react hooks', 'google', 'de'),
-  'https://www.google.com/search?q=react%20hooks&hl=de&gl=de&cr=DE',
-  'Google search must append hl=de, gl=de, cr=DE when German is active'
+  'https://www.google.com/search?q=react%20hooks&hl=de&gl=de',
+  'Google search must append hl=de, gl=de without restrictive cr parameter when German is active'
 );
 assert.equal(
   formatSearchUrl('react hooks', 'google', 'ar'),
-  'https://www.google.com/search?q=react%20hooks&hl=ar&gl=sa&cr=SA',
-  'Google search must append hl=ar, gl=sa, cr=SA when Arabic is active'
+  'https://www.google.com/search?q=react%20hooks&hl=ar&gl=sa',
+  'Google search must append hl=ar, gl=sa without restrictive cr parameter when Arabic is active'
 );
 
 // 2. Backward Compatibility with bare URLs when lang is not specified
@@ -83,8 +84,8 @@ assert.equal(
 );
 assert.equal(
   formatSearchUrl('test query', 'yahoo', 'tr'),
-  'https://search.yahoo.com/search?p=test%20query&vl=lang_tr&cr=TR',
-  'Yahoo must use vl=lang_tr&cr=TR for Turkish'
+  'https://search.yahoo.com/search?p=test%20query&vl=lang_tr',
+  'Yahoo must use vl=lang_tr without restrictive cr parameter for Turkish'
 );
 
 // 7. Direct URL and dangerous scheme preservation
@@ -100,4 +101,37 @@ assert.ok(
 const detected = detectSystemLanguage();
 assert.equal(detected, 'en', 'The interface must stay English regardless of system language');
 
-console.log('[PASS] [Search Localization & Anti-Bot] 15 search localization, backward compatibility, and system detection tests passed.');
+// 9. Foreign Script Filtering & Suggestion Sanitization
+
+// Query in Latin/Turkish must reject Cyrillic, Arabic, CJK suggestions
+assert.equal(isSuggestionScriptCompatible('hava', 'hava durumu'), true);
+assert.equal(isSuggestionScriptCompatible('hava', 'havaist sefer saatleri'), true);
+assert.equal(isSuggestionScriptCompatible('hava', 'hava скачать торрент'), false, 'Cyrillic suggestion must be purged for Latin query');
+assert.equal(isSuggestionScriptCompatible('hava', 'hava فیلم سینمایی'), false, 'Arabic suggestion must be purged for Latin query');
+assert.equal(isSuggestionScriptCompatible('hava', 'hava 日本語'), false, 'CJK suggestion must be purged for Latin query');
+
+// Queries with native Cyrillic or Arabic must retain their respective scripts
+assert.equal(isSuggestionScriptCompatible('яндекс', 'яндекс карты'), true);
+assert.equal(isSuggestionScriptCompatible('مرحبا', 'مرحبا بكم'), true);
+
+// sanitizeSuggestions handles raw lists, deduplicates, strips HTML tags and limits to 8
+const rawMixedSuggestions = [
+  '<b>hava</b> durumu',
+  'hava durumu', // duplicate
+  'havaist',
+  'hava скачать', // Cyrillic rejected
+  'hava durumu istanbul',
+  'hava durumu ankara',
+  'hava durumu izmir',
+  'hava durumu bursa',
+  'hava durumu antalya',
+  'hava durumu trabzon',
+  'hava durumu konya'
+];
+const sanitized = sanitizeSuggestions('hava', rawMixedSuggestions);
+assert.equal(sanitized.length, 8, 'Must clamp to maximum 8 suggestions');
+assert.equal(sanitized[0], 'hava durumu', 'Must strip HTML tags');
+assert.ok(!sanitized.some(s => /скачать/.test(s)), 'Must not contain foreign script');
+assert.equal(new Set(sanitized.map(s => s.toLowerCase())).size, sanitized.length, 'Must have zero duplicates');
+
+console.log('[PASS] [Search Localization & Anti-Bot] 20 search localization, script filtering, backward compatibility, and system detection tests passed.');

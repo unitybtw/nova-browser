@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Plus, X } from 'lucide-react';
 import { Tab, UserSettings } from '../types/browser';
-import { formatSearchUrl, getSearchEngineName } from '../utils/searchEngine';
+import { formatSearchUrl, getSearchEngineName, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
 import { useModalFocusTrap } from '../hooks/useModalFocusTrap';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { getLocale, getLanguage, useTranslation } from '../services/i18n';
@@ -72,11 +72,13 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
-    const clientLocale = getLocale();
+    const clientLocale = getSearchLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
     const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 5));
+    } else {
+      setSuggestions([]);
     }
 
     const controller = new AbortController();
@@ -173,7 +175,7 @@ export const SpotlightOmnibox: React.FC<SpotlightOmniboxProps> = React.memo(({
       return;
     }
 
-    const url = formatSearchUrl(target, searchEngine, getLanguage());
+    const url = formatSearchUrl(target, searchEngine, getSearchLanguage());
     if (onNavigate) {
       onNavigate(url);
     } else {

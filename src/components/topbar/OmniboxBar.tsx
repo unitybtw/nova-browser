@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tab, Bookmark, UserSettings, PermissionRequest } from '../../types/browser';
-import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain } from '../../utils/searchEngine';
+import { formatSearchUrl, getSearchEngineName, isValidUrlOrDomain, getSearchLocale, getSearchLanguage } from '../../utils/searchEngine';
 import { getLanguage, getLocale, useTranslation } from '../../services/i18n';
 import { getUrlSecurityInfo, formatDisplayUrl } from '../../utils/securityUtils';
 import { SiteInfoPopover } from '../SiteInfoPopover';
@@ -219,8 +219,8 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       return;
     }
 
-    // 1. Instant 0ms cache lookup
-    const clientLocale = getLocale();
+    // 1. Instant 0ms cache lookup with smart local/regional detection
+    const clientLocale = getSearchLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
     const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     // Always assign, including on a miss: skipping the write here would leave
@@ -278,10 +278,10 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
 
     let targetValue = searchValue;
 
-    if (selectedIndex > -1 && selectedIndex < suggestions.length) {
-      targetValue = suggestions[selectedIndex];
-    } else if (selectedIndex >= suggestions.length && selectedIndex < suggestions.length + matchedBookmarks.length) {
-      targetValue = matchedBookmarks[selectedIndex - suggestions.length].url;
+    if (selectedIndex > -1 && selectedIndex < matchedBookmarks.length) {
+      targetValue = matchedBookmarks[selectedIndex].url;
+    } else if (selectedIndex >= matchedBookmarks.length && selectedIndex < matchedBookmarks.length + suggestions.length) {
+      targetValue = suggestions[selectedIndex - matchedBookmarks.length];
     }
 
     if (isAIMode || targetValue.startsWith('@ai ') || targetValue.startsWith('ai:')) {
@@ -300,7 +300,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
       return;
     }
 
-    const url = formatSearchUrl(targetValue, searchEngine, getLanguage());
+    const url = formatSearchUrl(targetValue, searchEngine, getSearchLanguage());
     onNavigate(url);
     setShowSuggestions(false);
     setSelectedIndex(-1);
@@ -420,13 +420,17 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 e.preventDefault();
                 setIsAIMode(true);
                 setSearchValue('');
-              } else if (e.key === 'Tab' && selectedIndex >= 0 && selectedIndex < suggestions.length) {
+              } else if (e.key === 'Tab' && selectedIndex >= 0) {
                 e.preventDefault();
-                setSearchValue(suggestions[selectedIndex]);
+                if (selectedIndex < matchedBookmarks.length) {
+                  setSearchValue(matchedBookmarks[selectedIndex].url);
+                } else if (selectedIndex < matchedBookmarks.length + suggestions.length) {
+                  setSearchValue(suggestions[selectedIndex - matchedBookmarks.length]);
+                }
                 setSelectedIndex(-1);
               } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                const maxIndex = suggestions.length + matchedBookmarks.length - 1;
+                const maxIndex = matchedBookmarks.length + suggestions.length - 1;
                 setSelectedIndex(prev => (prev < maxIndex ? prev + 1 : prev));
               } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -599,7 +603,7 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                   onMouseEnter={() => setSelectedIndex(-1)}
                   onClick={() => {
                     setShowSuggestions(false);
-                    onNavigate(formatSearchUrl(searchValue, searchEngine, getLanguage()));
+                    onNavigate(formatSearchUrl(searchValue, searchEngine, getSearchLanguage()));
                     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                   }}
                   className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm text-left transition-colors group ${
@@ -623,75 +627,83 @@ export const OmniboxBar: React.FC<OmniboxBarProps> = React.memo(({
                 )}
               </button>
 
-              {/* Search Suggestions (Index 0 to suggestions.length - 1) */}
-              {suggestions.length > 0 && (
-                <div className="py-1" role="listbox" aria-label="Search suggestions">
-                  <div className="px-4 pt-2 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Search Suggestions
+              {/* Matching Bookmarks (Index 0 to matchedBookmarks.length - 1) */}
+              {matchedBookmarks.length > 0 && (
+                <div className="py-1 border-b border-slate-100 dark:border-slate-800/60">
+                  <div className="px-4 pt-1.5 pb-1 flex items-center justify-between text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <span>Bookmarks & History</span>
+                    <span className="text-[9px] lowercase opacity-75 font-normal">matches</span>
                   </div>
-
-                  {suggestions.map((suggestion, idx) => (
+                  {matchedBookmarks.map((bookmark, idx) => {
+                    const isSelected = selectedIndex === idx;
+                    return (
                       <button
-                        key={`sug-${idx}`}
+                        key={`bm-${bookmark.id}`}
                         type="button"
                         role="option"
-                        aria-selected={selectedIndex === idx}
+                        aria-selected={isSelected}
                         onMouseEnter={() => setSelectedIndex(idx)}
                         onClick={() => {
-                          setSearchValue(suggestion);
+                          setSearchValue(bookmark.url);
                           setShowSuggestions(false);
-                          onNavigate(formatSearchUrl(suggestion, searchEngine, getLanguage()));
+                          onNavigate(bookmark.url);
                           if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
-                          selectedIndex === idx
+                        className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
+                          isSelected
                             ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
                             : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
                         }`}
                       >
-                        <Search className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === idx ? 'text-cyan-500' : 'text-slate-400'}`} />
-                        <span className="truncate">{suggestion}</span>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <Star className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-cyan-500 fill-cyan-500' : 'text-amber-400 fill-amber-400'}`} />
+                          <span className="truncate font-medium">{bookmark.title || bookmark.url}</span>
+                        </div>
+                        <span className="text-xs text-slate-400 dark:text-slate-500 ml-4 shrink-0 font-mono text-[11px] max-w-[150px] truncate">
+                          {bookmark.url.replace(/^https?:\/\//, '')}
+                        </span>
                       </button>
-                    ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Matching Bookmarks (Index suggestions.length to ...) */}
-              {matchedBookmarks.length > 0 && (
-                <div className="py-1">
-                  <div className="px-4 pt-1 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Bookmarks
+              {/* Search Suggestions (Index matchedBookmarks.length to ...) */}
+              {suggestions.length > 0 && (
+                <div className="py-1" role="listbox" aria-label="Search suggestions">
+                  <div className="px-4 pt-1.5 pb-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Search Suggestions
                   </div>
-                  {matchedBookmarks
-                    .map((bookmark, idx) => {
-                      const bookmarkIdx = suggestions.length + idx;
-                      return (
-                        <button
-                          key={`bm-${bookmark.id}`}
-                          type="button"
-                          onMouseEnter={() => setSelectedIndex(bookmarkIdx)}
-                          onClick={() => {
-                            setSearchValue(bookmark.url);
-                            setShowSuggestions(false);
-                            onNavigate(bookmark.url);
-                            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-                          }}
-                          className={`w-full flex items-center justify-between px-4 py-2 text-sm text-left transition-colors ${
-                            selectedIndex === bookmarkIdx
-                              ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
-                              : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3 overflow-hidden">
-                            <Star className={`w-3.5 h-3.5 shrink-0 ${selectedIndex === bookmarkIdx ? 'text-cyan-500 fill-cyan-500' : 'text-amber-400 fill-amber-400'}`} />
-                            <span className="truncate font-medium">{bookmark.title}</span>
-                          </div>
-                          <span className="text-xs text-slate-400 truncate max-w-[150px]">{bookmark.url}</span>
-                        </button>
-                      );
-                    })}
+
+                  {suggestions.map((suggestion, sIdx) => {
+                    const globalIdx = matchedBookmarks.length + sIdx;
+                    const isSelected = selectedIndex === globalIdx;
+                    return (
+                      <button
+                        key={`sug-${sIdx}`}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onMouseEnter={() => setSelectedIndex(globalIdx)}
+                        onClick={() => {
+                          setSearchValue(suggestion);
+                          setShowSuggestions(false);
+                          onNavigate(formatSearchUrl(suggestion, searchEngine, getSearchLanguage()));
+                          if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-2 text-sm text-left transition-colors ${
+                          isSelected
+                            ? 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 font-medium'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-200'
+                        }`}
+                      >
+                        <Search className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-cyan-500' : 'text-slate-400'}`} />
+                        <span className="truncate">{suggestion}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-                )}
+              )}
               </motion.div>
             )}
         </AnimatePresence>

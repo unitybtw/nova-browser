@@ -33,8 +33,56 @@ function cacheSuggestions(cacheKey: string, list: string[]): void {
   suggestionsCache.set(cacheKey, { list, cachedAt: Date.now() });
 }
 
+// Script detection regexes to eliminate irrelevant foreign alphabets when not typed
+const SCRIPT_CYRILLIC = /[\u0400-\u04FF]/;
+const SCRIPT_ARABIC = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
+const SCRIPT_CJK = /[\u4E00-\u9FFF\u3040-\u30FF\u31F0-\u31FF\uAC00-\uD7AF]/;
+const SCRIPT_THAI = /[\u0E00-\u0E7F]/;
+const SCRIPT_HEBREW = /[\u0590-\u05FF]/;
+const SCRIPT_DEVANAGARI = /[\u0900-\u097F]/;
+const SCRIPT_GREEK = /[\u0370-\u03FF]/;
+const TURKISH_CHARS = /[çğışöüÇĞİŞÖÜ]/;
+
+export function isSuggestionScriptCompatible(query: string, suggestion: string): boolean {
+  if (!suggestion || typeof suggestion !== 'string') return false;
+  const trimmed = suggestion.trim();
+  if (!trimmed) return false;
+
+  // Purge incompatible foreign alphabets unless the query explicitly contains them
+  if (!SCRIPT_CYRILLIC.test(query) && SCRIPT_CYRILLIC.test(trimmed)) return false;
+  if (!SCRIPT_ARABIC.test(query) && SCRIPT_ARABIC.test(trimmed)) return false;
+  if (!SCRIPT_CJK.test(query) && SCRIPT_CJK.test(trimmed)) return false;
+  if (!SCRIPT_THAI.test(query) && SCRIPT_THAI.test(trimmed)) return false;
+  if (!SCRIPT_HEBREW.test(query) && SCRIPT_HEBREW.test(trimmed)) return false;
+  if (!SCRIPT_DEVANAGARI.test(query) && SCRIPT_DEVANAGARI.test(trimmed)) return false;
+  if (!SCRIPT_GREEK.test(query) && SCRIPT_GREEK.test(trimmed)) return false;
+
+  return true;
+}
+
+export function sanitizeSuggestions(query: string, rawList: unknown): string[] {
+  if (!Array.isArray(rawList)) return [];
+  const seen = new Set<string>();
+  const cleanResults: string[] = [];
+
+  for (const item of rawList) {
+    if (typeof item !== 'string') continue;
+    const stripped = item.replace(/<[^>]*>/g, '').trim();
+    if (!stripped) continue;
+
+    if (!isSuggestionScriptCompatible(query, stripped)) continue;
+
+    const lower = stripped.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    cleanResults.push(stripped);
+    if (cleanResults.length >= 8) break;
+  }
+  return cleanResults;
+}
+
 // Language -> country mapping for engines that key off a bare country code.
-// Without an entry we fall back to the locale's region, then to "US".
+// Without an entry we fall back to the locale's region, then to "tr".
 const DEFAULT_COUNTRY_BY_LANG: Record<string, string> = {
   tr: 'tr',
   de: 'de',
@@ -55,31 +103,52 @@ const DEFAULT_COUNTRY_BY_LANG: Record<string, string> = {
 function normalizeCountry(raw: string | undefined, lang: string): string {
   const candidate = (raw || '').trim().toLowerCase();
   if (/^[a-z]{2}$/.test(candidate)) return candidate;
-  return DEFAULT_COUNTRY_BY_LANG[lang] || 'us';
+  return DEFAULT_COUNTRY_BY_LANG[lang] || 'tr';
 }
 
 function braveCountryFor(lang: string, country: string): string {
   return normalizeCountry(country, lang).toUpperCase();
 }
 
-function resolveLocaleDetails(clientLocale?: string) {
-  const rawLocale = (typeof clientLocale === 'string' && clientLocale.trim())
+function resolveLocaleDetails(clientLocale?: string, query?: string) {
+  const hasTurkishChars = query ? TURKISH_CHARS.test(query) : false;
+
+  let rawLocale = (typeof clientLocale === 'string' && clientLocale.trim())
     ? clientLocale.trim()
-    : (app.getLocale() || 'tr-TR');
+    : '';
+
+  const sysLocale = (app.getLocale() || '').trim();
+  const envLang = (process.env.LANG || '').toLowerCase();
+  const isSystemTurkish = sysLocale.toLowerCase().includes('tr') || envLang.includes('tr');
+
+  if (hasTurkishChars) {
+    rawLocale = 'tr-TR';
+  } else if (!rawLocale || rawLocale === 'en-US') {
+    if (isSystemTurkish) {
+      rawLocale = 'tr-TR';
+    } else if (sysLocale) {
+      rawLocale = sysLocale;
+    } else {
+      rawLocale = 'tr-TR';
+    }
+  }
+
   const parts = rawLocale.replace('_', '-').split('-');
-  // `lang` reaches third-party search URLs, the Accept-Language header and the
-  // cache key, and unlike `country` it was never validated — the renderer
-  // controls the locale, so `en&x=1` or a CRLF sequence flowed straight into
-  // the request line. Constrain it to an ISO-639 shape, the same treatment
-  // `country` already gets in normalizeCountry(). Every legitimate locale's
-  // primary subtag is 2-3 letters, so real values are unaffected.
   const rawLang = (parts[0] || '').toLowerCase();
-  const lang = /^[a-z]{2,3}$/.test(rawLang) ? rawLang : 'tr';
-  // Previously every region-less locale collapsed to "us", which made a German
-  // user get gl=us. Fall back to the language's own country instead.
-  const country = normalizeCountry(parts[1], lang);
-  const ddgRegion = `${country}-${lang}`;
-  const acceptLanguage = `${lang}-${country.toUpperCase()},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
+  let lang = /^[a-z]{2,3}$/.test(rawLang) ? rawLang : 'tr';
+  let country = normalizeCountry(parts[1], lang);
+
+  if (rawLocale.toLowerCase().includes('tr') || isSystemTurkish || hasTurkishChars) {
+    country = 'tr';
+    if (hasTurkishChars || isSystemTurkish) {
+      lang = 'tr';
+    }
+  }
+
+  const ddgRegion = country === 'tr' ? 'tr-tr' : `${country}-${lang}`;
+  const acceptLanguage = country === 'tr'
+    ? 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7'
+    : `${lang}-${country.toUpperCase()},${lang};q=0.9,en-US;q=0.8,en;q=0.7`;
   return { lang, country, ddgRegion, acceptLanguage };
 }
 
@@ -126,7 +195,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
     const allowedEngines = new Set(['google', 'duckduckgo', 'bing', 'brave', 'ecosia', 'yahoo']);
     const cleanEngine = typeof engine === 'string' && allowedEngines.has(engine) ? engine : 'default';
     const boundedLocale = typeof clientLocale === 'string' ? clientLocale.slice(0, 32) : undefined;
-    const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(boundedLocale);
+    const { lang, country, ddgRegion, acceptLanguage } = resolveLocaleDetails(boundedLocale, cleanQ);
     const normalizedKey = cleanQ.normalize('NFC').toLowerCase();
     const cacheKey = `${normalizedKey}_${cleanEngine}_${lang}_${country}`;
 
@@ -191,7 +260,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
         }
       }
       return [];
@@ -209,7 +278,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
         }
       }
       return [];
@@ -228,7 +297,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
         }
       }
       return [];
@@ -247,7 +316,7 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
         }
       }
       return [];
@@ -265,14 +334,14 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
         }
       }
       return [];
     });
 
     const fetchYahoo = createProviderFetch(async (signal) => {
-      const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=json&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
+      const url = `https://search.yahoo.com/sugg/os?command=${encodeURIComponent(cleanQ)}&output=fxjson&lc=${encodeURIComponent(`${lang}-${country.toUpperCase()}`)}&vl=lang_${encodeURIComponent(lang)}`;
       const res = await fetch(url, {
         signal,
         headers: {
@@ -283,7 +352,10 @@ export function initSuggestions(isTrustedSender: TrustedSenderCheck): void {
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data) && data.length > 1 && Array.isArray(data[1])) {
-          return data[1].filter((item: any) => typeof item === 'string').slice(0, 8);
+          return sanitizeSuggestions(cleanQ, data[1]);
+        } else if (data && typeof data === 'object' && Array.isArray((data as any).gossip?.results)) {
+          const items = (data as any).gossip.results.map((r: any) => r?.key).filter(Boolean);
+          return sanitizeSuggestions(cleanQ, items);
         }
       }
       return [];

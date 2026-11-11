@@ -43,7 +43,7 @@ import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
 import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
 import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { getSidebarTabRows } from '../utils/verticalTabs';
-import { formatSearchUrl } from '../utils/searchEngine';
+import { formatSearchUrl, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
 import { isSafeNavigationUrl } from '../utils/safeNavigation';
 import { getClientCachedSuggestions, setClientCachedSuggestions } from '../utils/suggestionCache';
 import { TabContextMenu, TabContextMenuState } from './TabContextMenu';
@@ -795,11 +795,13 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     }
 
     // 1. Instant 0ms cache lookup
-    const clientLocale = getLocale();
+    const clientLocale = getSearchLocale();
     const cacheKey = `${trimmed}_${searchEngine}`;
     const cached = getClientCachedSuggestions(cacheKey, clientLocale);
     if (cached) {
       setSuggestions(cached.slice(0, 5));
+    } else {
+      setSuggestions([]);
     }
 
     abortControllerRef.current?.abort();
@@ -846,7 +848,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       targetValue = suggestions[selectedIndex];
     }
 
-    const url = formatSearchUrl(targetValue, searchEngine || 'google', getLanguage());
+    const url = formatSearchUrl(targetValue, searchEngine || 'google', getSearchLanguage());
     if (onNavigate) {
       onNavigate(url);
     } else if (onNewTab) {
@@ -1207,7 +1209,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                   <button
                     key={s}
                     onMouseDown={() => {
-                      const formatted = formatSearchUrl(s, searchEngine, getLanguage());
+                      const formatted = formatSearchUrl(s, searchEngine, getSearchLanguage());
                       if (onNavigate) onNavigate(formatted);
                       else onNewTab(formatted);
                       setShowSuggestions(false);
