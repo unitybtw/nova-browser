@@ -32,15 +32,19 @@ import {
   LayoutGrid,
   Trash2,
   PanelLeft,
+  PanelRight,
   Pin,
   Columns2,
   HelpCircle,
   Compass,
   Cloud,
-  PictureInPicture2
+  PictureInPicture2,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { NovaAssistantIcon } from './ui/NovaAssistantIcon';
-import { Tab, Bookmark, Workspace, Folder, UserSettings } from '../types/browser';
+import { Tab, Bookmark, Workspace, Folder, UserSettings, BrowserDesignProfile } from '../types/browser';
+import { clampNumber } from '../utils/designSecurity';
 import { getWorkspaceIcon, WORKSPACE_COLORS } from '../utils/workspaceIcons';
 import { getSidebarTabRows } from '../utils/verticalTabs';
 import { formatSearchUrl, getSearchLocale, getSearchLanguage } from '../utils/searchEngine';
@@ -155,6 +159,71 @@ function renderFavoriteIcon(fav: FavoriteApp) {
   }
 }
 
+export const MIN_SIDEBAR_WIDTH = 200;
+export const MAX_SIDEBAR_WIDTH = 360;
+export const DEFAULT_SIDEBAR_WIDTH = 250;
+
+export type SidebarPosition = 'left' | 'right';
+export type SidebarSectionKey = keyof BrowserDesignProfile['layout']['sidebarSections'];
+export type SidebarSectionsConfig = BrowserDesignProfile['layout']['sidebarSections'];
+
+export const DEFAULT_SIDEBAR_SECTIONS: SidebarSectionsConfig = {
+  favorites: true,
+  pinned: true,
+  folders: true,
+  workspaces: true,
+  dockFooter: true,
+};
+
+/** Clamp sidebar width strictly within the supported [200, 360] px shell bounds. */
+export function clampSidebarWidth(width: unknown): number {
+  return Math.round(clampNumber(width, MIN_SIDEBAR_WIDTH, MAX_SIDEBAR_WIDTH, DEFAULT_SIDEBAR_WIDTH));
+}
+
+/** Compute next sidebar width from a horizontal drag delta relative to the docked edge. */
+export function computeResizedSidebarWidth(
+  startWidth: number,
+  deltaX: number,
+  position: SidebarPosition
+): number {
+  const safeStart = clampSidebarWidth(startWidth);
+  const safeDelta = Number.isFinite(deltaX) ? deltaX : 0;
+  const raw = position === 'right' ? safeStart - safeDelta : safeStart + safeDelta;
+  return clampSidebarWidth(raw);
+}
+
+/** Normalize optional/partial sidebar section flags against all-visible defaults. */
+export function resolveSidebarSections(
+  sections?: Partial<SidebarSectionsConfig> | null
+): SidebarSectionsConfig {
+  return {
+    favorites: sections?.favorites ?? DEFAULT_SIDEBAR_SECTIONS.favorites,
+    pinned: sections?.pinned ?? DEFAULT_SIDEBAR_SECTIONS.pinned,
+    folders: sections?.folders ?? DEFAULT_SIDEBAR_SECTIONS.folders,
+    workspaces: sections?.workspaces ?? DEFAULT_SIDEBAR_SECTIONS.workspaces,
+    dockFooter: sections?.dockFooter ?? DEFAULT_SIDEBAR_SECTIONS.dockFooter,
+  };
+}
+
+/**
+ * Adjust hover-preview anchor rect when the sidebar is docked on the right so
+ * TabHoverPreview (which opens at `rect.right + 12` with 280px width) renders
+ * to the left of the sidebar instead of overflowing past the right viewport edge.
+ */
+export function resolveSidebarHoverPreviewRect(
+  rect: { top: number; left: number; width: number; height: number; right: number; bottom: number } | null,
+  position: SidebarPosition
+): { top: number; left: number; width: number; height: number; right: number; bottom: number } | null {
+  if (!rect || position !== 'right') return rect;
+  const previewWidth = 280;
+  const gap = 12;
+  const targetLeft = Math.max(12, rect.left - previewWidth - gap);
+  return {
+    ...rect,
+    right: targetLeft - gap,
+  };
+}
+
 export interface SidebarTabsProps {
   tabs: Tab[];
   folders?: Folder[];
@@ -208,6 +277,11 @@ export interface SidebarTabsProps {
   isCollapsed?: boolean;
   onReorderTabs?: (draggedId: string, targetId: string) => void;
   onTogglePip?: (id: string) => void;
+  sidebarWidth?: number;
+  sidebarPosition?: SidebarPosition;
+  sidebarSections?: Partial<SidebarSectionsConfig>;
+  isCustomizeMode?: boolean;
+  onToggleSidebarSection?: (section: SidebarSectionKey) => void;
 }
 
 interface SidebarTabItemProps {
@@ -564,6 +638,127 @@ const SidebarTabItem: React.FC<SidebarTabItemProps> = React.memo(({
   );
 });
 
+interface SidebarSectionToggleProps {
+  sectionKey: SidebarSectionKey;
+  label: string;
+  onToggle?: (section: SidebarSectionKey) => void;
+  className?: string;
+}
+
+const SidebarSectionHiddenCard: React.FC<SidebarSectionToggleProps> = ({
+  sectionKey,
+  label,
+  onToggle,
+  className = '',
+}) => (
+  <div
+    data-sidebar-section={sectionKey}
+    data-section-visible="false"
+    style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+    className={`mx-3 my-1 px-2.5 py-1.5 rounded-xl border border-dashed border-slate-300/80 dark:border-white/20 bg-black/[0.02] dark:bg-white/[0.03] opacity-60 flex items-center justify-between gap-2 text-[11px] no-drag ${className}`}
+  >
+    <span className="truncate opacity-80">{label} hidden</span>
+    <button
+      type="button"
+      onClick={() => onToggle?.(sectionKey)}
+      aria-label={`Show ${label} section`}
+      title={`Show ${label} section`}
+      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-black/[0.06] dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 text-[10px] font-medium cursor-pointer shrink-0"
+    >
+      <EyeOff className="w-3 h-3 text-amber-500" />
+      <span>Show</span>
+    </button>
+  </div>
+);
+
+const SidebarSectionCustomizeBadge: React.FC<SidebarSectionToggleProps> = ({
+  sectionKey,
+  label,
+  onToggle,
+}) => (
+  <button
+    type="button"
+    onClick={(e) => {
+      e.stopPropagation();
+      onToggle?.(sectionKey);
+    }}
+    aria-label={`Hide ${label} section`}
+    title={`Hide ${label} section`}
+    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-accent/10 hover:bg-accent/20 text-accent-hover dark:text-accent border border-dashed border-accent/40 text-[10px] font-medium cursor-pointer shrink-0"
+  >
+    <Eye className="w-2.5 h-2.5" />
+    <span>Hide</span>
+  </button>
+);
+
+export function sidebarTabsPropsEqual(prevProps: SidebarTabsProps, nextProps: SidebarTabsProps): boolean {
+  // Compare only rendered fields; callback props are stable useCallback refs.
+  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
+  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
+  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
+  if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
+  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
+  if (prevProps.canGoBack !== nextProps.canGoBack) return false;
+  if (prevProps.canGoForward !== nextProps.canGoForward) return false;
+  if (prevProps.isLoading !== nextProps.isLoading) return false;
+  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
+  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
+  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
+  if (prevProps.onNewIncognitoTab !== nextProps.onNewIncognitoTab) return false;
+  if (prevProps.sidebarWidth !== nextProps.sidebarWidth) return false;
+  if (prevProps.sidebarPosition !== nextProps.sidebarPosition) return false;
+  if (prevProps.isCustomizeMode !== nextProps.isCustomizeMode) return false;
+  if (prevProps.onToggleSidebarSection !== nextProps.onToggleSidebarSection) return false;
+
+  const prevSections = resolveSidebarSections(prevProps.sidebarSections);
+  const nextSections = resolveSidebarSections(nextProps.sidebarSections);
+  if (
+    prevSections.favorites !== nextSections.favorites ||
+    prevSections.pinned !== nextSections.pinned ||
+    prevSections.folders !== nextSections.folders ||
+    prevSections.workspaces !== nextSections.workspaces ||
+    prevSections.dockFooter !== nextSections.dockFooter
+  ) {
+    return false;
+  }
+
+  // Array-valued props compared by reference (state arrays from App)
+  if (prevProps.folders !== nextProps.folders) return false;
+  if (prevProps.workspaces !== nextProps.workspaces) return false;
+  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
+
+  // Tabs: length + order-sensitive comparison of every rendered field
+  // (incl. folderId, used by the root-list filter).
+  const prevTabs = prevProps.tabs;
+  const nextTabs = nextProps.tabs;
+  if (prevTabs === nextTabs) return true;
+  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
+  for (let i = 0; i < prevTabs.length; i++) {
+    const a = prevTabs[i];
+    const b = nextTabs[i];
+    if (a === b) continue;
+    if (
+      a.id !== b.id ||
+      a.url !== b.url ||
+      a.title !== b.title ||
+      a.favicon !== b.favicon ||
+      a.isLoading !== b.isLoading ||
+      a.isPinned !== b.isPinned ||
+      a.isIncognito !== b.isIncognito ||
+      a.isPlayingAudio !== b.isPlayingAudio ||
+      a.isInPip !== b.isInPip ||
+      a.isMuted !== b.isMuted ||
+      a.isSuspended !== b.isSuspended ||
+      a.splitWith !== b.splitWith ||
+      a.folderId !== b.folderId ||
+      (a.id === nextProps.activeTabId && a.blockedAdsCount !== b.blockedAdsCount)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   tabs,
   folders,
@@ -616,13 +811,28 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
   bookmarks = [],
   onToggleCollapse,
   isCollapsed = false,
-  onReorderTabs
+  onReorderTabs,
+  sidebarWidth = DEFAULT_SIDEBAR_WIDTH,
+  sidebarPosition = 'left',
+  sidebarSections,
+  isCustomizeMode = false,
+  onToggleSidebarSection,
 }) => {
   const activeTab = tabs.find(t => t.id === activeTabId);
   const activeWorkspace = workspaces.find(w => w.id === activeWorkspaceId) || workspaces[0];
-  const isMac = useMemo(() => {
-    return typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-  }, []);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  const resolvedSidebarWidth = clampSidebarWidth(sidebarWidth);
+  const isRightSidebar = sidebarPosition === 'right';
+  const sections = useMemo(
+    () => resolveSidebarSections(sidebarSections),
+    [
+      sidebarSections?.favorites,
+      sidebarSections?.pinned,
+      sidebarSections?.folders,
+      sidebarSections?.workspaces,
+      sidebarSections?.dockFooter,
+    ]
+  );
 
   const [hoveredTab, setHoveredTab] = useState<Tab | null>(null);
   const [hoverRect, setHoverRect] = useState<{ top: number; left: number; width: number; height: number; right: number; bottom: number } | null>(null);
@@ -1020,36 +1230,47 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
     />
   ));
   const pinnedTabs = tabs.filter(tab => tab.isPinned);
+  const workspaceFolders = folders?.filter(f => f.workspaceId === activeWorkspaceId) || [];
+  const sidebarRootStyle: React.CSSProperties = {
+    width: `${resolvedSidebarWidth}px`,
+    fontFamily: 'var(--nova-font-ui, inherit)',
+    ...(isRightSidebar
+      ? { borderLeftWidth: 'var(--nova-sidebar-border-width, 1px)' }
+      : { borderRightWidth: 'var(--nova-sidebar-border-width, 1px)' }),
+    ...(!isIncognito
+      ? {
+          background: 'var(--nova-sidebar-bg, var(--sidebar-surface))',
+          color: 'var(--nova-sidebar-text, var(--sidebar-ink))',
+          borderColor: 'var(--nova-sidebar-border, var(--sidebar-border))',
+        }
+      : {
+          background: 'var(--nova-sidebar-bg, #0c0a14)',
+          color: 'var(--nova-sidebar-text, #e2e8f0)',
+          borderColor: 'var(--nova-sidebar-border, rgba(148, 163, 184, 0.16))',
+        }),
+  };
 
   return (
     <>
       {/* PERF: solid surface instead of backdrop-blur — a persistent blur over
           live page content forces a recomposite on every page repaint. */}
       <div
-        style={!isIncognito ? {
-          background: 'var(--nova-sidebar-bg, var(--sidebar-surface))',
-          color: 'var(--nova-sidebar-text, var(--sidebar-ink))',
-          borderColor: 'var(--nova-sidebar-border, var(--sidebar-border))',
-          borderRightWidth: 'var(--nova-sidebar-border-width, 1px)',
-          fontFamily: 'var(--nova-font-ui, inherit)',
-        } : {
-          background: 'var(--nova-sidebar-bg, #0c0a14)',
-          color: 'var(--nova-sidebar-text, #e2e8f0)',
-          borderColor: 'var(--nova-sidebar-border, rgba(148, 163, 184, 0.16))',
-          borderRightWidth: 'var(--nova-sidebar-border-width, 1px)',
-          fontFamily: 'var(--nova-font-ui, inherit)',
-        }}
-        className={`nova-vertical-sidebar flex flex-col h-full w-[250px] overflow-hidden shrink-0 select-none z-50 border-r ${isIncognito ? 'dark bg-[#0c0a14] text-slate-200 border-slate-800' : 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 border-slate-200/80 dark:border-white/[0.06]'}`}
+        data-sidebar-position={sidebarPosition}
+        style={sidebarRootStyle}
+        className={`nova-vertical-sidebar flex flex-col h-full overflow-hidden shrink-0 select-none z-50 ${
+          isRightSidebar ? 'border-l' : 'border-r'
+        } ${isIncognito ? 'dark bg-[#0c0a14] text-slate-200 border-slate-800' : 'text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-900 border-slate-200/80 dark:border-white/[0.06]'}`}
       >
 
-        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space + Sidebar Toggle + Back/Forward/Reload */}
+        {/* 1. TOP CONTROL ROW: macOS Traffic Light Space (left dock only) + Sidebar Toggle + Back/Forward/Reload */}
         <div
           className="h-10 pt-1 px-3 flex items-center justify-between drag-region shrink-0 select-none"
           style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         >
           <div className="flex items-center gap-1">
-            {isMac && (
+            {isMac && !isRightSidebar && (
               <div
+                data-sidebar-mac-spacer="true"
                 className="w-[72px] h-full shrink-0 select-none drag-region"
                 style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
               />
@@ -1063,6 +1284,8 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
               >
                 {isCollapsed ? (
                   <Pin className="w-3.5 h-3.5 rotate-45 text-accent" />
+                ) : isRightSidebar ? (
+                  <PanelRight className="w-3.5 h-3.5" />
                 ) : (
                   <PanelLeft className="w-3.5 h-3.5" />
                 )}
@@ -1302,104 +1525,134 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
         </div>
 
         {/* 3. FAVORITES: compact, persistent shortcuts */}
-        <div
-          className="px-3 pb-2.5 no-drag"
-          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-        >
-          <div className="nova-sidebar-favorites grid grid-cols-4 gap-1.5">
-            {favorites.slice(0, 4).map((fav) => (
-              <div key={fav.id} className="relative group/fav">
-                <button
-                  onClick={() => handleFavoriteClick(fav.url)}
-                  className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-colors duration-150 shadow-xs cursor-pointer"
-                  title={`${fav.name} (${fav.url})`}
-                >
-                  <div className="w-4 h-4 flex items-center justify-center">
-                    {renderFavoriteIcon(fav)}
-                  </div>
-                </button>
-
-                {/* Delete Shortcut */}
-                <button
-                  onClick={(e) => handleRemoveFavorite(fav.id, e)}
-                  aria-label={`Remove ${fav.name} favorite`}
-                  className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
-                >
-                  <X className="w-2 h-2" />
-                </button>
-              </div>
-            ))}
-
-            {/* Add Favorite Tile */}
-            {favorites.length < 4 && (
-              <button
-                onClick={() => setIsAddFavOpen(true)}
-                className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
-                title="Add Favorite"
-              >
-                <Plus className="w-3.5 h-3.5 opacity-60" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Add Favorite Inline Form */}
-        <AnimatePresence>
-          {isAddFavOpen && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="px-3 pb-2.5 no-drag"
+        {sections.favorites ? (
+          <>
+            <div
+              data-sidebar-section="favorites"
+              data-section-visible="true"
+              className={`px-3 pb-2.5 no-drag ${
+                isCustomizeMode ? 'mx-2 mb-1.5 pt-1.5 rounded-xl ring-1 ring-dashed ring-accent/45' : ''
+              }`}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             >
-              <form
-                onSubmit={handleAddFavorite}
-                style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
-                className="p-2 rounded-xl bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5"
-              >
-                <input
-                  type="text"
-                  placeholder="Name (e.g. Reddit)"
-                  value={newFavName}
-                  onChange={(e) => setNewFavName(e.target.value)}
-                  className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
-                  autoFocus
-                />
-                <input
-                  type="text"
-                  placeholder="URL (e.g. reddit.com)"
-                  value={newFavUrl}
-                  onChange={(e) => setNewFavUrl(e.target.value)}
-                  className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
-                />
-                <div className="flex items-center justify-end gap-1 pt-0.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddFavOpen(false)}
-                    className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-2 py-0.5 text-[10px] bg-accent rounded-md text-accent-text font-medium hover:bg-accent-hover cursor-pointer"
-                  >
-                    Save
-                  </button>
+              {isCustomizeMode && (
+                <div className="flex items-center justify-between pb-1 text-[10px] font-medium opacity-75">
+                  <span>Favorites</span>
+                  <SidebarSectionCustomizeBadge sectionKey="favorites" label="Favorites" onToggle={onToggleSidebarSection} />
                 </div>
-              </form>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              )}
+              <div className="nova-sidebar-favorites grid grid-cols-4 gap-1.5">
+                {favorites.slice(0, 4).map((fav) => (
+                  <div key={fav.id} className="relative group/fav">
+                    <button
+                      onClick={() => handleFavoriteClick(fav.url)}
+                      className="w-full flex items-center justify-center h-9 rounded-xl bg-white/80 hover:bg-white border border-slate-200/90 hover:border-slate-300 dark:bg-white/6 dark:hover:bg-white/10 dark:border-white/[0.08] dark:hover:border-white/15 transition-colors duration-150 shadow-xs cursor-pointer"
+                      title={`${fav.name} (${fav.url})`}
+                    >
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        {renderFavoriteIcon(fav)}
+                      </div>
+                    </button>
+
+                    {/* Delete Shortcut */}
+                    <button
+                      onClick={(e) => handleRemoveFavorite(fav.id, e)}
+                      aria-label={`Remove ${fav.name} favorite`}
+                      className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-red-500 flex items-center justify-center opacity-0 group-hover/fav:opacity-100 transition-opacity shadow-md z-10 cursor-pointer"
+                    >
+                      <X className="w-2 h-2" />
+                    </button>
+                  </div>
+                ))}
+
+                {/* Add Favorite Tile */}
+                {favorites.length < 4 && (
+                  <button
+                    onClick={() => setIsAddFavOpen(true)}
+                    className="flex items-center justify-center h-9 rounded-xl bg-slate-200/40 hover:bg-slate-200/80 border border-dashed border-slate-300 dark:bg-white/3 dark:hover:bg-white/8 dark:border-white/15 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+                    title="Add Favorite"
+                  >
+                    <Plus className="w-3.5 h-3.5 opacity-60" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Add Favorite Inline Form */}
+            <AnimatePresence>
+              {isAddFavOpen && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="px-3 pb-2.5 no-drag"
+                  style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                >
+                  <form
+                    onSubmit={handleAddFavorite}
+                    style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
+                    className="p-2 rounded-xl bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/15 shadow-xl flex flex-col gap-1.5"
+                  >
+                    <input
+                      type="text"
+                      placeholder="Name (e.g. Reddit)"
+                      value={newFavName}
+                      onChange={(e) => setNewFavName(e.target.value)}
+                      className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      placeholder="URL (e.g. reddit.com)"
+                      value={newFavUrl}
+                      onChange={(e) => setNewFavUrl(e.target.value)}
+                      className="w-full h-6 px-2 bg-black/[0.04] dark:bg-white/8 border border-slate-200 dark:border-white/10 rounded-md text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none"
+                    />
+                    <div className="flex items-center justify-end gap-1 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setIsAddFavOpen(false)}
+                        className="px-2 py-0.5 text-[10px] text-slate-500 dark:text-slate-400 cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-2 py-0.5 text-[10px] bg-accent rounded-md text-accent-text font-medium hover:bg-accent-hover cursor-pointer"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        ) : isCustomizeMode ? (
+          <SidebarSectionHiddenCard
+            sectionKey="favorites"
+            label="Favorites"
+            onToggle={onToggleSidebarSection}
+            className="mb-2"
+          />
+        ) : null}
 
         {/* 4. ACTIVE WORKSPACE */}
+        {sections.workspaces && (
         <div
-          className="px-3 pb-2 no-drag relative"
+          className={`px-3 pb-2 no-drag relative ${
+            isCustomizeMode ? 'mx-2 mb-1 pt-1 rounded-xl ring-1 ring-dashed ring-accent/45' : ''
+          }`}
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           ref={dropdownRef}
           data-sidebar-workspace
         >
+          {isCustomizeMode && (
+            <div className="flex items-center justify-between pb-1 text-[10px] font-medium opacity-75">
+              <span>Workspaces</span>
+              <SidebarSectionCustomizeBadge sectionKey="workspaces" label="Workspaces" onToggle={onToggleSidebarSection} />
+            </div>
+          )}
           <button
             onClick={() => setIsWorkspaceDropdownOpen(!isWorkspaceDropdownOpen)}
             aria-label="Switch workspace"
@@ -1501,6 +1754,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             )}
           </AnimatePresence>
         </div>
+        )}
 
         <div className="nova-sidebar-create-row">
           <button onClick={() => onNewTab()} className="nova-sidebar-new-tab">
@@ -1537,139 +1791,203 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             if (tabId) onMoveTabToFolder?.(tabId, undefined);
           }}
         >
-          <AnimatePresence>
-            {pinnedTabs.length > 0 && (
-              <div key="pinned" className="nova-sidebar-pinned">
-                <div className="nova-sidebar-section-label"><Pin size={11} />Pinned</div>
-                {renderTabRows(pinnedTabs)}
+          {sections.pinned ? (
+            (pinnedTabs.length > 0 || isCustomizeMode) && (
+              <div key="pinned" className="nova-sidebar-pinned" data-sidebar-section="pinned" data-section-visible="true">
+                <div className="nova-sidebar-section-label">
+                  <Pin size={11} />
+                  Pinned
+                  {isCustomizeMode && (
+                    <span className="ml-auto">
+                      <SidebarSectionCustomizeBadge sectionKey="pinned" label="Pinned" onToggle={onToggleSidebarSection} />
+                    </span>
+                  )}
+                </div>
+                <AnimatePresence>
+                  {pinnedTabs.length > 0 && renderTabRows(pinnedTabs)}
+                </AnimatePresence>
               </div>
-            )}
-            <div key="open-label" className="nova-sidebar-section-label">Open tabs<span>{tabs.filter(tab => !tab.isPinned).length}</span></div>
-            {/* Folders */}
-            {folders?.filter(f => f.workspaceId === activeWorkspaceId).map(folder => {
-              const folderTabs = tabs.filter(t => !t.isPinned && t.folderId === folder.id);
-              return (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, height: 0 }}
-                  transition={{ duration: 0.15 }}
-                  key={folder.id}
-                  className="flex flex-col gap-0.5"
+            )
+          ) : isCustomizeMode ? (
+            <SidebarSectionHiddenCard
+              key="pinned-hidden"
+              sectionKey="pinned"
+              label="Pinned"
+              onToggle={onToggleSidebarSection}
+              className="mx-0"
+            />
+          ) : null}
+          <div key="open-label" className="nova-sidebar-section-label">Open tabs<span>{tabs.filter(tab => !tab.isPinned).length}</span></div>
+          {/* Folders */}
+          {sections.folders ? (
+            <div key="folders-branch" className="flex flex-col gap-0.5">
+              {isCustomizeMode && (
+                <div
+                  key="folders-customize"
+                  data-sidebar-section="folders"
+                  data-section-visible="true"
+                  className="flex items-center justify-between px-1 py-0.5 text-[10px] font-medium opacity-75"
                 >
-                  <div
-                    onClick={(e) => { if (isFromNestedControl(e)) return; onToggleFolder?.(folder.id); }}
-                    onKeyDown={(e) => {
-                      if (isFromNestedControl(e)) return;
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
-                        onToggleFolder?.(folder.id);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded={folder.isExpanded}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDragOverFolderId(folder.id);
-                    }}
-                    onDragLeave={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                        setDragOverFolderId(null);
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setDragOverFolderId(null);
-                      const tabId = e.dataTransfer.getData('text/plain');
-                      if (tabId) onMoveTabToFolder?.(tabId, folder.id);
-                    }}
-                    className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-black/[0.08] dark:bg-white/15 ring-2 ring-accent/50' : ''}`}
-                  >
-                    <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
-                      {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                    </div>
-                    <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
-                    {editingFolderId === folder.id ? (
-                      <input autoFocus aria-label="Folder name" title="Enter to save, Escape to cancel" maxLength={100}
-                        className="min-w-0 flex-1 rounded px-1 py-0.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none ring-1 ring-accent/60"
-                        value={folderName} onChange={event => setFolderName(event.target.value)}
-                        onFocus={event => event.target.select()}
-                        onBlur={() => setEditingFolderId(null)}
-                        onKeyDown={event => {
-                          event.stopPropagation();
-                          if (event.key === 'Enter') {
-                            event.preventDefault();
-                            if (!folderName.trim()) return;
-                            onRenameFolder?.(folder.id, folderName.trim());
-                            setEditingFolderId(null);
-                            event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
-                          } else if (event.key === 'Escape') {
-                            event.preventDefault();
-                            setEditingFolderId(null);
-                            event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
-                          }
-                        }} />
-                    ) : <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>}
-                    {onRenameFolder && editingFolderId !== folder.id && (
-                      <button aria-label={`Rename ${folder.name} folder`} title="Rename folder"
-                        onClick={event => { event.stopPropagation(); setFolderName(folder.name); setEditingFolderId(folder.id); }}
-                        onKeyDown={event => event.stopPropagation()}
-                        className="p-1 rounded-md opacity-0 group-hover/folder:opacity-100 focus:opacity-100 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400">
-                        <Pencil className="w-3 h-3" />
-                      </button>
-                    )}
-                    <button
-                      aria-label={`Delete ${folder.name} folder`}
-                      onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
-                      onKeyDown={(e) => { e.stopPropagation(); }}
-                      className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
+                  <span>Folders</span>
+                  <SidebarSectionCustomizeBadge sectionKey="folders" label="Folders" onToggle={onToggleSidebarSection} />
+                </div>
+              )}
+              <AnimatePresence>
+                {workspaceFolders.map(folder => {
+                  const folderTabs = tabs.filter(t => !t.isPinned && t.folderId === folder.id);
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.15 }}
+                      key={folder.id}
+                      className="flex flex-col gap-0.5"
                     >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <AnimatePresence>
-                    {folder.isExpanded && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                        className="relative"
+                      <div
+                        onClick={(e) => { if (isFromNestedControl(e)) return; onToggleFolder?.(folder.id); }}
+                        onKeyDown={(e) => {
+                          if (isFromNestedControl(e)) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onToggleFolder?.(folder.id);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={folder.isExpanded}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverFolderId(folder.id);
+                        }}
+                        onDragLeave={(e) => {
+                          if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                            setDragOverFolderId(null);
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDragOverFolderId(null);
+                          const tabId = e.dataTransfer.getData('text/plain');
+                          if (tabId) onMoveTabToFolder?.(tabId, folder.id);
+                        }}
+                        className={`flex items-center gap-2 h-8 px-2 rounded-lg cursor-pointer hover:bg-black/[0.05] dark:hover:bg-white/6 transition-colors group/folder ${dragOverFolderId === folder.id ? 'bg-black/[0.08] dark:bg-white/15 ring-2 ring-accent/50' : ''}`}
                       >
-                        <div className="flex flex-col gap-0.5 pb-1">
-                          {renderTabRows(folderTabs, true)}
+                        <div className="w-4 h-4 flex items-center justify-center shrink-0 opacity-60">
+                          {folder.isExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              );
-            })}
-
-            {renderTabRows(tabs.filter(tab => !tab.isPinned && !tab.folderId))}
-          </AnimatePresence>
+                        <FolderIcon className="w-3.5 h-3.5 opacity-70 group-hover/folder:opacity-100 transition-opacity" />
+                        {editingFolderId === folder.id ? (
+                          <input autoFocus aria-label="Folder name" title="Enter to save, Escape to cancel" maxLength={100}
+                            className="min-w-0 flex-1 rounded px-1 py-0.5 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white outline-none ring-1 ring-accent/60"
+                            value={folderName} onChange={event => setFolderName(event.target.value)}
+                            onFocus={event => event.target.select()}
+                            onBlur={() => setEditingFolderId(null)}
+                            onKeyDown={event => {
+                              event.stopPropagation();
+                              if (event.key === 'Enter') {
+                                event.preventDefault();
+                                if (!folderName.trim()) return;
+                                onRenameFolder?.(folder.id, folderName.trim());
+                                setEditingFolderId(null);
+                                event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
+                              } else if (event.key === 'Escape') {
+                                event.preventDefault();
+                                setEditingFolderId(null);
+                                event.currentTarget.closest<HTMLElement>('[role="button"]')?.focus();
+                              }
+                            }} />
+                        ) : <span className="text-xs font-semibold flex-1 truncate">{folder.name}</span>}
+                        {onRenameFolder && editingFolderId !== folder.id && (
+                          <button aria-label={`Rename ${folder.name} folder`} title="Rename folder"
+                            onClick={event => { event.stopPropagation(); setFolderName(folder.name); setEditingFolderId(folder.id); }}
+                            onKeyDown={event => event.stopPropagation()}
+                            className="p-1 rounded-md opacity-0 group-hover/folder:opacity-100 focus:opacity-100 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-400">
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                        <button
+                          aria-label={`Delete ${folder.name} folder`}
+                          onClick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }}
+                          onKeyDown={(e) => { e.stopPropagation(); }}
+                          className="p-1 rounded-md hover:bg-slate-200 dark:hover:bg-white/10 opacity-0 group-hover/folder:opacity-100 transition-opacity text-slate-400 hover:text-red-500"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                      <AnimatePresence>
+                        {folder.isExpanded && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="relative"
+                          >
+                            <div className="flex flex-col gap-0.5 pb-1">
+                              {renderTabRows(folderTabs, true)}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+              <AnimatePresence>
+                {renderTabRows(tabs.filter(tab => !tab.isPinned && !tab.folderId))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div key="flat-branch" className="flex flex-col gap-0.5">
+              {isCustomizeMode && (
+                <SidebarSectionHiddenCard
+                  key="folders-hidden"
+                  sectionKey="folders"
+                  label="Folders"
+                  onToggle={onToggleSidebarSection}
+                  className="mx-0"
+                />
+              )}
+              <AnimatePresence>
+                {renderTabRows(tabs.filter(tab => !tab.isPinned))}
+              </AnimatePresence>
+            </div>
+          )}
         </div>
 
-        <div className="nova-sidebar-spaces" aria-label="Workspaces">
-          <div className="nova-sidebar-space-buttons">
-            {workspaces.map(workspace => (
-              <button key={workspace.id} onClick={() => onSelectWorkspace(workspace.id)}
-                title={workspace.name} aria-label={`Switch to ${workspace.name}`}
-                aria-pressed={workspace.id === activeWorkspaceId}
-                style={{ '--space-color': WORKSPACE_COLORS[workspace.color] || WORKSPACE_COLORS.slate } as React.CSSProperties}>
-                <span>{workspace.name.charAt(0).toUpperCase()}</span>
-              </button>
-            ))}
+        {sections.workspaces ? (
+          <div className="nova-sidebar-spaces" aria-label="Workspaces" data-sidebar-section="workspaces" data-section-visible="true">
+            <div className="nova-sidebar-space-buttons">
+              {workspaces.map(workspace => (
+                <button key={workspace.id} onClick={() => onSelectWorkspace(workspace.id)}
+                  title={workspace.name} aria-label={`Switch to ${workspace.name}`}
+                  aria-pressed={workspace.id === activeWorkspaceId}
+                  style={{ '--space-color': WORKSPACE_COLORS[workspace.color] || WORKSPACE_COLORS.slate } as React.CSSProperties}>
+                  <span>{workspace.name.charAt(0).toUpperCase()}</span>
+                </button>
+              ))}
+            </div>
+            <button className="nova-sidebar-manage-spaces" title="Manage spaces" onClick={() => window.dispatchEvent(new CustomEvent('open-workspace-manager'))}><Plus size={14} /></button>
           </div>
-          <button className="nova-sidebar-manage-spaces" title="Manage spaces" onClick={() => window.dispatchEvent(new CustomEvent('open-workspace-manager'))}><Plus size={14} /></button>
-        </div>
+        ) : isCustomizeMode ? (
+          <SidebarSectionHiddenCard
+            sectionKey="workspaces"
+            label="Workspaces"
+            onToggle={onToggleSidebarSection}
+          />
+        ) : null}
 
         {/* 7. BOTTOM DOCK FOOTER */}
+        {sections.dockFooter ? (
         <div
-          className="h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative"
+          data-sidebar-section="dockFooter"
+          data-section-visible="true"
+          className={`h-11 px-3.5 pb-2 border-t border-slate-200/80 dark:border-white/[0.06] flex items-center justify-between no-drag mt-auto relative ${
+            isCustomizeMode ? 'ring-1 ring-inset ring-dashed ring-accent/45' : ''
+          }`}
           style={{
             WebkitAppRegion: 'no-drag',
             borderColor: 'var(--nova-sidebar-border, var(--sidebar-border))',
@@ -1694,7 +2012,7 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
                 exit={{ opacity: 0, y: 10, scale: 0.96 }}
                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 style={!isIncognito ? POPOVER_SURFACE_STYLE : undefined}
-                className="absolute bottom-12 left-3 bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44"
+                className={`absolute bottom-12 ${isRightSidebar ? 'right-3' : 'left-3'} bg-white dark:bg-[#28282b] border border-slate-200 dark:border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 py-1 w-44`}
               >
                 {onToggleAIAssistant && (
                   <button
@@ -1755,6 +2073,9 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
           </AnimatePresence>
 
           <div className="flex items-center gap-1">
+            {isCustomizeMode && (
+              <SidebarSectionCustomizeBadge sectionKey="dockFooter" label="Footer Dock" onToggle={onToggleSidebarSection} />
+            )}
             {onCreateFolder && (
               <button
                 onClick={onCreateFolder}
@@ -1773,13 +2094,21 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
             </button>
           </div>
         </div>
+        ) : isCustomizeMode ? (
+          <SidebarSectionHiddenCard
+            sectionKey="dockFooter"
+            label="Footer Dock"
+            onToggle={onToggleSidebarSection}
+            className="mt-auto mb-2"
+          />
+        ) : null}
 
       </div>
 
       {/* Tab Hover Preview */}
       <TabHoverPreview
         tab={hoveredTab}
-        rect={hoverRect}
+        rect={resolveSidebarHoverPreviewRect(hoverRect, sidebarPosition)}
         position="right"
         visible={Boolean(hoveredTab && hoverRect && !tabContextMenu.isOpen)}
       />
@@ -1823,55 +2152,4 @@ export const SidebarTabs: React.FC<SidebarTabsProps> = React.memo(({
       />
     </>
   );
-}, (prevProps, nextProps) => {
-  // Compare only rendered fields; callback props are stable useCallback refs.
-
-  if (prevProps.activeTabId !== nextProps.activeTabId) return false;
-  if (prevProps.activeWorkspaceId !== nextProps.activeWorkspaceId) return false;
-  if (prevProps.canReopenClosedTab !== nextProps.canReopenClosedTab) return false;
-  if (prevProps.isCollapsed !== nextProps.isCollapsed) return false;
-  if (prevProps.isAIAssistantOpen !== nextProps.isAIAssistantOpen) return false;
-  if (prevProps.canGoBack !== nextProps.canGoBack) return false;
-  if (prevProps.canGoForward !== nextProps.canGoForward) return false;
-  if (prevProps.isLoading !== nextProps.isLoading) return false;
-  if (prevProps.searchEngine !== nextProps.searchEngine) return false;
-  if (prevProps.privacyShield !== nextProps.privacyShield) return false;
-  if (prevProps.isIncognito !== nextProps.isIncognito) return false;
-  if (prevProps.onNewIncognitoTab !== nextProps.onNewIncognitoTab) return false;
-
-  // Array-valued props compared by reference (state arrays from App)
-  if (prevProps.folders !== nextProps.folders) return false;
-  if (prevProps.workspaces !== nextProps.workspaces) return false;
-  if (prevProps.bookmarks !== nextProps.bookmarks) return false;
-
-  // Tabs: length + order-sensitive comparison of every rendered field
-  // (incl. folderId, used by the root-list filter).
-  const prevTabs = prevProps.tabs;
-  const nextTabs = nextProps.tabs;
-  if (prevTabs === nextTabs) return true;
-  if (!prevTabs || !nextTabs || prevTabs.length !== nextTabs.length) return false;
-  for (let i = 0; i < prevTabs.length; i++) {
-    const a = prevTabs[i];
-    const b = nextTabs[i];
-    if (a === b) continue;
-    if (
-      a.id !== b.id ||
-      a.url !== b.url ||
-      a.title !== b.title ||
-      a.favicon !== b.favicon ||
-      a.isLoading !== b.isLoading ||
-      a.isPinned !== b.isPinned ||
-      a.isIncognito !== b.isIncognito ||
-      a.isPlayingAudio !== b.isPlayingAudio ||
-      a.isInPip !== b.isInPip ||
-      a.isMuted !== b.isMuted ||
-      a.isSuspended !== b.isSuspended ||
-      a.splitWith !== b.splitWith ||
-      a.folderId !== b.folderId ||
-      (a.id === nextProps.activeTabId && a.blockedAdsCount !== b.blockedAdsCount)
-    ) {
-      return false;
-    }
-  }
-  return true;
-});
+}, sidebarTabsPropsEqual);

@@ -332,6 +332,58 @@ async function main() {
     await click(Array.from(container.querySelectorAll('button')).find(button => button.textContent === 'Reload preview')!);
     assert.equal(previewFrame.src, previewSource, 'reload cannot leave the rendered preview on about:blank');
     console.log('[PASS] Shared navigation reloads the actual preview iframe without a blank detour');
+
+    // Verify customizable sidebar width, right-docked macOS spacer removal, and section toggles
+    Object.defineProperty(w.navigator, 'platform', { configurable: true, value: 'MacIntel' });
+    const toggledSections: string[] = [];
+    await React.act(async () => root.render(React.createElement(SidebarTabs, {
+      tabs: [base('pin-1', { isPinned: true }), base('folder-tab', { folderId: 'folder-1' }), base('open-1')],
+      folders: [{ id: 'folder-1', name: 'Docs', isExpanded: true, workspaceId: 'default' }],
+      activeTabId: 'open-1',
+      workspaces: currentSpaces,
+      activeWorkspaceId: 'default',
+      onSelectTab: () => {},
+      onCloseTab: () => {},
+      onNewTab: () => {},
+      onToggleMuteTab: () => {},
+      onSelectWorkspace: () => {},
+      sidebarWidth: 318,
+      sidebarPosition: 'right',
+      sidebarSections: { favorites: false, pinned: true, folders: false, workspaces: true, dockFooter: false },
+      isCustomizeMode: false,
+      onToggleSidebarSection: (sec) => toggledSections.push(sec),
+    })));
+    const sidebarEl = container.querySelector('.nova-vertical-sidebar') as HTMLElement;
+    assert.ok(sidebarEl, 'sidebar renders');
+    assert.equal(sidebarEl.style.width, '318px', 'custom sidebarWidth applies dynamically');
+    assert.equal(sidebarEl.getAttribute('data-sidebar-position'), 'right');
+    assert.equal(sidebarEl.querySelector('[data-sidebar-mac-spacer="true"]'), null, 'macOS spacer is omitted from right-docked sidebar');
+    assert.equal(sidebarEl.querySelector('.nova-sidebar-favorites'), null, 'favorites hidden when sidebarSections.favorites is false');
+    assert.equal(sidebarEl.querySelector('[title="Library"]'), null, 'dockFooter hidden when sidebarSections.dockFooter is false');
+    assert.ok(sidebarEl.querySelector('[data-tab-id="folder-tab"]'), 'unpinned folder tab stays reachable when folders section is hidden');
+
+    await React.act(async () => root.render(React.createElement(SidebarTabs, {
+      tabs: [base('pin-1', { isPinned: true }), base('open-1')],
+      folders: [{ id: 'folder-1', name: 'Docs', isExpanded: true, workspaceId: 'default' }],
+      activeTabId: 'open-1',
+      workspaces: currentSpaces,
+      activeWorkspaceId: 'default',
+      onSelectTab: () => {},
+      onCloseTab: () => {},
+      onNewTab: () => {},
+      onToggleMuteTab: () => {},
+      onSelectWorkspace: () => {},
+      sidebarWidth: 318,
+      sidebarPosition: 'left',
+      sidebarSections: { favorites: false, pinned: true, folders: false, workspaces: true, dockFooter: false },
+      isCustomizeMode: true,
+      onToggleSidebarSection: (sec) => toggledSections.push(sec),
+    })));
+    assert.ok(container.querySelector('[data-sidebar-mac-spacer="true"]'), 'macOS spacer renders in left-docked sidebar');
+    await click(container.querySelector('[aria-label="Show Favorites section"]'));
+    await click(container.querySelector('[aria-label="Hide Pinned section"]'));
+    assert.deepEqual(toggledSections, ['favorites', 'pinned']);
+    console.log('[PASS] Sidebar width, right/left macOS spacer, section visibility, and customize badges');
   } finally {
     await React.act(async () => root.unmount());
     dom.window.close();

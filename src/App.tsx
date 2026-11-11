@@ -22,11 +22,34 @@ import type {
   Bookmark,
   Extension,
   Workspace,
-  ShortcutConfig
+  ShortcutConfig,
+  BrowserDesignProfile,
+  ToolbarItemKind,
+  ToolbarSlotItem,
 } from './types/browser';
 export type { DownloadItem, HistoryItem, UserSettings, BrowserDemoOptions, VpnLocation };
 import type { BlockedSiteAlertData } from './components/BlockedSiteModal';
-import { SidebarTabs } from './components/SidebarTabs';
+import {
+  SidebarTabs,
+  MIN_SIDEBAR_WIDTH,
+  MAX_SIDEBAR_WIDTH,
+  DEFAULT_SIDEBAR_WIDTH,
+  clampSidebarWidth,
+  computeResizedSidebarWidth,
+  resolveSidebarSections,
+  type SidebarPosition,
+  type SidebarSectionKey,
+} from './components/SidebarTabs';
+import { createDefaultDesignProfile, TOOLBAR_ITEM_ORDER_DEFAULT } from './utils/designDefaults';
+import { resolveEffectiveDesign } from './utils/designEngine';
+import { sanitizeDesignProfile } from './utils/designSecurity';
+import {
+  reorderToolbarItems,
+  moveToolbarItemToIndex,
+  insertToolbarItem,
+  toggleToolbarItemVisibility,
+  removeToolbarItem,
+} from './utils/toolbarSlots';
 import { repairTabFolderAssignments } from './utils/verticalTabs';
 import { generateId } from './utils/idGenerator';
 import { safeParseArrayWithBackup, safeParseObjectWithBackup } from './utils/safeStorage';
@@ -121,7 +144,66 @@ import {
   isWindows,
 } from './utils/appConstants';
 
+const isNewTabRouteUrl = (url?: string): boolean =>
+  !url || url === 'nova://newtab' || url === 'about:blank' || url === 'https://newtab';
 
+function hasWorkspaceDesignOverride(settings: UserSettings, workspaceId?: string): workspaceId is string {
+  if (!workspaceId || workspaceId === '__proto__' || workspaceId === 'constructor' || workspaceId === 'prototype') {
+    return false;
+  }
+  const designs = settings.workspaceDesigns;
+  return Boolean(
+    designs &&
+    Object.prototype.hasOwnProperty.call(designs, workspaceId) &&
+    designs[workspaceId] &&
+    typeof designs[workspaceId] === 'object'
+  );
+}
+
+function updateWorkspaceAwareLayout(
+  prev: UserSettings,
+  activeWorkspaceId: string,
+  updater: (currentLayout: BrowserDesignProfile['layout']) => Partial<BrowserDesignProfile['layout']>
+): UserSettings {
+  const baseProfile = sanitizeDesignProfile(prev.designProfile, createDefaultDesignProfile());
+  if (hasWorkspaceDesignOverride(prev, activeWorkspaceId)) {
+    const existingOverride = prev.workspaceDesigns![activeWorkspaceId]!;
+    const currentLayout: BrowserDesignProfile['layout'] = {
+      ...baseProfile.layout,
+      ...(existingOverride.layout || {}),
+      sidebarSections: {
+        ...baseProfile.layout.sidebarSections,
+        ...(existingOverride.layout?.sidebarSections || {}),
+      },
+      toolbarItems: existingOverride.layout?.toolbarItems ?? baseProfile.layout.toolbarItems,
+    };
+    const nextPatch = updater(currentLayout);
+    return {
+      ...prev,
+      workspaceDesigns: {
+        ...prev.workspaceDesigns,
+        [activeWorkspaceId]: {
+          ...existingOverride,
+          layout: {
+            ...(existingOverride.layout || {}),
+            ...nextPatch,
+          },
+        },
+      },
+    };
+  }
+  const nextPatch = updater(baseProfile.layout);
+  return {
+    ...prev,
+    designProfile: {
+      ...baseProfile,
+      layout: {
+        ...baseProfile.layout,
+        ...nextPatch,
+      },
+    },
+  };
+}
 
 function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   const demoParams = useMemo(() => {
@@ -643,6 +725,33 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
+  const effectiveDesign = useMemo(
+    () => resolveEffectiveDesign(settings, activeWorkspaceId, Boolean(activeTab?.isIncognito)),
+    [settings, activeWorkspaceId, activeTab?.isIncognito]
+  );
+  const [isCustomizeMode, setIsCustomizeMode] = useState(false);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const [resizingSidebarWidth, setResizingSidebarWidth] = useState<number | null>(null);
+  const resizingWidthRef = useRef<number | null>(null);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  const isResettingAppearanceRef = useRef(false);
+
+  const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
+  const useVerticalTabs = isWebsiteDemo
+    ? false
+    : effectiveDesign.layout.chromeMode === 'vertical-left' ||
+      effectiveDesign.layout.chromeMode === 'vertical-right';
+  const sidebarPosition: SidebarPosition =
+    effectiveDesign.layout.chromeMode === 'vertical-right' ? 'right' : 'left';
+  const configuredSidebarWidth = clampSidebarWidth(effectiveDesign.layout.sidebarWidth);
+  const activeSidebarWidth = resizingSidebarWidth ?? configuredSidebarWidth;
+  const isNewTabActive = isNewTabRouteUrl(activeTab?.url);
+
+  useEffect(() => {
+    return () => {
+      resizeCleanupRef.current?.();
+    };
+  }, []);
   const downloads = useMemo(() => getVisibleDownloads(allDownloads, activeTab?.isIncognito ? '*' : undefined), [allDownloads, activeTab?.id, activeTab?.isIncognito]);
   const handleClearVisibleDownloads = useCallback(() => handleClearDownloads(activeTab?.isIncognito ? '*' : undefined), [handleClearDownloads, activeTab?.id, activeTab?.isIncognito]);
   const {
@@ -936,6 +1045,186 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     setIsHoverRevealing(false);
   }, []);
 
+  const handleToggleCustomizeMode = useCallback(() => {
+    if (isWebsiteDemo) return;
+    setIsCustomizeMode(prev => !prev);
+  }, [isWebsiteDemo]);
+
+  const handleResetAppearanceDefault = useCallback(async () => {
+    if (isResettingAppearanceRef.current) return;
+    isResettingAppearanceRef.current = true;
+    try {
+      const confirmed = await showConfirm({
+        title: 'Reset Appearance to Default',
+        message: 'Reset all browser appearance, layout, and custom CSS settings to default?',
+        detail: 'This restores the default chrome layout, surface colors, typography, workspace overrides, and New Tab layout.',
+        confirmLabel: 'Reset to Default',
+        cancelLabel: 'Cancel',
+      });
+      if (!confirmed) return;
+      setSettings(prev => ({
+        ...prev,
+        designProfile: createDefaultDesignProfile(),
+        workspaceDesigns: {},
+        useVerticalTabs: false,
+        showTasksWidget: false,
+      }));
+      setIsSidebarCollapsed(false);
+      setIsCustomizeMode(false);
+    } finally {
+      isResettingAppearanceRef.current = false;
+    }
+  }, [setSettings, setIsSidebarCollapsed]);
+
+  const persistSidebarWidth = useCallback((width: number) => {
+    const clamped = clampSidebarWidth(width);
+    const activeWsId = activeWorkspaceIdRef.current || 'default';
+    setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, () => ({
+      sidebarWidth: clamped,
+    })));
+  }, [setSettings, activeWorkspaceIdRef]);
+
+  const handleResetSidebarWidth = useCallback(() => {
+    persistSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+  }, [persistSidebarWidth]);
+
+  const handleToggleSidebarSection = useCallback((section: SidebarSectionKey) => {
+    const activeWsId = activeWorkspaceIdRef.current || 'default';
+    setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, (layout) => {
+      const sections = resolveSidebarSections(layout.sidebarSections);
+      return {
+        sidebarSections: {
+          ...sections,
+          [section]: !sections[section],
+        },
+      };
+    }));
+  }, [setSettings, activeWorkspaceIdRef]);
+
+  const mutateToolbarItems = useCallback(
+    (updater: (items: ToolbarSlotItem[]) => ToolbarSlotItem[]) => {
+      const activeWsId = activeWorkspaceIdRef.current || 'default';
+      setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, (layout) => ({
+        toolbarItems: updater(layout.toolbarItems || TOOLBAR_ITEM_ORDER_DEFAULT),
+      })));
+    },
+    [setSettings, activeWorkspaceIdRef]
+  );
+
+  const handleReorderToolbarSlot = useCallback(
+    (draggedId: string, targetId: string) =>
+      mutateToolbarItems(items => reorderToolbarItems(items, draggedId, targetId)),
+    [mutateToolbarItems]
+  );
+
+  const handleMoveToolbarSlotToIndex = useCallback(
+    (draggedId: string, targetIndex: number) =>
+      mutateToolbarItems(items => moveToolbarItemToIndex(items, draggedId, targetIndex)),
+    [mutateToolbarItems]
+  );
+
+  const handleInsertToolbarSlot = useCallback(
+    (kind: ToolbarItemKind, atIndex: number) =>
+      mutateToolbarItems(items => insertToolbarItem(items, kind, atIndex)),
+    [mutateToolbarItems]
+  );
+
+  const handleToggleToolbarSlotVisibility = useCallback(
+    (id: string) =>
+      mutateToolbarItems(items => toggleToolbarItemVisibility(items, id)),
+    [mutateToolbarItems]
+  );
+
+  const handleRemoveToolbarSlot = useCallback(
+    (id: string) =>
+      mutateToolbarItems(items => removeToolbarItem(items, id)),
+    [mutateToolbarItems]
+  );
+
+  const handleToggleBookmarksBar = useCallback(() => {
+    setSettings(prev => ({ ...prev, showBookmarksBar: !prev.showBookmarksBar }));
+  }, [setSettings]);
+
+  const handleSidebarResizeStart = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    resizeCleanupRef.current?.();
+
+    const startX = e.clientX;
+    const startWidth = configuredSidebarWidth;
+    const side = sidebarPosition;
+    resizingWidthRef.current = startWidth;
+    setIsResizingSidebar(true);
+    setResizingSidebarWidth(startWidth);
+
+    let rafId: number | null = null;
+    let latestClientX = startX;
+
+    const flushWidth = () => {
+      rafId = null;
+      const nextWidth = computeResizedSidebarWidth(startWidth, latestClientX - startX, side);
+      resizingWidthRef.current = nextWidth;
+      setResizingSidebarWidth(nextWidth);
+    };
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      latestClientX = moveEvent.clientX;
+      if (rafId === null) {
+        rafId = requestAnimationFrame(flushWidth);
+      }
+    };
+
+    const finishResize = (finalClientX?: number) => {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
+      resizeCleanupRef.current = null;
+
+      const finalWidth = typeof finalClientX === 'number'
+        ? computeResizedSidebarWidth(startWidth, finalClientX - startX, side)
+        : (resizingWidthRef.current ?? startWidth);
+
+      resizingWidthRef.current = null;
+      setIsResizingSidebar(false);
+      setResizingSidebarWidth(null);
+      persistSidebarWidth(finalWidth);
+    };
+
+    const handleMouseUp = (upEvent: MouseEvent) => finishResize(upEvent.clientX);
+    const handleWindowBlur = () => finishResize();
+
+    resizeCleanupRef.current = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('blur', handleWindowBlur);
+  }, [configuredSidebarWidth, sidebarPosition, persistSidebarWidth]);
+
+  useEffect(() => {
+    if (isWebsiteDemo) return;
+    const api = getElectronAPI();
+    if (!api) return;
+    const unsubCustomize = api.onToggleCustomizeMode?.(() => {
+      handleToggleCustomizeMode();
+    });
+    const unsubReset = api.onResetAppearanceDefault?.(() => {
+      void handleResetAppearanceDefault();
+    });
+    return () => {
+      unsubCustomize?.();
+      unsubReset?.();
+    };
+  }, [isWebsiteDemo, handleToggleCustomizeMode, handleResetAppearanceDefault]);
+
   const handleManageExtensions = useCallback(() => handleNewTab('nova://settings#extensions'), [handleNewTab]);
 
   const handleSpotlightSelectTab = useCallback((tabId: string) => {
@@ -1182,14 +1471,13 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       }
 
       const s = settings.shortcuts;
-      if (!s) return;
 
       const key = e.key.toLowerCase();
       const shift = e.shiftKey;
       const meta = e.metaKey || e.ctrlKey; // Accept either Meta (Mac) or Ctrl (Windows)
 
-      const matches = (shortcutName: keyof typeof s) => {
-        return matchesShortcut(s[shortcutName], e, isMac);
+      const matches = (shortcutName: keyof NonNullable<typeof s>) => {
+        return s ? matchesShortcut(s[shortcutName], e, isMac) : false;
       };
 
       if (matches('newTab')) {
@@ -1349,6 +1637,21 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         return;
       }
 
+      // Toggle Customize Mode (Cmd + Shift + E / Ctrl + Shift + E)
+      if (meta && shift && !e.altKey && (key === 'e' || e.code === 'KeyE')) {
+        e.preventDefault();
+        handleToggleCustomizeMode();
+        return;
+      }
+
+      // Emergency Reset Appearance to Default (Cmd + Shift + 0 / Ctrl + Shift + 0)
+      // Placed strictly BEFORE Zoom Reset (`meta && key === '0'`) so Shift+0 is never swallowed.
+      if (meta && shift && !e.altKey && (key === '0' || e.code === 'Digit0')) {
+        e.preventDefault();
+        void handleResetAppearanceDefault();
+        return;
+      }
+
       // Reset Zoom (Cmd + 0)
       if (meta && key === '0') {
         e.preventDefault();
@@ -1394,7 +1697,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeTabId, activateTab, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature]);
+  }, [activeTabId, activateTab, handleNewTab, handleNewIncognitoTab, handleReload, handleToggleBookmarkActive, handleZoomIn, handleZoomOut, handleResetZoom, handleGoBack, handleGoForward, handleCloseTab, handleReopenClosedTab, handlePrintPage, handleOpenDevTools, handleTakeScreenshot, handleOpenDownloads, closeAllModals, settings.shortcuts, demoParams.isDemo, demoParams.feature, handleToggleCustomizeMode, handleResetAppearanceDefault]);
 
   const activeDownloadsCount = useMemo(() => downloads.filter(d => d.state === 'progressing').length, [downloads]);
   // DownloadToast tekil prop alıyor: öğe `downloads` dizisinden referansıyla
@@ -1403,8 +1706,6 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     if (downloads.length === 0) return null;
     return downloads.find(d => d.state === 'progressing') || downloads[0];
   }, [downloads]);
-  const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
-  const useVerticalTabs = isWebsiteDemo ? false : settings.useVerticalTabs;
   // Keep the settings object identity stable between unrelated App renders so
   // memoized BrowserViews do not re-render just because tab/sidebar state changed.
   const browserViewSettings = useMemo(() => ({
@@ -1433,9 +1734,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   // webview state, scroll position, and page sessions.
   const sortedTabs = useMemo(() => [...tabs].sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true })), [tabs]);
 
+  const motionReducedMode = effectiveDesign.effects.reduceChromeMotion ? 'always' : 'user';
+
   if (showOnboarding) {
     return (
-      <MotionConfig reducedMotion="user" transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
+      <MotionConfig reducedMotion={motionReducedMode} transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
         <React.Suspense fallback={<div className="h-screen w-screen bg-[#07050d]" />}>
           <Onboarding
             onComplete={handleOnboardingComplete}
@@ -1445,9 +1748,125 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     );
   }
 
+  const renderSidebarTabs = (collapsed: boolean, widthPx: number) => (
+    <SidebarTabs
+      tabs={workspaceTabs}
+      folders={folders}
+      activeTabId={activeTabId}
+      onSelectTab={handleSelectTab}
+      onCloseTab={handleCloseTab}
+      onNewTab={handleNewTab}
+      onNewIncognitoTab={handleNewIncognitoTab}
+      onToggleMuteTab={handleToggleMuteTab}
+      onTogglePip={handleTogglePip}
+      onDuplicateTab={handleDuplicateTab}
+      onTogglePinTab={handleTogglePinTab}
+      onCloseOtherTabs={handleCloseOtherTabs}
+      onCloseTabsToRight={handleCloseTabsToRight}
+      onNewTabRight={handleNewTabRight}
+      onReopenClosedTab={handleReopenClosedTab}
+      canReopenClosedTab={closedTabsStack.length > 0}
+      onToggleBookmark={handleToggleBookmarkActive}
+      workspaces={workspaces}
+      activeWorkspaceId={activeWorkspaceId}
+      onSelectWorkspace={handleSelectWorkspace}
+      isIncognito={activeTab?.isIncognito}
+      onCreateFolder={handleCreateFolder}
+      onToggleFolder={handleToggleFolder}
+      onRenameFolder={handleRenameFolder}
+      onDeleteFolder={handleDeleteFolder}
+      onMoveTabToFolder={handleMoveTabToFolder}
+      onOpenSpotlight={handleOpenSpotlight}
+      onTabDragStart={handleTabDragStart}
+      onTabDragEnd={handleTabDragEnd}
+      onCloseSplit={handleCloseSplitView}
+      onNavigate={handleNavigate}
+      onGoBack={handleGoBack}
+      onGoForward={handleGoForward}
+      onReload={handleReload}
+      canGoBack={activeTab?.canGoBack}
+      canGoForward={activeTab?.canGoForward}
+      isLoading={activeTab?.isLoading}
+      searchEngine={settings.searchEngine}
+      privacyShield={settings.privacyShield}
+      onTogglePrivacyShield={handleTogglePrivacyShield}
+      onOpenDownloads={handleOpenDownloads}
+      onOpenHistory={handleOpenHistory}
+      onOpenSettings={handleOpenSettings}
+      onOpenAccount={handleOpenAccount}
+      onOpenHelp={handleOpenHelp}
+      onOpenExtensions={handleOpenExtensions}
+      onToggleAIAssistant={handleToggleAIAssistant}
+      isAIAssistantOpen={isSidePanelOpen}
+      bookmarks={bookmarks}
+      isCollapsed={collapsed}
+      onReorderTabs={handleReorderTabs}
+      onToggleCollapse={collapsed ? handleExpandSidebar : handleCollapseSidebar}
+      sidebarWidth={widthPx}
+      sidebarPosition={sidebarPosition}
+      sidebarSections={effectiveDesign.layout.sidebarSections}
+      isCustomizeMode={isCustomizeMode}
+      onToggleSidebarSection={handleToggleSidebarSection}
+    />
+  );
+
+  const pinnedSidebarMotionNode = (
+    <AnimatePresence key={`pinned-sidebar-${sidebarPosition}`} initial={false}>
+      {useVerticalTabs && !isSidebarCollapsed && (
+        <motion.div
+          initial={false}
+          animate={{ width: activeSidebarWidth, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={
+            isResizingSidebar || effectiveDesign.effects.reduceChromeMotion
+              ? { duration: 0 }
+              : { duration: 0.28, ease: [0.16, 1, 0.3, 1] }
+          }
+          className="h-full flex flex-col shrink-0 relative z-50 overflow-hidden"
+        >
+          {renderSidebarTabs(false, activeSidebarWidth)}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  const sidebarResizerNode = useVerticalTabs && !isSidebarCollapsed ? (
+    <div
+      key="sidebar-resizer-handle"
+      id="sidebar-resizer-handle"
+      role="separator"
+      aria-orientation="vertical"
+      aria-label="Resize sidebar"
+      aria-valuemin={MIN_SIDEBAR_WIDTH}
+      aria-valuemax={MAX_SIDEBAR_WIDTH}
+      aria-valuenow={activeSidebarWidth}
+      tabIndex={0}
+      data-sidebar-resizer={sidebarPosition}
+      style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      className={`w-1 shrink-0 h-full cursor-col-resize relative z-50 select-none no-drag transition-colors ${
+        isResizingSidebar
+          ? 'bg-[var(--nova-accent,#3b82f6)]'
+          : 'bg-transparent hover:bg-[var(--nova-accent,#3b82f6)]/60'
+      }`}
+      onMouseDown={handleSidebarResizeStart}
+      onDoubleClick={handleResetSidebarWidth}
+      onKeyDown={(e) => {
+        if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+        e.preventDefault();
+        const step = e.shiftKey ? 20 : 10;
+        const delta = e.key === 'ArrowRight' ? step : -step;
+        persistSidebarWidth(computeResizedSidebarWidth(activeSidebarWidth, delta, sidebarPosition));
+      }}
+      title="Drag to resize sidebar (double-click to reset)"
+    >
+      <div className="absolute inset-y-0 -left-1 -right-1" />
+    </div>
+  ) : null;
+
   return (
-    <MotionConfig reducedMotion="user" transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
+    <MotionConfig reducedMotion={motionReducedMode} transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
       <div
+        data-chrome-mode={effectiveDesign.layout.chromeMode}
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-row h-full w-full overflow-hidden text-slate-900 dark:text-slate-100 relative ${
           activeTab?.isIncognito
@@ -1455,87 +1874,29 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
             : 'bg-slate-100 dark:bg-slate-950'
         } transition-colors duration-300`}>
 
-      {/* Pinned Vertical Sidebar with smooth slide animation */}
-      <AnimatePresence initial={false}>
-        {useVerticalTabs && !isSidebarCollapsed && (
-          <motion.div
-            initial={false}
-            animate={{ width: 250, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-            className="h-full flex flex-col shrink-0 relative z-50 overflow-hidden"
-          >
-            <SidebarTabs
-              tabs={workspaceTabs}
-              folders={folders}
-              activeTabId={activeTabId}
-              onSelectTab={handleSelectTab}
-              onCloseTab={handleCloseTab}
-              onNewTab={handleNewTab}
-              onNewIncognitoTab={handleNewIncognitoTab}
-              onToggleMuteTab={handleToggleMuteTab}
-              onTogglePip={handleTogglePip}
-              onDuplicateTab={handleDuplicateTab}
-              onTogglePinTab={handleTogglePinTab}
-              onCloseOtherTabs={handleCloseOtherTabs}
-              onCloseTabsToRight={handleCloseTabsToRight}
-              onNewTabRight={handleNewTabRight}
-              onReopenClosedTab={handleReopenClosedTab}
-              canReopenClosedTab={closedTabsStack.length > 0}
-              onToggleBookmark={handleToggleBookmarkActive}
-              workspaces={workspaces}
-              activeWorkspaceId={activeWorkspaceId}
-              onSelectWorkspace={handleSelectWorkspace}
-              isIncognito={activeTab?.isIncognito}
-              onCreateFolder={handleCreateFolder}
-              onToggleFolder={handleToggleFolder}
-              onRenameFolder={handleRenameFolder}
-              onDeleteFolder={handleDeleteFolder}
-              onMoveTabToFolder={handleMoveTabToFolder}
-              onOpenSpotlight={handleOpenSpotlight}
-              onTabDragStart={handleTabDragStart}
-              onTabDragEnd={handleTabDragEnd}
-              onCloseSplit={handleCloseSplitView}
-              onNavigate={handleNavigate}
-              onGoBack={handleGoBack}
-              onGoForward={handleGoForward}
-              onReload={handleReload}
-              canGoBack={activeTab?.canGoBack}
-              canGoForward={activeTab?.canGoForward}
-              isLoading={activeTab?.isLoading}
-              searchEngine={settings.searchEngine}
-              privacyShield={settings.privacyShield}
-              onTogglePrivacyShield={handleTogglePrivacyShield}
-              onOpenDownloads={handleOpenDownloads}
-              onOpenHistory={handleOpenHistory}
-              onOpenSettings={handleOpenSettings}
-              onOpenAccount={handleOpenAccount}
-              onOpenHelp={handleOpenHelp}
-              onOpenExtensions={handleOpenExtensions}
-              onToggleAIAssistant={handleToggleAIAssistant}
-              isAIAssistantOpen={isSidePanelOpen}
-              bookmarks={bookmarks}
-              isCollapsed={false}
-              onReorderTabs={handleReorderTabs}
-              onToggleCollapse={handleCollapseSidebar}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Left-docked Pinned Vertical Sidebar + Resizer */}
+      {sidebarPosition === 'left' && pinnedSidebarMotionNode}
+      {sidebarPosition === 'left' && sidebarResizerNode}
 
       {/* Hover Edge Trigger & Auto-Revealing Drawer when Collapsed */}
       {useVerticalTabs && isSidebarCollapsed && (
         <>
-          {/* Left Edge Mouse Sensor for Instant Hover Reveal */}
+          {/* Edge Mouse Sensor for Instant Hover Reveal */}
           <div
-            className="fixed top-0 left-0 bottom-0 w-8 z-40 no-drag"
+            data-sidebar-hover-sensor={sidebarPosition}
+            className={`fixed top-0 ${sidebarPosition === 'right' ? 'right-0' : 'left-0'} bottom-0 w-8 z-40 no-drag`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onMouseEnter={handleHoverSidebarOpen}
           />
 
           {/* Floating Expand Sidebar Button when Collapsed */}
           <div
-            className={`fixed top-2.5 ${isMac ? 'left-[82px]' : 'left-2.5'} z-45 flex items-center no-drag`}
+            data-sidebar-expand-container={sidebarPosition}
+            className={`fixed ${
+              sidebarPosition === 'right'
+                ? `${isMac || isWindows ? 'top-1.5' : 'top-2.5'} right-2.5`
+                : `top-2.5 ${isMac ? 'left-[82px]' : 'left-2.5'}`
+            } z-45 flex items-center no-drag`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           >
             <button
@@ -1545,7 +1906,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
               className="p-1.5 px-2 rounded-xl bg-white/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md border border-slate-200/80 dark:border-white/10 transition-colors hover:scale-105 active:scale-95 flex items-center gap-1.5 text-xs font-medium cursor-pointer no-drag select-none"
               title={isMac ? "Expand Sidebar (⌘S)" : "Expand Sidebar (Ctrl+S)"}
             >
-              <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              {sidebarPosition === 'right' ? (
+                <PanelRight className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              ) : (
+                <PanelLeft className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+              )}
               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">{isMac ? '⌘S' : 'Ctrl+S'}</span>
             </button>
           </div>
@@ -1554,69 +1919,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
           <AnimatePresence>
             {isHoverRevealing && (
               <motion.div
-                initial={{ x: -250, opacity: 0 }}
+                initial={{ x: sidebarPosition === 'right' ? configuredSidebarWidth : -configuredSidebarWidth, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                exit={{ x: -250, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                exit={{ x: sidebarPosition === 'right' ? configuredSidebarWidth : -configuredSidebarWidth, opacity: 0 }}
+                transition={
+                  effectiveDesign.effects.reduceChromeMotion
+                    ? { duration: 0 }
+                    : { type: 'spring', stiffness: 380, damping: 28 }
+                }
                 onMouseEnter={handleHoverSidebarOpen}
                 onMouseLeave={handleHoverSidebarClose}
-                style={{ backgroundColor: 'var(--nova-sidebar-bg)', borderColor: 'var(--nova-border-subtle)' }}
-                className="fixed top-0 left-0 bottom-0 z-50 w-[240px] shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-r border-slate-200 dark:border-white/10"
+                style={{
+                  width: configuredSidebarWidth,
+                  backgroundColor: 'var(--nova-sidebar-bg)',
+                  borderColor: 'var(--nova-border-subtle)',
+                }}
+                className={`fixed top-0 ${
+                  sidebarPosition === 'right' ? 'right-0 border-l' : 'left-0 border-r'
+                } bottom-0 z-50 shadow-2xl overflow-hidden bg-white/95 dark:bg-slate-900/98 border-slate-200 dark:border-white/10`}
               >
-                <SidebarTabs
-                  tabs={workspaceTabs}
-                  folders={folders}
-                  activeTabId={activeTabId}
-                  onSelectTab={handleSelectTab}
-                  onCloseTab={handleCloseTab}
-                  onNewTab={handleNewTab}
-                  onNewIncognitoTab={handleNewIncognitoTab}
-                  onToggleMuteTab={handleToggleMuteTab}
-                  onTogglePip={handleTogglePip}
-                  onDuplicateTab={handleDuplicateTab}
-                  onTogglePinTab={handleTogglePinTab}
-                  onCloseOtherTabs={handleCloseOtherTabs}
-                  onCloseTabsToRight={handleCloseTabsToRight}
-                  onNewTabRight={handleNewTabRight}
-                  onReopenClosedTab={handleReopenClosedTab}
-                  canReopenClosedTab={closedTabsStack.length > 0}
-                  onToggleBookmark={handleToggleBookmarkActive}
-                  workspaces={workspaces}
-                  activeWorkspaceId={activeWorkspaceId}
-                  onSelectWorkspace={handleSelectWorkspace}
-                  isIncognito={activeTab?.isIncognito}
-                  onCreateFolder={handleCreateFolder}
-                  onToggleFolder={handleToggleFolder}
-                  onRenameFolder={handleRenameFolder}
-                  onDeleteFolder={handleDeleteFolder}
-                  onMoveTabToFolder={handleMoveTabToFolder}
-                  onOpenSpotlight={handleOpenSpotlight}
-                  onTabDragStart={handleTabDragStart}
-                  onTabDragEnd={handleTabDragEnd}
-                  onCloseSplit={handleCloseSplitView}
-                  onNavigate={handleNavigate}
-                  onGoBack={handleGoBack}
-                  onGoForward={handleGoForward}
-                  onReload={handleReload}
-                  canGoBack={activeTab?.canGoBack}
-                  canGoForward={activeTab?.canGoForward}
-                  isLoading={activeTab?.isLoading}
-                  searchEngine={settings.searchEngine}
-                  privacyShield={settings.privacyShield}
-                  onTogglePrivacyShield={handleTogglePrivacyShield}
-                  onOpenDownloads={handleOpenDownloads}
-                  onOpenHistory={handleOpenHistory}
-                  onOpenSettings={handleOpenSettings}
-                  onOpenAccount={handleOpenAccount}
-                  onOpenHelp={handleOpenHelp}
-                  onOpenExtensions={handleOpenExtensions}
-                  onToggleAIAssistant={handleToggleAIAssistant}
-                  isAIAssistantOpen={isSidePanelOpen}
-                  bookmarks={bookmarks}
-                  isCollapsed={true}
-                  onReorderTabs={handleReorderTabs}
-                  onToggleCollapse={handleExpandSidebar}
-                />
+                {renderSidebarTabs(true, configuredSidebarWidth)}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1624,16 +1946,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       )}
 
       {/* Main Viewport Card with fluid margin & border radius transition.
+          Keyed so switching vertical-left <-> vertical-right never remounts webviews.
           PERF: transition is scoped to the properties that actually change on
           sidebar toggle (margin/radius/shadow) — a blanket transition-all makes
           the compositor watch every property of this full-size container. */}
       <div
+        key="browser-main-shell"
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
         className={`flex flex-col flex-1 min-w-0 h-full relative z-40 ${useVerticalTabs ? 'overflow-hidden' : 'overflow-visible'} transition-[margin,border-radius,box-shadow] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
         useVerticalTabs
           ? isSidebarCollapsed
             ? 'bg-white dark:bg-slate-900 m-0 rounded-none border-0'
-            : 'rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ml-1.5'
+            : `rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.06)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.35)] border border-slate-200/90 dark:border-white/[0.08] bg-white dark:bg-slate-900 m-2 ${
+                sidebarPosition === 'right' ? 'mr-1.5' : 'ml-1.5'
+              }`
           : 'bg-white dark:bg-slate-900 rounded-none m-0 border-0'
       }`}>
         {/* TOP NAVIGATION BAR with fluid accordion fold transition */}
@@ -1657,6 +1983,7 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 downloads={downloads}
                 onClearDownloads={handleClearVisibleDownloads}
                 showBookmarksBar={settings.showBookmarksBar}
+                onToggleBookmarksBar={handleToggleBookmarksBar}
                 useVerticalTabs={useVerticalTabs}
                 onToggleReaderMode={handleToggleReaderMode}
                 isSplitView={!!splitTabId}
@@ -1713,10 +2040,37 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
                 permissionRequests={permissionRequests}
                 onRespondPermission={handleRespondPermission}
                 onDismissPermission={handleDismissPermission}
+                design={isWebsiteDemo ? undefined : effectiveDesign}
+                isCustomizeMode={isWebsiteDemo ? false : isCustomizeMode}
+                onReorderToolbarSlot={handleReorderToolbarSlot}
+                onMoveToolbarSlotToIndex={handleMoveToolbarSlotToIndex}
+                onInsertToolbarSlot={handleInsertToolbarSlot}
+                onToggleToolbarSlotVisibility={handleToggleToolbarSlotVisibility}
+                onRemoveToolbarSlot={handleRemoveToolbarSlot}
+                onOpenCustomizeMode={handleToggleCustomizeMode}
               />
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* macOS Traffic Lights Spacer & Drag Bar when Vertical Tabs are docked on the Right */}
+        {useVerticalTabs && isMac && sidebarPosition === 'right' && (
+          <div
+            data-main-mac-drag-strip="true"
+            className="w-full h-9 shrink-0 flex items-center justify-between drag-region select-none px-3 bg-slate-100/60 dark:bg-slate-900/60 border-b border-slate-200/60 dark:border-white/5"
+            style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+          >
+            {/* 76px reserved spacer so macOS traffic lights (x: 14, y: 14) never overlap content or split headers */}
+            <div
+              data-main-mac-spacer="true"
+              className="w-[76px] h-full shrink-0 select-none drag-region"
+              style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+            />
+            <div className="flex-1 min-w-0 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+              <span className="truncate max-w-sm text-[11px]">{activeTab?.title || 'Nova Browser'}</span>
+            </div>
+          </div>
+        )}
 
         {/* Windows Controls Overlay Spacer & Drag Bar when Vertical Tabs is active */}
         {useVerticalTabs && isWindows && (
@@ -1811,8 +2165,23 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         {/* Unified Browser Views Container (Single persistent container for primary, secondary split, and background tabs) */}
         <div
           id="browser-views-container"
-          className="h-full relative flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden"
+          className="h-full relative flex-1 min-w-0 flex flex-col min-h-0 overflow-hidden z-10 isolate"
         >
+          {/* Non-destructive pointer shields so <webview> never swallows resize drag or Customize Mode events
+              (kept off on nova://newtab in Customize Mode so Task 10 widget customization stays interactive). */}
+          {isResizingSidebar ? (
+            <div
+              data-webview-pointer-shield="resize"
+              aria-hidden="true"
+              className="absolute inset-0 z-40 pointer-events-auto cursor-col-resize bg-transparent"
+            />
+          ) : isCustomizeMode && !isNewTabActive ? (
+            <div
+              data-webview-pointer-shield="customize"
+              aria-hidden="true"
+              className="absolute inset-0 z-40 pointer-events-auto bg-transparent"
+            />
+          ) : null}
           {sortedTabs.map((tab) => {
             const isPrimary = secondarySplitTab ? tab.id === primarySplitTab?.id : tab.id === activeTabId;
             const isSecondary = secondarySplitTab ? tab.id === secondarySplitTab?.id : false;
@@ -2164,6 +2533,10 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
       </React.Suspense>
 
       </div>
+
+      {/* Right-docked Resizer + Pinned Vertical Sidebar */}
+      {sidebarPosition === 'right' && sidebarResizerNode}
+      {sidebarPosition === 'right' && pinnedSidebarMotionNode}
 
       <React.Suspense fallback={null}>
         {isReaderModeOpen && readerTabId && (
