@@ -1,3 +1,5 @@
+import { createDefaultDesignProfile } from '../utils/designDefaults';
+
 export interface Tab {
   id: string;
   url: string;
@@ -104,6 +106,157 @@ export interface ShortcutConfig {
   meta?: boolean;
 }
 
+export type ChromeMode = 'classic-top' | 'compact-single-row' | 'vertical-left' | 'vertical-right';
+export type TabBarPosition = 'above-toolbar' | 'below-toolbar';
+
+export type ToolbarItemKind =
+  | 'back'
+  | 'forward'
+  | 'reload'
+  | 'home'
+  | 'workspaces'
+  | 'omnibox'
+  | 'ai'
+  | 'shield'
+  | 'downloads'
+  | 'extensions'
+  | 'bookmarksToggle'
+  | 'splitView'
+  | 'pip'
+  | 'screenshot'
+  | 'account'
+  | 'customize'
+  | 'menu'
+  | 'spacer'
+  | 'divider';
+
+export interface ToolbarSlotItem {
+  id: string;
+  kind: ToolbarItemKind;
+  visible: boolean;
+}
+
+export type SurfaceZoneId =
+  | 'frame'
+  | 'tabBar'
+  | 'activeTab'
+  | 'inactiveTab'
+  | 'toolbar'
+  | 'omnibox'
+  | 'sidebar'
+  | 'aiPanel'
+  | 'popovers';
+
+export interface SurfaceZoneStyle {
+  bg?: string;
+  textColor?: string;
+  mutedColor?: string;
+  opacity?: number;
+  blur?: number;
+  borderColor?: string;
+  borderWidth?: number;
+  radius?: number;
+  shadow?: 'none' | 'soft' | 'elevated' | 'glow';
+}
+
+export type UiFontFamily = 'system' | 'inter' | 'geist' | 'mono' | 'serif' | 'rounded';
+export type UiDensity = 'compact' | 'normal' | 'comfortable';
+export type WindowMaterial = 'opaque' | 'glass-vibrancy';
+
+export interface NewTabLayoutConfig {
+  clock: {
+    visible: boolean;
+    format: '24h' | '12h';
+    style: 'minimal' | 'editorial' | 'mono' | 'pill';
+    align: 'center' | 'left';
+  };
+  greeting: {
+    visible: boolean;
+    customText?: string;
+  };
+  searchBox: {
+    visible: boolean;
+    style: 'glass' | 'solid' | 'minimal' | 'pill';
+    width: 'narrow' | 'medium' | 'wide';
+  };
+  shortcuts: {
+    visible: boolean;
+    columns: 4 | 5 | 6 | 7 | 8;
+    cardStyle: 'tile' | 'pill' | 'icon-only' | 'compact';
+  };
+  tasksWidget: {
+    visible: boolean;
+    placement: 'bottom' | 'left' | 'right' | 'floating';
+  };
+}
+
+export interface BrowserDesignProfile {
+  meta: {
+    version: 1;
+    name: string;
+    author?: string;
+    baseTemplateId?: string;
+  };
+  layout: {
+    chromeMode: ChromeMode;
+    tabBarPosition: TabBarPosition;
+    sidebarWidth: number;
+    sidebarCollapsedShowRail: boolean;
+    sidebarSections: {
+      favorites: boolean;
+      pinned: boolean;
+      folders: boolean;
+      workspaces: boolean;
+      dockFooter: boolean;
+    };
+    toolbarItems: ToolbarSlotItem[];
+    toolbarShowLabels: boolean;
+    omniboxMaxWidth: 'compact' | 'balanced' | 'full';
+  };
+  surfaces: Partial<Record<SurfaceZoneId, SurfaceZoneStyle>>;
+  typography: {
+    fontFamily: UiFontFamily;
+    uiScale: number;
+    iconScale: number;
+  };
+  density: UiDensity;
+  effects: {
+    windowMaterial: WindowMaterial;
+    reduceChromeMotion: boolean;
+  };
+  newTabLayout: NewTabLayoutConfig;
+  customCss: {
+    enabled: boolean;
+    css: string;
+  };
+}
+
+export interface PartialBrowserDesignProfile {
+  meta?: Partial<BrowserDesignProfile['meta']>;
+  layout?: Partial<Omit<BrowserDesignProfile['layout'], 'sidebarSections'>> & {
+    sidebarSections?: Partial<BrowserDesignProfile['layout']['sidebarSections']>;
+  };
+  surfaces?: BrowserDesignProfile['surfaces'];
+  typography?: Partial<BrowserDesignProfile['typography']>;
+  density?: UiDensity;
+  effects?: Partial<BrowserDesignProfile['effects']>;
+  newTabLayout?: {
+    clock?: Partial<NewTabLayoutConfig['clock']>;
+    greeting?: Partial<NewTabLayoutConfig['greeting']>;
+    searchBox?: Partial<NewTabLayoutConfig['searchBox']>;
+    shortcuts?: Partial<NewTabLayoutConfig['shortcuts']>;
+    tasksWidget?: Partial<NewTabLayoutConfig['tasksWidget']>;
+  };
+  customCss?: Partial<BrowserDesignProfile['customCss']>;
+}
+
+export interface ThemePackDocument {
+  format: 'nova-theme-pack';
+  schemaVersion: 1;
+  exportedAt: number;
+  profile: BrowserDesignProfile;
+}
+
 export interface UserSettings {
   searchEngine: 'google' | 'duckduckgo' | 'bing' | 'brave' | 'ecosia' | 'yahoo';
   privacyShield: boolean;
@@ -146,6 +299,8 @@ export interface UserSettings {
   autoDownloadUpdates?: boolean;
   defaultTranslationLanguage?: string;
   language?: 'en' | 'tr' | 'ar' | 'de';
+  designProfile?: BrowserDesignProfile;
+  workspaceDesigns?: Record<string, PartialBrowserDesignProfile>;
 }
 
 export function detectSystemLanguage(): 'en' | 'tr' | 'ar' | 'de' {
@@ -192,6 +347,8 @@ export const defaultSettings: UserSettings = {
   aiSystemPersonality: 'balanced',
   defaultTranslationLanguage: 'en',
   language: detectSystemLanguage(),
+  designProfile: createDefaultDesignProfile(),
+  workspaceDesigns: {},
   shortcuts: {
     newTab: { key: 't', shift: false, meta: true },
     reopenTab: { key: 't', shift: true, meta: true },
