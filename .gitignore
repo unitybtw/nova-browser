@@ -42,6 +42,7 @@ Thumbs.db
 
 # Internal Tool Temporary Files
 .superpowers/
+.worktrees/
 .impeccable/
 .kilo/
 .codex/
