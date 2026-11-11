@@ -821,18 +821,18 @@ export const SidePanel = React.memo(({
           animate={{ width: 420, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{
-            width: { duration: 0.28, ease: [0.16, 1, 0.3, 1] },
-            opacity: { duration: 0.2, ease: 'easeInOut' }
+            width: { duration: 0.32, ease: [0.16, 1, 0.3, 1] },
+            opacity: { duration: 0.24, ease: [0.16, 1, 0.3, 1] }
           }}
-          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.12)] dark:shadow-[-12px_0_32px_-8px_rgba(0,0,0,0.45)] overflow-hidden select-none"
+          style={{ willChange: 'width, opacity' }}
+          className="flex-shrink-0 relative h-full border-l border-slate-200/80 dark:border-white/10 bg-white/95 dark:bg-slate-900/98 backdrop-blur-2xl flex flex-col z-20 shadow-[-8px_0_24px_-6px_rgba(0,0,0,0.08)] dark:shadow-[-8px_0_24px_-6px_rgba(0,0,0,0.25)] overflow-hidden select-none"
         >
           <motion.div
-            initial={{ x: 28, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 28, opacity: 0 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
             transition={{
-              x: { duration: 0.24, ease: [0.16, 1, 0.3, 1] },
-              opacity: { duration: 0.18, ease: 'easeOut' }
+              opacity: { duration: 0.22, ease: 'easeOut' }
             }}
             className="w-[420px] min-w-[420px] max-w-[420px] h-full flex flex-col"
           >
@@ -1163,7 +1163,7 @@ export const SidePanel = React.memo(({
       </div>
 
       {/* 3. MODERN SPRING PHYSICS PROMPT INPUT */}
-      <footer className="p-3 pt-1.5 bg-slate-100 dark:bg-slate-950 border-t border-slate-200/70 dark:border-white/[0.06] flex justify-center">
+      <footer className="p-3 pt-2 bg-transparent border-t border-slate-200/50 dark:border-white/5 flex justify-center">
         <PromptInput
           fullWidth
           className="w-full"
