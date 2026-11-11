@@ -1,9 +1,17 @@
-import { useEffect } from 'react';
-import type { UserSettings } from '../types/browser';
+import { useEffect, useRef } from 'react';
+import type { BrowserDesignProfile, UserSettings } from '../types/browser';
 import { setLanguage } from '../services/i18n';
 import { getElectronAPI } from '../utils/electronBridge';
+import { designToCssVariables, resolveEffectiveDesign } from '../utils/designEngine';
+import { sanitizeCustomCss } from '../utils/designSecurity';
 
-export interface UseThemeLanguageOptions {
+export interface UseThemeLanguageDesignOptions {
+  activeWorkspaceId?: string;
+  isIncognito?: boolean;
+  draftProfileOverride?: BrowserDesignProfile;
+}
+
+export interface UseThemeLanguageOptions extends UseThemeLanguageDesignOptions {
   settings: UserSettings;
 }
 
@@ -11,16 +19,54 @@ export interface UseThemeLanguageOptions {
  * Tema + dil efektleri (App.tsx'ten birebir taşındı).
  *
  * - Tema efekti: settings.theme -> document.documentElement `dark` class,
- *   accent/browserColor paletlerini `:root` + `#nova-accent-style` üzerinden
- *   uygular, `getElectronAPI().setTheme` IPC'sini aynen çağırır, `system`
- *   modunda matchMedia dinleyicisi kurar.
+ *   accent/browserColor paletleri ve per-zone design token'larını `:root` +
+ *   `#nova-accent-style` üzerinden uygular, `#nova-custom-user-style` ile
+ *   temizlenmiş Custom CSS enjekte eder, `getElectronAPI().setTheme` ve
+ *   `setWindowMaterial` IPC'lerini çağırır, `system` modunda matchMedia
+ *   dinleyicisi kurar.
  * - Dil efekti: settings.language -> `setLanguage()` (lang/dir + listener notify).
  *
  * İki efekt aynı hook içinde art arda tanımlı olduğu için ilk render'da aynı
  * commit'te çalışır; tema ve dil arasında ek bir paint olmaz (flash yok).
  * Sıralama orijinal App.tsx'teki gibidir (önce tema, sonra dil).
  */
-export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
+export function useThemeLanguage(options: UseThemeLanguageOptions): void;
+export function useThemeLanguage(
+  settings: UserSettings,
+  options?: UseThemeLanguageDesignOptions
+): void;
+export function useThemeLanguage(
+  settingsOrOptions: UserSettings | UseThemeLanguageOptions,
+  designOptions: UseThemeLanguageDesignOptions = {}
+): void {
+  const isWrappedOptions =
+    Boolean(settingsOrOptions) &&
+    typeof settingsOrOptions === 'object' &&
+    'settings' in settingsOrOptions &&
+    Boolean((settingsOrOptions as UseThemeLanguageOptions).settings) &&
+    typeof (settingsOrOptions as UseThemeLanguageOptions).settings === 'object';
+
+  const settings = isWrappedOptions
+    ? (settingsOrOptions as UseThemeLanguageOptions).settings
+    : (settingsOrOptions as UserSettings);
+
+  const resolvedOptions: UseThemeLanguageDesignOptions = isWrappedOptions
+    ? {
+        activeWorkspaceId:
+          designOptions.activeWorkspaceId ??
+          (settingsOrOptions as UseThemeLanguageOptions).activeWorkspaceId,
+        isIncognito:
+          designOptions.isIncognito ??
+          (settingsOrOptions as UseThemeLanguageOptions).isIncognito,
+        draftProfileOverride:
+          designOptions.draftProfileOverride ??
+          (settingsOrOptions as UseThemeLanguageOptions).draftProfileOverride,
+      }
+    : designOptions;
+
+  const { activeWorkspaceId, isIncognito = false, draftProfileOverride } = resolvedOptions;
+  const lastWindowMaterialRef = useRef<'opaque' | 'glass-vibrancy' | null>(null);
+
   // Apply Theme Mode & Custom Accent
   useEffect(() => {
     if (settings.theme === 'dark') {
@@ -35,22 +81,24 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
       }
     }
 
-    // Apply custom accent colors via style injection
-    const defaultColorMap: Record<string, string> = {
-      'blue': '#3b82f6',
-      'emerald': '#10b981',
-      'purple': '#a855f7',
-      'rose': '#f43f5e',
-      'amber': '#f59e0b'
-    };
+    const effectiveSettings: UserSettings = draftProfileOverride
+      ? {
+          ...settings,
+          designProfile: draftProfileOverride,
+          workspaceDesigns: undefined,
+          useVerticalTabs:
+            draftProfileOverride.layout.chromeMode === 'vertical-left' ||
+            draftProfileOverride.layout.chromeMode === 'vertical-right',
+          showTasksWidget: draftProfileOverride.newTabLayout.tasksWidget.visible,
+        }
+      : settings;
 
-    let hex = defaultColorMap['blue'];
-    if (settings.accentColor === 'custom' && settings.customAccentColor) {
-      const isValidHex = /^#[0-9a-fA-F]{3,8}$/.test(settings.customAccentColor);
-      hex = isValidHex ? settings.customAccentColor : '#3b82f6';
-    } else if (settings.accentColor && defaultColorMap[settings.accentColor]) {
-      hex = defaultColorMap[settings.accentColor];
-    }
+    const effectiveDesign = resolveEffectiveDesign(
+      effectiveSettings,
+      activeWorkspaceId,
+      Boolean(isIncognito)
+    );
+    const hex = effectiveDesign.effectiveAccentHex;
 
     // Apply full browser UI colors via style injection
     const browserColorPreset = settings.browserColor || 'default';
@@ -511,16 +559,26 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
       '--nova-card-bg': palette.card
     });
 
-    const lightVars = buildPaletteVariables(activeLightPalette, false);
-    const darkVars = buildPaletteVariables(activeDarkPalette, true);
-    const activePalette = isDark ? activeDarkPalette : activeLightPalette;
-    const currentVars = isDark ? darkVars : lightVars;
+    const lightBaseVars = buildPaletteVariables(activeLightPalette, false);
+    const darkBaseVars = buildPaletteVariables(activeDarkPalette, true);
+    const lightVars = {
+      ...lightBaseVars,
+      ...designToCssVariables(effectiveDesign, false, lightBaseVars),
+    };
+    const darkVars = {
+      ...darkBaseVars,
+      ...designToCssVariables(effectiveDesign, true, darkBaseVars),
+    };
 
     // Apply directly to root style object for immediate reactivity
-    const rootStyle = document.documentElement.style;
-    for (const [key, value] of Object.entries(currentVars)) {
-      rootStyle.setProperty(key, value);
-    }
+    const applyRootVariables = (isDarkMode: boolean) => {
+      const vars = isDarkMode ? darkVars : lightVars;
+      const rootStyle = document.documentElement.style;
+      for (const [key, value] of Object.entries(vars)) {
+        rootStyle.setProperty(key, value);
+      }
+    };
+    applyRootVariables(isDark);
 
     let accentStyleEl = document.getElementById('nova-accent-style');
     if (!accentStyleEl) {
@@ -536,7 +594,28 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
       .dark, html.dark, body.dark, :is(.dark *), [data-theme="dark"] {
         ${Object.entries(darkVars).map(([k, v]) => `${k}: ${v} !important;`).join('\n        ')}
       }
+      #nova-browser-chrome, .nova-vertical-sidebar, .nova-chrome-surface {
+        font-family: var(--nova-font-ui);
+      }
     `;
+
+    let customStyleEl = document.getElementById('nova-custom-user-style');
+    if (!customStyleEl) {
+      customStyleEl = document.createElement('style');
+      customStyleEl.id = 'nova-custom-user-style';
+    }
+    if (accentStyleEl.nextSibling !== customStyleEl) {
+      accentStyleEl.parentNode?.insertBefore(customStyleEl, accentStyleEl.nextSibling);
+    }
+    customStyleEl.textContent = effectiveDesign.customCss.enabled
+      ? sanitizeCustomCss(effectiveDesign.customCss.css).css
+      : '';
+
+    const windowMaterial = effectiveDesign.effects.windowMaterial;
+    if (lastWindowMaterialRef.current !== windowMaterial) {
+      lastWindowMaterialRef.current = windowMaterial;
+      (getElectronAPI() as any)?.setWindowMaterial?.(windowMaterial);
+    }
 
     // Apply to Electron nativeTheme for webviews
     if (getElectronAPI()?.setTheme) {
@@ -552,11 +631,25 @@ export function useThemeLanguage({ settings }: UseThemeLanguageOptions) {
         } else {
           document.documentElement.classList.remove('dark');
         }
+        applyRootVariables(e.matches);
       };
       mediaQuery.addEventListener('change', listener);
       return () => mediaQuery.removeEventListener('change', listener);
     }
-  }, [settings.theme, settings.accentColor, settings.customAccentColor, settings.browserColor, settings.customBrowserColor]);
+  }, [
+    settings.theme,
+    settings.accentColor,
+    settings.customAccentColor,
+    settings.browserColor,
+    settings.customBrowserColor,
+    settings.useVerticalTabs,
+    settings.showTasksWidget,
+    settings.designProfile,
+    settings.workspaceDesigns,
+    activeWorkspaceId,
+    isIncognito,
+    draftProfileOverride,
+  ]);
 
   // Apply Language and RTL Mode
   useEffect(() => {

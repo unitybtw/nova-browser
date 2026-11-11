@@ -589,7 +589,11 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   });
 
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
-  useThemeLanguage({ settings });
+  const isActiveTabIncognito = Boolean((tabs.find(t => t.id === activeTabId) || tabs[0])?.isIncognito);
+  useThemeLanguage(settings, {
+    activeWorkspaceId,
+    isIncognito: isActiveTabIncognito,
+  });
 
   // Cloud sync handler + background auto-sync + realtime listener
   const { handlePerformSync } = useAppSync({

@@ -571,29 +571,32 @@ button:active:not(:disabled) {
 /* Vertical tabs: Arc's spatial hierarchy, with Dia's restrained density.
    Solid surfaces keep the sidebar stable over video and scrolling webviews. */
 .nova-vertical-sidebar {
-  --sidebar-ink: #383936;
-  --sidebar-muted: #65685f;
-  --sidebar-hover: #e6e7e1;
-  --sidebar-selected: #fff;
-  --sidebar-surface: #eeefe9;
-  --sidebar-border: #d9dbd3;
+  --sidebar-ink: var(--nova-sidebar-text, #383936);
+  --sidebar-muted: var(--nova-sidebar-muted, #65685f);
+  --sidebar-hover: var(--nova-inactive-tab-hover-bg, #e6e7e1);
+  --sidebar-selected: var(--nova-activeTab-bg, var(--nova-active-tab-bg, #fff));
+  --sidebar-surface: var(--nova-sidebar-bg, #eeefe9);
+  --sidebar-border: var(--nova-sidebar-border, #d9dbd3);
   color: var(--sidebar-ink);
-  font-size: 13px;
+  font-family: var(--nova-font-ui, inherit);
+  font-size: calc(13px * var(--nova-ui-scale, 1));
+  backdrop-filter: blur(var(--nova-sidebar-blur, 0px));
+  -webkit-backdrop-filter: blur(var(--nova-sidebar-blur, 0px));
 }
 .dark .nova-vertical-sidebar {
-  --sidebar-ink: #e3e4df;
-  --sidebar-muted: #95968e;
-  --sidebar-hover: #32342f;
-  --sidebar-selected: #3c3e38;
-  --sidebar-surface: #262823;
-  --sidebar-border: #3b3d36;
+  --sidebar-ink: var(--nova-sidebar-text, #e3e4df);
+  --sidebar-muted: var(--nova-sidebar-muted, #95968e);
+  --sidebar-hover: var(--nova-inactive-tab-hover-bg, #32342f);
+  --sidebar-selected: var(--nova-activeTab-bg, var(--nova-active-tab-bg, #3c3e38));
+  --sidebar-surface: var(--nova-sidebar-bg, #262823);
+  --sidebar-border: var(--nova-sidebar-border, #3b3d36);
 }
 .nova-vertical-sidebar > :first-child { height: 46px; padding: 4px 10px 0; }
 .nova-vertical-sidebar button { -webkit-app-region: no-drag; }
 .nova-vertical-sidebar button:focus-visible,
 .nova-vertical-sidebar [role='tab']:focus-visible,
 .nova-vertical-sidebar [role='button']:focus-visible {
-  outline: 2px solid #74876a;
+  outline: 2px solid var(--nova-accent, #74876a);
   outline-offset: 2px;
   opacity: 1;
 }
