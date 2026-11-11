@@ -64,6 +64,7 @@ import { useSessionPersistence } from './hooks/useSessionPersistence';
 import { useClosedTabs } from './hooks/useClosedTabs';
 import { usePanels } from './hooks/usePanels';
 import { useThemeLanguage } from './hooks/useThemeLanguage';
+import { CustomizeContext, useCustomizeManager } from './components/customization/CustomizeContext';
 import { useOnboarding } from './hooks/useOnboarding';
 import { useExtensions } from './hooks/useExtensions';
 import { useAppSync } from './hooks/useAppSync';
@@ -120,6 +121,8 @@ const AICursorOverlay = lazyWithRetry(() => import('./components/AICursorOverlay
 const FindInPage = lazyWithRetry(() => import('./components/FindInPage').then(m => ({ default: m.FindInPage })));
 const DownloadToast = lazyWithRetry(() => import('./components/DownloadToast').then(m => ({ default: m.DownloadToast })));
 const UpdateToast = lazyWithRetry(() => import('./components/UpdateToast').then(m => ({ default: m.UpdateToast })));
+const CustomizeTopBanner = lazyWithRetry(() => import('./components/customization/CustomizeTopBanner').then(m => ({ default: m.CustomizeTopBanner })));
+const DesignStudioDrawer = lazyWithRetry(() => import('./components/customization/DesignStudioDrawer').then(m => ({ default: m.DesignStudioDrawer })));
 
 // Idle prefetch SidePanel chunk so opening the AI assistant is instantaneous without chunk-fetch pause
 if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
@@ -706,11 +709,27 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     isHydrated,
   });
 
+  const isWebsiteDemo = Boolean(demoParams.isDemo && demoParams.feature === 'website');
+
+  const customize = useCustomizeManager({
+    settings,
+    activeWorkspaceId,
+    workspaces,
+    onUpdateSettings: handleUpdateSettings,
+  });
+  const isCustomizeMode = isWebsiteDemo ? false : customize.isCustomizeMode;
+  const setIsCustomizeMode = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
+    const next = typeof val === 'function' ? val(customize.isCustomizeMode) : val;
+    if (next) customize.openCustomizeMode();
+    else customize.discard();
+  }, [customize]);
+
   // Tema + dil yan etkileri useThemeLanguage hookunda (birebir tasindi; ayni committe calisir, flash yok).
   const isActiveTabIncognito = Boolean((tabs.find(t => t.id === activeTabId) || tabs[0])?.isIncognito);
   useThemeLanguage(settings, {
     activeWorkspaceId,
     isIncognito: isActiveTabIncognito,
+    draftProfileOverride: isCustomizeMode ? customize.draftProfile : undefined,
   });
 
   // Cloud sync handler + background auto-sync + realtime listener
@@ -761,18 +780,26 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   // Active Tab & Derived Split Partner Tab
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || tabs[0], [tabs, activeTabId]);
-  const effectiveDesign = useMemo(
-    () => resolveEffectiveDesign(settings, activeWorkspaceId, Boolean(activeTab?.isIncognito)),
-    [settings, activeWorkspaceId, activeTab?.isIncognito]
-  );
-  const [isCustomizeMode, setIsCustomizeMode] = useState(false);
+  const effectiveDesign = useMemo(() => {
+    if (isCustomizeMode) {
+      return resolveEffectiveDesign(
+        {
+          ...settings,
+          designProfile: customize.draftProfile,
+          workspaceDesigns: undefined,
+        },
+        activeWorkspaceId,
+        Boolean(activeTab?.isIncognito)
+      );
+    }
+    return resolveEffectiveDesign(settings, activeWorkspaceId, Boolean(activeTab?.isIncognito));
+  }, [isCustomizeMode, customize.draftProfile, settings, activeWorkspaceId, activeTab?.isIncognito]);
+
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
   const [resizingSidebarWidth, setResizingSidebarWidth] = useState<number | null>(null);
   const resizingWidthRef = useRef<number | null>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const isResettingAppearanceRef = useRef(false);
-
-  const isWebsiteDemo = demoParams.isDemo && demoParams.feature === 'website';
   const useVerticalTabs = isWebsiteDemo
     ? false
     : effectiveDesign.layout.chromeMode === 'vertical-left' ||
@@ -1083,8 +1110,12 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const handleToggleCustomizeMode = useCallback(() => {
     if (isWebsiteDemo) return;
-    setIsCustomizeMode(prev => !prev);
-  }, [isWebsiteDemo]);
+    if (customize.isCustomizeMode) {
+      customize.commit();
+    } else {
+      customize.openCustomizeMode();
+    }
+  }, [isWebsiteDemo, customize]);
 
   const handleResetAppearanceDefault = useCallback(async () => {
     if (isResettingAppearanceRef.current) return;
@@ -1098,6 +1129,9 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         cancelLabel: 'Cancel',
       });
       if (!confirmed) return;
+      if (typeof customize !== 'undefined' && customize?.discard) {
+        customize.discard();
+      }
       setSettings(prev => ({
         ...prev,
         designProfile: createDefaultDesignProfile(),
@@ -1110,21 +1144,47 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
     } finally {
       isResettingAppearanceRef.current = false;
     }
-  }, [setSettings, setIsSidebarCollapsed]);
+  }, [customize, setSettings, setIsSidebarCollapsed, setIsCustomizeMode]);
 
   const persistSidebarWidth = useCallback((width: number) => {
     const clamped = clampSidebarWidth(width);
+    if (customize.isCustomizeMode) {
+      customize.updateDraft(prev => ({
+        ...prev,
+        layout: {
+          ...prev.layout,
+          sidebarWidth: clamped,
+        },
+      }));
+      return;
+    }
     const activeWsId = activeWorkspaceIdRef.current || 'default';
     setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, () => ({
       sidebarWidth: clamped,
     })));
-  }, [setSettings, activeWorkspaceIdRef]);
+  }, [customize, setSettings, activeWorkspaceIdRef]);
 
   const handleResetSidebarWidth = useCallback(() => {
     persistSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
   }, [persistSidebarWidth]);
 
   const handleToggleSidebarSection = useCallback((section: SidebarSectionKey) => {
+    if (customize.isCustomizeMode) {
+      customize.updateDraft(prev => {
+        const sections = resolveSidebarSections(prev.layout.sidebarSections);
+        return {
+          ...prev,
+          layout: {
+            ...prev.layout,
+            sidebarSections: {
+              ...sections,
+              [section]: !sections[section],
+            },
+          },
+        };
+      });
+      return;
+    }
     const activeWsId = activeWorkspaceIdRef.current || 'default';
     setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, (layout) => {
       const sections = resolveSidebarSections(layout.sidebarSections);
@@ -1135,13 +1195,20 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         },
       };
     }));
-  }, [setSettings, activeWorkspaceIdRef]);
+  }, [customize, setSettings, activeWorkspaceIdRef]);
 
   const handleUpdateNewTabLayout = useCallback((nextLayout: NewTabLayoutConfig) => {
     if (isWebsiteDemo) return;
+    if (customize.isCustomizeMode) {
+      customize.updateDraft(prev => ({
+        ...prev,
+        newTabLayout: nextLayout,
+      }));
+      return;
+    }
     const activeWsId = activeWorkspaceIdRef.current || 'default';
     setSettings(prev => updateWorkspaceAwareNewTabLayout(prev, activeWsId, nextLayout));
-  }, [isWebsiteDemo, setSettings, activeWorkspaceIdRef]);
+  }, [isWebsiteDemo, customize, setSettings, activeWorkspaceIdRef]);
 
   const handleUpdateSettingsWithDesignSync = useCallback((updates: Partial<UserSettings>) => {
     if (typeof updates.showTasksWidget === 'boolean' && !updates.designProfile) {
@@ -1169,12 +1236,22 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
 
   const mutateToolbarItems = useCallback(
     (updater: (items: ToolbarSlotItem[]) => ToolbarSlotItem[]) => {
+      if (customize.isCustomizeMode) {
+        customize.updateDraft(prev => ({
+          ...prev,
+          layout: {
+            ...prev.layout,
+            toolbarItems: updater(prev.layout.toolbarItems || TOOLBAR_ITEM_ORDER_DEFAULT),
+          },
+        }));
+        return;
+      }
       const activeWsId = activeWorkspaceIdRef.current || 'default';
       setSettings(prev => updateWorkspaceAwareLayout(prev, activeWsId, (layout) => ({
         toolbarItems: updater(layout.toolbarItems || TOOLBAR_ITEM_ORDER_DEFAULT),
       })));
     },
-    [setSettings, activeWorkspaceIdRef]
+    [customize, setSettings, activeWorkspaceIdRef]
   );
 
   const handleReorderToolbarSlot = useCallback(
@@ -1944,7 +2021,8 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
   ) : null;
 
   return (
-    <MotionConfig reducedMotion={motionReducedMode} transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
+    <CustomizeContext.Provider value={customize}>
+      <MotionConfig reducedMotion={motionReducedMode} transition={{ type: 'spring', stiffness: 380, damping: 28, mass: 0.8 }}>
       <div
         data-chrome-mode={effectiveDesign.layout.chromeMode}
         style={!activeTab?.isIncognito ? { backgroundColor: 'var(--nova-frame-bg)' } : undefined}
@@ -2678,8 +2756,17 @@ function App({ demo: demoOptions }: { demo?: BrowserDemoOptions } = {}) {
         )}
         <AICursorOverlay />
       </React.Suspense>
+
+      {/* Live Customize Banner & Design Studio Drawer */}
+      {isCustomizeMode && !isWebsiteDemo && (
+        <React.Suspense fallback={null}>
+          <CustomizeTopBanner />
+          <DesignStudioDrawer />
+        </React.Suspense>
+      )}
     </div>
     </MotionConfig>
+    </CustomizeContext.Provider>
   );
 }
 

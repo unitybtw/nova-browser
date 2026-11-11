@@ -400,6 +400,7 @@ async function main() {
       },
       setIsSidebarCollapsed: (v: boolean) => { sidebarCollapsed = v; },
       setIsCustomizeMode: (v: boolean) => { customizeMode = v; },
+      customize: { discard: () => { customizeMode = false; } },
     });
     vm.runInContext(
       ts.transpileModule(`globalThis.runReset = ${resetFnBody};`, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText,

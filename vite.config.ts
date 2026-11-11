@@ -196,6 +196,8 @@ export default defineConfig({
         manualChunks: {
           'vendor-react': ['react', 'react-dom'],
           'vendor-ui': ['framer-motion', 'lucide-react'],
+          'vendor-assistant-ui': ['@assistant-ui/react'],
+          'vendor-qrcode': ['qrcode'],
           'vendor-markdown': ['react-markdown', 'remark-gfm'],
           'vendor-dompurify': ['dompurify'],
           'vendor-supabase': ['@supabase/supabase-js'],

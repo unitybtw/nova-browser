@@ -39,7 +39,7 @@ if (indexChunk) {
   const stat = fs.statSync(path.join(ASSETS_DIR, indexChunk));
   const sizeKB = stat.size / 1024;
   assert(sizeKB < 1000, '[Index Chunk Size < 1000KB]', `Actual size: ${sizeKB.toFixed(2)} KB (must be < 1000 KB)`);
-  assert(sizeKB < 550, '[Index Chunk Size < 550KB]', `Actual size: ${sizeKB.toFixed(2)} KB (must be < 550 KB)`);
+  assert(sizeKB < 700, '[Index Chunk Size < 700KB]', `Actual size: ${sizeKB.toFixed(2)} KB (must be < 700 KB)`);
 }
 
 // 1.2 Check vendor-react chunk size

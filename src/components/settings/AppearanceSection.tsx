@@ -1,15 +1,20 @@
-import React from 'react';
-import { RotateCcw, Shuffle, Check, Images } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { RotateCcw, Shuffle, Check, Images, Sparkles, Paintbrush, Download, Upload, Layers, AlertCircle } from 'lucide-react';
 import { UserSettings } from '../../types/browser';
 import { useLiveUnsplashPhoto } from '../../utils/unsplash';
 import { TabAnimationPreviewBox } from './TabAnimationPreviewBox';
 import { ToggleSwitch } from './ToggleSwitch';
 import { SmoothCollapse } from './SmoothCollapse';
 import { BackgroundPreviewCard, BACKGROUND_OPTIONS } from './BackgroundPreviewCard';
+import { STARTER_DESIGN_TEMPLATES, getStarterTemplateById } from '../../utils/designTemplates';
+import { createDefaultDesignProfile } from '../../utils/designDefaults';
+import { exportThemePack, importThemePack, sanitizeDesignProfile } from '../../utils/designSecurity';
 
 export interface AppearanceSectionProps {
   settings: UserSettings;
   onUpdateSettings: (newSettings: Partial<UserSettings>) => void;
+  activeWorkspaceId?: string;
+  onOpenCustomizeMode?: () => void;
 }
 
 const DailyWallpaperSection = () => {
@@ -148,9 +153,256 @@ const DailyWallpaperSection = () => {
 export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
   settings,
   onUpdateSettings,
+  activeWorkspaceId,
+  onOpenCustomizeMode,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [themePackMsg, setThemePackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleLaunchStudio = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('nova-open-customize-mode'));
+    }
+    onOpenCustomizeMode?.();
+  };
+
+  const handleApplyTemplate = (tmplId: string) => {
+    const tmpl = getStarterTemplateById(tmplId);
+    if (!tmpl) return;
+    const isVertical =
+      tmpl.profile.layout.chromeMode === 'vertical-left' ||
+      tmpl.profile.layout.chromeMode === 'vertical-right';
+    onUpdateSettings({
+      designProfile: sanitizeDesignProfile({
+        ...tmpl.profile,
+        meta: { ...tmpl.profile.meta, baseTemplateId: tmpl.id },
+      }),
+      useVerticalTabs: isVertical,
+      showTasksWidget: tmpl.profile.newTabLayout.tasksWidget.visible,
+    });
+  };
+
+  const handleExportThemePack = () => {
+    const profile = settings.designProfile || createDefaultDesignProfile();
+    const json = exportThemePack(profile);
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      try {
+        const slug =
+          (profile.meta.name || 'theme')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || 'nova-theme';
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${slug}.novatheme.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (_) {}
+    }
+  };
+
+  const handleImportThemePack = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const text = String(reader.result || '');
+        const res = importThemePack(text);
+        if (res.ok) {
+          const isVertical =
+            res.profile.layout.chromeMode === 'vertical-left' ||
+            res.profile.layout.chromeMode === 'vertical-right';
+          onUpdateSettings({
+            designProfile: sanitizeDesignProfile(res.profile),
+            useVerticalTabs: isVertical,
+            showTasksWidget: res.profile.newTabLayout.tasksWidget.visible,
+          });
+          setThemePackMsg({ type: 'success', text: `Imported theme "${res.profile.meta.name}"` });
+        } else {
+          setThemePackMsg({ type: 'error', text: res.error || 'Failed to import theme pack' });
+        }
+      } catch (err: any) {
+        setThemePackMsg({ type: 'error', text: err?.message || 'Invalid theme file' });
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleResetAllCustomizations = () => {
+    onUpdateSettings({
+      designProfile: undefined,
+      workspaceDesigns: undefined,
+      browserColor: 'default',
+      accentColor: 'blue',
+      tabStyle: 'floating',
+      tabAnimation: 'chrome',
+      useVerticalTabs: false,
+      showTasksWidget: true,
+    });
+  };
+
+  const hasWsOverride = Boolean(
+    activeWorkspaceId &&
+      settings.workspaceDesigns &&
+      Object.prototype.hasOwnProperty.call(settings.workspaceDesigns, activeWorkspaceId) &&
+      settings.workspaceDesigns[activeWorkspaceId]
+  );
+
   return (
-            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* LIVE DESIGN STUDIO HERO CARD */}
+      <section className="p-6 rounded-2xl bg-gradient-to-br from-blue-900/40 via-indigo-900/30 to-purple-900/30 border border-blue-500/30 shadow-lg relative overflow-hidden space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-blue-500/20 text-blue-400 border border-blue-400/30 rounded-full flex items-center gap-1">
+                <Sparkles className="w-3 h-3" /> Live Studio
+              </span>
+              {hasWsOverride && (
+                <span className="px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/20 text-amber-400 border border-amber-400/30 rounded-full flex items-center gap-1">
+                  <Layers className="w-3 h-3" /> Workspace Override
+                </span>
+              )}
+            </div>
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+              <Paintbrush className="w-5 h-5 text-blue-500" />
+              Live Design Studio
+            </h2>
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl leading-relaxed">
+              Real-time interactive chrome customizer with 5 tabs, modular toolbar slots, 9 UI surface zones,
+              desktop window vibrancy, typography scaling, and starter templates. Shortcut:{' '}
+              <kbd className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-[11px] font-mono border border-slate-300 dark:border-slate-700">
+                Cmd/Ctrl+Shift+E
+              </kbd>
+            </p>
+          </div>
+
+          <button
+            type="button"
+            data-action="launch-design-studio"
+            onClick={handleLaunchStudio}
+            className="flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-md shadow-blue-500/20 transition-all cursor-pointer active:scale-95 shrink-0"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Open Live Design Studio</span>
+          </button>
+        </div>
+
+        {/* Quick Starter Templates */}
+        <div className="pt-4 border-t border-blue-500/20 space-y-2">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-700 dark:text-slate-200">Quick Starter Templates</span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400">Click to apply instantly</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+            {STARTER_DESIGN_TEMPLATES.map((tmpl) => {
+              const isSelected = settings.designProfile?.meta.baseTemplateId === tmpl.id;
+              return (
+                <button
+                  key={tmpl.id}
+                  type="button"
+                  onClick={() => handleApplyTemplate(tmpl.id)}
+                  className={`p-2 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
+                    isSelected
+                      ? 'border-blue-500 bg-blue-500/20 text-blue-100 shadow-sm'
+                      : 'border-slate-300 dark:border-slate-700/60 bg-white/70 dark:bg-slate-800/60 hover:border-blue-400 text-slate-700 dark:text-slate-200'
+                  }`}
+                >
+                  <span className="font-semibold text-[11px] truncate block">{tmpl.name}</span>
+                  <div className="flex items-center gap-1">
+                    <div
+                      className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs"
+                      style={{ backgroundColor: tmpl.previewBg }}
+                    />
+                    <div
+                      className="w-3.5 h-3.5 rounded-full border border-black/10 shadow-xs"
+                      style={{ backgroundColor: tmpl.previewAccent }}
+                    />
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Theme Pack Controls & Reset */}
+        <div className="pt-3 border-t border-blue-500/20 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleExportThemePack}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 transition-colors font-medium cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-500" />
+              <span>Export Theme Pack</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-700 transition-colors font-medium cursor-pointer"
+            >
+              <Upload className="w-3.5 h-3.5 text-emerald-500" />
+              <span>Import Theme Pack</span>
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,.novatheme.json"
+              onChange={handleImportThemePack}
+              className="hidden"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            {hasWsOverride && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (activeWorkspaceId && settings.workspaceDesigns) {
+                    const next = { ...settings.workspaceDesigns };
+                    delete next[activeWorkspaceId];
+                    onUpdateSettings({ workspaceDesigns: next });
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 hover:bg-amber-500/20 transition-colors font-medium cursor-pointer"
+              >
+                <span>Clear Workspace Override</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleResetAllCustomizations}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors font-medium cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reset All Customizations</span>
+            </button>
+          </div>
+        </div>
+
+        {themePackMsg && (
+          <div
+            className={`p-2.5 rounded-xl text-xs flex items-center gap-2 border ${
+              themePackMsg.type === 'success'
+                ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                : 'bg-red-500/10 text-red-700 dark:text-red-300 border-red-500/20'
+            }`}
+          >
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{themePackMsg.text}</span>
+          </div>
+        )}
+      </section>
               <section>
                 <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b border-slate-200 dark:border-slate-800 pb-2">Theme Mode</h2>
                 <div className="premium-card bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700/50 p-2 flex gap-2">
@@ -443,7 +695,30 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                     <ToggleSwitch
                       ariaLabel="Toggle vertical tabs"
                       checked={settings.useVerticalTabs}
-                      onToggle={() => onUpdateSettings({ useVerticalTabs: !settings.useVerticalTabs })}
+                      onToggle={() => {
+                        const nextVertical = !settings.useVerticalTabs;
+                        const base = settings.designProfile || createDefaultDesignProfile();
+                        let nextChromeMode = base.layout.chromeMode;
+                        if (nextVertical) {
+                          if (nextChromeMode !== 'vertical-left' && nextChromeMode !== 'vertical-right') {
+                            nextChromeMode = 'vertical-left';
+                          }
+                        } else {
+                          if (nextChromeMode === 'vertical-left' || nextChromeMode === 'vertical-right') {
+                            nextChromeMode = 'classic-top';
+                          }
+                        }
+                        onUpdateSettings({
+                          useVerticalTabs: nextVertical,
+                          designProfile: {
+                            ...base,
+                            layout: {
+                              ...base.layout,
+                              chromeMode: nextChromeMode,
+                            },
+                          },
+                        });
+                      }}
                     />
                   </div>
                   
@@ -455,7 +730,23 @@ export const AppearanceSection: React.FC<AppearanceSectionProps> = ({
                     <ToggleSwitch
                       ariaLabel="Toggle tasks widget"
                       checked={Boolean(settings.showTasksWidget)}
-                      onToggle={() => onUpdateSettings({ showTasksWidget: !settings.showTasksWidget })}
+                      onToggle={() => {
+                        const nextTasks = !settings.showTasksWidget;
+                        const base = settings.designProfile || createDefaultDesignProfile();
+                        onUpdateSettings({
+                          showTasksWidget: nextTasks,
+                          designProfile: {
+                            ...base,
+                            newTabLayout: {
+                              ...base.newTabLayout,
+                              tasksWidget: {
+                                ...base.newTabLayout.tasksWidget,
+                                visible: nextTasks,
+                              },
+                            },
+                          },
+                        });
+                      }}
                     />
                   </div>
                 </div>

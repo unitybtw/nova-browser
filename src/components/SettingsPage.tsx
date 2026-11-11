@@ -22,6 +22,8 @@ export interface SettingsPageProps {
   onClearHistory?: () => void;
   onPurgeMemory?: () => Promise<void> | void;
   onPerformSync?: (mergedData?: any) => Promise<void> | void;
+  activeWorkspaceId?: string;
+  onOpenCustomizeMode?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
@@ -32,7 +34,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onImportData,
   onClearHistory,
   onPurgeMemory,
-  onPerformSync
+  onPerformSync,
+  activeWorkspaceId,
+  onOpenCustomizeMode,
 }) => {
   const [activeTab, setActiveTab] = useState<'general' | 'account' | 'appearance' | 'ai' | 'privacy' | 'passwords' | 'extensions' | 'advanced' | 'mcp' | 'shortcuts'>('general');
 
@@ -121,7 +125,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {/* APPEARANCE */}
           {activeTab === 'appearance' && (
-            <AppearanceSection settings={settings} onUpdateSettings={onUpdateSettings} />
+            <AppearanceSection
+              settings={settings}
+              onUpdateSettings={onUpdateSettings}
+              activeWorkspaceId={activeWorkspaceId}
+              onOpenCustomizeMode={onOpenCustomizeMode}
+            />
           )}
 
           {/* NOVA AI */}
