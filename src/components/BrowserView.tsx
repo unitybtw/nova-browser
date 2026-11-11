@@ -244,6 +244,8 @@ export function browserViewPropsEqual(prev: BrowserViewProps, next: BrowserViewP
   return true;
 }
 
+export const areBrowserViewPropsEqual = browserViewPropsEqual;
+
 /**
  * Post-await currency check for a credential lookup.
  *

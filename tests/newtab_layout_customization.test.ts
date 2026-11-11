@@ -117,7 +117,7 @@ async function main() {
   MotionGlobalConfig.skipAnimations = true;
 
   const { NewTabPage } = await import('../src/components/NewTabPage');
-  const { BrowserView, browserViewPropsEqual } = await import('../src/components/BrowserView');
+  const { BrowserView, browserViewPropsEqual, areBrowserViewPropsEqual } = await import('../src/components/BrowserView');
 
   const container = w.document.getElementById('root')!;
   const root = createRoot(container);
@@ -463,9 +463,49 @@ async function main() {
       onUpdateNewTabLayout: noop,
     };
     assert.equal(browserViewPropsEqual(baseBvProps, { ...baseBvProps }), true);
+    assert.equal(areBrowserViewPropsEqual(baseBvProps, { ...baseBvProps }), true);
+    assert.equal(areBrowserViewPropsEqual, browserViewPropsEqual, 'areBrowserViewPropsEqual is exported alias of browserViewPropsEqual');
     assert.equal(browserViewPropsEqual(baseBvProps, { ...baseBvProps, newTabLayout: layoutB }), false, 'Memo detects newTabLayout change');
     assert.equal(browserViewPropsEqual(baseBvProps, { ...baseBvProps, isCustomizeMode: true }), false, 'Memo detects isCustomizeMode change');
     assert.equal(browserViewPropsEqual(baseBvProps, { ...baseBvProps, onUpdateNewTabLayout: () => {} }), false, 'Memo detects onUpdateNewTabLayout change');
+    assert.equal(areBrowserViewPropsEqual(baseBvProps, { ...baseBvProps, onUpdateNewTabLayout: () => {} }), false, 'areBrowserViewPropsEqual detects onUpdateNewTabLayout change');
+
+    // Verify BrowserView re-renders and does not retain a stale closure when onUpdateNewTabLayout changes
+    let calledV1 = 0;
+    let calledV2 = 0;
+    const v1Updater = () => { calledV1++; };
+    const v2Updater = () => { calledV2++; };
+
+    await React.act(async () => {
+      root.render(React.createElement(BrowserView, {
+        ...baseBvProps,
+        disableTasksWidget: false,
+        isDemo: false,
+        isCustomizeMode: true,
+        onUpdateNewTabLayout: v1Updater,
+      }));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    await React.act(async () => {
+      root.render(React.createElement(BrowserView, {
+        ...baseBvProps,
+        disableTasksWidget: false,
+        isDemo: false,
+        isCustomizeMode: true,
+        onUpdateNewTabLayout: v2Updater,
+      }));
+      await new Promise((r) => setTimeout(r, 20));
+    });
+
+    await React.act(async () => {
+      const cycleClockBtn = container.querySelector('button[aria-label="Cycle clock style"]') as HTMLButtonElement;
+      assert.ok(cycleClockBtn, 'Cycle clock button is available');
+      cycleClockBtn.click();
+    });
+
+    assert.equal(calledV1, 0, 'Stale v1 onUpdateNewTabLayout handler was not called');
+    assert.equal(calledV2, 1, 'Fresh v2 onUpdateNewTabLayout handler was called after callback update');
 
     // Render BrowserView with disableTasksWidget=true & isDemo=true
     await React.act(async () => {
